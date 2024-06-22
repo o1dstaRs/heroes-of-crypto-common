@@ -83,3 +83,11 @@ export function getTimeMillis(): number {
 
     return Math.floor(Number(process.hrtime.bigint()) / 1000000);
 }
+
+export function interval(func: () => void, timeoutMillis: number): void {
+    if (isBrowser()) {
+        window.setInterval(func, timeoutMillis);
+    } else {
+        setInterval(func, timeoutMillis);
+    }
+}

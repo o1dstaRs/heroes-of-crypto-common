@@ -18,6 +18,7 @@ export enum AttackType {
 }
 
 export enum TeamType {
+    NO_TEAM = 0,
     UPPER = 1,
     LOWER = 2,
 }

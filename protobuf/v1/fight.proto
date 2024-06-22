@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package state;
+
+enum Team {
+    NO_TEAM = 0;
+    UPPER = 1;
+    LOWER = 2;
+}
+
+message StringList {
+  repeated string values = 1;
+}
+
+message Fight {
+    bytes id = 1;
+    uint32 current_lap = 2;
+    bool first_turn_made = 3;
+    bool fight_finished = 4;
+    Team previous_turn_team = 5;
+    int32 highest_speed_this_turn = 6;
+    repeated string already_made_turn = 7;
+    map<uint32, StringList> already_made_turn_by_team = 8;
+    repeated string already_hour_glass = 9;
+    repeated string already_replied_attack = 10;
+    map<uint32, uint32> team_units_alive = 11;
+    repeated string hour_glass_queue = 12;
+    repeated string morale_plus_queue = 13;
+    repeated string morale_minus_queue = 14;
+    int64 current_turn_start = 15;
+    int64 current_turn_end = 16;
+    map<uint32, uint32> current_lap_total_time_per_team = 17;
+    repeated string up_next = 18;
+    double steps_morale_multiplier = 19;
+    map<uint32, bool> has_additional_time_requested_per_team = 20;
+}
