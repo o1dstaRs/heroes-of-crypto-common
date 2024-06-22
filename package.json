@@ -11,6 +11,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "files": ["dist"],
+    "type": "module",
     "scripts": {
         "build": "rimraf dist && tsc",
         "build:proto": "scripts/protoc_generate.sh"

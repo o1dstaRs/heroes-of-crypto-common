@@ -1,29 +1,8 @@
-// package: state
+// package: public
 // file: fight.proto
 
 import * as jspb from "google-protobuf";
-
-export class StringList extends jspb.Message {
-  clearValuesList(): void;
-  getValuesList(): Array<string>;
-  setValuesList(value: Array<string>): void;
-  addValues(value: string, index?: number): string;
-
-  serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): StringList.AsObject;
-  static toObject(includeInstance: boolean, msg: StringList): StringList.AsObject;
-  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
-  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-  static serializeBinaryToWriter(message: StringList, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): StringList;
-  static deserializeBinaryFromReader(message: StringList, reader: jspb.BinaryReader): StringList;
-}
-
-export namespace StringList {
-  export type AsObject = {
-    valuesList: Array<string>,
-  }
-}
+import * as types_pb from "./types_pb";
 
 export class Fight extends jspb.Message {
   getId(): Uint8Array | string;
@@ -40,8 +19,8 @@ export class Fight extends jspb.Message {
   getFightFinished(): boolean;
   setFightFinished(value: boolean): void;
 
-  getPreviousTurnTeam(): TeamMap[keyof TeamMap];
-  setPreviousTurnTeam(value: TeamMap[keyof TeamMap]): void;
+  getPreviousTurnTeam(): types_pb.TeamMap[keyof types_pb.TeamMap];
+  setPreviousTurnTeam(value: types_pb.TeamMap[keyof types_pb.TeamMap]): void;
 
   getHighestSpeedThisTurn(): number;
   setHighestSpeedThisTurn(value: number): void;
@@ -51,7 +30,7 @@ export class Fight extends jspb.Message {
   setAlreadyMadeTurnList(value: Array<string>): void;
   addAlreadyMadeTurn(value: string, index?: number): string;
 
-  getAlreadyMadeTurnByTeamMap(): jspb.Map<number, StringList>;
+  getAlreadyMadeTurnByTeamMap(): jspb.Map<number, types_pb.StringList>;
   clearAlreadyMadeTurnByTeamMap(): void;
   clearAlreadyHourGlassList(): void;
   getAlreadyHourGlassList(): Array<string>;
@@ -114,10 +93,10 @@ export namespace Fight {
     currentLap: number,
     firstTurnMade: boolean,
     fightFinished: boolean,
-    previousTurnTeam: TeamMap[keyof TeamMap],
+    previousTurnTeam: types_pb.TeamMap[keyof types_pb.TeamMap],
     highestSpeedThisTurn: number,
     alreadyMadeTurnList: Array<string>,
-    alreadyMadeTurnByTeamMap: Array<[number, StringList.AsObject]>,
+    alreadyMadeTurnByTeamMap: Array<[number, types_pb.StringList.AsObject]>,
     alreadyHourGlassList: Array<string>,
     alreadyRepliedAttackList: Array<string>,
     teamUnitsAliveMap: Array<[number, number]>,
@@ -132,14 +111,6 @@ export namespace Fight {
     hasAdditionalTimeRequestedPerTeamMap: Array<[number, boolean]>,
   }
 }
-
-export interface TeamMap {
-  NO_TEAM: 0;
-  UPPER: 1;
-  LOWER: 2;
-}
-
-export const Team: TeamMap;
 
 StringList.prototype.toArray = function () {
     return this.getValuesList();

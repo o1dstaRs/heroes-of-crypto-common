@@ -1,39 +1,8 @@
 syntax = "proto3";
 
-package battlefield;
+package public;
 
-enum Race {
-  CHAOS = 0;
-  MIGHT = 1;
-  NATURE = 2;
-  LIFE = 3;
-}
-
-enum Team {
-  NO_TEAM = 0;
-  UPPER = 1;
-  LOWER = 2;
-}
-
-enum AttackType {
-  MELEE = 0;
-  RANGE = 1;
-  MAGIC = 2;
-}
-
-enum UnitSize {
-  NO_SIZE = 0;
-  SMALL = 1;
-  LARGE = 2;
-}
-
-enum UnitLevel {
-  NO_LEVEL = 0;
-  FIRST = 1;
-  SECOND = 2;
-  THIRD = 3;
-  FOURTH = 4;
-}
+import "types.proto";
 
 message Unit {
   bytes id = 1;

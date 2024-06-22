@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+export * from "./generated/protobuf/v1/fight_pb.d";
+export * from "./generated/protobuf/v1/unit_pb.d";
 export * from "./grid/grid";
 export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";

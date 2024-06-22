@@ -1,7 +1,8 @@
-// package: battlefield
+// package: public
 // file: unit.proto
 
 import * as jspb from "google-protobuf";
+import * as types_pb from "./types_pb";
 
 export class Unit extends jspb.Message {
   getId(): Uint8Array | string;
@@ -9,14 +10,14 @@ export class Unit extends jspb.Message {
   getId_asB64(): string;
   setId(value: Uint8Array | string): void;
 
-  getRace(): RaceMap[keyof RaceMap];
-  setRace(value: RaceMap[keyof RaceMap]): void;
+  getRace(): types_pb.RaceMap[keyof types_pb.RaceMap];
+  setRace(value: types_pb.RaceMap[keyof types_pb.RaceMap]): void;
 
   getName(): string;
   setName(value: string): void;
 
-  getTeam(): TeamMap[keyof TeamMap];
-  setTeam(value: TeamMap[keyof TeamMap]): void;
+  getTeam(): types_pb.TeamMap[keyof types_pb.TeamMap];
+  setTeam(value: types_pb.TeamMap[keyof types_pb.TeamMap]): void;
 
   getMaxHp(): number;
   setMaxHp(value: number): void;
@@ -45,11 +46,11 @@ export class Unit extends jspb.Message {
   getBaseArmor(): number;
   setBaseArmor(value: number): void;
 
-  getAttackType(): AttackTypeMap[keyof AttackTypeMap];
-  setAttackType(value: AttackTypeMap[keyof AttackTypeMap]): void;
+  getAttackType(): types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap];
+  setAttackType(value: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap]): void;
 
-  getAttackTypeSelected(): AttackTypeMap[keyof AttackTypeMap];
-  setAttackTypeSelected(value: AttackTypeMap[keyof AttackTypeMap]): void;
+  getAttackTypeSelected(): types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap];
+  setAttackTypeSelected(value: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap]): void;
 
   getAttack(): number;
   setAttack(value: number): void;
@@ -87,11 +88,11 @@ export class Unit extends jspb.Message {
   getExp(): number;
   setExp(value: number): void;
 
-  getSize(): UnitSizeMap[keyof UnitSizeMap];
-  setSize(value: UnitSizeMap[keyof UnitSizeMap]): void;
+  getSize(): types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap];
+  setSize(value: types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap]): void;
 
-  getLevel(): UnitLevelMap[keyof UnitLevelMap];
-  setLevel(value: UnitLevelMap[keyof UnitLevelMap]): void;
+  getLevel(): types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap];
+  setLevel(value: types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap]): void;
 
   clearSpellsList(): void;
   getSpellsList(): Array<string>;
@@ -133,9 +134,9 @@ export class Unit extends jspb.Message {
 export namespace Unit {
   export type AsObject = {
     id: Uint8Array | string,
-    race: RaceMap[keyof RaceMap],
+    race: types_pb.RaceMap[keyof types_pb.RaceMap],
     name: string,
-    team: TeamMap[keyof TeamMap],
+    team: types_pb.TeamMap[keyof types_pb.TeamMap],
     maxHp: number,
     hp: number,
     steps: number,
@@ -145,8 +146,8 @@ export namespace Unit {
     speed: number,
     armorMod: number,
     baseArmor: number,
-    attackType: AttackTypeMap[keyof AttackTypeMap],
-    attackTypeSelected: AttackTypeMap[keyof AttackTypeMap],
+    attackType: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap],
+    attackTypeSelected: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap],
     attack: number,
     attackDamageMin: number,
     attackDamageMax: number,
@@ -159,8 +160,8 @@ export namespace Unit {
     canCastSpells: boolean,
     canFly: boolean,
     exp: number,
-    size: UnitSizeMap[keyof UnitSizeMap],
-    level: UnitLevelMap[keyof UnitLevelMap],
+    size: types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap],
+    level: types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap],
     spellsList: Array<string>,
     abilitiesList: Array<string>,
     effectsList: Array<string>,
@@ -170,47 +171,4 @@ export namespace Unit {
     attackMultiplier: number,
   }
 }
-
-export interface RaceMap {
-  CHAOS: 0;
-  MIGHT: 1;
-  NATURE: 2;
-  LIFE: 3;
-}
-
-export const Race: RaceMap;
-
-export interface TeamMap {
-  NO_TEAM: 0;
-  UPPER: 1;
-  LOWER: 2;
-}
-
-export const Team: TeamMap;
-
-export interface AttackTypeMap {
-  MELEE: 0;
-  RANGE: 1;
-  MAGIC: 2;
-}
-
-export const AttackType: AttackTypeMap;
-
-export interface UnitSizeMap {
-  NO_SIZE: 0;
-  SMALL: 1;
-  LARGE: 2;
-}
-
-export const UnitSize: UnitSizeMap;
-
-export interface UnitLevelMap {
-  NO_LEVEL: 0;
-  FIRST: 1;
-  SECOND: 2;
-  THIRD: 3;
-  FOURTH: 4;
-}
-
-export const UnitLevel: UnitLevelMap;
 

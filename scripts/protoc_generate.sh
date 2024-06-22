@@ -21,7 +21,7 @@ TREE="protobuf/v1"
 SRC_DIR="${ROOT_DIR}/protobuf/v1"
 
 # Directory to write generated code (.d.ts files)
-OUT_DIR="${ROOT_DIR}/generated"
+OUT_DIR="${ROOT_DIR}/src/generated"
 
 # Clean all existing generated files
 rm -r "${OUT_DIR}"

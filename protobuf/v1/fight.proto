@@ -1,16 +1,8 @@
 syntax = "proto3";
 
-package state;
+package public;
 
-enum Team {
-    NO_TEAM = 0;
-    UPPER = 1;
-    LOWER = 2;
-}
-
-message StringList {
-  repeated string values = 1;
-}
+import "types.proto";
 
 message Fight {
     bytes id = 1;
