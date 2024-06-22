@@ -1,6 +1,6 @@
 /*
  * -----------------------------------------------------------------------------
- * This file is part of the common code of the Heroes of Crypto game client.
+ * This file is part of the common code of the Heroes of Crypto.
  *
  * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
  *
@@ -84,10 +84,32 @@ export function getTimeMillis(): number {
     return Math.floor(Number(process.hrtime.bigint()) / 1000000);
 }
 
-export function interval(func: () => void, timeoutMillis: number): void {
+export function interval(func: () => void | Promise<void>, timeoutMillis: number): void {
+    const executeFunction = async () => {
+        await func();
+    };
+
     if (isBrowser()) {
-        window.setInterval(func, timeoutMillis);
+        window.setInterval(executeFunction, timeoutMillis);
     } else {
-        setInterval(func, timeoutMillis);
+        setInterval(executeFunction, timeoutMillis);
     }
+}
+
+export function uuidToUint8Array(uuid: string): Uint8Array {
+    // Remove hyphens from the UUID string
+    const hexStr = uuid.replace(/-/g, "");
+
+    // Ensure the UUID string has the correct length
+    if (hexStr.length !== 32) {
+        throw new Error("Invalid UUID format");
+    }
+
+    // Convert each pair of hexadecimal digits into a byte
+    const byteArray = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+        byteArray[i] = parseInt(hexStr.substring(i * 2, 2), 16);
+    }
+
+    return byteArray;
 }
