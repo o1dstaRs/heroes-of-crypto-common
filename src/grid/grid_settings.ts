@@ -1,6 +1,6 @@
 /*
  * -----------------------------------------------------------------------------
- * This file is part of the common code of the Heroes of Crypto game client.
+ * This file is part of the common code of the Heroes of Crypto.
  *
  * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
  *

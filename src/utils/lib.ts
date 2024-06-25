@@ -1,6 +1,6 @@
 /*
  * -----------------------------------------------------------------------------
- * This file is part of the common code of the Heroes of Crypto game client.
+ * This file is part of the common code of the Heroes of Crypto.
  *
  * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
  *
@@ -83,3 +83,65 @@ export function getTimeMillis(): number {
 
     return Math.floor(Number(process.hrtime.bigint()) / 1000000);
 }
+
+export function interval(func: () => void | Promise<void>, timeoutMillis: number): void {
+    const executeFunction = async () => {
+        await func();
+    };
+
+    if (isBrowser()) {
+        window.setInterval(executeFunction, timeoutMillis);
+    } else {
+        setInterval(executeFunction, timeoutMillis);
+    }
+}
+
+export function uuidToUint8Array(uuid: string): Uint8Array {
+    // Remove hyphens from the UUID string
+    const hexStr = uuid.replace(/-/g, "");
+
+    // Ensure the UUID string has the correct length
+    if (hexStr.length !== 32) {
+        throw new Error("Invalid UUID format");
+    }
+
+    // Convert each pair of hexadecimal digits into a byte
+    const byteArray = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+        byteArray[i] = parseInt(hexStr.substring(i * 2, 2), 16);
+    }
+
+    return byteArray;
+}
+
+export const uuidFromBytes = (buffer: Uint8Array): string => {
+    // Ensure the buffer has exactly 16 bytes.
+    if (buffer.length !== 16) {
+        throw new Error("Buffer must be 16 bytes long");
+    }
+
+    // Array of hex groups for the UUID string
+    const hex = Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0"));
+
+    // Format according to UUID standard (8-4-4-4-12)
+    return [
+        hex.slice(0, 4).join(""),
+        hex.slice(4, 6).join(""),
+        hex.slice(6, 8).join(""),
+        hex.slice(8, 10).join(""),
+        hex.slice(10, 16).join(""),
+    ].join("-");
+};
+
+/**
+ * Convert a Base64-encoded string to a Uint8Array in Bun runtime.
+ * @param base64 - The Base64-encoded string.
+ * @returns The Uint8Array.
+ */
+export const base64ToUint8Array = (base64: string): Uint8Array => {
+    // Decode the Base64 string to a Buffer
+    const buffer = Buffer.from(base64, "base64");
+
+    // Convert the Buffer to a Uint8Array
+    return new Uint8Array(buffer);
+};
