@@ -10,7 +10,7 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamType } from "../units/unit_stats";
+import { TeamType } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
 import { getCellForPosition, getCellsAroundPoint, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
