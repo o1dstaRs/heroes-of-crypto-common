@@ -53,14 +53,25 @@ export const minus = (p0: XY, p1: XY): XY => ({ x: p0.x - p1.x, y: p0.y - p1.y }
 
 export const perpDot = (p0: XY, p1: XY): number => p0.x * p1.y - p0.y * p1.x;
 
-export const matrixElementOrZero = (matrix: number[][], x: number, y: number): number => {
+export const matrixElementOrDefault = (matrix: number[][], x: number, y: number, defaultValue: number): number => {
     if (!(y in matrix)) {
-        return 0;
+        return defaultValue;
     }
     if (!(x in matrix[y])) {
-        return 0;
+        return defaultValue;
     }
     return matrix[y][x];
+};
+
+export const updateMatrixElementIfExists = (matrix: number[][], x: number, y: number, updateValue: number): void => {
+    if (!(y in matrix)) {
+        return;
+    }
+    if (!(x in matrix[y])) {
+        return;
+    }
+
+    matrix[y][x] += updateValue;
 };
 
 export const intersect2D = (a0: XY, a1: XY, b0: XY, b1: XY): Intersect2DResult => {
