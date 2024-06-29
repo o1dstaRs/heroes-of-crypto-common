@@ -10,11 +10,11 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamType } from "../units/unit_stats";
+import { TeamType } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
 import { getCellForPosition, getCellsAroundPoint, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
-import { XY } from "../utils/math";
+import { XY, updateMatrixElementIfExists } from "../utils/math";
 
 const UPDATE_DOWN_LEFT = 0b01000001;
 const UPDATE_UP_LEFT = 0b00010010;
@@ -687,44 +687,44 @@ export class Grid {
         }
 
         if (lookRight) {
-            aggrGrid[cell.x + 1][cell.y] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y, cell.x + 1, updBy);
         }
         if (lookUp) {
-            aggrGrid[cell.x][cell.y + 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y + 1, cell.x, updBy);
         }
         if (lookLeft) {
-            aggrGrid[cell.x - 1][cell.y] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y, cell.x - 1, updBy);
         }
         if (lookDown) {
-            aggrGrid[cell.x][cell.y - 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y - 1, cell.x, updBy);
         }
         if (
             lookUp &&
             lookRight &&
             (!updatePositionMask || (updatePositionMask && updatePositionMask & UPDATE_UP_RIGHT))
         ) {
-            aggrGrid[cell.x + 1][cell.y + 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y + 1, cell.x + 1, updBy);
         }
         if (
             lookUp &&
             lookLeft &&
             (!updatePositionMask || (updatePositionMask && updatePositionMask & UPDATE_UP_LEFT))
         ) {
-            aggrGrid[cell.x - 1][cell.y + 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y + 1, cell.x - 1, updBy);
         }
         if (
             lookDown &&
             lookRight &&
             (!updatePositionMask || (updatePositionMask && updatePositionMask & UPDATE_DOWN_RIGHT))
         ) {
-            aggrGrid[cell.x + 1][cell.y - 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y - 1, cell.x + 1, updBy);
         }
         if (
             lookDown &&
             lookLeft &&
             (!updatePositionMask || (updatePositionMask && updatePositionMask & UPDATE_DOWN_LEFT))
         ) {
-            aggrGrid[cell.x - 1][cell.y - 1] += updBy;
+            updateMatrixElementIfExists(aggrGrid, cell.y - 1, cell.x - 1, updBy);
         }
     }
 }

@@ -11,6 +11,8 @@
 
 import { v4 as uuidv4 } from "uuid";
 
+import { FactionType } from "../factions/faction_properties";
+
 export enum AttackType {
     MELEE = "MELEE",
     RANGE = "RANGE",
@@ -23,19 +25,27 @@ export enum TeamType {
     LOWER = 2,
 }
 
-export interface IModifyableUnitStats {
+export enum UnitType {
+    NO_TYPE = 0,
+    CREATURE = 1,
+    HERO = 2,
+}
+
+export interface IModifyableUnitProperties {
     hp: number;
     armor: number;
 }
 
-export class UnitStats {
+export class UnitProperties {
     public readonly id: string;
 
-    public readonly race: string;
+    public readonly faction: FactionType;
 
     public readonly name: string;
 
     public readonly team: TeamType;
+
+    public readonly unitType: UnitType;
 
     public max_hp: number;
 
@@ -104,7 +114,7 @@ export class UnitStats {
     public attack_multiplier: number;
 
     public constructor(
-        race: string,
+        faction: FactionType,
         name: string,
         max_hp: number,
         steps: number,
@@ -130,9 +140,10 @@ export class UnitStats {
         amount_alive: number,
         amount_died: number,
         team: TeamType,
+        unitType: UnitType,
     ) {
         this.id = uuidv4();
-        this.race = race;
+        this.faction = faction;
         this.name = name;
         this.hp = max_hp;
         this.max_hp = max_hp;
@@ -168,5 +179,6 @@ export class UnitStats {
         this.amount_alive = amount_alive;
         this.amount_died = amount_died;
         this.team = team;
+        this.unitType = unitType;
     }
 }
