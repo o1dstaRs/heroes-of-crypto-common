@@ -50,6 +50,7 @@ export function removeItemOnce<T>(arr: T[], value: T): boolean {
 
 export function getRandomInt(min: number, max: number): number {
     if (typeof window !== "undefined" && typeof window.document !== "undefined") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const crypto = window.crypto || (window as any).msCrypto; // For IE11 compatibility
         const range = max - min;
         const maxByteValue = 256;

@@ -26,5 +26,5 @@
     "show_parameter_hints": true,
     "show_other_hints": true,
     "format_on_save": "on",
-    "file_scan_exclusions": ["node_modules", "package-lock.json", ".DS_Store", ".git"]
+    "file_scan_exclusions": ["node_modules", "package-lock.json", ".DS_Store", ".git", "dist"]
 }
