@@ -14,10 +14,18 @@ import { v4 as uuidv4 } from "uuid";
 import { FactionType } from "../factions/faction_properties";
 
 export enum AttackType {
-    MELEE = "MELEE",
-    RANGE = "RANGE",
-    MAGIC = "MAGIC",
+    NO_TYPE = 0,
+    MELEE = 1,
+    RANGE = 2,
+    MAGIC = 3,
 }
+
+export const ToAttackType: { [attackTypeName: string]: AttackType } = {
+    "": AttackType.NO_TYPE,
+    MELEE: AttackType.MELEE,
+    RANGE: AttackType.RANGE,
+    MAGIC: AttackType.MAGIC,
+};
 
 export enum TeamType {
     NO_TEAM = 0,
@@ -45,7 +53,7 @@ export class UnitProperties {
 
     public readonly team: TeamType;
 
-    public readonly unitType: UnitType;
+    public readonly unit_type: UnitType;
 
     public max_hp: number;
 
@@ -113,6 +121,8 @@ export class UnitProperties {
 
     public attack_multiplier: number;
 
+    public large_texture_name: string;
+
     public constructor(
         faction: FactionType,
         name: string,
@@ -140,7 +150,8 @@ export class UnitProperties {
         amount_alive: number,
         amount_died: number,
         team: TeamType,
-        unitType: UnitType,
+        unit_type: UnitType,
+        large_texture_name: string,
     ) {
         this.id = uuidv4();
         this.faction = faction;
@@ -179,6 +190,7 @@ export class UnitProperties {
         this.amount_alive = amount_alive;
         this.amount_died = amount_died;
         this.team = team;
-        this.unitType = unitType;
+        this.unit_type = unit_type;
+        this.large_texture_name = large_texture_name;
     }
 }

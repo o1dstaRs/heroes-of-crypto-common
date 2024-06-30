@@ -26,7 +26,7 @@ export const AllFactions = [
     FactionType.DEATH,
 ];
 
-export type AllFactionsType = (typeof AllFactions)[number];
+export type AllFactionsType = typeof AllFactions[number];
 
 export const ToFaction: { [key in AllFactionsType]: FactionType } = {
     "": FactionType.NO_TYPE,
