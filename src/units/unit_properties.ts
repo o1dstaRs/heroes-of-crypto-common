@@ -121,6 +121,8 @@ export class UnitProperties {
 
     public attack_multiplier: number;
 
+    public small_texture_name: string;
+
     public large_texture_name: string;
 
     public constructor(
@@ -151,6 +153,7 @@ export class UnitProperties {
         amount_died: number,
         team: TeamType,
         unit_type: UnitType,
+        small_texture_name: string,
         large_texture_name: string,
     ) {
         this.id = uuidv4();
@@ -191,6 +194,7 @@ export class UnitProperties {
         this.amount_died = amount_died;
         this.team = team;
         this.unit_type = unit_type;
+        this.small_texture_name = small_texture_name;
         this.large_texture_name = large_texture_name;
     }
 }
