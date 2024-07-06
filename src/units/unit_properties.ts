@@ -22,6 +22,7 @@ export enum AttackType {
 
 export const ToAttackType: { [attackTypeName: string]: AttackType } = {
     "": AttackType.NO_TYPE,
+    NO_TYPE: AttackType.NO_TYPE,
     MELEE: AttackType.MELEE,
     RANGE: AttackType.RANGE,
     MAGIC: AttackType.MAGIC,
@@ -111,6 +112,8 @@ export class UnitProperties {
 
     public readonly abilities: string[];
 
+    public readonly abilities_descriptions: string[];
+
     public effects: string[];
 
     public amount_alive: number;
@@ -148,6 +151,7 @@ export class UnitProperties {
         level: number,
         spells: string[],
         abilities: string[],
+        abilities_descriptions: string[],
         effects: string[],
         amount_alive: number,
         amount_died: number,
@@ -187,6 +191,7 @@ export class UnitProperties {
         this.level = level;
         this.spells = spells;
         this.abilities = abilities;
+        this.abilities_descriptions = abilities_descriptions;
         this.effects = effects;
         this.luck_per_turn = 0;
         this.attack_multiplier = 1;
