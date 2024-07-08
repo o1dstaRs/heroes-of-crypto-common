@@ -15,11 +15,7 @@ import { getRandomInt } from "../utils/lib";
 import { getCellForPosition, getCellsAroundPoint, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
-
-const UPDATE_DOWN_LEFT = 0b01000001;
-const UPDATE_UP_LEFT = 0b00010010;
-const UPDATE_DOWN_RIGHT = 0b00100100;
-const UPDATE_UP_RIGHT = 0b10001000;
+import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];
 
