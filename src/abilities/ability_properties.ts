@@ -17,9 +17,15 @@ export enum AbilityPowerType {
     UNLIMITED_SUPPLIES = 4,
     UNLIMITED_RANGE = 5,
     MAGIC_RESIST_100 = 6,
-    LIGHTNING_SPIN_ATTACK = 7,
-    FIRE_BREATH = 8,
-    APPLY_EFFECT = 9,
+    APPLY_EFFECT = 7,
+    IGNORE_ARMOR = 8,
+    PHYSICAL_RESIST_WHILE_MAGIC_VULNERABLE = 9,
+    NORMAL_DAMAGE = 10,
+    LIMITED_SUPPLIES = 11,
+    REGENERATION = 12,
+    BOOST_HEALTH = 13,
+    MAGIC_VULNERABILITY_WATER = 14,
+    RANGE_ARMOR_MODIFIER = 15,
 }
 
 export const AllAbilityPowerTypes = [
@@ -30,9 +36,15 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.UNLIMITED_SUPPLIES,
     AbilityPowerType.UNLIMITED_RANGE,
     AbilityPowerType.MAGIC_RESIST_100,
-    AbilityPowerType.LIGHTNING_SPIN_ATTACK,
-    AbilityPowerType.FIRE_BREATH,
     AbilityPowerType.APPLY_EFFECT,
+    AbilityPowerType.IGNORE_ARMOR,
+    AbilityPowerType.PHYSICAL_RESIST_WHILE_MAGIC_VULNERABLE,
+    AbilityPowerType.NORMAL_DAMAGE,
+    AbilityPowerType.LIMITED_SUPPLIES,
+    AbilityPowerType.REGENERATION,
+    AbilityPowerType.BOOST_HEALTH,
+    AbilityPowerType.MAGIC_VULNERABILITY_WATER,
+    AbilityPowerType.RANGE_ARMOR_MODIFIER,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -46,9 +58,15 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     UNLIMITED_SUPPLIES: AbilityPowerType.UNLIMITED_SUPPLIES,
     UNLIMITED_RANGE: AbilityPowerType.UNLIMITED_RANGE,
     MAGIC_RESIST_100: AbilityPowerType.MAGIC_RESIST_100,
-    LIGHTNING_SPIN_ATTACK: AbilityPowerType.LIGHTNING_SPIN_ATTACK,
-    FIRE_BREATH: AbilityPowerType.FIRE_BREATH,
     APPLY_EFFECT: AbilityPowerType.APPLY_EFFECT,
+    IGNORE_ARMOR: AbilityPowerType.IGNORE_ARMOR,
+    PHYSICAL_RESIST_WHILE_MAGIC_VULNERABLE: AbilityPowerType.PHYSICAL_RESIST_WHILE_MAGIC_VULNERABLE,
+    NORMAL_DAMAGE: AbilityPowerType.NORMAL_DAMAGE,
+    LIMITED_SUPPLIES: AbilityPowerType.LIMITED_SUPPLIES,
+    REGENERATION: AbilityPowerType.REGENERATION,
+    BOOST_HEALTH: AbilityPowerType.BOOST_HEALTH,
+    MAGIC_VULNERABILITY_WATER: AbilityPowerType.MAGIC_VULNERABILITY_WATER,
+    RANGE_ARMOR_MODIFIER: AbilityPowerType.RANGE_ARMOR_MODIFIER,
 };
 
 export enum AbilityType {
