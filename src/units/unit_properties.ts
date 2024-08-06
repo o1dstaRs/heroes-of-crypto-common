@@ -114,6 +114,8 @@ export class UnitProperties {
 
     public readonly abilities_descriptions: string[];
 
+    public readonly abilities_stack_powered: boolean[];
+
     public effects: string[];
 
     public amount_alive: number;
@@ -127,6 +129,8 @@ export class UnitProperties {
     public small_texture_name: string;
 
     public large_texture_name: string;
+
+    public stack_power: number;
 
     public constructor(
         faction: FactionType,
@@ -152,6 +156,7 @@ export class UnitProperties {
         spells: string[],
         abilities: string[],
         abilities_descriptions: string[],
+        abilities_stack_powered: boolean[],
         effects: string[],
         amount_alive: number,
         amount_died: number,
@@ -159,6 +164,7 @@ export class UnitProperties {
         unit_type: UnitType,
         small_texture_name: string,
         large_texture_name: string,
+        stack_power: number,
     ) {
         this.id = uuidv4();
         this.faction = faction;
@@ -192,6 +198,7 @@ export class UnitProperties {
         this.spells = spells;
         this.abilities = abilities;
         this.abilities_descriptions = abilities_descriptions;
+        this.abilities_stack_powered = abilities_stack_powered;
         this.effects = effects;
         this.luck_per_turn = 0;
         this.attack_multiplier = 1;
@@ -201,5 +208,6 @@ export class UnitProperties {
         this.unit_type = unit_type;
         this.small_texture_name = small_texture_name;
         this.large_texture_name = large_texture_name;
+        this.stack_power = stack_power;
     }
 }

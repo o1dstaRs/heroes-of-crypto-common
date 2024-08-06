@@ -124,6 +124,8 @@ export class AbilityProperties {
 
     public readonly skip_response: boolean;
 
+    public readonly stack_powered: boolean;
+
     public readonly effect: string | null;
 
     public constructor(
@@ -133,6 +135,7 @@ export class AbilityProperties {
         power: number,
         powerType: AbilityPowerType,
         skipResponse: boolean,
+        stackPowered: boolean,
         effect: string | null,
     ) {
         this.name = name;
@@ -141,6 +144,7 @@ export class AbilityProperties {
         this.power = power;
         this.power_type = powerType;
         this.skip_response = skipResponse;
+        this.stack_powered = stackPowered;
         this.effect = effect;
     }
 }

@@ -19,3 +19,4 @@ export * from "./units/unit_properties";
 export * from "./factions/faction_properties";
 export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
+export * as HoCConstants from "./constants";
