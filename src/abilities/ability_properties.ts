@@ -26,6 +26,9 @@ export enum AbilityPowerType {
     BOOST_HEALTH = 13,
     MAGIC_VULNERABILITY_WATER = 14,
     RANGE_ARMOR_MODIFIER = 15,
+    ADDITIONAL_MELEE_DAMAGE_PERCENTAGE = 16,
+    DISABLE_RANGE_ATTACK = 17,
+    LUCK_10 = 18,
 }
 
 export const AllAbilityPowerTypes = [
@@ -45,6 +48,9 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.BOOST_HEALTH,
     AbilityPowerType.MAGIC_VULNERABILITY_WATER,
     AbilityPowerType.RANGE_ARMOR_MODIFIER,
+    AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE,
+    AbilityPowerType.DISABLE_RANGE_ATTACK,
+    AbilityPowerType.LUCK_10,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -67,6 +73,9 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     BOOST_HEALTH: AbilityPowerType.BOOST_HEALTH,
     MAGIC_VULNERABILITY_WATER: AbilityPowerType.MAGIC_VULNERABILITY_WATER,
     RANGE_ARMOR_MODIFIER: AbilityPowerType.RANGE_ARMOR_MODIFIER,
+    ADDITIONAL_MELEE_DAMAGE_PERCENTAGE: AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE,
+    DISABLE_RANGE_ATTACK: AbilityPowerType.DISABLE_RANGE_ATTACK,
+    LUCK_10: AbilityPowerType.LUCK_10,
 };
 
 export enum AbilityType {
@@ -80,6 +89,8 @@ export enum AbilityType {
     STATUS = 7,
     HEAL = 8,
     UNIT_TYPE = 9,
+    BUFF_AURA = 10,
+    DEBUFF_AURA = 11,
 }
 
 export const AllAbilityTypes = [
@@ -93,6 +104,8 @@ export const AllAbilityTypes = [
     AbilityType.STATUS,
     AbilityType.HEAL,
     AbilityType.UNIT_TYPE,
+    AbilityType.BUFF_AURA,
+    AbilityType.DEBUFF_AURA,
 ];
 
 export type AllAbilityType = typeof AllAbilityTypes[number];
@@ -109,6 +122,8 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     STATUS: AbilityType.STATUS,
     HEAL: AbilityType.HEAL,
     UNIT_TYPE: AbilityType.UNIT_TYPE,
+    BUFF_AURA: AbilityType.BUFF_AURA,
+    DEBUFF_AURA: AbilityType.DEBUFF_AURA,
 };
 
 export class AbilityProperties {
@@ -128,6 +143,8 @@ export class AbilityProperties {
 
     public readonly effect: string | null;
 
+    public readonly aura_effect: string | null;
+
     public constructor(
         name: string,
         type: AbilityType,
@@ -137,6 +154,7 @@ export class AbilityProperties {
         skipResponse: boolean,
         stackPowered: boolean,
         effect: string | null,
+        aura_effect: string | null,
     ) {
         this.name = name;
         this.type = type;
@@ -146,5 +164,6 @@ export class AbilityProperties {
         this.skip_response = skipResponse;
         this.stack_powered = stackPowered;
         this.effect = effect;
+        this.aura_effect = aura_effect;
     }
 }

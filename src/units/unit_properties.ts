@@ -116,7 +116,15 @@ export class UnitProperties {
 
     public readonly abilities_stack_powered: boolean[];
 
+    public readonly abilities_auras: boolean[];
+
     public effects: string[];
+
+    public aura_effects: string[];
+
+    public aura_ranges: number[];
+
+    public aura_is_buff: boolean[];
 
     public amount_alive: number;
 
@@ -157,7 +165,11 @@ export class UnitProperties {
         abilities: string[],
         abilities_descriptions: string[],
         abilities_stack_powered: boolean[],
+        abilities_auras: boolean[],
         effects: string[],
+        aura_effects: string[],
+        aura_ranges: number[],
+        aura_is_buff: boolean[],
         amount_alive: number,
         amount_died: number,
         team: TeamType,
@@ -199,7 +211,11 @@ export class UnitProperties {
         this.abilities = abilities;
         this.abilities_descriptions = abilities_descriptions;
         this.abilities_stack_powered = abilities_stack_powered;
+        this.abilities_auras = abilities_auras;
         this.effects = effects;
+        this.aura_effects = aura_effects;
+        this.aura_ranges = aura_ranges;
+        this.aura_is_buff = aura_is_buff;
         this.luck_per_turn = 0;
         this.attack_multiplier = 1;
         this.amount_alive = amount_alive;
