@@ -118,7 +118,21 @@ export class UnitProperties {
 
     public readonly abilities_auras: boolean[];
 
-    public effects: string[];
+    public applied_effects: string[];
+
+    public applied_buffs: string[];
+
+    public applied_debuffs: string[];
+
+    public applied_effects_laps: number[];
+
+    public applied_buffs_laps: number[];
+
+    public applied_debuffs_laps: number[];
+
+    public applied_buffs_descriptions: string[];
+
+    public applied_debuffs_descriptions: string[];
 
     public aura_effects: string[];
 
@@ -166,7 +180,14 @@ export class UnitProperties {
         abilities_descriptions: string[],
         abilities_stack_powered: boolean[],
         abilities_auras: boolean[],
-        effects: string[],
+        applied_effects: string[],
+        applied_buffs: string[],
+        applied_debuffs: string[],
+        applied_effects_laps: number[],
+        applied_buffs_laps: number[],
+        applied_debuffs_laps: number[],
+        applied_buffs_descriptions: string[],
+        applied_debuffs_descriptions: string[],
         aura_effects: string[],
         aura_ranges: number[],
         aura_is_buff: boolean[],
@@ -212,7 +233,14 @@ export class UnitProperties {
         this.abilities_descriptions = abilities_descriptions;
         this.abilities_stack_powered = abilities_stack_powered;
         this.abilities_auras = abilities_auras;
-        this.effects = effects;
+        this.applied_effects = applied_effects;
+        this.applied_buffs = applied_buffs;
+        this.applied_debuffs = applied_debuffs;
+        this.applied_effects_laps = applied_effects_laps;
+        this.applied_buffs_laps = applied_buffs_laps;
+        this.applied_debuffs_laps = applied_debuffs_laps;
+        this.applied_buffs_descriptions = applied_buffs_descriptions;
+        this.applied_debuffs_descriptions = applied_debuffs_descriptions;
         this.aura_effects = aura_effects;
         this.aura_ranges = aura_ranges;
         this.aura_is_buff = aura_is_buff;
