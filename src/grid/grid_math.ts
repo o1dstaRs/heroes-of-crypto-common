@@ -25,21 +25,67 @@ export function getCellForPosition(gridSettings: GridSettings, position?: XY): X
     };
 }
 
-export function getCellsAroundPoint(gridSettings: GridSettings, point?: XY): XY[] {
+export function getCellsAroundCell(gridSettings: GridSettings, cell?: XY): XY[] {
     const cells: XY[] = [];
-    if (!point) {
+    if (!cell) {
         return cells;
     }
 
-    const canGoLeft = point.x > gridSettings.getMinX();
-    const canGoRight = point.x < gridSettings.getMaxX();
-    const canGoDown = point.y > gridSettings.getMinY();
-    const canGoUp = point.y < gridSettings.getMaxY();
+    const cellPosition = getPositionForCell(
+        cell,
+        gridSettings.getMinX(),
+        gridSettings.getStep(),
+        gridSettings.getHalfStep(),
+    );
+    const cellPositionUpLeft = {
+        x: cellPosition.x - gridSettings.getHalfStep(),
+        y: cellPosition.y + gridSettings.getHalfStep(),
+    };
+    const cellPositionUpRight = {
+        x: cellPosition.x + gridSettings.getHalfStep(),
+        y: cellPosition.y + gridSettings.getHalfStep(),
+    };
+    const cellPositionDownLeft = {
+        x: cellPosition.x - gridSettings.getHalfStep(),
+        y: cellPosition.y - gridSettings.getHalfStep(),
+    };
+    const cellPositionDownRight = {
+        x: cellPosition.x + gridSettings.getHalfStep(),
+        y: cellPosition.y - gridSettings.getHalfStep(),
+    };
+
+    const initialCellKey = (cell.x << 4) | cell.y;
+    const cellKeys: number[] = [initialCellKey];
+
+    for (const cp of [cellPositionUpLeft, cellPositionUpRight, cellPositionDownLeft, cellPositionDownRight]) {
+        const cellsAroundPosition = getCellsAroundPosition(gridSettings, cp);
+        for (const c of cellsAroundPosition) {
+            const cellKey = (c.x << 4) | c.y;
+            if (!cellKeys.includes(cellKey)) {
+                cellKeys.push(cellKey);
+                cells.push(c);
+            }
+        }
+    }
+
+    return cells;
+}
+
+export function getCellsAroundPosition(gridSettings: GridSettings, position?: XY): XY[] {
+    const cells: XY[] = [];
+    if (!position) {
+        return cells;
+    }
+
+    const canGoLeft = position.x > gridSettings.getMinX();
+    const canGoRight = position.x < gridSettings.getMaxX();
+    const canGoDown = position.y > gridSettings.getMinY();
+    const canGoUp = position.y < gridSettings.getMaxY();
 
     if (canGoLeft && canGoUp) {
         const c = getCellForPosition(gridSettings, {
-            x: point.x - gridSettings.getHalfStep(),
-            y: point.y + gridSettings.getHalfStep(),
+            x: position.x - gridSettings.getHalfStep(),
+            y: position.y + gridSettings.getHalfStep(),
         });
         if (c) {
             cells.push(c);
@@ -47,8 +93,8 @@ export function getCellsAroundPoint(gridSettings: GridSettings, point?: XY): XY[
     }
     if (canGoRight && canGoUp) {
         const c = getCellForPosition(gridSettings, {
-            x: point.x + gridSettings.getHalfStep(),
-            y: point.y + gridSettings.getHalfStep(),
+            x: position.x + gridSettings.getHalfStep(),
+            y: position.y + gridSettings.getHalfStep(),
         });
         if (c) {
             cells.push(c);
@@ -56,8 +102,8 @@ export function getCellsAroundPoint(gridSettings: GridSettings, point?: XY): XY[
     }
     if (canGoDown && canGoLeft) {
         const c = getCellForPosition(gridSettings, {
-            x: point.x - gridSettings.getHalfStep(),
-            y: point.y - gridSettings.getHalfStep(),
+            x: position.x - gridSettings.getHalfStep(),
+            y: position.y - gridSettings.getHalfStep(),
         });
         if (c) {
             cells.push(c);
@@ -65,8 +111,8 @@ export function getCellsAroundPoint(gridSettings: GridSettings, point?: XY): XY[
     }
     if (canGoDown && canGoRight) {
         const c = getCellForPosition(gridSettings, {
-            x: point.x + gridSettings.getHalfStep(),
-            y: point.y - gridSettings.getHalfStep(),
+            x: position.x + gridSettings.getHalfStep(),
+            y: position.y - gridSettings.getHalfStep(),
         });
         if (c) {
             cells.push(c);
@@ -111,17 +157,17 @@ export function hasXY(desired: XY, list?: XY[]): boolean {
     return false;
 }
 
-export function getPointForCell(cell: XY, minX: number, step: number, halfStep: number): XY {
+export function getPositionForCell(cell: XY, minX: number, step: number, halfStep: number): XY {
     return { x: minX + (1 + cell.x) * step - halfStep, y: cell.y * step + halfStep };
 }
 
-export function getPointForCells(gridSettings: GridSettings, cells?: XY[]): XY | undefined {
+export function getPositionForCells(gridSettings: GridSettings, cells?: XY[]): XY | undefined {
     if (!cells) {
         return undefined;
     }
 
     if (cells.length === 1) {
-        return getPointForCell(cells[0], gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
+        return getPositionForCell(cells[0], gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
     }
 
     if (cells.length !== 4) {
@@ -140,7 +186,7 @@ export function getPointForCells(gridSettings: GridSettings, cells?: XY[]): XY |
         yMax = Math.max(yMax, c.y);
     }
 
-    return getPointForCell(
+    return getPositionForCell(
         { x: xMin + (xMax - xMin) / 2, y: yMin + (yMax - yMin) / 2 },
         gridSettings.getMinX(),
         gridSettings.getStep(),
@@ -344,7 +390,7 @@ export function getClosestSideCenter(
     if (!cell) {
         return undefined;
     }
-    const cellPosition = getPointForCell(
+    const cellPosition = getPositionForCell(
         cell,
         gridSettings.getMinX(),
         gridSettings.getStep(),

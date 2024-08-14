@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { AbilityPowerType } from "../abilities/ability_properties";
 import { XY } from "../utils/math";
 
 export interface IAuraOnMap {
@@ -38,15 +39,25 @@ export class AuraEffectProperties {
 
     public readonly desc: string;
 
-    public readonly power: number;
+    public power: number;
 
     public readonly is_buff: boolean;
 
-    public constructor(name: string, range: number, desc: string, power: number, is_buff: boolean) {
+    public readonly power_type: AbilityPowerType;
+
+    public constructor(
+        name: string,
+        range: number,
+        desc: string,
+        power: number,
+        is_buff: boolean,
+        power_type: AbilityPowerType,
+    ) {
         this.name = name;
         this.range = range;
         this.desc = desc;
         this.power = power;
         this.is_buff = is_buff;
+        this.power_type = power_type;
     }
 }

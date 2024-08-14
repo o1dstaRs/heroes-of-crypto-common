@@ -150,9 +150,9 @@ export class AbilityProperties {
         type: AbilityType,
         desc: string,
         power: number,
-        powerType: AbilityPowerType,
-        skipResponse: boolean,
-        stackPowered: boolean,
+        power_type: AbilityPowerType,
+        skip_response: boolean,
+        stack_powered: boolean,
         effect: string | null,
         aura_effect: string | null,
     ) {
@@ -160,9 +160,9 @@ export class AbilityProperties {
         this.type = type;
         this.desc = desc;
         this.power = power;
-        this.power_type = powerType;
-        this.skip_response = skipResponse;
-        this.stack_powered = stackPowered;
+        this.power_type = power_type;
+        this.skip_response = skip_response;
+        this.stack_powered = stack_powered;
         this.effect = effect;
         this.aura_effect = aura_effect;
     }

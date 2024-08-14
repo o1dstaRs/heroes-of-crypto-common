@@ -43,6 +43,7 @@ export enum UnitType {
 export interface IModifyableUnitProperties {
     hp: number;
     armor: number;
+    luck: number;
 }
 
 export class UnitProperties {
@@ -66,7 +67,7 @@ export class UnitProperties {
 
     public morale: number;
 
-    public readonly luck: number;
+    public luck: number;
 
     public readonly speed: number;
 
@@ -80,7 +81,9 @@ export class UnitProperties {
 
     public attack_type_selected: AttackType;
 
-    public readonly attack: number;
+    public base_attack: number;
+
+    public attack_mod: number;
 
     public readonly attack_damage_min: number;
 
@@ -134,6 +137,10 @@ export class UnitProperties {
 
     public applied_debuffs_descriptions: string[];
 
+    public applied_buffs_powers: number[];
+
+    public applied_debuffs_powers: number[];
+
     public aura_effects: string[];
 
     public aura_ranges: number[];
@@ -164,7 +171,7 @@ export class UnitProperties {
         speed: number,
         base_armor: number,
         attack_type: AttackType,
-        attack: number,
+        base_attack: number,
         attack_damage_min: number,
         attack_damage_max: number,
         attack_range: number,
@@ -188,6 +195,8 @@ export class UnitProperties {
         applied_debuffs_laps: number[],
         applied_buffs_descriptions: string[],
         applied_debuffs_descriptions: string[],
+        applied_buffs_powers: number[],
+        applied_debuffs_powers: number[],
         aura_effects: string[],
         aura_ranges: number[],
         aura_is_buff: boolean[],
@@ -214,7 +223,8 @@ export class UnitProperties {
         this.range_armor = base_armor;
         this.attack_type = attack_type;
         this.attack_type_selected = attack_type;
-        this.attack = attack;
+        this.base_attack = base_attack;
+        this.attack_mod = 0;
         this.attack_damage_min = attack_damage_min;
         this.attack_damage_max = attack_damage_max;
         this.attack_range = attack_range;
@@ -241,6 +251,8 @@ export class UnitProperties {
         this.applied_debuffs_laps = applied_debuffs_laps;
         this.applied_buffs_descriptions = applied_buffs_descriptions;
         this.applied_debuffs_descriptions = applied_debuffs_descriptions;
+        this.applied_buffs_powers = applied_buffs_powers;
+        this.applied_debuffs_powers = applied_debuffs_powers;
         this.aura_effects = aura_effects;
         this.aura_ranges = aura_ranges;
         this.aura_is_buff = aura_is_buff;
