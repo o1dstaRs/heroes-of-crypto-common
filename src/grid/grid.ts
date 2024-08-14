@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
-import { getCellForPosition, getCellsAroundPoint, isCellWithinGrid } from "./grid_math";
+import { getCellForPosition, getCellsAroundPosition, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
@@ -473,7 +473,7 @@ export class Grid {
                 cells = [];
             }
         } else {
-            cells = getCellsAroundPoint(gridSettings, unitPosition);
+            cells = getCellsAroundPosition(gridSettings, unitPosition);
         }
         const enemyAggrMatrix: number[][] | undefined = this.getEnemyAggrMatrixByUnitId(unitId);
 
