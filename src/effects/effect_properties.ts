@@ -16,6 +16,7 @@ export interface IAuraOnMap {
     xy: XY;
     range: number;
     isBuff: boolean;
+    isSmallUnit: boolean;
 }
 
 export class EffectProperties {
