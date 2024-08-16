@@ -97,7 +97,7 @@ export class UnitProperties {
 
     public shot_distance: number;
 
-    public readonly magic_resist: number;
+    public magic_resist: number;
 
     public magic_resist_mod: number;
 
@@ -133,9 +133,13 @@ export class UnitProperties {
 
     public applied_debuffs_laps: number[];
 
+    public applied_effects_descriptions: string[];
+
     public applied_buffs_descriptions: string[];
 
     public applied_debuffs_descriptions: string[];
+
+    public applied_effects_powers: number[];
 
     public applied_buffs_powers: number[];
 
@@ -193,8 +197,10 @@ export class UnitProperties {
         applied_effects_laps: number[],
         applied_buffs_laps: number[],
         applied_debuffs_laps: number[],
+        applied_effects_descriptions: string[],
         applied_buffs_descriptions: string[],
         applied_debuffs_descriptions: string[],
+        applied_effects_powers: number[],
         applied_buffs_powers: number[],
         applied_debuffs_powers: number[],
         aura_effects: string[],
@@ -249,8 +255,10 @@ export class UnitProperties {
         this.applied_effects_laps = applied_effects_laps;
         this.applied_buffs_laps = applied_buffs_laps;
         this.applied_debuffs_laps = applied_debuffs_laps;
+        this.applied_effects_descriptions = applied_effects_descriptions;
         this.applied_buffs_descriptions = applied_buffs_descriptions;
         this.applied_debuffs_descriptions = applied_debuffs_descriptions;
+        this.applied_effects_powers = applied_effects_powers;
         this.applied_buffs_powers = applied_buffs_powers;
         this.applied_debuffs_powers = applied_debuffs_powers;
         this.aura_effects = aura_effects;

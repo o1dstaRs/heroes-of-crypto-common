@@ -168,3 +168,17 @@ export const q50 = (arr: number[]) => quantile(arr, 0.5);
 export const q75 = (arr: number[]) => quantile(arr, 0.75);
 
 export const q90 = (arr: number[]) => quantile(arr, 0.9);
+
+export const winningAtLeastOneEventProbability = (probabilities: number[]): number => {
+    // Calculate the probability of not winning any event
+    let probabilityOfNoWin = probabilities.reduce((acc: number, probability: number) => {
+        if (probability < 0 || probability > 1) {
+            throw new Error("Probability must be between 0 and 1");
+        }
+
+        return acc * (1 - probability);
+    }, 1); // Start with 1 for multiplication
+
+    // Calculate the probability of winning at least one event
+    return 1 - probabilityOfNoWin;
+};

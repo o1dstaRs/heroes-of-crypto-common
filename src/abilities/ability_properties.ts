@@ -30,6 +30,8 @@ export enum AbilityPowerType {
     DISABLE_RANGE_ATTACK = 17,
     LUCK_10 = 18,
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE = 19,
+    BASIC_AI = 20,
+    MAGIC_RESIST_50 = 21,
 }
 
 export const AllAbilityPowerTypes = [
@@ -53,6 +55,8 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.DISABLE_RANGE_ATTACK,
     AbilityPowerType.LUCK_10,
     AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
+    AbilityPowerType.BASIC_AI,
+    AbilityPowerType.MAGIC_RESIST_50,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -79,6 +83,8 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     DISABLE_RANGE_ATTACK: AbilityPowerType.DISABLE_RANGE_ATTACK,
     LUCK_10: AbilityPowerType.LUCK_10,
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE: AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
+    BASIC_AI: AbilityPowerType.BASIC_AI,
+    MAGIC_RESIST_50: AbilityPowerType.MAGIC_RESIST_50,
 };
 
 export enum AbilityType {
@@ -94,6 +100,8 @@ export enum AbilityType {
     UNIT_TYPE = 9,
     BUFF_AURA = 10,
     DEBUFF_AURA = 11,
+    CONTROL = 12,
+    MIND = 13,
 }
 
 export const AllAbilityTypes = [
@@ -109,6 +117,8 @@ export const AllAbilityTypes = [
     AbilityType.UNIT_TYPE,
     AbilityType.BUFF_AURA,
     AbilityType.DEBUFF_AURA,
+    AbilityType.CONTROL,
+    AbilityType.MIND,
 ];
 
 export type AllAbilityType = typeof AllAbilityTypes[number];
@@ -127,6 +137,8 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     UNIT_TYPE: AbilityType.UNIT_TYPE,
     BUFF_AURA: AbilityType.BUFF_AURA,
     DEBUFF_AURA: AbilityType.DEBUFF_AURA,
+    CONTROL: AbilityType.CONTROL,
+    MIND: AbilityType.MIND,
 };
 
 export class AbilityProperties {

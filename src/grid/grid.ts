@@ -376,7 +376,7 @@ export class Grid {
             }
         }
         if (allOccupied) {
-            console.log(`${unitId} ALREADY OCCUPIED cells`);
+            // console.log(`${unitId} ALREADY OCCUPIED cells`);
             return false;
         }
 
