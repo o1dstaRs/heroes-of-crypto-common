@@ -26,10 +26,13 @@ export class EffectProperties {
 
     public readonly desc: string;
 
-    public constructor(name: string, laps: number, desc: string) {
+    public power: number;
+
+    public constructor(name: string, laps: number, desc: string, power: number) {
         this.name = name;
         this.laps = laps;
         this.desc = desc;
+        this.power = power;
     }
 }
 
