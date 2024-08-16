@@ -32,6 +32,7 @@ export enum AbilityPowerType {
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE = 19,
     BASIC_AI = 20,
     MAGIC_RESIST_50 = 21,
+    DODGE_ANY_PERCENTAGE = 22,
 }
 
 export const AllAbilityPowerTypes = [
@@ -57,6 +58,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
     AbilityPowerType.BASIC_AI,
     AbilityPowerType.MAGIC_RESIST_50,
+    AbilityPowerType.DODGE_ANY_PERCENTAGE,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -85,6 +87,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE: AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
     BASIC_AI: AbilityPowerType.BASIC_AI,
     MAGIC_RESIST_50: AbilityPowerType.MAGIC_RESIST_50,
+    DODGE_ANY_PERCENTAGE: AbilityPowerType.DODGE_ANY_PERCENTAGE,
 };
 
 export enum AbilityType {
