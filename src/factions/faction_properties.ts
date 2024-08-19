@@ -16,6 +16,7 @@ export enum FactionType {
     NATURE = "Nature",
     LIFE = "Life",
     DEATH = "Death",
+    ORDER = "Order",
 }
 
 export const AllFactions = [
@@ -24,6 +25,7 @@ export const AllFactions = [
     FactionType.NATURE,
     FactionType.LIFE,
     FactionType.DEATH,
+    FactionType.ORDER,
 ];
 
 export type AllFactionsType = typeof AllFactions[number];
@@ -35,4 +37,5 @@ export const ToFaction: { [key in AllFactionsType]: FactionType } = {
     Nature: FactionType.NATURE,
     Life: FactionType.LIFE,
     Death: FactionType.DEATH,
+    Order: FactionType.ORDER,
 };

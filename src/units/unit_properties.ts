@@ -44,6 +44,7 @@ export interface IModifyableUnitProperties {
     hp: number;
     armor: number;
     luck: number;
+    morale: number;
 }
 
 export class UnitProperties {
@@ -61,7 +62,7 @@ export class UnitProperties {
 
     public hp: number;
 
-    public readonly steps: number;
+    public steps: number;
 
     public steps_morale: number;
 
