@@ -32,10 +32,12 @@ export enum AbilityPowerType {
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE = 19,
     BASIC_AI = 20,
     MAGIC_RESIST_50 = 21,
-    DODGE_ANY_PERCENTAGE = 22,
-    DODGE_PHYSICAL_LARGE_PERCENTAGE = 23,
+    DODGE_PERCENTAGE = 22,
+    DODGE_LARGE_PERCENTAGE = 23,
     GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE = 24,
     ABSORB_DEBUFF = 25,
+    APPLY_RANDOM_DEBUFF = 26,
+    KILL_RANDOM_AMOUNT = 27,
 }
 
 export const AllAbilityPowerTypes = [
@@ -61,10 +63,12 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
     AbilityPowerType.BASIC_AI,
     AbilityPowerType.MAGIC_RESIST_50,
-    AbilityPowerType.DODGE_ANY_PERCENTAGE,
-    AbilityPowerType.DODGE_PHYSICAL_LARGE_PERCENTAGE,
+    AbilityPowerType.DODGE_PERCENTAGE,
+    AbilityPowerType.DODGE_LARGE_PERCENTAGE,
     AbilityPowerType.GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE,
     AbilityPowerType.ABSORB_DEBUFF,
+    AbilityPowerType.APPLY_RANDOM_DEBUFF,
+    AbilityPowerType.KILL_RANDOM_AMOUNT,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -93,10 +97,12 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ADDITIONAL_RANGE_ARMOR_PERCENTAGE: AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE,
     BASIC_AI: AbilityPowerType.BASIC_AI,
     MAGIC_RESIST_50: AbilityPowerType.MAGIC_RESIST_50,
-    DODGE_ANY_PERCENTAGE: AbilityPowerType.DODGE_ANY_PERCENTAGE,
-    DODGE_PHYSICAL_LARGE_PERCENTAGE: AbilityPowerType.DODGE_PHYSICAL_LARGE_PERCENTAGE,
+    DODGE_PERCENTAGE: AbilityPowerType.DODGE_PERCENTAGE,
+    DODGE_LARGE_PERCENTAGE: AbilityPowerType.DODGE_LARGE_PERCENTAGE,
     GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE: AbilityPowerType.GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE,
     ABSORB_DEBUFF: AbilityPowerType.ABSORB_DEBUFF,
+    APPLY_RANDOM_DEBUFF: AbilityPowerType.APPLY_RANDOM_DEBUFF,
+    KILL_RANDOM_AMOUNT: AbilityPowerType.KILL_RANDOM_AMOUNT,
 };
 
 export enum AbilityType {
@@ -158,7 +164,7 @@ export class AbilityProperties {
 
     public readonly type: AbilityType;
 
-    public readonly desc: string;
+    public readonly desc: string[];
 
     public readonly power: number;
 
@@ -175,7 +181,7 @@ export class AbilityProperties {
     public constructor(
         name: string,
         type: AbilityType,
-        desc: string,
+        desc: string[],
         power: number,
         power_type: AbilityPowerType,
         skip_response: boolean,
