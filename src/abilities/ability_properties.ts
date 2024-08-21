@@ -33,6 +33,9 @@ export enum AbilityPowerType {
     BASIC_AI = 20,
     MAGIC_RESIST_50 = 21,
     DODGE_ANY_PERCENTAGE = 22,
+    DODGE_PHYSICAL_LARGE_PERCENTAGE = 23,
+    GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE = 24,
+    ABSORB_DEBUFF = 25,
 }
 
 export const AllAbilityPowerTypes = [
@@ -59,6 +62,9 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.BASIC_AI,
     AbilityPowerType.MAGIC_RESIST_50,
     AbilityPowerType.DODGE_ANY_PERCENTAGE,
+    AbilityPowerType.DODGE_PHYSICAL_LARGE_PERCENTAGE,
+    AbilityPowerType.GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE,
+    AbilityPowerType.ABSORB_DEBUFF,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -88,6 +94,9 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     BASIC_AI: AbilityPowerType.BASIC_AI,
     MAGIC_RESIST_50: AbilityPowerType.MAGIC_RESIST_50,
     DODGE_ANY_PERCENTAGE: AbilityPowerType.DODGE_ANY_PERCENTAGE,
+    DODGE_PHYSICAL_LARGE_PERCENTAGE: AbilityPowerType.DODGE_PHYSICAL_LARGE_PERCENTAGE,
+    GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE: AbilityPowerType.GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE,
+    ABSORB_DEBUFF: AbilityPowerType.ABSORB_DEBUFF,
 };
 
 export enum AbilityType {

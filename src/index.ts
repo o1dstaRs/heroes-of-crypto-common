@@ -14,6 +14,7 @@ export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * from "./abilities/ability_properties";
 export * from "./effects/effect_properties";
+export * from "./spells/spell_properties";
 export * from "./grid/grid_settings";
 export * from "./obstacles/obstacle_type";
 export * from "./units/unit_properties";
