@@ -65,3 +65,26 @@ export class AuraEffectProperties {
         this.power_type = power_type;
     }
 }
+
+export class AppliedAuraEffectProperties {
+    private readonly auraEffectProperties: AuraEffectProperties;
+
+    private readonly sourceCell: XY;
+
+    public constructor(auraEffectProperties: AuraEffectProperties, sourceCell: XY) {
+        this.auraEffectProperties = auraEffectProperties;
+        this.sourceCell = sourceCell;
+    }
+
+    public getSourceCell(): XY {
+        return this.sourceCell;
+    }
+
+    public getSourceCellAsString(): string {
+        return `${this.sourceCell.x};${this.sourceCell.y}`;
+    }
+
+    public getAuraEffectProperties(): AuraEffectProperties {
+        return this.auraEffectProperties;
+    }
+}

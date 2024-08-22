@@ -220,12 +220,6 @@ export class Grid {
                 cleanupReleaseForOwners.push(targetOwnerId);
             }
         }
-
-        if (cleanupReleaseForOwners.length) {
-            console.log(`${unitId} cleanupReleaseForOwners ${JSON.stringify(cleanupReleaseForOwners)}`);
-        } else {
-            console.log(`${unitId} cleanupReleaseForOwners is empty`);
-        }
     }
 
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {

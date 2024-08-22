@@ -30,7 +30,7 @@ export const AllFactions = [
 
 export type AllFactionsType = typeof AllFactions[number];
 
-export const ToFaction: { [key in AllFactionsType]: FactionType } = {
+export const ToFactionType: { [key in AllFactionsType]: FactionType } = {
     "": FactionType.NO_TYPE,
     Chaos: FactionType.CHAOS,
     Might: FactionType.MIGHT,
