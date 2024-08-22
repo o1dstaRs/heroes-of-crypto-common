@@ -38,6 +38,7 @@ export enum AbilityPowerType {
     ABSORB_DEBUFF = 25,
     APPLY_RANDOM_DEBUFF = 26,
     KILL_RANDOM_AMOUNT = 27,
+    MAGIC_RESIST_25 = 28,
 }
 
 export const AllAbilityPowerTypes = [
@@ -69,6 +70,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ABSORB_DEBUFF,
     AbilityPowerType.APPLY_RANDOM_DEBUFF,
     AbilityPowerType.KILL_RANDOM_AMOUNT,
+    AbilityPowerType.MAGIC_RESIST_25,
 ];
 
 export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
@@ -103,6 +105,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ABSORB_DEBUFF: AbilityPowerType.ABSORB_DEBUFF,
     APPLY_RANDOM_DEBUFF: AbilityPowerType.APPLY_RANDOM_DEBUFF,
     KILL_RANDOM_AMOUNT: AbilityPowerType.KILL_RANDOM_AMOUNT,
+    MAGIC_RESIST_25: AbilityPowerType.MAGIC_RESIST_25,
 };
 
 export enum AbilityType {
