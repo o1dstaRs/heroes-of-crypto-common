@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
 import { getDistance, intersect2D, Intersect2DResult, IXYDistance, XY } from "../utils/math";
@@ -377,6 +378,18 @@ export function getClosestVH(gridSettings: GridSettings, fromPosition: XY, toPos
     return vh;
 }
 
+const adjustClosestPointSideCenterPoint = (point: XY, unitPosition: XY): XY => {
+    let newX = point.x;
+    let newY = point.y;
+    if (point.x < unitPosition.x) {
+        newX -= 1;
+    }
+    if (point.y < unitPosition.y) {
+        newY -= 1;
+    }
+    return { x: newX, y: newY };
+};
+
 export function getClosestSideCenter(
     gridMatrix: number[][],
     gridSettings: GridSettings,
@@ -398,13 +411,19 @@ export function getClosestSideCenter(
     );
 
     const points: IXYDistance[] = [];
-    const canMoveLeft = !matrixElement(gridMatrix, cell.x - 1, cell.y);
-    const canMoveRight = !matrixElement(gridMatrix, cell.x + 1, cell.y);
-    const canMoveUp = !matrixElement(gridMatrix, cell.x, cell.y + 1);
-    const canMoveDown = !matrixElement(gridMatrix, cell.x, cell.y - 1);
+
+    const me1 = matrixElement(gridMatrix, cell.x - 1, cell.y);
+    const me2 = matrixElement(gridMatrix, cell.x + 1, cell.y);
+    const me3 = matrixElement(gridMatrix, cell.x, cell.y + 1);
+    const me4 = matrixElement(gridMatrix, cell.x, cell.y - 1);
+    const observableLeft = !me1 || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
+    const observableRight = !me2 || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
+    const observableUp = !me3 || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
+    const observableDown = !me4 || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
 
     if (
-        canMoveLeft &&
+        observableLeft &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x - gridSettings.getHalfStep()) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.x < toPosition.x) ||
             (isSmallUnitFrom &&
                 !isSmallUnitTo &&
@@ -417,7 +436,8 @@ export function getClosestSideCenter(
         });
     }
     if (
-        canMoveRight &&
+        observableRight &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x + gridSettings.getHalfStep()) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.x > toPosition.x) ||
             (isSmallUnitFrom &&
                 !isSmallUnitTo &&
@@ -430,7 +450,8 @@ export function getClosestSideCenter(
         });
     }
     if (
-        canMoveDown &&
+        observableDown &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y - gridSettings.getHalfStep()) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.y < toPosition.y) ||
             (isSmallUnitFrom &&
                 !isSmallUnitTo &&
@@ -442,8 +463,10 @@ export function getClosestSideCenter(
             distance: Number.MAX_VALUE,
         });
     }
+
     if (
-        canMoveUp &&
+        observableUp &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y + gridSettings.getHalfStep()) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.y > toPosition.y) ||
             (isSmallUnitFrom &&
                 !isSmallUnitTo &&
@@ -472,14 +495,14 @@ export function getClosestSideCenter(
         return undefined;
     }
     if (twoClosestPoints.length === 1 || !mousePosition) {
-        return twoClosestPoints[0].xy;
+        return adjustClosestPointSideCenterPoint(twoClosestPoints[0].xy, fromPosition);
     }
 
     const distanceA = getDistance(twoClosestPoints[0].xy, mousePosition);
     const distanceB = getDistance(twoClosestPoints[1].xy, mousePosition);
     if (distanceA === distanceB || distanceA < distanceB) {
-        return twoClosestPoints[0].xy;
+        return adjustClosestPointSideCenterPoint(twoClosestPoints[0].xy, fromPosition);
     }
 
-    return twoClosestPoints[1].xy;
+    return adjustClosestPointSideCenterPoint(twoClosestPoints[1].xy, fromPosition);
 }

@@ -20,10 +20,11 @@ import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];
 
 export enum GridType {
-    NORMAL,
-    WATER_CENTER,
-    LAVA_CENTER,
-    BLOCK_CENTER,
+    NO_TYPE = 0,
+    NORMAL = 1,
+    WATER_CENTER = 2,
+    LAVA_CENTER = 3,
+    BLOCK_CENTER = 4,
 }
 
 export class Grid {
