@@ -48,23 +48,28 @@ export function removeItemOnce<T>(arr: T[], value: T): boolean {
     return removed;
 }
 
+// supports 65536 max range
 export function getRandomInt(min: number, max: number): number {
+    if (max - min > 65536 || min < -65535 || max > 65536) {
+        throw new Error(`Invalid range. Only max - min <= 65536 is supported. Provided min: ${min} max: ${max}`);
+    }
+
     if (typeof window !== "undefined" && typeof window.document !== "undefined") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const crypto = window.crypto || (window as any).msCrypto; // For IE11 compatibility
         const range = max - min;
-        const maxByteValue = 256;
+        const maxByteValue = 65536; // 2^16 = 65536
 
         if (range <= 0) {
             throw new Error("Max must be greater than min");
         }
 
-        const byteArray = new Uint8Array(1);
+        const byteArray = new Uint16Array(1); // 16-bit array to handle values up to 65536
         let randomValue: number;
 
         do {
             crypto.getRandomValues(byteArray);
-            [randomValue] = byteArray;
+            randomValue = byteArray[0];
         } while (randomValue >= Math.floor(maxByteValue / range) * range);
 
         return min + (randomValue % range);
