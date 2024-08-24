@@ -48,7 +48,7 @@ export function removeItemOnce<T>(arr: T[], value: T): boolean {
     return removed;
 }
 
-// supports 65536 max
+// supports 65536 max range
 export function getRandomInt(min: number, max: number): number {
     if (max - min > 65536 || min < -65535 || max > 65536) {
         throw new Error(`Invalid range. Only max - min <= 65536 is supported. Provided min: ${min} max: ${max}`);
