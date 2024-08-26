@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { FactionType } from "../factions/faction_properties";
+import { FactionType } from "../factions/faction_type";
 
 export enum SpellTargetType {
     NO_TYPE = 0,
@@ -32,7 +32,7 @@ export const AllSpellTargetTypes = [
     SpellTargetType.ANY_UNIT,
 ];
 
-export type AllSpellTargetType = typeof AllSpellTargetTypes[number];
+export type AllSpellTargetType = (typeof AllSpellTargetTypes)[number];
 
 export const ToSpellTargetType: { [spellTargetTypeName: string]: SpellTargetType } = {
     "": SpellTargetType.NO_TYPE,
@@ -53,7 +53,7 @@ export enum SpellPowerType {
 
 export const AllSpellPowerTypes = [SpellPowerType.COMMON, SpellPowerType.MIND];
 
-export type AllSpellPowerType = typeof AllSpellPowerTypes[number];
+export type AllSpellPowerType = (typeof AllSpellPowerTypes)[number];
 
 export const ToSpellPowerType: { [spellPowerTypeName: string]: SpellPowerType } = {
     "": SpellPowerType.NO_TYPE,

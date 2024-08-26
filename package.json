@@ -12,10 +12,11 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "files": [
-        "dist"
+        "dist",
+        "src/generated"
     ],
     "scripts": {
-        "build": "rimraf dist && tsc",
+        "build": "rimraf dist && tsc && cp -r src/generated dist/generated",
         "build:proto": "scripts/protoc_generate.sh",
         "lint": "yarn run lint:es && yarn run lint:package && yarn run lint:style",
         "lint:es": "eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",
@@ -44,21 +45,24 @@
     },
     "dependencies": {
         "@types/uuid": "^9.0.8",
+        "denque": "^2.1.0",
         "uuid": "^10.0.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.5.0",
-        "@lusito/prettier-config": "^2.3.1",
-        "@lusito/stylelint-config": "^2.3.0",
         "@parcel/config-default": "^2.12.0",
+        "@types/google-protobuf": "^3.15.12",
         "@types/jest": "^29.5.12",
         "@typescript-eslint/eslint-plugin": "^7.14.1",
         "@typescript-eslint/parser": "^7.14.1",
         "eslint": "^9.6.0",
+        "google-protobuf": "^3.21.4",
         "idtsc": "^1.1.0",
         "jest": "^29.7.0",
         "parcel": "^2.12.0",
+        "prettier": "^3.3.3",
         "protobufjs": "^7.3.2",
+        "protoc-gen-js": "^3.21.2",
         "rimraf": "^5.0.7",
         "sort-package-json": "^1.57.0",
         "ts-jest": "^29.1.4",

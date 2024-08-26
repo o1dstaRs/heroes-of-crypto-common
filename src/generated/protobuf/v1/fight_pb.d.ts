@@ -13,6 +13,9 @@ export class Fight extends jspb.Message {
   getCurrentLap(): number;
   setCurrentLap(value: number): void;
 
+  getGridType(): types_pb.GridTypeMap[keyof types_pb.GridTypeMap];
+  setGridType(value: types_pb.GridTypeMap[keyof types_pb.GridTypeMap]): void;
+
   getFirstTurnMade(): boolean;
   setFirstTurnMade(value: boolean): void;
 
@@ -91,6 +94,7 @@ export namespace Fight {
   export type AsObject = {
     id: Uint8Array | string,
     currentLap: number,
+    gridType: types_pb.GridTypeMap[keyof types_pb.GridTypeMap],
     firstTurnMade: boolean,
     fightFinished: boolean,
     previousTurnTeam: types_pb.TeamMap[keyof types_pb.TeamMap],

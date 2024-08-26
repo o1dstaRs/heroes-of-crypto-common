@@ -28,7 +28,7 @@ export const AllFactions = [
     FactionType.ORDER,
 ];
 
-export type AllFactionsType = typeof AllFactions[number];
+export type AllFactionsType = (typeof AllFactions)[number];
 
 export const ToFactionType: { [key in AllFactionsType]: FactionType } = {
     "": FactionType.NO_TYPE,
