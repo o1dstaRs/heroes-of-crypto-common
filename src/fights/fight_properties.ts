@@ -14,7 +14,7 @@ import Denque from "denque";
 
 import { GridType } from "../grid/grid";
 import { TeamType } from "../units/unit_properties";
-import { getRandomInt, getTimeMillis, uuidToUint8Array } from "../utils/lib";
+import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
     MAX_TIME_TO_MAKE_TURN_MILLIS,
     MIN_TIME_TO_MAKE_TURN_MILLIS,
@@ -27,11 +27,11 @@ import { Fight } from "../generated/protobuf/v1/fight_pb";
 import { StringList } from "../generated/protobuf/v1/types_pb";
 
 export class FightProperties {
-    private readonly id: string;
+    private id: string;
 
     private currentLap: number;
 
-    private readonly gridType: GridType;
+    private gridType: GridType;
 
     private firstTurnMade: boolean;
 
@@ -41,33 +41,33 @@ export class FightProperties {
 
     private highestSpeedThisTurn: number;
 
-    private readonly alreadyMadeTurn: Set<string>;
+    private alreadyMadeTurn: Set<string>;
 
-    private readonly alreadyMadeTurnByTeam: Map<TeamType, Set<string>>;
+    private alreadyMadeTurnByTeam: Map<TeamType, Set<string>>;
 
-    private readonly alreadyHourGlass: Set<string>;
+    private alreadyHourGlass: Set<string>;
 
-    private readonly alreadyRepliedAttack: Set<string>;
+    private alreadyRepliedAttack: Set<string>;
 
-    private readonly teamUnitsAlive: Map<TeamType, number>;
+    private teamUnitsAlive: Map<TeamType, number>;
 
-    private readonly hourGlassQueue: Denque<string>;
+    private hourGlassQueue: Denque<string>;
 
-    private readonly moralePlusQueue: Denque<string>;
+    private moralePlusQueue: Denque<string>;
 
-    private readonly moraleMinusQueue: Denque<string>;
+    private moraleMinusQueue: Denque<string>;
 
     private currentTurnStart: number;
 
     private currentTurnEnd: number;
 
-    private readonly currentLapTotalTimePerTeam: Map<TeamType, number>;
+    private currentLapTotalTimePerTeam: Map<TeamType, number>;
 
-    private readonly upNextQueue: Denque<string>;
+    private upNextQueue: Denque<string>;
 
     private stepsMoraleMultiplier: number;
 
-    private readonly hasAdditionalTimeRequestedPerTeam: Map<TeamType, boolean>;
+    private hasAdditionalTimeRequestedPerTeam: Map<TeamType, boolean>;
 
     public constructor() {
         this.id = uuidv4();
@@ -446,6 +446,59 @@ export class FightProperties {
 
     public updatePreviousTurnTeam(teamType: TeamType): void {
         this.previousTurnTeam = teamType;
+    }
+
+    public static deserialize(bytes: Uint8Array): FightProperties {
+        const fight = Fight.deserializeBinary(bytes);
+        const fightProperties = new FightProperties();
+
+        fightProperties.id = uuidFromBytes(fight.getId_asU8());
+        fightProperties.currentLap = fight.getCurrentLap();
+        fightProperties.gridType = fight.getGridType();
+        fightProperties.firstTurnMade = fight.getFirstTurnMade();
+        fightProperties.fightFinished = fight.getFightFinished();
+        fightProperties.previousTurnTeam = fight.getPreviousTurnTeam();
+        fightProperties.highestSpeedThisTurn = fight.getHighestSpeedThisTurn();
+        fightProperties.alreadyMadeTurn = new Set(fight.getAlreadyMadeTurnList());
+
+        // Deserialize alreadyMadeTurnByTeam
+        const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
+        alreadyMadeTurnByTeamMap.forEach((value, key) => {
+            fightProperties.alreadyMadeTurnByTeam.set(key, new Set(value.getValuesList()));
+        });
+
+        fightProperties.alreadyHourGlass = new Set(fight.getAlreadyHourGlassList());
+        fightProperties.alreadyRepliedAttack = new Set(fight.getAlreadyRepliedAttackList());
+
+        // Deserialize teamUnitsAlive
+        const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
+        teamUnitsAliveMap.forEach((value, key) => {
+            fightProperties.teamUnitsAlive.set(key, value);
+        });
+
+        fightProperties.hourGlassQueue = new Denque(fight.getHourGlassQueueList());
+        fightProperties.moralePlusQueue = new Denque(fight.getMoralePlusQueueList());
+        fightProperties.moraleMinusQueue = new Denque(fight.getMoraleMinusQueueList());
+
+        fightProperties.currentTurnStart = fight.getCurrentTurnStart();
+        fightProperties.currentTurnEnd = fight.getCurrentTurnEnd();
+
+        // Deserialize currentLapTotalTimePerTeam
+        const currentLapTotalTimePerTeamMap = fight.getCurrentLapTotalTimePerTeamMap();
+        currentLapTotalTimePerTeamMap.forEach((value, key) => {
+            fightProperties.currentLapTotalTimePerTeam.set(key, value);
+        });
+
+        fightProperties.upNextQueue = new Denque(fight.getUpNextList());
+        fightProperties.stepsMoraleMultiplier = fight.getStepsMoraleMultiplier();
+
+        // Deserialize hasAdditionalTimeRequestedPerTeam
+        const hasAdditionalTimeRequestedPerTeamMap = fight.getHasAdditionalTimeRequestedPerTeamMap();
+        hasAdditionalTimeRequestedPerTeamMap.forEach((value, key) => {
+            fightProperties.hasAdditionalTimeRequestedPerTeam.set(key, value);
+        });
+
+        return fightProperties;
     }
 
     public serialize(): Uint8Array {
