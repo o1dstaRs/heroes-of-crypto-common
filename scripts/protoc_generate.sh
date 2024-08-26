@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -x
+#!/usr/bin/env bash
 
 # Make sure that git is installed on the system
 git --version 2>&1 >/dev/null
