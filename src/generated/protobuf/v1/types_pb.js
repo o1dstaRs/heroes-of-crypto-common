@@ -13,9 +13,16 @@
 
 var jspb = require('google-protobuf');
 var goog = jspb;
-var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
+var global =
+    (typeof globalThis !== 'undefined' && globalThis) ||
+    (typeof window !== 'undefined' && window) ||
+    (typeof global !== 'undefined' && global) ||
+    (typeof self !== 'undefined' && self) ||
+    (function () { return this; }).call(null) ||
+    Function('return this')();
 
 goog.exportSymbol('proto.public.AttackType', null, global);
+goog.exportSymbol('proto.public.GridType', null, global);
 goog.exportSymbol('proto.public.Race', null, global);
 goog.exportSymbol('proto.public.StringList', null, global);
 goog.exportSymbol('proto.public.Team', null, global);
@@ -244,6 +251,17 @@ proto.public.UnitLevel = {
   SECOND: 2,
   THIRD: 3,
   FOURTH: 4
+};
+
+/**
+ * @enum {number}
+ */
+proto.public.GridType = {
+  NO_TYPE: 0,
+  NORMAL: 1,
+  WATER_CENTER: 2,
+  LAVA_CENTER: 3,
+  BLOCK_CENTER: 4
 };
 
 goog.object.extend(exports, proto.public);

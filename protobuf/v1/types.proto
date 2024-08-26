@@ -35,6 +35,14 @@ enum UnitLevel {
   FOURTH = 4;
 }
 
+enum GridType {
+    NO_TYPE = 0;
+    NORMAL = 1;
+    WATER_CENTER = 2;
+    LAVA_CENTER = 3;
+    BLOCK_CENTER = 4;
+}
+
 message StringList {
   repeated string values = 1;
 }

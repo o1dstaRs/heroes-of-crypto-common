@@ -1,7 +1,16 @@
 {
-    "extends": "../../tsconfig.json",
     "compilerOptions": {
-        "outDir": "dist"
+        "outDir": "dist",
+        "rootDir": "src",
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "target": "ESNext",
+        "module": "ESNext",
+        "declaration": true,
+        "sourceMap": true
     },
-    "include": ["src/**/*"]
+    "include": ["src/**/*", "src/generated/protobuf/v1/*"],
+    "exclude": ["node_modules", "dist"]
 }

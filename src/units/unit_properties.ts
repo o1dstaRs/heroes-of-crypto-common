@@ -11,7 +11,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 
-import { FactionType } from "../factions/faction_properties";
+import { FactionType } from "../factions/faction_type";
 
 export enum AttackType {
     NO_TYPE = 0,

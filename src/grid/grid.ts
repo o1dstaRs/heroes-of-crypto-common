@@ -11,7 +11,6 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
-import { getRandomInt } from "../utils/lib";
 import { getCellForPosition, getCellsAroundPosition, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
@@ -42,23 +41,13 @@ export class Grid {
 
     private readonly targetBoardCoord: string[][];
 
-    private readonly numberOfLapsTillNarrowingBlock: number;
-
-    private readonly numberOfLapsTillNarrowingNormal: number;
-
     private readonly availableCenterStart: number;
 
     private readonly availableCenterEnd: number;
 
-    public constructor(
-        gridSize: number,
-        numberOfLapsTillNarrowingBlock: number,
-        numberOfLapsTillNarrowingNormal: number,
-    ) {
+    public constructor(gridSize: number, gridType: GridType) {
         this.gridSize = gridSize;
-        this.numberOfLapsTillNarrowingBlock = numberOfLapsTillNarrowingBlock;
-        this.numberOfLapsTillNarrowingNormal = numberOfLapsTillNarrowingNormal;
-        this.gridType = this.getRandomGridType();
+        this.gridType = gridType;
         if (this.gridType === GridType.NORMAL) {
             this.availableCenterStart = this.gridSize >> 1;
             this.availableCenterEnd = this.availableCenterStart;
@@ -111,21 +100,6 @@ export class Grid {
 
         this.boardAggrPerTeam.set(1, boardAggTeamUpper);
         this.boardAggrPerTeam.set(2, boardAggTeamLower);
-    }
-
-    private getRandomGridType(): GridType {
-        const randomValue = getRandomInt(0, 12);
-        if (randomValue < 4) {
-            return GridType.NORMAL;
-        }
-        if (randomValue > 7) {
-            return GridType.BLOCK_CENTER;
-        }
-        if (randomValue < 6) {
-            return GridType.WATER_CENTER;
-        }
-
-        return GridType.LAVA_CENTER;
     }
 
     public hasTarget(unitId: string): boolean {
@@ -308,12 +282,6 @@ export class Grid {
 
     public getGridType(): GridType {
         return this.gridType;
-    }
-
-    public getNumberOfLapsTillNarrowing(): number {
-        return this.gridType === GridType.BLOCK_CENTER
-            ? this.numberOfLapsTillNarrowingBlock
-            : this.numberOfLapsTillNarrowingNormal;
     }
 
     public areAllCellsEmpty(cells: XY[], unitId?: string) {

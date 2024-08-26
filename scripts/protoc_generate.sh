@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 
 # Make sure that git is installed on the system
 git --version 2>&1 >/dev/null
@@ -13,6 +13,7 @@ fi
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
 # Path to Protoc Plugin
+export PATH="${PATH}:${ROOT_DIR}/node_modules/.bin"
 PROTOC_GEN_TS_PATH="${ROOT_DIR}/node_modules/.bin/protoc-gen-ts"
 
 TREE="protobuf/v1"
@@ -36,7 +37,7 @@ protoc \
     --proto_path="${SRC_DIR}" \
     $(find "${SRC_DIR}" -iname "*.proto")
 
-# this is a hack to avoid toArray errors coming from google-probufjs
+# this is a hack to avoid toArray errors coming from google-protobufjs
 JS_CODE="StringList.prototype.toArray = function () {
     return this.getValuesList();
 };"

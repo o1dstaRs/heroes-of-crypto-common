@@ -13,7 +13,13 @@
 
 var jspb = require('google-protobuf');
 var goog = jspb;
-var global = (function() { return this || window || global || self || Function('return this')(); }).call(null);
+var global =
+    (typeof globalThis !== 'undefined' && globalThis) ||
+    (typeof window !== 'undefined' && window) ||
+    (typeof global !== 'undefined' && global) ||
+    (typeof self !== 'undefined' && self) ||
+    (function () { return this; }).call(null) ||
+    Function('return this')();
 
 var types_pb = require('./types_pb.js');
 goog.object.extend(proto, types_pb);
@@ -45,7 +51,7 @@ if (goog.DEBUG && !COMPILED) {
  * @private {!Array<number>}
  * @const
  */
-proto.public.Fight.repeatedFields_ = [7,9,10,12,13,14,18];
+proto.public.Fight.repeatedFields_ = [8,10,11,13,14,15,19];
 
 
 
@@ -80,23 +86,24 @@ proto.public.Fight.toObject = function(includeInstance, msg) {
   var f, obj = {
     id: msg.getId_asB64(),
     currentLap: jspb.Message.getFieldWithDefault(msg, 2, 0),
-    firstTurnMade: jspb.Message.getBooleanFieldWithDefault(msg, 3, false),
-    fightFinished: jspb.Message.getBooleanFieldWithDefault(msg, 4, false),
-    previousTurnTeam: jspb.Message.getFieldWithDefault(msg, 5, 0),
-    highestSpeedThisTurn: jspb.Message.getFieldWithDefault(msg, 6, 0),
-    alreadyMadeTurnList: (f = jspb.Message.getRepeatedField(msg, 7)) == null ? undefined : f,
+    gridType: jspb.Message.getFieldWithDefault(msg, 3, 0),
+    firstTurnMade: jspb.Message.getBooleanFieldWithDefault(msg, 4, false),
+    fightFinished: jspb.Message.getBooleanFieldWithDefault(msg, 5, false),
+    previousTurnTeam: jspb.Message.getFieldWithDefault(msg, 6, 0),
+    highestSpeedThisTurn: jspb.Message.getFieldWithDefault(msg, 7, 0),
+    alreadyMadeTurnList: (f = jspb.Message.getRepeatedField(msg, 8)) == null ? undefined : f,
     alreadyMadeTurnByTeamMap: (f = msg.getAlreadyMadeTurnByTeamMap()) ? f.toObject(includeInstance, proto.public.StringList.toObject) : [],
-    alreadyHourGlassList: (f = jspb.Message.getRepeatedField(msg, 9)) == null ? undefined : f,
-    alreadyRepliedAttackList: (f = jspb.Message.getRepeatedField(msg, 10)) == null ? undefined : f,
+    alreadyHourGlassList: (f = jspb.Message.getRepeatedField(msg, 10)) == null ? undefined : f,
+    alreadyRepliedAttackList: (f = jspb.Message.getRepeatedField(msg, 11)) == null ? undefined : f,
     teamUnitsAliveMap: (f = msg.getTeamUnitsAliveMap()) ? f.toObject(includeInstance, undefined) : [],
-    hourGlassQueueList: (f = jspb.Message.getRepeatedField(msg, 12)) == null ? undefined : f,
-    moralePlusQueueList: (f = jspb.Message.getRepeatedField(msg, 13)) == null ? undefined : f,
-    moraleMinusQueueList: (f = jspb.Message.getRepeatedField(msg, 14)) == null ? undefined : f,
-    currentTurnStart: jspb.Message.getFieldWithDefault(msg, 15, 0),
-    currentTurnEnd: jspb.Message.getFieldWithDefault(msg, 16, 0),
+    hourGlassQueueList: (f = jspb.Message.getRepeatedField(msg, 13)) == null ? undefined : f,
+    moralePlusQueueList: (f = jspb.Message.getRepeatedField(msg, 14)) == null ? undefined : f,
+    moraleMinusQueueList: (f = jspb.Message.getRepeatedField(msg, 15)) == null ? undefined : f,
+    currentTurnStart: jspb.Message.getFieldWithDefault(msg, 16, 0),
+    currentTurnEnd: jspb.Message.getFieldWithDefault(msg, 17, 0),
     currentLapTotalTimePerTeamMap: (f = msg.getCurrentLapTotalTimePerTeamMap()) ? f.toObject(includeInstance, undefined) : [],
-    upNextList: (f = jspb.Message.getRepeatedField(msg, 18)) == null ? undefined : f,
-    stepsMoraleMultiplier: jspb.Message.getFloatingPointFieldWithDefault(msg, 19, 0.0),
+    upNextList: (f = jspb.Message.getRepeatedField(msg, 19)) == null ? undefined : f,
+    stepsMoraleMultiplier: jspb.Message.getFloatingPointFieldWithDefault(msg, 20, 0.0),
     hasAdditionalTimeRequestedPerTeamMap: (f = msg.getHasAdditionalTimeRequestedPerTeamMap()) ? f.toObject(includeInstance, undefined) : []
   };
 
@@ -143,80 +150,84 @@ proto.public.Fight.deserializeBinaryFromReader = function(msg, reader) {
       msg.setCurrentLap(value);
       break;
     case 3:
-      var value = /** @type {boolean} */ (reader.readBool());
-      msg.setFirstTurnMade(value);
+      var value = /** @type {!proto.public.GridType} */ (reader.readEnum());
+      msg.setGridType(value);
       break;
     case 4:
       var value = /** @type {boolean} */ (reader.readBool());
-      msg.setFightFinished(value);
+      msg.setFirstTurnMade(value);
       break;
     case 5:
+      var value = /** @type {boolean} */ (reader.readBool());
+      msg.setFightFinished(value);
+      break;
+    case 6:
       var value = /** @type {!proto.public.Team} */ (reader.readEnum());
       msg.setPreviousTurnTeam(value);
       break;
-    case 6:
+    case 7:
       var value = /** @type {number} */ (reader.readInt32());
       msg.setHighestSpeedThisTurn(value);
       break;
-    case 7:
+    case 8:
       var value = /** @type {string} */ (reader.readString());
       msg.addAlreadyMadeTurn(value);
       break;
-    case 8:
+    case 9:
       var value = msg.getAlreadyMadeTurnByTeamMap();
       reader.readMessage(value, function(message, reader) {
         jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readUint32, jspb.BinaryReader.prototype.readMessage, proto.public.StringList.deserializeBinaryFromReader, 0, new proto.public.StringList());
          });
       break;
-    case 9:
+    case 10:
       var value = /** @type {string} */ (reader.readString());
       msg.addAlreadyHourGlass(value);
       break;
-    case 10:
+    case 11:
       var value = /** @type {string} */ (reader.readString());
       msg.addAlreadyRepliedAttack(value);
       break;
-    case 11:
+    case 12:
       var value = msg.getTeamUnitsAliveMap();
       reader.readMessage(value, function(message, reader) {
         jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readUint32, jspb.BinaryReader.prototype.readUint32, null, 0, 0);
          });
       break;
-    case 12:
+    case 13:
       var value = /** @type {string} */ (reader.readString());
       msg.addHourGlassQueue(value);
       break;
-    case 13:
+    case 14:
       var value = /** @type {string} */ (reader.readString());
       msg.addMoralePlusQueue(value);
       break;
-    case 14:
+    case 15:
       var value = /** @type {string} */ (reader.readString());
       msg.addMoraleMinusQueue(value);
       break;
-    case 15:
+    case 16:
       var value = /** @type {number} */ (reader.readInt64());
       msg.setCurrentTurnStart(value);
       break;
-    case 16:
+    case 17:
       var value = /** @type {number} */ (reader.readInt64());
       msg.setCurrentTurnEnd(value);
       break;
-    case 17:
+    case 18:
       var value = msg.getCurrentLapTotalTimePerTeamMap();
       reader.readMessage(value, function(message, reader) {
         jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readUint32, jspb.BinaryReader.prototype.readUint32, null, 0, 0);
          });
       break;
-    case 18:
+    case 19:
       var value = /** @type {string} */ (reader.readString());
       msg.addUpNext(value);
       break;
-    case 19:
+    case 20:
       var value = /** @type {number} */ (reader.readDouble());
       msg.setStepsMoraleMultiplier(value);
       break;
-    case 20:
+    case 21:
       var value = msg.getHasAdditionalTimeRequestedPerTeamMap();
       reader.readMessage(value, function(message, reader) {
         jspb.Map.deserializeBinary(message, reader, jspb.BinaryReader.prototype.readUint32, jspb.BinaryReader.prototype.readBool, null, 0, false);
@@ -265,119 +276,126 @@ proto.public.Fight.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getFirstTurnMade();
-  if (f) {
-    writer.writeBool(
+  f = message.getGridType();
+  if (f !== 0.0) {
+    writer.writeEnum(
       3,
       f
     );
   }
-  f = message.getFightFinished();
+  f = message.getFirstTurnMade();
   if (f) {
     writer.writeBool(
       4,
       f
     );
   }
+  f = message.getFightFinished();
+  if (f) {
+    writer.writeBool(
+      5,
+      f
+    );
+  }
   f = message.getPreviousTurnTeam();
   if (f !== 0.0) {
     writer.writeEnum(
-      5,
+      6,
       f
     );
   }
   f = message.getHighestSpeedThisTurn();
   if (f !== 0) {
     writer.writeInt32(
-      6,
+      7,
       f
     );
   }
   f = message.getAlreadyMadeTurnList();
   if (f.length > 0) {
     writer.writeRepeatedString(
-      7,
+      8,
       f
     );
   }
   f = message.getAlreadyMadeTurnByTeamMap(true);
   if (f && f.getLength() > 0) {
-    f.serializeBinary(8, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeMessage, proto.public.StringList.serializeBinaryToWriter);
+    f.serializeBinary(9, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeMessage, proto.public.StringList.serializeBinaryToWriter);
   }
   f = message.getAlreadyHourGlassList();
-  if (f.length > 0) {
-    writer.writeRepeatedString(
-      9,
-      f
-    );
-  }
-  f = message.getAlreadyRepliedAttackList();
   if (f.length > 0) {
     writer.writeRepeatedString(
       10,
       f
     );
   }
-  f = message.getTeamUnitsAliveMap(true);
-  if (f && f.getLength() > 0) {
-    f.serializeBinary(11, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeUint32);
-  }
-  f = message.getHourGlassQueueList();
+  f = message.getAlreadyRepliedAttackList();
   if (f.length > 0) {
     writer.writeRepeatedString(
-      12,
+      11,
       f
     );
   }
-  f = message.getMoralePlusQueueList();
+  f = message.getTeamUnitsAliveMap(true);
+  if (f && f.getLength() > 0) {
+    f.serializeBinary(12, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeUint32);
+  }
+  f = message.getHourGlassQueueList();
   if (f.length > 0) {
     writer.writeRepeatedString(
       13,
       f
     );
   }
-  f = message.getMoraleMinusQueueList();
+  f = message.getMoralePlusQueueList();
   if (f.length > 0) {
     writer.writeRepeatedString(
       14,
       f
     );
   }
-  f = message.getCurrentTurnStart();
-  if (f !== 0) {
-    writer.writeInt64(
+  f = message.getMoraleMinusQueueList();
+  if (f.length > 0) {
+    writer.writeRepeatedString(
       15,
       f
     );
   }
-  f = message.getCurrentTurnEnd();
+  f = message.getCurrentTurnStart();
   if (f !== 0) {
     writer.writeInt64(
       16,
       f
     );
   }
+  f = message.getCurrentTurnEnd();
+  if (f !== 0) {
+    writer.writeInt64(
+      17,
+      f
+    );
+  }
   f = message.getCurrentLapTotalTimePerTeamMap(true);
   if (f && f.getLength() > 0) {
-    f.serializeBinary(17, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeUint32);
+    f.serializeBinary(18, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeUint32);
   }
   f = message.getUpNextList();
   if (f.length > 0) {
     writer.writeRepeatedString(
-      18,
+      19,
       f
     );
   }
   f = message.getStepsMoraleMultiplier();
   if (f !== 0.0) {
     writer.writeDouble(
-      19,
+      20,
       f
     );
   }
   f = message.getHasAdditionalTimeRequestedPerTeamMap(true);
   if (f && f.getLength() > 0) {
-    f.serializeBinary(20, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeBool);
+    f.serializeBinary(21, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeBool);
   }
 };
 
@@ -443,28 +461,28 @@ proto.public.Fight.prototype.setCurrentLap = function(value) {
 
 
 /**
- * optional bool first_turn_made = 3;
+ * optional GridType grid_type = 3;
+ * @return {!proto.public.GridType}
+ */
+proto.public.Fight.prototype.getGridType = function() {
+  return /** @type {!proto.public.GridType} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
+};
+
+
+/**
+ * @param {!proto.public.GridType} value
+ * @return {!proto.public.Fight} returns this
+ */
+proto.public.Fight.prototype.setGridType = function(value) {
+  return jspb.Message.setProto3EnumField(this, 3, value);
+};
+
+
+/**
+ * optional bool first_turn_made = 4;
  * @return {boolean}
  */
 proto.public.Fight.prototype.getFirstTurnMade = function() {
-  return /** @type {boolean} */ (jspb.Message.getBooleanFieldWithDefault(this, 3, false));
-};
-
-
-/**
- * @param {boolean} value
- * @return {!proto.public.Fight} returns this
- */
-proto.public.Fight.prototype.setFirstTurnMade = function(value) {
-  return jspb.Message.setProto3BooleanField(this, 3, value);
-};
-
-
-/**
- * optional bool fight_finished = 4;
- * @return {boolean}
- */
-proto.public.Fight.prototype.getFightFinished = function() {
   return /** @type {boolean} */ (jspb.Message.getBooleanFieldWithDefault(this, 4, false));
 };
 
@@ -473,17 +491,35 @@ proto.public.Fight.prototype.getFightFinished = function() {
  * @param {boolean} value
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.setFightFinished = function(value) {
+proto.public.Fight.prototype.setFirstTurnMade = function(value) {
   return jspb.Message.setProto3BooleanField(this, 4, value);
 };
 
 
 /**
- * optional Team previous_turn_team = 5;
+ * optional bool fight_finished = 5;
+ * @return {boolean}
+ */
+proto.public.Fight.prototype.getFightFinished = function() {
+  return /** @type {boolean} */ (jspb.Message.getBooleanFieldWithDefault(this, 5, false));
+};
+
+
+/**
+ * @param {boolean} value
+ * @return {!proto.public.Fight} returns this
+ */
+proto.public.Fight.prototype.setFightFinished = function(value) {
+  return jspb.Message.setProto3BooleanField(this, 5, value);
+};
+
+
+/**
+ * optional Team previous_turn_team = 6;
  * @return {!proto.public.Team}
  */
 proto.public.Fight.prototype.getPreviousTurnTeam = function() {
-  return /** @type {!proto.public.Team} */ (jspb.Message.getFieldWithDefault(this, 5, 0));
+  return /** @type {!proto.public.Team} */ (jspb.Message.getFieldWithDefault(this, 6, 0));
 };
 
 
@@ -492,16 +528,16 @@ proto.public.Fight.prototype.getPreviousTurnTeam = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setPreviousTurnTeam = function(value) {
-  return jspb.Message.setProto3EnumField(this, 5, value);
+  return jspb.Message.setProto3EnumField(this, 6, value);
 };
 
 
 /**
- * optional int32 highest_speed_this_turn = 6;
+ * optional int32 highest_speed_this_turn = 7;
  * @return {number}
  */
 proto.public.Fight.prototype.getHighestSpeedThisTurn = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 6, 0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
 };
 
 
@@ -510,16 +546,16 @@ proto.public.Fight.prototype.getHighestSpeedThisTurn = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setHighestSpeedThisTurn = function(value) {
-  return jspb.Message.setProto3IntField(this, 6, value);
+  return jspb.Message.setProto3IntField(this, 7, value);
 };
 
 
 /**
- * repeated string already_made_turn = 7;
+ * repeated string already_made_turn = 8;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getAlreadyMadeTurnList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 7));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 8));
 };
 
 
@@ -528,7 +564,7 @@ proto.public.Fight.prototype.getAlreadyMadeTurnList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setAlreadyMadeTurnList = function(value) {
-  return jspb.Message.setField(this, 7, value || []);
+  return jspb.Message.setField(this, 8, value || []);
 };
 
 
@@ -538,7 +574,7 @@ proto.public.Fight.prototype.setAlreadyMadeTurnList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addAlreadyMadeTurn = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 7, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 8, value, opt_index);
 };
 
 
@@ -552,14 +588,14 @@ proto.public.Fight.prototype.clearAlreadyMadeTurnList = function() {
 
 
 /**
- * map<uint32, StringList> already_made_turn_by_team = 8;
+ * map<uint32, StringList> already_made_turn_by_team = 9;
  * @param {boolean=} opt_noLazyCreate Do not create the map if
  * empty, instead returning `undefined`
  * @return {!jspb.Map<number,!proto.public.StringList>}
  */
 proto.public.Fight.prototype.getAlreadyMadeTurnByTeamMap = function(opt_noLazyCreate) {
   return /** @type {!jspb.Map<number,!proto.public.StringList>} */ (
-      jspb.Message.getMapField(this, 8, opt_noLazyCreate,
+      jspb.Message.getMapField(this, 9, opt_noLazyCreate,
       proto.public.StringList));
 };
 
@@ -570,15 +606,16 @@ proto.public.Fight.prototype.getAlreadyMadeTurnByTeamMap = function(opt_noLazyCr
  */
 proto.public.Fight.prototype.clearAlreadyMadeTurnByTeamMap = function() {
   this.getAlreadyMadeTurnByTeamMap().clear();
-  return this;};
+  return this;
+};
 
 
 /**
- * repeated string already_hour_glass = 9;
+ * repeated string already_hour_glass = 10;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getAlreadyHourGlassList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 9));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 10));
 };
 
 
@@ -587,7 +624,7 @@ proto.public.Fight.prototype.getAlreadyHourGlassList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setAlreadyHourGlassList = function(value) {
-  return jspb.Message.setField(this, 9, value || []);
+  return jspb.Message.setField(this, 10, value || []);
 };
 
 
@@ -597,7 +634,7 @@ proto.public.Fight.prototype.setAlreadyHourGlassList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addAlreadyHourGlass = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 9, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 10, value, opt_index);
 };
 
 
@@ -611,11 +648,11 @@ proto.public.Fight.prototype.clearAlreadyHourGlassList = function() {
 
 
 /**
- * repeated string already_replied_attack = 10;
+ * repeated string already_replied_attack = 11;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getAlreadyRepliedAttackList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 10));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 11));
 };
 
 
@@ -624,7 +661,7 @@ proto.public.Fight.prototype.getAlreadyRepliedAttackList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setAlreadyRepliedAttackList = function(value) {
-  return jspb.Message.setField(this, 10, value || []);
+  return jspb.Message.setField(this, 11, value || []);
 };
 
 
@@ -634,7 +671,7 @@ proto.public.Fight.prototype.setAlreadyRepliedAttackList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addAlreadyRepliedAttack = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 10, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 11, value, opt_index);
 };
 
 
@@ -648,14 +685,14 @@ proto.public.Fight.prototype.clearAlreadyRepliedAttackList = function() {
 
 
 /**
- * map<uint32, uint32> team_units_alive = 11;
+ * map<uint32, uint32> team_units_alive = 12;
  * @param {boolean=} opt_noLazyCreate Do not create the map if
  * empty, instead returning `undefined`
  * @return {!jspb.Map<number,number>}
  */
 proto.public.Fight.prototype.getTeamUnitsAliveMap = function(opt_noLazyCreate) {
   return /** @type {!jspb.Map<number,number>} */ (
-      jspb.Message.getMapField(this, 11, opt_noLazyCreate,
+      jspb.Message.getMapField(this, 12, opt_noLazyCreate,
       null));
 };
 
@@ -666,15 +703,16 @@ proto.public.Fight.prototype.getTeamUnitsAliveMap = function(opt_noLazyCreate) {
  */
 proto.public.Fight.prototype.clearTeamUnitsAliveMap = function() {
   this.getTeamUnitsAliveMap().clear();
-  return this;};
+  return this;
+};
 
 
 /**
- * repeated string hour_glass_queue = 12;
+ * repeated string hour_glass_queue = 13;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getHourGlassQueueList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 12));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 13));
 };
 
 
@@ -683,7 +721,7 @@ proto.public.Fight.prototype.getHourGlassQueueList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setHourGlassQueueList = function(value) {
-  return jspb.Message.setField(this, 12, value || []);
+  return jspb.Message.setField(this, 13, value || []);
 };
 
 
@@ -693,7 +731,7 @@ proto.public.Fight.prototype.setHourGlassQueueList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addHourGlassQueue = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 12, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 13, value, opt_index);
 };
 
 
@@ -707,11 +745,11 @@ proto.public.Fight.prototype.clearHourGlassQueueList = function() {
 
 
 /**
- * repeated string morale_plus_queue = 13;
+ * repeated string morale_plus_queue = 14;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getMoralePlusQueueList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 13));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 14));
 };
 
 
@@ -720,7 +758,7 @@ proto.public.Fight.prototype.getMoralePlusQueueList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setMoralePlusQueueList = function(value) {
-  return jspb.Message.setField(this, 13, value || []);
+  return jspb.Message.setField(this, 14, value || []);
 };
 
 
@@ -730,7 +768,7 @@ proto.public.Fight.prototype.setMoralePlusQueueList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addMoralePlusQueue = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 13, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 14, value, opt_index);
 };
 
 
@@ -744,11 +782,11 @@ proto.public.Fight.prototype.clearMoralePlusQueueList = function() {
 
 
 /**
- * repeated string morale_minus_queue = 14;
+ * repeated string morale_minus_queue = 15;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getMoraleMinusQueueList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 14));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 15));
 };
 
 
@@ -757,7 +795,7 @@ proto.public.Fight.prototype.getMoraleMinusQueueList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setMoraleMinusQueueList = function(value) {
-  return jspb.Message.setField(this, 14, value || []);
+  return jspb.Message.setField(this, 15, value || []);
 };
 
 
@@ -767,7 +805,7 @@ proto.public.Fight.prototype.setMoraleMinusQueueList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addMoraleMinusQueue = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 14, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 15, value, opt_index);
 };
 
 
@@ -781,28 +819,10 @@ proto.public.Fight.prototype.clearMoraleMinusQueueList = function() {
 
 
 /**
- * optional int64 current_turn_start = 15;
+ * optional int64 current_turn_start = 16;
  * @return {number}
  */
 proto.public.Fight.prototype.getCurrentTurnStart = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
-};
-
-
-/**
- * @param {number} value
- * @return {!proto.public.Fight} returns this
- */
-proto.public.Fight.prototype.setCurrentTurnStart = function(value) {
-  return jspb.Message.setProto3IntField(this, 15, value);
-};
-
-
-/**
- * optional int64 current_turn_end = 16;
- * @return {number}
- */
-proto.public.Fight.prototype.getCurrentTurnEnd = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 16, 0));
 };
 
@@ -811,20 +831,38 @@ proto.public.Fight.prototype.getCurrentTurnEnd = function() {
  * @param {number} value
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.setCurrentTurnEnd = function(value) {
+proto.public.Fight.prototype.setCurrentTurnStart = function(value) {
   return jspb.Message.setProto3IntField(this, 16, value);
 };
 
 
 /**
- * map<uint32, uint32> current_lap_total_time_per_team = 17;
+ * optional int64 current_turn_end = 17;
+ * @return {number}
+ */
+proto.public.Fight.prototype.getCurrentTurnEnd = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 17, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.public.Fight} returns this
+ */
+proto.public.Fight.prototype.setCurrentTurnEnd = function(value) {
+  return jspb.Message.setProto3IntField(this, 17, value);
+};
+
+
+/**
+ * map<uint32, uint32> current_lap_total_time_per_team = 18;
  * @param {boolean=} opt_noLazyCreate Do not create the map if
  * empty, instead returning `undefined`
  * @return {!jspb.Map<number,number>}
  */
 proto.public.Fight.prototype.getCurrentLapTotalTimePerTeamMap = function(opt_noLazyCreate) {
   return /** @type {!jspb.Map<number,number>} */ (
-      jspb.Message.getMapField(this, 17, opt_noLazyCreate,
+      jspb.Message.getMapField(this, 18, opt_noLazyCreate,
       null));
 };
 
@@ -835,15 +873,16 @@ proto.public.Fight.prototype.getCurrentLapTotalTimePerTeamMap = function(opt_noL
  */
 proto.public.Fight.prototype.clearCurrentLapTotalTimePerTeamMap = function() {
   this.getCurrentLapTotalTimePerTeamMap().clear();
-  return this;};
+  return this;
+};
 
 
 /**
- * repeated string up_next = 18;
+ * repeated string up_next = 19;
  * @return {!Array<string>}
  */
 proto.public.Fight.prototype.getUpNextList = function() {
-  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 18));
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 19));
 };
 
 
@@ -852,7 +891,7 @@ proto.public.Fight.prototype.getUpNextList = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setUpNextList = function(value) {
-  return jspb.Message.setField(this, 18, value || []);
+  return jspb.Message.setField(this, 19, value || []);
 };
 
 
@@ -862,7 +901,7 @@ proto.public.Fight.prototype.setUpNextList = function(value) {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.addUpNext = function(value, opt_index) {
-  return jspb.Message.addToRepeatedField(this, 18, value, opt_index);
+  return jspb.Message.addToRepeatedField(this, 19, value, opt_index);
 };
 
 
@@ -876,11 +915,11 @@ proto.public.Fight.prototype.clearUpNextList = function() {
 
 
 /**
- * optional double steps_morale_multiplier = 19;
+ * optional double steps_morale_multiplier = 20;
  * @return {number}
  */
 proto.public.Fight.prototype.getStepsMoraleMultiplier = function() {
-  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 19, 0.0));
+  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 20, 0.0));
 };
 
 
@@ -889,19 +928,19 @@ proto.public.Fight.prototype.getStepsMoraleMultiplier = function() {
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setStepsMoraleMultiplier = function(value) {
-  return jspb.Message.setProto3FloatField(this, 19, value);
+  return jspb.Message.setProto3FloatField(this, 20, value);
 };
 
 
 /**
- * map<uint32, bool> has_additional_time_requested_per_team = 20;
+ * map<uint32, bool> has_additional_time_requested_per_team = 21;
  * @param {boolean=} opt_noLazyCreate Do not create the map if
  * empty, instead returning `undefined`
  * @return {!jspb.Map<number,boolean>}
  */
 proto.public.Fight.prototype.getHasAdditionalTimeRequestedPerTeamMap = function(opt_noLazyCreate) {
   return /** @type {!jspb.Map<number,boolean>} */ (
-      jspb.Message.getMapField(this, 20, opt_noLazyCreate,
+      jspb.Message.getMapField(this, 21, opt_noLazyCreate,
       null));
 };
 
@@ -912,7 +951,8 @@ proto.public.Fight.prototype.getHasAdditionalTimeRequestedPerTeamMap = function(
  */
 proto.public.Fight.prototype.clearHasAdditionalTimeRequestedPerTeamMap = function() {
   this.getHasAdditionalTimeRequestedPerTeamMap().clear();
-  return this;};
+  return this;
+};
 
 
 goog.object.extend(exports, proto.public);

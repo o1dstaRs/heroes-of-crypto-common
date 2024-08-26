@@ -73,7 +73,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.MAGIC_RESIST_25,
 ];
 
-export type AllAbilityPowerType = typeof AllAbilityPowerTypes[number];
+export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
 
 export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerType } = {
     "": AbilityPowerType.NO_TYPE,
@@ -142,7 +142,7 @@ export const AllAbilityTypes = [
     AbilityType.MIND,
 ];
 
-export type AllAbilityType = typeof AllAbilityTypes[number];
+export type AllAbilityType = (typeof AllAbilityTypes)[number];
 
 export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     "": AbilityType.NO_TYPE,

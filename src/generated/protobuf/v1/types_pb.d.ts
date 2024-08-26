@@ -68,3 +68,13 @@ export interface UnitLevelMap {
 
 export const UnitLevel: UnitLevelMap;
 
+export interface GridTypeMap {
+  NO_TYPE: 0;
+  NORMAL: 1;
+  WATER_CENTER: 2;
+  LAVA_CENTER: 3;
+  BLOCK_CENTER: 4;
+}
+
+export const GridType: GridTypeMap;
+
