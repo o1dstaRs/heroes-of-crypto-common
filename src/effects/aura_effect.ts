@@ -10,7 +10,6 @@
  */
 
 import { AbilityPowerType } from "../abilities/ability_properties";
-import { AttackType } from "../units/unit_properties";
 import { AuraEffectProperties } from "./effect_properties";
 
 export class AuraEffect {
@@ -65,30 +64,4 @@ export class AuraEffect {
             this.auraEffectProperties.range = -1;
         }
     }
-}
-
-export function canApplyAuraEffect(unitAttackType: AttackType, auraEffectProperties: AuraEffectProperties): boolean {
-    if (
-        auraEffectProperties.power_type === AbilityPowerType.LUCK_10 ||
-        auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
-        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE
-    ) {
-        return true;
-    }
-
-    if (
-        unitAttackType === AttackType.RANGE &&
-        auraEffectProperties.power_type === AbilityPowerType.DISABLE_RANGE_ATTACK
-    ) {
-        return true;
-    }
-
-    if (
-        unitAttackType === AttackType.MELEE &&
-        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE
-    ) {
-        return true;
-    }
-
-    return false;
 }

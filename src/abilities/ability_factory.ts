@@ -13,9 +13,6 @@ import { getAbilityConfig } from "../configuration/config_provider";
 import { EffectFactory } from "../effects/effect_factory";
 import { Ability } from "./ability";
 
-export const abilityToTextureName = (abilityName: string): string =>
-    `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
-
 export class AbilityFactory {
     protected readonly effectsFactory: EffectFactory;
 

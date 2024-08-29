@@ -11,8 +11,6 @@
 
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
-import { TeamType } from "../units/unit_properties";
-import { XY } from "../utils/math";
 import { AbilityPowerType, AbilityProperties, AbilityType } from "./ability_properties";
 
 export class Ability {
@@ -80,34 +78,4 @@ export class Ability {
     public getAuraEffectName(): string | undefined {
         return this.auraEffect?.getName();
     }
-}
-
-export function getAbilitiesWithPosisionCoefficient(
-    unitAbilities: Ability[],
-    fromCell?: XY,
-    toCell?: XY,
-    toUnitSmallSize?: boolean,
-    fromUnitTeam?: TeamType,
-): Ability[] {
-    const abilities: Ability[] = [];
-    if (!unitAbilities?.length || !fromCell || !toCell) {
-        return abilities;
-    }
-
-    for (const a of unitAbilities) {
-        if (a.getName() === "Backstab") {
-            const aY = fromCell.y;
-            const tY = toCell.y;
-
-            if (fromUnitTeam === TeamType.LOWER && aY > tY) {
-                abilities.push(a);
-            }
-
-            if (fromUnitTeam === TeamType.UPPER && aY < tY - (toUnitSmallSize ? 0 : 1)) {
-                abilities.push(a);
-            }
-        }
-    }
-
-    return abilities;
 }
