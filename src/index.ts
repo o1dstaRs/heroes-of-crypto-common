@@ -12,8 +12,14 @@
 export * from "./grid/grid";
 export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
+export * from "./abilities/ability";
+export * from "./abilities/ability_factory";
 export * from "./abilities/ability_properties";
+export * as HoCConfig from "./configuration/config_provider";
+export * from "./effects/aura_effect";
 export * from "./effects/effect_properties";
+export * from "./effects/effect_factory";
+export * from "./effects/effect";
 export * from "./spells/spell_properties";
 export * from "./grid/grid_settings";
 export * from "./obstacles/obstacle_type";

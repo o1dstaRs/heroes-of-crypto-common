@@ -8,6 +8,7 @@
         "moduleResolution": "node",
         "target": "ESNext",
         "module": "ESNext",
+        "resolveJsonModule": true,
         "declaration": true,
         "sourceMap": true
     },
