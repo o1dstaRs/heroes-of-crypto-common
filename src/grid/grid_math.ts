@@ -398,6 +398,7 @@ export function getClosestSideCenter(
     toPosition: XY,
     isSmallUnitFrom: boolean,
     isSmallUnitTo: boolean,
+    fromTeamType: TeamType,
 ): XY | undefined {
     const cell = getCellForPosition(gridSettings, mousePosition);
     if (!cell) {
@@ -416,10 +417,10 @@ export function getClosestSideCenter(
     const me2 = matrixElement(gridMatrix, cell.x + 1, cell.y);
     const me3 = matrixElement(gridMatrix, cell.x, cell.y + 1);
     const me4 = matrixElement(gridMatrix, cell.x, cell.y - 1);
-    const observableLeft = !me1 || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
-    const observableRight = !me2 || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
-    const observableUp = !me3 || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
-    const observableDown = !me4 || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
+    const observableLeft = !me1 || me1 === fromTeamType || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
+    const observableRight = !me2 || me2 === fromTeamType || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
+    const observableUp = !me3 || me3 === fromTeamType || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
+    const observableDown = !me4 || me4 === fromTeamType || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
 
     if (
         observableLeft &&

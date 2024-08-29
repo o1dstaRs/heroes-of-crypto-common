@@ -374,6 +374,10 @@ export class FightProperties {
             : NUMBER_OF_LAPS_TILL_NARROWING_NORMAL;
     }
 
+    public getLapsNarrowed(): number {
+        return Math.floor((this.currentLap - 1) / this.getNumberOfLapsTillNarrowing());
+    }
+
     public setTeamUnitsAlive(teamType: TeamType, unitsAlive: number): void {
         if (teamType) {
             this.teamUnitsAlive.set(teamType, unitsAlive);
