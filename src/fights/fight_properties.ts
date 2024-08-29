@@ -467,7 +467,7 @@ export class FightProperties {
 
         // Deserialize alreadyMadeTurnByTeam
         const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
-        alreadyMadeTurnByTeamMap.forEach((value, key) => {
+        alreadyMadeTurnByTeamMap.forEach((value: StringList, key: TeamType) => {
             fightProperties.alreadyMadeTurnByTeam.set(key, new Set(value.getValuesList()));
         });
 
@@ -476,7 +476,7 @@ export class FightProperties {
 
         // Deserialize teamUnitsAlive
         const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
-        teamUnitsAliveMap.forEach((value, key) => {
+        teamUnitsAliveMap.forEach((value: number, key: TeamType) => {
             fightProperties.teamUnitsAlive.set(key, value);
         });
 
@@ -489,7 +489,7 @@ export class FightProperties {
 
         // Deserialize currentLapTotalTimePerTeam
         const currentLapTotalTimePerTeamMap = fight.getCurrentLapTotalTimePerTeamMap();
-        currentLapTotalTimePerTeamMap.forEach((value, key) => {
+        currentLapTotalTimePerTeamMap.forEach((value: number, key: TeamType) => {
             fightProperties.currentLapTotalTimePerTeam.set(key, value);
         });
 
@@ -498,7 +498,7 @@ export class FightProperties {
 
         // Deserialize hasAdditionalTimeRequestedPerTeam
         const hasAdditionalTimeRequestedPerTeamMap = fight.getHasAdditionalTimeRequestedPerTeamMap();
-        hasAdditionalTimeRequestedPerTeamMap.forEach((value, key) => {
+        hasAdditionalTimeRequestedPerTeamMap.forEach((value: boolean, key: TeamType) => {
             fightProperties.hasAdditionalTimeRequestedPerTeam.set(key, value);
         });
 
