@@ -72,6 +72,31 @@ export function getCellsAroundCell(gridSettings: GridSettings, cell?: XY): XY[] 
     return cells;
 }
 
+export function projectLineToFieldEdge(gridSettings: GridSettings, x0: number, y0: number, x1: number, y1: number): XY {
+    // Calculate direction vector
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+
+    // Calculate the maximum scalar multiplier needed to reach the field edge
+    const scalarX =
+        dx !== 0 ? Math.max((gridSettings.getMinX() - x1) / dx, (gridSettings.getMaxX() - x1) / dx) : Infinity;
+    const scalarY =
+        dy !== 0 ? Math.max((gridSettings.getMinY() - y1) / dy, (gridSettings.getMaxY() - y1) / dy) : Infinity;
+
+    // Use the smaller of the two scalars to ensure we stop at the first edge we hit
+    const scalar = Math.min(scalarX, scalarY);
+
+    // Calculate the new end point
+    const x = x1 + dx * scalar;
+    const y = y1 + dy * scalar;
+
+    // Clamp values to ensure they're within the field
+    return {
+        x: Math.max(gridSettings.getMinX(), Math.min(gridSettings.getMaxX(), x)),
+        y: Math.max(gridSettings.getMinY(), Math.min(gridSettings.getMaxY(), y)),
+    };
+}
+
 export function getCellsAroundPosition(gridSettings: GridSettings, position?: XY): XY[] {
     const cells: XY[] = [];
     if (!position) {

@@ -111,7 +111,7 @@
                 "Order:Rangebane",
                 "Order:Cowardice"
             ],
-            "abilities": []
+            "abilities": ["Book of Healing"]
         },
         "Crusader": {
             "name": "Crusader",
@@ -137,7 +137,7 @@
         "Griffin": {
             "name": "Griffin",
             "hp": 68,
-            "steps": 7.4,
+            "steps": 6.2,
             "speed": 8,
             "armor": 22,
             "attack_type": "MELEE",
@@ -153,7 +153,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Range Null Field Aura"]
+            "abilities": ["Range Null Field Aura", "Sky Runner"]
         },
         "Tsar Cannon": {
             "name": "Tsar Cannon",
@@ -163,8 +163,8 @@
             "armor": 33,
             "attack_type": "RANGE",
             "attack": 44,
-            "attack_damage_min": 30,
-            "attack_damage_max": 45,
+            "attack_damage_min": 35,
+            "attack_damage_max": 55,
             "attack_range": 1,
             "range_shots": 4,
             "shot_distance": 8,
@@ -174,7 +174,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["No Melee"]
+            "abilities": ["No Melee", "Through Shot"]
         },
         "Angel": {
             "name": "Angel",
@@ -248,7 +248,7 @@
             "speed": 4,
             "armor": 9,
             "attack_type": "MELEE",
-            "attack": 13,
+            "attack": 11,
             "attack_damage_min": 2,
             "attack_damage_max": 3,
             "attack_range": 1,
@@ -260,7 +260,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Luck Aura"]
+            "abilities": ["Luck Aura", "Lucky Strike"]
         },
         "White Tiger": {
             "name": "White Tiger",
@@ -330,7 +330,7 @@
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
-            "abilities": []
+            "abilities": ["Forest Spellbook"]
         },
         "Unicorn": {
             "name": "Unicorn",
@@ -610,7 +610,7 @@
         "Hydra": {
             "name": "Hydra",
             "hp": 195,
-            "steps": 5,
+            "steps": 4.9,
             "speed": 6,
             "armor": 32,
             "attack_type": "MELEE",
@@ -847,7 +847,7 @@
                 "Chaos:Mass Riot",
                 "Chaos:Mass Magic Mirror"
             ],
-            "abilities": []
+            "abilities": ["Tome of Might"]
         },
         "Cyclops": {
             "name": "Cyclops",
@@ -893,14 +893,14 @@
         },
         "Behemoth": {
             "name": "Behemoth",
-            "hp": 175,
-            "steps": 4.9,
+            "hp": 170,
+            "steps": 5.2,
             "speed": 5.5,
             "armor": 34,
             "attack_type": "MELEE",
-            "attack": 39,
+            "attack": 32,
             "attack_damage_min": 55,
-            "attack_damage_max": 80,
+            "attack_damage_max": 75,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
@@ -910,7 +910,7 @@
             "size": 2,
             "level": 3,
             "spells": [],
-            "abilities": []
+            "abilities": ["Unyielding Power"]
         },
         "Frenzied Boar": {
             "name": "Frenzied Boar",

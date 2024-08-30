@@ -438,5 +438,85 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null
+    },
+    "Through Shot": {
+        "name": "Through Shot",
+        "type": "ATTACK",
+        "desc": [
+            "Ranged attacks go through the targets and deal {}%",
+            "of the damage to affected units. Disables responses on both ends"
+        ],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Sky Runner": {
+        "name": "Sky Runner",
+        "type": "MOVEMENT",
+        "desc": ["Gives {} additinal steps to the owner"],
+        "power": 5,
+        "power_type": "ADDITIONAL_STEPS",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Lucky Strike": {
+        "name": "Lucky Strike",
+        "type": "ATTACK",
+        "desc": ["On attack there is {}% chance to deal {}% more damage"],
+        "power": 40,
+        "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Forest Spellbook": {
+        "name": "Forest Spellbook",
+        "type": "INFO",
+        "desc": ["Grants the caster the following spells: Courage, Helping Hand and Summon Wolves"],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Tome of Might": {
+        "name": "Tome of Might",
+        "type": "INFO",
+        "desc": ["Enables the caster to use the following spells: Riot, Magic Mirror, Mass Riot and Mass Magic Mirror"],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Book of Healing": {
+        "name": "Book of Healing",
+        "type": "INFO",
+        "desc": ["Allows the caster to access the following spells: Heal, Blessing, Mass Heal"],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Unyielding Power": {
+        "name": "Unyielding Power",
+        "type": "ATTACK",
+        "desc": ["Gains 2 base attack and 5 health points each lap"],
+        "power": 0,
+        "power_type": "GAIN_ATTACK_AND_HP_EACH_LAP",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null
     }
 }
