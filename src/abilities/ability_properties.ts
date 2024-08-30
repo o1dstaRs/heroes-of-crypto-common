@@ -39,6 +39,9 @@ export enum AbilityPowerType {
     APPLY_RANDOM_DEBUFF = 26,
     KILL_RANDOM_AMOUNT = 27,
     MAGIC_RESIST_25 = 28,
+    ADDITIONAL_STEPS = 29,
+    SPELLBOOK = 30,
+    GAIN_ATTACK_AND_HP_EACH_LAP = 31,
 }
 
 export const AllAbilityPowerTypes = [
@@ -71,6 +74,9 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.APPLY_RANDOM_DEBUFF,
     AbilityPowerType.KILL_RANDOM_AMOUNT,
     AbilityPowerType.MAGIC_RESIST_25,
+    AbilityPowerType.ADDITIONAL_STEPS,
+    AbilityPowerType.SPELLBOOK,
+    AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -106,6 +112,9 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     APPLY_RANDOM_DEBUFF: AbilityPowerType.APPLY_RANDOM_DEBUFF,
     KILL_RANDOM_AMOUNT: AbilityPowerType.KILL_RANDOM_AMOUNT,
     MAGIC_RESIST_25: AbilityPowerType.MAGIC_RESIST_25,
+    ADDITIONAL_STEPS: AbilityPowerType.ADDITIONAL_STEPS,
+    SPELLBOOK: AbilityPowerType.SPELLBOOK,
+    GAIN_ATTACK_AND_HP_EACH_LAP: AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
 };
 
 export enum AbilityType {
@@ -123,6 +132,8 @@ export enum AbilityType {
     DEBUFF_AURA = 11,
     CONTROL = 12,
     MIND = 13,
+    MOVEMENT = 14,
+    INFO = 15,
 }
 
 export const AllAbilityTypes = [
@@ -140,6 +151,8 @@ export const AllAbilityTypes = [
     AbilityType.DEBUFF_AURA,
     AbilityType.CONTROL,
     AbilityType.MIND,
+    AbilityType.MOVEMENT,
+    AbilityType.INFO,
 ];
 
 export type AllAbilityType = (typeof AllAbilityTypes)[number];
@@ -160,6 +173,8 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     DEBUFF_AURA: AbilityType.DEBUFF_AURA,
     CONTROL: AbilityType.CONTROL,
     MIND: AbilityType.MIND,
+    MOVEMENT: AbilityType.MOVEMENT,
+    INFO: AbilityType.INFO,
 };
 
 export class AbilityProperties {
