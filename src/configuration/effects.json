@@ -17,5 +17,11 @@
         "laps": 3,
         "power": 30,
         "desc": "The unit has a {}% probability of missing their physical attacks."
+    },
+    "Shatter Armor": {
+        "name": "Shatter Armor",
+        "laps": 3,
+        "power": 5,
+        "desc": "The unit temporarily lost {} armor."
     }
 }

@@ -424,6 +424,7 @@ export function getClosestSideCenter(
     isSmallUnitFrom: boolean,
     isSmallUnitTo: boolean,
     fromTeamType: TeamType,
+    isThroughShot = false,
 ): XY | undefined {
     const cell = getCellForPosition(gridSettings, mousePosition);
     if (!cell) {
@@ -442,10 +443,21 @@ export function getClosestSideCenter(
     const me2 = matrixElement(gridMatrix, cell.x + 1, cell.y);
     const me3 = matrixElement(gridMatrix, cell.x, cell.y + 1);
     const me4 = matrixElement(gridMatrix, cell.x, cell.y - 1);
-    const observableLeft = !me1 || me1 === fromTeamType || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
-    const observableRight = !me2 || me2 === fromTeamType || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
-    const observableUp = !me3 || me3 === fromTeamType || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
-    const observableDown = !me4 || me4 === fromTeamType || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
+    let observableLeft: boolean;
+    let observableRight: boolean;
+    let observableUp: boolean;
+    let observableDown: boolean;
+    if (isThroughShot) {
+        observableLeft = me1 !== ObstacleType.BLOCK;
+        observableRight = me1 !== ObstacleType.BLOCK;
+        observableUp = me1 !== ObstacleType.BLOCK;
+        observableDown = me1 !== ObstacleType.BLOCK;
+    } else {
+        observableLeft = !me1 || me1 === fromTeamType || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
+        observableRight = !me2 || me2 === fromTeamType || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
+        observableUp = !me3 || me3 === fromTeamType || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
+        observableDown = !me4 || me4 === fromTeamType || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
+    }
 
     if (
         observableLeft &&

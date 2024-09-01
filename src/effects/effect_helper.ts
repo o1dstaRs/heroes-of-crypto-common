@@ -17,7 +17,8 @@ export function canApplyAuraEffect(unitAttackType: AttackType, auraEffectPropert
     if (
         auraEffectProperties.power_type === AbilityPowerType.LUCK_10 ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
-        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS
     ) {
         return true;
     }

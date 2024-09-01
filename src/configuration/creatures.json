@@ -137,7 +137,7 @@
         "Griffin": {
             "name": "Griffin",
             "hp": 68,
-            "steps": 6.2,
+            "steps": 6.5,
             "speed": 8,
             "armor": 22,
             "attack_type": "MELEE",
@@ -160,7 +160,7 @@
             "hp": 400,
             "steps": 3.2,
             "speed": 3,
-            "armor": 33,
+            "armor": 30,
             "attack_type": "RANGE",
             "attack": 44,
             "attack_damage_min": 35,
@@ -264,7 +264,7 @@
         },
         "White Tiger": {
             "name": "White Tiger",
-            "hp": 25,
+            "hp": 27,
             "steps": 4.4,
             "speed": 8,
             "armor": 20,
@@ -327,6 +327,7 @@
                 "Life:Courage",
                 "Life:Courage",
                 "Life:Helping Hand",
+                "Nature:Summon Wolves",
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
@@ -397,10 +398,10 @@
         },
         "Gargantuan": {
             "name": "Gargantuan",
-            "hp": 180,
+            "hp": 170,
             "steps": 4.5,
             "speed": 4,
-            "armor": 30,
+            "armor": 28,
             "attack_type": "RANGE",
             "attack": 28,
             "attack_damage_min": 30,
@@ -425,7 +426,7 @@
             "speed": 7,
             "armor": 9,
             "attack_type": "MELEE",
-            "attack": 8,
+            "attack": 9,
             "attack_damage_min": 1,
             "attack_damage_max": 4,
             "attack_range": 1,
@@ -761,9 +762,9 @@
         "Wolf Rider": {
             "name": "Wolf Rider",
             "hp": 13,
-            "steps": 4.3,
+            "steps": 3.9,
             "speed": 7,
-            "armor": 12,
+            "armor": 10,
             "attack_type": "MELEE",
             "attack": 13,
             "attack_damage_min": 3,
@@ -777,18 +778,18 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": []
+            "abilities": ["Wolf Trail Aura", "Rapid Charge"]
         },
         "Nomad": {
             "name": "Nomad",
-            "hp": 30,
-            "steps": 4.2,
+            "hp": 25,
+            "steps": 5.2,
             "speed": 8,
-            "armor": 19,
+            "armor": 17,
             "attack_type": "MELEE",
-            "attack": 20,
+            "attack": 21,
             "attack_damage_min": 7,
-            "attack_damage_max": 8,
+            "attack_damage_max": 9,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
@@ -798,7 +799,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": []
+            "abilities": ["Shatter Armor", "Rapid Charge"]
         },
         "Harpy": {
             "name": "Harpy",
@@ -893,7 +894,7 @@
         },
         "Behemoth": {
             "name": "Behemoth",
-            "hp": 170,
+            "hp": 180,
             "steps": 5.2,
             "speed": 5.5,
             "armor": 34,
