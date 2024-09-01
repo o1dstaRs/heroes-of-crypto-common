@@ -181,6 +181,10 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
         throw new TypeError(`Invalid description list for ability ${abilityName}`);
     }
 
+    if (ability.effect !== null && ability?.effect.constructor !== String) {
+        throw new TypeError(`Invalid effect list for ability ${abilityName}`);
+    }
+
     return new AbilityProperties(
         abilityName,
         abilityType,

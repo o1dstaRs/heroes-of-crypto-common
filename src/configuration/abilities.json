@@ -518,5 +518,38 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null
+    },
+    "Shatter Armor": {
+        "name": "Shatter Armor",
+        "type": "STATUS",
+        "desc": ["Melee attacks strip {} armor from the target. The effect stacks"],
+        "power": 5,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Shatter Armor",
+        "aura_effect": null
+    },
+    "Rapid Charge": {
+        "name": "Rapid Charge",
+        "type": "ATTACK",
+        "desc": ["Each cell travelled increases the attack power by {}%"],
+        "power": 10,
+        "power_type": "ADDITIONAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
+    },
+    "Wolf Trail Aura": {
+        "name": "Wolf Trail Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within range gain {} additional moving distance."],
+        "power": 1,
+        "power_type": "ADDITIONAL_STEPS",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": "Wolf Trail"
     }
 }
