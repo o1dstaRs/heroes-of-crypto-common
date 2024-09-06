@@ -60,8 +60,12 @@ export function getRandomInt(min: number, max: number): number {
         const range = max - min;
         const maxByteValue = 65536; // 2^16 = 65536
 
-        if (range <= 0) {
-            throw new Error("Max must be greater than min");
+        if (range === 0) {
+            return min;
+        }
+
+        if (range < 0) {
+            throw new Error("Max must be greater or equal than min");
         }
 
         const byteArray = new Uint16Array(1); // 16-bit array to handle values up to 65536

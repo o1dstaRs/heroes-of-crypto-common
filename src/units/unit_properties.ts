@@ -86,9 +86,9 @@ export class UnitProperties {
 
     public attack_mod: number;
 
-    public readonly attack_damage_min: number;
+    public attack_damage_min: number;
 
-    public readonly attack_damage_max: number;
+    public attack_damage_max: number;
 
     public readonly attack_range: number;
 

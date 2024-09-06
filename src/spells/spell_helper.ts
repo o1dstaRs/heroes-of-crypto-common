@@ -15,7 +15,7 @@ import { IModifyableUnitProperties, TeamType } from "../units/unit_properties";
 import { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
-import { SpellTargetType } from "./spell_properties";
+import { SpellPowerType, SpellTargetType } from "./spell_properties";
 
 const verifyEmptyCell = (gridMatrix: number[][], emptyGridCell?: XY): boolean => {
     if (!emptyGridCell) {
@@ -39,34 +39,47 @@ export function canMassCastSpell(
     enemiesDebuffs: Map<string, AppliedSpell[]>,
     alliesMagicResists: Map<string, number>,
     enemiesMagicResists: Map<string, number>,
+    alliesHp: Map<string, number>,
+    alliesMaxHp: Map<string, number>,
 ): boolean {
     let canBeCasted = false;
 
     if (spell.getSpellTargetType() === SpellTargetType.ALL_ALLIES) {
-        for (const [unitId, magicResist] of alliesMagicResists) {
-            const allyBuffs = alliesBuffs.get(unitId);
-
-            if (allyBuffs?.length) {
-                let canBeCastedForAlly = false;
-
-                for (const buff of allyBuffs) {
-                    if (
-                        !spell.getConflictsWith().includes(buff.getName()) &&
-                        buff.getName() !== spell.getName() &&
-                        magicResist !== 100
-                    ) {
-                        canBeCastedForAlly = true;
-                        break;
-                    }
-                }
-
-                if (canBeCastedForAlly) {
+        if (spell.getPowerType() === SpellPowerType.HEAL) {
+            for (const [unitId, hp] of alliesHp) {
+                const maxHp = alliesMaxHp.get(unitId);
+                const magicResist = alliesMagicResists.get(unitId);
+                if (maxHp !== undefined && hp < maxHp && magicResist !== 100) {
                     canBeCasted = true;
                     break;
                 }
-            } else if (magicResist !== 100) {
-                canBeCasted = true;
-                break;
+            }
+        } else {
+            for (const [unitId, magicResist] of alliesMagicResists) {
+                const allyBuffs = alliesBuffs.get(unitId);
+
+                if (allyBuffs?.length) {
+                    let canBeCastedForAlly = false;
+
+                    for (const buff of allyBuffs) {
+                        if (
+                            !spell.getConflictsWith().includes(buff.getName()) &&
+                            buff.getName() !== spell.getName() &&
+                            magicResist !== 100
+                        ) {
+                            canBeCastedForAlly = true;
+                            break;
+                        }
+                    }
+
+                    if (canBeCastedForAlly) {
+                        canBeCasted = true;
+                        break;
+                    }
+                } else if (magicResist !== 100) {
+                    canBeCasted = true;
+                    break;
+                }
             }
         }
     } else if (spell.getSpellTargetType() === SpellTargetType.ALL_ENEMIES) {
@@ -128,6 +141,8 @@ export function canCastSpell(
     toTeamType?: TeamType,
     fromUnitName?: string,
     toUnitName?: string,
+    toUnitHp?: number,
+    toUnitMaxHp?: number,
     fromUnitStackPower?: number,
     toUnitMagicResistance?: number,
     targetGridCell?: XY,
@@ -142,6 +157,10 @@ export function canCastSpell(
         spell.getMinimalCasterStackPower() > fromUnitStackPower
     ) {
         return false;
+    }
+
+    if (spell.getPowerType() === SpellPowerType.HEAL) {
+        return toUnitHp && toUnitMaxHp && toUnitHp < toUnitMaxHp && toUnitMagicResistance !== 100;
     }
 
     let spellFound = false;
