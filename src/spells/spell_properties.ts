@@ -49,9 +49,10 @@ export enum SpellPowerType {
     NO_TYPE = 0,
     COMMON = 1,
     MIND = 2,
+    HEAL = 3,
 }
 
-export const AllSpellPowerTypes = [SpellPowerType.COMMON, SpellPowerType.MIND];
+export const AllSpellPowerTypes = [SpellPowerType.COMMON, SpellPowerType.MIND, SpellPowerType.HEAL];
 
 export type AllSpellPowerType = (typeof AllSpellPowerTypes)[number];
 
@@ -59,6 +60,7 @@ export const ToSpellPowerType: { [spellPowerTypeName: string]: SpellPowerType } 
     "": SpellPowerType.NO_TYPE,
     COMMON: SpellPowerType.COMMON,
     MIND: SpellPowerType.MIND,
+    HEAL: SpellPowerType.HEAL,
 };
 
 export class SpellProperties {

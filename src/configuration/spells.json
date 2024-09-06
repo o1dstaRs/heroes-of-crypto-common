@@ -31,6 +31,34 @@
         }
     },
     "Life": {
+        "Heal": {
+            "name": "Heal",
+            "level": 1,
+            "desc": ["Heal an ally for {} health points."],
+            "target": "ANY_ALLY",
+            "power": 5,
+            "power_type": "HEAL",
+            "laps": 18,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": []
+        },
+        "Blessing": {
+            "name": "Blessing",
+            "level": 2,
+            "desc": ["Bless an ally to ensure it always inflicts the maximum possible damage."],
+            "target": "ANY_ALLY",
+            "power": 0,
+            "power_type": "COMMON",
+            "laps": 3,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": []
+        },
         "Helping Hand": {
             "name": "Helping Hand",
             "level": 2,
@@ -58,13 +86,27 @@
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
             "conflicts_with": []
+        },
+        "Mass Heal": {
+            "name": "Mass Heal",
+            "level": 2,
+            "desc": ["Heal all allies for {} health points."],
+            "target": "ALL_ALLIES",
+            "power": 2.5,
+            "power_type": "HEAL",
+            "laps": 18,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
+            "conflicts_with": []
         }
     },
     "Nature": {
         "Summon Wolves": {
             "name": "Summon Wolves",
             "level": 1,
-            "desc": ["Summon wolves to fight for your team.", "Lasts till the end of the fight."],
+            "desc": ["Summon {} wolves to fight for your team.", "Lasts till the end of the fight."],
             "target": "RANDOM_CLOSE_TO_CASTER",
             "power": 1,
             "power_type": "COMMON",

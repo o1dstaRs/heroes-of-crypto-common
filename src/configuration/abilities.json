@@ -551,5 +551,16 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Wolf Trail"
+    },
+    "Penetrating Bite": {
+        "name": "Penetrating Bite",
+        "type": "ATTACK",
+        "desc": ["Melee attacks deal additional damage equal to {}% of unit's max hp."],
+        "power": 35,
+        "power_type": "ADDITIONAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null
     }
 }
