@@ -42,6 +42,7 @@ export enum AbilityPowerType {
     ADDITIONAL_STEPS = 29,
     SPELLBOOK = 30,
     GAIN_ATTACK_AND_HP_EACH_LAP = 31,
+    ADDITIONAL_BASE_ATTACK_AND_ARMOR = 32,
 }
 
 export const AllAbilityPowerTypes = [
@@ -77,6 +78,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ADDITIONAL_STEPS,
     AbilityPowerType.SPELLBOOK,
     AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
+    AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -115,6 +117,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ADDITIONAL_STEPS: AbilityPowerType.ADDITIONAL_STEPS,
     SPELLBOOK: AbilityPowerType.SPELLBOOK,
     GAIN_ATTACK_AND_HP_EACH_LAP: AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
+    ADDITIONAL_BASE_ATTACK_AND_ARMOR: AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR,
 };
 
 export enum AbilityType {
@@ -134,6 +137,7 @@ export enum AbilityType {
     MIND = 13,
     MOVEMENT = 14,
     INFO = 15,
+    EFFECT = 16,
 }
 
 export const AllAbilityTypes = [
@@ -153,6 +157,7 @@ export const AllAbilityTypes = [
     AbilityType.MIND,
     AbilityType.MOVEMENT,
     AbilityType.INFO,
+    AbilityType.EFFECT,
 ];
 
 export type AllAbilityType = (typeof AllAbilityTypes)[number];
@@ -175,6 +180,7 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     MIND: AbilityType.MIND,
     MOVEMENT: AbilityType.MOVEMENT,
     INFO: AbilityType.INFO,
+    EFFECT: AbilityType.EFFECT,
 };
 
 export class AbilityProperties {
