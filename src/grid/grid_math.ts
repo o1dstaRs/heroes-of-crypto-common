@@ -290,7 +290,7 @@ export function getLargeUnitAttackCells(
     attackPosition: XY,
     attackerBodyCellTopRight: XY,
     enemyCell: XY,
-    currentActiveKnownPaths: Map<number, IWeightedRoute[]>,
+    currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
     fromPathHashes?: Set<number>,
 ): XY[] {
     const attackCells: XY[] = [];
@@ -302,7 +302,7 @@ export function getLargeUnitAttackCells(
     const verifyAndPush = (cell: XY) => {
         const cellsToCheck: XY[] = [cell];
         const isSelfCell = cell.x === attackerBodyCellTopRight.x && cell.y === attackerBodyCellTopRight.y;
-        if (!isSelfCell && !currentActiveKnownPaths.has((cell.x << 4) | cell.y)) {
+        if (!isSelfCell && !currentActiveKnownPaths?.has((cell.x << 4) | cell.y)) {
             return;
         }
 
