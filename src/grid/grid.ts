@@ -11,7 +11,7 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
-import { getCellForPosition, getCellsAroundPosition, isCellWithinGrid } from "./grid_math";
+import { isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
@@ -37,7 +37,7 @@ export class Grid {
 
     private readonly boardCoord: string[][];
 
-    private readonly gridSize: number;
+    private readonly gridSettings: GridSettings;
 
     private readonly targetBoardCoord: string[][];
 
@@ -45,14 +45,15 @@ export class Grid {
 
     private readonly availableCenterEnd: number;
 
-    public constructor(gridSize: number, gridType: GridType) {
-        this.gridSize = gridSize;
+    public constructor(gridSettings: GridSettings, gridType: GridType) {
+        this.gridSettings = gridSettings;
+        const gridSize = gridSettings.getGridSize();
         this.gridType = gridType;
         if (this.gridType === GridType.NORMAL) {
-            this.availableCenterStart = this.gridSize >> 1;
+            this.availableCenterStart = gridSize >> 1;
             this.availableCenterEnd = this.availableCenterStart;
         } else {
-            const quarter = this.gridSize >> 2;
+            const quarter = gridSize >> 2;
             const halfQuarter = quarter >> 1;
             this.availableCenterStart = quarter + halfQuarter;
             this.availableCenterEnd = this.availableCenterStart + quarter;
@@ -133,10 +134,10 @@ export class Grid {
         let lookUp = false;
         let lookLeft = false;
         let lookDown = false;
-        if (targetCell.x + 1 < this.gridSize) {
+        if (targetCell.x + 1 < this.gridSettings.getGridSize()) {
             lookRight = true;
         }
-        if (targetCell.y + 1 < this.gridSize) {
+        if (targetCell.y + 1 < this.gridSettings.getGridSize()) {
             lookUp = true;
         }
         if (targetCell.x - 1 >= 0) {
@@ -239,7 +240,12 @@ export class Grid {
     }
 
     public occupyCell(cell: XY, unitId: string, team: number, attackRange: number): boolean {
-        if (cell.x < 0 || cell.y < 0 || cell.x >= this.gridSize || cell.y >= this.gridSize) {
+        if (
+            cell.x < 0 ||
+            cell.y < 0 ||
+            cell.x >= this.gridSettings.getGridSize() ||
+            cell.y >= this.gridSettings.getGridSize()
+        ) {
             return false;
         }
 
@@ -297,8 +303,8 @@ export class Grid {
         return true;
     }
 
-    public occupyByHole(gridSettings: GridSettings, cell: XY) {
-        if (isCellWithinGrid(gridSettings, cell)) {
+    public occupyByHole(cell: XY) {
+        if (isCellWithinGrid(this.gridSettings, cell)) {
             this.boardCoord[cell.x][cell.y] = "H";
             this.targetBoardCoord[cell.x][cell.y] = "H";
         }
@@ -387,7 +393,12 @@ export class Grid {
         let yMin = Number.MAX_SAFE_INTEGER;
         let yMax = Number.MIN_SAFE_INTEGER;
         for (const c of cells) {
-            if (c.x < 0 || c.y < 0 || c.x >= this.gridSize || c.y >= this.gridSize) {
+            if (
+                c.x < 0 ||
+                c.y < 0 ||
+                c.x >= this.gridSettings.getGridSize() ||
+                c.y >= this.gridSettings.getGridSize()
+            ) {
                 continue;
             }
 
@@ -421,34 +432,6 @@ export class Grid {
         return subArray[cell.y];
     }
 
-    public canBeAttackedByMelee(
-        unitPosition: XY,
-        unitId: string,
-        isSmallUnit: boolean,
-        gridSettings: GridSettings,
-    ): boolean {
-        let cells: XY[];
-        if (isSmallUnit) {
-            const cell = getCellForPosition(gridSettings, unitPosition);
-            if (cell) {
-                cells = [cell];
-            } else {
-                cells = [];
-            }
-        } else {
-            cells = getCellsAroundPosition(gridSettings, unitPosition);
-        }
-        const enemyAggrMatrix: number[][] | undefined = this.getEnemyAggrMatrixByUnitId(unitId);
-
-        for (const cell of cells) {
-            if (enemyAggrMatrix && enemyAggrMatrix[cell.x][cell.y] > 1) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public canMoveThere(cell: XY): boolean {
         console.log(
             `canMoveThere ${cell.x} ${cell.y} -> x:${this.boardCoord[cell.x][cell.y]} t:${
@@ -463,9 +446,9 @@ export class Grid {
 
     public print(unitId: string, printAggrGrids = true) {
         let msg = "";
-        for (let column = this.gridSize - 1; column >= 0; column--) {
+        for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
             const rowElements: string[] = [];
-            for (let row = 0; row < this.gridSize; row++) {
+            for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                 const occupantUnitId = this.boardCoord[row][column];
                 const tgt = this.targetBoardCoord[row][column];
                 if (occupantUnitId === unitId) {
@@ -489,9 +472,9 @@ export class Grid {
             const aggrUpper = this.getAggrMatrixByTeam(1);
             if (aggrUpper) {
                 msg = "";
-                for (let column = this.gridSize - 1; column >= 0; column--) {
+                for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
                     const rowElements: string[] = [];
-                    for (let row = 0; row < this.gridSize; row++) {
+                    for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                         rowElements.push(`${aggrUpper[row][column]}`);
                     }
                     msg += rowElements.join(" ");
@@ -503,9 +486,9 @@ export class Grid {
             const aggrLower = this.getAggrMatrixByTeam(2);
             if (aggrLower) {
                 msg = "";
-                for (let column = this.gridSize - 1; column >= 0; column--) {
+                for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
                     const rowElements: string[] = [];
-                    for (let row = 0; row < this.gridSize; row++) {
+                    for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                         rowElements.push(`${aggrLower[row][column]}`);
                     }
                     msg += rowElements.join(" ");
@@ -520,10 +503,10 @@ export class Grid {
      * Always generates a new two-dimensional array
      */
     public getMatrix(): number[][] {
-        const matrix: number[][] = new Array(this.gridSize);
-        for (let column = this.gridSize - 1; column >= 0; column--) {
-            const rowNumbers: number[] = new Array(this.gridSize);
-            for (let row = 0; row < this.gridSize; row++) {
+        const matrix: number[][] = new Array(this.gridSettings.getGridSize());
+        for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
+            const rowNumbers: number[] = new Array(this.gridSettings.getGridSize());
+            for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                 rowNumbers[row] = this.getOccupantNumeric(row, column);
             }
             matrix[column] = rowNumbers;
@@ -568,7 +551,7 @@ export class Grid {
     }
 
     // private getCenterCells(): XY[] {
-    //     const quarter = this.gridSize >> 2;
+    //     const quarter = this.gridSettings.getGridSize() >> 2;
     //     const halfQuarter = quarter >> 1;
     //     const start = quarter + halfQuarter;
     //     const end = start + quarter;
@@ -615,7 +598,7 @@ export class Grid {
         let lookDown = false;
 
         if (
-            cell.x + range < this.gridSize &&
+            cell.x + range < this.gridSettings.getGridSize() &&
             (!updatePositionMask ||
                 (updatePositionMask &&
                     (updatePositionMask & UPDATE_DOWN_RIGHT || updatePositionMask & UPDATE_UP_RIGHT)))
@@ -623,7 +606,7 @@ export class Grid {
             lookRight = true;
         }
         if (
-            cell.y + range < this.gridSize &&
+            cell.y + range < this.gridSettings.getGridSize() &&
             (!updatePositionMask ||
                 (updatePositionMask && (updatePositionMask & UPDATE_UP_RIGHT || updatePositionMask & UPDATE_UP_LEFT)))
         ) {

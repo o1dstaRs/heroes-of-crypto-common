@@ -23,5 +23,17 @@
         "laps": 3,
         "power": 5,
         "desc": "The unit temporarily lost {} armor."
+    },
+    "Pegasus Light": {
+        "name": "Pegasus Light",
+        "laps": 1,
+        "power": 10,
+        "desc": "Each unit attacking the target will receive +{} morale."
+    },
+    "Paralysis": {
+        "name": "Paralysis",
+        "laps": 1,
+        "power": 40,
+        "desc": "The affected enemy is unable to move and has {}% damage reduction."
     }
 }

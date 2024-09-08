@@ -322,7 +322,7 @@
     "Boar Saliva": {
         "name": "Boar Saliva",
         "type": "MIND",
-        "desc": ["Applying Board Saliva to an enemy has a {}% chance to miss their physical attack"],
+        "desc": ["Applying Boar Saliva to an enemy gives them a {}% chance to miss their physical attack"],
         "power": 30,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -431,7 +431,7 @@
     "Area Throw": {
         "name": "Area Throw",
         "type": "ATTACK",
-        "desc": ["Ranged attacks inflict {}% of the damage on all units adjacent to the target cell."],
+        "desc": ["Ranged attacks inflict {}% of the damage on all units adjacent to the target cell"],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
@@ -544,7 +544,7 @@
     "Wolf Trail Aura": {
         "name": "Wolf Trail Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies within range gain {} additional moving distance."],
+        "desc": ["Allies within range gain {} additional moving distance"],
         "power": 1,
         "power_type": "ADDITIONAL_STEPS",
         "skip_reponse": false,
@@ -555,12 +555,45 @@
     "Penetrating Bite": {
         "name": "Penetrating Bite",
         "type": "ATTACK",
-        "desc": ["Melee attacks deal additional damage equal to {}% of unit's max hp."],
+        "desc": ["Melee attacks deal additional damage equal to {}% of unit's max hp"],
         "power": 35,
         "power_type": "ADDITIONAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
+        "aura_effect": null
+    },
+    "Pegasus Might Aura": {
+        "name": "Pegasus Might Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within range gain +{} base attack and armor"],
+        "power": 2,
+        "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Pegasus Might"
+    },
+    "Pegasus Light": {
+        "name": "Pegasus Light",
+        "type": "EFFECT",
+        "desc": ["Applying Pegasus Light to an enemy. Each unit attacking it will receive +{} morale"],
+        "power": 10,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Pegasus Light",
+        "aura_effect": null
+    },
+    "Paralysis": {
+        "name": "Paralysis",
+        "type": "STATUS",
+        "desc": ["An enemy affected by Paralysis is unable to move and has {}% damage reduction"],
+        "power": 40,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Paralysis",
         "aura_effect": null
     }
 }

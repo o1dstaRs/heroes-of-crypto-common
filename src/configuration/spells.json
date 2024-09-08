@@ -56,7 +56,7 @@
             "is_buff": true,
             "self_cast_allowed": true,
             "self_debuff_applies": false,
-            "minimal_caster_stack_power": 1,
+            "minimal_caster_stack_power": 3,
             "conflicts_with": []
         },
         "Helping Hand": {

@@ -47,5 +47,13 @@
         "power": 1,
         "is_buff": true,
         "power_type": "ADDITIONAL_STEPS"
+    },
+    "Pegasus Might": {
+        "name": "Pegasus Might",
+        "range": 2,
+        "desc": "Allies within range gain +{} base attack and armor.",
+        "power": 2,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR"
     }
 }

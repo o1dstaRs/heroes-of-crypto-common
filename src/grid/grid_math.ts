@@ -14,6 +14,7 @@ import { TeamType } from "../units/unit_properties";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
 import { getDistance, intersect2D, Intersect2DResult, IXYDistance, XY } from "../utils/math";
 import { GridSettings } from "./grid_settings";
+import { IWeightedRoute } from "./path_definitions";
 
 export function getCellForPosition(gridSettings: GridSettings, position?: XY): XY | undefined {
     if (!position) {
@@ -282,6 +283,101 @@ export function getRandomCellAroundPosition(
     }
 
     return proposedCell;
+}
+
+export function getLargeUnitAttackCells(
+    gridSettings: GridSettings,
+    attackPosition: XY,
+    attackerBodyCellTopRight: XY,
+    enemyCell: XY,
+    currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+    fromPathHashes?: Set<number>,
+): XY[] {
+    const attackCells: XY[] = [];
+
+    if (!fromPathHashes?.size) {
+        return attackCells;
+    }
+
+    const verifyAndPush = (cell: XY) => {
+        const cellsToCheck: XY[] = [cell];
+        const isSelfCell = cell.x === attackerBodyCellTopRight.x && cell.y === attackerBodyCellTopRight.y;
+        if (!isSelfCell && !currentActiveKnownPaths?.has((cell.x << 4) | cell.y)) {
+            return;
+        }
+
+        cellsToCheck.push({ x: cell.x - 1, y: cell.y });
+        cellsToCheck.push({ x: cell.x - 1, y: cell.y - 1 });
+        cellsToCheck.push({ x: cell.x, y: cell.y - 1 });
+
+        let allCellsCompliant = true;
+        for (const ctc of cellsToCheck) {
+            if (ctc.x === enemyCell.x && ctc.y === enemyCell.y) {
+                allCellsCompliant = false;
+                break;
+            }
+            if (
+                ctc.x < 0 ||
+                ctc.x >= gridSettings.getGridSize() ||
+                ctc.y < 0 ||
+                ctc.y >= gridSettings.getGridSize() ||
+                !fromPathHashes.has((ctc.x << 4) | ctc.y)
+            ) {
+                allCellsCompliant = false;
+                break;
+            }
+        }
+        if (allCellsCompliant) {
+            attackCells.push(cell);
+        }
+    };
+
+    if (attackPosition.x < enemyCell.x && attackPosition.y < enemyCell.y) {
+        verifyAndPush(attackPosition);
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+        return attackCells;
+    }
+    if (attackPosition.x > enemyCell.x && attackPosition.y > enemyCell.y) {
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+        return attackCells;
+    }
+    if (attackPosition.x < enemyCell.x && attackPosition.y > enemyCell.y) {
+        verifyAndPush(attackPosition);
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+        return attackCells;
+    }
+    if (attackPosition.x > enemyCell.x && attackPosition.y < enemyCell.y) {
+        verifyAndPush(attackPosition);
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+        return attackCells;
+    }
+
+    if (attackPosition.x < enemyCell.x) {
+        verifyAndPush(attackPosition);
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+        return attackCells;
+    }
+    if (attackPosition.y > enemyCell.y) {
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+        return attackCells;
+    }
+    if (attackPosition.y < enemyCell.y) {
+        verifyAndPush({ x: attackPosition.x, y: attackPosition.y });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+        return attackCells;
+    }
+    if (attackPosition.x > enemyCell.x) {
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+        return attackCells;
+    }
+    return attackCells;
 }
 
 export function arePointsConnected(gridSettings: GridSettings, pointA: XY, pointB: XY): boolean {

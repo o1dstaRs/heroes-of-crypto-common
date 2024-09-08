@@ -110,7 +110,7 @@
             "name": "Healer",
             "hp": 13,
             "steps": 3.2,
-            "speed": 2,
+            "speed": 4,
             "armor": 12,
             "attack_type": "MAGIC",
             "attack": 13,
@@ -397,7 +397,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": []
+            "abilities": ["Paralysis"]
         },
         "Phoenix": {
             "name": "Phoenix",
@@ -481,7 +481,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": []
+            "abilities": ["Pegasus Might Aura", "Pegasus Light"]
         }
     },
     "Chaos": {
@@ -933,7 +933,7 @@
         "Ogre Mage": {
             "name": "Ogre Mage",
             "hp": 60,
-            "steps": 5,
+            "steps": 4,
             "speed": 5,
             "armor": 21,
             "attack_type": "MAGIC",
