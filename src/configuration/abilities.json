@@ -511,7 +511,7 @@
     "Unyielding Power": {
         "name": "Unyielding Power",
         "type": "ATTACK",
-        "desc": ["Gains 2 base attack and 5 health points each lap"],
+        "desc": ["Gains 1 step, 2 base attack and 5 health points each lap"],
         "power": 0,
         "power_type": "GAIN_ATTACK_AND_HP_EACH_LAP",
         "skip_reponse": false,
@@ -594,6 +594,48 @@
         "skip_reponse": false,
         "stack_powered": true,
         "effect": "Paralysis",
+        "aura_effect": null
+    },
+    "Deep Wounds Level 1": {
+        "name": "Deep Wounds Level 1",
+        "type": "EFFECT",
+        "desc": [
+            "Applies Deep Wounds effect on attack or response",
+            "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
+        ],
+        "power": 6,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Deep Wounds",
+        "aura_effect": null
+    },
+    "Deep Wounds Level 2": {
+        "name": "Deep Wounds Level 2",
+        "type": "EFFECT",
+        "desc": [
+            "Applies Deep Wounds effect on attack or response",
+            "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
+        ],
+        "power": 13,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Deep Wounds",
+        "aura_effect": null
+    },
+    "Deep Wounds Level 3": {
+        "name": "Deep Wounds Level 3",
+        "type": "EFFECT",
+        "desc": [
+            "Applies Deep Wounds effect on attack or response",
+            "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
+        ],
+        "power": 21,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Deep Wounds",
         "aura_effect": null
     }
 }
