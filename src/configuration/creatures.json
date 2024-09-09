@@ -177,7 +177,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Range Null Field Aura", "Sky Runner"]
+            "abilities": ["Range Null Field Aura", "Sky Runner", "Deep Wounds Level 2"]
         },
         "Tsar Cannon": {
             "name": "Tsar Cannon",
@@ -263,7 +263,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Double Punch"]
+            "abilities": ["Double Punch", "Deep Wounds Level 1"]
         },
         "Leprechaun": {
             "name": "Leprechaun",
@@ -305,7 +305,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": []
+            "abilities": ["Deep Wounds Level 2"]
         },
         "Elf": {
             "name": "Elf",
@@ -1003,7 +1003,7 @@
         "Behemoth": {
             "name": "Behemoth",
             "hp": 180,
-            "steps": 5.2,
+            "steps": 4.2,
             "speed": 5.5,
             "armor": 34,
             "attack_type": "MELEE",
@@ -1019,7 +1019,7 @@
             "size": 2,
             "level": 3,
             "spells": [],
-            "abilities": ["Unyielding Power"]
+            "abilities": ["Unyielding Power", "Deep Wounds Level 3"]
         },
         "Frenzied Boar": {
             "name": "Frenzied Boar",

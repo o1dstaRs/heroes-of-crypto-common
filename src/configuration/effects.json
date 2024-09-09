@@ -35,5 +35,11 @@
         "laps": 1,
         "power": 40,
         "desc": "The affected enemy is unable to move and has {}% damage reduction."
+    },
+    "Deep Wounds": {
+        "name": "Deep Wounds",
+        "laps": 3,
+        "power": 0,
+        "desc": "Next attack with Deep Wounds ability will deal {}% more damage."
     }
 }
