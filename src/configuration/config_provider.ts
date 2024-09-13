@@ -185,6 +185,14 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
         throw new TypeError(`Invalid effect list for ability ${abilityName}`);
     }
 
+    if (
+        ability.can_be_casted === undefined ||
+        ability.can_be_casted === null ||
+        ability.can_be_casted.constructor !== Boolean
+    ) {
+        throw TypeError(`Unknown 'can_be_casted' type for ability ${abilityName}`);
+    }
+
     return new AbilityProperties(
         abilityName,
         abilityType,
@@ -195,6 +203,7 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
         ability.stack_powered,
         ability.effect,
         ability.aura_effect,
+        ability.can_be_casted,
     );
 };
 
@@ -334,6 +343,38 @@ export const getSpellConfig = (faction: FactionType, spellName: string): SpellPr
         throw TypeError(`Unknown 'conflicts_with' type for the spell - ${spellName}`);
     }
 
+    if (
+        spellConfig.is_buff === undefined ||
+        spellConfig.is_buff === null ||
+        spellConfig.is_buff.constructor !== Boolean
+    ) {
+        throw TypeError(`Unknown 'is_buff' type for the spell - ${spellName}`);
+    }
+
+    if (
+        spellConfig.is_giftable === undefined ||
+        spellConfig.is_giftable === null ||
+        spellConfig.is_giftable.constructor !== Boolean
+    ) {
+        throw TypeError(`Unknown 'is_giftable' type for the spell - ${spellName}`);
+    }
+
+    if (
+        spellConfig.minimal_caster_stack_power === undefined ||
+        spellConfig.minimal_caster_stack_power === null ||
+        spellConfig.minimal_caster_stack_power.constructor !== Number
+    ) {
+        throw TypeError(`Unknown 'minimal_caster_stack_power' type for the spell - ${spellName}`);
+    }
+
+    if (
+        spellConfig.maximum_gift_level === undefined ||
+        spellConfig.maximum_gift_level === null ||
+        spellConfig.maximum_gift_level.constructor !== Number
+    ) {
+        throw TypeError(`Unknown 'maximum_gift_level' type for the spell - ${spellName}`);
+    }
+
     const targetType =
         spellConfig.target && spellConfig.target.constructor === String
             ? ToSpellTargetType[spellConfig.target as string]
@@ -364,6 +405,8 @@ export const getSpellConfig = (faction: FactionType, spellName: string): SpellPr
         spellConfig.self_debuff_applies,
         spellConfig.minimal_caster_stack_power,
         spellConfig.conflicts_with,
+        spellConfig.is_giftable,
+        spellConfig.maximum_gift_level,
     );
 };
 

@@ -13,7 +13,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Dismorale": {
             "name": "Dismorale",
@@ -27,7 +29,25 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Wild Regeneration": {
+            "name": "Wild Regeneration",
+            "level": 0,
+            "desc": ["Grant ability to restore health up to its maximum HP at the start of its turn."],
+            "target": "ANY_ALLY",
+            "power": 0,
+            "power_type": "HEAL",
+            "laps": 18,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": true,
+            "maximum_gift_level": 3
         }
     },
     "Life": {
@@ -43,7 +63,25 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Spiritual Armor": {
+            "name": "Spiritual Armor",
+            "level": 1,
+            "desc": ["Grants an ally an additional 30% armor.", "Lasts 3 laps."],
+            "target": "ANY_ALLY",
+            "power": 30,
+            "power_type": "COMMON",
+            "laps": 3,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Blessing": {
             "name": "Blessing",
@@ -57,7 +95,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 3,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Helping Hand": {
             "name": "Helping Hand",
@@ -71,7 +111,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": true,
             "minimal_caster_stack_power": 4,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Courage": {
             "name": "Courage",
@@ -85,7 +127,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Mass Heal": {
             "name": "Mass Heal",
@@ -99,7 +143,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 3,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Nature": {
@@ -115,7 +161,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Chaos": {
@@ -131,7 +179,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": ["Mass Riot"]
+            "conflicts_with": ["Mass Riot"],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Mass Riot": {
             "name": "Mass Riot",
@@ -145,7 +195,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 4,
-            "conflicts_with": ["Riot"]
+            "conflicts_with": ["Riot"],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Magic Mirror": {
             "name": "Magic Mirror",
@@ -163,7 +215,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": ["Mass Magic Mirror"]
+            "conflicts_with": ["Mass Magic Mirror"],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Mass Magic Mirror": {
             "name": "Mass Magic Mirror",
@@ -181,7 +235,9 @@
             "self_cast_allowed": true,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 4,
-            "conflicts_with": ["Magic Mirror"]
+            "conflicts_with": ["Magic Mirror"],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Death": {
@@ -197,7 +253,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Quagmire": {
             "name": "Quagmire",
@@ -211,7 +269,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Weakening Beam": {
             "name": "Weakening Beam",
@@ -225,7 +285,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Weakness": {
             "name": "Weakness",
@@ -239,7 +301,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Order": {
@@ -255,7 +319,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         },
         "Cowardice": {
             "name": "Cowardice",
@@ -269,7 +335,9 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
-            "conflicts_with": []
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     }
 }

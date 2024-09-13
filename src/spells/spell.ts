@@ -102,6 +102,14 @@ export class Spell {
         return this.amountRemaining > 0;
     }
 
+    public isGiftable(): boolean {
+        return this.spellProperties.is_giftable;
+    }
+
+    public getMaximumGiftLevel(): number {
+        return this.spellProperties.maximum_gift_level;
+    }
+
     public isSummon(): boolean {
         return this.isSummonSpell;
     }
@@ -114,7 +122,14 @@ export class Spell {
         return this.summonUnitName;
     }
 
+    public increaseAmount(): void {
+        this.amountRemaining = Math.floor(this.amountRemaining + 1);
+    }
+
     public decreaseAmount(): void {
-        this.amountRemaining -= 1;
+        if (this.isRemaining()) {
+            this.amountRemaining -= 1;
+        }
+        this.amountRemaining = Math.floor(this.amountRemaining);
     }
 }
