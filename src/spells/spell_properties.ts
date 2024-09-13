@@ -90,6 +90,10 @@ export class SpellProperties {
 
     public readonly conflicts_with: string[];
 
+    public readonly is_giftable: boolean;
+
+    public readonly maximum_gift_level: number;
+
     public constructor(
         faction: FactionType,
         name: string,
@@ -104,6 +108,8 @@ export class SpellProperties {
         self_debuff_applies: boolean,
         minimal_caster_stack_power: number,
         conflicts_with: string[],
+        is_giftable: boolean,
+        maximum_gift_level: number,
     ) {
         this.faction = faction;
         this.name = name;
@@ -118,5 +124,7 @@ export class SpellProperties {
         this.self_debuff_applies = self_debuff_applies;
         this.minimal_caster_stack_power = minimal_caster_stack_power;
         this.conflicts_with = conflicts_with;
+        this.is_giftable = is_giftable;
+        this.maximum_gift_level = maximum_gift_level;
     }
 }

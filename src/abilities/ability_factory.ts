@@ -9,28 +9,35 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getAbilityConfig } from "../configuration/config_provider";
+import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
 import { EffectFactory } from "../effects/effect_factory";
+import { FactionType } from "../factions/faction_type";
+import { Spell } from "../spells/spell";
 import { Ability } from "./ability";
 
 export class AbilityFactory {
-    protected readonly effectsFactory: EffectFactory;
+    protected readonly effectFactory: EffectFactory;
 
-    public constructor(effectsFactory: EffectFactory) {
-        this.effectsFactory = effectsFactory;
+    public constructor(effectFactory: EffectFactory) {
+        this.effectFactory = effectFactory;
     }
 
     public getEffectsFactory(): EffectFactory {
-        return this.effectsFactory;
+        return this.effectFactory;
     }
 
     public makeAbility(name: string) {
         const abilityConfig = getAbilityConfig(name);
+        let spell: Spell | undefined = undefined;
+        if (abilityConfig.can_be_casted) {
+            spell = new Spell({ spellProperties: getSpellConfig(FactionType.NO_TYPE, abilityConfig.name), amount: 1 });
+        }
 
         return new Ability(
             abilityConfig,
-            this.effectsFactory.makeEffect(abilityConfig.effect),
-            this.effectsFactory.makeAuraEffect(abilityConfig.aura_effect),
+            this.effectFactory.makeEffect(abilityConfig.effect),
+            this.effectFactory.makeAuraEffect(abilityConfig.aura_effect),
+            spell,
         );
     }
 }

@@ -15,16 +15,9 @@ import { isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
+import { GridType } from "./grid_type";
 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];
-
-export enum GridType {
-    NO_TYPE = 0,
-    NORMAL = 1,
-    WATER_CENTER = 2,
-    LAVA_CENTER = 3,
-    BLOCK_CENTER = 4,
-}
 
 export class Grid {
     private cellsByUnitId: { [unitId: string]: XY[] } = {};
@@ -33,7 +26,7 @@ export class Grid {
 
     private boardAggrPerTeam: Map<number, number[][]> = new Map();
 
-    private readonly gridType: GridType;
+    private gridType: GridType;
 
     private readonly boardCoord: string[][];
 
@@ -41,23 +34,18 @@ export class Grid {
 
     private readonly targetBoardCoord: string[][];
 
-    private readonly availableCenterStart: number;
+    private availableCenterStart: number;
 
-    private readonly availableCenterEnd: number;
+    private availableCenterEnd: number;
 
     public constructor(gridSettings: GridSettings, gridType: GridType) {
         this.gridSettings = gridSettings;
         const gridSize = gridSettings.getGridSize();
         this.gridType = gridType;
-        if (this.gridType === GridType.NORMAL) {
-            this.availableCenterStart = gridSize >> 1;
-            this.availableCenterEnd = this.availableCenterStart;
-        } else {
-            const quarter = gridSize >> 2;
-            const halfQuarter = quarter >> 1;
-            this.availableCenterStart = quarter + halfQuarter;
-            this.availableCenterEnd = this.availableCenterStart + quarter;
-        }
+        const quarter = gridSize >> 2;
+        const halfQuarter = quarter >> 1;
+        this.availableCenterStart = quarter + halfQuarter;
+        this.availableCenterEnd = this.availableCenterStart + quarter;
         this.boardCoord = new Array(gridSize);
         this.targetBoardCoord = new Array(gridSize);
         const boardAggTeamLower: number[][] = new Array(gridSize);
@@ -101,6 +89,41 @@ export class Grid {
 
         this.boardAggrPerTeam.set(1, boardAggTeamUpper);
         this.boardAggrPerTeam.set(2, boardAggTeamLower);
+    }
+
+    public refreshWithNewType(gridType: GridType): void {
+        this.gridType = gridType;
+
+        const quarter = this.gridSettings.getGridSize() >> 2;
+        const halfQuarter = quarter >> 1;
+        this.availableCenterStart = quarter + halfQuarter;
+        this.availableCenterEnd = this.availableCenterStart + quarter;
+
+        for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
+            for (let column = 0; column < this.gridSettings.getGridSize(); column++) {
+                if (
+                    row >= this.availableCenterStart &&
+                    row < this.availableCenterEnd &&
+                    column >= this.availableCenterStart &&
+                    column < this.availableCenterEnd
+                ) {
+                    const obstacleType = this.getObstacleTypePerGrid();
+                    if (obstacleType === undefined) {
+                        this.boardCoord[row][column] = "";
+                        this.targetBoardCoord[row][column] = "";
+                    } else if (obstacleType === ObstacleType.BLOCK) {
+                        this.boardCoord[row][column] = "B";
+                        this.targetBoardCoord[row][column] = "B";
+                    } else if (obstacleType === ObstacleType.LAVA) {
+                        this.boardCoord[row][column] = "L";
+                        this.targetBoardCoord[row][column] = "L";
+                    } else if (obstacleType === ObstacleType.WATER) {
+                        this.boardCoord[row][column] = "W";
+                        this.targetBoardCoord[row][column] = "W";
+                    }
+                }
+            }
+        }
     }
 
     public hasTarget(unitId: string): boolean {

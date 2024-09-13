@@ -11,6 +11,7 @@
 
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
+import { Spell } from "../spells/spell";
 import { AbilityPowerType, AbilityProperties, AbilityType } from "./ability_properties";
 
 export class Ability {
@@ -20,14 +21,18 @@ export class Ability {
 
     private readonly auraEffect: AuraEffect | undefined;
 
+    private readonly spell: Spell | undefined;
+
     public constructor(
         abilityProperties: AbilityProperties,
         effect: Effect | undefined,
         auraEffect: AuraEffect | undefined,
+        spell: Spell | undefined,
     ) {
         this.abilityProperties = abilityProperties;
         this.effect = effect;
         this.auraEffect = auraEffect;
+        this.spell = spell;
     }
 
     public getName(): string {
@@ -66,6 +71,10 @@ export class Ability {
         return this.effect?.getName();
     }
 
+    public getSpell(): Spell | undefined {
+        return this.spell;
+    }
+
     public getAuraEffect(): AuraEffect | undefined {
         if (this.auraEffect) {
             this.auraEffect.toDefault();
@@ -77,5 +86,13 @@ export class Ability {
 
     public getAuraEffectName(): string | undefined {
         return this.auraEffect?.getName();
+    }
+
+    public getProperties(): AbilityProperties {
+        return structuredClone(this.abilityProperties);
+    }
+
+    public isStackPowered(): boolean {
+        return this.abilityProperties.stack_powered;
     }
 }

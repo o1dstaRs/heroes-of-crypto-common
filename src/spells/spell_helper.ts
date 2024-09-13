@@ -134,6 +134,7 @@ export function canCastSpell(
     alreadyAppliedBuffAndDebuffs?: AppliedSpell[],
     spell?: Spell,
     unitSpells?: Spell[],
+    targetUnitSpells?: Spell[],
     emptyGridCell?: XY,
     fromUnitId?: string,
     toUnitId?: string,
@@ -141,6 +142,7 @@ export function canCastSpell(
     toTeamType?: TeamType,
     fromUnitName?: string,
     toUnitName?: string,
+    toUnitLevel?: number,
     toUnitHp?: number,
     toUnitMaxHp?: number,
     fromUnitStackPower?: number,
@@ -159,10 +161,6 @@ export function canCastSpell(
         return false;
     }
 
-    if (spell.getPowerType() === SpellPowerType.HEAL) {
-        return toUnitHp && toUnitMaxHp && toUnitHp < toUnitMaxHp && toUnitMagicResistance !== 100;
-    }
-
     let spellFound = false;
     for (const s of unitSpells) {
         if (s.getName() === spell.getName() && s.isRemaining()) {
@@ -170,9 +168,44 @@ export function canCastSpell(
             break;
         }
     }
-
     if (!spellFound) {
         return false;
+    }
+
+    const isSelfCast =
+        (fromUnitId && toUnitId && fromUnitId === toUnitId) ||
+        (fromUnitName && toUnitName && fromUnitName === toUnitName && fromTeamType === toTeamType);
+
+    if (spell.getPowerType() === SpellPowerType.HEAL) {
+        if (spell.isGiftable()) {
+            let alreadyHasSpell = false;
+            if (targetUnitSpells) {
+                for (const targetUnitSpell of targetUnitSpells) {
+                    if (targetUnitSpell.getName() === spell.getName()) {
+                        alreadyHasSpell = true;
+                        break;
+                    }
+                }
+            }
+
+            return (
+                !alreadyHasSpell &&
+                fromTeamType &&
+                toTeamType &&
+                fromTeamType === toTeamType &&
+                toUnitLevel &&
+                toUnitLevel <= spell.getMaximumGiftLevel() &&
+                (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
+            );
+        } else {
+            return (
+                toUnitHp &&
+                toUnitMaxHp &&
+                toUnitHp < toUnitMaxHp &&
+                toUnitMagicResistance !== 100 &&
+                (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
+            );
+        }
     }
 
     const notAlreadyApplied = (): boolean => {
@@ -190,10 +223,6 @@ export function canCastSpell(
 
         return true;
     };
-
-    const isSelfCast =
-        (fromUnitId && toUnitId && fromUnitId === toUnitId) ||
-        (fromUnitName && toUnitName && fromUnitName === toUnitName && fromTeamType === toTeamType);
 
     if (spell.getSpellTargetType() === SpellTargetType.ANY_ALLY) {
         if (toUnitMagicResistance && toUnitMagicResistance === 100) {

@@ -19,6 +19,9 @@ export class Fight extends jspb.Message {
   getFirstTurnMade(): boolean;
   setFirstTurnMade(value: boolean): void;
 
+  getFightStarted(): boolean;
+  setFightStarted(value: boolean): void;
+
   getFightFinished(): boolean;
   setFightFinished(value: boolean): void;
 
@@ -96,6 +99,7 @@ export namespace Fight {
     currentLap: number,
     gridType: types_pb.GridTypeMap[keyof types_pb.GridTypeMap],
     firstTurnMade: boolean,
+    fightStarted: boolean,
     fightFinished: boolean,
     previousTurnTeam: types_pb.TeamMap[keyof types_pb.TeamMap],
     highestSpeedThisTurn: number,

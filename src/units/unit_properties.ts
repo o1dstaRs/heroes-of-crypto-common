@@ -102,7 +102,7 @@ export class UnitProperties {
 
     public magic_resist_mod: number;
 
-    public readonly can_cast_spells: boolean;
+    public can_cast_spells: boolean;
 
     public can_fly: boolean;
 
@@ -245,26 +245,26 @@ export class UnitProperties {
         this.exp = exp;
         this.size = size;
         this.level = level;
-        this.spells = spells;
-        this.abilities = abilities;
-        this.abilities_descriptions = abilities_descriptions;
-        this.abilities_stack_powered = abilities_stack_powered;
-        this.abilities_auras = abilities_auras;
-        this.applied_effects = applied_effects;
-        this.applied_buffs = applied_buffs;
-        this.applied_debuffs = applied_debuffs;
-        this.applied_effects_laps = applied_effects_laps;
-        this.applied_buffs_laps = applied_buffs_laps;
-        this.applied_debuffs_laps = applied_debuffs_laps;
-        this.applied_effects_descriptions = applied_effects_descriptions;
-        this.applied_buffs_descriptions = applied_buffs_descriptions;
-        this.applied_debuffs_descriptions = applied_debuffs_descriptions;
-        this.applied_effects_powers = applied_effects_powers;
-        this.applied_buffs_powers = applied_buffs_powers;
-        this.applied_debuffs_powers = applied_debuffs_powers;
-        this.aura_effects = aura_effects;
-        this.aura_ranges = aura_ranges;
-        this.aura_is_buff = aura_is_buff;
+        this.spells = structuredClone(spells);
+        this.abilities = structuredClone(abilities);
+        this.abilities_descriptions = structuredClone(abilities_descriptions);
+        this.abilities_stack_powered = structuredClone(abilities_stack_powered);
+        this.abilities_auras = structuredClone(abilities_auras);
+        this.applied_effects = structuredClone(applied_effects);
+        this.applied_buffs = structuredClone(applied_buffs);
+        this.applied_debuffs = structuredClone(applied_debuffs);
+        this.applied_effects_laps = structuredClone(applied_effects_laps);
+        this.applied_buffs_laps = structuredClone(applied_buffs_laps);
+        this.applied_debuffs_laps = structuredClone(applied_debuffs_laps);
+        this.applied_effects_descriptions = structuredClone(applied_effects_descriptions);
+        this.applied_buffs_descriptions = structuredClone(applied_buffs_descriptions);
+        this.applied_debuffs_descriptions = structuredClone(applied_debuffs_descriptions);
+        this.applied_effects_powers = structuredClone(applied_effects_powers);
+        this.applied_buffs_powers = structuredClone(applied_buffs_powers);
+        this.applied_debuffs_powers = structuredClone(applied_debuffs_powers);
+        this.aura_effects = structuredClone(aura_effects);
+        this.aura_ranges = structuredClone(aura_ranges);
+        this.aura_is_buff = structuredClone(aura_is_buff);
         this.luck_per_turn = 0;
         this.attack_multiplier = 1;
         this.amount_alive = amount_alive;

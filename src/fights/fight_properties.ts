@@ -12,7 +12,6 @@
 import { v4 as uuidv4 } from "uuid";
 import Denque from "denque";
 
-import { GridType } from "../grid/grid";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
@@ -25,6 +24,7 @@ import {
 } from "../constants";
 import { Fight } from "../generated/protobuf/v1/fight_pb";
 import { StringList } from "../generated/protobuf/v1/types_pb";
+import { GridType } from "../grid/grid_type";
 
 export class FightProperties {
     private id: string;
@@ -34,6 +34,8 @@ export class FightProperties {
     private gridType: GridType;
 
     private firstTurnMade: boolean;
+
+    private fightStarted: boolean;
 
     private fightFinished: boolean;
 
@@ -74,6 +76,7 @@ export class FightProperties {
         this.currentLap = 1;
         this.gridType = this.getRandomGridType();
         this.firstTurnMade = false;
+        this.fightStarted = false;
         this.fightFinished = false;
         this.previousTurnTeam = TeamType.NO_TEAM;
         this.highestSpeedThisTurn = 0;
@@ -224,6 +227,12 @@ export class FightProperties {
         return this.hasAdditionalTimeRequestedPerTeam;
     }
 
+    public setGridType(gridType: GridType): void {
+        if (!this.fightStarted) {
+            this.gridType = gridType;
+        }
+    }
+
     public dequeueNextUnitId(): string | undefined {
         return this.upNextQueue.shift();
     }
@@ -339,6 +348,10 @@ export class FightProperties {
         this.firstTurnMade = true;
     }
 
+    public startFight(): void {
+        this.fightStarted = true;
+    }
+
     public finishFight(): void {
         this.fightFinished = true;
     }
@@ -362,6 +375,10 @@ export class FightProperties {
             this.currentLap > this.getNumberOfLapsTillNarrowing() &&
             this.currentLap % this.getNumberOfLapsTillNarrowing() === 1
         );
+    }
+
+    public hasFightStarted(): boolean {
+        return this.fightStarted;
     }
 
     public getTeamUnitsAlive(teamType: TeamType): number {
@@ -460,6 +477,7 @@ export class FightProperties {
         fightProperties.currentLap = fight.getCurrentLap();
         fightProperties.gridType = fight.getGridType();
         fightProperties.firstTurnMade = fight.getFirstTurnMade();
+        fightProperties.fightStarted = fight.getFightStarted();
         fightProperties.fightFinished = fight.getFightFinished();
         fightProperties.previousTurnTeam = fight.getPreviousTurnTeam();
         fightProperties.highestSpeedThisTurn = fight.getHighestSpeedThisTurn();
@@ -511,6 +529,7 @@ export class FightProperties {
         fight.setCurrentLap(this.currentLap);
         fight.setGridType(this.gridType);
         fight.setFirstTurnMade(this.firstTurnMade);
+        fight.setFightStarted(this.fightStarted);
         fight.setFightFinished(this.fightFinished);
         fight.setPreviousTurnTeam(this.previousTurnTeam);
         fight.setHighestSpeedThisTurn(this.highestSpeedThisTurn);

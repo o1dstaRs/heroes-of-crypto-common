@@ -202,6 +202,8 @@ export class AbilityProperties {
 
     public readonly aura_effect: string | null;
 
+    public readonly can_be_casted: boolean;
+
     public constructor(
         name: string,
         type: AbilityType,
@@ -212,6 +214,7 @@ export class AbilityProperties {
         stack_powered: boolean,
         effect: string | null,
         aura_effect: string | null,
+        can_be_casted: boolean,
     ) {
         this.name = name;
         this.type = type;
@@ -222,5 +225,6 @@ export class AbilityProperties {
         this.stack_powered = stack_powered;
         this.effect = effect;
         this.aura_effect = aura_effect;
+        this.can_be_casted = can_be_casted;
     }
 }
