@@ -43,6 +43,9 @@ export enum AbilityPowerType {
     SPELLBOOK = 30,
     GAIN_ATTACK_AND_HP_EACH_LAP = 31,
     ADDITIONAL_BASE_ATTACK_AND_ARMOR = 32,
+    MIND_RESIST = 33,
+    GAIN_ATTACK_ON_LOSSES = 34,
+    STEAL_ARMOR_ON_HIT = 35,
 }
 
 export const AllAbilityPowerTypes = [
@@ -79,6 +82,9 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.SPELLBOOK,
     AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
     AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR,
+    AbilityPowerType.MIND_RESIST,
+    AbilityPowerType.GAIN_ATTACK_ON_LOSSES,
+    AbilityPowerType.STEAL_ARMOR_ON_HIT,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -118,6 +124,9 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     SPELLBOOK: AbilityPowerType.SPELLBOOK,
     GAIN_ATTACK_AND_HP_EACH_LAP: AbilityPowerType.GAIN_ATTACK_AND_HP_EACH_LAP,
     ADDITIONAL_BASE_ATTACK_AND_ARMOR: AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR,
+    MIND_RESIST: AbilityPowerType.MIND_RESIST,
+    GAIN_ATTACK_ON_LOSSES: AbilityPowerType.GAIN_ATTACK_ON_LOSSES,
+    STEAL_ARMOR_ON_HIT: AbilityPowerType.STEAL_ARMOR_ON_HIT,
 };
 
 export enum AbilityType {

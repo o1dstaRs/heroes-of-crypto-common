@@ -147,6 +147,7 @@ export function canCastSpell(
     toUnitMaxHp?: number,
     fromUnitStackPower?: number,
     toUnitMagicResistance?: number,
+    toUnitHasMindResistance?: boolean,
     targetGridCell?: XY,
 ) {
     if (
@@ -240,7 +241,10 @@ export function canCastSpell(
     }
 
     if (spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY) {
-        if (toUnitMagicResistance && toUnitMagicResistance === 100) {
+        if (
+            (toUnitMagicResistance && toUnitMagicResistance === 100) ||
+            (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance)
+        ) {
             return false;
         }
 
