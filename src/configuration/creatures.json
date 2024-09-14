@@ -129,6 +129,7 @@
                 "Life:Heal",
                 "Life:Heal",
                 "Life:Heal",
+                "Order:Cowardice",
                 "Life:Spiritual Armor",
                 "Life:Spiritual Armor",
                 "Life:Blessing",
@@ -534,9 +535,9 @@
             "hp": 11,
             "steps": 3,
             "speed": 5,
-            "armor": 12,
+            "armor": 9,
             "attack_type": "MELEE",
-            "attack": 14,
+            "attack": 13,
             "attack_damage_min": 2,
             "attack_damage_max": 3,
             "attack_range": 1,
@@ -548,7 +549,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": []
+            "abilities": ["Madness", "Blind Fury", "Miner"]
         },
         "Medusa": {
             "name": "Medusa",

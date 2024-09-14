@@ -219,7 +219,7 @@
     "Stun": {
         "name": "Stun",
         "type": "STATUS",
-        "desc": ["On attack, has a {}% chance to stun an enemy for 1 turn"],
+        "desc": ["On attack, has a {}% chance to stun (Status) an enemy for 1 turn"],
         "power": 30,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -231,7 +231,7 @@
     "Blindness": {
         "name": "Blindness",
         "type": "MIND",
-        "desc": ["When responding to a melee attack, there is a {}% chance to blind the enemy for 2 turns"],
+        "desc": ["When responding to a melee attack, there is a {}% chance to blind (Mind) the enemy for 2 turns"],
         "power": 25,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -351,7 +351,7 @@
     "Boar Saliva": {
         "name": "Boar Saliva",
         "type": "MIND",
-        "desc": ["Applying Boar Saliva to an enemy gives them a {}% chance to miss their physical attack"],
+        "desc": ["Applying Boar Saliva (Mind) to an enemy gives them a {}% chance to miss their physical attack"],
         "power": 30,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -432,7 +432,7 @@
         "type": "MIND",
         "desc": [
             "On attack, there is a chance to apply up to",
-            "{}% of additional damage to the target in amount of units."
+            "{}% of additional Mind damage to the target in amount of units"
         ],
         "power": 50,
         "power_type": "KILL_RANDOM_AMOUNT",
@@ -568,7 +568,7 @@
     "Shatter Armor": {
         "name": "Shatter Armor",
         "type": "STATUS",
-        "desc": ["Melee attacks strip {} armor from the target. The effect stacks"],
+        "desc": ["Melee attacks strip {} armor (Status) from the target. The effect stacks"],
         "power": 5,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -640,7 +640,7 @@
     "Paralysis": {
         "name": "Paralysis",
         "type": "STATUS",
-        "desc": ["An enemy affected by Paralysis is unable to move and has {}% damage reduction"],
+        "desc": ["An enemy affected by Paralysis (Status) is unable to move and has {}% damage reduction"],
         "power": 40,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
@@ -691,6 +691,42 @@
         "skip_reponse": false,
         "stack_powered": true,
         "effect": "Deep Wounds",
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Madness": {
+        "name": "Madness",
+        "type": "DEFENCE",
+        "desc": ["Grants 100% resistance to all Mind attacks and spells. The owner always has 0 morale"],
+        "power": 100,
+        "power_type": "MIND_RESIST",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Blind Fury": {
+        "name": "Blind Fury",
+        "type": "ATTACK",
+        "desc": ["The unit's attack power increases in proportion to the number of lost units. Current power: {}%"],
+        "power": 0,
+        "power_type": "GAIN_ATTACK_ON_LOSSES",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Miner": {
+        "name": "Miner",
+        "type": "ATTACK",
+        "desc": ["Permanently steals {} base armor from the enemy on hit"],
+        "power": 1,
+        "power_type": "STEAL_ARMOR_ON_HIT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
         "aura_effect": null,
         "can_be_casted": false
     }
