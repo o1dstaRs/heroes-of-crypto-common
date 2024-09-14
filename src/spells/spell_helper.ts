@@ -148,6 +148,7 @@ export function canCastSpell(
     fromUnitStackPower?: number,
     toUnitMagicResistance?: number,
     toUnitHasMindResistance?: boolean,
+    toUnitCanBeHealded?: boolean,
     targetGridCell?: XY,
 ) {
     if (
@@ -200,6 +201,7 @@ export function canCastSpell(
             );
         } else {
             return (
+                toUnitCanBeHealded &&
                 toUnitHp &&
                 toUnitMaxHp &&
                 toUnitHp < toUnitMaxHp &&

@@ -544,7 +544,7 @@
     "Book of Healing": {
         "name": "Book of Healing",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells: Heal, Blessing, Mass Heal"],
+        "desc": ["Allows the caster to access the following spells: Heal, Spiritual Armor, Blessing, Mass Heal"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -726,6 +726,21 @@
         "power_type": "STEAL_ARMOR_ON_HIT",
         "skip_reponse": false,
         "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Mechanism": {
+        "name": "Mechanism",
+        "type": "UNIT_TYPE",
+        "desc": [
+            "Invulnerable to Mind attacks and spells, poison and vampirism.",
+            "While 50% more vulnerable to Status attacks. Cannot be healed and always has 0 morale"
+        ],
+        "power": 1,
+        "power_type": "MECHANISM",
+        "skip_reponse": false,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_casted": false

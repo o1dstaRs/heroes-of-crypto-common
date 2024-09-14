@@ -46,6 +46,8 @@ export enum AbilityPowerType {
     MIND_RESIST = 33,
     GAIN_ATTACK_ON_LOSSES = 34,
     STEAL_ARMOR_ON_HIT = 35,
+    UNDEAD = 36,
+    MECHANISM = 37,
 }
 
 export const AllAbilityPowerTypes = [
@@ -85,6 +87,8 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.MIND_RESIST,
     AbilityPowerType.GAIN_ATTACK_ON_LOSSES,
     AbilityPowerType.STEAL_ARMOR_ON_HIT,
+    AbilityPowerType.UNDEAD,
+    AbilityPowerType.MECHANISM,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -127,6 +131,8 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     MIND_RESIST: AbilityPowerType.MIND_RESIST,
     GAIN_ATTACK_ON_LOSSES: AbilityPowerType.GAIN_ATTACK_ON_LOSSES,
     STEAL_ARMOR_ON_HIT: AbilityPowerType.STEAL_ARMOR_ON_HIT,
+    UNDEAD: AbilityPowerType.UNDEAD,
+    MECHANISM: AbilityPowerType.MECHANISM,
 };
 
 export enum AbilityType {
