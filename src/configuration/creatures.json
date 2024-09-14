@@ -129,7 +129,6 @@
                 "Life:Heal",
                 "Life:Heal",
                 "Life:Heal",
-                "Order:Cowardice",
                 "Life:Spiritual Armor",
                 "Life:Spiritual Armor",
                 "Life:Blessing",
@@ -201,7 +200,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["No Melee", "Through Shot"]
+            "abilities": ["Mechanism", "No Melee", "Through Shot"]
         },
         "Angel": {
             "name": "Angel",
