@@ -36,15 +36,56 @@ const verifyEmptyCell = (gridMatrix: number[][], emptyGridCell?: XY): boolean =>
 export function canMassCastSpell(
     spell: Spell,
     alliesBuffs: Map<string, AppliedSpell[]>,
+    enemiesBuffs: Map<string, AppliedSpell[]>,
     enemiesDebuffs: Map<string, AppliedSpell[]>,
     alliesMagicResists: Map<string, number>,
     enemiesMagicResists: Map<string, number>,
     alliesHp: Map<string, number>,
     alliesMaxHp: Map<string, number>,
+    alliesCanFly: Map<string, boolean>,
+    enemiesCanFly: Map<string, boolean>,
 ): boolean {
     let canBeCasted = false;
 
-    if (spell.getSpellTargetType() === SpellTargetType.ALL_ALLIES) {
+    if (spell.getSpellTargetType() === SpellTargetType.ALL_FLYING) {
+        const checkFlyingUnitsEffect = (
+            unitsCanFly: Map<string, boolean>,
+            unitsBuffs: Map<string, AppliedSpell[]>,
+            magicResists: Map<string, number>,
+            spell: Spell,
+        ): boolean => {
+            for (const [unitId, canFly] of unitsCanFly) {
+                if (canFly && magicResists.get(unitId) !== 100) {
+                    const buffs = unitsBuffs.get(unitId);
+
+                    if (buffs?.length) {
+                        let canBeCastedForUnit = true;
+
+                        for (const b of buffs) {
+                            if (spell.getConflictsWith().includes(b.getName()) || b.getName() === spell.getName()) {
+                                canBeCastedForUnit = false;
+                                break;
+                            }
+                        }
+
+                        if (canBeCastedForUnit) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        if (
+            checkFlyingUnitsEffect(alliesCanFly, alliesBuffs, alliesMagicResists, spell) ||
+            checkFlyingUnitsEffect(enemiesCanFly, enemiesBuffs, enemiesMagicResists, spell)
+        ) {
+            canBeCasted = true;
+        }
+    } else if (spell.getSpellTargetType() === SpellTargetType.ALL_ALLIES) {
         if (spell.getPowerType() === SpellPowerType.HEAL) {
             for (const [unitId, hp] of alliesHp) {
                 const maxHp = alliesMaxHp.get(unitId);
@@ -59,15 +100,15 @@ export function canMassCastSpell(
                 const allyBuffs = alliesBuffs.get(unitId);
 
                 if (allyBuffs?.length) {
-                    let canBeCastedForAlly = false;
+                    let canBeCastedForAlly = true;
 
                     for (const buff of allyBuffs) {
                         if (
-                            !spell.getConflictsWith().includes(buff.getName()) &&
-                            buff.getName() !== spell.getName() &&
-                            magicResist !== 100
+                            spell.getConflictsWith().includes(buff.getName()) ||
+                            buff.getName() === spell.getName() ||
+                            magicResist === 100
                         ) {
-                            canBeCastedForAlly = true;
+                            canBeCastedForAlly = false;
                             break;
                         }
                     }
@@ -87,15 +128,15 @@ export function canMassCastSpell(
             const enemyDebuffs = enemiesDebuffs.get(unitId);
 
             if (enemyDebuffs?.length) {
-                let canBeCastedForEnemy = false;
+                let canBeCastedForEnemy = true;
 
                 for (const debuff of enemyDebuffs) {
                     if (
-                        !spell.getConflictsWith().includes(debuff.getName()) &&
-                        debuff.getName() !== spell.getName() &&
-                        magicResist !== 100
+                        spell.getConflictsWith().includes(debuff.getName()) ||
+                        debuff.getName() === spell.getName() ||
+                        magicResist === 100
                     ) {
-                        canBeCastedForEnemy = true;
+                        canBeCastedForEnemy = false;
                         break;
                     }
                 }
@@ -138,6 +179,7 @@ export function canCastSpell(
     emptyGridCell?: XY,
     fromUnitId?: string,
     toUnitId?: string,
+    forcedUnitId?: string,
     fromTeamType?: TeamType,
     toTeamType?: TeamType,
     fromUnitName?: string,
@@ -245,7 +287,8 @@ export function canCastSpell(
     if (spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY) {
         if (
             (toUnitMagicResistance && toUnitMagicResistance === 100) ||
-            (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance)
+            (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance) ||
+            (forcedUnitId && forcedUnitId !== toUnitId)
         ) {
             return false;
         }

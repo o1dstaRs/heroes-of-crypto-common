@@ -52,8 +52,16 @@
         "name": "Pegasus Might",
         "range": 2,
         "desc": "Allies within range gain +{} base attack and armor.",
-        "power": 2,
+        "power": 3,
         "is_buff": true,
         "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR"
+    },
+    "War Anger": {
+        "name": "War Anger",
+        "range": 2,
+        "desc": "Standing within range on hit grants {}% of additional attack damage to the enemy owner.",
+        "power": 10,
+        "is_buff": false,
+        "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE"
     }
 }

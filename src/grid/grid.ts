@@ -313,6 +313,10 @@ export class Grid {
         return this.gridType;
     }
 
+    public getSettings(): GridSettings {
+        return this.gridSettings;
+    }
+
     public areAllCellsEmpty(cells: XY[], unitId?: string) {
         for (const c of cells) {
             const occupantUnitId = this.getOccupantUnitId(c);

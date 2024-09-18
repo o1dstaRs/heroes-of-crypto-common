@@ -11,7 +11,7 @@
 
 import { FactionType } from "../factions/faction_type";
 import { IModifyableUnitProperties } from "../units/unit_properties";
-import { SpellPowerType, SpellProperties, SpellTargetType } from "./spell_properties";
+import { SpellMultiplierType, SpellPowerType, SpellProperties, SpellTargetType } from "./spell_properties";
 
 export interface ICalculatedBuffsDebuffsEffect {
     baseStats: IModifyableUnitProperties;
@@ -74,6 +74,10 @@ export class Spell {
         return this.spellProperties.power_type;
     }
 
+    public getMultiplierType(): SpellMultiplierType {
+        return this.spellProperties.multiplier_type;
+    }
+
     public getLapsTotal(): number {
         return this.spellProperties.laps;
     }
@@ -120,6 +124,22 @@ export class Spell {
 
     public getSummonUnitName(): string {
         return this.summonUnitName;
+    }
+
+    public getSpellProperties(): SpellProperties {
+        return structuredClone(this.spellProperties);
+    }
+
+    public getAmount(): number {
+        return this.amountRemaining;
+    }
+
+    public setPower(power: number): void {
+        this.spellProperties.power = power;
+    }
+
+    public setDesc(desc: string[]): void {
+        this.spellProperties.desc = desc;
     }
 
     public increaseAmount(): void {
