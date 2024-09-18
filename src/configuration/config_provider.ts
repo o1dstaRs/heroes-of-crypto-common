@@ -18,9 +18,11 @@ import creaturesJson from "./creatures.json";
 import { AuraEffectProperties, EffectProperties } from "../effects/effect_properties";
 import { AbilityProperties, ToAbilityPowerType, ToAbilityType } from "../abilities/ability_properties";
 import {
+    SpellMultiplierType,
     SpellPowerType,
     SpellProperties,
     SpellTargetType,
+    ToSpellMultiplierType,
     ToSpellPowerType,
     ToSpellTargetType,
 } from "../spells/spell_properties";
@@ -157,6 +159,7 @@ export const getHeroConfig = (
         `${largeTextureName.split("_").slice(0, -1).join("_")}${heroConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MIN_UNIT_STACK_POWER,
+        "",
     );
 };
 
@@ -324,6 +327,7 @@ export const getCreatureConfig = (
         `${largeTextureName.split("_").slice(0, -1).join("_")}${creatureConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MAX_UNIT_STACK_POWER,
+        "",
     );
 };
 
@@ -391,6 +395,14 @@ export const getSpellConfig = (faction: FactionType, spellName: string): SpellPr
         throw new TypeError(`Invalid power type for spell ${spellName} = ${powerType}`);
     }
 
+    const multiplierType =
+        spellConfig.multiplier_type && spellConfig.multiplier_type.constructor === String
+            ? ToSpellMultiplierType[spellConfig.multiplier_type as string]
+            : undefined;
+    if (multiplierType === undefined || multiplierType === SpellMultiplierType.NO_TYPE) {
+        throw new TypeError(`Invalid multiplier type for spell ${spellName} = ${multiplierType}`);
+    }
+
     return new SpellProperties(
         faction,
         spellConfig.name,
@@ -399,6 +411,7 @@ export const getSpellConfig = (faction: FactionType, spellName: string): SpellPr
         targetType,
         spellConfig.power,
         powerType,
+        multiplierType,
         spellConfig.laps,
         spellConfig.is_buff,
         spellConfig.self_cast_allowed,

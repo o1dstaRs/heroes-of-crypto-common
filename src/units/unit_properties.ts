@@ -166,6 +166,8 @@ export class UnitProperties {
 
     public stack_power: number;
 
+    public target: string;
+
     public constructor(
         faction: FactionType,
         name: string,
@@ -214,6 +216,7 @@ export class UnitProperties {
         small_texture_name: string,
         large_texture_name: string,
         stack_power: number,
+        target: string,
     ) {
         this.id = uuidv4();
         this.faction = faction;
@@ -274,5 +277,6 @@ export class UnitProperties {
         this.small_texture_name = small_texture_name;
         this.large_texture_name = large_texture_name;
         this.stack_power = stack_power;
+        this.target = target;
     }
 }

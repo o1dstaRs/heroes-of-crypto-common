@@ -28,6 +28,7 @@ export * from "./spells/spell";
 export * from "./spells/spell_properties";
 export * from "./grid/path_definitions";
 export * from "./grid/path_helper";
+export * from "./grid/square_placement";
 export * from "./grid/grid_settings";
 export * from "./grid/grid_type";
 export * from "./obstacles/obstacle_type";

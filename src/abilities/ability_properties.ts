@@ -48,6 +48,8 @@ export enum AbilityPowerType {
     STEAL_ARMOR_ON_HIT = 35,
     UNDEAD = 36,
     MECHANISM = 37,
+    RESURRECTION = 38,
+    STEPS_AND_ARMOR = 39,
 }
 
 export const AllAbilityPowerTypes = [
@@ -89,6 +91,8 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.STEAL_ARMOR_ON_HIT,
     AbilityPowerType.UNDEAD,
     AbilityPowerType.MECHANISM,
+    AbilityPowerType.RESURRECTION,
+    AbilityPowerType.STEPS_AND_ARMOR,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -133,6 +137,8 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     STEAL_ARMOR_ON_HIT: AbilityPowerType.STEAL_ARMOR_ON_HIT,
     UNDEAD: AbilityPowerType.UNDEAD,
     MECHANISM: AbilityPowerType.MECHANISM,
+    RESURRECTION: AbilityPowerType.RESURRECTION,
+    STEPS_AND_ARMOR: AbilityPowerType.STEPS_AND_ARMOR,
 };
 
 export enum AbilityType {
@@ -153,6 +159,7 @@ export enum AbilityType {
     MOVEMENT = 14,
     INFO = 15,
     EFFECT = 16,
+    MASS_BUFF = 17,
 }
 
 export const AllAbilityTypes = [
@@ -173,6 +180,7 @@ export const AllAbilityTypes = [
     AbilityType.MOVEMENT,
     AbilityType.INFO,
     AbilityType.EFFECT,
+    AbilityType.MASS_BUFF,
 ];
 
 export type AllAbilityType = (typeof AllAbilityTypes)[number];
@@ -196,6 +204,7 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
     MOVEMENT: AbilityType.MOVEMENT,
     INFO: AbilityType.INFO,
     EFFECT: AbilityType.EFFECT,
+    MASS_BUFF: AbilityType.MASS_BUFF,
 };
 
 export class AbilityProperties {

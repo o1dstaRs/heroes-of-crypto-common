@@ -617,7 +617,7 @@
         "name": "Pegasus Might Aura",
         "type": "BUFF_AURA",
         "desc": ["Allies within range gain +{} base attack and armor"],
-        "power": 2,
+        "power": 3,
         "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR",
         "skip_reponse": false,
         "stack_powered": false,
@@ -744,5 +744,79 @@
         "effect": null,
         "aura_effect": null,
         "can_be_casted": false
+    },
+    "Aggr": {
+        "name": "Aggr",
+        "type": "MIND",
+        "desc": ["When applied with a {}% chance, Aggr (Mind) causes the enemy to attack only back for 1 turn"],
+        "power": 50,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Aggr",
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Skewer Strike": {
+        "name": "Skewer Strike",
+        "type": "ATTACK",
+        "desc": ["Melee attacks also affect enemies standing next to smaller targets with a {}% of attack power"],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Resurrection": {
+        "name": "Resurrection",
+        "type": "DEFENCE",
+        "desc": ["50% of the initial units supply will be restored after full stack death"],
+        "power": 1,
+        "power_type": "RESURRECTION",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "War Anger Aura": {
+        "name": "War Anger Aura",
+        "type": "DEBUFF_AURA",
+        "desc": ["The owner gains {}% of additional damage for each enemy standing within range during attack"],
+        "power": 10,
+        "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": "War Anger",
+        "can_be_casted": false
+    },
+    "Wind Flow": {
+        "name": "Wind Flow",
+        "type": "MASS_BUFF",
+        "desc": [
+            "When cast, all flying units gain 4 base armor points while losing 4 movement points, including enemies"
+        ],
+        "power": 4,
+        "power_type": "STEPS_AND_ARMOR",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": true
+    },
+    "Battle Roar": {
+        "name": "Battle Roar",
+        "type": "MASS_BUFF",
+        "desc": ["When cast, all allies gain +1 movement step for each caster"],
+        "power": 0,
+        "power_type": "ADDITIONAL_STEPS",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": true
     }
 }

@@ -41,5 +41,11 @@
         "laps": 3,
         "power": 0,
         "desc": "Next attack with Deep Wounds ability will deal {}% more damage."
+    },
+    "Aggr": {
+        "name": "Aggr",
+        "laps": 1,
+        "power": 0,
+        "desc": "Forces the target to retaliate only against the attacker, ignoring all other enemies."
     }
 }
