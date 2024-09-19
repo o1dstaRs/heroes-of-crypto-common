@@ -204,10 +204,10 @@
         },
         "Angel": {
             "name": "Angel",
-            "hp": 160,
+            "hp": 175,
             "steps": 8.8,
             "speed": 7.7,
-            "armor": 27,
+            "armor": 28,
             "attack_type": "MELEE",
             "attack": 32,
             "attack_damage_min": 55,
@@ -1004,7 +1004,7 @@
         },
         "Behemoth": {
             "name": "Behemoth",
-            "hp": 190,
+            "hp": 200,
             "steps": 4.2,
             "speed": 5.5,
             "armor": 34,
@@ -1025,7 +1025,7 @@
         },
         "Frenzied Boar": {
             "name": "Frenzied Boar",
-            "hp": 225,
+            "hp": 240,
             "steps": 6,
             "speed": 6.5,
             "armor": 40,
