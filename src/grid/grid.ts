@@ -126,6 +126,24 @@ export class Grid {
         }
     }
 
+    public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
+        if (!cells1.length || !cells2.length) {
+            return false;
+        }
+
+        for (const cell1 of cells1) {
+            for (const cell2 of cells2) {
+                const dx = Math.abs(cell1.x - cell2.x);
+                const dy = Math.abs(cell1.y - cell2.y);
+                if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1) || (dx === 1 && dy === 1)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public hasTarget(unitId: string): boolean {
         const occupiedCells = this.cellsByUnitId[unitId];
         if (!occupiedCells?.length) {
