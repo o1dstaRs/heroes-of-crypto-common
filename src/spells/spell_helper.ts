@@ -248,6 +248,9 @@ export function canCastSpell(
                 toUnitMaxHp &&
                 toUnitHp < toUnitMaxHp &&
                 toUnitMagicResistance !== 100 &&
+                fromTeamType &&
+                toTeamType &&
+                fromTeamType === toTeamType &&
                 (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
             );
         }
