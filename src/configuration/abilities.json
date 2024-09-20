@@ -818,5 +818,17 @@
         "effect": null,
         "aura_effect": null,
         "can_be_casted": true
+    },
+    "Castling": {
+        "name": "Castling",
+        "type": "ATTACK",
+        "desc": ["Swaps small opponent within movement range when casted"],
+        "power": 0,
+        "power_type": "SWAP_WITH_OPPONENT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": true
     }
 }

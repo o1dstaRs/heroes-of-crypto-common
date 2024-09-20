@@ -21,6 +21,7 @@ export enum SpellTargetType {
     ANY_ENEMY = 6,
     ANY_UNIT = 7,
     ALL_FLYING = 8,
+    ENEMY_WITHIN_MOVEMENT_RANGE = 9,
 }
 
 export const AllSpellTargetTypes = [
@@ -32,6 +33,7 @@ export const AllSpellTargetTypes = [
     SpellTargetType.ANY_ENEMY,
     SpellTargetType.ANY_UNIT,
     SpellTargetType.ALL_FLYING,
+    SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE,
 ];
 
 export type AllSpellTargetType = (typeof AllSpellTargetTypes)[number];
@@ -46,6 +48,7 @@ export const ToSpellTargetType: { [spellTargetTypeName: string]: SpellTargetType
     ANY_ENEMY: SpellTargetType.ANY_ENEMY,
     ANY_UNIT: SpellTargetType.ANY_UNIT,
     ALL_FLYING: SpellTargetType.ALL_FLYING,
+    ENEMY_WITHIN_MOVEMENT_RANGE: SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE,
 };
 
 export enum SpellPowerType {

@@ -559,7 +559,22 @@ export class Grid {
         return matrix;
     }
 
-    private getOccupantNumeric(row: number, column: number): number {
+    /**
+     * Always generates a new two-dimensional array
+     */
+    public getMatrixNoUnits(): number[][] {
+        const matrix: number[][] = new Array(this.gridSettings.getGridSize());
+        for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
+            const rowNumbers: number[] = new Array(this.gridSettings.getGridSize());
+            for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
+                rowNumbers[row] = this.getOccupantNumeric(row, column, true);
+            }
+            matrix[column] = rowNumbers;
+        }
+        return matrix;
+    }
+
+    private getOccupantNumeric(row: number, column: number, excludeUnits = false): number {
         const r = this.boardCoord[row];
         if (r === undefined) {
             return 0;
@@ -572,7 +587,11 @@ export class Grid {
         if (r[column] || tr[column]) {
             const team = this.unitIdToTeam[r[column]];
             if (team) {
-                return team;
+                if (excludeUnits) {
+                    return 0;
+                } else {
+                    return team;
+                }
             }
         }
 

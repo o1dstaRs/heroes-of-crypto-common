@@ -1255,7 +1255,6 @@ export class PathHelper {
                         }
 
                         stepsRemaining.set(keyNeighbor, remaining - moveCost);
-                        //                        curWeightedRoute.route.push(n);
                         const weightedRoute = {
                             cell: { x: n.x, y: n.y },
                             route: [...curWeightedRoute.route, n],
@@ -1338,8 +1337,6 @@ export class PathHelper {
                         }
                         queue.push(weightedRoute);
                         visited.add(keyNeighbor);
-
-                        //          console.log(`${n.x}:${n.y} is diag: ${isDiagMove} stepsRemaining: ${stepsRemaining.get(keyNeighbor)}`);
                     }
                 }
             }
