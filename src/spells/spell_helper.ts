@@ -176,7 +176,7 @@ export function canCastSpell(
     spell?: Spell,
     unitSpells?: Spell[],
     targetUnitSpells?: Spell[],
-    emptyGridCell?: XY,
+    targetCell?: XY,
     fromUnitId?: string,
     toUnitId?: string,
     forcedUnitId?: string,
@@ -187,10 +187,12 @@ export function canCastSpell(
     toUnitLevel?: number,
     toUnitHp?: number,
     toUnitMaxHp?: number,
+    toUnitIsSmallSize?: boolean,
     fromUnitStackPower?: number,
     toUnitMagicResistance?: number,
     toUnitHasMindResistance?: boolean,
     toUnitCanBeHealded?: boolean,
+    currentEnemiesCellsWithinMovementRange?: XY[],
     targetGridCell?: XY,
 ) {
     if (
@@ -256,6 +258,20 @@ export function canCastSpell(
         }
     }
 
+    const oneOfTheEnemiesHasTargetCell = (): boolean => {
+        if (!currentEnemiesCellsWithinMovementRange?.length) {
+            return false;
+        }
+
+        for (const c of currentEnemiesCellsWithinMovementRange) {
+            if (c.x === targetCell?.x && c.y === targetCell?.y) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     const notAlreadyApplied = (): boolean => {
         const willConclictWith = spell.getConflictsWith();
         if (alreadyAppliedBuffAndDebuffs?.length) {
@@ -287,7 +303,12 @@ export function canCastSpell(
         }
     }
 
-    if (spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY) {
+    if (
+        spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY ||
+        (spell.getSpellTargetType() === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE &&
+            toUnitIsSmallSize &&
+            oneOfTheEnemiesHasTargetCell())
+    ) {
         if (
             (toUnitMagicResistance && toUnitMagicResistance === 100) ||
             (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance) ||
@@ -307,7 +328,7 @@ export function canCastSpell(
         spell.getSpellTargetType() === SpellTargetType.FREE_CELL &&
         isCellWithinGrid(gridSettings, targetGridCell)
     ) {
-        return !verifyEmptyCell(gridMatrix, emptyGridCell);
+        return !verifyEmptyCell(gridMatrix, targetCell);
     }
 
     return false;

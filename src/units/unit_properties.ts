@@ -28,6 +28,21 @@ export const ToAttackType: { [attackTypeName: string]: AttackType } = {
     MAGIC: AttackType.MAGIC,
 };
 
+export enum MovementType {
+    NO_TYPE = 0,
+    WALK = 1,
+    FLY = 2,
+    TELEPORT = 3,
+}
+
+export const ToMovementType: { [movementTypeName: string]: MovementType } = {
+    "": MovementType.NO_TYPE,
+    NO_TYPE: MovementType.NO_TYPE,
+    WALK: MovementType.WALK,
+    FLY: MovementType.FLY,
+    TELEPORT: MovementType.TELEPORT,
+};
+
 export enum TeamType {
     NO_TEAM = 0,
     UPPER = 1,
@@ -104,7 +119,7 @@ export class UnitProperties {
 
     public can_cast_spells: boolean;
 
-    public can_fly: boolean;
+    public movement_type: MovementType;
 
     public exp: number;
 
@@ -185,7 +200,7 @@ export class UnitProperties {
         range_shots: number,
         shot_distance: number,
         magic_resist: number,
-        can_fly: boolean,
+        movement_type: MovementType,
         exp: number,
         size: number,
         level: number,
@@ -244,7 +259,7 @@ export class UnitProperties {
         this.magic_resist = magic_resist;
         this.magic_resist_mod = 0;
         this.can_cast_spells = spells.length > 0;
-        this.can_fly = can_fly;
+        this.movement_type = movement_type;
         this.exp = exp;
         this.size = size;
         this.level = level;
