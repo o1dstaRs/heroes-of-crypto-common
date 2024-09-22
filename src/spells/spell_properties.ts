@@ -56,9 +56,15 @@ export enum SpellPowerType {
     COMMON = 1,
     MIND = 2,
     HEAL = 3,
+    POSITION_CHANGE = 4,
 }
 
-export const AllSpellPowerTypes = [SpellPowerType.COMMON, SpellPowerType.MIND, SpellPowerType.HEAL];
+export const AllSpellPowerTypes = [
+    SpellPowerType.COMMON,
+    SpellPowerType.MIND,
+    SpellPowerType.HEAL,
+    SpellPowerType.POSITION_CHANGE,
+];
 
 export type AllSpellPowerType = (typeof AllSpellPowerTypes)[number];
 
@@ -67,6 +73,7 @@ export const ToSpellPowerType: { [spellPowerTypeName: string]: SpellPowerType } 
     COMMON: SpellPowerType.COMMON,
     MIND: SpellPowerType.MIND,
     HEAL: SpellPowerType.HEAL,
+    POSITION_CHANGE: SpellPowerType.POSITION_CHANGE,
 };
 
 export enum SpellMultiplierType {

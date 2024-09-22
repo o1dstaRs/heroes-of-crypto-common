@@ -17,6 +17,7 @@ import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "..
 import {
     MAX_TIME_TO_MAKE_TURN_MILLIS,
     MIN_TIME_TO_MAKE_TURN_MILLIS,
+    NUMBER_OF_LAPS_FIRST_ARMAGEDDON,
     NUMBER_OF_LAPS_TILL_NARROWING_BLOCK,
     NUMBER_OF_LAPS_TILL_NARROWING_NORMAL,
     STEPS_MORALE_MULTIPLIER,
@@ -375,6 +376,23 @@ export class FightProperties {
             this.currentLap > this.getNumberOfLapsTillNarrowing() &&
             this.currentLap % this.getNumberOfLapsTillNarrowing() === 1
         );
+    }
+
+    public getArmageddonWave(): number {
+        return Math.floor(this.currentLap - NUMBER_OF_LAPS_FIRST_ARMAGEDDON + 1);
+    }
+
+    public isTimeToDryCenter(): boolean {
+        let isTimeToDryCenter = false;
+        if (this.gridType === GridType.LAVA_CENTER || this.gridType === GridType.WATER_CENTER) {
+            const numberOfLapsTillNarrowing = this.getNumberOfLapsTillNarrowing();
+            const narrowedTimes = Math.floor((this.currentLap - 1) / numberOfLapsTillNarrowing);
+            if (narrowedTimes === numberOfLapsTillNarrowing) {
+                return true;
+            }
+        }
+
+        return isTimeToDryCenter;
     }
 
     public hasFightStarted(): boolean {

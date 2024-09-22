@@ -27,7 +27,15 @@ import {
     ToSpellTargetType,
 } from "../spells/spell_properties";
 import { FactionType } from "../factions/faction_type";
-import { AttackType, TeamType, ToAttackType, UnitProperties, UnitType } from "../units/unit_properties";
+import {
+    AttackType,
+    MovementType,
+    TeamType,
+    ToAttackType,
+    ToMovementType,
+    UnitProperties,
+    UnitType,
+} from "../units/unit_properties";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 
 const DEFAULT_HERO_CONFIG = {
@@ -43,7 +51,7 @@ const DEFAULT_HERO_CONFIG = {
     range_shots: 10,
     shot_distance: 5,
     magic_resists: 5,
-    can_fly: false,
+    movement_type: "WALK",
     exp: 0,
     size: 1,
     level: 1,
@@ -111,6 +119,14 @@ export const getHeroConfig = (
         throw new TypeError(`Invalid attack type for hero ${heroName} = ${attackType}`);
     }
 
+    const movementType =
+        heroConfig.movement_type && heroConfig.movement_type.constructor === String
+            ? ToMovementType[heroConfig.movement_type as string]
+            : undefined;
+    if (movementType === undefined || movementType === MovementType.NO_TYPE) {
+        throw new TypeError(`Invalid movement type for hero ${heroName} = ${movementType}`);
+    }
+
     return new UnitProperties(
         faction,
         heroName,
@@ -128,7 +144,7 @@ export const getHeroConfig = (
         heroConfig.range_shots,
         heroConfig.shot_distance,
         heroConfig.magic_resists,
-        heroConfig.can_fly,
+        movementType,
         heroConfig.exp,
         heroConfig.size,
         heroConfig.level,
@@ -237,6 +253,14 @@ export const getCreatureConfig = (
         throw new TypeError(`Invalid attack type for creature ${creatureName} = ${attackType}`);
     }
 
+    const movementType =
+        creatureConfig.movement_type && creatureConfig.movement_type.constructor === String
+            ? ToMovementType[creatureConfig.movement_type as string]
+            : undefined;
+    if (movementType === undefined || movementType === MovementType.NO_TYPE) {
+        throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
+    }
+
     const luck = DEFAULT_LUCK_PER_FACTION[faction] ?? 0;
     const morale = DEFAULT_MORALE_PER_FACTION[faction] ?? 0;
 
@@ -296,7 +320,7 @@ export const getCreatureConfig = (
         creatureConfig.range_shots,
         creatureConfig.shot_distance,
         creatureConfig.magic_resist,
-        creatureConfig.can_fly,
+        movementType,
         creatureConfig.exp,
         creatureConfig.size,
         creatureConfig.level,

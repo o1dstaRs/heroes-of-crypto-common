@@ -38,6 +38,8 @@ export class Grid {
 
     private availableCenterEnd: number;
 
+    private cleanedUpCenter = false;
+
     public constructor(gridSettings: GridSettings, gridType: GridType) {
         this.gridSettings = gridSettings;
         const gridSize = gridSettings.getGridSize();
@@ -91,6 +93,33 @@ export class Grid {
         this.boardAggrPerTeam.set(2, boardAggTeamLower);
     }
 
+    public cleanupCenterObstacle(): void {
+        if (
+            !this.cleanedUpCenter &&
+            (this.gridType === GridType.LAVA_CENTER || this.gridType === GridType.WATER_CENTER)
+        ) {
+            const quarter = this.gridSettings.getGridSize() >> 2;
+            const halfQuarter = quarter >> 1;
+            this.availableCenterStart = quarter + halfQuarter;
+            this.availableCenterEnd = this.availableCenterStart + quarter;
+
+            for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
+                for (let column = 0; column < this.gridSettings.getGridSize(); column++) {
+                    if (
+                        row >= this.availableCenterStart &&
+                        row < this.availableCenterEnd &&
+                        column >= this.availableCenterStart &&
+                        column < this.availableCenterEnd
+                    ) {
+                        this.boardCoord[row][column] = "";
+                        this.targetBoardCoord[row][column] = "";
+                    }
+                }
+            }
+            this.cleanedUpCenter = true;
+        }
+    }
+
     public refreshWithNewType(gridType: GridType): void {
         this.gridType = gridType;
 
@@ -124,6 +153,7 @@ export class Grid {
                 }
             }
         }
+        this.cleanedUpCenter = false;
     }
 
     public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
@@ -292,11 +322,11 @@ export class Grid {
 
         this.unitIdToTeam[unitId] = team;
 
-        //    console.log(`${unitId} TRY OCCUPY ${cell.x} ${cell.y}`);
+        // console.log(`${unitId} TRY OCCUPY ${cell.x} ${cell.y}`);
 
         const occupantUnitId = this.getOccupantUnitId(cell);
         if (occupantUnitId) {
-            // console.log(`${unitId} ALREADY OCCUPIED ${cellPosition.x} ${cellPosition.y} by ${occupantUnitId}`);
+            // console.log(`${unitId} ALREADY OCCUPIED ${cell.x} ${cell.y} by ${occupantUnitId}`);
             return false;
         }
 
@@ -599,7 +629,8 @@ export class Grid {
             row >= this.availableCenterStart &&
             row < this.availableCenterEnd &&
             column >= this.availableCenterStart &&
-            column < this.availableCenterEnd
+            column < this.availableCenterEnd &&
+            !this.cleanedUpCenter
         ) {
             const obstacleType = this.getObstacleTypePerGrid();
             if (obstacleType !== undefined) {
