@@ -21,7 +21,7 @@ export const AllGridTypes = [GridType.NORMAL, GridType.WATER_CENTER, GridType.LA
 
 export type AllGridType = (typeof AllGridTypes)[number];
 
-export const ToGridType: { [gridTypeName: string]: GridType } = {
+export const ToGridType: { [gridTypeValue: string]: GridType } = {
     "": GridType.NO_TYPE,
     "1": GridType.NORMAL,
     "2": GridType.WATER_CENTER,
