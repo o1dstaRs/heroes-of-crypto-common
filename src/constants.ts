@@ -3,17 +3,18 @@ export const PENALTY_ON_RANGE_SHOT_THROUGH_TEAMMATES = false;
 export const MIN_UNIT_STACK_POWER = 1;
 export const MAX_UNIT_STACK_POWER = 5;
 
-// teams
+// teams & augments
 export const MAX_UNITS_PER_TEAM = 8;
+export const MAX_AUGMENT_POINTS = 7;
 
 // map
 export const NUMBER_OF_LAPS_TILL_NARROWING_NORMAL = 3;
 export const NUMBER_OF_LAPS_TILL_NARROWING_BLOCK = 4;
-export const NUMBER_OF_LAPS_TILL_STOP_NARROWING = 15;
+export const NUMBER_OF_LAPS_TILL_STOP_NARROWING = 12;
 export const NUMBER_OF_LAPS_FIRST_ARMAGEDDON = NUMBER_OF_LAPS_TILL_STOP_NARROWING;
 export const NUMBER_OF_ARMAGEDDON_WAVES = 4;
 
-// morale and luck
+// morale & luck
 export const MORALE_CHANGE_FOR_DISTANCE = 3;
 export const MORALE_CHANGE_FOR_SHIELD_OR_CLOCK = 2;
 export const MORALE_CHANGE_FOR_SKIP = 1;

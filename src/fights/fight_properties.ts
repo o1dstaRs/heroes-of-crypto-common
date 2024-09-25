@@ -15,7 +15,9 @@ import Denque from "denque";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
+    MAX_AUGMENT_POINTS,
     MAX_TIME_TO_MAKE_TURN_MILLIS,
+    MAX_UNITS_PER_TEAM,
     MIN_TIME_TO_MAKE_TURN_MILLIS,
     NUMBER_OF_LAPS_FIRST_ARMAGEDDON,
     NUMBER_OF_LAPS_TILL_NARROWING_BLOCK,
@@ -26,6 +28,13 @@ import {
 import { Fight } from "../generated/protobuf/v1/fight_pb";
 import { StringList } from "../generated/protobuf/v1/types_pb";
 import { GridType } from "../grid/grid_type";
+import {
+    ArmorAugment,
+    AugmentType,
+    DefaultPlacementLevel1,
+    getPlacementSizes,
+    PlacementAugment,
+} from "../augments/augment_properties";
 
 export class FightProperties {
     private id: string;
@@ -69,8 +78,13 @@ export class FightProperties {
     private upNextQueue: Denque<string>;
 
     private stepsMoraleMultiplier: number;
-
     private hasAdditionalTimeRequestedPerTeam: Map<TeamType, boolean>;
+
+    private defaultPlacementPerTeam: Map<TeamType, DefaultPlacementLevel1>;
+
+    private augmentPlacementPerTeam: Map<TeamType, PlacementAugment>;
+
+    private augmentArmorPerTeam: Map<TeamType, ArmorAugment>;
 
     public constructor() {
         this.id = uuidv4();
@@ -93,8 +107,11 @@ export class FightProperties {
         this.currentTurnEnd = 0;
         this.currentLapTotalTimePerTeam = new Map();
         this.upNextQueue = new Denque();
-        this.stepsMoraleMultiplier = 0;
         this.hasAdditionalTimeRequestedPerTeam = new Map();
+        this.stepsMoraleMultiplier = 0;
+        this.defaultPlacementPerTeam = new Map();
+        this.augmentPlacementPerTeam = new Map();
+        this.augmentArmorPerTeam = new Map();
     }
 
     private getRandomGridType(): GridType {
@@ -180,6 +197,17 @@ export class FightProperties {
         return this.currentTurnEnd;
     }
 
+    public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
+        console.log(this.augmentPlacementPerTeam);
+        console.log(`getNumberOfUnitsAvailableForPlacement ${teamType}`);
+        console.log(this.augmentPlacementPerTeam.get(teamType));
+        return (
+            MAX_UNITS_PER_TEAM -
+            PlacementAugment.LEVEL_3 +
+            (this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1)
+        );
+    }
+
     public upNextIncludes(unitId: string): boolean {
         for (let i = 0; i < this.upNextQueue.length; i++) {
             if (this.upNextQueue.get(i) === unitId) {
@@ -223,7 +251,6 @@ export class FightProperties {
     public getStepsMoraleMultiplier(): number {
         return this.stepsMoraleMultiplier;
     }
-
     public getHasAdditionalTimeRequestedPerTeam(): Map<TeamType, boolean> {
         return this.hasAdditionalTimeRequestedPerTeam;
     }
@@ -299,8 +326,8 @@ export class FightProperties {
         if (!teamType) {
             return 0;
         }
-
         const hasAdditionaTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(teamType);
+
         if (hasAdditionaTimeRequested) {
             return 0;
         }
@@ -335,8 +362,8 @@ export class FightProperties {
                 ),
             );
             if (!justCheck) {
-                this.currentTurnEnd += additionalTime;
                 this.hasAdditionalTimeRequestedPerTeam.set(teamType, true);
+                this.currentTurnEnd += additionalTime;
             }
 
             return additionalTime;
@@ -367,8 +394,8 @@ export class FightProperties {
         this.moraleMinusQueue.clear();
         this.moralePlusQueue.clear();
         this.upNextQueue.clear();
-        this.currentLapTotalTimePerTeam.clear();
         this.hasAdditionalTimeRequestedPerTeam.clear();
+        this.currentLapTotalTimePerTeam.clear();
     }
 
     public isNarrowingLap(): boolean {
@@ -487,6 +514,62 @@ export class FightProperties {
         this.previousTurnTeam = teamType;
     }
 
+    public setDefaultPlacementPerTeam(teamType: TeamType, placement: DefaultPlacementLevel1): void {
+        if (!this.defaultPlacementPerTeam.has(teamType)) {
+            this.defaultPlacementPerTeam.set(teamType, placement);
+            this.augmentPlacementPerTeam.set(teamType, PlacementAugment.LEVEL_1);
+        }
+    }
+
+    public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
+        if (this.canAugment(teamType, augmentType)) {
+            if (augmentType.type === "Placement") {
+                this.augmentPlacementPerTeam.set(teamType, augmentType.value);
+                return true;
+            } else if (augmentType.type === "Armor") {
+                this.augmentArmorPerTeam.set(teamType, augmentType.value);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public getAugmentPlacement(teamType: TeamType): number[] {
+        const defaultPlacement = this.defaultPlacementPerTeam.get(teamType);
+        if (defaultPlacement === undefined || defaultPlacement === null) {
+            throw new Error(`Default placement not found for team ${teamType}`);
+        }
+
+        const augmentPlacement = this.augmentPlacementPerTeam.get(teamType);
+        if (augmentPlacement === undefined || augmentPlacement === null) {
+            throw new Error(`Augment placement not found for team ${teamType}`);
+        }
+
+        return getPlacementSizes(augmentPlacement, defaultPlacement);
+    }
+
+    public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
+        if (!augmentType || augmentType.value < 0 || !augmentType.type) {
+            return false;
+        }
+
+        const augmentPoints = Math.floor(augmentType.value);
+        let augmentPlacement;
+        if (augmentType.type === "Placement") {
+            augmentPlacement = PlacementAugment.LEVEL_1;
+        } else {
+            augmentPlacement = this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1;
+        }
+
+        const currentAugmentPoints = augmentPlacement;
+        if (currentAugmentPoints + augmentPoints > MAX_AUGMENT_POINTS) {
+            return false;
+        }
+
+        return true;
+    }
+
     public static deserialize(bytes: Uint8Array): FightProperties {
         const fight = Fight.deserializeBinary(bytes);
         const fightProperties = new FightProperties();
@@ -531,7 +614,6 @@ export class FightProperties {
 
         fightProperties.upNextQueue = new Denque(fight.getUpNextList());
         fightProperties.stepsMoraleMultiplier = fight.getStepsMoraleMultiplier();
-
         // Deserialize hasAdditionalTimeRequestedPerTeam
         const hasAdditionalTimeRequestedPerTeamMap = fight.getHasAdditionalTimeRequestedPerTeamMap();
         hasAdditionalTimeRequestedPerTeamMap.forEach((value: boolean, key: TeamType) => {
@@ -583,12 +665,12 @@ export class FightProperties {
         currentLapTotalTimePerTeam.set(TeamType.UPPER, upperCurrentLapTotalTime);
         currentLapTotalTimePerTeam.set(TeamType.LOWER, lowerCurrentLapTotalTime);
         fight.setUpNextList(this.upNextQueue.toArray());
-        fight.setStepsMoraleMultiplier(this.stepsMoraleMultiplier);
         const hasAdditionalTimeRequestedPerTeam = fight.getHasAdditionalTimeRequestedPerTeamMap();
         const upperAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamType.UPPER) ?? false;
         const lowerAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamType.LOWER) ?? false;
         hasAdditionalTimeRequestedPerTeam.set(TeamType.UPPER, upperAdditionalTimeRequested);
         hasAdditionalTimeRequestedPerTeam.set(TeamType.LOWER, lowerAdditionalTimeRequested);
+        fight.setStepsMoraleMultiplier(this.stepsMoraleMultiplier);
 
         return fight.serializeBinary();
     }
