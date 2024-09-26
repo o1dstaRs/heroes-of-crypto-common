@@ -35,7 +35,7 @@ export function canApplyAuraEffect(unitAttackType: AttackType, auraEffectPropert
     }
 
     if (
-        unitAttackType === AttackType.MELEE &&
+        (unitAttackType === AttackType.MELEE || unitAttackType === AttackType.MAGIC) &&
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE
     ) {
         return true;
