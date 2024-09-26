@@ -108,6 +108,46 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Armor Augment": {
+            "name": "Armor Augment",
+            "level": 0,
+            "desc": [
+                "Level []. Augment boosts the entire team's base armor by {}%.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Might Augment": {
+            "name": "Might Augment",
+            "level": 0,
+            "desc": [
+                "Level []. Augment increases the base attack of the entire team by {}%.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Life": {

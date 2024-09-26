@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { EffectProperties } from "./effect_properties";
 
 export class Effect {
@@ -46,7 +47,10 @@ export class Effect {
     }
 
     public extend(): void {
-        if (this.effectProperties.laps === Number.MAX_SAFE_INTEGER) {
+        if (
+            this.effectProperties.laps === Number.MAX_SAFE_INTEGER ||
+            this.effectProperties.laps === NUMBER_OF_LAPS_TOTAL
+        ) {
             return;
         }
 
@@ -58,7 +62,10 @@ export class Effect {
     }
 
     public minusLap(): void {
-        if (this.effectProperties.laps === Number.MAX_SAFE_INTEGER) {
+        if (
+            this.effectProperties.laps === Number.MAX_SAFE_INTEGER ||
+            this.effectProperties.laps === NUMBER_OF_LAPS_TOTAL
+        ) {
             return;
         }
 

@@ -33,6 +33,7 @@ import {
     AugmentType,
     DefaultPlacementLevel1,
     getPlacementSizes,
+    MightAugment,
     PlacementAugment,
 } from "../augments/augment_properties";
 
@@ -86,6 +87,8 @@ export class FightProperties {
 
     private augmentArmorPerTeam: Map<TeamType, ArmorAugment>;
 
+    private augmentMightPerTeam: Map<TeamType, MightAugment>;
+
     public constructor() {
         this.id = uuidv4();
         this.currentLap = 1;
@@ -112,6 +115,7 @@ export class FightProperties {
         this.defaultPlacementPerTeam = new Map();
         this.augmentPlacementPerTeam = new Map();
         this.augmentArmorPerTeam = new Map();
+        this.augmentMightPerTeam = new Map();
     }
 
     private getRandomGridType(): GridType {
@@ -198,9 +202,6 @@ export class FightProperties {
     }
 
     public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
-        console.log(this.augmentPlacementPerTeam);
-        console.log(`getNumberOfUnitsAvailableForPlacement ${teamType}`);
-        console.log(this.augmentPlacementPerTeam.get(teamType));
         return (
             MAX_UNITS_PER_TEAM -
             PlacementAugment.LEVEL_3 +
@@ -518,6 +519,8 @@ export class FightProperties {
         if (!this.defaultPlacementPerTeam.has(teamType)) {
             this.defaultPlacementPerTeam.set(teamType, placement);
             this.augmentPlacementPerTeam.set(teamType, PlacementAugment.LEVEL_1);
+            this.augmentArmorPerTeam.set(teamType, ArmorAugment.NO_AUGMENT);
+            this.augmentMightPerTeam.set(teamType, MightAugment.NO_AUGMENT);
         }
     }
 
@@ -528,6 +531,9 @@ export class FightProperties {
                 return true;
             } else if (augmentType.type === "Armor") {
                 this.augmentArmorPerTeam.set(teamType, augmentType.value);
+                return true;
+            } else if (augmentType.type === "Might") {
+                this.augmentMightPerTeam.set(teamType, augmentType.value);
                 return true;
             }
         }
@@ -549,6 +555,14 @@ export class FightProperties {
         return getPlacementSizes(augmentPlacement, defaultPlacement);
     }
 
+    public getAugmentArmor(teamType: TeamType): ArmorAugment {
+        return this.augmentArmorPerTeam.get(teamType) ?? ArmorAugment.NO_AUGMENT;
+    }
+
+    public getAugmentMight(teamType: TeamType): MightAugment {
+        return this.augmentMightPerTeam.get(teamType) ?? MightAugment.NO_AUGMENT;
+    }
+
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
         if (!augmentType || augmentType.value < 0 || !augmentType.type) {
             return false;
@@ -562,7 +576,21 @@ export class FightProperties {
             augmentPlacement = this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1;
         }
 
-        const currentAugmentPoints = augmentPlacement;
+        let augmentArmor;
+        if (augmentType.type === "Armor") {
+            augmentArmor = ArmorAugment.NO_AUGMENT;
+        } else {
+            augmentArmor = this.augmentArmorPerTeam.get(teamType) ?? ArmorAugment.NO_AUGMENT;
+        }
+
+        let augmentMight;
+        if (augmentType.type === "Might") {
+            augmentMight = MightAugment.NO_AUGMENT;
+        } else {
+            augmentMight = this.augmentMightPerTeam.get(teamType) ?? MightAugment.NO_AUGMENT;
+        }
+
+        const currentAugmentPoints = augmentPlacement + augmentArmor + augmentMight;
         if (currentAugmentPoints + augmentPoints > MAX_AUGMENT_POINTS) {
             return false;
         }

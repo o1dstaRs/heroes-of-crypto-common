@@ -55,4 +55,60 @@ export enum ArmorAugment {
     LEVEL_3 = 3,
 }
 
-export type AugmentType = { type: "Placement"; value: PlacementAugment } | { type: "Armor"; value: ArmorAugment };
+export const ToArmorAugment: { [armorAugemtValue: string]: ArmorAugment } = {
+    "": ArmorAugment.NO_AUGMENT,
+    "0": ArmorAugment.NO_AUGMENT,
+    "1": ArmorAugment.LEVEL_1,
+    "2": ArmorAugment.LEVEL_2,
+    "3": ArmorAugment.LEVEL_3,
+};
+
+export const getArmorPower = (augment: ArmorAugment): number => {
+    switch (augment) {
+        case ArmorAugment.NO_AUGMENT:
+            return 0;
+        case ArmorAugment.LEVEL_1:
+            return 6;
+        case ArmorAugment.LEVEL_2:
+            return 13;
+        case ArmorAugment.LEVEL_3:
+            return 21;
+        default:
+            throw new Error("Invalid armor augment");
+    }
+};
+
+export enum MightAugment {
+    NO_AUGMENT = 0,
+    LEVEL_1 = 1,
+    LEVEL_2 = 2,
+    LEVEL_3 = 3,
+}
+
+export const ToMightAugment: { [mightAugemtValue: string]: MightAugment } = {
+    "": MightAugment.NO_AUGMENT,
+    "0": MightAugment.NO_AUGMENT,
+    "1": MightAugment.LEVEL_1,
+    "2": MightAugment.LEVEL_2,
+    "3": MightAugment.LEVEL_3,
+};
+
+export const getMightPower = (augment: MightAugment): number => {
+    switch (augment) {
+        case MightAugment.NO_AUGMENT:
+            return 0;
+        case MightAugment.LEVEL_1:
+            return 8;
+        case MightAugment.LEVEL_2:
+            return 17;
+        case MightAugment.LEVEL_3:
+            return 27;
+        default:
+            throw new Error("Invalid might augment");
+    }
+};
+
+export type AugmentType =
+    | { type: "Placement"; value: PlacementAugment }
+    | { type: "Armor"; value: ArmorAugment }
+    | { type: "Might"; value: MightAugment };

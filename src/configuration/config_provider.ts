@@ -355,7 +355,7 @@ export const getCreatureConfig = (
     );
 };
 
-export const getSpellConfig = (faction: FactionType, spellName: string): SpellProperties => {
+export const getSpellConfig = (faction: FactionType, spellName: string, laps?: number): SpellProperties => {
     // @ts-ignore: we do not know the type here yet
     const raceSpells = spellsJson[faction ? faction : "System"];
     if (!raceSpells) {
@@ -436,7 +436,7 @@ export const getSpellConfig = (faction: FactionType, spellName: string): SpellPr
         spellConfig.power,
         powerType,
         multiplierType,
-        spellConfig.laps,
+        laps !== undefined ? laps : spellConfig.laps,
         spellConfig.is_buff,
         spellConfig.self_cast_allowed,
         spellConfig.self_debuff_applies,

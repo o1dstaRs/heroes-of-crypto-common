@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { NUMBER_OF_LAPS_TOTAL } from "../constants";
+
 export class AppliedSpell {
     private readonly name: string;
 
@@ -50,7 +52,7 @@ export class AppliedSpell {
     }
 
     public minusLap(): void {
-        if (this.lapsRemaining === Number.MAX_SAFE_INTEGER) {
+        if (this.lapsRemaining === Number.MAX_SAFE_INTEGER || this.lapsRemaining === NUMBER_OF_LAPS_TOTAL) {
             return;
         }
 
