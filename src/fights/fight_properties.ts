@@ -34,7 +34,9 @@ import {
     DefaultPlacementLevel1,
     getPlacementSizes,
     MightAugment,
+    MovementAugment,
     PlacementAugment,
+    SniperAugment,
 } from "../augments/augment_properties";
 
 export class FightProperties {
@@ -89,6 +91,10 @@ export class FightProperties {
 
     private augmentMightPerTeam: Map<TeamType, MightAugment>;
 
+    private augmentSniperPerTeam: Map<TeamType, SniperAugment>;
+
+    private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
+
     public constructor() {
         this.id = uuidv4();
         this.currentLap = 1;
@@ -116,6 +122,8 @@ export class FightProperties {
         this.augmentPlacementPerTeam = new Map();
         this.augmentArmorPerTeam = new Map();
         this.augmentMightPerTeam = new Map();
+        this.augmentSniperPerTeam = new Map();
+        this.augmentMovementPerTeam = new Map();
     }
 
     private getRandomGridType(): GridType {
@@ -521,6 +529,8 @@ export class FightProperties {
             this.augmentPlacementPerTeam.set(teamType, PlacementAugment.LEVEL_1);
             this.augmentArmorPerTeam.set(teamType, ArmorAugment.NO_AUGMENT);
             this.augmentMightPerTeam.set(teamType, MightAugment.NO_AUGMENT);
+            this.augmentSniperPerTeam.set(teamType, SniperAugment.NO_AUGMENT);
+            this.augmentMovementPerTeam.set(teamType, MovementAugment.NO_AUGMENT);
         }
     }
 
@@ -534,6 +544,12 @@ export class FightProperties {
                 return true;
             } else if (augmentType.type === "Might") {
                 this.augmentMightPerTeam.set(teamType, augmentType.value);
+                return true;
+            } else if (augmentType.type === "Sniper") {
+                this.augmentSniperPerTeam.set(teamType, augmentType.value);
+                return true;
+            } else if (augmentType.type === "Movement") {
+                this.augmentMovementPerTeam.set(teamType, augmentType.value);
                 return true;
             }
         }
@@ -563,6 +579,14 @@ export class FightProperties {
         return this.augmentMightPerTeam.get(teamType) ?? MightAugment.NO_AUGMENT;
     }
 
+    public getAugmentSniper(teamType: TeamType): SniperAugment {
+        return this.augmentSniperPerTeam.get(teamType) ?? SniperAugment.NO_AUGMENT;
+    }
+
+    public getAugmentMovement(teamType: TeamType): MovementAugment {
+        return this.augmentMovementPerTeam.get(teamType) ?? MovementAugment.NO_AUGMENT;
+    }
+
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
         if (!augmentType || augmentType.value < 0 || !augmentType.type) {
             return false;
@@ -590,7 +614,21 @@ export class FightProperties {
             augmentMight = this.augmentMightPerTeam.get(teamType) ?? MightAugment.NO_AUGMENT;
         }
 
-        const currentAugmentPoints = augmentPlacement + augmentArmor + augmentMight;
+        let augmentSniper;
+        if (augmentType.type === "Sniper") {
+            augmentSniper = SniperAugment.NO_AUGMENT;
+        } else {
+            augmentSniper = this.augmentSniperPerTeam.get(teamType) ?? SniperAugment.NO_AUGMENT;
+        }
+
+        let augmentMovement;
+        if (augmentType.type === "Movement") {
+            augmentMovement = MovementAugment.NO_AUGMENT;
+        } else {
+            augmentMovement = this.augmentMovementPerTeam.get(teamType) ?? MovementAugment.NO_AUGMENT;
+        }
+
+        const currentAugmentPoints = augmentPlacement + augmentArmor + augmentMight + augmentSniper + augmentMovement;
         if (currentAugmentPoints + augmentPoints > MAX_AUGMENT_POINTS) {
             return false;
         }

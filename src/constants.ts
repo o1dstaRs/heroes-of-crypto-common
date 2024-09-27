@@ -5,7 +5,7 @@ export const MAX_UNIT_STACK_POWER = 5;
 
 // teams & augments
 export const MAX_UNITS_PER_TEAM = 8;
-export const MAX_AUGMENT_POINTS = 7;
+export const MAX_AUGMENT_POINTS = 6;
 
 // map
 export const NUMBER_OF_LAPS_TILL_NARROWING_NORMAL = 3;
