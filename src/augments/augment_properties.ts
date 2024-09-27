@@ -108,7 +108,65 @@ export const getMightPower = (augment: MightAugment): number => {
     }
 };
 
+export enum SniperAugment {
+    NO_AUGMENT = 0,
+    LEVEL_1 = 1,
+    LEVEL_2 = 2,
+    LEVEL_3 = 3,
+}
+
+export const ToSniperAugment: { [sniperAugemtValue: string]: SniperAugment } = {
+    "": SniperAugment.NO_AUGMENT,
+    "0": SniperAugment.NO_AUGMENT,
+    "1": SniperAugment.LEVEL_1,
+    "2": SniperAugment.LEVEL_2,
+    "3": SniperAugment.LEVEL_3,
+};
+
+export const getSniperPower = (augment: SniperAugment): [number, number] => {
+    switch (augment) {
+        case SniperAugment.NO_AUGMENT:
+            return [0, 0];
+        case SniperAugment.LEVEL_1:
+            return [8, 20];
+        case SniperAugment.LEVEL_2:
+            return [17, 45];
+        case SniperAugment.LEVEL_3:
+            return [27, 75];
+        default:
+            throw new Error("Invalid sniper augment");
+    }
+};
+
+export enum MovementAugment {
+    NO_AUGMENT = 0,
+    LEVEL_1 = 1,
+    LEVEL_2 = 2,
+}
+
+export const ToMovementAugment: { [movementAugemtValue: string]: MovementAugment } = {
+    "": MovementAugment.NO_AUGMENT,
+    "0": MovementAugment.NO_AUGMENT,
+    "1": MovementAugment.LEVEL_1,
+    "2": MovementAugment.LEVEL_2,
+};
+
+export const getMovementPower = (augment: MovementAugment): number => {
+    switch (augment) {
+        case MovementAugment.NO_AUGMENT:
+            return 0;
+        case MovementAugment.LEVEL_1:
+            return 1;
+        case MovementAugment.LEVEL_2:
+            return 2;
+        default:
+            throw new Error("Invalid movement augment");
+    }
+};
+
 export type AugmentType =
     | { type: "Placement"; value: PlacementAugment }
     | { type: "Armor"; value: ArmorAugment }
-    | { type: "Might"; value: MightAugment };
+    | { type: "Might"; value: MightAugment }
+    | { type: "Sniper"; value: SniperAugment }
+    | { type: "Movement"; value: MovementAugment };

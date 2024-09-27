@@ -280,7 +280,7 @@
         "name": "Sharpened Weapons Aura",
         "type": "BUFF_AURA",
         "desc": ["Affected melee allies have +{}% base attack power"],
-        "power": 20,
+        "power": 18,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,

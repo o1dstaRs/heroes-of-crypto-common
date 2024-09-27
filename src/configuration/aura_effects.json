@@ -4,7 +4,7 @@
         "name": "Sharpened Weapons",
         "range": 2,
         "desc": "Affected melee allies have +{}% base attack power.",
-        "power": 20,
+        "power": 18,
         "is_buff": true,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE"
     },
