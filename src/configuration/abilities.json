@@ -315,7 +315,10 @@
     "Arrows Wingshield Aura": {
         "name": "Arrows Wingshield Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies in range receive a +{}% defense bonus against ranged attacks"],
+        "desc": [
+            "Allies in range receive a +{}% defense bonus against ranged attacks",
+            "The owner is immune to being shot through"
+        ],
         "power": 30,
         "power_type": "ADDITIONAL_RANGE_ARMOR_PERCENTAGE",
         "skip_reponse": false,
@@ -830,5 +833,32 @@
         "effect": null,
         "aura_effect": null,
         "can_be_casted": true
+    },
+    "Chain Lightning": {
+        "name": "Chain Lightning",
+        "type": "ATTACK",
+        "desc": [
+            "On attack or reponse, deals {}/{}/{}/{}% of the damage",
+            "to the connected enemy (Wind). Depending on how far the enemy is from the target"
+        ],
+        "power": 80,
+        "power_type": "MAGIC_DAMAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
+    },
+    "Wind Element": {
+        "name": "Wind Element",
+        "type": "DEFENCE",
+        "desc": ["Gives Wind immunity. Earth attacks deal {}% more damage"],
+        "power": 50,
+        "power_type": "MAGIC_VULNERABILITY_EARTH",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
     }
 }
