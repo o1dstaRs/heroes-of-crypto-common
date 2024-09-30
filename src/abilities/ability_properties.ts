@@ -51,6 +51,8 @@ export enum AbilityPowerType {
     RESURRECTION = 38,
     STEPS_AND_ARMOR = 39,
     SWAP_WITH_OPPONENT = 40,
+    MAGIC_DAMAGE = 41,
+    MAGIC_VULNERABILITY_EARTH = 42,
 }
 
 export const AllAbilityPowerTypes = [
@@ -95,6 +97,8 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.RESURRECTION,
     AbilityPowerType.STEPS_AND_ARMOR,
     AbilityPowerType.SWAP_WITH_OPPONENT,
+    AbilityPowerType.MAGIC_DAMAGE,
+    AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -142,6 +146,8 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     RESURRECTION: AbilityPowerType.RESURRECTION,
     STEPS_AND_ARMOR: AbilityPowerType.STEPS_AND_ARMOR,
     SWAP_WITH_OPPONENT: AbilityPowerType.SWAP_WITH_OPPONENT,
+    MAGIC_DAMAGE: AbilityPowerType.MAGIC_DAMAGE,
+    MAGIC_VULNERABILITY_EARTH: AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
 };
 
 export enum AbilityType {

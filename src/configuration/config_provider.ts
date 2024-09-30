@@ -286,7 +286,17 @@ export const getCreatureConfig = (
             throw new TypeError(`No power for ability ${abilityName} and creature ${creatureName}`);
         }
 
-        abilityDescriptions.push(abilityConfig.desc.join("\n").replace(/\{\}/g, abilityConfig.power.toString()));
+        if (abilityConfig.name === "Chain Lightning") {
+            const description = abilityConfig.desc.join("\n");
+            const updatedDescription = description
+                .replace("{}", abilityConfig.power.toFixed())
+                .replace("{}", ((abilityConfig.power / 8) * 7).toFixed())
+                .replace("{}", ((abilityConfig.power / 8) * 6).toFixed())
+                .replace("{}", ((abilityConfig.power / 8) * 5).toFixed());
+            abilityDescriptions.push(updatedDescription);
+        } else {
+            abilityDescriptions.push(abilityConfig.desc.join("\n").replace(/\{\}/g, abilityConfig.power.toString()));
+        }
         abilityIsStackPowered.push(abilityConfig.stack_powered);
 
         const auraEffect = abilityConfig.aura_effect;
