@@ -16,18 +16,14 @@ import { getDistance, intersect2D, Intersect2DResult, IXYDistance, XY } from "..
 import { GridSettings } from "./grid_settings";
 import { IWeightedRoute } from "./path_definitions";
 
-export function getCellForPosition(gridSettings: GridSettings, position?: XY): XY | undefined {
-    if (!position) {
-        return undefined;
-    }
-
+export function getCellForPosition(gridSettings: GridSettings, position: XY): XY {
     return {
         x: Math.floor((position.x + gridSettings.getMaxX()) / gridSettings.getCellSize()),
         y: Math.floor(position.y / gridSettings.getCellSize()),
     };
 }
 
-export function getCellsAroundCell(gridSettings: GridSettings, cell?: XY): XY[] {
+export function getCellsAroundCell(gridSettings: GridSettings, cell: XY): XY[] {
     const cells: XY[] = [];
     if (!cell) {
         return cells;
@@ -98,7 +94,7 @@ export function projectLineToFieldEdge(gridSettings: GridSettings, x0: number, y
     };
 }
 
-export function getCellsAroundPosition(gridSettings: GridSettings, position?: XY): XY[] {
+export function getCellsAroundPosition(gridSettings: GridSettings, position: XY): XY[] {
     const cells: XY[] = [];
     if (!position) {
         return cells;
@@ -149,7 +145,7 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position?: XY
     return cells;
 }
 
-export function isPositionWithinGrid(gridSettings: GridSettings, position?: XY): boolean {
+export function isPositionWithinGrid(gridSettings: GridSettings, position: XY): boolean {
     if (!position) {
         return false;
     }
@@ -162,11 +158,7 @@ export function isPositionWithinGrid(gridSettings: GridSettings, position?: XY):
     );
 }
 
-export function isCellWithinGrid(gridSettings: GridSettings, cell?: XY): boolean {
-    if (!cell) {
-        return false;
-    }
-
+export function isCellWithinGrid(gridSettings: GridSettings, cell: XY): boolean {
     return cell.x >= 0 && cell.x < gridSettings.getGridSize() && cell.y >= 0 && cell.y < gridSettings.getGridSize();
 }
 
@@ -188,11 +180,7 @@ export function getPositionForCell(cell: XY, minX: number, step: number, halfSte
     return { x: minX + (1 + cell.x) * step - halfStep, y: cell.y * step + halfStep };
 }
 
-export function getPositionForCells(gridSettings: GridSettings, cells?: XY[]): XY | undefined {
-    if (!cells) {
-        return undefined;
-    }
-
+export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY | undefined {
     if (cells.length === 1) {
         return getPositionForCell(cells[0], gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
     }

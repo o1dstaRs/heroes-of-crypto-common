@@ -18,6 +18,7 @@ export enum AttackType {
     MELEE = 1,
     RANGE = 2,
     MAGIC = 3,
+    MELEE_MAGIC = 4,
 }
 
 export const ToAttackType: { [attackTypeName: string]: AttackType } = {
@@ -26,6 +27,7 @@ export const ToAttackType: { [attackTypeName: string]: AttackType } = {
     MELEE: AttackType.MELEE,
     RANGE: AttackType.RANGE,
     MAGIC: AttackType.MAGIC,
+    MELEE_MAGIC: AttackType.MELEE_MAGIC,
 };
 
 export enum MovementType {

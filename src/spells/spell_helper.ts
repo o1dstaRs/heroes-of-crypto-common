@@ -326,6 +326,7 @@ export function canCastSpell(
         !toUnitId &&
         !toUnitName &&
         spell.getSpellTargetType() === SpellTargetType.FREE_CELL &&
+        targetGridCell &&
         isCellWithinGrid(gridSettings, targetGridCell)
     ) {
         return !verifyEmptyCell(gridMatrix, targetCell);
