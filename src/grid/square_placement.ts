@@ -23,7 +23,7 @@ export enum PlacementType {
 export class SquarePlacement {
     private readonly gridSettings: GridSettings;
 
-    private readonly placementType: PlacementType;
+    protected readonly placementType: PlacementType;
 
     private readonly size: number;
 
