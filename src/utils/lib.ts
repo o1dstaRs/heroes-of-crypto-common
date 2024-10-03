@@ -155,3 +155,30 @@ export const base64ToUint8Array = (base64: string): Uint8Array => {
     // Convert the Buffer to a Uint8Array
     return new Uint8Array(buffer);
 };
+
+export class RefNumber {
+    public value: number;
+
+    public constructor(initialValue: number) {
+        this.value = initialValue;
+    }
+
+    public getValue(): number {
+        return this.value;
+    }
+
+    // Increment the value
+    public increment(by: number = 1): void {
+        this.value += by;
+    }
+
+    // Decrement the value
+    public decrement(by: number = 1): void {
+        this.value -= by;
+    }
+
+    // Reset to a specific value
+    public reset(newValue: number): void {
+        this.value = newValue;
+    }
+}
