@@ -63,5 +63,13 @@
         "power": 10,
         "is_buff": false,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE"
+    },
+    "Tie up the Horses": {
+        "name": "Tie up the Horses",
+        "range": 2,
+        "desc": "Allied non flying units within the aura's range gain +{} movement distance.",
+        "power": 2,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_STEPS_WALK"
     }
 }

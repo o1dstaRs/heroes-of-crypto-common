@@ -204,7 +204,7 @@
         },
         "Angel": {
             "name": "Angel",
-            "hp": 175,
+            "hp": 180,
             "steps": 8.8,
             "speed": 7.7,
             "armor": 26,
@@ -222,6 +222,27 @@
             "level": 4,
             "spells": [],
             "abilities": ["Resurrection", "Arrows Wingshield Aura"]
+        },
+        "Champion": {
+            "name": "Champion",
+            "hp": 150,
+            "steps": 5.2,
+            "speed": 5.9,
+            "armor": 26,
+            "attack_type": "MELEE",
+            "attack": 30,
+            "attack_damage_min": 37,
+            "attack_damage_max": 52,
+            "attack_range": 1,
+            "range_shots": 0,
+            "shot_distance": 0,
+            "magic_resist": 15,
+            "movement_type": "WALK",
+            "exp": 334,
+            "size": 2,
+            "level": 4,
+            "spells": [],
+            "abilities": ["Tie up the Horses Aura", "Rapid Charge"]
         }
     },
     "Nature": {
