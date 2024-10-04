@@ -866,5 +866,17 @@
         "effect": null,
         "aura_effect": null,
         "can_be_casted": false
+    },
+    "Tie up the Horses Aura": {
+        "name": "Tie up the Horses Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allied non-flying units within the aura's range gain +{} movement distance"],
+        "power": 2,
+        "power_type": "ADDITIONAL_STEPS_WALK",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Tie up the Horses",
+        "can_be_casted": false
     }
 }

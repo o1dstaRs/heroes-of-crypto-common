@@ -16,13 +16,18 @@ import { AttackType } from "../units/unit_properties";
 import { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
-export function canApplyAuraEffect(unitAttackType: AttackType, auraEffectProperties: AuraEffectProperties): boolean {
+export function canApplyAuraEffect(
+    unitAttackType: AttackType,
+    unitCanFly: boolean,
+    auraEffectProperties: AuraEffectProperties,
+): boolean {
     if (
         auraEffectProperties.power_type === AbilityPowerType.LUCK_10 ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR ||
-        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS ||
+        (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS_WALK && !unitCanFly)
     ) {
         return true;
     }

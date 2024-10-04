@@ -53,6 +53,7 @@ export enum AbilityPowerType {
     SWAP_WITH_OPPONENT = 40,
     MAGIC_DAMAGE = 41,
     MAGIC_VULNERABILITY_EARTH = 42,
+    ADDITIONAL_STEPS_WALK = 43,
 }
 
 export const AllAbilityPowerTypes = [
@@ -99,6 +100,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.SWAP_WITH_OPPONENT,
     AbilityPowerType.MAGIC_DAMAGE,
     AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
+    AbilityPowerType.ADDITIONAL_STEPS_WALK,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -148,6 +150,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     SWAP_WITH_OPPONENT: AbilityPowerType.SWAP_WITH_OPPONENT,
     MAGIC_DAMAGE: AbilityPowerType.MAGIC_DAMAGE,
     MAGIC_VULNERABILITY_EARTH: AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
+    ADDITIONAL_STEPS_WALK: AbilityPowerType.ADDITIONAL_STEPS_WALK,
 };
 
 export enum AbilityType {
