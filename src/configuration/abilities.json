@@ -643,8 +643,11 @@
     "Paralysis": {
         "name": "Paralysis",
         "type": "STATUS",
-        "desc": ["An enemy affected by Paralysis (Status) is unable to move and has {}% damage reduction"],
-        "power": 40,
+        "desc": [
+            "When applied with a {}% chance,",
+            "Paralysis (Status) prevents the affected enemy from moving and reduces their damage by {}%"
+        ],
+        "power": 50,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,
         "stack_powered": true,
@@ -813,7 +816,10 @@
     "Battle Roar": {
         "name": "Battle Roar",
         "type": "MASS_BUFF",
-        "desc": ["When cast, all allies gain +1 movement step for each caster"],
+        "desc": [
+            "When cast, all allies gain +1 movement step for each caster",
+            "and are ensured to deal maximum damage with each attack"
+        ],
         "power": 0,
         "power_type": "ADDITIONAL_STEPS",
         "skip_reponse": false,

@@ -40,6 +40,7 @@ export default [
                     "ts-expect-error": "allow-with-description",
                 },
             ],
+            "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
         },
     },
 ];

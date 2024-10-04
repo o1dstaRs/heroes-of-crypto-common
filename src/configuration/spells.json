@@ -78,12 +78,16 @@
         "Battle Roar": {
             "name": "Battle Roar",
             "level": 0,
-            "desc": ["All allies gain {} movement steps.", "Lasts 1 lap."],
+            "desc": [
+                "All allies receive {} additional movement steps",
+                "and are ensured to deal maximum damage with each attack.",
+                "Lasts 2 laps."
+            ],
             "target": "ALL_ALLIES",
             "power": 1,
             "power_type": "COMMON",
             "multiplier_type": "UNIT_AMOUNT",
-            "laps": 1,
+            "laps": 2,
             "is_buff": true,
             "self_cast_allowed": false,
             "self_debuff_applies": false,

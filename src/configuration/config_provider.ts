@@ -289,10 +289,17 @@ export const getCreatureConfig = (
         if (abilityConfig.name === "Chain Lightning") {
             const description = abilityConfig.desc.join("\n");
             const updatedDescription = description
-                .replace("{}", abilityConfig.power.toFixed())
-                .replace("{}", ((abilityConfig.power / 8) * 7).toFixed())
-                .replace("{}", ((abilityConfig.power / 8) * 6).toFixed())
-                .replace("{}", ((abilityConfig.power / 8) * 5).toFixed());
+                .replace("{}", Number(abilityConfig.power.toFixed()).toString())
+                .replace("{}", Number(((abilityConfig.power / 8) * 7).toFixed()).toString())
+                .replace("{}", Number(((abilityConfig.power / 8) * 6).toFixed()).toString())
+                .replace("{}", Number(((abilityConfig.power / 8) * 5).toFixed()).toString());
+            abilityDescriptions.push(updatedDescription);
+        }
+        if (abilityConfig.name === "Paralysis") {
+            const description = abilityConfig.desc.join("\n");
+            const updatedDescription = description
+                .replace("{}", Number((abilityConfig.power * 2).toFixed()).toString())
+                .replace("{}", Number(abilityConfig.power.toFixed()).toString());
             abilityDescriptions.push(updatedDescription);
         } else {
             abilityDescriptions.push(abilityConfig.desc.join("\n").replace(/\{\}/g, abilityConfig.power.toString()));
