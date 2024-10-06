@@ -11,7 +11,9 @@
 
 import { isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
+import { Unit } from "../units/unit";
 import { IModifyableUnitProperties, TeamType } from "../units/unit_properties";
+import { getRandomInt } from "../utils/lib";
 import { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
@@ -412,3 +414,37 @@ export function calculateBuffsDebuffsEffect(
         additionalStats,
     };
 }
+
+export const isMirrored = (targetUnit: Unit): boolean => {
+    let mirrorChance = 0;
+    const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
+    const massMagicMirrorBuff = targetUnit.getBuff("Mass Magic Mirror");
+    if (magicMirrorBuff) {
+        mirrorChance = magicMirrorBuff.getPower();
+    }
+    if (massMagicMirrorBuff) {
+        mirrorChance = Math.max(mirrorChance, massMagicMirrorBuff.getPower());
+    }
+    if (mirrorChance > 100) {
+        mirrorChance = 100;
+    }
+    if (mirrorChance < 0) {
+        mirrorChance = 0;
+    }
+    mirrorChance = Math.floor(mirrorChance);
+
+    return getRandomInt(0, 100) < Math.floor(mirrorChance);
+};
+
+export const hasAlreadyAppliedSpell = (targetUnit: Unit, spell: Spell): boolean => {
+    const conflictingSpells = [...spell.getConflictsWith(), spell.getName()];
+    let alreadyApplied = false;
+    for (const cs of conflictingSpells) {
+        if ((spell.isBuff() && targetUnit.hasBuffActive(cs)) || (!spell.isBuff() && targetUnit.hasDebuffActive(cs))) {
+            alreadyApplied = true;
+            break;
+        }
+    }
+
+    return alreadyApplied;
+};
