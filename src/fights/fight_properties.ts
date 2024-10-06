@@ -38,6 +38,9 @@ import {
     PlacementAugment,
     SniperAugment,
 } from "../augments/augment_properties";
+import { isPositionWithinGrid } from "../grid/grid_math";
+import { GridSettings } from "../grid/grid_settings";
+import { Unit } from "../units/unit";
 
 export class FightProperties {
     private id: string;
@@ -125,21 +128,6 @@ export class FightProperties {
         this.augmentMightPerTeam = new Map();
         this.augmentSniperPerTeam = new Map();
         this.augmentMovementPerTeam = new Map();
-    }
-
-    private getRandomGridType(): GridType {
-        const randomValue = getRandomInt(0, 12);
-        if (randomValue < 4) {
-            return GridType.NORMAL;
-        }
-        if (randomValue > 7) {
-            return GridType.BLOCK_CENTER;
-        }
-        if (randomValue < 6) {
-            return GridType.WATER_CENTER;
-        }
-
-        return GridType.LAVA_CENTER;
     }
 
     public getId(): string {
@@ -742,6 +730,61 @@ export class FightProperties {
         return fight.serializeBinary();
     }
 
+    public prefetchNextUnitsToTurn(allUnits: Map<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): void {
+        const upNextUnitsCount = unitsUpper.length + unitsLower.length;
+
+        if (this.upNextQueue.length >= upNextUnitsCount) {
+            return;
+        }
+
+        while (this.upNextQueue.length < upNextUnitsCount) {
+            const nextUnitId = this.getNextTurnUnitId(allUnits, unitsUpper, unitsLower);
+
+            if (nextUnitId) {
+                const unit = allUnits.get(nextUnitId);
+                if (
+                    unit &&
+                    !unit.isDead() &&
+                    !this.upNextIncludes(nextUnitId) &&
+                    !this.alreadyMadeTurn.has(nextUnitId)
+                ) {
+                    this.upNextQueue.push(nextUnitId);
+                    this.updatePreviousTurnTeam(unit.getTeam());
+                }
+            } else {
+                break;
+            }
+        }
+    }
+
+    public setUnitsCalculatedStacksPower(gridSettings: GridSettings, allUnits: Map<string, Unit>): void {
+        let maxTotalExp = Number.MIN_SAFE_INTEGER;
+        for (const u of allUnits.values()) {
+            if (!isPositionWithinGrid(gridSettings, u.getPosition())) {
+                continue;
+            }
+            const totalExp = u.getExp() * u.getAmountAlive();
+            maxTotalExp = maxTotalExp < totalExp ? totalExp : maxTotalExp;
+        }
+        for (const u of allUnits.values()) {
+            if (!isPositionWithinGrid(gridSettings, u.getPosition())) {
+                continue;
+            }
+            const percentage = ((u.getExp() * u.getAmountAlive()) / maxTotalExp) * 100;
+            if (percentage <= 20) {
+                u.setStackPower(1);
+            } else if (percentage <= 40) {
+                u.setStackPower(2);
+            } else if (percentage <= 60) {
+                u.setStackPower(3);
+            } else if (percentage <= 80) {
+                u.setStackPower(4);
+            } else {
+                u.setStackPower(5);
+            }
+        }
+    }
+
     private removeItemOnce(deque: Denque<string>, item: string): boolean {
         const index = deque.toArray().indexOf(item); // Find the index of the item
         let removed = false;
@@ -762,5 +805,140 @@ export class FightProperties {
         }
 
         return removed;
+    }
+
+    private getNextTurnUnitId(allUnits: Map<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): string | undefined {
+        if (!unitsLower.length || !unitsUpper.length) {
+            return undefined;
+        }
+
+        // plus morale
+        while (this.moralePlusQueue.length) {
+            const nextUnitId = this.moralePlusQueue.shift();
+            if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+                return nextUnitId;
+            }
+        }
+
+        let totalArmyMoraleUpper = 0;
+        let totalArmyMoraleLower = 0;
+        let firstBatch: Unit[];
+        let secondBatch: Unit[];
+
+        // total morale based
+        if (this.previousTurnTeam == TeamType.NO_TEAM) {
+            for (const u of unitsUpper) {
+                this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
+                totalArmyMoraleUpper += u.getMorale();
+            }
+            for (const u of unitsLower) {
+                this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
+                totalArmyMoraleLower += u.getMorale();
+            }
+
+            const avgArmyMoraleUpper = unitsUpper.length ? totalArmyMoraleUpper / unitsUpper.length : 0;
+            const avgArmyMoraleLower = unitsLower.length ? totalArmyMoraleLower / unitsUpper.length : 0;
+
+            if (avgArmyMoraleUpper > avgArmyMoraleLower) {
+                firstBatch = unitsUpper;
+                secondBatch = unitsLower;
+            } else if (avgArmyMoraleUpper < avgArmyMoraleLower) {
+                firstBatch = unitsLower;
+                secondBatch = unitsUpper;
+            } else {
+                let lowerMaxSpeed = Number.MIN_SAFE_INTEGER;
+                for (const u of unitsLower) {
+                    lowerMaxSpeed = u.getSpeed() > lowerMaxSpeed ? u.getSpeed() : lowerMaxSpeed;
+                }
+                let upperMaxSpeed = Number.MIN_SAFE_INTEGER;
+                for (const u of unitsUpper) {
+                    upperMaxSpeed = u.getSpeed() > upperMaxSpeed ? u.getSpeed() : upperMaxSpeed;
+                }
+
+                if (lowerMaxSpeed > upperMaxSpeed) {
+                    firstBatch = unitsLower;
+                    secondBatch = unitsUpper;
+                } else if (lowerMaxSpeed < upperMaxSpeed) {
+                    firstBatch = unitsUpper;
+                    secondBatch = unitsLower;
+                } else {
+                    const rnd = Math.floor(Math.random() * 2);
+                    if (rnd) {
+                        firstBatch = unitsUpper;
+                        secondBatch = unitsLower;
+                    } else {
+                        firstBatch = unitsLower;
+                        secondBatch = unitsUpper;
+                    }
+                }
+            }
+        } else if (this.previousTurnTeam === TeamType.LOWER) {
+            firstBatch = unitsUpper;
+            secondBatch = unitsLower;
+        } else {
+            firstBatch = unitsLower;
+            secondBatch = unitsUpper;
+        }
+
+        for (const u of firstBatch) {
+            const unitId = u.getId();
+            if (
+                !this.alreadyMadeTurn.has(unitId) &&
+                !this.upNextIncludes(unitId) &&
+                !this.hourGlassIncludes(unitId) &&
+                !this.moraleMinusIncludes(unitId)
+            ) {
+                return unitId;
+            }
+        }
+        for (const u of secondBatch) {
+            const unitId = u.getId();
+            if (
+                !this.alreadyMadeTurn.has(unitId) &&
+                !this.upNextIncludes(unitId) &&
+                !this.hourGlassIncludes(unitId) &&
+                !this.moraleMinusIncludes(unitId)
+            ) {
+                return unitId;
+            }
+        }
+
+        // minus morale
+        while (this.moraleMinusQueue.length) {
+            const nextUnitId = this.moraleMinusQueue.shift();
+            if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+                return nextUnitId;
+            }
+        }
+
+        // hourglass
+        if (
+            this.hourGlassQueue.length &&
+            this.alreadyMadeTurn.size + this.hourGlassQueue.length + this.upNextQueue.length >= allUnits.size
+        ) {
+            while (this.hourGlassQueue.length) {
+                const nextUnitId = this.hourGlassQueue.shift();
+                if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+                    return nextUnitId;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    private getRandomGridType(): GridType {
+        const randomValue = getRandomInt(0, 12);
+        if (randomValue < 4) {
+            return GridType.NORMAL;
+        }
+        if (randomValue > 7) {
+            return GridType.BLOCK_CENTER;
+        }
+        if (randomValue < 6) {
+            return GridType.WATER_CENTER;
+        }
+
+        return GridType.LAVA_CENTER;
     }
 }
