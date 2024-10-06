@@ -147,7 +147,7 @@
     "Lightning Spin": {
         "name": "Lightning Spin",
         "type": "ATTACK",
-        "desc": ["Attacks all enemies around with {}% damage"],
+        "desc": ["Attacks all enemies around with {}% damage. The unit's attacks are not responded"],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": true,
@@ -523,7 +523,7 @@
     "Forest Spellbook": {
         "name": "Forest Spellbook",
         "type": "INFO",
-        "desc": ["Grants the caster the following spells: Courage, Helping Hand and Summon Wolves"],
+        "desc": ["Grants the caster the following spells:", "Courage, Helping Hand and Summon Wolves"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -535,7 +535,10 @@
     "Tome of Might": {
         "name": "Tome of Might",
         "type": "INFO",
-        "desc": ["Enables the caster to use the following spells: Riot, Magic Mirror, Mass Riot and Mass Magic Mirror"],
+        "desc": [
+            "Enables the caster to use the following spells:",
+            "Riot, Magic Mirror, Mass Riot and Mass Magic Mirror"
+        ],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -547,7 +550,7 @@
     "Book of Healing": {
         "name": "Book of Healing",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells: Heal, Spiritual Armor, Blessing, Mass Heal"],
+        "desc": ["Allows the caster to access the following spells:", "Heal, Spiritual Armor, Blessing, Mass Heal"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -877,6 +880,21 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Tie up the Horses",
+        "can_be_casted": false
+    },
+    "Crusade": {
+        "name": "Crusade",
+        "type": "ATTACK",
+        "desc": [
+            "The unit gain +{} attack and armor points for each cell travelled",
+            "Doesn't increase above 50 base points"
+        ],
+        "power": 0.5,
+        "power_type": "GAIN_ATTACK_AND_ARMOR_EACH_STEP",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
         "can_be_casted": false
     }
 }
