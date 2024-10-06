@@ -34,6 +34,7 @@ export * from "./grid/grid_settings";
 export * from "./grid/grid_type";
 export * from "./obstacles/obstacle_type";
 export * from "./units/unit_properties";
+export * from "./units/unit";
 export * as HoCScene from "./scene/scene_log";
 export * from "./fights/fight_properties";
 export * from "./factions/faction_type";

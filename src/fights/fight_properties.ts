@@ -81,6 +81,7 @@ export class FightProperties {
     private upNextQueue: Denque<string>;
 
     private stepsMoraleMultiplier: number;
+
     private hasAdditionalTimeRequestedPerTeam: Map<TeamType, boolean>;
 
     private defaultPlacementPerTeam: Map<TeamType, DefaultPlacementLevel1>;
