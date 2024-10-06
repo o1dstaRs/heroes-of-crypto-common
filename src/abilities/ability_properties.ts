@@ -54,6 +54,7 @@ export enum AbilityPowerType {
     MAGIC_DAMAGE = 41,
     MAGIC_VULNERABILITY_EARTH = 42,
     ADDITIONAL_STEPS_WALK = 43,
+    GAIN_ATTACK_AND_ARMOR_EACH_STEP = 44,
 }
 
 export const AllAbilityPowerTypes = [
@@ -101,6 +102,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.MAGIC_DAMAGE,
     AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
     AbilityPowerType.ADDITIONAL_STEPS_WALK,
+    AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -151,6 +153,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     MAGIC_DAMAGE: AbilityPowerType.MAGIC_DAMAGE,
     MAGIC_VULNERABILITY_EARTH: AbilityPowerType.MAGIC_VULNERABILITY_EARTH,
     ADDITIONAL_STEPS_WALK: AbilityPowerType.ADDITIONAL_STEPS_WALK,
+    GAIN_ATTACK_AND_ARMOR_EACH_STEP: AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP,
 };
 
 export enum AbilityType {
