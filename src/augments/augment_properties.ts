@@ -128,11 +128,11 @@ export const getSniperPower = (augment: SniperAugment): [number, number] => {
         case SniperAugment.NO_AUGMENT:
             return [0, 0];
         case SniperAugment.LEVEL_1:
-            return [6, 17];
+            return [7, 20];
         case SniperAugment.LEVEL_2:
             return [15, 40];
         case SniperAugment.LEVEL_3:
-            return [25, 70];
+            return [24, 70];
         default:
             throw new Error("Invalid sniper augment");
     }

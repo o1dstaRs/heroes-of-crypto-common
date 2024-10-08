@@ -207,7 +207,7 @@ export class MoveHandler {
         toCell: XY,
         stepsMoraleMultiplier: number,
         unit: Unit,
-        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        currentActiveKnownPaths?: ReadonlyMap<number, IWeightedRoute[]>,
     ): boolean {
         if (!currentActiveKnownPaths) {
             return false;

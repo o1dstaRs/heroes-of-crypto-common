@@ -730,7 +730,7 @@ export class FightProperties {
         return fight.serializeBinary();
     }
 
-    public prefetchNextUnitsToTurn(allUnits: Map<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): void {
+    public prefetchNextUnitsToTurn(allUnits: ReadonlyMap<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): void {
         const upNextUnitsCount = unitsUpper.length + unitsLower.length;
 
         if (this.upNextQueue.length >= upNextUnitsCount) {
@@ -807,7 +807,11 @@ export class FightProperties {
         return removed;
     }
 
-    private getNextTurnUnitId(allUnits: Map<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): string | undefined {
+    private getNextTurnUnitId(
+        allUnits: ReadonlyMap<string, Unit>,
+        unitsUpper: Unit[],
+        unitsLower: Unit[],
+    ): string | undefined {
         if (!unitsLower.length || !unitsUpper.length) {
             return undefined;
         }

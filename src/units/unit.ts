@@ -126,7 +126,7 @@ export interface IUnitAIRepr {
     getSize(): number;
     canFly(): boolean;
     isSmallSize(): boolean;
-    getBaseCell(): XY | undefined;
+    getBaseCell(): XY;
     getCells(): XY[];
     getAttackType(): AttackType;
 }
@@ -2137,39 +2137,37 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         } else {
             const baseCell = this.getBaseCell();
-            if (baseCell) {
-                const posHash = (baseCell.x << 4) | baseCell.y;
-                for (const ae of adjacentEnemies) {
-                    canAttackUnitIds.add(ae.getId());
-                    for (const c of ae.getCells()) {
-                        let addPos = false;
-                        if (this.isSmallSize()) {
-                            addPos = true;
-                        } else {
-                            const largeUnitAttackCells = getLargeUnitAttackCells(
-                                this.gridSettings,
-                                baseCell,
-                                { x: maxX, y: maxY },
-                                c,
-                                currentActiveKnownPaths,
-                                fromPathHashes,
-                            );
+            const posHash = (baseCell.x << 4) | baseCell.y;
+            for (const ae of adjacentEnemies) {
+                canAttackUnitIds.add(ae.getId());
+                for (const c of ae.getCells()) {
+                    let addPos = false;
+                    if (this.isSmallSize()) {
+                        addPos = true;
+                    } else {
+                        const largeUnitAttackCells = getLargeUnitAttackCells(
+                            this.gridSettings,
+                            baseCell,
+                            { x: maxX, y: maxY },
+                            c,
+                            currentActiveKnownPaths,
+                            fromPathHashes,
+                        );
 
-                            if (largeUnitAttackCells?.length) {
-                                addPos = true;
-                                possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
-                            }
+                        if (largeUnitAttackCells?.length) {
+                            addPos = true;
+                            possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
+                        }
+                    }
+
+                    if (addPos) {
+                        if (!canAttackUnitIds.has(ae.getId())) {
+                            canAttackUnitIds.add(ae.getId());
                         }
 
-                        if (addPos) {
-                            if (!canAttackUnitIds.has(ae.getId())) {
-                                canAttackUnitIds.add(ae.getId());
-                            }
-
-                            if (!possibleAttackCellHashes.has(posHash)) {
-                                possibleAttackCells.push(baseCell);
-                                possibleAttackCellHashes.add(posHash);
-                            }
+                        if (!possibleAttackCellHashes.has(posHash)) {
+                            possibleAttackCells.push(baseCell);
+                            possibleAttackCellHashes.add(posHash);
                         }
                     }
                 }
