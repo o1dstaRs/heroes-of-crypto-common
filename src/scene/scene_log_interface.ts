@@ -9,16 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { ISceneLog } from "./scene_log_interface";
-
-export class SceneLogMock implements ISceneLog {
-    public getLog(): string {
-        return "";
-    }
-
-    public updateLog(_newLog?: string): void {}
-
-    public hasBeenUpdated(): boolean {
-        return false;
-    }
+export interface ISceneLog {
+    getLog(): string;
+    updateLog(_newLog?: string): void;
+    hasBeenUpdated(): boolean;
 }

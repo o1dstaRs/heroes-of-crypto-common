@@ -10,9 +10,13 @@
  */
 
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { Grid } from "../grid/grid";
 import { getCellsAroundCell } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
+import { Unit } from "../units/unit";
+import { UnitsHolder } from "../units/units_holder";
 import { AttackType } from "../units/unit_properties";
+import { getRandomInt } from "../utils/lib";
 import { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
@@ -135,3 +139,24 @@ export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: nu
 
     return ret;
 }
+
+export const getAbsorptionTarget = (forUnit: Unit, grid: Grid, unitsHolder: UnitsHolder): Unit | undefined => {
+    const absorbPenaltiesAura = forUnit.getBuff("Absorb Penalties Aura");
+    if (absorbPenaltiesAura) {
+        const x = absorbPenaltiesAura.getFirstSpellProperty();
+        const y = absorbPenaltiesAura.getSecondSpellProperty();
+        if (x !== undefined && y !== undefined) {
+            const auraSourceUnitId = grid.getOccupantUnitId({ x: x, y: y });
+            if (auraSourceUnitId) {
+                const auraSourceUnit = unitsHolder.getAllUnits().get(auraSourceUnitId);
+                if (auraSourceUnit) {
+                    if (getRandomInt(0, 100) < Math.floor(absorbPenaltiesAura.getPower()) && !auraSourceUnit.isDead()) {
+                        return auraSourceUnit;
+                    }
+                }
+            }
+        }
+    }
+
+    return undefined;
+};
