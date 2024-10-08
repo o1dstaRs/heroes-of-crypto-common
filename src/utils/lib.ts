@@ -182,3 +182,11 @@ export class RefNumber {
         this.value = newValue;
     }
 }
+
+export const getLapString = (laps: number): string => {
+    if (laps === 1) {
+        return "1 lap";
+    } else {
+        return `${laps} laps`;
+    }
+};

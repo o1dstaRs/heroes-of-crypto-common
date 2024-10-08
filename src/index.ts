@@ -27,6 +27,7 @@ export * from "./effects/effect_factory";
 export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
 export * from "./spells/spell";
+export * from "./handlers/move_handler";
 export * from "./spells/spell_properties";
 export * from "./grid/path_definitions";
 export * from "./grid/path_helper";
