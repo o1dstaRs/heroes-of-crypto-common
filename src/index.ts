@@ -38,7 +38,7 @@ export * from "./obstacles/obstacle_type";
 export * from "./units/unit_properties";
 export * from "./units/units_holder";
 export * from "./units/unit";
-export * as HoCScene from "./scene/scene_log";
+export * from "./scene/scene_log_interface";
 export * from "./fights/fight_properties";
 export * from "./fights/fight_state_manager";
 export * from "./factions/faction_type";

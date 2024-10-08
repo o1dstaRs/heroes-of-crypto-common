@@ -35,7 +35,7 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { IWeightedRoute } from "../grid/path_definitions";
-import { SceneLog } from "../scene/scene_log";
+import { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
@@ -469,7 +469,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
 
-    public refreshPreTurnState(sceneLog: SceneLog) {
+    public refreshPreTurnState(sceneLog: ISceneLog) {
         if (this.unitProperties.hp !== this.unitProperties.max_hp && this.hasAbilityActive("Wild Regeneration")) {
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
             this.unitProperties.hp = this.unitProperties.max_hp;
@@ -1036,7 +1036,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.luck_per_turn = 0;
     }
 
-    public applyArmageddonDamage(armageddonWave: number, sceneLog: SceneLog): void {
+    public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): void {
         const aw = Math.floor(armageddonWave);
         if (aw <= 0 || aw > NUMBER_OF_ARMAGEDDON_WAVES) {
             return;
