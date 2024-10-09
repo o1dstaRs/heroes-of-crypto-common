@@ -41,7 +41,7 @@ export class UnitsHolder {
         return this.allUnits.values();
     }
 
-    public getAllUnits(): Map<string, Unit> {
+    public getAllUnits(): ReadonlyMap<string, Unit> {
         return this.allUnits;
     }
 
@@ -256,25 +256,6 @@ export class UnitsHolder {
             FightStateManager.getInstance().getFightProperties().removeFromMoraleMinusQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromMoralePlusQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromUpNext(unitId);
-
-            // if (FightStateManager.getInstance().getFightProperties().removeFromUpNext(unitId))
-            //     {
-            //     const unitsUpper: Unit[] = [];
-            //     const unitsLower: Unit[] = [];
-            //     for (const u of this.getAllUnitsIterator()) {
-            //         if (u.isDead()) {
-            //             continue;
-            //         }
-            //         if (u.getTeam() === TeamType.LOWER) {
-            //             unitsLower.push(u);
-            //         } else {
-            //             unitsUpper.push(u);
-            //         }
-            //     }
-            //     HoCLib.shuffle(unitsUpper);
-            //     HoCLib.shuffle(unitsLower);
-            //     FightStateManager.getInstance().prefetchNextUnitsToTurn(this.allUnits, unitsUpper, unitsLower);
-            // }
 
             return true;
         }

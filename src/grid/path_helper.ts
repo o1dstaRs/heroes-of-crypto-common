@@ -392,14 +392,15 @@ export class PathHelper {
     public calculateClosestAttackFrom(
         mousePosition: XY,
         attackCells: XY[],
-        unitCells: XY[],
+        attackerUnitCells: XY[],
+        targetUnitCells: XY[],
         unitIsSmallSize: boolean,
         attackRange: number,
         targetUnitIsSmallSize: boolean,
         targetUnitTeam: TeamType,
         attackCellHashesToLargeCells: Map<number, XY[]>,
     ): XY | undefined {
-        if (!attackCells.length || !unitCells.length) {
+        if (!attackCells.length || !targetUnitCells.length) {
             return undefined;
         }
 
@@ -414,7 +415,7 @@ export class PathHelper {
         let yMin = Number.MAX_SAFE_INTEGER;
         let yMax = Number.MIN_SAFE_INTEGER;
 
-        for (const uc of unitCells) {
+        for (const uc of targetUnitCells) {
             xMin = Math.min(xMin, uc.x);
             xMax = Math.max(xMax, uc.x);
             yMin = Math.min(yMin, uc.y);
@@ -444,20 +445,28 @@ export class PathHelper {
         const yTop = unitPositionY + part;
 
         shuffle(attackCells);
-
         const availableAttackCells: XY[] = [];
         const availableAttackCellHashes: Set<number> = new Set();
         for (const position of attackCells) {
+            let isAttackerCell = false;
+            for (const auc of attackerUnitCells) {
+                if (auc.x === position.x && auc.y === position.y) {
+                    isAttackerCell = true;
+                    break;
+                }
+            }
+
             if (
-                Math.abs(position.x - mouseCell.x) <= attackRange &&
-                Math.abs(position.y - mouseCell.y) <= attackRange
+                (Math.abs(position.x - mouseCell.x) <= attackRange &&
+                    Math.abs(position.y - mouseCell.y) <= attackRange) ||
+                isAttackerCell
             ) {
                 availableAttackCells.push(position);
                 availableAttackCellHashes.add((position.x << 4) | position.y);
             }
         }
 
-        if (availableAttackCells) {
+        if (availableAttackCells.length) {
             let cornerPos = false;
             if (!targetUnitIsSmallSize) {
                 cornerPos =

@@ -29,6 +29,7 @@ import { EffectFactory } from "../effects/effect_factory";
 import { AllFactionsType, FactionType, ToFactionType } from "../factions/faction_type";
 import {
     getCellForPosition,
+    getCellsAroundCell,
     getCellsAroundPosition,
     getLargeUnitAttackCells,
     isPositionWithinGrid,
@@ -126,7 +127,7 @@ export interface IUnitAIRepr {
     getSize(): number;
     canFly(): boolean;
     isSmallSize(): boolean;
-    getBaseCell(): XY | undefined;
+    getBaseCell(): XY;
     getCells(): XY[];
     getAttackType(): AttackType;
 }
@@ -1703,7 +1704,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 spellsUpdated.push(s);
             }
         }
-        this.spells = spellsUpdated;
+        // this.spells = spellsUpdated;
     }
 
     public getAllProperties(): UnitProperties {
@@ -1954,11 +1955,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsAura.getPower() / 100);
         }
 
-        const weaknessDebuff = this.getDebuff("Weakness");
-        if (weaknessDebuff) {
-            baseAttackMultiplier = baseAttackMultiplier * ((100 - weaknessDebuff.getPower()) / 100);
-        }
-
         const blessingBuff = this.getBuff("Blessing");
         if (blessingBuff || battleRoarBuff) {
             this.unitProperties.attack_damage_min = this.unitProperties.attack_damage_max;
@@ -1981,6 +1977,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             this.unitProperties.attack_mod = this.initialUnitProperties.attack_mod;
         }
+
+        const weaknessDebuff = this.getDebuff("Weakness");
+        if (weaknessDebuff) {
+            // baseAttackMultiplier = baseAttackMultiplier * ((100 - weaknessDebuff.getPower()) / 100);
+
+            this.unitProperties.attack_mod -= (this.unitProperties.base_attack * weaknessDebuff.getPower()) / 100;
+        }
+
         if (this.hasAbilityActive("Blind Fury")) {
             this.unitProperties.attack_mod +=
                 (1 -
@@ -2043,7 +2047,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let fromPathHashes: Set<number> | undefined;
         let currentCells: XY[];
         if (this.isSmallSize()) {
-            const currentCell = getCellForPosition(this.gridSettings, this.getPosition());
+            const currentCell = this.getBaseCell();
             if (currentCell) {
                 possibleFromPathCells.unshift(currentCell);
                 currentCells = [currentCell];
@@ -2051,7 +2055,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 currentCells = [];
             }
         } else {
-            currentCells = getCellsAroundPosition(this.gridSettings, this.getPosition());
+            currentCells = this.getCells();
             for (const c of currentCells) {
                 possibleFromPathCells.unshift(c);
             }
@@ -2088,7 +2092,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     }
                     bodyCells = [bodyCellPos];
                 } else {
-                    bodyCells = getCellsAroundPosition(this.gridSettings, u.getPosition());
+                    bodyCells = u.getCells();
                 }
 
                 for (const bodyCell of bodyCells) {
@@ -2137,39 +2141,79 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         } else {
             const baseCell = this.getBaseCell();
-            if (baseCell) {
-                const posHash = (baseCell.x << 4) | baseCell.y;
-                for (const ae of adjacentEnemies) {
-                    canAttackUnitIds.add(ae.getId());
-                    for (const c of ae.getCells()) {
-                        let addPos = false;
-                        if (this.isSmallSize()) {
-                            addPos = true;
-                        } else {
-                            const largeUnitAttackCells = getLargeUnitAttackCells(
-                                this.gridSettings,
-                                baseCell,
-                                { x: maxX, y: maxY },
-                                c,
-                                currentActiveKnownPaths,
-                                fromPathHashes,
-                            );
 
-                            if (largeUnitAttackCells?.length) {
-                                addPos = true;
-                                possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
-                            }
+            let checkCells: XY[];
+            if (this.isSmallSize()) {
+                // use either target move position on current
+                // depending on the action type (attack vs response)
+                checkCells = getCellsAroundCell(this.gridSettings, baseCell);
+            } else {
+                checkCells = [];
+                for (let i = -2; i <= 1; i++) {
+                    for (let j = -2; j <= 1; j++) {
+                        checkCells.push({ x: baseCell.x + i, y: baseCell.y + j });
+                    }
+                }
+            }
+            const surroundingCellHashes: number[] = [];
+            for (const c of checkCells) {
+                surroundingCellHashes.push((c.x << 4) | c.y);
+            }
+
+            const skipCells: number[] = [];
+            for (const ae of adjacentEnemies) {
+                for (const c of ae.getCells()) {
+                    skipCells.push((c.x << 4) | c.y);
+                }
+            }
+
+            const enemiesCells: Map<string, XY[]> = new Map();
+            for (const ae of adjacentEnemies) {
+                const enemyRelatedCells: XY[] = [];
+                for (const c of ae.getCells()) {
+                    const cellsAround = getCellsAroundCell(this.gridSettings, c);
+                    for (const ca of cellsAround) {
+                        const cellAroundHash = (ca.x << 4) | ca.y;
+                        if (skipCells.includes(cellAroundHash)) {
+                            continue;
                         }
+                        enemyRelatedCells.push(ca);
+                    }
+                }
+                enemiesCells.set(ae.getId(), enemyRelatedCells);
+            }
 
-                        if (addPos) {
-                            if (!canAttackUnitIds.has(ae.getId())) {
-                                canAttackUnitIds.add(ae.getId());
-                            }
+            for (const ae of adjacentEnemies) {
+                const enemyRelatedCells = enemiesCells.get(ae.getId());
+                if (!enemyRelatedCells?.length) {
+                    continue;
+                }
+                canAttackUnitIds.add(ae.getId());
+                for (const c of enemyRelatedCells) {
+                    const posHash = (c.x << 4) | c.y;
+                    let addPos = false;
+                    if (this.isSmallSize()) {
+                        addPos = true;
+                    } else if (surroundingCellHashes.includes((c.x << 4) | c.y)) {
+                        const largeUnitAttackCells = getLargeUnitAttackCells(
+                            this.gridSettings,
+                            baseCell,
+                            { x: maxX, y: maxY },
+                            c,
+                            currentActiveKnownPaths,
+                            fromPathHashes,
+                        );
 
-                            if (!possibleAttackCellHashes.has(posHash)) {
-                                possibleAttackCells.push(baseCell);
-                                possibleAttackCellHashes.add(posHash);
-                            }
+                        if (largeUnitAttackCells?.length) {
+                            addPos = true;
+                            possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
+                        }
+                    }
+
+                    if (addPos) {
+                        if (!possibleAttackCellHashes.has(posHash)) {
+                            possibleAttackCells.push(c);
+                            possibleAttackCellHashes.add(posHash);
                         }
                     }
                 }
@@ -2191,7 +2235,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 const ability = this.abilityFactory.makeAbility(abilityName);
                 this.abilities.push(ability);
                 const spell = ability.getSpell();
-                if (spell && !this.unitProperties.spells.includes(spell.getName())) {
+                if (spell && !this.unitProperties.spells.includes(`:${spell.getName()}`)) {
                     this.unitProperties.spells.push(`:${spell.getName()}`);
                     this.unitProperties.can_cast_spells = true;
                     spellAdded = true;
@@ -2230,6 +2274,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
     protected parseSpells(): void {
         const spells: Map<string, number> = this.parseSpellData(this.unitProperties.spells);
+        const newSpells: Spell[] = [];
 
         for (const [k, v] of spells.entries()) {
             const spArr = k.split(":");
@@ -2243,8 +2288,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
 
             const spellProperties = getSpellConfig(faction, spArr[1]);
-            this.spells.push(new Spell({ spellProperties: spellProperties, amount: v }));
+            newSpells.push(new Spell({ spellProperties: spellProperties, amount: v }));
         }
+        this.spells = newSpells;
     }
 
     protected parseAuraEffects(): void {

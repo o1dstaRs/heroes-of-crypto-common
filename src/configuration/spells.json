@@ -450,9 +450,9 @@
         "Weakness": {
             "name": "Weakness",
             "level": 1,
-            "desc": ["The unit's base attack is reduced by 24%.", "Lasts 3 laps."],
+            "desc": ["The unit's base attack is reduced by 30%.", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
-            "power": 24,
+            "power": 30,
             "power_type": "COMMON",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,

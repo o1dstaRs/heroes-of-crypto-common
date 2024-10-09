@@ -174,13 +174,11 @@ export function canCastSpell(
     isLocked: boolean,
     gridSettings: GridSettings,
     gridMatrix: number[][],
-    alreadyAppliedBuffAndDebuffs?: AppliedSpell[],
+    casterUnit: Unit,
+    targetUnit?: Unit,
     spell?: Spell,
     unitSpells?: Spell[],
-    targetUnitSpells?: Spell[],
     targetCell?: XY,
-    fromUnitId?: string,
-    toUnitId?: string,
     forcedUnitId?: string,
     fromTeamType?: TeamType,
     toTeamType?: TeamType,
@@ -221,23 +219,14 @@ export function canCastSpell(
     }
 
     const isSelfCast =
-        (fromUnitId && toUnitId && fromUnitId === toUnitId) ||
+        (targetUnit && casterUnit.getId() === targetUnit.getId()) ||
         (fromUnitName && toUnitName && fromUnitName === toUnitName && fromTeamType === toTeamType);
 
     if (spell.getPowerType() === SpellPowerType.HEAL) {
         if (spell.isGiftable()) {
-            let alreadyHasSpell = false;
-            if (targetUnitSpells) {
-                for (const targetUnitSpell of targetUnitSpells) {
-                    if (targetUnitSpell.getName() === spell.getName()) {
-                        alreadyHasSpell = true;
-                        break;
-                    }
-                }
-            }
-
             return (
-                !alreadyHasSpell &&
+                targetUnit &&
+                !targetUnit.hasAbilityActive(spell.getName()) &&
                 fromTeamType &&
                 toTeamType &&
                 fromTeamType === toTeamType &&
@@ -276,15 +265,17 @@ export function canCastSpell(
 
     const notAlreadyApplied = (): boolean => {
         const willConclictWith = spell.getConflictsWith();
-        if (alreadyAppliedBuffAndDebuffs?.length) {
-            for (const existingBuff of alreadyAppliedBuffAndDebuffs) {
-                if (
-                    (existingBuff.getName() === spell.getName() || willConclictWith.includes(existingBuff.getName())) &&
-                    existingBuff.getLaps()
-                ) {
-                    return false;
-                }
-            }
+        if (!targetUnit) {
+            return false;
+        }
+
+        const existingBuff = targetUnit.getBuff(spell.getName());
+        if (
+            existingBuff &&
+            (existingBuff.getName() === spell.getName() || willConclictWith.includes(existingBuff.getName())) &&
+            existingBuff.getLaps()
+        ) {
+            return false;
         }
 
         return true;
@@ -314,7 +305,8 @@ export function canCastSpell(
         if (
             (toUnitMagicResistance && toUnitMagicResistance === 100) ||
             (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance) ||
-            (forcedUnitId && forcedUnitId !== toUnitId)
+            !targetUnit ||
+            (targetUnit && forcedUnitId && forcedUnitId !== targetUnit.getId())
         ) {
             return false;
         }
@@ -325,7 +317,7 @@ export function canCastSpell(
     }
 
     if (
-        !toUnitId &&
+        !targetUnit &&
         !toUnitName &&
         spell.getSpellTargetType() === SpellTargetType.FREE_CELL &&
         targetGridCell &&
