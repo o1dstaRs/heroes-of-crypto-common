@@ -39,16 +39,10 @@ export class MoveHandler {
 
     private readonly unitsHolder: UnitsHolder;
 
-    private readonly largeUnitsXtoY: Map<number, number[]>;
-
-    private readonly largeUnitsYtoX: Map<number, number[]>;
-
     public constructor(gridSettings: GridSettings, grid: Grid, unitsHolder: UnitsHolder) {
         this.gridSettings = gridSettings;
         this.grid = grid;
         this.unitsHolder = unitsHolder;
-        this.largeUnitsXtoY = new Map();
-        this.largeUnitsYtoX = new Map();
     }
 
     public moveUnitTowardsCenter(cell: XY, updatePositionMask: number, lapsNarrowed: number): ISystemMoveResult {
@@ -213,30 +207,6 @@ export class MoveHandler {
             return false;
         }
 
-        const bodyPosition = unit.getPosition();
-
-        const yPositions = this.largeUnitsXtoY.get(bodyPosition.x);
-        const yPositionUpdated = [];
-        if (yPositions?.length) {
-            for (const y of yPositions) {
-                if (y !== bodyPosition.y) {
-                    yPositionUpdated.push(y);
-                }
-            }
-        }
-        this.largeUnitsXtoY.set(bodyPosition.x, yPositionUpdated);
-
-        const xPositions = this.largeUnitsYtoX.get(bodyPosition.y);
-        const xPositionUpdated = [];
-        if (xPositions?.length) {
-            for (const x of xPositions) {
-                if (x !== bodyPosition.x) {
-                    xPositionUpdated.push(x);
-                }
-            }
-        }
-        this.largeUnitsYtoX.set(bodyPosition.y, xPositionUpdated);
-
         const movePaths = currentActiveKnownPaths.get((toCell.x << 4) | toCell.y);
         if (movePaths?.length) {
             const path = movePaths[0].route;
@@ -246,7 +216,10 @@ export class MoveHandler {
                 this.gridSettings.getStep(),
                 this.gridSettings.getHalfStep(),
             );
-            const distanceBefore = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), bodyPosition);
+            const distanceBefore = this.unitsHolder.getDistanceToClosestEnemy(
+                unit.getOppositeTeam(),
+                unit.getPosition(),
+            );
             const distanceAfter = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), targetPos);
             if (distanceAfter < distanceBefore) {
                 unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE);
@@ -260,31 +233,6 @@ export class MoveHandler {
         }
 
         return true;
-    }
-
-    public clearLargeUnitsCache(): void {
-        this.largeUnitsXtoY.clear();
-        this.largeUnitsYtoX.clear();
-    }
-
-    public updateLargeUnitsCache(bodyPosition: XY): void {
-        const existingArrayXtoY = this.largeUnitsXtoY.get(bodyPosition.x);
-        if (existingArrayXtoY) {
-            existingArrayXtoY.push(bodyPosition.y);
-        } else {
-            this.largeUnitsXtoY.set(bodyPosition.x, [bodyPosition.y]);
-        }
-
-        const existingArrayYtoX = this.largeUnitsYtoX.get(bodyPosition.y);
-        if (existingArrayYtoX) {
-            existingArrayYtoX.push(bodyPosition.x);
-        } else {
-            this.largeUnitsYtoX.set(bodyPosition.y, [bodyPosition.x]);
-        }
-    }
-
-    public getLargeUnitsCache(): [Map<number, number[]>, Map<number, number[]>] {
-        return [this.largeUnitsXtoY, this.largeUnitsYtoX];
     }
 
     public finishDirectedUnitMove(

@@ -418,11 +418,10 @@
         "name": "Spit Ball",
         "type": "ATTACK",
         "desc": [
-            "On range attack, there is a {}% chance to apply",
-            "a random debuff to the target: Sadness, Quagmire,",
-            "Weakening Beam, Weakness, Rangebane or Cowardice"
+            "On a ranged attack, there is a {}% chance to apply any of the following debuffs to the target:",
+            "Sadness, Quagmire, Weakening Beam, Weakness, Rangebane, or Cowardice. Multiple debuffs can be applied in a single shot"
         ],
-        "power": 100,
+        "power": 25,
         "power_type": "APPLY_RANDOM_DEBUFF",
         "skip_reponse": false,
         "stack_powered": true,
@@ -460,7 +459,10 @@
     "Large Caliber": {
         "name": "Large Caliber",
         "type": "ATTACK",
-        "desc": ["Ranged attacks deal {}% of the damage to all units adjacent to the target unit's cell"],
+        "desc": [
+            "Ranged attacks deal {}% of the damage to all units adjacent to the target unit's cell.",
+            "Ranged attacks ignore structures"
+        ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
@@ -472,7 +474,10 @@
     "Area Throw": {
         "name": "Area Throw",
         "type": "ATTACK",
-        "desc": ["Ranged attacks inflict {}% of the damage on all units adjacent to the target cell"],
+        "desc": [
+            "Ranged attacks inflict {}% of the damage on all units adjacent to the target cell.",
+            "Ranged attacks ignore structures"
+        ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
@@ -886,7 +891,7 @@
         "name": "Crusade",
         "type": "ATTACK",
         "desc": [
-            "The unit gain +{} attack and armor points for each cell travelled",
+            "The unit gains +{} attack and armor points for each cell travelled",
             "Doesn't increase above 50 base points"
         ],
         "power": 0.5,

@@ -16,6 +16,7 @@ import { TeamType } from "../units/unit_properties";
 import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
     MAX_AUGMENT_POINTS,
+    MAX_HITS_MOUNTAIN,
     MAX_TIME_TO_MAKE_TURN_MILLIS,
     MAX_UNITS_PER_TEAM,
     MIN_TIME_TO_MAKE_TURN_MILLIS,
@@ -99,10 +100,15 @@ export class FightProperties {
 
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
 
+    private obstacleHitsLeft: number = 0;
+
     public constructor() {
         this.id = uuidv4();
         this.currentLap = 1;
         this.gridType = this.getRandomGridType();
+        if (this.gridType === GridType.BLOCK_CENTER) {
+            this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
+        }
         this.firstTurnMade = false;
         this.fightStarted = false;
         this.fightFinished = false;
@@ -198,6 +204,17 @@ export class FightProperties {
         return this.currentTurnEnd;
     }
 
+    public getObstacleHitsLeft(): number {
+        return this.obstacleHitsLeft;
+    }
+
+    public encointerObstacleHit(): void {
+        this.obstacleHitsLeft--;
+        if (this.obstacleHitsLeft < 0) {
+            this.obstacleHitsLeft = 0;
+        }
+    }
+
     public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
         return (
             MAX_UNITS_PER_TEAM -
@@ -256,6 +273,9 @@ export class FightProperties {
     public setGridType(gridType: GridType): void {
         if (!this.fightStarted) {
             this.gridType = gridType;
+            if (this.gridType === GridType.BLOCK_CENTER) {
+                this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
+            }
         }
     }
 
