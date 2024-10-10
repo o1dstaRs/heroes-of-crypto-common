@@ -2033,7 +2033,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
     public attackMeleeAllowed(
         enemyTeam: Unit[],
-        positions: Map<string, XY>,
+        positions: ReadonlyMap<string, XY>,
         adjacentEnemies: Unit[],
         fromPathCells?: XY[],
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
@@ -2119,6 +2119,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                                     currentActiveKnownPaths,
                                     fromPathHashes,
                                 );
+
                                 if (largeUnitAttackCells?.length) {
                                     addCell = true;
                                     possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
@@ -2188,32 +2189,53 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (!enemyRelatedCells?.length) {
                     continue;
                 }
-                canAttackUnitIds.add(ae.getId());
-                for (const c of enemyRelatedCells) {
-                    const posHash = (c.x << 4) | c.y;
-                    let addPos = false;
-                    if (this.isSmallSize()) {
-                        addPos = true;
-                    } else if (surroundingCellHashes.includes((c.x << 4) | c.y)) {
-                        const largeUnitAttackCells = getLargeUnitAttackCells(
-                            this.gridSettings,
-                            baseCell,
-                            { x: maxX, y: maxY },
-                            c,
-                            currentActiveKnownPaths,
-                            fromPathHashes,
-                        );
+                const position = positions.get(ae.getId());
+                if (!position || !isPositionWithinGrid(this.gridSettings, position)) {
+                    continue;
+                }
 
-                        if (largeUnitAttackCells?.length) {
-                            addPos = true;
-                            possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
-                        }
+                let bodyCells: XY[];
+                if (ae.isSmallSize()) {
+                    const bodyCellPos = getCellForPosition(this.gridSettings, position);
+                    if (!bodyCellPos) {
+                        continue;
                     }
+                    bodyCells = [bodyCellPos];
+                } else {
+                    bodyCells = ae.getCells();
+                }
 
-                    if (addPos) {
-                        if (!possibleAttackCellHashes.has(posHash)) {
-                            possibleAttackCells.push(c);
-                            possibleAttackCellHashes.add(posHash);
+                for (const bodyCell of bodyCells) {
+                    for (const c of enemyRelatedCells) {
+                        const posHash = (c.x << 4) | c.y;
+                        let addPos = false;
+                        if (this.isSmallSize()) {
+                            addPos = true;
+                        } else if (surroundingCellHashes.includes((c.x << 4) | c.y)) {
+                            const largeUnitAttackCells = getLargeUnitAttackCells(
+                                this.gridSettings,
+                                c,
+                                { x: maxX, y: maxY },
+                                bodyCell,
+                                currentActiveKnownPaths,
+                                fromPathHashes,
+                            );
+
+                            if (largeUnitAttackCells?.length) {
+                                addPos = true;
+                                possibleAttackCellHashesToLargeCells.set(posHash, largeUnitAttackCells);
+                            }
+                        }
+
+                        if (addPos) {
+                            if (!canAttackUnitIds.has(ae.getId())) {
+                                canAttackUnitIds.add(ae.getId());
+                            }
+
+                            if (!possibleAttackCellHashes.has(posHash)) {
+                                possibleAttackCells.push(c);
+                                possibleAttackCellHashes.add(posHash);
+                            }
                         }
                     }
                 }
