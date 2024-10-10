@@ -275,6 +275,8 @@ export class FightProperties {
             this.gridType = gridType;
             if (this.gridType === GridType.BLOCK_CENTER) {
                 this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
+            } else {
+                this.obstacleHitsLeft = 0;
             }
         }
     }

@@ -275,7 +275,7 @@ export function getRandomCellAroundPosition(
 
 export function getLargeUnitAttackCells(
     gridSettings: GridSettings,
-    attackPosition: XY,
+    attackFromCell: XY,
     attackerBodyCellTopRight: XY,
     enemyCell: XY,
     currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
@@ -320,49 +320,49 @@ export function getLargeUnitAttackCells(
         }
     };
 
-    if (attackPosition.x < enemyCell.x && attackPosition.y < enemyCell.y) {
-        verifyAndPush(attackPosition);
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+    if (attackFromCell.x < enemyCell.x && attackFromCell.y < enemyCell.y) {
+        verifyAndPush(attackFromCell);
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y + 1 });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y });
         return attackCells;
     }
-    if (attackPosition.x > enemyCell.x && attackPosition.y > enemyCell.y) {
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+    if (attackFromCell.x > enemyCell.x && attackFromCell.y > enemyCell.y) {
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y + 1 });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y });
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y + 1 });
         return attackCells;
     }
-    if (attackPosition.x < enemyCell.x && attackPosition.y > enemyCell.y) {
-        verifyAndPush(attackPosition);
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+    if (attackFromCell.x < enemyCell.x && attackFromCell.y > enemyCell.y) {
+        verifyAndPush(attackFromCell);
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y + 1 });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y + 1 });
         return attackCells;
     }
-    if (attackPosition.x > enemyCell.x && attackPosition.y < enemyCell.y) {
-        verifyAndPush(attackPosition);
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+    if (attackFromCell.x > enemyCell.x && attackFromCell.y < enemyCell.y) {
+        verifyAndPush(attackFromCell);
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y + 1 });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y });
         return attackCells;
     }
 
-    if (attackPosition.x < enemyCell.x) {
-        verifyAndPush(attackPosition);
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
+    if (attackFromCell.x < enemyCell.x) {
+        verifyAndPush(attackFromCell);
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y + 1 });
         return attackCells;
     }
-    if (attackPosition.y > enemyCell.y) {
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y + 1 });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+    if (attackFromCell.y > enemyCell.y) {
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y + 1 });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y + 1 });
         return attackCells;
     }
-    if (attackPosition.y < enemyCell.y) {
-        verifyAndPush({ x: attackPosition.x, y: attackPosition.y });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
+    if (attackFromCell.y < enemyCell.y) {
+        verifyAndPush({ x: attackFromCell.x, y: attackFromCell.y });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y });
         return attackCells;
     }
-    if (attackPosition.x > enemyCell.x) {
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y });
-        verifyAndPush({ x: attackPosition.x + 1, y: attackPosition.y + 1 });
+    if (attackFromCell.x > enemyCell.x) {
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y });
+        verifyAndPush({ x: attackFromCell.x + 1, y: attackFromCell.y + 1 });
         return attackCells;
     }
     return attackCells;
