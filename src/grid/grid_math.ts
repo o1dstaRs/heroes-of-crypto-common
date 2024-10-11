@@ -533,9 +533,9 @@ export function getClosestSideCenter(
     let observableDown: boolean;
     if (isThroughShot) {
         observableLeft = me1 !== ObstacleType.BLOCK;
-        observableRight = me1 !== ObstacleType.BLOCK;
-        observableUp = me1 !== ObstacleType.BLOCK;
-        observableDown = me1 !== ObstacleType.BLOCK;
+        observableRight = me2 !== ObstacleType.BLOCK;
+        observableUp = me3 !== ObstacleType.BLOCK;
+        observableDown = me4 !== ObstacleType.BLOCK;
     } else {
         observableLeft = !me1 || me1 === fromTeamType || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
         observableRight = !me2 || me2 === fromTeamType || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;

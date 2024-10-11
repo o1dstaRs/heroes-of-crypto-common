@@ -9,12 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { IBoardObj, Unit } from "../units/unit";
-import { XY } from "../utils/math";
-
-export interface IAnimationData {
-    toPosition: XY;
-    affectedUnit: IBoardObj;
-    fromPosition?: XY;
-    bodyUnit?: Unit;
+export interface IStatisticHolder<T> {
+    add(singleDamageStatistic: T, identifyFn: (a: T, b: T) => boolean, combineFn: (a: T, b: T) => T): void;
+    get(compareFn: (a: T, b: T) => number): T[];
 }
