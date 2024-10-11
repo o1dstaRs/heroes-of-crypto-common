@@ -96,7 +96,9 @@ export class Grid {
     public cleanupCenterObstacle(): void {
         if (
             !this.cleanedUpCenter &&
-            (this.gridType === GridType.LAVA_CENTER || this.gridType === GridType.WATER_CENTER)
+            (this.gridType === GridType.LAVA_CENTER ||
+                this.gridType === GridType.WATER_CENTER ||
+                this.gridType === GridType.BLOCK_CENTER)
         ) {
             const quarter = this.gridSettings.getGridSize() >> 2;
             const halfQuarter = quarter >> 1;
@@ -604,6 +606,22 @@ export class Grid {
         return matrix;
     }
 
+    public getCenterCells(): XY[] {
+        const quarter = this.gridSettings.getGridSize() >> 2;
+        const halfQuarter = quarter >> 1;
+        const start = quarter + halfQuarter;
+        const end = start + quarter;
+        const centerCells: XY[] = [];
+
+        for (let x = start; x < end; x++) {
+            for (let y = start; y < end; y++) {
+                centerCells.push({ x, y });
+            }
+        }
+
+        return centerCells;
+    }
+
     private getOccupantNumeric(row: number, column: number, excludeUnits = false): number {
         const r = this.boardCoord[row];
         if (r === undefined) {
@@ -644,22 +662,6 @@ export class Grid {
 
         return 0;
     }
-
-    // private getCenterCells(): XY[] {
-    //     const quarter = this.gridSettings.getGridSize() >> 2;
-    //     const halfQuarter = quarter >> 1;
-    //     const start = quarter + halfQuarter;
-    //     const end = start + quarter;
-    //     const centerCells: XY[] = [];
-
-    //     for (let x = start; x < end; x++) {
-    //         for (let y = start; y < end; y++) {
-    //             centerCells.push({ x, y });
-    //         }
-    //     }
-
-    //     return centerCells;
-    // }
 
     private getObstacleTypePerGrid(): ObstacleType | undefined {
         if (this.gridType === GridType.BLOCK_CENTER) {

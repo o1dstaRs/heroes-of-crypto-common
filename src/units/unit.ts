@@ -129,7 +129,14 @@ export interface IUnitAIRepr {
     isSmallSize(): boolean;
     getBaseCell(): XY;
     getCells(): XY[];
+    getPosition(): XY;
     getAttackType(): AttackType;
+}
+
+export interface IBoardObj {
+    isSmallSize(): boolean;
+    getPosition(): XY;
+    setRenderPosition(x: number, y: number): void;
 }
 
 interface IDamageable {
@@ -164,7 +171,7 @@ interface IDamager {
     selectAttackType(selectedAttackType: AttackType): boolean;
 }
 
-export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUnitAIRepr {
+export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUnitAIRepr, IBoardObj {
     protected readonly unitProperties: UnitProperties;
 
     protected readonly initialUnitProperties: UnitProperties;
@@ -1059,16 +1066,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.applyDamage(armageddonDamage);
     }
 
-    public applyDamage(minusHp: number): void {
+    public applyDamage(minusHp: number): number {
         if (minusHp < this.unitProperties.hp) {
             this.unitProperties.hp -= minusHp;
             this.handleDamageAnimation(0); // Trigger animation hook with no deaths
-            return;
+            return minusHp;
         }
 
         this.unitProperties.amount_died += 1;
         this.unitProperties.amount_alive -= 1;
         minusHp -= this.unitProperties.hp;
+        let substracted = this.unitProperties.hp;
         this.unitProperties.hp = this.unitProperties.max_hp;
 
         const amountDied = Math.floor(minusHp / this.unitProperties.max_hp);
@@ -1077,7 +1085,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_died += this.unitProperties.amount_alive;
             this.unitProperties.amount_alive = 0;
             this.handleDamageAnimation(this.unitProperties.amount_alive); // Trigger animation hook with all deaths
-            return;
+            return Math.floor(this.unitProperties.amount_alive * this.unitProperties.max_hp) + substracted;
         }
 
         this.unitProperties.amount_died += amountDied;
@@ -1093,6 +1101,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.steps += 1;
             this.initialUnitProperties.steps += 1;
         }
+
+        return minusHp + substracted;
     }
 
     public isDead(): boolean {
