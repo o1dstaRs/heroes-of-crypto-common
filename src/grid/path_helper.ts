@@ -121,7 +121,12 @@ export class PathHelper {
             return { x: newUnitCellX, y: newUnitCellY };
         }
 
-        if (targetUnitTeam === TeamType.UPPER) {
+        if (
+            targetUnitTeam === TeamType.UPPER ||
+            (targetUnitTeam === TeamType.NO_TEAM &&
+                (unitCell.x <= this.gridSettings.getGridSize() / 2 ||
+                    unitCell.y <= this.gridSettings.getGridSize() / 2))
+        ) {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
@@ -129,7 +134,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
-        } else {
+        } else if (targetUnitTeam === TeamType.LOWER || targetUnitTeam === TeamType.NO_TEAM) {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
@@ -153,7 +158,11 @@ export class PathHelper {
             return { x: newUnitCellX, y: newUnitCellY };
         }
 
-        if (targetUnitTeam === TeamType.UPPER) {
+        if (
+            targetUnitTeam === TeamType.UPPER ||
+            (targetUnitTeam === TeamType.NO_TEAM &&
+                (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
+        ) {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
@@ -161,7 +170,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
-        } else {
+        } else if (targetUnitTeam === TeamType.LOWER || targetUnitTeam === TeamType.NO_TEAM) {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
@@ -180,7 +189,11 @@ export class PathHelper {
         availableAttackCellHashes: Set<number>,
         targetUnitTeam: TeamType,
     ): XY | undefined {
-        if (targetUnitTeam === TeamType.UPPER) {
+        if (
+            targetUnitTeam === TeamType.UPPER ||
+            (targetUnitTeam === TeamType.NO_TEAM &&
+                (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y <= this.gridSettings.getGridSize() / 2))
+        ) {
             const firstUnitCellY = unitCell.y - 1;
             if (firstUnitCellY >= 0 && availableAttackCellHashes.has((newUnitCellX << 4) | firstUnitCellY)) {
                 return { x: newUnitCellX, y: firstUnitCellY };
@@ -193,7 +206,7 @@ export class PathHelper {
             ) {
                 return { x: newUnitCellX, y: secondUnitCellY };
             }
-        } else {
+        } else if (targetUnitTeam === TeamType.LOWER || targetUnitTeam === TeamType.NO_TEAM) {
             const firstUnitCellY = unitCell.y + 1;
             if (
                 firstUnitCellY < this.gridSettings.getGridSize() &&
@@ -217,7 +230,11 @@ export class PathHelper {
         availableAttackCellHashes: Set<number>,
         targetUnitTeam: TeamType,
     ): XY | undefined {
-        if (targetUnitTeam === TeamType.UPPER) {
+        if (
+            targetUnitTeam === TeamType.UPPER ||
+            (targetUnitTeam === TeamType.NO_TEAM &&
+                (unitCell.x <= this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
+        ) {
             const firstUnitCellX = unitCell.x - 1;
             if (firstUnitCellX >= 0 && availableAttackCellHashes.has((firstUnitCellX << 4) | newUnitCellY)) {
                 return { x: firstUnitCellX, y: newUnitCellY };
@@ -230,7 +247,7 @@ export class PathHelper {
             ) {
                 return { x: secondUnitCellX, y: newUnitCellY };
             }
-        } else {
+        } else if (targetUnitTeam === TeamType.LOWER) {
             const firstUnitCellX = unitCell.x + 1;
             if (
                 firstUnitCellX < this.gridSettings.getGridSize() &&

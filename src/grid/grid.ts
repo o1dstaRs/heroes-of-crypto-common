@@ -606,7 +606,7 @@ export class Grid {
         return matrix;
     }
 
-    public getCenterCells(): XY[] {
+    public getCenterCells(excludeInner = false): XY[] {
         const quarter = this.gridSettings.getGridSize() >> 2;
         const halfQuarter = quarter >> 1;
         const start = quarter + halfQuarter;
@@ -615,7 +615,15 @@ export class Grid {
 
         for (let x = start; x < end; x++) {
             for (let y = start; y < end; y++) {
-                centerCells.push({ x, y });
+                if (
+                    !excludeInner ||
+                    !(
+                        (x === this.gridSettings.getGridSize() / 2 || x === this.gridSettings.getGridSize() / 2 - 1) &&
+                        (y === this.gridSettings.getGridSize() / 2 || y === this.gridSettings.getGridSize() / 2 - 1)
+                    )
+                ) {
+                    centerCells.push({ x, y });
+                }
             }
         }
 

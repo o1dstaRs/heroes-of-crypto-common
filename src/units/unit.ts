@@ -2047,6 +2047,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         adjacentEnemies: Unit[],
         fromPathCells?: XY[],
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        extendByCells?: XY[],
     ): IAttackTargets {
         const canAttackUnitIds: Set<string> = new Set();
         const possibleAttackCells: XY[] = [];
@@ -2100,9 +2101,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     if (!bodyCellPos) {
                         continue;
                     }
-                    bodyCells = [bodyCellPos];
+                    bodyCells = extendByCells ? [bodyCellPos, ...extendByCells] : [bodyCellPos];
                 } else {
-                    bodyCells = u.getCells();
+                    bodyCells = extendByCells ? [...u.getCells(), ...extendByCells] : u.getCells();
                 }
 
                 for (const bodyCell of bodyCells) {
@@ -2210,9 +2211,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     if (!bodyCellPos) {
                         continue;
                     }
-                    bodyCells = [bodyCellPos];
+                    bodyCells = extendByCells ? [bodyCellPos, ...extendByCells] : [bodyCellPos];
                 } else {
-                    bodyCells = ae.getCells();
+                    bodyCells = extendByCells ? [...ae.getCells(), ...extendByCells] : ae.getCells();
                 }
 
                 for (const bodyCell of bodyCells) {

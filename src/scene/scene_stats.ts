@@ -9,7 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
-export interface IStatisticHolder<T> {
-    add(singleDamageStatistic: T): void;
-    get(): T[];
+import { TeamType } from "../units/unit_properties";
+
+export interface IDamageStatistic {
+    unitName: string;
+    damage: number;
+    team: TeamType;
 }

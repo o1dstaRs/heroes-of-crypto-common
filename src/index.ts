@@ -40,6 +40,7 @@ export * from "./units/unit_properties";
 export * from "./units/units_holder";
 export * from "./units/unit";
 export * from "./scene/scene_log_interface";
+export * from "./scene/scene_stats";
 export * from "./scene/statistic_holder_interface";
 export * from "./fights/fight_properties";
 export * from "./fights/fight_state_manager";
