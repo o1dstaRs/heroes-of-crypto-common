@@ -129,8 +129,8 @@ export interface IUnitAIRepr {
     isSmallSize(): boolean;
     getBaseCell(): XY;
     getCells(): XY[];
-    getPosition(): XY;
     getAttackType(): AttackType;
+    hasAbilityActive(abilityName: string): boolean;
 }
 
 export interface IBoardObj {
@@ -1181,6 +1181,80 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
 
+    public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
+        if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
+            const spellProperties = getSpellConfig(FactionType.NO_TYPE, "Made of Fire");
+            this.applyBuff(
+                new Spell({
+                    spellProperties: spellProperties,
+                    amount: 1,
+                }),
+                undefined,
+                undefined,
+                true,
+            );
+
+            this.unitProperties.max_hp = Math.max(
+                Math.ceil(this.unitProperties.max_hp + this.unitProperties.max_hp / spellProperties.power),
+                this.unitProperties.max_hp,
+            );
+            this.unitProperties.base_attack = Math.max(
+                Number(
+                    (this.unitProperties.base_attack + this.unitProperties.base_attack / spellProperties.power).toFixed(
+                        2,
+                    ),
+                ),
+                this.unitProperties.base_attack,
+            );
+            this.unitProperties.base_armor = Math.max(
+                Number(
+                    (this.unitProperties.base_armor + this.unitProperties.base_armor / spellProperties.power).toFixed(
+                        2,
+                    ),
+                ),
+                this.unitProperties.base_armor,
+            );
+            this.unitProperties.steps = Math.max(
+                Number((this.unitProperties.steps + this.unitProperties.steps / spellProperties.power).toFixed(21)),
+                this.unitProperties.steps,
+            );
+            this.unitProperties.speed = Math.max(
+                Number((this.unitProperties.speed + this.unitProperties.speed / spellProperties.power).toFixed(1)),
+                this.unitProperties.speed,
+            );
+            this.unitProperties.shot_distance = Math.max(
+                Number(
+                    (
+                        this.unitProperties.shot_distance +
+                        this.unitProperties.shot_distance / spellProperties.power
+                    ).toFixed(1),
+                ),
+                this.unitProperties.shot_distance,
+            );
+            this.unitProperties.magic_resist = Math.max(
+                Number(
+                    (
+                        this.unitProperties.magic_resist +
+                        this.unitProperties.magic_resist / spellProperties.power
+                    ).toFixed(2),
+                ),
+                this.unitProperties.magic_resist,
+            );
+        }
+
+        if (hasWaterCell && this.hasAbilityActive("Made of Water") && !this.hasBuffActive("Made of Water")) {
+            this.applyBuff(
+                new Spell({
+                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Made of Water"),
+                    amount: 1,
+                }),
+                undefined,
+                undefined,
+                true,
+            );
+        }
+    }
+
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;
         const currentHp = this.unitProperties.hp;
@@ -1746,10 +1820,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // HP
+        const madeOfFireBuff = this.getBuff("Made of Fire");
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
-        this.unitProperties.max_hp = this.refreshAndGetAdjustedMaxHp(currentLap) + baseStatsDiff.baseStats.hp;
+        this.unitProperties.max_hp =
+            this.refreshAndGetAdjustedMaxHp(currentLap, madeOfFireBuff) + baseStatsDiff.baseStats.hp;
 
         if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.unitProperties.hp += 5;
@@ -1811,7 +1887,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // ARMOR
         const pegasusMightAura = this.getAppliedAuraEffect("Pegasus Might Aura");
         this.unitProperties.base_armor = Number(
-            (this.initialUnitProperties.base_armor + baseStatsDiff.baseStats.armor).toFixed(2),
+            (
+                (madeOfFireBuff
+                    ? this.initialUnitProperties.base_armor + this.initialUnitProperties.base_armor / 10
+                    : this.initialUnitProperties.base_armor) + baseStatsDiff.baseStats.armor
+            ).toFixed(2),
         );
         if (pegasusMightAura) {
             this.unitProperties.base_armor += pegasusMightAura.getPower();
@@ -1852,7 +1932,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // MDEF
-        this.unitProperties.magic_resist = this.initialUnitProperties.magic_resist;
+        this.unitProperties.magic_resist = madeOfFireBuff
+            ? this.initialUnitProperties.magic_resist +
+              this.initialUnitProperties.magic_resist / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.magic_resist;
         const enchantedSkinAbility = this.getAbility("Enchanted Skin");
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
@@ -1887,12 +1970,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.range_shots_mod = endlessQuiverAbility.getPower();
         }
 
+        // SPEED
+        this.unitProperties.speed = madeOfFireBuff
+            ? this.initialUnitProperties.speed + this.initialUnitProperties.speed / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.speed;
+
         // STEPS
         const skyRunnerAbility = this.getAbility("Sky Runner");
         if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.initialUnitProperties.steps += 1;
         }
-        this.unitProperties.steps = this.initialUnitProperties.steps;
+
+        this.unitProperties.steps = madeOfFireBuff
+            ? this.initialUnitProperties.steps + this.initialUnitProperties.steps / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.steps;
         if (skyRunnerAbility) {
             this.unitProperties.steps += this.calculateAbilityCount(skyRunnerAbility);
         }
@@ -1932,8 +2023,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.initialUnitProperties.base_attack += 2;
             }
         }
-        this.unitProperties.base_attack = this.initialUnitProperties.base_attack;
-        this.unitProperties.shot_distance = this.initialUnitProperties.shot_distance;
+        this.unitProperties.base_attack = madeOfFireBuff
+            ? this.initialUnitProperties.base_attack +
+              this.initialUnitProperties.base_attack / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.base_attack;
+        this.unitProperties.shot_distance = madeOfFireBuff
+            ? this.initialUnitProperties.shot_distance +
+              this.initialUnitProperties.shot_distance / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.shot_distance;
         if (pegasusMightAura) {
             this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
@@ -1990,8 +2087,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const weaknessDebuff = this.getDebuff("Weakness");
         if (weaknessDebuff) {
-            // baseAttackMultiplier = baseAttackMultiplier * ((100 - weaknessDebuff.getPower()) / 100);
-
             this.unitProperties.attack_mod -= (this.unitProperties.base_attack * weaknessDebuff.getPower()) / 100;
         }
 
@@ -2347,12 +2442,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return armor;
     }
 
-    protected refreshAndGetAdjustedMaxHp(currentLap: number): number {
+    protected refreshAndGetAdjustedMaxHp(currentLap: number, madeOfFireBuff?: AppliedSpell): number {
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
         if (hasUnyieldingPower) {
-            this.unitProperties.max_hp = this.initialUnitProperties.max_hp + currentLap * 5;
+            this.unitProperties.max_hp =
+                (madeOfFireBuff
+                    ? Math.ceil(
+                          this.initialUnitProperties.max_hp +
+                              this.initialUnitProperties.max_hp / madeOfFireBuff.getPower(),
+                      )
+                    : this.initialUnitProperties.max_hp) +
+                currentLap * 5;
         } else {
-            this.unitProperties.max_hp = this.initialUnitProperties.max_hp;
+            this.unitProperties.max_hp = madeOfFireBuff
+                ? Math.ceil(
+                      this.initialUnitProperties.max_hp + this.initialUnitProperties.max_hp / madeOfFireBuff.getPower(),
+                  )
+                : this.initialUnitProperties.max_hp;
         }
 
         const boostHealthAbility = this.getAbility("Boost Health");

@@ -22,4 +22,6 @@ export interface IWeightedRoute {
     route: XY[];
     weight: number;
     firstAggrMet: boolean;
+    hasLavaCell: boolean;
+    hasWaterCell: boolean;
 }

@@ -87,7 +87,7 @@ export class UnitProperties {
 
     public luck: number;
 
-    public readonly speed: number;
+    public speed: number;
 
     public armor_mod: number;
 

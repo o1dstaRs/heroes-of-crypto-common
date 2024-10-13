@@ -373,7 +373,12 @@ export class PathHelper {
         return captured;
     }
 
-    private filterUnallowedDestinations(movePath: IMovePath, matrix: number[][], isSmallUnit: boolean): IMovePath {
+    private filterUnallowedDestinations(
+        movePath: IMovePath,
+        matrix: number[][],
+        isSmallUnit: boolean,
+        isMadeOfFire: boolean,
+    ): IMovePath {
         const filteredCells: XY[] = [];
         const hashes: Set<number> = new Set();
         const { knownPaths } = movePath;
@@ -388,7 +393,7 @@ export class PathHelper {
 
             const matrixElement = matrixElementOrDefault(matrix, cell.x, cell.y, 0);
             if (
-                matrixElement === ObstacleType.LAVA ||
+                (!isMadeOfFire && matrixElement === ObstacleType.LAVA) ||
                 matrixElement === ObstacleType.WATER ||
                 matrixElement === ObstacleType.BLOCK
             ) {
@@ -1094,6 +1099,7 @@ export class PathHelper {
         aggrBoard?: number[][],
         canFly = false,
         isSmallUnit = true,
+        isMadeOfFire = false,
     ): IMovePath {
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];
@@ -1119,6 +1125,8 @@ export class PathHelper {
                 route: [currentCell],
                 weight: 0,
                 firstAggrMet: false,
+                hasLavaCell: matrixElementOrDefault(matrix, currentCell.x, currentCell.y, 0) === ObstacleType.LAVA,
+                hasWaterCell: matrixElementOrDefault(matrix, currentCell.x, currentCell.y, 0) === ObstacleType.WATER,
             },
         ];
 
@@ -1160,7 +1168,7 @@ export class PathHelper {
                 const el1 = matrixElementOrDefault(matrix, n.x, n.y, 0);
                 if (isSmallUnit) {
                     if (
-                        ((!canFly && el1) ||
+                        ((el1 && !canFly && !(isMadeOfFire && el1 === ObstacleType.LAVA)) ||
                             (canFly && el1 && el1 !== ObstacleType.LAVA && el1 !== ObstacleType.WATER)) &&
                         !initialCellKeys.has(keyNeighbor)
                     ) {
@@ -1175,16 +1183,16 @@ export class PathHelper {
                     const el3 = matrixElementOrDefault(matrix, n.x - 1, n.y - 1, 0);
                     const el4 = matrixElementOrDefault(matrix, n.x, n.y - 1, 0);
                     if (
-                        (((!canFly && el1) ||
+                        (((el1 && !canFly && !(isMadeOfFire && el1 === ObstacleType.LAVA)) ||
                             (canFly && el1 && el1 !== ObstacleType.LAVA && el1 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(keyNeighbor)) ||
-                        (((!canFly && el2) ||
+                        (((el2 && !canFly && !(isMadeOfFire && el2 === ObstacleType.LAVA)) ||
                             (canFly && el2 && el2 !== ObstacleType.LAVA && el2 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(unitKeyLeft)) ||
-                        (((!canFly && el3) ||
+                        (((el3 && !canFly && !(isMadeOfFire && el3 === ObstacleType.LAVA)) ||
                             (canFly && el3 && el3 !== ObstacleType.LAVA && el3 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(unitKeyLeftDown)) ||
-                        (((!canFly && el4) ||
+                        (((el4 && !canFly && !(isMadeOfFire && el4 === ObstacleType.LAVA)) ||
                             (canFly && el4 && el4 !== ObstacleType.LAVA && el4 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(unitKeyDown))
                     ) {
@@ -1286,6 +1294,8 @@ export class PathHelper {
                             route: [...curWeightedRoute.route, n],
                             weight: curWeightedRoute.weight + moveCost,
                             firstAggrMet: curWeightedRoute.firstAggrMet,
+                            hasLavaCell: curWeightedRoute.hasLavaCell || el1 === ObstacleType.LAVA,
+                            hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
                         if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
                             if (!allowedToMoveThere.has(keyNeighbor)) {
@@ -1336,6 +1346,8 @@ export class PathHelper {
                             route: [...curWeightedRoute.route, n],
                             weight: curWeightedRoute.weight + moveCost,
                             firstAggrMet: curWeightedRoute.firstAggrMet,
+                            hasLavaCell: curWeightedRoute.hasLavaCell || el1 === ObstacleType.LAVA,
+                            hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
 
                         if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
@@ -1378,7 +1390,8 @@ export class PathHelper {
             const pos = { x: c.x, y: c.y };
             const key = (c.x << 4) | c.y;
             if (isSmallUnit) {
-                if (matrixElementOrDefault(matrix, c.x, c.y, 0) || allowedToMoveThere.has(key)) {
+                const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
+                if ((me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) || allowedToMoveThere.has(key)) {
                     continue;
                 }
 
@@ -1391,16 +1404,20 @@ export class PathHelper {
                         route: [currentCell, pos],
                         weight: 1,
                         firstAggrMet: false,
+                        hasLavaCell: me1 === ObstacleType.LAVA,
+                        hasWaterCell: me1 === ObstacleType.WATER,
                     },
                 ]);
             } else if (c.x < currentCell.x) {
                 const unitKeyLeft = ((c.x - 1) << 4) | c.y;
                 const unitKeyLeftDown = ((c.x - 1) << 4) | (c.y - 1);
+                const me1 = matrixElementOrDefault(matrix, c.x - 1, c.y, 0);
+                const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0);
                 if (
                     !allowedToMoveThere.has(unitKeyLeft) &&
-                    !matrixElementOrDefault(matrix, c.x - 1, c.y, 0) &&
+                    !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
                     !allowedToMoveThere.has(unitKeyLeftDown) &&
-                    !matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0)
+                    !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
                     allowedToMoveThere.add(unitKeyLeft);
                     allowed.push({ x: c.x - 1, y: c.y });
@@ -1413,17 +1430,21 @@ export class PathHelper {
                             route: [currentCell, pos],
                             weight: 1,
                             firstAggrMet: false,
+                            hasLavaCell: me1 === ObstacleType.LAVA || me2 === ObstacleType.LAVA,
+                            hasWaterCell: me1 === ObstacleType.WATER || me2 === ObstacleType.WATER,
                         },
                     ]);
                 }
             } else if (c.x > currentCell.x) {
                 const unitKeyRight = (c.x << 4) | c.y;
                 const unitKeyRightDown = (c.x << 4) | (c.y - 1);
+                const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
+                const me2 = matrixElementOrDefault(matrix, c.x, c.y - 1, 0);
                 if (
                     !allowedToMoveThere.has(unitKeyRight) &&
-                    !matrixElementOrDefault(matrix, c.x, c.y, 0) &&
+                    !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
                     !allowedToMoveThere.has(unitKeyRightDown) &&
-                    !matrixElementOrDefault(matrix, c.x, c.y - 1, 0)
+                    !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
                     allowedToMoveThere.add(unitKeyRight);
                     allowed.push({ x: c.x, y: c.y });
@@ -1436,17 +1457,21 @@ export class PathHelper {
                             route: [currentCell, pos],
                             weight: 1,
                             firstAggrMet: false,
+                            hasLavaCell: me1 === ObstacleType.LAVA || me2 === ObstacleType.LAVA,
+                            hasWaterCell: me1 === ObstacleType.WATER || me2 === ObstacleType.WATER,
                         },
                     ]);
                 }
             } else if (c.y < currentCell.y) {
                 const unitKeyDown = (c.x << 4) | (c.y - 1);
                 const unitKeyDownLeft = ((c.x - 1) << 4) | (c.y - 1);
+                const me1 = matrixElementOrDefault(matrix, c.x, c.y - 1, 0);
+                const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0);
                 if (
                     !allowedToMoveThere.has(unitKeyDown) &&
-                    !matrixElementOrDefault(matrix, c.x, c.y - 1, 0) &&
+                    !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
                     !allowedToMoveThere.has(unitKeyDownLeft) &&
-                    !matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0)
+                    !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
                     allowedToMoveThere.add(unitKeyDown);
                     allowed.push({ x: c.x, y: c.y - 1 });
@@ -1459,17 +1484,21 @@ export class PathHelper {
                             route: [currentCell, pos],
                             weight: 1,
                             firstAggrMet: false,
+                            hasLavaCell: me1 === ObstacleType.LAVA || me2 === ObstacleType.LAVA,
+                            hasWaterCell: me1 === ObstacleType.WATER || me2 === ObstacleType.WATER,
                         },
                     ]);
                 }
             } else {
                 const unitKeyUp = (c.x << 4) | c.y;
                 const unitKeyUpLeft = ((c.x - 1) << 4) | c.y;
+                const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
+                const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y, 0);
                 if (
                     !allowedToMoveThere.has(unitKeyUp) &&
-                    !matrixElementOrDefault(matrix, c.x, c.y, 0) &&
+                    !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
                     !allowedToMoveThere.has(unitKeyUpLeft) &&
-                    !matrixElementOrDefault(matrix, c.x - 1, c.y, 0)
+                    !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
                     allowedToMoveThere.add(unitKeyUp);
                     allowed.push({ x: c.x, y: c.y });
@@ -1482,6 +1511,8 @@ export class PathHelper {
                             route: [currentCell, pos],
                             weight: 1,
                             firstAggrMet: false,
+                            hasLavaCell: me1 === ObstacleType.LAVA || me2 === ObstacleType.LAVA,
+                            hasWaterCell: me1 === ObstacleType.WATER || me2 === ObstacleType.WATER,
                         },
                     ]);
                 }
@@ -1496,6 +1527,7 @@ export class PathHelper {
             },
             matrix,
             isSmallUnit,
+            isMadeOfFire,
         );
     }
 }
