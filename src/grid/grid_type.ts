@@ -12,19 +12,19 @@
 export enum GridType {
     NO_TYPE = 0,
     NORMAL = 1,
-    WATER_CENTER = 2,
-    LAVA_CENTER = 3,
-    BLOCK_CENTER = 4,
+    LAVA_CENTER = 2,
+    BLOCK_CENTER = 3,
+    WATER_CENTER = 4,
 }
 
-export const AllGridTypes = [GridType.NORMAL, GridType.WATER_CENTER, GridType.LAVA_CENTER, GridType.BLOCK_CENTER];
+export const AllGridTypes = [GridType.NORMAL, GridType.LAVA_CENTER, GridType.BLOCK_CENTER]; //, GridType.WATER_CENTER];
 
 export type AllGridType = (typeof AllGridTypes)[number];
 
 export const ToGridType: { [gridTypeValue: string]: GridType } = {
     "": GridType.NO_TYPE,
     "1": GridType.NORMAL,
-    "2": GridType.WATER_CENTER,
-    "3": GridType.LAVA_CENTER,
-    "4": GridType.BLOCK_CENTER,
+    "2": GridType.LAVA_CENTER,
+    "3": GridType.BLOCK_CENTER,
+    // "4": GridType.WATER_CENTER,
 };

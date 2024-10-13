@@ -9,9 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
-export enum ObstacleType {
-    BLOCK = -1,
-    HOLE = -2,
-    LAVA = -3,
-    WATER = -4,
+import { TeamType } from "../units/unit_properties";
+
+export interface IDamageStatistic {
+    unitName: string;
+    damage: number;
+    team: TeamType;
 }

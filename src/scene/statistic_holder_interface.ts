@@ -10,6 +10,6 @@
  */
 
 export interface IStatisticHolder<T> {
-    add(singleDamageStatistic: T, identifyFn: (a: T, b: T) => boolean, combineFn: (a: T, b: T) => T): void;
-    get(compareFn: (a: T, b: T) => number): T[];
+    add(singleDamageStatistic: T): void;
+    get(): T[];
 }

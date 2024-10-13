@@ -901,5 +901,21 @@
         "effect": null,
         "aura_effect": null,
         "can_be_casted": false
+    },
+    "Made of Fire": {
+        "name": "Made of Fire",
+        "type": "TEMP_BUFF",
+        "desc": [
+            "Upon coming into contact with lava at the center of the map,",
+            "the creature receives a 10% boost to all stats, including its abilities.",
+            "The creature can move through the lava or remain standing in it"
+        ],
+        "power": 10,
+        "power_type": "BOOST_ALL_STATS_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_casted": false
     }
 }

@@ -888,7 +888,7 @@ export class FightProperties {
                     firstBatch = unitsUpper;
                     secondBatch = unitsLower;
                 } else {
-                    const rnd = Math.floor(Math.random() * 2);
+                    const rnd = getRandomInt(0, 2);
                     if (rnd) {
                         firstBatch = unitsUpper;
                         secondBatch = unitsLower;
@@ -962,7 +962,8 @@ export class FightProperties {
             return GridType.BLOCK_CENTER;
         }
         if (randomValue < 6) {
-            return GridType.WATER_CENTER;
+            // return GridType.WATER_CENTER;
+            return GridType.LAVA_CENTER;
         }
 
         return GridType.LAVA_CENTER;

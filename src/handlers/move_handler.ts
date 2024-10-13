@@ -228,6 +228,7 @@ export class MoveHandler {
             }
             unit.applyMoraleStepsModifier(stepsMoraleMultiplier);
             unit.applyTravelledDistanceModifier(path.length);
+            unit.applyLavaWaterModifier(movePaths[0].hasLavaCell, movePaths[0].hasWaterCell);
         } else {
             return false;
         }

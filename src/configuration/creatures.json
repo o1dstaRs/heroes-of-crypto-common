@@ -505,6 +505,27 @@
             "level": 4,
             "spells": [],
             "abilities": ["Pegasus Might Aura", "Pegasus Light"]
+        },
+        "Arachna Queen": {
+            "name": "Arachna Queen",
+            "hp": 180,
+            "steps": 8,
+            "speed": 5.4,
+            "armor": 31,
+            "attack_type": "MELEE",
+            "attack": 32,
+            "attack_damage_min": 54,
+            "attack_damage_max": 78,
+            "attack_range": 1,
+            "range_shots": 0,
+            "shot_distance": 0,
+            "magic_resist": 15,
+            "movement_type": "WALK",
+            "exp": 500,
+            "size": 2,
+            "level": 4,
+            "spells": [],
+            "abilities": []
         }
     },
     "Chaos": {
@@ -653,7 +674,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Fire Element", "Fire Shield"]
+            "abilities": ["Fire Element", "Made of Fire", "Fire Shield"]
         },
         "Goblin Knight": {
             "name": "Goblin Knight",
