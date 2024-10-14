@@ -177,9 +177,7 @@ export function canCastSpell(
     casterUnit: Unit,
     targetUnit?: Unit,
     spell?: Spell,
-    unitSpells?: Spell[],
     targetCell?: XY,
-    forcedUnitId?: string,
     fromTeamType?: TeamType,
     toTeamType?: TeamType,
     fromUnitName?: string,
@@ -201,14 +199,13 @@ export function canCastSpell(
         !spell ||
         spell.getLapsTotal() <= 0 ||
         !spell.isRemaining() ||
-        !unitSpells?.length ||
         spell.getMinimalCasterStackPower() > fromUnitStackPower
     ) {
         return false;
     }
 
     let spellFound = false;
-    for (const s of unitSpells) {
+    for (const s of casterUnit.getSpells()) {
         if (s.getName() === spell.getName() && s.isRemaining()) {
             spellFound = true;
             break;
@@ -221,6 +218,15 @@ export function canCastSpell(
     const isSelfCast =
         (targetUnit && casterUnit.getId() === targetUnit.getId()) ||
         (fromUnitName && toUnitName && fromUnitName === toUnitName && fromTeamType === toTeamType);
+
+    if (spell.getPowerType() === SpellPowerType.RESURRECT) {
+        return (
+            targetUnit &&
+            targetUnit.getTeam() === casterUnit.getTeam() &&
+            targetUnit.getAmountDied() > 0 &&
+            (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
+        );
+    }
 
     if (spell.getPowerType() === SpellPowerType.HEAL) {
         if (spell.isGiftable()) {
@@ -302,6 +308,7 @@ export function canCastSpell(
             toUnitIsSmallSize &&
             oneOfTheEnemiesHasTargetCell())
     ) {
+        const forcedUnitId = casterUnit.getTarget();
         if (
             (toUnitMagicResistance && toUnitMagicResistance === 100) ||
             (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance) ||

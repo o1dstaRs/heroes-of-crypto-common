@@ -224,7 +224,10 @@ export class UnitsHolder {
         }
 
         const unitToDelete = this.allUnits.get(unitId);
-        let considerResurrection = checkForResurrection && unitToDelete?.hasAbilityActive("Resurrection");
+        let considerResurrection =
+            checkForResurrection &&
+            unitToDelete?.hasAbilityActive("Resurrection") &&
+            unitToDelete?.hasSpellRemaining("Resurrection");
 
         if (considerResurrection) {
             if (unitToDelete) {
@@ -238,6 +241,7 @@ export class UnitsHolder {
                     unitToDelete.deleteAllDebuffs();
                     unitToDelete.resetTarget();
                     unitToDelete.deleteAbility("Resurrection");
+                    unitToDelete.useSpell("Resurrection");
                 } else {
                     considerResurrection = false;
                 }

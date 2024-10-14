@@ -113,6 +113,23 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Resurrection": {
+            "name": "Resurrection",
+            "level": 0,
+            "desc": ["Resurrect fallen ally units on the battlefield. Up to {} total hit points."],
+            "target": "ANY_ALLY",
+            "power": 0,
+            "power_type": "RESURRECT",
+            "multiplier_type": "UNIT_CUMULATIVE_MAX_HP",
+            "laps": 1,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Armor Augment": {
             "name": "Armor Augment",
             "level": 0,

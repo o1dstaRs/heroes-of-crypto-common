@@ -29,7 +29,7 @@ export class AbilityFactory {
     public makeAbility(name: string) {
         const abilityConfig = getAbilityConfig(name);
         let spell: Spell | undefined = undefined;
-        if (abilityConfig.can_be_casted) {
+        if (abilityConfig.can_be_cast) {
             spell = new Spell({ spellProperties: getSpellConfig(FactionType.NO_TYPE, abilityConfig.name), amount: 1 });
         }
 
