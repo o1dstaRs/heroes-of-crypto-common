@@ -79,7 +79,14 @@ export class MoveHandler {
                 }
             }
 
-            if (this.grid.areAllCellsEmpty(targetCells, unit.getId())) {
+            if (
+                this.grid.areAllCellsEmpty(targetCells, unit.getId()) ||
+                this.grid.canOccupyCells(
+                    targetCells,
+                    unit.hasAbilityActive("Made of Fire"),
+                    unit.hasAbilityActive("Made of Water"),
+                )
+            ) {
                 const systemMoveResult = this.finishDirectedUnitMove(unit, targetCells, undefined, updatePositionMask);
                 if (systemMoveResult.log) {
                     logs.push(systemMoveResult.log);
@@ -114,7 +121,14 @@ export class MoveHandler {
                     if (moveX) {
                         const shiftedCells = this.getShiftedCells(targetCells, priorityShift, lapsNarrowed, true);
                         if (shiftedCells) {
-                            if (this.grid.areAllCellsEmpty(shiftedCells, unit.getId())) {
+                            if (
+                                this.grid.areAllCellsEmpty(shiftedCells, unit.getId()) ||
+                                this.grid.canOccupyCells(
+                                    shiftedCells,
+                                    unit.hasAbilityActive("Made of Fire"),
+                                    unit.hasAbilityActive("Made of Water"),
+                                )
+                            ) {
                                 const position = getPositionForCells(this.gridSettings, shiftedCells);
                                 if (!position) {
                                     targetCells = shiftedCells;
@@ -151,7 +165,14 @@ export class MoveHandler {
                     if (moveY) {
                         const shiftedCells = this.getShiftedCells(targetCells, priorityShift, lapsNarrowed, false);
                         if (shiftedCells) {
-                            if (this.grid.areAllCellsEmpty(shiftedCells, unit.getId())) {
+                            if (
+                                this.grid.areAllCellsEmpty(shiftedCells, unit.getId()) ||
+                                this.grid.canOccupyCells(
+                                    shiftedCells,
+                                    unit.hasAbilityActive("Made of Fire"),
+                                    unit.hasAbilityActive("Made of Water"),
+                                )
+                            ) {
                                 const position = getPositionForCells(this.gridSettings, shiftedCells);
                                 if (!position) {
                                     targetCells = shiftedCells;
@@ -253,9 +274,23 @@ export class MoveHandler {
 
         // this.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
         if (unit.isSmallSize()) {
-            this.grid.occupyCell(targetCells[0], unit.getId(), unit.getTeam(), unit.getAttackRange());
+            this.grid.occupyCell(
+                targetCells[0],
+                unit.getId(),
+                unit.getTeam(),
+                unit.getAttackRange(),
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
         } else {
-            this.grid.occupyCells(targetCells, unit.getId(), unit.getTeam(), unit.getAttackRange());
+            this.grid.occupyCells(
+                targetCells,
+                unit.getId(),
+                unit.getTeam(),
+                unit.getAttackRange(),
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
         }
         let deleteUnit = false;
         const bodyPosition = unit.getPosition();
