@@ -60,6 +60,7 @@ export enum SpellPowerType {
     MIND = 2,
     HEAL = 3,
     POSITION_CHANGE = 4,
+    RESURRECT = 5,
 }
 
 export const AllSpellPowerTypes = [
@@ -67,6 +68,7 @@ export const AllSpellPowerTypes = [
     SpellPowerType.MIND,
     SpellPowerType.HEAL,
     SpellPowerType.POSITION_CHANGE,
+    SpellPowerType.RESURRECT,
 ];
 
 export type AllSpellPowerType = (typeof AllSpellPowerTypes)[number];
@@ -77,6 +79,7 @@ export const ToSpellPowerType: { [spellPowerTypeName: string]: SpellPowerType } 
     MIND: SpellPowerType.MIND,
     HEAL: SpellPowerType.HEAL,
     POSITION_CHANGE: SpellPowerType.POSITION_CHANGE,
+    RESURRECT: SpellPowerType.RESURRECT,
 };
 
 export enum SpellMultiplierType {
@@ -84,12 +87,14 @@ export enum SpellMultiplierType {
     NO_MULTIPLIER = 1,
     UNIT_AMOUNT = 2,
     UNIT_AMOUNT_POWER = 3,
+    UNIT_CUMULATIVE_MAX_HP = 4,
 }
 
 export const AllSpellMultiplierTypes = [
     SpellMultiplierType.NO_MULTIPLIER,
     SpellMultiplierType.UNIT_AMOUNT,
     SpellMultiplierType.UNIT_AMOUNT_POWER,
+    SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
 ];
 
 export type AllSpellMultiplierType = (typeof AllSpellMultiplierTypes)[number];
@@ -99,6 +104,7 @@ export const ToSpellMultiplierType: { [spellMultiplierTypeName: string]: SpellMu
     NO_MULTIPLIER: SpellMultiplierType.NO_MULTIPLIER,
     UNIT_AMOUNT: SpellMultiplierType.UNIT_AMOUNT,
     UNIT_AMOUNT_POWER: SpellMultiplierType.UNIT_AMOUNT_POWER,
+    UNIT_CUMULATIVE_MAX_HP: SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
 };
 
 export class SpellProperties {

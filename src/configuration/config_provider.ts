@@ -205,11 +205,11 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     }
 
     if (
-        ability.can_be_casted === undefined ||
-        ability.can_be_casted === null ||
-        ability.can_be_casted.constructor !== Boolean
+        ability.can_be_cast === undefined ||
+        ability.can_be_cast === null ||
+        ability.can_be_cast.constructor !== Boolean
     ) {
-        throw TypeError(`Unknown 'can_be_casted' type for ability ${abilityName}`);
+        throw TypeError(`Unknown 'can_be_cast' type for ability ${abilityName}`);
     }
 
     return new AbilityProperties(
@@ -222,7 +222,7 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
         ability.stack_powered,
         ability.effect,
         ability.aura_effect,
-        ability.can_be_casted,
+        ability.can_be_cast,
     );
 };
 

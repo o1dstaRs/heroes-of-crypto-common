@@ -10,7 +10,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Backstab": {
         "name": "Backstab",
@@ -22,7 +22,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Handyman": {
         "name": "Handyman",
@@ -34,7 +34,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Double Shot": {
         "name": "Double Shot",
@@ -46,7 +46,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Shadow Touch": {
         "name": "Shadow Touch",
@@ -58,7 +58,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "One in the Field": {
         "name": "One in the Field",
@@ -70,7 +70,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Endless Quiver": {
         "name": "Endless Quiver",
@@ -82,7 +82,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Sniper": {
         "name": "Sniper",
@@ -94,7 +94,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Leather Armor": {
         "name": "Leather Armor",
@@ -106,7 +106,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Limited Supply": {
         "name": "Limited Supply",
@@ -118,7 +118,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Enchanted Skin": {
         "name": "Enchanted Skin",
@@ -130,7 +130,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Undead": {
         "name": "Undead",
@@ -142,7 +142,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Lightning Spin": {
         "name": "Lightning Spin",
@@ -154,7 +154,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Fire Breath": {
         "name": "Fire Breath",
@@ -166,7 +166,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Fire Element": {
         "name": "Fire Element",
@@ -178,7 +178,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Fire Shield": {
         "name": "Fire Shield",
@@ -190,7 +190,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Piercing Spear": {
         "name": "Piercing Spear",
@@ -202,7 +202,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Boost Health": {
         "name": "Boost Health",
@@ -214,7 +214,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Stun": {
         "name": "Stun",
@@ -226,7 +226,7 @@
         "stack_powered": true,
         "effect": "Stun",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Blindness": {
         "name": "Blindness",
@@ -238,7 +238,7 @@
         "stack_powered": true,
         "effect": "Blindness",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Wild Regeneration": {
         "name": "Wild Regeneration",
@@ -250,7 +250,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": true
+        "can_be_cast": true
     },
     "Heavy Armor": {
         "name": "Heavy Armor",
@@ -262,7 +262,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "No Melee": {
         "name": "No Melee",
@@ -274,7 +274,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Sharpened Weapons Aura": {
         "name": "Sharpened Weapons Aura",
@@ -286,7 +286,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Sharpened Weapons",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Range Null Field Aura": {
         "name": "Range Null Field Aura",
@@ -298,7 +298,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Range Null Field",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Luck Aura": {
         "name": "Luck Aura",
@@ -310,7 +310,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Luck",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Arrows Wingshield Aura": {
         "name": "Arrows Wingshield Aura",
@@ -325,7 +325,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Arrows Wingshield",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "AI Driven": {
         "name": "AI Driven",
@@ -337,7 +337,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Magic Shield": {
         "name": "Magic Shield",
@@ -349,7 +349,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Boar Saliva": {
         "name": "Boar Saliva",
@@ -361,7 +361,7 @@
         "stack_powered": true,
         "effect": "Boar Saliva",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Dodge": {
         "name": "Dodge",
@@ -373,7 +373,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Small Specie": {
         "name": "Small Specie",
@@ -385,7 +385,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Bitter Experience": {
         "name": "Bitter Experience",
@@ -397,7 +397,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Absorb Penalties Aura": {
         "name": "Absorb Penalties Aura",
@@ -412,7 +412,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Absorb Penalties",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Spit Ball": {
         "name": "Spit Ball",
@@ -427,7 +427,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Petrifying Gaze": {
         "name": "Petrifying Gaze",
@@ -442,7 +442,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Wardguard": {
         "name": "Wardguard",
@@ -454,7 +454,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Large Caliber": {
         "name": "Large Caliber",
@@ -469,7 +469,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Area Throw": {
         "name": "Area Throw",
@@ -484,7 +484,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Through Shot": {
         "name": "Through Shot",
@@ -499,7 +499,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Sky Runner": {
         "name": "Sky Runner",
@@ -511,7 +511,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Lucky Strike": {
         "name": "Lucky Strike",
@@ -523,7 +523,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Forest Spellbook": {
         "name": "Forest Spellbook",
@@ -535,7 +535,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Tome of Might": {
         "name": "Tome of Might",
@@ -550,7 +550,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Book of Healing": {
         "name": "Book of Healing",
@@ -562,7 +562,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Unyielding Power": {
         "name": "Unyielding Power",
@@ -574,7 +574,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Shatter Armor": {
         "name": "Shatter Armor",
@@ -586,7 +586,7 @@
         "stack_powered": true,
         "effect": "Shatter Armor",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Rapid Charge": {
         "name": "Rapid Charge",
@@ -598,7 +598,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Wolf Trail Aura": {
         "name": "Wolf Trail Aura",
@@ -610,7 +610,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Wolf Trail",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Penetrating Bite": {
         "name": "Penetrating Bite",
@@ -622,7 +622,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Pegasus Might Aura": {
         "name": "Pegasus Might Aura",
@@ -634,7 +634,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Pegasus Might",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Pegasus Light": {
         "name": "Pegasus Light",
@@ -646,7 +646,7 @@
         "stack_powered": true,
         "effect": "Pegasus Light",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Paralysis": {
         "name": "Paralysis",
@@ -661,7 +661,7 @@
         "stack_powered": true,
         "effect": "Paralysis",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Deep Wounds Level 1": {
         "name": "Deep Wounds Level 1",
@@ -676,7 +676,7 @@
         "stack_powered": true,
         "effect": "Deep Wounds",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Deep Wounds Level 2": {
         "name": "Deep Wounds Level 2",
@@ -691,7 +691,7 @@
         "stack_powered": true,
         "effect": "Deep Wounds",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Deep Wounds Level 3": {
         "name": "Deep Wounds Level 3",
@@ -706,7 +706,7 @@
         "stack_powered": true,
         "effect": "Deep Wounds",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Madness": {
         "name": "Madness",
@@ -718,7 +718,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Blind Fury": {
         "name": "Blind Fury",
@@ -730,7 +730,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Miner": {
         "name": "Miner",
@@ -742,7 +742,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Mechanism": {
         "name": "Mechanism",
@@ -757,7 +757,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Aggr": {
         "name": "Aggr",
@@ -769,7 +769,7 @@
         "stack_powered": true,
         "effect": "Aggr",
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Skewer Strike": {
         "name": "Skewer Strike",
@@ -781,19 +781,22 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Resurrection": {
         "name": "Resurrection",
         "type": "DEFENCE",
-        "desc": ["50% of the initial units supply will be restored after full stack death"],
+        "desc": [
+            "50% of the initial units supply will be restored after full stack death.",
+            "Can be cast to resurrect fallen ally units on the battlefield"
+        ],
         "power": 1,
         "power_type": "RESURRECTION",
         "skip_reponse": false,
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": true
     },
     "War Anger Aura": {
         "name": "War Anger Aura",
@@ -805,7 +808,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "War Anger",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Wind Flow": {
         "name": "Wind Flow",
@@ -819,7 +822,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": true
+        "can_be_cast": true
     },
     "Battle Roar": {
         "name": "Battle Roar",
@@ -834,7 +837,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": true
+        "can_be_cast": true
     },
     "Castling": {
         "name": "Castling",
@@ -846,7 +849,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": true
+        "can_be_cast": true
     },
     "Chain Lightning": {
         "name": "Chain Lightning",
@@ -861,7 +864,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Wind Element": {
         "name": "Wind Element",
@@ -873,7 +876,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Tie up the Horses Aura": {
         "name": "Tie up the Horses Aura",
@@ -885,7 +888,7 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Tie up the Horses",
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Crusade": {
         "name": "Crusade",
@@ -900,7 +903,7 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     },
     "Made of Fire": {
         "name": "Made of Fire",
@@ -916,6 +919,6 @@
         "stack_powered": false,
         "effect": null,
         "aura_effect": null,
-        "can_be_casted": false
+        "can_be_cast": false
     }
 }

@@ -441,6 +441,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return (this.unitProperties.amount_alive - 1) * this.unitProperties.max_hp + cumulativeHp;
     }
 
+    public getCumulativeMaxHp(): number {
+        return this.unitProperties.amount_alive * this.unitProperties.max_hp;
+    }
+
     public getEffects(): Effect[] {
         return this.effects;
     }
@@ -714,6 +718,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public hasAbilityActive(abilityName: string): boolean {
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public hasSpellRemaining(spellName: string): boolean {
+        for (const s of this.spells) {
+            if (s.getName() === spellName && s.isRemaining()) {
                 return true;
             }
         }
@@ -1773,7 +1787,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public useSpell(spellName: string): void {
-        const spellsUpdated: Spell[] = [];
         for (const s of this.spells) {
             if (s.getName() === spellName) {
                 s.decreaseAmount();
@@ -1784,15 +1797,42 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     }
                 }
             }
-            if (s.isRemaining()) {
-                spellsUpdated.push(s);
+            if (!s.isRemaining() && spellName === "Resurrection") {
+                this.deleteAbility("Resurrection");
             }
         }
-        // this.spells = spellsUpdated;
     }
 
     public getAllProperties(): UnitProperties {
         return structuredClone(this.unitProperties);
+    }
+
+    // returns number of units resurrected
+    public applyResurrection(resurrectionPower: number): number {
+        const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
+        if (hpDiff >= resurrectionPower) {
+            this.unitProperties.hp += resurrectionPower;
+            return 0;
+        } else {
+            this.unitProperties.hp = this.unitProperties.max_hp;
+            resurrectionPower -= hpDiff;
+        }
+
+        const projectedAmountResurrected = Math.ceil(resurrectionPower / this.unitProperties.max_hp);
+        const actualAmountResurrected = Math.min(this.unitProperties.amount_died, projectedAmountResurrected);
+
+        if (projectedAmountResurrected > actualAmountResurrected) {
+            this.unitProperties.hp = this.unitProperties.max_hp;
+        } else {
+            const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
+            this.unitProperties.hp = hpStillToHeal;
+        }
+
+        const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
+        this.unitProperties.amount_alive += actualAmountResurrected;
+        this.unitProperties.amount_died = newAmountDied < 0 ? 0 : newAmountDied;
+
+        return actualAmountResurrected;
     }
 
     public applyHeal(healPower: number): number {
