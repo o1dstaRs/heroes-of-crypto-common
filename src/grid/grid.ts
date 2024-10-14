@@ -99,7 +99,12 @@ export class Grid {
 
             for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                 for (let column = 0; column < this.gridSettings.getGridSize(); column++) {
+                    const boardVal = this.boardCoord[row][column];
                     if (
+                        // lava and water cells may be taken by certain units
+                        ((this.gridType === GridType.LAVA_CENTER && boardVal === "L") ||
+                            (this.gridType === GridType.WATER_CENTER && boardVal === "W") ||
+                            this.gridType === GridType.BLOCK_CENTER) &&
                         row >= this.availableCenterStart &&
                         row < this.availableCenterEnd &&
                         column >= this.availableCenterStart &&
