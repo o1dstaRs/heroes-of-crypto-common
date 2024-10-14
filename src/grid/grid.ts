@@ -32,8 +32,6 @@ export class Grid {
 
     private readonly gridSettings: GridSettings;
 
-    private readonly targetBoardCoord: string[][];
-
     private availableCenterStart: number;
 
     private availableCenterEnd: number;
@@ -49,13 +47,11 @@ export class Grid {
         this.availableCenterStart = quarter + halfQuarter;
         this.availableCenterEnd = this.availableCenterStart + quarter;
         this.boardCoord = new Array(gridSize);
-        this.targetBoardCoord = new Array(gridSize);
         const boardAggTeamLower: number[][] = new Array(gridSize);
         const boardAggTeamUpper: number[][] = new Array(gridSize);
 
         for (let row = 0; row < gridSize; row++) {
             this.boardCoord[row] = new Array(gridSize);
-            this.targetBoardCoord[row] = new Array(gridSize);
             boardAggTeamLower[row] = new Array(gridSize);
             boardAggTeamUpper[row] = new Array(gridSize);
         }
@@ -71,16 +67,12 @@ export class Grid {
                     const obstacleType = this.getObstacleTypePerGrid();
                     if (obstacleType === undefined) {
                         this.boardCoord[row][column] = "";
-                        this.targetBoardCoord[row][column] = "";
                     } else if (obstacleType === ObstacleType.BLOCK) {
                         this.boardCoord[row][column] = "B";
-                        this.targetBoardCoord[row][column] = "B";
                     } else if (obstacleType === ObstacleType.LAVA) {
                         this.boardCoord[row][column] = "L";
-                        this.targetBoardCoord[row][column] = "L";
                     } else if (obstacleType === ObstacleType.WATER) {
                         this.boardCoord[row][column] = "W";
-                        this.targetBoardCoord[row][column] = "W";
                     }
                 }
 
@@ -107,14 +99,18 @@ export class Grid {
 
             for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                 for (let column = 0; column < this.gridSettings.getGridSize(); column++) {
+                    const boardVal = this.boardCoord[row][column];
                     if (
+                        // lava and water cells may be taken by certain units
+                        ((this.gridType === GridType.LAVA_CENTER && boardVal === "L") ||
+                            (this.gridType === GridType.WATER_CENTER && boardVal === "W") ||
+                            this.gridType === GridType.BLOCK_CENTER) &&
                         row >= this.availableCenterStart &&
                         row < this.availableCenterEnd &&
                         column >= this.availableCenterStart &&
                         column < this.availableCenterEnd
                     ) {
                         this.boardCoord[row][column] = "";
-                        this.targetBoardCoord[row][column] = "";
                     }
                 }
             }
@@ -141,16 +137,12 @@ export class Grid {
                     const obstacleType = this.getObstacleTypePerGrid();
                     if (obstacleType === undefined) {
                         this.boardCoord[row][column] = "";
-                        this.targetBoardCoord[row][column] = "";
                     } else if (obstacleType === ObstacleType.BLOCK) {
                         this.boardCoord[row][column] = "B";
-                        this.targetBoardCoord[row][column] = "B";
                     } else if (obstacleType === ObstacleType.LAVA) {
                         this.boardCoord[row][column] = "L";
-                        this.targetBoardCoord[row][column] = "L";
                     } else if (obstacleType === ObstacleType.WATER) {
                         this.boardCoord[row][column] = "W";
-                        this.targetBoardCoord[row][column] = "W";
                     }
                 }
             }
@@ -174,101 +166,6 @@ export class Grid {
         }
 
         return false;
-    }
-
-    public hasTarget(unitId: string): boolean {
-        const occupiedCells = this.cellsByUnitId[unitId];
-        if (!occupiedCells?.length) {
-            return false;
-        }
-
-        let allCellsDoHaveTarget = false;
-        for (const oc of occupiedCells) {
-            if (this.targetBoardCoord[oc.x][oc.y]) {
-                allCellsDoHaveTarget = true;
-            } else {
-                allCellsDoHaveTarget = false;
-                break;
-            }
-        }
-
-        return allCellsDoHaveTarget;
-    }
-
-    public targetToCell(unitId: string, team: number, currentCell?: XY, targetCell?: XY) {
-        if (!currentCell || !targetCell) {
-            return;
-        }
-        this.targetBoardCoord[targetCell.x][targetCell.y] = unitId;
-
-        this.unitIdToTeam[unitId] = team;
-
-        let lookRight = false;
-        let lookUp = false;
-        let lookLeft = false;
-        let lookDown = false;
-        if (targetCell.x + 1 < this.gridSettings.getGridSize()) {
-            lookRight = true;
-        }
-        if (targetCell.y + 1 < this.gridSettings.getGridSize()) {
-            lookUp = true;
-        }
-        if (targetCell.x - 1 >= 0) {
-            lookLeft = true;
-        }
-        if (targetCell.y - 1 >= 0) {
-            lookDown = true;
-        }
-
-        const cleanupReleaseForOwners: string[] = [];
-        if (lookRight) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x + 1][targetCell.y];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookUp) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x][targetCell.y + 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookLeft) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x - 1][targetCell.y];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookDown) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x][targetCell.y - 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookUp && lookRight) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x + 1][targetCell.y + 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookUp && lookLeft) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x - 1][targetCell.y + 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookDown && lookRight) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x + 1][targetCell.y - 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
-        if (lookDown && lookLeft) {
-            const targetOwnerId = this.targetBoardCoord[targetCell.x - 1][targetCell.y - 1];
-            if (targetOwnerId && this.unitIdToTeam[targetOwnerId] && this.unitIdToTeam[targetOwnerId] !== team) {
-                cleanupReleaseForOwners.push(targetOwnerId);
-            }
-        }
     }
 
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
@@ -312,7 +209,14 @@ export class Grid {
         }
     }
 
-    public occupyCell(cell: XY, unitId: string, team: number, attackRange: number): boolean {
+    public occupyCell(
+        cell: XY,
+        unitId: string,
+        team: number,
+        attackRange: number,
+        canOccupyLava: boolean,
+        canOccupyWater: boolean,
+    ): boolean {
         if (
             cell.x < 0 ||
             cell.y < 0 ||
@@ -327,9 +231,12 @@ export class Grid {
         // console.log(`${unitId} TRY OCCUPY ${cell.x} ${cell.y}`);
 
         const occupantUnitId = this.getOccupantUnitId(cell);
-        if (occupantUnitId) {
-            // console.log(`${unitId} ALREADY OCCUPIED ${cell.x} ${cell.y} by ${occupantUnitId}`);
+        if (
+            occupantUnitId &&
+            !((occupantUnitId === "L" && canOccupyLava) || (occupantUnitId === "W" && canOccupyWater))
+        ) {
             return false;
+            // console.log(`${unitId} ALREADY OCCUPIED ${cell.x} ${cell.y} by ${occupantUnitId}`);
         }
 
         let aggrGrid: number[][] | undefined;
@@ -345,8 +252,25 @@ export class Grid {
         if (occupiedCells?.length) {
             for (const oc of occupiedCells) {
                 if (this.boardCoord[oc.x][oc.y] === unitId) {
+                    const isLava = !this.cleanedUpCenter && this.gridType === GridType.LAVA_CENTER;
+                    const isWater = !this.cleanedUpCenter && this.gridType === GridType.WATER_CENTER;
+                    if (
+                        (isLava || isWater) &&
+                        oc.x >= this.availableCenterStart &&
+                        oc.x < this.availableCenterEnd &&
+                        oc.y >= this.availableCenterStart &&
+                        oc.y < this.availableCenterEnd
+                    ) {
+                        if (isLava) {
+                            this.boardCoord[oc.x][oc.y] = "L";
+                        } else if (isWater) {
+                            this.boardCoord[oc.x][oc.y] = "W";
+                        }
+                    } else {
+                        this.boardCoord[oc.x][oc.y] = "";
+                    }
                     //                console.log(`${unitId} tick: ${currentTick} cleaning up ${occupying.x} ${occupying.y}`);
-                    this.boardCoord[oc.x][oc.y] = "";
+
                     this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
                 }
             }
@@ -367,6 +291,21 @@ export class Grid {
         return this.gridSettings;
     }
 
+    public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean): boolean {
+        for (const c of cells) {
+            const occupantUnitId = this.getOccupantUnitId(c);
+            if (
+                occupantUnitId &&
+                (occupantUnitId !== "L" || !canOccupyLava) &&
+                (occupantUnitId !== "W" || !canOccupyWater)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public areAllCellsEmpty(cells: XY[], unitId?: string) {
         for (const c of cells) {
             const occupantUnitId = this.getOccupantUnitId(c);
@@ -383,7 +322,6 @@ export class Grid {
     public occupyByHole(cell: XY) {
         if (isCellWithinGrid(this.gridSettings, cell)) {
             this.boardCoord[cell.x][cell.y] = "H";
-            this.targetBoardCoord[cell.x][cell.y] = "H";
         }
     }
 
@@ -400,7 +338,14 @@ export class Grid {
         return this.getAggrMatrixByTeam(team === TeamType.LOWER ? TeamType.UPPER : TeamType.LOWER);
     }
 
-    public occupyCells(cells: XY[], unitId: string, team: number, attackRange: number): boolean {
+    public occupyCells(
+        cells: XY[],
+        unitId: string,
+        team: number,
+        attackRange: number,
+        canOccupyLava: boolean,
+        canOccupyWater: boolean,
+    ): boolean {
         if (!cells.length) {
             return false;
         }
@@ -411,19 +356,15 @@ export class Grid {
         // console.log(`${unitId} TRY OCCUPY MANY ${cell.x} ${cell.y}`);
         // }
 
-        let allOccupied = false;
         for (const c of cells) {
             const occupantUnitId = this.getOccupantUnitId(c);
-            if (occupantUnitId) {
-                allOccupied = true;
-            } else {
-                allOccupied = false;
-                break;
+            if (
+                occupantUnitId &&
+                unitId !== occupantUnitId &&
+                !((occupantUnitId === "L" && canOccupyLava) || (occupantUnitId === "W" && canOccupyWater))
+            ) {
+                return false;
             }
-        }
-        if (allOccupied) {
-            // console.log(`${unitId} ALREADY OCCUPIED cells`);
-            return false;
         }
 
         const occupiedCells = this.cellsByUnitId[unitId];
@@ -448,8 +389,25 @@ export class Grid {
                     continue;
                 }
                 if (this.boardCoord[oc.x][oc.y] === unitId) {
-                    this.boardCoord[oc.x][oc.y] = "";
+                    const isLava = !this.cleanedUpCenter && this.gridType === GridType.LAVA_CENTER;
+                    const isWater = !this.cleanedUpCenter && this.gridType === GridType.WATER_CENTER;
+                    if (
+                        (isLava || isWater) &&
+                        oc.x >= this.availableCenterStart &&
+                        oc.x < this.availableCenterEnd &&
+                        oc.y >= this.availableCenterStart &&
+                        oc.y < this.availableCenterEnd
+                    ) {
+                        if (isLava) {
+                            this.boardCoord[oc.x][oc.y] = "L";
+                        } else if (isWater) {
+                            this.boardCoord[oc.x][oc.y] = "W";
+                        }
+                    } else {
+                        this.boardCoord[oc.x][oc.y] = "";
+                    }
                 }
+
                 xMin = Math.min(xMin, oc.x);
                 xMax = Math.max(xMax, oc.x);
                 yMin = Math.min(yMin, oc.y);
@@ -509,31 +467,16 @@ export class Grid {
         return subArray[cell.y];
     }
 
-    public canMoveThere(cell: XY): boolean {
-        console.log(
-            `canMoveThere ${cell.x} ${cell.y} -> x:${this.boardCoord[cell.x][cell.y]} t:${
-                this.targetBoardCoord[cell.x][cell.y]
-            }`,
-        );
-        return (
-            (!this.boardCoord[cell.x][cell.y] || !!this.boardCoord[cell.x][cell.y]) &&
-            !this.targetBoardCoord[cell.x][cell.y]
-        );
-    }
-
     public print(unitId: string, printAggrGrids = true) {
         let msg = "";
         for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
             const rowElements: string[] = [];
             for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
                 const occupantUnitId = this.boardCoord[row][column];
-                const tgt = this.targetBoardCoord[row][column];
                 if (occupantUnitId === unitId) {
                     rowElements.push(".");
                 } else if (occupantUnitId && occupantUnitId.length !== 1) {
                     rowElements.push("x");
-                } else if (tgt && tgt.length !== 1) {
-                    rowElements.push("t");
                 } else if (occupantUnitId) {
                     rowElements.push(occupantUnitId[0]);
                 } else {
@@ -635,12 +578,8 @@ export class Grid {
         if (r === undefined) {
             return 0;
         }
-        const tr = this.targetBoardCoord[row];
-        if (tr === undefined) {
-            return 0;
-        }
 
-        if (r[column] || tr[column]) {
+        if (r[column]) {
             const team = this.unitIdToTeam[r[column]];
             if (team) {
                 if (excludeUnits) {
@@ -664,7 +603,7 @@ export class Grid {
             }
         }
 
-        if (r[column] === "H" && tr[column] === "H") {
+        if (r[column] === "H") {
             return ObstacleType.HOLE;
         }
 
