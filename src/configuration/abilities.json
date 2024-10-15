@@ -920,5 +920,17 @@
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
+    },
+    "Disguise Aura": {
+        "name": "Disguise Aura",
+        "type": "DEFENCE",
+        "desc": ["The owner becomes untargetable, unless there is an enemy unit within the aura range"],
+        "power": 0,
+        "power_type": "UNTARGETABLE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Disguise",
+        "can_be_cast": false
     }
 }

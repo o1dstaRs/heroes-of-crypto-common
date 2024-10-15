@@ -20,31 +20,35 @@ import { getRandomInt } from "../utils/lib";
 import { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
-export function canApplyAuraEffect(
-    unitAttackType: AttackType,
-    unitCanFly: boolean,
-    auraEffectProperties: AuraEffectProperties,
-): boolean {
+export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectProperties): boolean {
+    if (
+        auraEffectProperties.power_type === AbilityPowerType.UNTARGETABLE &&
+        unit.hasAuraEffect("Disguise") &&
+        unit.hasAbilityActive("Disguise Aura")
+    ) {
+        return true;
+    }
+
     if (
         auraEffectProperties.power_type === AbilityPowerType.LUCK_10 ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS ||
-        (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS_WALK && !unitCanFly)
+        (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS_WALK && !unit.canFly())
     ) {
         return true;
     }
 
     if (
-        unitAttackType === AttackType.RANGE &&
+        unit.getAttackType() === AttackType.RANGE &&
         auraEffectProperties.power_type === AbilityPowerType.DISABLE_RANGE_ATTACK
     ) {
         return true;
     }
 
     if (
-        (unitAttackType === AttackType.MELEE || unitAttackType === AttackType.MAGIC) &&
+        (unit.getAttackType() === AttackType.MELEE || unit.getAttackType() === AttackType.MAGIC) &&
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE
     ) {
         return true;

@@ -9,7 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { EffectHelper } from "..";
+import { EffectHelper, FactionType, Spell } from "..";
+import { getSpellConfig } from "../configuration/config_provider";
 import { MORALE_CHANGE_FOR_KILL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -343,7 +344,56 @@ export class UnitsHolder {
             }
             u.adjustBaseStats(FightStateManager.getInstance().getFightProperties().getCurrentLap());
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
+
+            const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
+            if (disguiseAura) {
+                if (this.getNumberOfEnemiesWithinRange(u, disguiseAura.getRange())) {
+                    u.deleteBuff("Hidden");
+                    if (!u.hasDebuffActive("Visible")) {
+                        u.applyDebuff(
+                            new Spell({
+                                spellProperties: getSpellConfig(FactionType.NO_TYPE, "Visible"),
+                                amount: 1,
+                            }),
+                        );
+                    }
+                } else {
+                    u.deleteDebuff("Visible");
+                    if (!u.hasBuffActive("Hidden")) {
+                        u.applyBuff(
+                            new Spell({
+                                spellProperties: getSpellConfig(FactionType.NO_TYPE, "Hidden"),
+                                amount: 1,
+                            }),
+                        );
+                    }
+                }
+            }
         }
+    }
+
+    public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
+        const enemyIdsSpotted: string[] = [];
+        const enemyIds: string[] = [];
+        for (const e of this.getAllEnemyUnits(unit.getTeam())) {
+            enemyIds.push(e.getId());
+        }
+
+        for (const c of unit.getCells()) {
+            const auraCells = EffectHelper.getAuraCells(this.gridSettings, c, range);
+            for (const ac of auraCells) {
+                const occupantId = this.grid.getOccupantUnitId(ac);
+                if (!occupantId) {
+                    continue;
+                }
+
+                if (enemyIds.includes(occupantId) && !enemyIdsSpotted.includes(occupantId)) {
+                    enemyIdsSpotted.push(occupantId);
+                }
+            }
+        }
+
+        return enemyIdsSpotted.length;
     }
 
     public getUnitAuraAttackMod(unit: Unit, cells?: XY[]): number {
@@ -496,7 +546,7 @@ export class UnitsHolder {
             for (let i = 0; i < unitAppliedAuraEffectProperties.length; i++) {
                 const appliedAuraEffectProperties = unitAppliedAuraEffectProperties[i];
                 const auraEffectProperties = appliedAuraEffectProperties.getAuraEffectProperties();
-                if (EffectHelper.canApplyAuraEffect(u.getAttackType(), u.canFly(), auraEffectProperties)) {
+                if (EffectHelper.canApplyAuraEffect(u, auraEffectProperties)) {
                     u.applyAuraEffect(
                         `${auraEffectProperties.name} Aura`,
                         auraEffectProperties.desc.replace(/\{\}/g, auraEffectProperties.power.toString()),
