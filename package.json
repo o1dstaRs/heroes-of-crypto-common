@@ -1,6 +1,6 @@
 {
     "name": "@heroesofcrypto/common",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "private": false,
     "description": "Common game logic for Heroes of Crypto. Used on both client and server sides",
     "homepage": "https://heroesofcrypto.io",
