@@ -226,6 +226,40 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Visible": {
+            "name": "Visible",
+            "level": 0,
+            "desc": ["The unit is completely visible to the enemy team.", "Lasts till the end of the fight."],
+            "target": "AUTO",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Hidden": {
+            "name": "Hidden",
+            "level": 0,
+            "desc": ["The unit cannot be targeted by the enemy team.", "Lasts till the end of the fight."],
+            "target": "AUTO",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 1,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Life": {

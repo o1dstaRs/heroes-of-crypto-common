@@ -311,12 +311,12 @@
         },
         "White Tiger": {
             "name": "White Tiger",
-            "hp": 27,
+            "hp": 26,
             "steps": 4.4,
             "speed": 5.8,
-            "armor": 20,
+            "armor": 19,
             "attack_type": "MELEE",
-            "attack": 21,
+            "attack": 20,
             "attack_damage_min": 7,
             "attack_damage_max": 9,
             "attack_range": 1,
@@ -328,7 +328,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": ["Deep Wounds Level 2"]
+            "abilities": ["Disguise Aura", "Deep Wounds Level 2"]
         },
         "Elf": {
             "name": "Elf",

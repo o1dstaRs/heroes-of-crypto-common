@@ -398,6 +398,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.auraEffects;
     }
 
+    public hasAuraEffect(auraEffectName: string): boolean {
+        for (const ae of this.auraEffects) {
+            if (auraEffectName === ae.getName()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public getAbility(abilityName: string): Ability | undefined {
         for (const a of this.abilities) {
             if (abilityName === a.getName()) {
