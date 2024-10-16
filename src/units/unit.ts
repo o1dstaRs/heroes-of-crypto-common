@@ -1309,13 +1309,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
+        const madeOfFireBuff = this.getBuff("Made of Fire");
+
         if (
             auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE ||
             auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
             auraEffect.getPowerType() === AbilityPowerType.ABSORB_DEBUFF
         ) {
             calculatedCoeff +=
-                (auraEffect.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() + this.getLuck() / 100;
+                (auraEffect.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() / 100 +
+                (madeOfFireBuff ? (auraEffect.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
         }
 
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_STEPS) {
@@ -1367,20 +1371,29 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return 0;
         }
 
+        const madeOfFireBuff = this.getBuff("Made of Fire");
+
         if (ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP) {
-            return (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() + this.getLuck() / 10;
+            return (
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() / 10 +
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 10
+            );
         }
 
         return Number(
             (
                 (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                (this.getLuck() / 100) * ability.getPower()
+                ((this.getLuck() + (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
+                    100) *
+                    ability.getPower()
             ).toFixed(1),
         );
     }
 
     public calculateAbilityMultiplier(ability: Ability): number {
         let calculatedCoeff = 1;
+        const madeOfFireBuff = this.getBuff("Made of Fire");
         if (
             ability.getPowerType() === AbilityPowerType.TOTAL_DAMAGE_PERCENTAGE ||
             ability.getPowerType() === AbilityPowerType.MAGIC_DAMAGE ||
@@ -1391,7 +1404,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ability.getPowerType() === AbilityPowerType.ABSORB_DEBUFF ||
             ability.getPowerType() === AbilityPowerType.BOOST_HEALTH
         ) {
-            let combinedPower = ability.getPower() + this.getLuck();
+            let combinedPower =
+                ability.getPower() +
+                this.getLuck() +
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
             if (combinedPower < 0) {
                 combinedPower = 1;
             }
@@ -1403,7 +1419,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ability.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE
         ) {
             calculatedCoeff +=
-                (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() + this.getLuck() / 100;
+                (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() / 100 +
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
         }
 
         return calculatedCoeff;
@@ -1439,7 +1457,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public calculateAbilityApplyChance(ability: Ability): number {
-        const combinedPower = ability.getPower() + this.getLuck();
+        const madeOfFireBuff = this.getBuff("Made of Fire");
+        const combinedPower =
+            ability.getPower() +
+            this.getLuck() +
+            (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
         if (combinedPower < 0) {
             return 0;
         }
@@ -2168,7 +2190,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             baseArmorMultiplier =
                 baseArmorMultiplier *
                 (1 +
-                    ((heavyArmorAbility.getPower() + this.getLuck()) / 100 / MAX_UNIT_STACK_POWER) *
+                    ((heavyArmorAbility.getPower() +
+                        this.getLuck() +
+                        (madeOfFireBuff ? (heavyArmorAbility.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
+                        100 /
+                        MAX_UNIT_STACK_POWER) *
                         this.getStackPower());
         }
 
