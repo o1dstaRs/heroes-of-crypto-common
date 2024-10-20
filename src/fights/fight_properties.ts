@@ -42,6 +42,7 @@ import {
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
+import { PlacementType } from "../grid/placement_properties";
 
 export class FightProperties {
     private id: string;
@@ -49,6 +50,8 @@ export class FightProperties {
     private currentLap: number;
 
     private gridType: GridType;
+
+    private placementType: PlacementType;
 
     private firstTurnMade: boolean;
 
@@ -106,6 +109,7 @@ export class FightProperties {
         this.id = uuidv4();
         this.currentLap = 1;
         this.gridType = this.getRandomGridType();
+        this.placementType = PlacementType.RECTANGLE;
         if (this.gridType === GridType.BLOCK_CENTER) {
             this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
         }
@@ -146,6 +150,10 @@ export class FightProperties {
 
     public getGridType(): GridType {
         return this.gridType;
+    }
+
+    public getPlacementType(): PlacementType {
+        return this.placementType;
     }
 
     public getFirstTurnMade(): boolean {
@@ -579,7 +587,7 @@ export class FightProperties {
             throw new Error(`Augment placement not found for team ${teamType}`);
         }
 
-        return getPlacementSizes(augmentPlacement, defaultPlacement);
+        return getPlacementSizes(this.placementType, augmentPlacement, defaultPlacement);
     }
 
     public getAugmentArmor(teamType: TeamType): ArmorAugment {

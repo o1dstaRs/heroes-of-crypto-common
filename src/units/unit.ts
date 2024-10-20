@@ -126,7 +126,10 @@ export interface IUnitAIRepr {
     getSpeed(): number;
     getSize(): number;
     canFly(): boolean;
+    getTarget(): string;
+    getAttackRange(): number;
     isSmallSize(): boolean;
+    canMove(): boolean;
     getBaseCell(): XY;
     getCells(): XY[];
     getAttackType(): AttackType;
@@ -1363,6 +1366,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&
             ability.getPowerType() !== AbilityPowerType.ADDITIONAL_STEPS &&
             ability.getPowerType() !== AbilityPowerType.STEAL_ARMOR_ON_HIT &&
+            ability.getPowerType() !== AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK &&
             ability.getName() !== "Shatter Armor" &&
             ability.getName() !== "Deep Wounds Level 1" &&
             ability.getName() !== "Deep Wounds Level 2" &&
@@ -1884,6 +1888,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public handleResurrectionAnimation(): void {}
+
+    public reduceBaseAttack(reduceBy: number): number {
+        if (reduceBy <= 0) {
+            return 0;
+        }
+
+        const oldBaseAttack = this.initialUnitProperties.base_attack;
+        this.initialUnitProperties.base_attack = Math.max(1, this.initialUnitProperties.base_attack - reduceBy);
+
+        return Number((oldBaseAttack - this.initialUnitProperties.base_attack).toFixed(1));
+    }
 
     public adjustBaseStats(currentLap: number) {
         // target

@@ -13,12 +13,12 @@ import { XY } from "../utils/math";
 import { GridSettings } from "./grid_settings";
 import { IPlacement, PlacementPositionType, PlacementType } from "./placement_properties";
 
-export class SquarePlacement implements IPlacement {
+export class RectanglePlacement implements IPlacement {
     private readonly gridSettings: GridSettings;
 
     protected readonly placementPositionType: PlacementPositionType;
 
-    protected readonly placementType: PlacementType = PlacementType.SQUARE;
+    protected readonly placementType: PlacementType = PlacementType.RECTANGLE;
 
     private readonly size: number;
 
@@ -34,36 +34,39 @@ export class SquarePlacement implements IPlacement {
 
     public constructor(gridSettings: GridSettings, placementPositionType: PlacementPositionType, size = 3) {
         if (![3, 4, 5].includes(size)) {
-            throw new Error("Only 3x3, 4x4, and 5x5 placements are supported.");
+            throw new Error("Only the following placements heights are supported: 3, 4, 5.");
         }
         this.gridSettings = gridSettings;
         this.placementPositionType = placementPositionType;
         this.size = size;
         this.possibleCellHashesSet = new Set();
 
+        const sizeShift = size * gridSettings.getStep();
+        const isSmallestPlacement = size === 3;
+
         switch (placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                this.xLeft = -gridSettings.getMaxX() + gridSettings.getStep();
-                this.xRight = this.xLeft + this.size * gridSettings.getStep();
-                this.yUpper = gridSettings.getStep() * this.size + gridSettings.getStep();
-                this.yLower = gridSettings.getStep();
+                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMinY() + gridSettings.getStep() + sizeShift;
+                this.yLower = gridSettings.getMinY() + gridSettings.getStep();
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                this.xLeft = -gridSettings.getMaxX() + gridSettings.getStep();
-                this.xRight = this.xLeft + this.size * gridSettings.getStep();
-                this.yLower = gridSettings.getMaxY() - gridSettings.getStep() * this.size - gridSettings.getStep();
+                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yLower = gridSettings.getMaxY() - gridSettings.getStep() - sizeShift;
                 this.yUpper = gridSettings.getMaxY() - gridSettings.getStep();
                 break;
             case PlacementPositionType.LOWER_RIGHT:
-                this.xLeft = gridSettings.getMaxX() - gridSettings.getStep() - gridSettings.getStep() * this.size;
-                this.xRight = gridSettings.getMaxX() - gridSettings.getStep();
-                this.yUpper = gridSettings.getStep() * this.size + gridSettings.getStep();
-                this.yLower = gridSettings.getStep();
+                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMinY() + gridSettings.getStep() + sizeShift;
+                this.yLower = gridSettings.getMinY() + gridSettings.getStep();
                 break;
             case PlacementPositionType.UPPER_RIGHT:
-                this.xLeft = gridSettings.getMaxX() - gridSettings.getStep() - gridSettings.getStep() * this.size;
-                this.xRight = gridSettings.getMaxX() - gridSettings.getStep();
-                this.yLower = gridSettings.getMaxY() - gridSettings.getStep() * this.size - gridSettings.getStep();
+                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yLower = gridSettings.getMaxY() - gridSettings.getStep() - sizeShift;
                 this.yUpper = gridSettings.getMaxY() - gridSettings.getStep();
                 break;
             default:
@@ -103,39 +106,40 @@ export class SquarePlacement implements IPlacement {
         let borderX;
         let borderY;
         const diff = isSmallUnit ? 0 : 1;
+        const isSmallestPlacement = this.size === 3;
 
         switch (this.placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                x = 1 + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diff;
                 y = 1 + diff;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.size - diff;
-                borderY = borderX;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
+                borderY = y + this.size - diff;
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                x = 1 + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diff;
                 y = this.gridSettings.getGridSize() - 2;
                 sx = 1;
                 sy = -1;
-                borderX = x + this.size - diff;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
                 borderY = y - this.size + diff;
                 break;
             case PlacementPositionType.LOWER_RIGHT:
-                x = this.gridSettings.getGridSize() - 2;
+                x = (isSmallestPlacement ? 1 : 0) + diff;
                 y = 1 + diff;
-                sx = -1;
+                sx = 1;
                 sy = 1;
-                borderX = x - this.size - diff;
-                borderY = sy + this.size;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
+                borderY = y + this.size - diff;
                 break;
             case PlacementPositionType.UPPER_RIGHT:
-                sx = -1;
+                x = (isSmallestPlacement ? 1 : 0) + diff;
+                y = this.gridSettings.getGridSize() - 2;
+                sx = 1;
                 sy = -1;
-                x = this.gridSettings.getGridSize() + sx - 1;
-                y = this.gridSettings.getGridSize() + sy - 1;
-                borderX = x - this.size + diff;
-                borderY = borderX;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
+                borderY = y - this.size + diff;
                 break;
             default:
                 throw new Error("Invalid placement position type.");

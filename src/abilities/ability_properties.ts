@@ -57,6 +57,7 @@ export enum AbilityPowerType {
     GAIN_ATTACK_AND_ARMOR_EACH_STEP = 44,
     BOOST_ALL_STATS_PERCENTAGE = 45,
     UNTARGETABLE = 46,
+    REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK = 47,
 }
 
 export const AllAbilityPowerTypes = [
@@ -107,6 +108,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP,
     AbilityPowerType.BOOST_ALL_STATS_PERCENTAGE,
     AbilityPowerType.UNTARGETABLE,
+    AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -160,6 +162,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     GAIN_ATTACK_AND_ARMOR_EACH_STEP: AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP,
     BOOST_ALL_STATS_PERCENTAGE: AbilityPowerType.BOOST_ALL_STATS_PERCENTAGE,
     UNTARGETABLE: AbilityPowerType.UNTARGETABLE,
+    REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK,
 };
 
 export enum AbilityType {
