@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { PlacementType } from "../grid/placement_properties";
+
 export enum DefaultPlacementLevel1 {
     NO_DEFAULT = 0,
     THREE_BY_THREE = 3,
@@ -28,7 +30,11 @@ export const ToPlacementAugment: { [placementAugemtValue: string]: PlacementAugm
     "2": PlacementAugment.LEVEL_3,
 };
 
-export const getPlacementSizes = (augment: PlacementAugment, defaultPlacement: DefaultPlacementLevel1): number[] => {
+export const getPlacementSizes = (
+    placementType: PlacementType,
+    augment: PlacementAugment,
+    defaultPlacement: DefaultPlacementLevel1,
+): number[] => {
     switch (augment) {
         case PlacementAugment.LEVEL_1:
             switch (defaultPlacement) {
@@ -40,9 +46,21 @@ export const getPlacementSizes = (augment: PlacementAugment, defaultPlacement: D
                     throw new Error("Invalid default placement size. Supported: 3x3, 4x4");
             }
         case PlacementAugment.LEVEL_2:
-            return [5];
+            if (placementType === PlacementType.SQUARE) {
+                return [5];
+            } else if (placementType === PlacementType.RECTANGLE) {
+                return [4];
+            } else {
+                return [0];
+            }
         case PlacementAugment.LEVEL_3:
-            return [5, 5];
+            if (placementType === PlacementType.SQUARE) {
+                return [5, 5];
+            } else if (placementType === PlacementType.RECTANGLE) {
+                return [5];
+            } else {
+                return [0];
+            }
         default:
             throw new Error("Invalid placement augment");
     }

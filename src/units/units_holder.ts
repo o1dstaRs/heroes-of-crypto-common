@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { EffectHelper, FactionType, Spell } from "..";
+import { EffectHelper, FactionType, IPlacement, Spell } from "..";
 import { getSpellConfig } from "../configuration/config_provider";
 import { MORALE_CHANGE_FOR_KILL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
@@ -17,10 +17,9 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { getCellsAroundCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
-import { SquarePlacement } from "../grid/square_placement";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
-import { Unit } from "./unit";
+import { IUnitAIRepr, Unit } from "./unit";
 import { TeamType, UnitProperties } from "./unit_properties";
 
 export class UnitsHolder {
@@ -70,10 +69,10 @@ export class UnitsHolder {
 
     public getAllAlliesPlaced(
         teamType: TeamType,
-        lowerLeftPlacement: SquarePlacement,
-        upperRightPlacement: SquarePlacement,
-        lowerRightPlacement?: SquarePlacement,
-        upperLeftPlacement?: SquarePlacement,
+        lowerLeftPlacement: IPlacement,
+        upperRightPlacement: IPlacement,
+        lowerRightPlacement?: IPlacement,
+        upperLeftPlacement?: IPlacement,
     ): Unit[] {
         const allies: Unit[] = [];
         for (const unit of this.allUnits.values()) {
@@ -293,7 +292,7 @@ export class UnitsHolder {
         return closestDistance;
     }
 
-    public allEnemiesAroundUnit(attacker: Unit, isAttack: boolean, attackFromCell?: XY): Unit[] {
+    public allEnemiesAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): Unit[] {
         const enemyList: Unit[] = [];
         const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
 
@@ -579,10 +578,10 @@ export class UnitsHolder {
         enemyTeamType: TeamType,
         unitProperties: UnitProperties,
         unitPosition: XY,
-        lowerLeftPlacement?: SquarePlacement,
-        upperRightPlacement?: SquarePlacement,
-        lowerRightPlacement?: SquarePlacement,
-        upperLeftPlacement?: SquarePlacement,
+        lowerLeftPlacement?: IPlacement,
+        upperRightPlacement?: IPlacement,
+        lowerRightPlacement?: IPlacement,
+        upperLeftPlacement?: IPlacement,
         verifyWithinGridPosition = true,
     ): boolean {
         const isLargeUnit = unitProperties.size === 2;

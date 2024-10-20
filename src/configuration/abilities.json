@@ -932,5 +932,17 @@
         "effect": null,
         "aura_effect": "Disguise",
         "can_be_cast": false
+    },
+    "Dulling Defense": {
+        "name": "Dulling Defense",
+        "type": "DEFENCE",
+        "desc": ["The enemy permanently loses {} base attack points upon attacking the owner with a melee attack"],
+        "power": 2,
+        "power_type": "REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
     }
 }
