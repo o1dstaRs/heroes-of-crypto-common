@@ -14,8 +14,6 @@ import { FightProperties } from "./fight_properties";
 export class FightStateManager {
     private static instance: FightStateManager;
 
-    // TODO: control units here too
-
     private fightProperties: FightProperties;
 
     private constructor() {
