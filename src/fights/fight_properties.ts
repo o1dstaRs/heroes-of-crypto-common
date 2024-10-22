@@ -17,6 +17,7 @@ import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "..
 import {
     MAX_AUGMENT_POINTS,
     MAX_HITS_MOUNTAIN,
+    MAX_SYNERGY_LEVEL,
     MAX_TIME_TO_MAKE_TURN_MILLIS,
     MAX_UNITS_PER_TEAM,
     MIN_TIME_TO_MAKE_TURN_MILLIS,
@@ -43,6 +44,16 @@ import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
 import { PlacementType } from "../grid/placement_properties";
+import {
+    ChaosSynergy,
+    LifeSynergy,
+    MightSynergy,
+    NatureSynergy,
+    SpecificSynergy,
+    SynergyWithLevel,
+    UNITS_TO_SYNERGY_LEVEL,
+} from "../synergies/synergy_properties";
+import { FactionType } from "../factions/faction_type";
 
 export class FightProperties {
     private id: string;
@@ -103,6 +114,16 @@ export class FightProperties {
 
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
 
+    private synergyUnitsLifePerTeam: Map<TeamType, number>;
+
+    private synergyUnitsChaosPerTeam: Map<TeamType, number>;
+
+    private synergyUnitsMightPerTeam: Map<TeamType, number>;
+
+    private synergyUnitsNaturePerTeam: Map<TeamType, number>;
+
+    private synergiesPerTeam: Map<TeamType, string[]>;
+
     private obstacleHitsLeft: number = 0;
 
     public constructor() {
@@ -138,6 +159,11 @@ export class FightProperties {
         this.augmentMightPerTeam = new Map();
         this.augmentSniperPerTeam = new Map();
         this.augmentMovementPerTeam = new Map();
+        this.synergyUnitsLifePerTeam = new Map();
+        this.synergyUnitsChaosPerTeam = new Map();
+        this.synergyUnitsMightPerTeam = new Map();
+        this.synergyUnitsNaturePerTeam = new Map();
+        this.synergiesPerTeam = new Map();
     }
 
     public getId(): string {
@@ -474,11 +500,131 @@ export class FightProperties {
         }
     }
 
+    public setSynergyUnitsPerFactions(
+        teamType: TeamType,
+        nLife: number,
+        nChaos: number,
+        nMight: number,
+        nNature: number,
+    ): void {
+        if (teamType === TeamType.NO_TEAM) {
+            return;
+        }
+
+        if (nLife > 0) {
+            this.synergyUnitsLifePerTeam.set(teamType, Math.floor(nLife));
+        }
+
+        if (nChaos > 0) {
+            this.synergyUnitsChaosPerTeam.set(teamType, Math.floor(nChaos));
+        }
+
+        if (nMight > 0) {
+            this.synergyUnitsMightPerTeam.set(teamType, Math.floor(nMight));
+        }
+
+        if (nNature > 0) {
+            this.synergyUnitsNaturePerTeam.set(teamType, Math.floor(nNature));
+        }
+    }
+
+    public updateSynergyPerTeam(
+        teamType: TeamType,
+        faction: FactionType,
+        synergy: SpecificSynergy,
+        synergyLevel: number,
+    ): boolean {
+        const synergyLevelInt = Math.floor(synergyLevel);
+
+        if (synergyLevelInt <= 0) {
+            return false;
+        }
+
+        if (synergyLevelInt > MAX_SYNERGY_LEVEL) {
+            return false;
+        }
+
+        if (
+            faction !== FactionType.LIFE &&
+            faction !== FactionType.CHAOS &&
+            faction !== FactionType.MIGHT &&
+            faction !== FactionType.NATURE
+        ) {
+            return false;
+        }
+
+        const arr = this.synergiesPerTeam.get(teamType) ?? [];
+
+        const newArray = [];
+        const prefix = `${faction}:`;
+        for (const a of arr) {
+            if (!a.startsWith(prefix)) {
+                newArray.push(a);
+            }
+        }
+
+        newArray.push(`${prefix}${synergy}:${synergyLevelInt}`);
+        this.synergiesPerTeam.set(teamType, newArray);
+
+        return true;
+    }
+
+    public getPossibleSynergies(teamType: TeamType): SynergyWithLevel[] {
+        const synergies: SynergyWithLevel[] = [];
+        const sizes = [6, 4, 2]; // Check higher levels first
+        // Iterate over synergy units for each faction and determine the highest synergy level
+        const synergyTypes: { unitsPerTeam: Map<TeamType, number>; synergyEnum: { [key: number]: string } }[] = [
+            {
+                unitsPerTeam: this.synergyUnitsLifePerTeam,
+                synergyEnum: LifeSynergy as { [key: number]: string },
+            },
+            {
+                unitsPerTeam: this.synergyUnitsChaosPerTeam,
+                synergyEnum: ChaosSynergy as { [key: number]: string },
+            },
+            {
+                unitsPerTeam: this.synergyUnitsMightPerTeam,
+                synergyEnum: MightSynergy as { [key: number]: string },
+            },
+            {
+                unitsPerTeam: this.synergyUnitsNaturePerTeam,
+                synergyEnum: NatureSynergy as { [key: number]: string },
+            },
+        ];
+
+        synergyTypes.forEach(({ unitsPerTeam, synergyEnum }) => {
+            const unitsCount = unitsPerTeam.get(teamType) ?? 0;
+            let added = false;
+            for (const size of sizes) {
+                if (unitsCount >= size && !added) {
+                    const synergyLevel = UNITS_TO_SYNERGY_LEVEL[size];
+                    // Add highest level synergyEnum type
+                    Object.keys(synergyEnum)
+                        .map(Number)
+                        .filter((index) => index > 0)
+                        .forEach((index) => {
+                            synergies.push({
+                                synergy: synergyEnum[index],
+                                level: synergyLevel,
+                            });
+                            added = true;
+                        });
+                }
+            }
+        });
+
+        return synergies;
+    }
+
     public addRepliedAttack(unitId: string): void {
         this.alreadyRepliedAttack.add(unitId);
     }
 
     public addAlreadyMadeTurn(teamType: TeamType, unitId: string): void {
+        if (teamType === TeamType.NO_TEAM) {
+            return;
+        }
+
         let unitIdsSet = this.alreadyMadeTurnByTeam.get(teamType);
         if (!unitIdsSet) {
             unitIdsSet = new Set();
@@ -543,6 +689,10 @@ export class FightProperties {
     }
 
     public setDefaultPlacementPerTeam(teamType: TeamType, placement: DefaultPlacementLevel1): void {
+        if (teamType === TeamType.NO_TEAM) {
+            return;
+        }
+
         if (!this.defaultPlacementPerTeam.has(teamType)) {
             this.defaultPlacementPerTeam.set(teamType, placement);
             this.augmentPlacementPerTeam.set(teamType, PlacementAugment.LEVEL_1);
@@ -554,6 +704,10 @@ export class FightProperties {
     }
 
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
+        if (teamType === TeamType.NO_TEAM) {
+            return false;
+        }
+
         if (this.canAugment(teamType, augmentType)) {
             if (augmentType.type === "Placement") {
                 this.augmentPlacementPerTeam.set(teamType, augmentType.value);
@@ -577,6 +731,10 @@ export class FightProperties {
     }
 
     public getAugmentPlacement(teamType: TeamType): number[] {
+        if (teamType === TeamType.NO_TEAM) {
+            return [];
+        }
+
         const defaultPlacement = this.defaultPlacementPerTeam.get(teamType);
         if (defaultPlacement === undefined || defaultPlacement === null) {
             throw new Error(`Default placement not found for team ${teamType}`);
@@ -607,7 +765,7 @@ export class FightProperties {
     }
 
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
-        if (!augmentType || augmentType.value < 0 || !augmentType.type) {
+        if (teamType === TeamType.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
             return false;
         }
 

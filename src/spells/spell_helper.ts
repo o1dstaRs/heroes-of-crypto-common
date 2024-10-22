@@ -12,7 +12,7 @@
 import { isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
-import { IModifyableUnitProperties, TeamType } from "../units/unit_properties";
+import { IModifyableUnitProperties } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
 import { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
@@ -178,15 +178,6 @@ export function canCastSpell(
     targetUnit?: Unit,
     spell?: Spell,
     targetCell?: XY,
-    fromTeamType?: TeamType,
-    toTeamType?: TeamType,
-    fromUnitName?: string,
-    toUnitName?: string,
-    toUnitLevel?: number,
-    toUnitHp?: number,
-    toUnitMaxHp?: number,
-    toUnitIsSmallSize?: boolean,
-    fromUnitStackPower?: number,
     toUnitMagicResistance?: number,
     toUnitHasMindResistance?: boolean,
     toUnitCanBeHealded?: boolean,
@@ -195,11 +186,10 @@ export function canCastSpell(
 ) {
     if (
         isLocked ||
-        !fromUnitStackPower ||
         !spell ||
         spell.getLapsTotal() <= 0 ||
         !spell.isRemaining() ||
-        spell.getMinimalCasterStackPower() > fromUnitStackPower
+        spell.getMinimalCasterStackPower() > casterUnit.getStackPower()
     ) {
         return false;
     }
@@ -217,7 +207,7 @@ export function canCastSpell(
 
     const isSelfCast =
         (targetUnit && casterUnit.getId() === targetUnit.getId()) ||
-        (fromUnitName && toUnitName && fromUnitName === toUnitName && fromTeamType === toTeamType);
+        (targetUnit && casterUnit.getName() === targetUnit.getName() && casterUnit.getTeam() === targetUnit.getTeam());
 
     if (spell.getPowerType() === SpellPowerType.RESURRECT) {
         return (
@@ -233,23 +223,17 @@ export function canCastSpell(
             return (
                 targetUnit &&
                 !targetUnit.hasAbilityActive(spell.getName()) &&
-                fromTeamType &&
-                toTeamType &&
-                fromTeamType === toTeamType &&
-                toUnitLevel &&
-                toUnitLevel <= spell.getMaximumGiftLevel() &&
+                casterUnit.getTeam() === targetUnit.getTeam() &&
+                targetUnit.getLevel() <= spell.getMaximumGiftLevel() &&
                 (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
             );
         } else {
             return (
                 toUnitCanBeHealded &&
-                toUnitHp &&
-                toUnitMaxHp &&
-                toUnitHp < toUnitMaxHp &&
+                targetUnit &&
+                targetUnit.getHp() < targetUnit.getMaxHp() &&
                 toUnitMagicResistance !== 100 &&
-                fromTeamType &&
-                toTeamType &&
-                fromTeamType === toTeamType &&
+                casterUnit.getTeam() === targetUnit.getTeam() &&
                 (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
             );
         }
@@ -275,13 +259,27 @@ export function canCastSpell(
             return false;
         }
 
-        const existingBuff = targetUnit.getBuff(spell.getName());
-        if (
-            existingBuff &&
-            (existingBuff.getName() === spell.getName() || willConclictWith.includes(existingBuff.getName())) &&
-            existingBuff.getLaps()
-        ) {
-            return false;
+        if (spell.isBuff()) {
+            const existingBuff = targetUnit.getBuff(spell.getName());
+
+            if (existingBuff && existingBuff.getLaps() > 0) {
+                return false;
+            }
+            for (const b of targetUnit.getBuffs()) {
+                if ((b.getName() === spell.getName() || willConclictWith.includes(b.getName())) && b.getLaps()) {
+                    return false;
+                }
+            }
+        } else {
+            const existingDebuff = targetUnit.getDebuff(spell.getName());
+            if (existingDebuff && existingDebuff.getLaps() > 0) {
+                return false;
+            }
+            for (const d of targetUnit.getDebuffs()) {
+                if ((d.getName() === spell.getName() || willConclictWith.includes(d.getName())) && d.getLaps()) {
+                    return false;
+                }
+            }
         }
 
         return true;
@@ -293,9 +291,8 @@ export function canCastSpell(
         }
 
         if (
-            fromTeamType &&
-            toTeamType &&
-            fromTeamType === toTeamType &&
+            targetUnit &&
+            casterUnit.getTeam() === targetUnit.getTeam() &&
             (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
         ) {
             return notAlreadyApplied();
@@ -305,7 +302,8 @@ export function canCastSpell(
     if (
         spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY ||
         (spell.getSpellTargetType() === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE &&
-            toUnitIsSmallSize &&
+            targetUnit &&
+            targetUnit.getSize() === 1 &&
             oneOfTheEnemiesHasTargetCell())
     ) {
         const forcedUnitId = casterUnit.getTarget();
@@ -318,14 +316,13 @@ export function canCastSpell(
             return false;
         }
 
-        if (fromTeamType && toTeamType && fromTeamType !== toTeamType && !isSelfCast) {
+        if (casterUnit.getTeam() !== targetUnit.getTeam() && !isSelfCast) {
             return notAlreadyApplied();
         }
     }
 
     if (
         !targetUnit &&
-        !toUnitName &&
         spell.getSpellTargetType() === SpellTargetType.FREE_CELL &&
         targetGridCell &&
         isCellWithinGrid(gridSettings, targetGridCell)

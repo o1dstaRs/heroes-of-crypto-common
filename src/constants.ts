@@ -14,9 +14,10 @@ export const PENALTY_ON_RANGE_SHOT_THROUGH_TEAMMATES = false;
 export const MIN_UNIT_STACK_POWER = 1;
 export const MAX_UNIT_STACK_POWER = 5;
 
-// teams & augments
+// teams, augments and synergies
 export const MAX_UNITS_PER_TEAM = 8;
 export const MAX_AUGMENT_POINTS = 6;
+export const MAX_SYNERGY_LEVEL = 3;
 
 // map
 export const NUMBER_OF_LAPS_TILL_NARROWING_NORMAL = 3;
