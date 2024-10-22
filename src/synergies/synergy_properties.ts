@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { FactionType } from "../factions/faction_type";
+
 export enum LifeSynergy {
     NO_SYNERGY = 0,
     PLUS_SUPPLY_PERCENTAGE = 1,
@@ -121,6 +123,7 @@ export enum SynergyLevel {
 export type SynergyWithLevel = {
     synergy: string;
     level: SynergyLevel;
+    faction: FactionType;
 };
 
 export const UNITS_TO_SYNERGY_LEVEL: { [key: number]: SynergyLevel } = {

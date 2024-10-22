@@ -51,6 +51,10 @@ import {
     NatureSynergy,
     SpecificSynergy,
     SynergyWithLevel,
+    ToChaosSynergy,
+    ToLifeSynergy,
+    ToMightSynergy,
+    ToNatureSynergy,
     UNITS_TO_SYNERGY_LEVEL,
 } from "../synergies/synergy_properties";
 import { FactionType } from "../factions/faction_type";
@@ -553,6 +557,33 @@ export class FightProperties {
             return false;
         }
 
+        let foundSynergy = false;
+        for (const ps of this.getPossibleSynergies(teamType)) {
+            let specificSynergy: SpecificSynergy | undefined = undefined;
+            if (faction === FactionType.LIFE) {
+                specificSynergy = ToLifeSynergy[ps.synergy];
+            } else if (faction === FactionType.CHAOS) {
+                specificSynergy = ToChaosSynergy[ps.synergy];
+            } else if (faction === FactionType.MIGHT) {
+                specificSynergy = ToMightSynergy[ps.synergy];
+            } else if (faction === FactionType.NATURE) {
+                specificSynergy = ToNatureSynergy[ps.synergy];
+            }
+            if (
+                synergy &&
+                specificSynergy &&
+                specificSynergy === synergy &&
+                ps.level === synergyLevelInt &&
+                ps.faction === faction
+            ) {
+                foundSynergy = true;
+            }
+        }
+
+        if (!foundSynergy) {
+            return false;
+        }
+
         const arr = this.synergiesPerTeam.get(teamType) ?? [];
 
         const newArray = [];
@@ -573,26 +604,34 @@ export class FightProperties {
         const synergies: SynergyWithLevel[] = [];
         const sizes = [6, 4, 2]; // Check higher levels first
         // Iterate over synergy units for each faction and determine the highest synergy level
-        const synergyTypes: { unitsPerTeam: Map<TeamType, number>; synergyEnum: { [key: number]: string } }[] = [
+        const synergyTypes: {
+            unitsPerTeam: Map<TeamType, number>;
+            synergyEnum: { [key: number]: string };
+            faction: FactionType;
+        }[] = [
             {
                 unitsPerTeam: this.synergyUnitsLifePerTeam,
                 synergyEnum: LifeSynergy as { [key: number]: string },
+                faction: FactionType.LIFE,
             },
             {
                 unitsPerTeam: this.synergyUnitsChaosPerTeam,
                 synergyEnum: ChaosSynergy as { [key: number]: string },
+                faction: FactionType.CHAOS,
             },
             {
                 unitsPerTeam: this.synergyUnitsMightPerTeam,
                 synergyEnum: MightSynergy as { [key: number]: string },
+                faction: FactionType.MIGHT,
             },
             {
                 unitsPerTeam: this.synergyUnitsNaturePerTeam,
                 synergyEnum: NatureSynergy as { [key: number]: string },
+                faction: FactionType.NATURE,
             },
         ];
 
-        synergyTypes.forEach(({ unitsPerTeam, synergyEnum }) => {
+        synergyTypes.forEach(({ unitsPerTeam, synergyEnum, faction }) => {
             const unitsCount = unitsPerTeam.get(teamType) ?? 0;
             let added = false;
             for (const size of sizes) {
@@ -606,6 +645,7 @@ export class FightProperties {
                             synergies.push({
                                 synergy: synergyEnum[index],
                                 level: synergyLevel,
+                                faction: faction,
                             });
                             added = true;
                         });
