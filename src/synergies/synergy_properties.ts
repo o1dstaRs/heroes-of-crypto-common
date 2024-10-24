@@ -11,6 +11,33 @@
 
 import { FactionType } from "../factions/faction_type";
 
+export const SynergyKeysToPower: { [key: string]: number } = {
+    "Life:1:1": 5,
+    "Life:2:1": 5,
+    "Life:1:2": 11,
+    "Life:2:2": 12,
+    "Life:1:3": 18,
+    "Life:2:3": 20,
+    "Chaos:1:1": 0.6,
+    "Chaos:2:1": 6,
+    "Chaos:1:2": 1.3,
+    "Chaos:2:2": 11,
+    "Chaos:1:3": 2.1,
+    "Chaos:2:3": 17,
+    "Might:1:1": 1,
+    "Might:2:1": 3,
+    "Might:1:2": 2,
+    "Might:2:2": 6,
+    "Might:1:3": 3,
+    "Might:2:3": 10,
+    "Nature:1:1": 1,
+    "Nature:2:1": 10,
+    "Nature:1:2": 2,
+    "Nature:2:2": 20,
+    "Nature:1:3": 3,
+    "Nature:2:3": 30,
+};
+
 export enum LifeSynergy {
     NO_SYNERGY = 0,
     PLUS_SUPPLY_PERCENTAGE = 1,
@@ -38,20 +65,20 @@ export function getLifeSynergyByName(name: LifeSynergyNamesType): LifeSynergy {
 
 export enum ChaosSynergy {
     NO_SYNERGY = 0,
-    SLOW_ON_SHOT = 1,
+    MOVEMENT = 1,
     BREAK_ON_ATTACK = 2,
 }
 
 export const ChaosSynergyNames = {
     NO_SYNERGY: "NO_SYNERGY",
-    SLOW_ON_SHOT: "SLOW_ON_SHOT",
+    MOVEMENT: "MOVEMENT",
     BREAK_ON_ATTACK: "BREAK_ON_ATTACK",
 } as const;
 
 export const ToChaosSynergy: { [synergyName: string]: ChaosSynergy } = {
     "": ChaosSynergy.NO_SYNERGY,
     NO_SYNERGY: ChaosSynergy.NO_SYNERGY,
-    SLOW_ON_SHOT: ChaosSynergy.SLOW_ON_SHOT,
+    MOVEMENT: ChaosSynergy.MOVEMENT,
     BREAK_ON_ATTACK: ChaosSynergy.BREAK_ON_ATTACK,
 };
 
@@ -127,6 +154,7 @@ export type SynergyWithLevel = {
 };
 
 export const UNITS_TO_SYNERGY_LEVEL: { [key: number]: SynergyLevel } = {
+    0: SynergyLevel.NO_SYNERGY,
     2: SynergyLevel.LEVEL_1,
     4: SynergyLevel.LEVEL_2,
     6: SynergyLevel.LEVEL_3,
