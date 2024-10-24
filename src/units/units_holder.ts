@@ -346,7 +346,15 @@ export class UnitsHolder {
 
             const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
             if (disguiseAura) {
-                if (this.getNumberOfEnemiesWithinRange(u, disguiseAura.getRange())) {
+                if (
+                    this.getNumberOfEnemiesWithinRange(
+                        u,
+                        disguiseAura.getRange() +
+                            FightStateManager.getInstance()
+                                .getFightProperties()
+                                .getAuraAdditionalAuraRangePerTeam(u.getTeam()),
+                    )
+                ) {
                     u.deleteBuff("Hidden");
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
@@ -408,7 +416,14 @@ export class UnitsHolder {
             const unitCells = cells?.length ? cells : unit.getCells();
 
             for (const c of unitCells) {
-                const auraCells = EffectHelper.getAuraCells(this.gridSettings, c, warAngerAuraEffect.getRange());
+                const auraCells = EffectHelper.getAuraCells(
+                    this.gridSettings,
+                    c,
+                    warAngerAuraEffect.getRange() +
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAuraAdditionalAuraRangePerTeam(unit.getTeam()),
+                );
                 for (const ac of auraCells) {
                     const occupantId = this.grid.getOccupantUnitId(ac);
                     if (!occupantId) {
@@ -451,7 +466,13 @@ export class UnitsHolder {
                         unitAuraEffectProperties.power = u.calculateAuraPower(uae);
                     }
 
-                    if (unitAuraEffectProperties.range < 0) {
+                    const auraRange =
+                        unitAuraEffectProperties.range +
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAuraAdditionalAuraRangePerTeam(u.getTeam());
+
+                    if (auraRange < 0) {
                         continue;
                     }
 
@@ -463,11 +484,7 @@ export class UnitsHolder {
                         continue;
                     }
 
-                    const affectedCellKeys = EffectHelper.getAuraCellKeys(
-                        this.gridSettings,
-                        c,
-                        unitAuraEffectProperties.range,
-                    );
+                    const affectedCellKeys = EffectHelper.getAuraCellKeys(this.gridSettings, c, auraRange);
                     for (const ack of affectedCellKeys) {
                         if (!teamAuraEffects.has(ack)) {
                             teamAuraEffects.set(ack, []);
