@@ -40,7 +40,7 @@ import { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
-import { getRandomInt } from "../utils/lib";
+import { getLapString, getRandomInt } from "../utils/lib";
 import { getDistance, winningAtLeastOneEventProbability, XY } from "../utils/math";
 import { AttackType, MovementType, TeamType, UnitProperties, UnitType } from "./unit_properties";
 
@@ -143,7 +143,7 @@ export interface IBoardObj {
 }
 
 interface IDamageable {
-    applyDamage(minusHp: number, currentTick: number): void;
+    applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak: boolean): void;
 
     calculatePossibleLosses(minusHp: number): number;
 
@@ -263,8 +263,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.debuffs = [];
         this.maxRangeShots = this.unitProperties.range_shots;
         this.abilityFactory = abilityFactory;
-        this.parseAbilities();
         this.effects = [];
+        this.parseAbilities();
         this.parseAuraEffects();
     }
 
@@ -402,10 +402,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getAbilities(): Ability[] {
+        if (this.hasEffectActive("Break")) {
+            return [];
+        }
+
         return this.abilities;
     }
 
     public getAuraEffects(): AuraEffect[] {
+        if (this.hasEffectActive("Break")) {
+            return [];
+        }
+
         return this.auraEffects;
     }
 
@@ -420,6 +428,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getAbility(abilityName: string): Ability | undefined {
+        if (this.hasEffectActive("Break")) {
+            return undefined;
+        }
+
         for (const a of this.abilities) {
             if (abilityName === a.getName()) {
                 return a;
@@ -737,6 +749,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public hasAbilityActive(abilityName: string): boolean {
+        if (this.hasEffectActive("Break")) {
+            return false;
+        }
+
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
                 return true;
@@ -782,6 +798,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getAbilityPower(abilityName: string): number {
+        if (this.hasEffectActive("Break")) {
+            return 0;
+        }
+
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
                 return ab.getPower();
@@ -808,7 +828,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getSteps(): number {
-        return this.unitProperties.steps + this.unitProperties.steps_morale;
+        return this.unitProperties.steps + this.unitProperties.steps_mod;
     }
 
     public getMorale(): number {
@@ -902,6 +922,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getSpellsCount(): number {
+        if (this.unitType === UnitType.CREATURE && this.hasEffectActive("Break")) {
+            return 0;
+        }
+
         return this.unitProperties.spells.length;
     }
 
@@ -1098,10 +1122,27 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         sceneLog.updateLog(`${this.getName()} got hit by armageddon for ${armageddonDamage} damage`);
-        this.applyDamage(armageddonDamage);
+        this.applyDamage(armageddonDamage, 0, sceneLog, false);
     }
 
-    public applyDamage(minusHp: number): number {
+    public applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak = false): number {
+        if (minusHp <= 0) {
+            return 0;
+        }
+
+        if (chanceToBreak > 0 && getRandomInt(0, 100) < Math.min(chanceToBreak, 100)) {
+            const breakEffect = this.effectFactory.makeEffect("Break");
+            if (breakEffect) {
+                const laps = breakEffect.getLaps();
+                if (extendBreak) {
+                    breakEffect.extend();
+                }
+                if (this.applyEffect(breakEffect)) {
+                    sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
+                }
+            }
+        }
+
         if (minusHp < this.unitProperties.hp) {
             this.unitProperties.hp -= minusHp;
             this.handleDamageAnimation(0); // Trigger animation hook with no deaths
@@ -1193,10 +1234,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
         }
         this.initialUnitProperties.morale = this.unitProperties.morale;
-    }
-
-    public applyMoraleStepsModifier(stepsMoraleMultiplier = 0): void {
-        this.unitProperties.steps_morale = Number((stepsMoraleMultiplier * this.getMorale()).toFixed(2));
     }
 
     public applyTravelledDistanceModifier(cellsTravelled: number, synergyAbilityPowerIncrease: number): void {
@@ -1617,6 +1654,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.onHourglass = onHourglass;
     }
 
+    public isOnHourglass(): boolean {
+        return this.onHourglass;
+    }
+
     public refreshPossibleAttackTypes(canLandRangeAttack: boolean) {
         this.possibleAttackTypes = [];
         if (this.getAttackType() === AttackType.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
@@ -1851,6 +1892,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 for (let i = this.unitProperties.spells.length - 1; i >= 0; i--) {
                     if (this.unitProperties.spells[i] === fullSpellName) {
                         this.unitProperties.spells.splice(i, 1);
+                        break;
                     }
                 }
             }
@@ -1921,7 +1963,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number((oldBaseAttack - this.initialUnitProperties.base_attack).toFixed(1));
     }
 
-    public adjustBaseStats(currentLap: number, synergyAbilityPowerIncrease: number) {
+    public adjustBaseStats(
+        currentLap: number,
+        synergyAbilityPowerIncrease: number,
+        synergyMovementStepsIncrease: number,
+        stepsMoraleMultiplier = 0,
+    ) {
         // target
         if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
@@ -2085,6 +2132,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             : this.initialUnitProperties.speed;
 
         // STEPS
+        this.unitProperties.steps_mod =
+            Number((stepsMoraleMultiplier * this.getMorale()).toFixed(1)) + synergyMovementStepsIncrease;
         const skyRunnerAbility = this.getAbility("Sky Runner");
         if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.initialUnitProperties.steps += 1;
@@ -2098,12 +2147,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const wolfTrailAuraEffect = this.getAppliedAuraEffect("Wolf Trail Aura");
         if (wolfTrailAuraEffect) {
-            this.unitProperties.steps += wolfTrailAuraEffect.getPower();
+            this.unitProperties.steps_mod += wolfTrailAuraEffect.getPower();
         }
         if (!this.canFly()) {
             const tieUpTheHorsesAuraEffect = this.getAppliedAuraEffect("Tie up the Horses Aura");
             if (tieUpTheHorsesAuraEffect) {
-                this.unitProperties.steps += tieUpTheHorsesAuraEffect.getPower();
+                this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }
         }
         const movementAugmentBuff = this.getBuff("Movement Augment");
@@ -2112,7 +2161,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const battleRoarBuff = this.getBuff("Battle Roar");
         if (battleRoarBuff) {
-            this.unitProperties.steps += battleRoarBuff.getPower();
+            this.unitProperties.steps_mod += battleRoarBuff.getPower();
         }
         if (windFlowBuff) {
             const newSteps = this.unitProperties.steps - windFlowBuff.getPower();
@@ -2124,7 +2173,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (quagmireDebuff) {
             stepsMultiplier = (100 - quagmireDebuff.getPower()) / 100;
         }
-        this.unitProperties.steps = Number((this.unitProperties.steps * stepsMultiplier).toFixed(2));
+        this.unitProperties.steps = Number((this.unitProperties.steps * stepsMultiplier).toFixed(1));
+        this.unitProperties.steps_mod = Number((this.unitProperties.steps_mod * stepsMultiplier).toFixed(1));
 
         // ATTACK
         if (!this.adjustedBaseStatsLaps.includes(currentLap)) {

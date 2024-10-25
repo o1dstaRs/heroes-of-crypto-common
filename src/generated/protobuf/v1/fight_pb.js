@@ -94,10 +94,10 @@ proto.public.Fight.toObject = function(includeInstance, msg) {
     highestSpeedThisTurn: jspb.Message.getFieldWithDefault(msg, 8, 0),
     alreadyMadeTurnList: (f = jspb.Message.getRepeatedField(msg, 9)) == null ? undefined : f,
     alreadyMadeTurnByTeamMap: (f = msg.getAlreadyMadeTurnByTeamMap()) ? f.toObject(includeInstance, proto.public.StringList.toObject) : [],
-    alreadyHourGlassList: (f = jspb.Message.getRepeatedField(msg, 11)) == null ? undefined : f,
+    alreadyHourglassList: (f = jspb.Message.getRepeatedField(msg, 11)) == null ? undefined : f,
     alreadyRepliedAttackList: (f = jspb.Message.getRepeatedField(msg, 12)) == null ? undefined : f,
     teamUnitsAliveMap: (f = msg.getTeamUnitsAliveMap()) ? f.toObject(includeInstance, undefined) : [],
-    hourGlassQueueList: (f = jspb.Message.getRepeatedField(msg, 14)) == null ? undefined : f,
+    hourglassQueueList: (f = jspb.Message.getRepeatedField(msg, 14)) == null ? undefined : f,
     moralePlusQueueList: (f = jspb.Message.getRepeatedField(msg, 15)) == null ? undefined : f,
     moraleMinusQueueList: (f = jspb.Message.getRepeatedField(msg, 16)) == null ? undefined : f,
     currentTurnStart: jspb.Message.getFieldWithDefault(msg, 17, 0),
@@ -186,7 +186,7 @@ proto.public.Fight.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 11:
       var value = /** @type {string} */ (reader.readString());
-      msg.addAlreadyHourGlass(value);
+      msg.addAlreadyHourglass(value);
       break;
     case 12:
       var value = /** @type {string} */ (reader.readString());
@@ -200,7 +200,7 @@ proto.public.Fight.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 14:
       var value = /** @type {string} */ (reader.readString());
-      msg.addHourGlassQueue(value);
+      msg.addHourglassQueue(value);
       break;
     case 15:
       var value = /** @type {string} */ (reader.readString());
@@ -334,7 +334,7 @@ proto.public.Fight.serializeBinaryToWriter = function(message, writer) {
   if (f && f.getLength() > 0) {
     f.serializeBinary(10, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeMessage, proto.public.StringList.serializeBinaryToWriter);
   }
-  f = message.getAlreadyHourGlassList();
+  f = message.getAlreadyHourglassList();
   if (f.length > 0) {
     writer.writeRepeatedString(
       11,
@@ -352,7 +352,7 @@ proto.public.Fight.serializeBinaryToWriter = function(message, writer) {
   if (f && f.getLength() > 0) {
     f.serializeBinary(13, writer, jspb.BinaryWriter.prototype.writeUint32, jspb.BinaryWriter.prototype.writeUint32);
   }
-  f = message.getHourGlassQueueList();
+  f = message.getHourglassQueueList();
   if (f.length > 0) {
     writer.writeRepeatedString(
       14,
@@ -641,10 +641,10 @@ proto.public.Fight.prototype.clearAlreadyMadeTurnByTeamMap = function() {
 
 
 /**
- * repeated string already_hour_glass = 11;
+ * repeated string already_hourglass = 11;
  * @return {!Array<string>}
  */
-proto.public.Fight.prototype.getAlreadyHourGlassList = function() {
+proto.public.Fight.prototype.getAlreadyHourglassList = function() {
   return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 11));
 };
 
@@ -653,7 +653,7 @@ proto.public.Fight.prototype.getAlreadyHourGlassList = function() {
  * @param {!Array<string>} value
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.setAlreadyHourGlassList = function(value) {
+proto.public.Fight.prototype.setAlreadyHourglassList = function(value) {
   return jspb.Message.setField(this, 11, value || []);
 };
 
@@ -663,7 +663,7 @@ proto.public.Fight.prototype.setAlreadyHourGlassList = function(value) {
  * @param {number=} opt_index
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.addAlreadyHourGlass = function(value, opt_index) {
+proto.public.Fight.prototype.addAlreadyHourglass = function(value, opt_index) {
   return jspb.Message.addToRepeatedField(this, 11, value, opt_index);
 };
 
@@ -672,8 +672,8 @@ proto.public.Fight.prototype.addAlreadyHourGlass = function(value, opt_index) {
  * Clears the list making it empty but non-null.
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.clearAlreadyHourGlassList = function() {
-  return this.setAlreadyHourGlassList([]);
+proto.public.Fight.prototype.clearAlreadyHourglassList = function() {
+  return this.setAlreadyHourglassList([]);
 };
 
 
@@ -738,10 +738,10 @@ proto.public.Fight.prototype.clearTeamUnitsAliveMap = function() {
 
 
 /**
- * repeated string hour_glass_queue = 14;
+ * repeated string hourglass_queue = 14;
  * @return {!Array<string>}
  */
-proto.public.Fight.prototype.getHourGlassQueueList = function() {
+proto.public.Fight.prototype.getHourglassQueueList = function() {
   return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 14));
 };
 
@@ -750,7 +750,7 @@ proto.public.Fight.prototype.getHourGlassQueueList = function() {
  * @param {!Array<string>} value
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.setHourGlassQueueList = function(value) {
+proto.public.Fight.prototype.setHourglassQueueList = function(value) {
   return jspb.Message.setField(this, 14, value || []);
 };
 
@@ -760,7 +760,7 @@ proto.public.Fight.prototype.setHourGlassQueueList = function(value) {
  * @param {number=} opt_index
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.addHourGlassQueue = function(value, opt_index) {
+proto.public.Fight.prototype.addHourglassQueue = function(value, opt_index) {
   return jspb.Message.addToRepeatedField(this, 14, value, opt_index);
 };
 
@@ -769,8 +769,8 @@ proto.public.Fight.prototype.addHourGlassQueue = function(value, opt_index) {
  * Clears the list making it empty but non-null.
  * @return {!proto.public.Fight} returns this
  */
-proto.public.Fight.prototype.clearHourGlassQueueList = function() {
-  return this.setHourGlassQueueList([]);
+proto.public.Fight.prototype.clearHourglassQueueList = function() {
+  return this.setHourglassQueueList([]);
 };
 
 

@@ -38,10 +38,10 @@ export class Fight extends jspb.Message {
 
   getAlreadyMadeTurnByTeamMap(): jspb.Map<number, types_pb.StringList>;
   clearAlreadyMadeTurnByTeamMap(): void;
-  clearAlreadyHourGlassList(): void;
-  getAlreadyHourGlassList(): Array<string>;
-  setAlreadyHourGlassList(value: Array<string>): void;
-  addAlreadyHourGlass(value: string, index?: number): string;
+  clearAlreadyHourglassList(): void;
+  getAlreadyHourglassList(): Array<string>;
+  setAlreadyHourglassList(value: Array<string>): void;
+  addAlreadyHourglass(value: string, index?: number): string;
 
   clearAlreadyRepliedAttackList(): void;
   getAlreadyRepliedAttackList(): Array<string>;
@@ -50,10 +50,10 @@ export class Fight extends jspb.Message {
 
   getTeamUnitsAliveMap(): jspb.Map<number, number>;
   clearTeamUnitsAliveMap(): void;
-  clearHourGlassQueueList(): void;
-  getHourGlassQueueList(): Array<string>;
-  setHourGlassQueueList(value: Array<string>): void;
-  addHourGlassQueue(value: string, index?: number): string;
+  clearHourglassQueueList(): void;
+  getHourglassQueueList(): Array<string>;
+  setHourglassQueueList(value: Array<string>): void;
+  addHourglassQueue(value: string, index?: number): string;
 
   clearMoralePlusQueueList(): void;
   getMoralePlusQueueList(): Array<string>;
@@ -105,10 +105,10 @@ export namespace Fight {
     highestSpeedThisTurn: number,
     alreadyMadeTurnList: Array<string>,
     alreadyMadeTurnByTeamMap: Array<[number, types_pb.StringList.AsObject]>,
-    alreadyHourGlassList: Array<string>,
+    alreadyHourglassList: Array<string>,
     alreadyRepliedAttackList: Array<string>,
     teamUnitsAliveMap: Array<[number, number]>,
-    hourGlassQueueList: Array<string>,
+    hourglassQueueList: Array<string>,
     moralePlusQueueList: Array<string>,
     moraleMinusQueueList: Array<string>,
     currentTurnStart: number,

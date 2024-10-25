@@ -46,6 +46,7 @@ export interface AttackTypeMap {
   MELEE: 0;
   RANGE: 1;
   MAGIC: 2;
+  MELEE_MAGIC: 3;
 }
 
 export const AttackType: AttackTypeMap;

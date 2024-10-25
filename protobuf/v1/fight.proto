@@ -15,10 +15,10 @@ message Fight {
     int32 highest_speed_this_turn = 8;
     repeated string already_made_turn = 9;
     map<uint32, StringList> already_made_turn_by_team = 10;
-    repeated string already_hour_glass = 11;
+    repeated string already_hourglass = 11;
     repeated string already_replied_attack = 12;
     map<uint32, uint32> team_units_alive = 13;
-    repeated string hour_glass_queue = 14;
+    repeated string hourglass_queue = 14;
     repeated string morale_plus_queue = 15;
     repeated string morale_minus_queue = 16;
     int64 current_turn_start = 17;

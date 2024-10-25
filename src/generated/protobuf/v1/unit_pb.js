@@ -91,7 +91,7 @@ proto.public.Unit.toObject = function(includeInstance, msg) {
     maxHp: jspb.Message.getFieldWithDefault(msg, 5, 0),
     hp: jspb.Message.getFieldWithDefault(msg, 6, 0),
     steps: jspb.Message.getFloatingPointFieldWithDefault(msg, 7, 0.0),
-    stepsMorale: jspb.Message.getFloatingPointFieldWithDefault(msg, 8, 0.0),
+    stepsMod: jspb.Message.getFloatingPointFieldWithDefault(msg, 8, 0.0),
     morale: jspb.Message.getFieldWithDefault(msg, 9, 0),
     luck: jspb.Message.getFieldWithDefault(msg, 10, 0),
     speed: jspb.Message.getFieldWithDefault(msg, 11, 0),
@@ -186,7 +186,7 @@ proto.public.Unit.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 8:
       var value = /** @type {number} */ (reader.readDouble());
-      msg.setStepsMorale(value);
+      msg.setStepsMod(value);
       break;
     case 9:
       var value = /** @type {number} */ (reader.readInt32());
@@ -378,7 +378,7 @@ proto.public.Unit.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getStepsMorale();
+  f = message.getStepsMod();
   if (f !== 0.0) {
     writer.writeDouble(
       8,
@@ -735,10 +735,10 @@ proto.public.Unit.prototype.setSteps = function(value) {
 
 
 /**
- * optional double steps_morale = 8;
+ * optional double steps_mod = 8;
  * @return {number}
  */
-proto.public.Unit.prototype.getStepsMorale = function() {
+proto.public.Unit.prototype.getStepsMod = function() {
   return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 8, 0.0));
 };
 
@@ -747,7 +747,7 @@ proto.public.Unit.prototype.getStepsMorale = function() {
  * @param {number} value
  * @return {!proto.public.Unit} returns this
  */
-proto.public.Unit.prototype.setStepsMorale = function(value) {
+proto.public.Unit.prototype.setStepsMod = function(value) {
   return jspb.Message.setProto3FloatField(this, 8, value);
 };
 

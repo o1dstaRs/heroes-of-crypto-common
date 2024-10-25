@@ -81,7 +81,7 @@ export class UnitProperties {
 
     public steps: number;
 
-    public steps_morale: number;
+    public steps_mod: number;
 
     public morale: number;
 
@@ -241,7 +241,7 @@ export class UnitProperties {
         this.hp = max_hp;
         this.max_hp = max_hp;
         this.steps = steps;
-        this.steps_morale = 0;
+        this.steps_mod = 0;
         this.morale = morale;
         this.luck = luck;
         this.speed = speed;

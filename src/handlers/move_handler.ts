@@ -248,7 +248,6 @@ export class MoveHandler {
             } else if (distanceAfter > distanceBefore) {
                 unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE);
             }
-            unit.applyMoraleStepsModifier(stepsMoraleMultiplier);
             unit.applyTravelledDistanceModifier(path.length, synergyAbilityPowerIncrease);
             unit.applyLavaWaterModifier(movePaths[0].hasLavaCell, movePaths[0].hasWaterCell);
         } else {

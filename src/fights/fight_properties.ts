@@ -84,13 +84,13 @@ export class FightProperties {
 
     private alreadyMadeTurnByTeam: Map<TeamType, Set<string>>;
 
-    private alreadyHourGlass: Set<string>;
+    private alreadyHourglass: Set<string>;
 
     private alreadyRepliedAttack: Set<string>;
 
     private teamUnitsAlive: Map<TeamType, number>;
 
-    private hourGlassQueue: Denque<string>;
+    private hourglassQueue: Denque<string>;
 
     private moralePlusQueue: Denque<string>;
 
@@ -147,10 +147,10 @@ export class FightProperties {
         this.highestSpeedThisTurn = 0;
         this.alreadyMadeTurn = new Set();
         this.alreadyMadeTurnByTeam = new Map();
-        this.alreadyHourGlass = new Set();
+        this.alreadyHourglass = new Set();
         this.alreadyRepliedAttack = new Set();
         this.teamUnitsAlive = new Map();
-        this.hourGlassQueue = new Denque();
+        this.hourglassQueue = new Denque();
         this.moralePlusQueue = new Denque();
         this.moraleMinusQueue = new Denque();
         this.currentTurnStart = 0;
@@ -208,8 +208,8 @@ export class FightProperties {
         return this.alreadyMadeTurn.has(unitId);
     }
 
-    public hasAlreadyHourGlass(unitId: string): boolean {
-        return this.alreadyHourGlass.has(unitId);
+    public hasAlreadyHourglass(unitId: string): boolean {
+        return this.alreadyHourglass.has(unitId);
     }
 
     public hasAlreadyRepliedAttack(unitId: string): boolean {
@@ -228,8 +228,8 @@ export class FightProperties {
         return this.moralePlusQueue.length;
     }
 
-    public getHourGlassQueueSize(): number {
-        return this.hourGlassQueue.length;
+    public getHourglassQueueSize(): number {
+        return this.hourglassQueue.length;
     }
 
     public getUpNextQueueSize(): number {
@@ -293,9 +293,9 @@ export class FightProperties {
         return false;
     }
 
-    public hourGlassIncludes(unitId: string): boolean {
-        for (let i = 0; i < this.hourGlassQueue.length; i++) {
-            if (this.hourGlassQueue.get(i) === unitId) {
+    public hourglassIncludes(unitId: string): boolean {
+        for (let i = 0; i < this.hourglassQueue.length; i++) {
+            if (this.hourglassQueue.get(i) === unitId) {
                 return true;
             }
         }
@@ -333,8 +333,8 @@ export class FightProperties {
         return this.moralePlusQueue.shift();
     }
 
-    public dequeueHourGlassQueue(): string | undefined {
-        return this.hourGlassQueue.shift();
+    public dequeueHourglassQueue(): string | undefined {
+        return this.hourglassQueue.shift();
     }
 
     public setHighestSpeedThisTurn(highestSpeedThisTurn: number): void {
@@ -447,10 +447,10 @@ export class FightProperties {
     public flipLap(): void {
         this.alreadyMadeTurn.clear();
         this.alreadyMadeTurnByTeam.clear();
-        this.alreadyHourGlass.clear();
+        this.alreadyHourglass.clear();
         this.alreadyRepliedAttack.clear();
         this.currentLap++;
-        this.hourGlassQueue.clear();
+        this.hourglassQueue.clear();
         this.moraleMinusQueue.clear();
         this.moralePlusQueue.clear();
         this.upNextQueue.clear();
@@ -670,6 +670,24 @@ export class FightProperties {
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`] ?? 0;
     }
 
+    public getAdditionalMovementStepsPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.CHAOS, ChaosSynergy.MOVEMENT);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`] ?? 0;
+    }
+
+    public getBreakChancePerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`] ?? 0;
+    }
+
     public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(
             teamType,
@@ -850,9 +868,9 @@ export class FightProperties {
         this.currentLapTotalTimePerTeam.set(teamType, currentTotalTimePerTeam);
     }
 
-    public enqueueHourGlass(unitId: string) {
-        this.alreadyHourGlass.add(unitId);
-        this.hourGlassQueue.push(unitId);
+    public enqueueHourglass(unitId: string) {
+        this.alreadyHourglass.add(unitId);
+        this.hourglassQueue.push(unitId);
     }
 
     public enqueueMoraleMinus(unitId: string) {
@@ -877,8 +895,8 @@ export class FightProperties {
         return this.removeItemOnce(this.upNextQueue, unitId);
     }
 
-    public removeFromHourGlassQueue(unitId: string): void {
-        this.removeItemOnce(this.hourGlassQueue, unitId);
+    public removeFromHourglassQueue(unitId: string): void {
+        this.removeItemOnce(this.hourglassQueue, unitId);
     }
 
     public removeFromMoraleMinusQueue(unitId: string): void {
@@ -1042,7 +1060,7 @@ export class FightProperties {
             fightProperties.alreadyMadeTurnByTeam.set(key, new Set(value.getValuesList()));
         });
 
-        fightProperties.alreadyHourGlass = new Set(fight.getAlreadyHourGlassList());
+        fightProperties.alreadyHourglass = new Set(fight.getAlreadyHourglassList());
         fightProperties.alreadyRepliedAttack = new Set(fight.getAlreadyRepliedAttackList());
 
         // Deserialize teamUnitsAlive
@@ -1051,7 +1069,7 @@ export class FightProperties {
             fightProperties.teamUnitsAlive.set(key, value);
         });
 
-        fightProperties.hourGlassQueue = new Denque(fight.getHourGlassQueueList());
+        fightProperties.hourglassQueue = new Denque(fight.getHourglassQueueList());
         fightProperties.moralePlusQueue = new Denque(fight.getMoralePlusQueueList());
         fightProperties.moraleMinusQueue = new Denque(fight.getMoraleMinusQueueList());
 
@@ -1099,14 +1117,14 @@ export class FightProperties {
         const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
         alreadyMadeTurnByTeamMap.set(TeamType.UPPER, alreadyMadeTurnByUpperTeamList);
         alreadyMadeTurnByTeamMap.set(TeamType.LOWER, alreadyMadeTurnByLowerTeamList);
-        fight.setAlreadyHourGlassList(Array.from(this.alreadyHourGlass));
+        fight.setAlreadyHourglassList(Array.from(this.alreadyHourglass));
         fight.setAlreadyRepliedAttackList(Array.from(this.alreadyRepliedAttack));
         const upperTeamUnitsAlive = this.teamUnitsAlive.get(TeamType.UPPER) ?? 0;
         const lowerTeamUnitsAlive = this.teamUnitsAlive.get(TeamType.LOWER) ?? 0;
         const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
         teamUnitsAliveMap.set(TeamType.UPPER, upperTeamUnitsAlive);
         teamUnitsAliveMap.set(TeamType.LOWER, lowerTeamUnitsAlive);
-        fight.setHourGlassQueueList(this.hourGlassQueue.toArray());
+        fight.setHourglassQueueList(this.hourglassQueue.toArray());
         fight.setMoralePlusQueueList(this.moralePlusQueue.toArray());
         fight.setMoraleMinusQueueList(this.moraleMinusQueue.toArray());
         fight.setCurrentTurnStart(Math.round(this.currentTurnStart));
@@ -1317,7 +1335,7 @@ export class FightProperties {
             if (
                 !this.alreadyMadeTurn.has(unitId) &&
                 !this.upNextIncludes(unitId) &&
-                !this.hourGlassIncludes(unitId) &&
+                !this.hourglassIncludes(unitId) &&
                 !this.moraleMinusIncludes(unitId)
             ) {
                 return unitId;
@@ -1328,7 +1346,7 @@ export class FightProperties {
             if (
                 !this.alreadyMadeTurn.has(unitId) &&
                 !this.upNextIncludes(unitId) &&
-                !this.hourGlassIncludes(unitId) &&
+                !this.hourglassIncludes(unitId) &&
                 !this.moraleMinusIncludes(unitId)
             ) {
                 return unitId;
@@ -1345,11 +1363,11 @@ export class FightProperties {
 
         // hourglass
         if (
-            this.hourGlassQueue.length &&
-            this.alreadyMadeTurn.size + this.hourGlassQueue.length + this.upNextQueue.length >= allUnits.size
+            this.hourglassQueue.length &&
+            this.alreadyMadeTurn.size + this.hourglassQueue.length + this.upNextQueue.length >= allUnits.size
         ) {
-            while (this.hourGlassQueue.length) {
-                const nextUnitId = this.hourGlassQueue.shift();
+            while (this.hourglassQueue.length) {
+                const nextUnitId = this.hourglassQueue.shift();
                 if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
                     return nextUnitId;
                 }
