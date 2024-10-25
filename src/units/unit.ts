@@ -155,6 +155,7 @@ interface IDamager {
         attackRate: number,
         enemyUnit: Unit,
         isRangeAttack: boolean,
+        synergyAbilityPowerIncrease: number,
         divisor: number,
         abilityMultiplier: number,
     ): number;
@@ -163,11 +164,18 @@ interface IDamager {
         attackRate: number,
         enemyUnit: Unit,
         isRangeAttack: boolean,
+        synergyAbilityPowerIncrease: number,
         divisor: number,
         abilityMultiplier: number,
     ): number;
 
-    calculateAttackDamage(enemyUnit: Unit, attackType: AttackType, divisor: number, abilityMultiplier: number): number;
+    calculateAttackDamage(
+        enemyUnit: Unit,
+        attackType: AttackType,
+        synergyAbilityPowerIncrease: number,
+        divisor: number,
+        abilityMultiplier: number,
+    ): number;
 
     getAttackTypeSelection(): AttackType;
 
@@ -352,7 +360,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public addAbility(ability: Ability): void {
         this.unitProperties.abilities.push(ability.getName());
         if (ability.getName() === "Chain Lightning") {
-            const percentage = Number((this.calculateAbilityMultiplier(ability) * 100).toFixed(2));
+            const percentage = Number((this.calculateAbilityMultiplier(ability, 0) * 100).toFixed(2));
             const description = ability.getDesc().join("\n");
             const updatedDescription = description
                 .replace("{}", Number(percentage.toFixed()).toString())
@@ -363,7 +371,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (ability.getName() === "Paralysis") {
             const description = ability.getDesc().join("\n");
-            const reduction = this.calculateAbilityApplyChance(ability);
+            const reduction = this.calculateAbilityApplyChance(ability, 0);
             const chance = Math.min(100, reduction * 2);
             const updatedDescription = description
                 .replace("{}", Number(chance.toFixed(2)).toString())
@@ -1191,10 +1199,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.steps_morale = Number((stepsMoraleMultiplier * this.getMorale()).toFixed(2));
     }
 
-    public applyTravelledDistanceModifier(cellsTravelled: number): void {
+    public applyTravelledDistanceModifier(cellsTravelled: number, synergyAbilityPowerIncrease: number): void {
         const cruradeAbility = this.getAbility("Crusade");
         if (cruradeAbility) {
-            const additionalAttackAndArmor = this.calculateAbilityCount(cruradeAbility) * cellsTravelled;
+            const additionalAttackAndArmor =
+                this.calculateAbilityCount(cruradeAbility, synergyAbilityPowerIncrease) * cellsTravelled;
             this.initialUnitProperties.base_attack = Number(
                 (this.initialUnitProperties.base_attack + additionalAttackAndArmor).toFixed(2),
             );
@@ -1301,7 +1310,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return amountDied;
     }
 
-    public calculateAuraPower(auraEffect: AuraEffect): number {
+    public calculateAuraPower(auraEffect: AuraEffect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
 
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_STEPS_WALK) {
@@ -1321,7 +1330,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         ) {
             calculatedCoeff +=
                 (auraEffect.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                this.getLuck() / 100 +
+                (this.getLuck() + synergyAbilityPowerIncrease) / 100 +
                 (madeOfFireBuff ? (auraEffect.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
         }
 
@@ -1329,7 +1338,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return Number(
                 (
                     (auraEffect.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                    (this.getLuck() / 100) * auraEffect.getPower()
+                    ((this.getLuck() + synergyAbilityPowerIncrease) / 100) * auraEffect.getPower()
                 ).toFixed(1),
             );
         }
@@ -1337,9 +1346,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
     }
 
-    public calculateEffectMultiplier(effect: Effect): number {
+    public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
-        let combinedPower = effect.getPower() + this.getLuck();
+        let combinedPower = effect.getPower() + this.getLuck() + synergyAbilityPowerIncrease;
         if (combinedPower < 0) {
             combinedPower = 1;
         }
@@ -1361,7 +1370,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return !this.hasAbilityActive("Mechanism");
     }
 
-    public calculateAbilityCount(ability: Ability): number {
+    public calculateAbilityCount(ability: Ability, synergyAbilityPowerIncrease: number): number {
         if (
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&
             ability.getPowerType() !== AbilityPowerType.ADDITIONAL_STEPS &&
@@ -1381,6 +1390,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return (
                 (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
                 this.getLuck() / 10 +
+                synergyAbilityPowerIncrease / 10 +
                 (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 10
             );
         }
@@ -1388,14 +1398,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number(
             (
                 (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                ((this.getLuck() + (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
+                ((this.getLuck() +
+                    (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) +
+                    synergyAbilityPowerIncrease) /
                     100) *
                     ability.getPower()
             ).toFixed(1),
         );
     }
 
-    public calculateAbilityMultiplier(ability: Ability): number {
+    public calculateAbilityMultiplier(ability: Ability, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
         const madeOfFireBuff = this.getBuff("Made of Fire");
         if (
@@ -1411,7 +1423,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             let combinedPower =
                 ability.getPower() +
                 this.getLuck() +
-                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) +
+                synergyAbilityPowerIncrease;
             if (combinedPower < 0) {
                 combinedPower = 1;
             }
@@ -1424,14 +1437,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         ) {
             calculatedCoeff +=
                 (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                this.getLuck() / 100 +
+                (this.getLuck() + synergyAbilityPowerIncrease) / 100 +
                 (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
         }
 
         return calculatedCoeff;
     }
 
-    public calculateMissChance(enemyUnit: Unit): number {
+    public calculateMissChance(enemyUnit: Unit, enemySynergyAbilityPowerIncrease: number): number {
         const combinedMissChances = [];
         const selfBoarSalivaEffect = this.getEffect("Boar Saliva");
 
@@ -1441,14 +1454,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const enemyDodgeAbility = enemyUnit.getAbility("Dodge");
         if (enemyDodgeAbility) {
-            const dodgeChance = this.calculateAbilityApplyChance(enemyDodgeAbility) / 100;
+            const dodgeChance =
+                this.calculateAbilityApplyChance(enemyDodgeAbility, enemySynergyAbilityPowerIncrease) / 100;
             combinedMissChances.push(dodgeChance);
         }
 
         if (!this.isSmallSize()) {
             const smallSpecieAbility = enemyUnit.getAbility("Small Specie");
             if (smallSpecieAbility) {
-                const dodgeChance = this.calculateAbilityApplyChance(smallSpecieAbility) / 100;
+                const dodgeChance =
+                    this.calculateAbilityApplyChance(smallSpecieAbility, enemySynergyAbilityPowerIncrease) / 100;
                 combinedMissChances.push(dodgeChance);
             }
         }
@@ -1460,11 +1475,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return 0;
     }
 
-    public calculateAbilityApplyChance(ability: Ability): number {
+    public calculateAbilityApplyChance(ability: Ability, synergyAbilityPowerIncrease: number): number {
         const madeOfFireBuff = this.getBuff("Made of Fire");
         const combinedPower =
             ability.getPower() +
             this.getLuck() +
+            synergyAbilityPowerIncrease +
             (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
         if (combinedPower < 0) {
             return 0;
@@ -1476,6 +1492,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         attackRate: number,
         enemyUnit: Unit,
         isRangeAttack: boolean,
+        synergyAbilityPowerIncrease: number,
         divisor = 1,
         abilityMultiplier = 1,
     ): number {
@@ -1485,7 +1502,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Math.ceil(
             ((((this.unitProperties.attack_damage_min * attackRate * this.unitProperties.amount_alive) /
-                this.getEnemyArmor(enemyUnit, isRangeAttack)) *
+                this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
                 (1 - enemyUnit.getLuck() / 100)) /
                 divisor) *
                 this.unitProperties.attack_multiplier *
@@ -1497,6 +1514,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         attackRate: number,
         enemyUnit: Unit,
         isRangeAttack: boolean,
+        synergyAbilityPowerIncrease: number,
         divisor = 1,
         abilityMultiplier = 1,
     ): number {
@@ -1505,7 +1523,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         return Math.ceil(
             ((((this.unitProperties.attack_damage_max * attackRate * this.unitProperties.amount_alive) /
-                this.getEnemyArmor(enemyUnit, isRangeAttack)) *
+                this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
                 (1 - enemyUnit.getLuck() / 100)) /
                 divisor) *
                 this.unitProperties.attack_multiplier *
@@ -1516,6 +1534,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public calculateAttackDamage(
         enemyUnit: Unit,
         attackType: AttackType,
+        synergyAbilityPowerIncrease: number,
         divisor = 1,
         abilityMultiplier = 1,
         decreaseNumberOfShots = true,
@@ -1524,12 +1543,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.getAttack(),
             enemyUnit,
             attackType === AttackType.RANGE,
+            synergyAbilityPowerIncrease,
             divisor,
         );
         const max = this.calculateAttackDamageMax(
             this.getAttack(),
             enemyUnit,
             attackType === AttackType.RANGE,
+            synergyAbilityPowerIncrease,
             divisor,
         );
         const attackingByMelee = attackType === AttackType.MELEE || attackType === AttackType.MELEE_MAGIC;
@@ -1900,7 +1921,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number((oldBaseAttack - this.initialUnitProperties.base_attack).toFixed(1));
     }
 
-    public adjustBaseStats(currentLap: number) {
+    public adjustBaseStats(currentLap: number, synergyAbilityPowerIncrease: number) {
         // target
         if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
@@ -1912,7 +1933,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
         this.unitProperties.max_hp =
-            this.refreshAndGetAdjustedMaxHp(currentLap, madeOfFireBuff) + baseStatsDiff.baseStats.hp;
+            this.refreshAndGetAdjustedMaxHp(currentLap, synergyAbilityPowerIncrease, madeOfFireBuff) +
+            baseStatsDiff.baseStats.hp;
 
         if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.unitProperties.hp += 5;
@@ -2030,12 +2052,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const magicResists: number[] = [this.getMagicResist() / 100];
             const magicShieldAbility = this.getAbility("Magic Shield");
             if (magicShieldAbility) {
-                magicResists.push(this.calculateAbilityMultiplier(magicShieldAbility));
+                magicResists.push(this.calculateAbilityMultiplier(magicShieldAbility, synergyAbilityPowerIncrease));
             }
 
             const wardguardAbility = this.getAbility("Wardguard");
             if (wardguardAbility) {
-                magicResists.push(this.calculateAbilityMultiplier(wardguardAbility));
+                magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
             }
 
             this.unitProperties.magic_resist = Number(
@@ -2072,7 +2094,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.initialUnitProperties.steps + this.initialUnitProperties.steps / madeOfFireBuff.getPower()
             : this.initialUnitProperties.steps;
         if (skyRunnerAbility) {
-            this.unitProperties.steps += this.calculateAbilityCount(skyRunnerAbility);
+            this.unitProperties.steps += this.calculateAbilityCount(skyRunnerAbility, synergyAbilityPowerIncrease);
         }
         const wolfTrailAuraEffect = this.getAppliedAuraEffect("Wolf Trail Aura");
         if (wolfTrailAuraEffect) {
@@ -2207,6 +2229,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 (1 +
                     ((heavyArmorAbility.getPower() +
                         this.getLuck() +
+                        synergyAbilityPowerIncrease +
                         (madeOfFireBuff ? (heavyArmorAbility.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
                         100 /
                         MAX_UNIT_STACK_POWER) *
@@ -2216,7 +2239,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.base_armor = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
         this.unitProperties.range_armor = Number((this.unitProperties.base_armor * rangeArmorMultiplier).toFixed(2));
 
-        this.refreshAbilitiesDescriptions();
+        this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
     }
 
     public setRangeShotDistance(distance: number) {
@@ -2465,7 +2488,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return spellAdded;
     }
 
-    protected refreshAbilitiesDescriptions(): void {}
+    protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {}
 
     protected getDistanceToFurthestCorner(position: XY): number {
         return Math.max(
@@ -2523,17 +2546,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
     protected handleDamageAnimation(_unitsDied: number): void {}
 
-    protected getEnemyArmor(enemyUnit: Unit, isRangeAttack: boolean): number {
+    protected getEnemyArmor(enemyUnit: Unit, isRangeAttack: boolean, synergyAbilityPowerIncrease: number): number {
         const piercingSpearAbility = this.getAbility("Piercing Spear");
         const armor = isRangeAttack ? enemyUnit.getRangeArmor() : enemyUnit.getArmor();
         if (piercingSpearAbility) {
-            return armor * (1 - this.calculateAbilityMultiplier(piercingSpearAbility));
+            return armor * (1 - this.calculateAbilityMultiplier(piercingSpearAbility, synergyAbilityPowerIncrease));
         }
 
         return armor;
     }
 
-    protected refreshAndGetAdjustedMaxHp(currentLap: number, madeOfFireBuff?: AppliedSpell): number {
+    protected refreshAndGetAdjustedMaxHp(
+        currentLap: number,
+        synergyAbilityPowerIncrease: number,
+        madeOfFireBuff?: AppliedSpell,
+    ): number {
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
         if (hasUnyieldingPower) {
             this.unitProperties.max_hp =
@@ -2554,7 +2581,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const boostHealthAbility = this.getAbility("Boost Health");
         if (boostHealthAbility) {
-            const multiplier = this.calculateAbilityMultiplier(boostHealthAbility);
+            const multiplier = this.calculateAbilityMultiplier(boostHealthAbility, synergyAbilityPowerIncrease);
 
             let adjustActualHp = false;
             if (this.unitProperties.hp === this.unitProperties.max_hp) {
