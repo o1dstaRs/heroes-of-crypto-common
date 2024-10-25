@@ -256,7 +256,7 @@ export class UnitsHolder {
                 this.grid.cleanupAll(unitId, unitToDelete.getAttackRange(), unitToDelete.isSmallSize());
             }
 
-            FightStateManager.getInstance().getFightProperties().removeFromHourGlassQueue(unitId);
+            FightStateManager.getInstance().getFightProperties().removeFromHourglassQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromMoraleMinusQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromMoralePlusQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromUpNext(unitId);
@@ -344,6 +344,8 @@ export class UnitsHolder {
             u.adjustBaseStats(
                 FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
+                FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
+                FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
 
@@ -589,9 +591,6 @@ export class UnitsHolder {
         for (const u of this.getAllUnitsIterator()) {
             if (u.getTeam() === unit.getTeam() && u.getName() === unit.getName()) {
                 u.decreaseMorale(MORALE_CHANGE_FOR_KILL);
-                u.applyMoraleStepsModifier(
-                    FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
-                );
             }
         }
     }

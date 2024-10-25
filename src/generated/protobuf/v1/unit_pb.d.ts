@@ -28,8 +28,8 @@ export class Unit extends jspb.Message {
   getSteps(): number;
   setSteps(value: number): void;
 
-  getStepsMorale(): number;
-  setStepsMorale(value: number): void;
+  getStepsMod(): number;
+  setStepsMod(value: number): void;
 
   getMorale(): number;
   setMorale(value: number): void;
@@ -140,7 +140,7 @@ export namespace Unit {
     maxHp: number,
     hp: number,
     steps: number,
-    stepsMorale: number,
+    stepsMod: number,
     morale: number,
     luck: number,
     speed: number,

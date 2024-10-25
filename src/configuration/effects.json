@@ -47,5 +47,11 @@
         "laps": 1,
         "power": 0,
         "desc": "Forces the target to retaliate only against the attacker, ignoring all other enemies."
+    },
+    "Break": {
+        "name": "Break",
+        "laps": 1,
+        "power": 0,
+        "desc": "Disables all the unit's abilities for one turn."
     }
 }

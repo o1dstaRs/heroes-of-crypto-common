@@ -44,7 +44,7 @@ message Unit {
   uint32 max_hp = 5;
   uint32 hp = 6;
   float steps = 7;
-  float steps_morale = 8;
+  float steps_mod = 8;
   int32 morale = 9;
   int32 luck = 10;
   uint32 speed = 11;

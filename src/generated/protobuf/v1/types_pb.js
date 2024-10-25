@@ -230,7 +230,8 @@ proto.public.Team = {
 proto.public.AttackType = {
   MELEE: 0,
   RANGE: 1,
-  MAGIC: 2
+  MAGIC: 2,
+  MELEE_MAGIC: 3
 };
 
 /**
