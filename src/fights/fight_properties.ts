@@ -50,6 +50,7 @@ import {
     MightSynergy,
     NatureSynergy,
     SpecificSynergy,
+    SynergyKeysToPower,
     SynergyLevel,
     SynergyWithLevel,
     ToChaosSynergy,
@@ -660,8 +661,26 @@ export class FightProperties {
         }
     }
 
-    public getAuraAdditionalAuraRangePerTeam(teamType: TeamType): number {
-        return this.findSynergyLevel(teamType, FactionType.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
+    public getAdditionalAuraRangePerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`] ?? 0;
+    }
+
+    public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(
+            teamType,
+            FactionType.MIGHT,
+            MightSynergy.PLUS_STACK_ABILITIES_POWER,
+        );
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`] ?? 0;
     }
 
     public updateSynergyPerTeam(

@@ -341,7 +341,10 @@ export class UnitsHolder {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
             }
-            u.adjustBaseStats(FightStateManager.getInstance().getFightProperties().getCurrentLap());
+            u.adjustBaseStats(
+                FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+                FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
+            );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
 
             const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
@@ -352,7 +355,7 @@ export class UnitsHolder {
                         disguiseAura.getRange() +
                             FightStateManager.getInstance()
                                 .getFightProperties()
-                                .getAuraAdditionalAuraRangePerTeam(u.getTeam()),
+                                .getAdditionalAuraRangePerTeam(u.getTeam()),
                     )
                 ) {
                     u.deleteBuff("Hidden");
@@ -422,7 +425,7 @@ export class UnitsHolder {
                     warAngerAuraEffect.getRange() +
                         FightStateManager.getInstance()
                             .getFightProperties()
-                            .getAuraAdditionalAuraRangePerTeam(unit.getTeam()),
+                            .getAdditionalAuraRangePerTeam(unit.getTeam()),
                 );
                 for (const ac of auraCells) {
                     const occupantId = this.grid.getOccupantUnitId(ac);
@@ -463,14 +466,17 @@ export class UnitsHolder {
                     uae.toDefault();
                     const unitAuraEffectProperties = uae.getProperties();
                     if (unitAuraEffectProperties.power) {
-                        unitAuraEffectProperties.power = u.calculateAuraPower(uae);
+                        unitAuraEffectProperties.power = u.calculateAuraPower(
+                            uae,
+                            FightStateManager.getInstance()
+                                .getFightProperties()
+                                .getAdditionalAbilityPowerPerTeam(u.getTeam()),
+                        );
                     }
 
                     const auraRange =
                         unitAuraEffectProperties.range +
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getAuraAdditionalAuraRangePerTeam(u.getTeam());
+                        FightStateManager.getInstance().getFightProperties().getAdditionalAuraRangePerTeam(u.getTeam());
 
                     if (auraRange < 0) {
                         continue;

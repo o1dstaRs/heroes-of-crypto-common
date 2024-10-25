@@ -222,6 +222,7 @@ export class MoveHandler {
         toCell: XY,
         stepsMoraleMultiplier: number,
         unit: Unit,
+        synergyAbilityPowerIncrease: number,
         currentActiveKnownPaths?: ReadonlyMap<number, IWeightedRoute[]>,
     ): boolean {
         if (!currentActiveKnownPaths) {
@@ -248,7 +249,7 @@ export class MoveHandler {
                 unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE);
             }
             unit.applyMoraleStepsModifier(stepsMoraleMultiplier);
-            unit.applyTravelledDistanceModifier(path.length);
+            unit.applyTravelledDistanceModifier(path.length, synergyAbilityPowerIncrease);
             unit.applyLavaWaterModifier(movePaths[0].hasLavaCell, movePaths[0].hasWaterCell);
         } else {
             return false;
