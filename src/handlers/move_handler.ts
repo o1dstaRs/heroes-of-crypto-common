@@ -220,9 +220,9 @@ export class MoveHandler {
 
     public applyMoveModifiers(
         toCell: XY,
-        stepsMoraleMultiplier: number,
         unit: Unit,
         synergyAbilityPowerIncrease: number,
+        synergyMoraleIncrease: number,
         currentActiveKnownPaths?: ReadonlyMap<number, IWeightedRoute[]>,
     ): boolean {
         if (!currentActiveKnownPaths) {
@@ -244,9 +244,9 @@ export class MoveHandler {
             );
             const distanceAfter = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), targetPos);
             if (distanceAfter < distanceBefore) {
-                unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE);
+                unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
             } else if (distanceAfter > distanceBefore) {
-                unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE);
+                unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
             }
             unit.applyTravelledDistanceModifier(path.length, synergyAbilityPowerIncrease);
             unit.applyLavaWaterModifier(movePaths[0].hasLavaCell, movePaths[0].hasWaterCell);

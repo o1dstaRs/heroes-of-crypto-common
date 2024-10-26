@@ -11,7 +11,6 @@
 
 import { EffectHelper, FactionType, IPlacement, Spell } from "..";
 import { getSpellConfig } from "../configuration/config_provider";
-import { MORALE_CHANGE_FOR_KILL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
@@ -345,6 +344,8 @@ export class UnitsHolder {
                 FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
+                FightStateManager.getInstance().getFightProperties().getAdditionalFlyArmorPerTeam(u.getTeam()),
+                FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
@@ -587,10 +588,41 @@ export class UnitsHolder {
         this.allUnits.set(unit.getId(), unit);
     }
 
-    public decreaseMoraleForTheSameUnitsOfTheTeam(unit: Unit): void {
+    public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
+        for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {
+            const moraleDecrease = moraleDecreaseForTheUnitTeam[unitNameKey];
+            const unitNameKeySplit = unitNameKey.split(":");
+            if (unitNameKeySplit.length === 2) {
+                const unitName = unitNameKeySplit[0];
+                const unitTeam = parseInt(unitNameKeySplit[1]);
+                if (unitTeam !== TeamType.LOWER && unitTeam !== TeamType.UPPER) {
+                    continue;
+                }
+                for (const u of this.getAllUnitsIterator()) {
+                    if (u.getTeam() === unitTeam && u.getName() === unitName) {
+                        u.decreaseMorale(
+                            moraleDecrease,
+                            FightStateManager.getInstance()
+                                .getFightProperties()
+                                .getAdditionalMoralePerTeam(u.getTeam()),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    public increaseUnitsSupplyIfNeededPerTeam(team: TeamType): void {
+        if (
+            FightStateManager.getInstance().getFightProperties().hasFightStarted() ||
+            FightStateManager.getInstance().getFightProperties().hasFightFinished()
+        ) {
+            return;
+        }
+
         for (const u of this.getAllUnitsIterator()) {
-            if (u.getTeam() === unit.getTeam() && u.getName() === unit.getName()) {
-                u.decreaseMorale(MORALE_CHANGE_FOR_KILL);
+            if (u.getTeam() === team) {
+                u.increaseSupply(FightStateManager.getInstance().getFightProperties().getAdditionalSupplyPerTeam(team));
             }
         }
     }
