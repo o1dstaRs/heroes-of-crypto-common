@@ -192,7 +192,7 @@ export class FightProperties {
         return this.firstTurnMade;
     }
 
-    public getFightFinished(): boolean {
+    public hasFightFinished(): boolean {
         return this.fightFinished;
     }
 
@@ -257,7 +257,8 @@ export class FightProperties {
 
     public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
         return (
-            MAX_UNITS_PER_TEAM -
+            MAX_UNITS_PER_TEAM +
+            this.getAdditionalBoardUnitsPerTeam(teamType) -
             PlacementAugment.LEVEL_3 +
             (this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1)
         );
@@ -699,6 +700,33 @@ export class FightProperties {
         }
 
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`] ?? 0;
+    }
+
+    public getAdditionalFlyArmorPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.NATURE, NatureSynergy.PLUS_FLY_ARMOR);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Nature:${NatureSynergy.PLUS_FLY_ARMOR}:${synergyLevel}`] ?? 0;
+    }
+
+    public getAdditionalMoralePerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE}:${synergyLevel}`] ?? 0;
+    }
+
+    public getAdditionalSupplyPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_SUPPLY_PERCENTAGE);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}:${synergyLevel}`] ?? 0;
     }
 
     public updateSynergyPerTeam(
@@ -1229,6 +1257,15 @@ export class FightProperties {
         }
 
         return synergyLevel;
+    }
+
+    private getAdditionalBoardUnitsPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.NATURE, NatureSynergy.INCREASE_BOARD_UNITS);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${synergyLevel}`] ?? 0;
     }
 
     private removeItemOnce(deque: Denque<string>, item: string): boolean {

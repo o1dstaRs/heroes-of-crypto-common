@@ -950,6 +950,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getOppositeTeam(): TeamType {
+        if (this.teamType === TeamType.NO_TEAM) {
+            return TeamType.NO_TEAM;
+        }
+
         if (this.teamType === TeamType.LOWER) {
             return TeamType.UPPER;
         }
@@ -1185,8 +1189,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.amount_alive <= 0;
     }
 
-    public increaseMorale(moraleAmount: number): void {
+    public increaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
         if (
+            moraleAmount <= 0 ||
             this.hasAbilityActive("Madness") ||
             this.hasAbilityActive("Mechanism") ||
             this.hasBuffActive("Courage") ||
@@ -1197,11 +1202,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return;
         }
 
-        this.unitProperties.morale += moraleAmount;
-        if (this.unitProperties.morale > MORALE_MAX_VALUE_TOTAL) {
-            this.unitProperties.morale = MORALE_MAX_VALUE_TOTAL;
+        let newMorale = this.unitProperties.morale + moraleAmount;
+        if (newMorale > MORALE_MAX_VALUE_TOTAL) {
+            newMorale = MORALE_MAX_VALUE_TOTAL;
         }
-        this.initialUnitProperties.morale = this.unitProperties.morale;
+        if (newMorale < -MORALE_MAX_VALUE_TOTAL) {
+            newMorale = -MORALE_MAX_VALUE_TOTAL;
+        }
+        this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
     }
 
     public decreaseBaseArmor(armorAmount: number): void {
@@ -1217,8 +1225,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
     }
 
-    public decreaseMorale(moraleAmount: number): void {
+    public increaseSupply(supplyIncreasePercentage: number): void {
+        if (supplyIncreasePercentage <= 0) {
+            return;
+        }
+
+        this.initialUnitProperties.amount_alive = Math.floor(
+            this.initialUnitProperties.amount_alive * (1 + supplyIncreasePercentage / 100),
+        );
+        this.unitProperties.amount_alive = this.initialUnitProperties.amount_alive;
+    }
+
+    public decreaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
         if (
+            moraleAmount <= 0 ||
             this.hasAbilityActive("Madness") ||
             this.hasAbilityActive("Mechanism") ||
             this.hasBuffActive("Courage") ||
@@ -1229,11 +1249,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return;
         }
 
-        this.unitProperties.morale -= moraleAmount;
-        if (this.unitProperties.morale < -MORALE_MAX_VALUE_TOTAL) {
-            this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
+        let newMorale = this.unitProperties.morale - moraleAmount;
+        if (newMorale > MORALE_MAX_VALUE_TOTAL) {
+            newMorale = MORALE_MAX_VALUE_TOTAL;
         }
-        this.initialUnitProperties.morale = this.unitProperties.morale;
+        if (newMorale < -MORALE_MAX_VALUE_TOTAL) {
+            newMorale = -MORALE_MAX_VALUE_TOTAL;
+        }
+        this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
     }
 
     public applyTravelledDistanceModifier(cellsTravelled: number, synergyAbilityPowerIncrease: number): void {
@@ -1967,6 +1990,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         currentLap: number,
         synergyAbilityPowerIncrease: number,
         synergyMovementStepsIncrease: number,
+        synergyFlyArmorIncrease: number,
+        synergyMoraleIncrease: number,
         stepsMoraleMultiplier = 0,
     ) {
         // target
@@ -2006,7 +2031,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // MORALE
         this.unitProperties.attack_multiplier = 1;
-        this.unitProperties.morale = this.initialUnitProperties.morale;
+        if (synergyMoraleIncrease > 0) {
+            // this.initialUnitProperties.morale = synergyMoraleIncrease;
+            this.unitProperties.morale = this.initialUnitProperties.morale + synergyMoraleIncrease;
+        } else {
+            this.unitProperties.morale = this.initialUnitProperties.morale;
+        }
         if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
             this.unitProperties.morale = 0;
         } else {
@@ -2039,6 +2069,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         }
+        if (this.unitProperties.morale > MORALE_MAX_VALUE_TOTAL) {
+            this.unitProperties.morale = MORALE_MAX_VALUE_TOTAL;
+        }
+        if (this.unitProperties.morale < -MORALE_MAX_VALUE_TOTAL) {
+            this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
+        }
 
         // ARMOR
         const pegasusMightAura = this.getAppliedAuraEffect("Pegasus Might Aura");
@@ -2062,22 +2098,68 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 ((this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower()).toFixed(2),
             );
         }
+
+        // BUFFS & DEBUFFS
+        const weakeningBeamDebuff = this.getDebuff("Weakening Beam");
+        let baseArmorMultiplier = 1;
+        if (weakeningBeamDebuff) {
+            baseArmorMultiplier = (100 - weakeningBeamDebuff.getPower()) / 100;
+        }
+
+        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
+            this.adjustedBaseStatsLaps.push(currentLap);
+        }
+
+        const heavyArmorAbility = this.getAbility("Heavy Armor");
+        if (heavyArmorAbility) {
+            baseArmorMultiplier =
+                baseArmorMultiplier *
+                (1 +
+                    ((heavyArmorAbility.getPower() +
+                        this.getLuck() +
+                        synergyAbilityPowerIncrease +
+                        (madeOfFireBuff ? (heavyArmorAbility.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
+                        100 /
+                        MAX_UNIT_STACK_POWER) *
+                        this.getStackPower());
+        }
+
+        this.unitProperties.base_armor = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
+
         // mod
         const shatterArmorEffect = this.getEffect("Shatter Armor");
+        let shatterArmorEffectPower = 0;
         if (shatterArmorEffect) {
-            this.unitProperties.armor_mod = -shatterArmorEffect.getPower();
-        } else {
-            this.unitProperties.armor_mod = this.initialUnitProperties.armor_mod;
+            shatterArmorEffectPower = shatterArmorEffect.getPower();
         }
+        this.unitProperties.armor_mod =
+            shatterArmorEffectPower > 0 ? -shatterArmorEffectPower : this.initialUnitProperties.armor_mod;
+        let armorModMultiplier = 0;
+        console.log(`one ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
+        if (this.getMovementType() === MovementType.FLY && synergyFlyArmorIncrease > 0) {
+            armorModMultiplier = synergyFlyArmorIncrease / 100;
+        }
+        console.log(`two ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
         if (this.hasBuffActive("Spiritual Armor")) {
             const spell = new Spell({
                 spellProperties: getSpellConfig(FactionType.LIFE, "Spiritual Armor"),
                 amount: 1,
             });
+            armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
+            console.log(`three ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
+        }
+
+        if (armorModMultiplier) {
+            console.log(`four ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
             this.unitProperties.armor_mod = Number(
-                ((this.unitProperties.base_armor * spell.getPower()) / 100).toFixed(2),
+                (
+                    Math.max(this.unitProperties.base_armor - shatterArmorEffectPower, 1) * armorModMultiplier -
+                    shatterArmorEffectPower
+                ).toFixed(2),
             );
         }
+
+        // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
 
         const leatherArmorAbility = this.getAbility("Leather Armor");
         let rangeArmorMultiplier = leatherArmorAbility ? leatherArmorAbility.getPower() / 100 : 1;
@@ -2261,32 +2343,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));
         this.unitProperties.shot_distance = Number(this.unitProperties.shot_distance.toFixed(2));
 
-        // BUFFS & DEBUFFS
-        const weakeningBeamDebuff = this.getDebuff("Weakening Beam");
-        let baseArmorMultiplier = 1;
-        if (weakeningBeamDebuff) {
-            baseArmorMultiplier = (100 - weakeningBeamDebuff.getPower()) / 100;
-        }
-
-        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
-            this.adjustedBaseStatsLaps.push(currentLap);
-        }
-
-        const heavyArmorAbility = this.getAbility("Heavy Armor");
-        if (heavyArmorAbility) {
-            baseArmorMultiplier =
-                baseArmorMultiplier *
-                (1 +
-                    ((heavyArmorAbility.getPower() +
-                        this.getLuck() +
-                        synergyAbilityPowerIncrease +
-                        (madeOfFireBuff ? (heavyArmorAbility.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
-                        100 /
-                        MAX_UNIT_STACK_POWER) *
-                        this.getStackPower());
-        }
-
-        this.unitProperties.base_armor = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
         this.unitProperties.range_armor = Number((this.unitProperties.base_armor * rangeArmorMultiplier).toFixed(2));
 
         this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
