@@ -169,6 +169,8 @@ export class UnitProperties {
 
     public aura_is_buff: boolean[];
 
+    public synergies: string[];
+
     public amount_alive: number;
 
     public amount_died: number;
@@ -226,6 +228,7 @@ export class UnitProperties {
         aura_effects: string[],
         aura_ranges: number[],
         aura_is_buff: boolean[],
+        synergies: string[],
         amount_alive: number,
         amount_died: number,
         team: TeamType,
@@ -285,6 +288,7 @@ export class UnitProperties {
         this.aura_effects = structuredClone(aura_effects);
         this.aura_ranges = structuredClone(aura_ranges);
         this.aura_is_buff = structuredClone(aura_is_buff);
+        this.synergies = structuredClone(synergies);
         this.luck_per_turn = 0;
         this.attack_multiplier = 1;
         this.amount_alive = amount_alive;

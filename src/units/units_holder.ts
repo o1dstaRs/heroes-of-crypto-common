@@ -14,7 +14,7 @@ import { getSpellConfig } from "../configuration/config_provider";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
-import { getCellsAroundCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
+import { getCellsAroundCell, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
@@ -74,17 +74,37 @@ export class UnitsHolder {
         upperLeftPlacement?: IPlacement,
     ): Unit[] {
         const allies: Unit[] = [];
+
         for (const unit of this.allUnits.values()) {
             if (unit.getTeam() === teamType) {
-                if (
-                    ((teamType === TeamType.LOWER &&
-                        (lowerLeftPlacement.isAllowed(unit.getPosition()) ||
-                            (lowerRightPlacement && lowerRightPlacement.isAllowed(unit.getPosition())))) ||
-                        (teamType === TeamType.UPPER &&
-                            (upperRightPlacement.isAllowed(unit.getPosition()) ||
-                                (upperLeftPlacement && upperLeftPlacement.isAllowed(unit.getPosition()))))) &&
-                    isPositionWithinGrid(this.gridSettings, unit.getPosition())
-                ) {
+                const unitCells = unit.getCells();
+                let allCellsAllowed = true;
+
+                for (const c of unitCells) {
+                    const cellPosition = getPositionForCell(
+                        c,
+                        this.gridSettings.getMinX(),
+                        this.gridSettings.getStep(),
+                        this.gridSettings.getHalfStep(),
+                    );
+
+                    if (
+                        !(
+                            (teamType === TeamType.LOWER &&
+                                (lowerLeftPlacement.isAllowed(cellPosition) ||
+                                    (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
+                            (teamType === TeamType.UPPER &&
+                                (upperRightPlacement.isAllowed(cellPosition) ||
+                                    (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
+                                isPositionWithinGrid(this.gridSettings, cellPosition))
+                        )
+                    ) {
+                        allCellsAllowed = false;
+                        break;
+                    }
+                }
+
+                if (allCellsAllowed) {
                     allies.push(unit);
                 }
             }
@@ -349,6 +369,7 @@ export class UnitsHolder {
                 FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
+            u.setSynergies(FightStateManager.getInstance().getFightProperties().getSynergiesPerTeam(u.getTeam()));
 
             const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
             if (disguiseAura) {
@@ -628,40 +649,50 @@ export class UnitsHolder {
     }
 
     public deleteUnitIfNotAllowed(
-        teamType: TeamType,
-        enemyTeamType: TeamType,
-        unitProperties: UnitProperties,
-        unitPosition: XY,
+        unitId: string,
         lowerLeftPlacement?: IPlacement,
         upperRightPlacement?: IPlacement,
         lowerRightPlacement?: IPlacement,
         upperLeftPlacement?: IPlacement,
         verifyWithinGridPosition = true,
     ): boolean {
-        const isLargeUnit = unitProperties.size === 2;
-        const bodyPosition =
-            isLargeUnit && teamType === TeamType.UPPER
-                ? { x: unitPosition.x - 1, y: unitPosition.y - 1 }
-                : unitPosition;
-        const isWithinGrid = isPositionWithinGrid(this.gridSettings, unitPosition);
-        if (
-            (enemyTeamType === TeamType.LOWER &&
-                ((lowerLeftPlacement && lowerLeftPlacement.isAllowed(bodyPosition)) ||
-                    (lowerRightPlacement && lowerRightPlacement.isAllowed(bodyPosition)))) ||
-            (enemyTeamType === TeamType.UPPER &&
-                ((upperRightPlacement && upperRightPlacement.isAllowed(bodyPosition)) ||
-                    (upperLeftPlacement && upperLeftPlacement.isAllowed(bodyPosition)))) ||
-            (isWithinGrid &&
-                teamType === TeamType.LOWER &&
-                !lowerLeftPlacement?.isAllowed(bodyPosition) &&
-                !lowerRightPlacement?.isAllowed(bodyPosition)) ||
-            (isWithinGrid &&
-                teamType === TeamType.UPPER &&
-                !upperRightPlacement?.isAllowed(bodyPosition) &&
-                !upperLeftPlacement?.isAllowed(bodyPosition)) ||
-            (verifyWithinGridPosition && !isWithinGrid)
-        ) {
-            return this.deleteUnitById(unitProperties.id);
+        const unit = this.allUnits.get(unitId);
+        if (!unit) {
+            return this.deleteUnitById(unitId);
+        }
+
+        const unitCells = unit.getCells();
+        const teamType = unit.getTeam();
+        const enemyTeamType = unit.getOppositeTeam();
+
+        for (const c of unitCells) {
+            const cellPosition = getPositionForCell(
+                c,
+                this.gridSettings.getMinX(),
+                this.gridSettings.getStep(),
+                this.gridSettings.getHalfStep(),
+            );
+
+            const isWithinGrid = isPositionWithinGrid(this.gridSettings, cellPosition);
+            if (
+                (enemyTeamType === TeamType.LOWER &&
+                    ((lowerLeftPlacement && lowerLeftPlacement.isAllowed(cellPosition)) ||
+                        (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
+                (enemyTeamType === TeamType.UPPER &&
+                    ((upperRightPlacement && upperRightPlacement.isAllowed(cellPosition)) ||
+                        (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition)))) ||
+                (isWithinGrid &&
+                    teamType === TeamType.LOWER &&
+                    !lowerLeftPlacement?.isAllowed(cellPosition) &&
+                    !lowerRightPlacement?.isAllowed(cellPosition)) ||
+                (isWithinGrid &&
+                    teamType === TeamType.UPPER &&
+                    !upperRightPlacement?.isAllowed(cellPosition) &&
+                    !upperLeftPlacement?.isAllowed(cellPosition)) ||
+                (verifyWithinGridPosition && !isWithinGrid)
+            ) {
+                return this.deleteUnitById(unitId);
+            }
         }
 
         return false;

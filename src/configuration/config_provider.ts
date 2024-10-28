@@ -75,6 +75,7 @@ const DEFAULT_HERO_CONFIG = {
     aura_effects: [],
     aura_ranges: [],
     aura_is_buff: [],
+    synergies: [],
 };
 
 const DEFAULT_LUCK_PER_FACTION = {
@@ -168,6 +169,7 @@ export const getHeroConfig = (
         heroConfig.aura_effects,
         heroConfig.aura_ranges,
         heroConfig.aura_is_buff,
+        heroConfig.synergies,
         1,
         0,
         team,
@@ -361,6 +363,7 @@ export const getCreatureConfig = (
         auraEffects,
         abilityAuraRanges,
         abilityAuraIsBuff,
+        [],
         amount > 0 ? amount : Math.ceil((totalExp ?? 0) / creatureConfig.exp),
         0,
         team,

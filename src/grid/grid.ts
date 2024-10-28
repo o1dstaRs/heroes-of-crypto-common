@@ -221,7 +221,8 @@ export class Grid {
             cell.x < 0 ||
             cell.y < 0 ||
             cell.x >= this.gridSettings.getGridSize() ||
-            cell.y >= this.gridSettings.getGridSize()
+            cell.y >= this.gridSettings.getGridSize() ||
+            !isCellWithinGrid(this.gridSettings, cell)
         ) {
             return false;
         }
@@ -292,6 +293,10 @@ export class Grid {
     }
 
     public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean): boolean {
+        if (cells.length !== 1 && cells.length !== 4) {
+            return false;
+        }
+
         for (const c of cells) {
             const occupantUnitId = this.getOccupantUnitId(c);
             if (
@@ -346,7 +351,7 @@ export class Grid {
         canOccupyLava: boolean,
         canOccupyWater: boolean,
     ): boolean {
-        if (!cells.length) {
+        if (!cells.length || !(cells.length === 1 || cells.length === 4)) {
             return false;
         }
 
@@ -357,6 +362,10 @@ export class Grid {
         // }
 
         for (const c of cells) {
+            if (!isCellWithinGrid(this.gridSettings, c)) {
+                return false;
+            }
+
             const occupantUnitId = this.getOccupantUnitId(c);
             if (
                 occupantUnitId &&

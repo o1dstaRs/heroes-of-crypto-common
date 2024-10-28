@@ -729,6 +729,10 @@ export class FightProperties {
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}:${synergyLevel}`] ?? 0;
     }
 
+    public getSynergiesPerTeam(teamType: TeamType): string[] {
+        return this.synergiesPerTeam.get(teamType) ?? [];
+    }
+
     public updateSynergyPerTeam(
         teamType: TeamType,
         faction: FactionType,
