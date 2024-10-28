@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
-import { getDistance, intersect2D, Intersect2DResult, IXYDistance, XY } from "../utils/math";
+import { getDistance, intersect2D, Intersect2DResult, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
 import { GridSettings } from "./grid_settings";
 import { IWeightedRoute } from "./path_definitions";
 
@@ -209,7 +209,7 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
     );
 }
 
-export function getRandomCellAroundPosition(
+export function getRandomGridCellAroundPosition(
     gridSettings: GridSettings,
     gridMatrix: number[][],
     teamType: TeamType,
@@ -220,37 +220,55 @@ export function getRandomCellAroundPosition(
         return undefined;
     }
 
-    let proposedCell: XY | undefined;
+    let proposedCells: XY[] = [];
+    let hasHashes: number[] = [];
+
     if (teamType === TeamType.LOWER) {
-        if (!gridMatrix[cell.y + 1][cell.x + 1]) {
-            proposedCell = { x: cell.x + 1, y: cell.y + 1 };
-        } else {
-            const rnd = getRandomInt(0, 2);
-            if (rnd) {
-                if (!gridMatrix[cell.y + 1][cell.x]) {
-                    proposedCell = { x: cell.x, y: cell.y + 1 };
-                }
-            } else if (!gridMatrix[cell.y][cell.x + 1]) {
-                proposedCell = { x: cell.x + 1, y: cell.y };
+        if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y + 1, 0)) {
+            proposedCells.push({ x: cell.x, y: cell.y + 1 });
+            hasHashes.push((cell.x << 4) | (cell.y + 1));
+        }
+        if (getRandomInt(0, 2)) {
+            if (!matrixElementOrDefault(gridMatrix, cell.x + 1, cell.y + 1, 0)) {
+                proposedCells.push({ x: cell.x + 1, y: cell.y + 1 });
+                hasHashes.push(((cell.x + 1) << 4) | (cell.y + 1));
+                proposedCells.push({ x: cell.x - 1, y: cell.y + 1 });
+                hasHashes.push(((cell.x - 1) << 4) | (cell.y + 1));
             }
+        } else if (!matrixElementOrDefault(gridMatrix, cell.x - 1, cell.y + 1, 0)) {
+            proposedCells.push({ x: cell.x - 1, y: cell.y + 1 });
+            hasHashes.push(((cell.x - 1) << 4) | (cell.y + 1));
+            proposedCells.push({ x: cell.x + 1, y: cell.y + 1 });
+            hasHashes.push(((cell.x + 1) << 4) | (cell.y + 1));
         }
     } else if (teamType === TeamType.UPPER) {
-        if (!gridMatrix[cell.y - 1][cell.x - 1]) {
-            proposedCell = { x: cell.x - 1, y: cell.y - 1 };
-        } else {
-            const rnd = getRandomInt(0, 2);
-            if (rnd) {
-                if (!gridMatrix[cell.y - 1][cell.x]) {
-                    proposedCell = { x: cell.x, y: cell.y - 1 };
-                }
-            } else if (!gridMatrix[cell.y][cell.x - 1]) {
-                proposedCell = { x: cell.x - 1, y: cell.y };
+        if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y - 1, 0)) {
+            proposedCells.push({ x: cell.x, y: cell.y - 1 });
+            hasHashes.push((cell.x << 4) | (cell.y - 1));
+        }
+        if (getRandomInt(0, 2)) {
+            if (!matrixElementOrDefault(gridMatrix, cell.x + 1, cell.y - 1, 0)) {
+                proposedCells.push({ x: cell.x + 1, y: cell.y - 1 });
+                hasHashes.push(((cell.x + 1) << 4) | (cell.y - 1));
+                proposedCells.push({ x: cell.x - 1, y: cell.y - 1 });
+                hasHashes.push(((cell.x - 1) << 4) | (cell.y - 1));
             }
+        } else if (!matrixElementOrDefault(gridMatrix, cell.x - 1, cell.y - 1, 0)) {
+            proposedCells.push({ x: cell.x - 1, y: cell.y - 1 });
+            hasHashes.push(((cell.x - 1) << 4) | (cell.y - 1));
+            proposedCells.push({ x: cell.x + 1, y: cell.y - 1 });
+            hasHashes.push(((cell.x + 1) << 4) | (cell.y - 1));
         }
     }
 
-    if (!proposedCell) {
-        const cells = [
+    for (const pc of proposedCells) {
+        if (isCellWithinGrid(gridSettings, pc)) {
+            return pc;
+        }
+    }
+
+    if (!proposedCells.length) {
+        proposedCells = [
             { x: cell.x + 1, y: cell.y + 1 },
             { x: cell.x - 1, y: cell.y - 1 },
             { x: cell.x - 1, y: cell.y + 1 },
@@ -260,17 +278,16 @@ export function getRandomCellAroundPosition(
             { x: cell.x - 1, y: cell.y },
             { x: cell.x, y: cell.y - 1 },
         ];
-        while (!proposedCell && cells.length) {
-            const rnd = getRandomInt(0, cells.length);
-            const c = cells[rnd];
-            if (!gridMatrix[c.y][c.x]) {
-                proposedCell = c;
-            }
-            cells.splice(rnd, 1);
+        shuffle(proposedCells);
+    }
+
+    for (const pc of proposedCells) {
+        if (!matrixElementOrDefault(gridMatrix, pc.x, pc.y, 0) && isCellWithinGrid(gridSettings, pc)) {
+            return pc;
         }
     }
 
-    return proposedCell;
+    return undefined;
 }
 
 export function getLargeUnitAttackCells(
@@ -487,7 +504,7 @@ export function getClosestVH(gridSettings: GridSettings, fromPosition: XY, toPos
     return vh;
 }
 
-const adjustClosestPointSideCenterPoint = (point: XY, unitPosition: XY): XY => {
+export function adjustClosestPointSideCenterPoint(point: XY, unitPosition: XY): XY {
     let newX = point.x;
     let newY = point.y;
     if (point.x < unitPosition.x) {
@@ -497,7 +514,16 @@ const adjustClosestPointSideCenterPoint = (point: XY, unitPosition: XY): XY => {
         newY -= 1;
     }
     return { x: newX, y: newY };
-};
+}
+
+export function getDistanceToFurthestCorner(position: XY, gridSettings: GridSettings): number {
+    return Math.max(
+        getDistance(position, { x: gridSettings.getMinX(), y: gridSettings.getMinY() }),
+        getDistance(position, { x: gridSettings.getMinX(), y: gridSettings.getMaxY() }),
+        getDistance(position, { x: gridSettings.getMaxX(), y: gridSettings.getMinY() }),
+        getDistance(position, { x: gridSettings.getMaxX(), y: gridSettings.getMaxY() }),
+    );
+}
 
 export function getClosestSideCenter(
     gridMatrix: number[][],

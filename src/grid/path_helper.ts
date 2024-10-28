@@ -13,7 +13,7 @@ import { ObstacleType } from "../obstacles/obstacle_type";
 import { TeamType } from "../units/unit_properties";
 import { getRandomInt, shuffle } from "../utils/lib";
 import { getDistance, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
-import { getCellForPosition, getPositionForCell } from "./grid_math";
+import { getCellForPosition, getPositionForCell, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { IMovePath, IWeightedRoute } from "./path_definitions";
 
@@ -977,7 +977,26 @@ export class PathHelper {
                 reachable.push(c);
             }
 
-            return reachable;
+            let allWithinGrid = true;
+            let allOutsideGrid = true;
+            for (const c of reachable) {
+                if (!isCellWithinGrid(this.gridSettings, c)) {
+                    allWithinGrid = false;
+                    break;
+                }
+            }
+            for (const c of reachable) {
+                if (isCellWithinGrid(this.gridSettings, c)) {
+                    allOutsideGrid = false;
+                    break;
+                }
+            }
+
+            if (allOutsideGrid || allWithinGrid) {
+                return reachable;
+            }
+
+            return [];
         };
 
         const yStart = PathHelper.Y_FACTION_ICONS_OFFSET - 1;

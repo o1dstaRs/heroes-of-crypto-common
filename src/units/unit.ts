@@ -33,6 +33,7 @@ import {
     getCellsAroundPosition,
     getLargeUnitAttackCells,
     isPositionWithinGrid,
+    getDistanceToFurthestCorner,
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { IWeightedRoute } from "../grid/path_definitions";
@@ -41,7 +42,7 @@ import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
-import { getDistance, winningAtLeastOneEventProbability, XY } from "../utils/math";
+import { winningAtLeastOneEventProbability, XY } from "../utils/math";
 import { AttackType, MovementType, TeamType, UnitProperties, UnitType } from "./unit_properties";
 
 export interface IAttackTargets {
@@ -1003,10 +1004,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.id;
     }
 
-    public setPosition(x: number, y: number, setRender = true) {
+    public setSynergies(synergies: string[]): void {
+        this.unitProperties.synergies = synergies;
+    }
+
+    public setPosition(x: number, y: number, setRender = true): void {
         if (this.hasAbilityActive("Sniper")) {
             this.setRangeShotDistance(
-                Number((this.getDistanceToFurthestCorner(this.getPosition()) / this.gridSettings.getStep()).toFixed(2)),
+                Number(
+                    (
+                        getDistanceToFurthestCorner(this.getPosition(), this.gridSettings) /
+                            this.gridSettings.getStep() -
+                        0.45
+                    ).toFixed(2),
+                ),
             );
         }
         this.position.x = x;
@@ -2135,22 +2146,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.armor_mod =
             shatterArmorEffectPower > 0 ? -shatterArmorEffectPower : this.initialUnitProperties.armor_mod;
         let armorModMultiplier = 0;
-        console.log(`one ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
         if (this.getMovementType() === MovementType.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
-        console.log(`two ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
         if (this.hasBuffActive("Spiritual Armor")) {
             const spell = new Spell({
                 spellProperties: getSpellConfig(FactionType.LIFE, "Spiritual Armor"),
                 amount: 1,
             });
             armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
-            console.log(`three ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
         }
 
         if (armorModMultiplier) {
-            console.log(`four ${armorModMultiplier} ${this.getName()} ${this.getTeam()}`);
             this.unitProperties.armor_mod = Number(
                 (
                     Math.max(this.unitProperties.base_armor - shatterArmorEffectPower, 1) * armorModMultiplier -
@@ -2595,15 +2602,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {}
-
-    protected getDistanceToFurthestCorner(position: XY): number {
-        return Math.max(
-            getDistance(position, { x: this.gridSettings.getMinX(), y: this.gridSettings.getMinY() }),
-            getDistance(position, { x: this.gridSettings.getMinX(), y: this.gridSettings.getMaxY() }),
-            getDistance(position, { x: this.gridSettings.getMaxX(), y: this.gridSettings.getMinY() }),
-            getDistance(position, { x: this.gridSettings.getMaxX(), y: this.gridSettings.getMaxY() }),
-        );
-    }
 
     protected parseSpellData(spellData: string[]): Map<string, number> {
         const spells: Map<string, number> = new Map();
