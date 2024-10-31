@@ -18,6 +18,7 @@ import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } 
 import { GridType } from "./grid_type";
 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];
+const NO_UNIT = "";
 
 export class Grid {
     private cellsByUnitId: { [unitId: string]: XY[] } = {};
@@ -51,7 +52,7 @@ export class Grid {
         const boardAggTeamUpper: number[][] = new Array(gridSize);
 
         for (let row = 0; row < gridSize; row++) {
-            this.boardCoord[row] = new Array(gridSize);
+            this.boardCoord[row] = new Array(gridSize).fill(NO_UNIT);
             boardAggTeamLower[row] = new Array(gridSize);
             boardAggTeamUpper[row] = new Array(gridSize);
         }
@@ -65,9 +66,7 @@ export class Grid {
                     column < this.availableCenterEnd
                 ) {
                     const obstacleType = this.getObstacleTypePerGrid();
-                    if (obstacleType === undefined) {
-                        this.boardCoord[row][column] = "";
-                    } else if (obstacleType === ObstacleType.BLOCK) {
+                    if (obstacleType === ObstacleType.BLOCK) {
                         this.boardCoord[row][column] = "B";
                     } else if (obstacleType === ObstacleType.LAVA) {
                         this.boardCoord[row][column] = "L";
@@ -110,7 +109,7 @@ export class Grid {
                         column >= this.availableCenterStart &&
                         column < this.availableCenterEnd
                     ) {
-                        this.boardCoord[row][column] = "";
+                        this.boardCoord[row][column] = NO_UNIT;
                     }
                 }
             }
@@ -136,7 +135,7 @@ export class Grid {
                 ) {
                     const obstacleType = this.getObstacleTypePerGrid();
                     if (obstacleType === undefined) {
-                        this.boardCoord[row][column] = "";
+                        this.boardCoord[row][column] = NO_UNIT;
                     } else if (obstacleType === ObstacleType.BLOCK) {
                         this.boardCoord[row][column] = "B";
                     } else if (obstacleType === ObstacleType.LAVA) {
@@ -171,7 +170,7 @@ export class Grid {
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
-        delete this.unitIdToTeam[unitId];
+        // delete this.unitIdToTeam[unitId];
         if (occupiedCells) {
             if (occupiedCells.length) {
                 let xMin = Number.MAX_SAFE_INTEGER;
@@ -180,7 +179,7 @@ export class Grid {
                 let yMax = Number.MIN_SAFE_INTEGER;
 
                 for (const oc of occupiedCells) {
-                    this.boardCoord[oc.x][oc.y] = "";
+                    this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     let aggrGrid: number[][] | undefined;
                     if (attackRange) {
                         aggrGrid = this.boardAggrPerTeam.get(team);
@@ -205,7 +204,7 @@ export class Grid {
                     }
                 }
             }
-            delete this.cellsByUnitId[unitId];
+            this.cellsByUnitId[unitId] = [];
         }
     }
 
@@ -218,6 +217,8 @@ export class Grid {
         canOccupyWater: boolean,
     ): boolean {
         if (
+            !unitId ||
+            !team ||
             cell.x < 0 ||
             cell.y < 0 ||
             cell.x >= this.gridSettings.getGridSize() ||
@@ -268,7 +269,7 @@ export class Grid {
                             this.boardCoord[oc.x][oc.y] = "W";
                         }
                     } else {
-                        this.boardCoord[oc.x][oc.y] = "";
+                        this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     }
                     //                console.log(`${unitId} tick: ${currentTick} cleaning up ${occupying.x} ${occupying.y}`);
 
@@ -351,7 +352,7 @@ export class Grid {
         canOccupyLava: boolean,
         canOccupyWater: boolean,
     ): boolean {
-        if (!cells.length || !(cells.length === 1 || cells.length === 4)) {
+        if (!unitId || !team || !cells.length || !(cells.length === 1 || cells.length === 4)) {
             return false;
         }
 
@@ -413,7 +414,7 @@ export class Grid {
                             this.boardCoord[oc.x][oc.y] = "W";
                         }
                     } else {
-                        this.boardCoord[oc.x][oc.y] = "";
+                        this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     }
                 }
 

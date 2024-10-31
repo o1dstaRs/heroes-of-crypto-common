@@ -1200,6 +1200,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.amount_alive <= 0;
     }
 
+    public setAmountAlive(amountAlive: number): void {
+        if (amountAlive <= 0) {
+            return;
+        }
+
+        this.unitProperties.amount_alive = Math.floor(amountAlive);
+        this.initialUnitProperties.amount_alive = Math.floor(amountAlive);
+    }
+
     public increaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
         if (
             moraleAmount <= 0 ||
@@ -2117,10 +2126,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             baseArmorMultiplier = (100 - weakeningBeamDebuff.getPower()) / 100;
         }
 
-        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
-            this.adjustedBaseStatsLaps.push(currentLap);
-        }
-
         const heavyArmorAbility = this.getAbility("Heavy Armor");
         if (heavyArmorAbility) {
             baseArmorMultiplier =
@@ -2351,6 +2356,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.shot_distance = Number(this.unitProperties.shot_distance.toFixed(2));
 
         this.unitProperties.range_armor = Number((this.unitProperties.base_armor * rangeArmorMultiplier).toFixed(2));
+
+        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
+            this.adjustedBaseStatsLaps.push(currentLap);
+        }
 
         this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
     }
