@@ -721,7 +721,7 @@
         "Hydra": {
             "name": "Hydra",
             "hp": 210,
-            "steps": 5.2,
+            "steps": 6.1,
             "speed": 6,
             "armor": 34,
             "attack_type": "MELEE",
