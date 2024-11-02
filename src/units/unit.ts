@@ -587,10 +587,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.applied_buffs.length == this.unitProperties.applied_buffs_powers.length
         ) {
             for (let i = this.unitProperties.applied_buffs.length - 1; i >= 0; i--) {
-                this.unitProperties.applied_buffs.splice(i, 1);
-                this.unitProperties.applied_buffs_laps.splice(i, 1);
-                this.unitProperties.applied_buffs_descriptions.splice(i, 1);
-                this.unitProperties.applied_buffs_powers.splice(i, 1);
+                const buffName = this.unitProperties.applied_buffs[i];
+                if (!buffName.endsWith(" Augment")) {
+                    this.unitProperties.applied_buffs.splice(i, 1);
+                    this.unitProperties.applied_buffs_laps.splice(i, 1);
+                    this.unitProperties.applied_buffs_descriptions.splice(i, 1);
+                    this.unitProperties.applied_buffs_powers.splice(i, 1);
+                }
             }
         }
     }
@@ -1174,9 +1177,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // dead
         if (amountDied >= this.unitProperties.amount_alive) {
             this.unitProperties.amount_died += this.unitProperties.amount_alive;
+            const wereAlive = this.unitProperties.amount_alive;
             this.unitProperties.amount_alive = 0;
-            this.handleDamageAnimation(this.unitProperties.amount_alive); // Trigger animation hook with all deaths
-            return Math.floor(this.unitProperties.amount_alive * this.unitProperties.max_hp) + substracted;
+            this.handleDamageAnimation(wereAlive); // Trigger animation hook with all deaths
+            return Math.floor(wereAlive * this.unitProperties.max_hp) + substracted;
         }
 
         this.unitProperties.amount_died += amountDied;
