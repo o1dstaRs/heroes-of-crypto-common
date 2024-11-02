@@ -353,7 +353,7 @@
         },
         "Satyr": {
             "name": "Satyr",
-            "hp": 12,
+            "hp": 15,
             "steps": 3.9,
             "speed": 4,
             "armor": 12,
@@ -374,7 +374,6 @@
                 "Life:Courage",
                 "Life:Courage",
                 "Life:Helping Hand",
-                "Nature:Summon Wolves",
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],

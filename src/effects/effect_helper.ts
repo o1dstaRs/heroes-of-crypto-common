@@ -48,7 +48,9 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
     }
 
     if (
-        (unit.getAttackType() === AttackType.MELEE || unit.getAttackType() === AttackType.MAGIC) &&
+        (unit.getAttackType() === AttackType.MELEE ||
+            unit.getAttackType() === AttackType.MAGIC ||
+            unit.getAttackType() === AttackType.MELEE_MAGIC) &&
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE
     ) {
         return true;
