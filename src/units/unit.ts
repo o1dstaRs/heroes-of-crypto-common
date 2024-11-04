@@ -2066,21 +2066,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // this.initialUnitProperties.luck_mod = synergyLuckIncrease;
-
-        // if (synergyLuckIncrease > 0) {
-        //     this.initialUnitProperties.luck_mod = synergyLuckIncrease;
-        // }
-
-        // if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
-        //     this.unitProperties.luck_mod += synergyLuckIncrease;
-        // }
-        // if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
-        //     this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
-        // } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
-        //     this.unitProperties.luck_mod = -LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
-        // }
-
         // MORALE
         this.unitProperties.attack_multiplier = 1;
         if (synergyMoraleIncrease > 0) {
