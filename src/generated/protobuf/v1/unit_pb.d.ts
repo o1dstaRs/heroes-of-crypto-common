@@ -115,8 +115,8 @@ export class Unit extends jspb.Message {
   getAmountDied(): number;
   setAmountDied(value: number): void;
 
-  getLuckPerTurn(): number;
-  setLuckPerTurn(value: number): void;
+  getLuckMod(): number;
+  setLuckMod(value: number): void;
 
   getAttackMultiplier(): number;
   setAttackMultiplier(value: number): void;
@@ -167,7 +167,7 @@ export namespace Unit {
     effectsList: Array<string>,
     amountAlive: number,
     amountDied: number,
-    luckPerTurn: number,
+    luckMod: number,
     attackMultiplier: number,
   }
 }

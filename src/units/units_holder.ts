@@ -366,6 +366,7 @@ export class UnitsHolder {
                 FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getAdditionalFlyArmorPerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(u.getTeam()),
+                FightStateManager.getInstance().getFightProperties().getAdditionalLuckPerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));

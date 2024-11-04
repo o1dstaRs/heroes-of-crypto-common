@@ -593,7 +593,7 @@
         },
         "Medusa": {
             "name": "Medusa",
-            "hp": 18,
+            "hp": 19,
             "steps": 3.9,
             "speed": 3,
             "armor": 13,

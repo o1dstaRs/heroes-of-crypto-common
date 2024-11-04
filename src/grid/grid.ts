@@ -247,7 +247,7 @@ export class Grid {
         }
 
         const occupiedCells = this.cellsByUnitId[unitId];
-        if (occupiedCells && occupiedCells.length !== 1) {
+        if (occupiedCells?.length && occupiedCells.length !== 1) {
             return false;
         }
 

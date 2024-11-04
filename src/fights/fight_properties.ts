@@ -522,9 +522,18 @@ export class FightProperties {
         this.synergyUnitsLifePerTeam.set(teamType, numberOfUnitsLife);
         const synergyLevelLife = Math.min(Math.floor(numberOfUnitsLife / 2), MAX_SYNERGY_LEVEL);
         if (synergyLevelLife) {
-            const firstSynergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE);
+            const firstSynergyLevel = this.findSynergyLevel(
+                teamType,
+                FactionType.LIFE,
+                LifeSynergy.PLUS_MORALE_AND_LUCK,
+            );
             if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE, synergyLevelLife);
+                this.updateSynergyPerTeam(
+                    teamType,
+                    FactionType.LIFE,
+                    LifeSynergy.PLUS_MORALE_AND_LUCK,
+                    synergyLevelLife,
+                );
             } else {
                 const secondSynergyLevel = this.findSynergyLevel(
                     teamType,
@@ -541,7 +550,12 @@ export class FightProperties {
                 }
             }
         } else {
-            this.updateSynergyPerTeam(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE, SynergyLevel.NO_SYNERGY);
+            this.updateSynergyPerTeam(
+                teamType,
+                FactionType.LIFE,
+                LifeSynergy.PLUS_MORALE_AND_LUCK,
+                SynergyLevel.NO_SYNERGY,
+            );
             this.updateSynergyPerTeam(
                 teamType,
                 FactionType.LIFE,
@@ -668,7 +682,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getAdditionalMovementStepsPerTeam(teamType: TeamType): number {
@@ -677,7 +691,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getBreakChancePerTeam(teamType: TeamType): number {
@@ -686,7 +700,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
@@ -699,7 +713,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getAdditionalFlyArmorPerTeam(teamType: TeamType): number {
@@ -708,16 +722,25 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Nature:${NatureSynergy.PLUS_FLY_ARMOR}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Nature:${NatureSynergy.PLUS_FLY_ARMOR}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getAdditionalMoralePerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE);
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
         if (!synergyLevel) {
             return 0;
         }
 
-        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[0] ?? 0;
+    }
+
+    public getAdditionalLuckPerTeam(teamType: TeamType): number {
+        const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
+        if (!synergyLevel) {
+            return 0;
+        }
+
+        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[1] ?? 0;
     }
 
     public getAdditionalSupplyPerTeam(teamType: TeamType): number {
@@ -726,7 +749,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     public getSynergiesPerTeam(teamType: TeamType): string[] {
@@ -1269,7 +1292,7 @@ export class FightProperties {
             return 0;
         }
 
-        return SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${synergyLevel}`] ?? 0;
+        return SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${synergyLevel}`]?.[0] ?? 0;
     }
 
     private removeItemOnce(deque: Denque<string>, item: string): boolean {
