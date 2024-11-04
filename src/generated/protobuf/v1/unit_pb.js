@@ -118,7 +118,7 @@ proto.public.Unit.toObject = function(includeInstance, msg) {
     effectsList: (f = jspb.Message.getRepeatedField(msg, 32)) == null ? undefined : f,
     amountAlive: jspb.Message.getFieldWithDefault(msg, 33, 0),
     amountDied: jspb.Message.getFieldWithDefault(msg, 34, 0),
-    luckPerTurn: jspb.Message.getFieldWithDefault(msg, 35, 0),
+    luckMod: jspb.Message.getFieldWithDefault(msg, 35, 0),
     attackMultiplier: jspb.Message.getFloatingPointFieldWithDefault(msg, 36, 0.0)
   };
 
@@ -294,7 +294,7 @@ proto.public.Unit.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 35:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setLuckPerTurn(value);
+      msg.setLuckMod(value);
       break;
     case 36:
       var value = /** @type {number} */ (reader.readDouble());
@@ -567,7 +567,7 @@ proto.public.Unit.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getLuckPerTurn();
+  f = message.getLuckMod();
   if (f !== 0) {
     writer.writeInt32(
       35,
@@ -1278,10 +1278,10 @@ proto.public.Unit.prototype.setAmountDied = function(value) {
 
 
 /**
- * optional int32 luck_per_turn = 35;
+ * optional int32 luck_mod = 35;
  * @return {number}
  */
-proto.public.Unit.prototype.getLuckPerTurn = function() {
+proto.public.Unit.prototype.getLuckMod = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 35, 0));
 };
 
@@ -1290,7 +1290,7 @@ proto.public.Unit.prototype.getLuckPerTurn = function() {
  * @param {number} value
  * @return {!proto.public.Unit} returns this
  */
-proto.public.Unit.prototype.setLuckPerTurn = function(value) {
+proto.public.Unit.prototype.setLuckMod = function(value) {
   return jspb.Message.setProto3IntField(this, 35, value);
 };
 

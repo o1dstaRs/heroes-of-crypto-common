@@ -230,6 +230,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
     protected adjustedBaseStatsLaps: number[] = [];
 
+    protected luckPerTurn: number = 0;
+
     protected constructor(
         unitProperties: UnitProperties,
         gridSettings: GridSettings,
@@ -851,7 +853,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public getLuck(): number {
-        const luck = this.unitProperties.luck + this.unitProperties.luck_per_turn;
+        const luck = this.unitProperties.luck + this.unitProperties.luck_mod;
         if (luck > LUCK_MAX_VALUE_TOTAL) {
             return LUCK_MAX_VALUE_TOTAL;
         }
@@ -1114,11 +1116,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else if (calculatedLuck + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
             calculatedLuck = -LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
         }
-        this.unitProperties.luck_per_turn = calculatedLuck;
+        this.unitProperties.luck_mod = calculatedLuck;
+        this.luckPerTurn = calculatedLuck;
     }
 
     public cleanupLuckPerTurn(): void {
-        this.unitProperties.luck_per_turn = 0;
+        // this.unitProperties.luck_mod = 0;
+        this.luckPerTurn = 0;
     }
 
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): void {
@@ -2016,6 +2020,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         synergyMovementStepsIncrease: number,
         synergyFlyArmorIncrease: number,
         synergyMoraleIncrease: number,
+        synergyLuckIncrease: number,
         stepsMoraleMultiplier = 0,
     ) {
         // target
@@ -2043,13 +2048,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // LUCK
         if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
             this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
-            this.unitProperties.luck_per_turn = 0;
+            this.unitProperties.luck_mod = 0;
         } else {
+            this.unitProperties.luck = synergyLuckIncrease;
             if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
                 this.unitProperties.luck = this.initialUnitProperties.luck;
             }
             if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
                 this.randomizeLuckPerTurn();
+            }
+
+            this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease;
+            if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
+                this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
+            } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
+                this.unitProperties.luck_mod = -LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
             }
         }
 

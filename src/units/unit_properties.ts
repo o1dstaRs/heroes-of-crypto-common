@@ -175,7 +175,7 @@ export class UnitProperties {
 
     public amount_died: number;
 
-    public luck_per_turn: number;
+    public luck_mod: number;
 
     public attack_multiplier: number;
 
@@ -289,7 +289,7 @@ export class UnitProperties {
         this.aura_ranges = structuredClone(aura_ranges);
         this.aura_is_buff = structuredClone(aura_is_buff);
         this.synergies = structuredClone(synergies);
-        this.luck_per_turn = 0;
+        this.luck_mod = 0;
         this.attack_multiplier = 1;
         this.amount_alive = amount_alive;
         this.amount_died = amount_died;

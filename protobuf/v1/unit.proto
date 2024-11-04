@@ -39,6 +39,6 @@ message Unit {
   repeated string effects = 32;
   uint32 amount_alive = 33;
   uint32 amount_died = 34;
-  int32 luck_per_turn = 35;
+  int32 luck_mod = 35;
   double attack_multiplier = 36;
 }

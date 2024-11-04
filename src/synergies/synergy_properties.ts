@@ -11,50 +11,50 @@
 
 import { FactionType } from "../factions/faction_type";
 
-export const SynergyKeysToPower: { [key: string]: number } = {
-    "Life:1:1": 5,
-    "Life:2:1": 5,
-    "Life:1:2": 11,
-    "Life:2:2": 12,
-    "Life:1:3": 18,
-    "Life:2:3": 20,
-    "Chaos:1:1": 0.6,
-    "Chaos:2:1": 6,
-    "Chaos:1:2": 1.3,
-    "Chaos:2:2": 11,
-    "Chaos:1:3": 2.1,
-    "Chaos:2:3": 17,
-    "Might:1:1": 1,
-    "Might:2:1": 3,
-    "Might:1:2": 2,
-    "Might:2:2": 6,
-    "Might:1:3": 3,
-    "Might:2:3": 10,
-    "Nature:1:1": 1,
-    "Nature:2:1": 10,
-    "Nature:1:2": 2,
-    "Nature:2:2": 20,
-    "Nature:1:3": 3,
-    "Nature:2:3": 30,
+export const SynergyKeysToPower: { [key: string]: number[] } = {
+    "Life:1:1": [6],
+    "Life:2:1": [6, 2],
+    "Life:1:2": [12],
+    "Life:2:2": [13, 5],
+    "Life:1:3": [19],
+    "Life:2:3": [20, 9],
+    "Chaos:1:1": [1],
+    "Chaos:2:1": [6],
+    "Chaos:1:2": [2],
+    "Chaos:2:2": [11],
+    "Chaos:1:3": [3],
+    "Chaos:2:3": [17],
+    "Might:1:1": [1],
+    "Might:2:1": [4],
+    "Might:1:2": [2],
+    "Might:2:2": [7],
+    "Might:1:3": [3],
+    "Might:2:3": [11],
+    "Nature:1:1": [1],
+    "Nature:2:1": [10],
+    "Nature:1:2": [2],
+    "Nature:2:2": [20],
+    "Nature:1:3": [3],
+    "Nature:2:3": [30],
 };
 
 export enum LifeSynergy {
     NO_SYNERGY = 0,
     PLUS_SUPPLY_PERCENTAGE = 1,
-    PLUS_MORALE = 2,
+    PLUS_MORALE_AND_LUCK = 2,
 }
 
 export const LifeSynergyNames = {
     NO_SYNERGY: "NO_SYNERGY",
     PLUS_SUPPLY_PERCENTAGE: "PLUS_SUPPLY_PERCENTAGE",
-    PLUS_MORALE: "PLUS_MORALE",
+    PLUS_MORALE_AND_LUCK: "PLUS_MORALE_AND_LUCK",
 } as const;
 
 export const ToLifeSynergy: { [synergyName: string]: LifeSynergy } = {
     "": LifeSynergy.NO_SYNERGY,
     NO_SYNERGY: LifeSynergy.NO_SYNERGY,
     PLUS_SUPPLY_PERCENTAGE: LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
-    PLUS_MORALE: LifeSynergy.PLUS_MORALE,
+    PLUS_MORALE_AND_LUCK: LifeSynergy.PLUS_MORALE_AND_LUCK,
 };
 
 export type LifeSynergyNamesType = keyof typeof LifeSynergyNames;
