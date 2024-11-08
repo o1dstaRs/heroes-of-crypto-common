@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package public;
+
+message RequestCode {
+    string email = 1;
+}
