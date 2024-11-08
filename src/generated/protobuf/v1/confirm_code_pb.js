@@ -75,8 +75,8 @@ proto.public.ConfirmCode.prototype.toObject = function(opt_includeInstance) {
  */
 proto.public.ConfirmCode.toObject = function(includeInstance, msg) {
   var f, obj = {
-    username: jspb.Message.getFieldWithDefault(msg, 1, ""),
-    email: jspb.Message.getFieldWithDefault(msg, 2, "")
+    email: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    code: jspb.Message.getFieldWithDefault(msg, 2, "")
   };
 
   if (includeInstance) {
@@ -115,11 +115,11 @@ proto.public.ConfirmCode.deserializeBinaryFromReader = function(msg, reader) {
     switch (field) {
     case 1:
       var value = /** @type {string} */ (reader.readString());
-      msg.setUsername(value);
+      msg.setEmail(value);
       break;
     case 2:
       var value = /** @type {string} */ (reader.readString());
-      msg.setEmail(value);
+      msg.setCode(value);
       break;
     default:
       reader.skipField();
@@ -150,14 +150,14 @@ proto.public.ConfirmCode.prototype.serializeBinary = function() {
  */
 proto.public.ConfirmCode.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = message.getUsername();
+  f = message.getEmail();
   if (f.length > 0) {
     writer.writeString(
       1,
       f
     );
   }
-  f = message.getEmail();
+  f = message.getCode();
   if (f.length > 0) {
     writer.writeString(
       2,
@@ -168,10 +168,10 @@ proto.public.ConfirmCode.serializeBinaryToWriter = function(message, writer) {
 
 
 /**
- * optional string username = 1;
+ * optional string email = 1;
  * @return {string}
  */
-proto.public.ConfirmCode.prototype.getUsername = function() {
+proto.public.ConfirmCode.prototype.getEmail = function() {
   return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 1, ""));
 };
 
@@ -180,16 +180,16 @@ proto.public.ConfirmCode.prototype.getUsername = function() {
  * @param {string} value
  * @return {!proto.public.ConfirmCode} returns this
  */
-proto.public.ConfirmCode.prototype.setUsername = function(value) {
+proto.public.ConfirmCode.prototype.setEmail = function(value) {
   return jspb.Message.setProto3StringField(this, 1, value);
 };
 
 
 /**
- * optional string email = 2;
+ * optional string code = 2;
  * @return {string}
  */
-proto.public.ConfirmCode.prototype.getEmail = function() {
+proto.public.ConfirmCode.prototype.getCode = function() {
   return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 2, ""));
 };
 
@@ -198,7 +198,7 @@ proto.public.ConfirmCode.prototype.getEmail = function() {
  * @param {string} value
  * @return {!proto.public.ConfirmCode} returns this
  */
-proto.public.ConfirmCode.prototype.setEmail = function(value) {
+proto.public.ConfirmCode.prototype.setCode = function(value) {
   return jspb.Message.setProto3StringField(this, 2, value);
 };
 

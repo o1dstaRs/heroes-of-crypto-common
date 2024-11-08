@@ -4,11 +4,11 @@
 import * as jspb from "google-protobuf";
 
 export class ConfirmCode extends jspb.Message {
-  getUsername(): string;
-  setUsername(value: string): void;
-
   getEmail(): string;
   setEmail(value: string): void;
+
+  getCode(): string;
+  setCode(value: string): void;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): ConfirmCode.AsObject;
@@ -22,8 +22,8 @@ export class ConfirmCode extends jspb.Message {
 
 export namespace ConfirmCode {
   export type AsObject = {
-    username: string,
     email: string,
+    code: string,
   }
 }
 

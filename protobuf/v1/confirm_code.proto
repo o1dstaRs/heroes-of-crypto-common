@@ -3,6 +3,6 @@ syntax = "proto3";
 package public;
 
 message ConfirmCode {
-    string username = 1;
-    string email = 2;
+    string email = 1;
+    string code = 2;
 }
