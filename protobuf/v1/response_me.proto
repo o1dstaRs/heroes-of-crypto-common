@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package public;
+
+message ResponseMe {
+    string username = 1;
+    string email = 2;
+    int32 wins = 3;
+    int32 losses = 4;
+    int32 total_games_played = 5;
+    bool is_active = 6;
+}
