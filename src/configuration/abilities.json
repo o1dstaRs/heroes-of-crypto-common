@@ -436,7 +436,7 @@
             "On attack, there is a chance to apply up to",
             "{}% of additional Mind damage to the target in amount of units"
         ],
-        "power": 50,
+        "power": 60,
         "power_type": "KILL_RANDOM_AMOUNT",
         "skip_reponse": false,
         "stack_powered": true,
