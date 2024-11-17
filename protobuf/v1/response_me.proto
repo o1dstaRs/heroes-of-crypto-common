@@ -9,4 +9,5 @@ message ResponseMe {
     int32 losses = 4;
     int32 total_games_played = 5;
     bool is_active = 6;
+    int64 match_making_queue_added_time = 7;
 }

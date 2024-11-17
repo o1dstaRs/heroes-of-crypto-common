@@ -411,25 +411,29 @@ export function calculateBuffsDebuffsEffect(
     };
 }
 
-export const isMirrored = (targetUnit: Unit): boolean => {
-    let mirrorChance = 0;
+export const getMagicMirrorPower = (targetUnit: Unit): number => {
+    let mirrorPower = 0;
     const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
     const massMagicMirrorBuff = targetUnit.getBuff("Mass Magic Mirror");
     if (magicMirrorBuff) {
-        mirrorChance = magicMirrorBuff.getPower();
+        mirrorPower = magicMirrorBuff.getPower();
     }
     if (massMagicMirrorBuff) {
-        mirrorChance = Math.max(mirrorChance, massMagicMirrorBuff.getPower());
+        mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
     }
-    if (mirrorChance > 100) {
-        mirrorChance = 100;
+    if (mirrorPower > 100) {
+        mirrorPower = 100;
     }
-    if (mirrorChance < 0) {
-        mirrorChance = 0;
+    if (mirrorPower < 0) {
+        mirrorPower = 0;
     }
-    mirrorChance = Math.floor(mirrorChance);
+    mirrorPower = Math.floor(mirrorPower);
 
-    return getRandomInt(0, 100) < Math.floor(mirrorChance);
+    return mirrorPower;
+};
+
+export const isMirrored = (targetUnit: Unit): boolean => {
+    return getRandomInt(0, 100) < Math.floor(getMagicMirrorPower(targetUnit));
 };
 
 export const hasAlreadyAppliedSpell = (targetUnit: Unit, spell: Spell): boolean => {

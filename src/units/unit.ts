@@ -1474,6 +1474,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const madeOfFireBuff = this.getBuff("Made of Fire");
 
+        if (
+            ability.getName() === "Deep Wounds Level 1" ||
+            ability.getName() === "Deep Wounds Level 2" ||
+            ability.getName() === "Deep Wounds Level 3"
+        ) {
+            const deepWoundsPower = Math.max(
+                0,
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                    this.getLuck() +
+                    synergyAbilityPowerIncrease +
+                    (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0),
+            );
+
+            return Number(deepWoundsPower.toFixed(1));
+        }
+
         if (ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP) {
             return (
                 (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
@@ -2015,6 +2031,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public adjustBaseStats(
+        hasFightStarted: boolean,
         currentLap: number,
         synergyAbilityPowerIncrease: number,
         synergyMovementStepsIncrease: number,
@@ -2037,7 +2054,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.refreshAndGetAdjustedMaxHp(currentLap, synergyAbilityPowerIncrease, madeOfFireBuff) +
             baseStatsDiff.baseStats.hp;
 
-        if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.unitProperties.hp += 5;
         }
 
@@ -2054,7 +2071,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
                 this.unitProperties.luck = this.initialUnitProperties.luck;
             }
-            if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
+            if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
                 this.randomizeLuckPerTurn();
             }
 
@@ -2246,7 +2263,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.steps_mod =
             Number((stepsMoraleMultiplier * this.getMorale()).toFixed(1)) + synergyMovementStepsIncrease;
         const skyRunnerAbility = this.getAbility("Sky Runner");
-        if (hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.initialUnitProperties.steps += 1;
         }
 
@@ -2288,7 +2305,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.steps_mod = Number((this.unitProperties.steps_mod * stepsMultiplier).toFixed(1));
 
         // ATTACK
-        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             if (hasUnyieldingPower) {
                 this.initialUnitProperties.base_attack += 2;
             }
@@ -2374,7 +2391,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.range_armor = Number((this.unitProperties.base_armor * rangeArmorMultiplier).toFixed(2));
 
-        if (!this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.adjustedBaseStatsLaps.push(currentLap);
         }
 

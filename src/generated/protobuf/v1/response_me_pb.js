@@ -80,7 +80,8 @@ proto.public.ResponseMe.toObject = function(includeInstance, msg) {
     wins: jspb.Message.getFieldWithDefault(msg, 3, 0),
     losses: jspb.Message.getFieldWithDefault(msg, 4, 0),
     totalGamesPlayed: jspb.Message.getFieldWithDefault(msg, 5, 0),
-    isActive: jspb.Message.getBooleanFieldWithDefault(msg, 6, false)
+    isActive: jspb.Message.getBooleanFieldWithDefault(msg, 6, false),
+    matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 7, 0)
   };
 
   if (includeInstance) {
@@ -140,6 +141,10 @@ proto.public.ResponseMe.deserializeBinaryFromReader = function(msg, reader) {
     case 6:
       var value = /** @type {boolean} */ (reader.readBool());
       msg.setIsActive(value);
+      break;
+    case 7:
+      var value = /** @type {number} */ (reader.readInt64());
+      msg.setMatchMakingQueueAddedTime(value);
       break;
     default:
       reader.skipField();
@@ -209,6 +214,13 @@ proto.public.ResponseMe.serializeBinaryToWriter = function(message, writer) {
   if (f) {
     writer.writeBool(
       6,
+      f
+    );
+  }
+  f = message.getMatchMakingQueueAddedTime();
+  if (f !== 0) {
+    writer.writeInt64(
+      7,
       f
     );
   }
@@ -320,6 +332,24 @@ proto.public.ResponseMe.prototype.getIsActive = function() {
  */
 proto.public.ResponseMe.prototype.setIsActive = function(value) {
   return jspb.Message.setProto3BooleanField(this, 6, value);
+};
+
+
+/**
+ * optional int64 match_making_queue_added_time = 7;
+ * @return {number}
+ */
+proto.public.ResponseMe.prototype.getMatchMakingQueueAddedTime = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.public.ResponseMe} returns this
+ */
+proto.public.ResponseMe.prototype.setMatchMakingQueueAddedTime = function(value) {
+  return jspb.Message.setProto3IntField(this, 7, value);
 };
 
 
