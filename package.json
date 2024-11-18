@@ -16,8 +16,10 @@
         "src/generated"
     ],
     "scripts": {
-        "build": "rimraf dist && tsc && cpy src/generated dist/generated --parents",
-        "build:proto": "scripts/protoc_generate.sh",
+        "prebuild": "rimraf dist",
+        "build": "yarn run prebuild && tsc && yarn run copy-generated",
+        "build:proto": "node scripts/protoc_generate.js",
+        "copy-generated": "cpy \"src/generated/**/*\" \"dist/generated\"",
         "lint": "yarn run lint:es && yarn run lint:package && yarn run lint:style",
         "lint:es": "eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",
         "lint:es:fix": "yarn run lint:es --fix",
@@ -25,7 +27,7 @@
         "lint:package": "yarn run lint:package:fix --check",
         "lint:package:fix": "sort-package-json package.json",
         "lint:style": "yarn run lint:style:base --check",
-        "lint:style:base": "prettier \"src/**/*.{ts,tsx,js,json}\" \"src/*/*.{ts,tsx,js,json}\"",
+        "lint:style:base": "prettier \"src/**/*.{ts,tsx,js,json}\"",
         "lint:style:fix": "yarn run lint:style:base --write"
     },
     "browserslist": [
@@ -56,7 +58,7 @@
         "@types/jest": "^29.5.12",
         "@typescript-eslint/eslint-plugin": "^7.14.1",
         "@typescript-eslint/parser": "^7.14.1",
-        "cpy-cli": "^3.1.1",
+        "cpy-cli": "^4.0.0",
         "eslint": "^9.8.0",
         "idtsc": "^1.1.0",
         "jest": "^29.7.0",
