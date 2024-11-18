@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package public;
+
+message ResponseEnqueue {
+    int64 match_making_queue_added_time = 1;
+}

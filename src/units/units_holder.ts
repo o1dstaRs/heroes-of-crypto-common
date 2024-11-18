@@ -361,6 +361,7 @@ export class UnitsHolder {
                 continue;
             }
             u.adjustBaseStats(
+                FightStateManager.getInstance().getFightProperties().hasFightStarted(),
                 FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
                 FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
