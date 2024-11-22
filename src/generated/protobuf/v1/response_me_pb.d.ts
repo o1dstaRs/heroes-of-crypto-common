@@ -25,6 +25,12 @@ export class ResponseMe extends jspb.Message {
   getMatchMakingQueueAddedTime(): number;
   setMatchMakingQueueAddedTime(value: number): void;
 
+  getMatchMakingCooldownTill(): number;
+  setMatchMakingCooldownTill(value: number): void;
+
+  getInGameId(): string;
+  setInGameId(value: string): void;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): ResponseMe.AsObject;
   static toObject(includeInstance: boolean, msg: ResponseMe): ResponseMe.AsObject;
@@ -44,6 +50,8 @@ export namespace ResponseMe {
     totalGamesPlayed: number,
     isActive: boolean,
     matchMakingQueueAddedTime: number,
+    matchMakingCooldownTill: number,
+    inGameId: string,
   }
 }
 
