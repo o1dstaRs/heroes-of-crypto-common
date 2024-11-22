@@ -10,4 +10,6 @@ message ResponseMe {
     int32 total_games_played = 5;
     bool is_active = 6;
     int64 match_making_queue_added_time = 7;
+    int64 match_making_cooldown_till = 8;
+    string in_game_id = 9;
 }

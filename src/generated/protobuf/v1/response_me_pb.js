@@ -81,7 +81,9 @@ proto.public.ResponseMe.toObject = function(includeInstance, msg) {
     losses: jspb.Message.getFieldWithDefault(msg, 4, 0),
     totalGamesPlayed: jspb.Message.getFieldWithDefault(msg, 5, 0),
     isActive: jspb.Message.getBooleanFieldWithDefault(msg, 6, false),
-    matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 7, 0)
+    matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 7, 0),
+    matchMakingCooldownTill: jspb.Message.getFieldWithDefault(msg, 8, 0),
+    inGameId: jspb.Message.getFieldWithDefault(msg, 9, "")
   };
 
   if (includeInstance) {
@@ -145,6 +147,14 @@ proto.public.ResponseMe.deserializeBinaryFromReader = function(msg, reader) {
     case 7:
       var value = /** @type {number} */ (reader.readInt64());
       msg.setMatchMakingQueueAddedTime(value);
+      break;
+    case 8:
+      var value = /** @type {number} */ (reader.readInt64());
+      msg.setMatchMakingCooldownTill(value);
+      break;
+    case 9:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setInGameId(value);
       break;
     default:
       reader.skipField();
@@ -221,6 +231,20 @@ proto.public.ResponseMe.serializeBinaryToWriter = function(message, writer) {
   if (f !== 0) {
     writer.writeInt64(
       7,
+      f
+    );
+  }
+  f = message.getMatchMakingCooldownTill();
+  if (f !== 0) {
+    writer.writeInt64(
+      8,
+      f
+    );
+  }
+  f = message.getInGameId();
+  if (f.length > 0) {
+    writer.writeString(
+      9,
       f
     );
   }
@@ -350,6 +374,42 @@ proto.public.ResponseMe.prototype.getMatchMakingQueueAddedTime = function() {
  */
 proto.public.ResponseMe.prototype.setMatchMakingQueueAddedTime = function(value) {
   return jspb.Message.setProto3IntField(this, 7, value);
+};
+
+
+/**
+ * optional int64 match_making_cooldown_till = 8;
+ * @return {number}
+ */
+proto.public.ResponseMe.prototype.getMatchMakingCooldownTill = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 8, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.public.ResponseMe} returns this
+ */
+proto.public.ResponseMe.prototype.setMatchMakingCooldownTill = function(value) {
+  return jspb.Message.setProto3IntField(this, 8, value);
+};
+
+
+/**
+ * optional string in_game_id = 9;
+ * @return {string}
+ */
+proto.public.ResponseMe.prototype.getInGameId = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 9, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.public.ResponseMe} returns this
+ */
+proto.public.ResponseMe.prototype.setInGameId = function(value) {
+  return jspb.Message.setProto3StringField(this, 9, value);
 };
 
 

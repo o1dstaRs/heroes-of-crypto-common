@@ -18,7 +18,7 @@
     "scripts": {
         "prebuild": "rimraf dist",
         "build": "yarn run prebuild && tsc && yarn run copy-generated",
-        "build:proto": "node scripts/protoc_generate.js",
+        "build:proto": "scripts/protoc_generate.sh",
         "copy-generated": "cpy \"src/generated/**/*\" \"dist/generated\"",
         "lint": "yarn run lint:es && yarn run lint:package && yarn run lint:style",
         "lint:es": "eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",
