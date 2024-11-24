@@ -944,5 +944,17 @@
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
+    },
+    "Devour Essence": {
+        "name": "Devour Essence",
+        "type": "ATTACK",
+        "desc": ["The unit rejuvenates back to {}% of the maximum health upon killing an enemy"],
+        "power": 100,
+        "power_type": "REJUVENATION",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
     }
 }
