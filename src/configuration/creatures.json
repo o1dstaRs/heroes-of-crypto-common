@@ -719,14 +719,14 @@
         },
         "Hydra": {
             "name": "Hydra",
-            "hp": 210,
+            "hp": 190,
             "steps": 6.1,
             "speed": 6,
             "armor": 34,
             "attack_type": "MELEE",
-            "attack": 33,
-            "attack_damage_min": 32,
-            "attack_damage_max": 58,
+            "attack": 34,
+            "attack_damage_min": 35,
+            "attack_damage_max": 60,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
@@ -736,7 +736,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Lightning Spin"]
+            "abilities": ["Lightning Spin", "Devour Essence"]
         },
         "Abomination": {
             "name": "Abomination",

@@ -1684,9 +1684,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
 
     public canSkipResponse(): boolean {
-        for (const a of this.abilities) {
-            if (a.getSkipResponse()) {
-                return true;
+        if (!this.hasAbilityActive("Break")) {
+            for (const a of this.abilities) {
+                if (a.getSkipResponse()) {
+                    return true;
+                }
             }
         }
 
@@ -1700,13 +1702,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        for (const a of this.abilities) {
-            if (
-                (a.getName() === "No Melee" &&
-                    (attackType === AttackType.MELEE || attackType === AttackType.MELEE_MAGIC)) ||
-                (a.getName() === "Through Shot" && attackType === AttackType.RANGE)
-            ) {
-                return false;
+        if (!this.hasEffectActive("Break")) {
+            for (const a of this.abilities) {
+                if (
+                    (a.getName() === "No Melee" &&
+                        (attackType === AttackType.MELEE || attackType === AttackType.MELEE_MAGIC)) ||
+                    (a.getName() === "Through Shot" && attackType === AttackType.RANGE)
+                ) {
+                    return false;
+                }
             }
         }
 
@@ -2323,13 +2327,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const mightAugmentBuff = this.getBuff("Might Augment");
-        if (this.getAttackType() !== AttackType.RANGE && mightAugmentBuff) {
+
+        if (this.getAttackTypeSelection() !== AttackType.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += Number(
                 ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
             );
         }
+
         const sniperAugmentBuff = this.getBuff("Sniper Augment");
-        if (this.getAttackType() === AttackType.RANGE && sniperAugmentBuff) {
+        if (this.getAttackTypeSelection() === AttackType.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
                 this.unitProperties.base_attack += Number(
