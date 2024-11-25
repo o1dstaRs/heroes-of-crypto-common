@@ -10,7 +10,9 @@
  */
 
 import { EffectHelper, FactionType, IPlacement, Spell } from "..";
+import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
 import { getSpellConfig } from "../configuration/config_provider";
+import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
@@ -19,7 +21,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
 import { IUnitAIRepr, Unit } from "./unit";
-import { TeamType, UnitProperties } from "./unit_properties";
+import { AttackType, TeamType, UnitProperties } from "./unit_properties";
 
 export class UnitsHolder {
     private readonly grid: Grid;
@@ -188,6 +190,101 @@ export class UnitsHolder {
         }
 
         return teamUnitHp;
+    }
+
+    public applyAugments(): void {
+        for (const unit of this.getAllUnitsIterator()) {
+            const augmentArmor = FightStateManager.getInstance().getFightProperties().getAugmentArmor(unit.getTeam());
+            const augmentArmorPower = getArmorPower(augmentArmor);
+            unit.deleteBuff("Armor Augment");
+            if (augmentArmor && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                const augmentArmorBuff = new Spell({
+                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Armor Augment", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of augmentArmorBuff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/g, augmentArmorPower.toString())
+                            .replace(/\[\]/g, augmentArmor.toString()),
+                    );
+                }
+                augmentArmorBuff.setDesc(infoArr);
+                augmentArmorBuff.setPower(augmentArmorPower);
+                unit.applyBuff(augmentArmorBuff);
+            }
+
+            const augmentMight = FightStateManager.getInstance().getFightProperties().getAugmentMight(unit.getTeam());
+            const augmentMightPower = getMightPower(augmentMight);
+            unit.deleteBuff("Might Augment");
+            if (augmentMight && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                const augmentMightBuff = new Spell({
+                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Might Augment", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of augmentMightBuff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/g, augmentMightPower.toString())
+                            .replace(/\[\]/g, augmentMight.toString()),
+                    );
+                }
+                augmentMightBuff.setDesc(infoArr);
+                augmentMightBuff.setPower(augmentMightPower);
+                unit.applyBuff(augmentMightBuff);
+            }
+
+            const augmentSniper = FightStateManager.getInstance().getFightProperties().getAugmentSniper(unit.getTeam());
+            const augmentSniperPower = getSniperPower(augmentSniper);
+            unit.deleteBuff("Sniper Augment");
+            if (
+                augmentSniper &&
+                unit.getAttackType() === AttackType.RANGE &&
+                isPositionWithinGrid(this.gridSettings, unit.getPosition())
+            ) {
+                const augmentSniperBuff = new Spell({
+                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Sniper Augment", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of augmentSniperBuff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/, augmentSniperPower[0].toString())
+                            .replace(/\{\}/, augmentSniperPower[1].toString())
+                            .replace(/\[\]/g, augmentSniper.toString()),
+                    );
+                }
+                augmentSniperBuff.setDesc(infoArr);
+                augmentSniperBuff.setPower(augmentSniperPower[0]);
+                unit.applyBuff(augmentSniperBuff, augmentSniperPower[0], augmentSniperPower[1]);
+            }
+
+            const augmentMovement = FightStateManager.getInstance()
+                .getFightProperties()
+                .getAugmentMovement(unit.getTeam());
+            const augmentMovementPower = getMovementPower(augmentMovement);
+            unit.deleteBuff("Movement Augment");
+            if (augmentMovement && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                const augmentMovementBuff = new Spell({
+                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Movement Augment", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of augmentMovementBuff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/g, augmentMovementPower.toString())
+                            .replace(/\[\]/g, augmentMovement.toString()),
+                    );
+                }
+                augmentMovementBuff.setDesc(infoArr);
+                augmentMovementBuff.setPower(augmentMovementPower);
+                unit.applyBuff(augmentMovementBuff);
+            }
+        }
     }
 
     public getAllTeamUnitsMaxHp(teamType: TeamType): Map<string, number> {
