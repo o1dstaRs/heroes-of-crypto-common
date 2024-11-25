@@ -1582,14 +1582,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public calculateAbilityApplyChance(ability: Ability, synergyAbilityPowerIncrease: number): number {
         const madeOfFireBuff = this.getBuff("Made of Fire");
         const combinedPower =
-            ability.getPower() +
             this.getLuck() +
             synergyAbilityPowerIncrease +
-            (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
+            ((ability.getPower() + (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0)) /
+                MAX_UNIT_STACK_POWER) *
+                this.getStackPower();
         if (combinedPower < 0) {
             return 0;
         }
-        return (combinedPower / MAX_UNIT_STACK_POWER) * this.getStackPower();
+
+        return combinedPower;
     }
 
     public calculateAttackDamageMin(
@@ -1729,7 +1731,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.onHourglass;
     }
 
-    public refreshPossibleAttackTypes(canLandRangeAttack: boolean) {
+    public refreshPossibleAttackTypes(canLandRangeAttack: boolean): boolean {
+        const currentSelectedAttackType = this.selectedAttackType;
         this.possibleAttackTypes = [];
         if (this.getAttackType() === AttackType.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
             this.possibleAttackTypes.push(AttackType.MAGIC);
@@ -1759,6 +1762,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.attack_type_selected = this.possibleAttackTypes[0];
         this.selectedAttackType = this.possibleAttackTypes[0];
+        return currentSelectedAttackType !== this.selectedAttackType;
     }
 
     public getAttackTypeSelection(): AttackType {
