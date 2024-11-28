@@ -461,7 +461,7 @@
         "type": "ATTACK",
         "desc": [
             "Ranged attacks deal {}% of the damage to all units adjacent to the target unit's cell.",
-            "Ranged attacks ignore structures"
+            "Ranged attacks ignore structures. The enemy responds after all damage has been dealt."
         ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
@@ -476,7 +476,7 @@
         "type": "ATTACK",
         "desc": [
             "Ranged attacks inflict {}% of the damage on all units adjacent to the target cell.",
-            "Ranged attacks ignore structures"
+            "Ranged attacks ignore structures. The enemy responds after all damage has been dealt."
         ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",

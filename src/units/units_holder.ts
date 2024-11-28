@@ -118,6 +118,41 @@ export class UnitsHolder {
         return allies;
     }
 
+    public toCleanupRandomUnitsTillTeamSize(
+        targetTeamSize: number,
+        teamType: TeamType,
+        lowerLeftPlacement: IPlacement,
+        upperRightPlacement: IPlacement,
+        lowerRightPlacement?: IPlacement,
+        upperLeftPlacement?: IPlacement,
+    ): Unit[] {
+        const ret: Unit[] = [];
+        let targetSize = targetTeamSize;
+        if (targetTeamSize < 0) {
+            targetSize = 0;
+        }
+
+        const units = this.getAllAlliesPlaced(
+            teamType,
+            lowerLeftPlacement,
+            upperRightPlacement,
+            lowerRightPlacement,
+            upperLeftPlacement,
+        );
+
+        if (units.length <= targetSize) {
+            return ret;
+        }
+
+        units.sort((a, b) => a.getStackPower() - b.getStackPower());
+
+        for (let i = 0; i < units.length - targetSize; i++) {
+            ret.push(units[i]);
+        }
+
+        return ret;
+    }
+
     public getAllTeamUnitsBuffs(teamType: TeamType): Map<string, AppliedSpell[]> {
         const teamUnitBuffs: Map<string, AppliedSpell[]> = new Map();
         for (const unit of this.allUnits.values()) {
