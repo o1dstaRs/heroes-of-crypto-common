@@ -22,6 +22,7 @@ import {
     MORALE_MAX_VALUE_TOTAL,
     NUMBER_OF_ARMAGEDDON_WAVES,
     NUMBER_OF_LAPS_TOTAL,
+    MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
 } from "../constants";
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
@@ -1137,7 +1138,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const unitsTotal = this.unitProperties.amount_died + this.unitProperties.amount_alive;
 
         if (canHitPartially) {
-            armageddonDamage = Math.floor(this.unitProperties.max_hp * unitsTotal * part);
+            armageddonDamage = Math.max(
+                MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
+                Math.floor(this.unitProperties.max_hp * unitsTotal * part),
+            );
         } else {
             const unitsDamaged = Math.ceil(unitsTotal * part);
             armageddonDamage = unitsDamaged * this.unitProperties.max_hp;
@@ -1557,9 +1561,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const enemyDodgeAbility = enemyUnit.getAbility("Dodge");
+
         if (enemyDodgeAbility) {
             const dodgeChance =
-                this.calculateAbilityApplyChance(enemyDodgeAbility, enemySynergyAbilityPowerIncrease) / 100;
+                enemyUnit.calculateAbilityApplyChance(enemyDodgeAbility, enemySynergyAbilityPowerIncrease) / 100;
             combinedMissChances.push(dodgeChance);
         }
 
@@ -1567,7 +1572,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const smallSpecieAbility = enemyUnit.getAbility("Small Specie");
             if (smallSpecieAbility) {
                 const dodgeChance =
-                    this.calculateAbilityApplyChance(smallSpecieAbility, enemySynergyAbilityPowerIncrease) / 100;
+                    enemyUnit.calculateAbilityApplyChance(smallSpecieAbility, enemySynergyAbilityPowerIncrease) / 100;
                 combinedMissChances.push(dodgeChance);
             }
         }
@@ -1606,13 +1611,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             divisor = 1;
         }
 
-        return Math.ceil(
-            ((((this.unitProperties.attack_damage_min * attackRate * this.unitProperties.amount_alive) /
-                this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
-                (1 - enemyUnit.getLuck() / 100)) /
-                divisor) *
-                this.unitProperties.attack_multiplier *
-                abilityMultiplier,
+        return Math.max(
+            1,
+            Math.ceil(
+                ((((this.unitProperties.attack_damage_min * attackRate * this.unitProperties.amount_alive) /
+                    this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
+                    (1 - enemyUnit.getLuck() / 100)) /
+                    divisor) *
+                    this.unitProperties.attack_multiplier *
+                    abilityMultiplier,
+            ),
         );
     }
 
@@ -1627,13 +1635,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (divisor <= 0) {
             divisor = 1;
         }
-        return Math.ceil(
-            ((((this.unitProperties.attack_damage_max * attackRate * this.unitProperties.amount_alive) /
-                this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
-                (1 - enemyUnit.getLuck() / 100)) /
-                divisor) *
-                this.unitProperties.attack_multiplier *
-                abilityMultiplier,
+        return Math.max(
+            1,
+            Math.ceil(
+                ((((this.unitProperties.attack_damage_max * attackRate * this.unitProperties.amount_alive) /
+                    this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
+                    (1 - enemyUnit.getLuck() / 100)) /
+                    divisor) *
+                    this.unitProperties.attack_multiplier *
+                    abilityMultiplier,
+            ),
         );
     }
 

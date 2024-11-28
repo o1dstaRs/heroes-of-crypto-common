@@ -132,6 +132,8 @@ export class FightProperties {
 
     private obstacleHitsLeft: number = 0;
 
+    private additionalNarrowingLaps: number = 0;
+
     public constructor() {
         this.id = uuidv4();
         this.currentLap = 1;
@@ -474,7 +476,8 @@ export class FightProperties {
         let isTimeToDryCenter = false;
         if (this.gridType === GridType.LAVA_CENTER || this.gridType === GridType.WATER_CENTER) {
             const numberOfLapsTillNarrowing = this.getNumberOfLapsTillNarrowing();
-            const narrowedTimes = Math.floor((this.currentLap - 1) / numberOfLapsTillNarrowing);
+            const narrowedTimes =
+                Math.floor((this.currentLap - 1) / numberOfLapsTillNarrowing) + this.additionalNarrowingLaps;
             if (narrowedTimes === numberOfLapsTillNarrowing) {
                 return true;
             }
@@ -497,8 +500,16 @@ export class FightProperties {
             : NUMBER_OF_LAPS_TILL_NARROWING_NORMAL;
     }
 
+    public encounterAdditionalNarrowingLap(): void {
+        this.additionalNarrowingLaps++;
+    }
+
+    public getAdditionalNarrowingLaps(): number {
+        return this.additionalNarrowingLaps;
+    }
+
     public getLapsNarrowed(): number {
-        return Math.floor((this.currentLap - 1) / this.getNumberOfLapsTillNarrowing());
+        return Math.floor((this.currentLap - 1) / this.getNumberOfLapsTillNarrowing()) + this.additionalNarrowingLaps;
     }
 
     public setTeamUnitsAlive(teamType: TeamType, unitsAlive: number): void {

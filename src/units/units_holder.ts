@@ -32,10 +32,13 @@ export class UnitsHolder {
 
     private teamsAuraEffects: Map<TeamType, Map<number, AppliedAuraEffectProperties[]>>;
 
+    private distancesToClosestEnemies: Map<string, number> = new Map();
+
     public constructor(grid: Grid) {
         this.grid = grid;
         this.gridSettings = grid.getSettings();
         this.teamsAuraEffects = new Map();
+        this.distancesToClosestEnemies = new Map();
     }
 
     public getAllUnitsIterator(): IterableIterator<Unit> {
@@ -124,6 +127,36 @@ export class UnitsHolder {
         }
 
         return teamUnitBuffs;
+    }
+
+    public haveDistancesToClosestEnemiesDecreased(): boolean {
+        let distanceDecreased = false;
+        for (const unit of this.allUnits.values()) {
+            if (unit.isDead()) {
+                continue;
+            }
+
+            const unitId = unit.getId();
+
+            let currentDistance = 0;
+            if (this.distancesToClosestEnemies.has(unitId)) {
+                currentDistance = Number(
+                    this.getDistanceToClosestEnemy(unit.getOppositeTeam(), unit.getPosition()).toFixed(2),
+                );
+                const knownDistance = this.distancesToClosestEnemies.get(unitId) ?? 0;
+                if (!knownDistance || knownDistance > currentDistance) {
+                    distanceDecreased = true;
+                }
+            } else {
+                distanceDecreased = true;
+                currentDistance = Number(
+                    this.getDistanceToClosestEnemy(unit.getOppositeTeam(), unit.getPosition()).toFixed(2),
+                );
+            }
+            this.distancesToClosestEnemies.set(unitId, currentDistance);
+        }
+
+        return distanceDecreased;
     }
 
     public getAllEnemyUnitsBuffs(myTeamType: TeamType): Map<string, AppliedSpell[]> {
