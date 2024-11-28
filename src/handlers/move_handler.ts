@@ -58,6 +58,8 @@ export class MoveHandler {
                 return { log: "", unitIdsDestroyed, unitIdToNewPosition };
             }
 
+            const unitId = unit.getId();
+
             const currentPosition = unit.getPosition();
             let cells: XY[];
             if (unit.isSmallSize()) {
@@ -80,7 +82,7 @@ export class MoveHandler {
             }
 
             if (
-                this.grid.areAllCellsEmpty(targetCells, unit.getId()) ||
+                this.grid.areAllCellsEmpty(targetCells, unitId) ||
                 this.grid.canOccupyCells(
                     targetCells,
                     unit.hasAbilityActive("Made of Fire"),
@@ -92,10 +94,10 @@ export class MoveHandler {
                     logs.push(systemMoveResult.log);
                 }
                 if (systemMoveResult.deleteUnit) {
-                    unitIdsDestroyed.push(unit.getId());
+                    unitIdsDestroyed.push(unitId);
                 }
                 if (systemMoveResult.newPosition) {
-                    unitIdToNewPosition.set(unit.getId(), systemMoveResult.newPosition);
+                    unitIdToNewPosition.set(unitId, systemMoveResult.newPosition);
                 }
             } else {
                 let moveX = false;
@@ -122,7 +124,7 @@ export class MoveHandler {
                         const shiftedCells = this.getShiftedCells(targetCells, priorityShift, lapsNarrowed, true);
                         if (shiftedCells) {
                             if (
-                                this.grid.areAllCellsEmpty(shiftedCells, unit.getId()) ||
+                                this.grid.areAllCellsEmpty(shiftedCells, unitId) ||
                                 this.grid.canOccupyCells(
                                     shiftedCells,
                                     unit.hasAbilityActive("Made of Fire"),
@@ -143,11 +145,11 @@ export class MoveHandler {
                                 if (systemMoveResult.log) {
                                     logs.push(systemMoveResult.log);
                                 }
-                                if (systemMoveResult.deleteUnit) {
-                                    unitIdsDestroyed.push(unit.getId());
+                                if (systemMoveResult.deleteUnit && !unitIdsDestroyed.includes(unitId)) {
+                                    unitIdsDestroyed.push(unitId);
                                 }
                                 if (systemMoveResult.newPosition) {
-                                    unitIdToNewPosition.set(unit.getId(), systemMoveResult.newPosition);
+                                    unitIdToNewPosition.set(unitId, systemMoveResult.newPosition);
                                 }
                                 priorityShift = 0;
                                 movedUnit = true;
@@ -166,7 +168,7 @@ export class MoveHandler {
                         const shiftedCells = this.getShiftedCells(targetCells, priorityShift, lapsNarrowed, false);
                         if (shiftedCells) {
                             if (
-                                this.grid.areAllCellsEmpty(shiftedCells, unit.getId()) ||
+                                this.grid.areAllCellsEmpty(shiftedCells, unitId) ||
                                 this.grid.canOccupyCells(
                                     shiftedCells,
                                     unit.hasAbilityActive("Made of Fire"),
@@ -187,11 +189,11 @@ export class MoveHandler {
                                 if (systemMoveResult.log) {
                                     logs.push(systemMoveResult.log);
                                 }
-                                if (systemMoveResult.deleteUnit) {
-                                    unitIdsDestroyed.push(unit.getId());
+                                if (systemMoveResult.deleteUnit && !unitIdsDestroyed.includes(unitId)) {
+                                    unitIdsDestroyed.push(unitId);
                                 }
                                 if (systemMoveResult.newPosition) {
-                                    unitIdToNewPosition.set(unit.getId(), systemMoveResult.newPosition);
+                                    unitIdToNewPosition.set(unitId, systemMoveResult.newPosition);
                                 }
                                 priorityShift = 0;
                                 movedUnit = true;
@@ -209,7 +211,9 @@ export class MoveHandler {
                 }
 
                 if (!movedUnit) {
-                    unitIdsDestroyed.push(unit.getId());
+                    if (!unitIdsDestroyed.includes(unitId)) {
+                        unitIdsDestroyed.push(unitId);
+                    }
                     logs.push(`${unit.getName()} destroyed`);
                 }
             }
