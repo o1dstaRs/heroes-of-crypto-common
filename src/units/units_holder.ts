@@ -131,12 +131,17 @@ export class UnitsHolder {
 
     public haveDistancesToClosestEnemiesDecreased(): boolean {
         let distanceDecreased = false;
+
         for (const unit of this.allUnits.values()) {
             if (unit.isDead()) {
                 continue;
             }
 
             const unitId = unit.getId();
+
+            if (!isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                continue;
+            }
 
             let currentDistance = 0;
             if (this.distancesToClosestEnemies.has(unitId)) {

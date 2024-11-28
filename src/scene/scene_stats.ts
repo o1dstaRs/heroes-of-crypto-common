@@ -15,4 +15,5 @@ export interface IDamageStatistic {
     unitName: string;
     damage: number;
     team: TeamType;
+    lap: number;
 }

@@ -128,6 +128,8 @@ export class FightProperties {
 
     private synergyUnitsNaturePerTeam: Map<TeamType, number>;
 
+    private damageDealFactPerLap: Map<number, boolean>;
+
     private synergiesPerTeam: Map<TeamType, string[]>;
 
     private obstacleHitsLeft: number = 0;
@@ -172,6 +174,7 @@ export class FightProperties {
         this.synergyUnitsMightPerTeam = new Map();
         this.synergyUnitsNaturePerTeam = new Map();
         this.synergiesPerTeam = new Map();
+        this.damageDealFactPerLap = new Map();
     }
 
     public getId(): string {
@@ -250,7 +253,19 @@ export class FightProperties {
         return this.obstacleHitsLeft;
     }
 
-    public encointerObstacleHit(): void {
+    public hasDamageDealFactPerLap(lap: number): boolean {
+        return this.damageDealFactPerLap.get(lap) ?? false;
+    }
+
+    public encounterDamageDealFact(): void {
+        this.damageDealFactPerLap.set(this.currentLap, true);
+    }
+
+    public encounterObstacleHit(): void {
+        if (this.obstacleHitsLeft > 0) {
+            this.damageDealFactPerLap.set(this.currentLap, true);
+        }
+
         this.obstacleHitsLeft--;
         if (this.obstacleHitsLeft < 0) {
             this.obstacleHitsLeft = 0;
