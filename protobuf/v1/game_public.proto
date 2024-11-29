@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package public;
+
+message GamePublic {
+    string id = 1;
+    bool confirmed = 2;
+    int64 init_time = 3;
+}
