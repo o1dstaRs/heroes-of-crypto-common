@@ -354,7 +354,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.spells.splice(i, 1);
             }
         }
-        if (!this.unitProperties.spells.length) {
+        if (this.unitProperties.spells.length <= 0) {
             this.unitProperties.can_cast_spells = false;
         }
 
@@ -523,6 +523,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
             this.unitProperties.hp = this.unitProperties.max_hp;
             sceneLog.updateLog(`${this.getName()} auto regenerated to its maximum hp (+${healedHp})`);
+            this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
         }
     }
 
