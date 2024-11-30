@@ -77,7 +77,8 @@ proto.public.GamePublic.toObject = function(includeInstance, msg) {
   var f, obj = {
     id: jspb.Message.getFieldWithDefault(msg, 1, ""),
     confirmed: jspb.Message.getBooleanFieldWithDefault(msg, 2, false),
-    initTime: jspb.Message.getFieldWithDefault(msg, 3, 0)
+    initTime: jspb.Message.getFieldWithDefault(msg, 3, 0),
+    abandoned: jspb.Message.getBooleanFieldWithDefault(msg, 4, false)
   };
 
   if (includeInstance) {
@@ -126,6 +127,10 @@ proto.public.GamePublic.deserializeBinaryFromReader = function(msg, reader) {
       var value = /** @type {number} */ (reader.readInt64());
       msg.setInitTime(value);
       break;
+    case 4:
+      var value = /** @type {boolean} */ (reader.readBool());
+      msg.setAbandoned(value);
+      break;
     default:
       reader.skipField();
       break;
@@ -173,6 +178,13 @@ proto.public.GamePublic.serializeBinaryToWriter = function(message, writer) {
   if (f !== 0) {
     writer.writeInt64(
       3,
+      f
+    );
+  }
+  f = message.getAbandoned();
+  if (f) {
+    writer.writeBool(
+      4,
       f
     );
   }
@@ -230,6 +242,24 @@ proto.public.GamePublic.prototype.getInitTime = function() {
  */
 proto.public.GamePublic.prototype.setInitTime = function(value) {
   return jspb.Message.setProto3IntField(this, 3, value);
+};
+
+
+/**
+ * optional bool abandoned = 4;
+ * @return {boolean}
+ */
+proto.public.GamePublic.prototype.getAbandoned = function() {
+  return /** @type {boolean} */ (jspb.Message.getBooleanFieldWithDefault(this, 4, false));
+};
+
+
+/**
+ * @param {boolean} value
+ * @return {!proto.public.GamePublic} returns this
+ */
+proto.public.GamePublic.prototype.setAbandoned = function(value) {
+  return jspb.Message.setProto3BooleanField(this, 4, value);
 };
 
 

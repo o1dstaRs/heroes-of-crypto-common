@@ -13,6 +13,9 @@ export class GamePublic extends jspb.Message {
   getInitTime(): number;
   setInitTime(value: number): void;
 
+  getAbandoned(): boolean;
+  setAbandoned(value: boolean): void;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): GamePublic.AsObject;
   static toObject(includeInstance: boolean, msg: GamePublic): GamePublic.AsObject;
@@ -28,6 +31,7 @@ export namespace GamePublic {
     id: string,
     confirmed: boolean,
     initTime: number,
+    abandoned: boolean,
   }
 }
 
