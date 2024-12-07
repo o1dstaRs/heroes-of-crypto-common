@@ -89,6 +89,7 @@ export interface PickPhaseMap {
   ARTIFACT_2: 6;
   AUGMENTS: 7;
   AUGMENTS_SCOUT: 8;
+  GIVE_RANDOM_PAIR: 9;
 }
 
 export const PickPhase: PickPhaseMap;
