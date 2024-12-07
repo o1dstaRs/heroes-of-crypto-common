@@ -279,7 +279,8 @@ proto.public.PickPhase = {
   ARTIFACT_1: 5,
   ARTIFACT_2: 6,
   AUGMENTS: 7,
-  AUGMENTS_SCOUT: 8
+  AUGMENTS_SCOUT: 8,
+  GIVE_RANDOM_PAIR: 9
 };
 
 /**
