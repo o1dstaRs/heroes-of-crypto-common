@@ -140,3 +140,15 @@ export interface CreatureMap {
 
 export const Creature: CreatureMap;
 
+export interface PickPhaseActionTypeMap {
+  NO_ACTION: 0;
+  PICK_INITIAL_PAIR: 1;
+  PICK_UNIT: 2;
+  BAN_UNIT: 3;
+  SELECT_ARTIFACT: 4;
+  AUGMENT: 5;
+  REVEAL: 6;
+}
+
+export const PickPhaseActionType: PickPhaseActionTypeMap;
+

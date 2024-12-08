@@ -25,6 +25,7 @@ goog.exportSymbol('proto.public.AttackType', null, global);
 goog.exportSymbol('proto.public.Creature', null, global);
 goog.exportSymbol('proto.public.GridType', null, global);
 goog.exportSymbol('proto.public.PickPhase', null, global);
+goog.exportSymbol('proto.public.PickPhaseActionType', null, global);
 goog.exportSymbol('proto.public.Race', null, global);
 goog.exportSymbol('proto.public.StringList', null, global);
 goog.exportSymbol('proto.public.Team', null, global);
@@ -328,6 +329,19 @@ proto.public.Creature = {
   CRUSADER: 38,
   TSAR_CANNON: 39,
   ANGEL: 40
+};
+
+/**
+ * @enum {number}
+ */
+proto.public.PickPhaseActionType = {
+  NO_ACTION: 0,
+  PICK_INITIAL_PAIR: 1,
+  PICK_UNIT: 2,
+  BAN_UNIT: 3,
+  SELECT_ARTIFACT: 4,
+  AUGMENT: 5,
+  REVEAL: 6
 };
 
 goog.object.extend(exports, proto.public);

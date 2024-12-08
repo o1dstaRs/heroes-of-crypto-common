@@ -1,9 +1,9 @@
 // package: public
-// file: game_public.proto
+// file: pick_phase_action.proto
 
 import * as jspb from "google-protobuf";
 
-export class GamePublic extends jspb.Message {
+export class PickPhaseAction extends jspb.Message {
   getId(): string;
   setId(value: string): void;
 
@@ -20,16 +20,16 @@ export class GamePublic extends jspb.Message {
   setTeam(value: number): void;
 
   serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): GamePublic.AsObject;
-  static toObject(includeInstance: boolean, msg: GamePublic): GamePublic.AsObject;
+  toObject(includeInstance?: boolean): PickPhaseAction.AsObject;
+  static toObject(includeInstance: boolean, msg: PickPhaseAction): PickPhaseAction.AsObject;
   static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
   static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
-  static serializeBinaryToWriter(message: GamePublic, writer: jspb.BinaryWriter): void;
-  static deserializeBinary(bytes: Uint8Array): GamePublic;
-  static deserializeBinaryFromReader(message: GamePublic, reader: jspb.BinaryReader): GamePublic;
+  static serializeBinaryToWriter(message: PickPhaseAction, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): PickPhaseAction;
+  static deserializeBinaryFromReader(message: PickPhaseAction, reader: jspb.BinaryReader): PickPhaseAction;
 }
 
-export namespace GamePublic {
+export namespace PickPhaseAction {
   export type AsObject = {
     id: string,
     confirmed: boolean,

@@ -12,6 +12,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 import { FactionType } from "../factions/faction_type";
+import { Creature } from "../generated/protobuf/v1/types_pb";
 
 export enum AttackType {
     NO_TYPE = 0,
@@ -301,3 +302,56 @@ export class UnitProperties {
         this.target = target;
     }
 }
+
+export const CreatureByLevel = [
+    [
+        Creature.ORC,
+        Creature.SCAVENGER,
+        Creature.TROGLODYTE,
+        Creature.CENTAUR,
+        Creature.BERSERKER,
+        Creature.WOLF_RIDER,
+        Creature.WOLF,
+        Creature.FAIRY,
+        Creature.LEPRECHAUN,
+        Creature.PEASANT,
+        Creature.SQUIRE,
+        Creature.ARBALESTER,
+    ],
+    [
+        Creature.TROLL,
+        Creature.MEDUSA,
+        Creature.BEHOLDER,
+        Creature.HARPY,
+        Creature.NOMAD,
+        Creature.HYENA,
+        Creature.ELF,
+        Creature.WHITE_TIGER,
+        Creature.SATYR,
+        Creature.VALKYRIE,
+        Creature.PIKEMAN,
+        Creature.HEALER,
+    ],
+    [
+        Creature.GOBLIN_KNIGHT,
+        Creature.EFREET,
+        Creature.CYCLOPS,
+        Creature.OGRE_MAGE,
+        Creature.MANTIS,
+        Creature.UNICORN,
+        Creature.GRIFFIN,
+        Creature.CRUSADER,
+    ],
+    [
+        Creature.BLACK_DRAGON,
+        Creature.HYDRA,
+        Creature.THUNDERBIRD,
+        Creature.BEHEMOTH,
+        Creature.GARGANTUAN,
+        Creature.PEGASUS,
+        Creature.TSAR_CANNON,
+        Creature.ANGEL,
+    ],
+] as const;
+
+export const CreaturePoolByLevel = [2, 2, 1, 1] as const;
