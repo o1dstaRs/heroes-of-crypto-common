@@ -104,3 +104,13 @@ enum Creature {
     TSAR_CANNON = 39;
     ANGEL = 40;
 }
+
+enum PickPhaseActionType {
+    NO_ACTION = 0;
+    PICK_INITIAL_PAIR = 1;
+    PICK_UNIT = 2;
+    BAN_UNIT = 3;
+    SELECT_ARTIFACT = 4;
+    AUGMENT = 5;
+    REVEAL = 6;
+}
