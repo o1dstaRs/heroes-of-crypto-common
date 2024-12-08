@@ -38,6 +38,13 @@ export function matrixElement(matrix: number[][], x: number, y: number): number 
     return matrix[y][x];
 }
 
+export function stringToBoolean(str: string | null | undefined): boolean {
+    if (str === null || str === undefined) {
+        return false;
+    }
+    return str.toLowerCase() === "true";
+}
+
 export function removeItemOnce<T>(arr: T[], value: T): boolean {
     const index = arr.indexOf(value);
     let removed = false;
