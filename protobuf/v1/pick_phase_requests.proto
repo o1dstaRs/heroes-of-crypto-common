@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package public;
+
+message PickPairRequest {
+    int32 pairIndex = 1;
+}
+
+message PickBanRequest {
+    int32 creature = 1;
+}
+
+message ArtifactRequest {
+    int32 artifact = 1;
+    int32 level = 2;
+}
+
+message RevealRequest {
+    int32 creatureIndex = 1;
+}
