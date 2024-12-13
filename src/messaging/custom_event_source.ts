@@ -209,7 +209,11 @@ class CustomEventSource<T> {
         }
 
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this.debugLog("Max reconnection attempts reached");
+            const errMsg = "Max reconnection attempts reached";
+            this.debugLog(errMsg);
+            if (this.onerror) {
+                this.onerror(new Error(errMsg));
+            }
             this.close();
             return;
         }

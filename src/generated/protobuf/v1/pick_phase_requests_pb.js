@@ -141,7 +141,7 @@ proto.public.PickPairRequest.prototype.toObject = function(opt_includeInstance) 
  */
 proto.public.PickPairRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-    pairindex: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    pairIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -180,7 +180,7 @@ proto.public.PickPairRequest.deserializeBinaryFromReader = function(msg, reader)
     switch (field) {
     case 1:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setPairindex(value);
+      msg.setPairIndex(value);
       break;
     default:
       reader.skipField();
@@ -211,7 +211,7 @@ proto.public.PickPairRequest.prototype.serializeBinary = function() {
  */
 proto.public.PickPairRequest.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = message.getPairindex();
+  f = message.getPairIndex();
   if (f !== 0) {
     writer.writeInt32(
       1,
@@ -222,10 +222,10 @@ proto.public.PickPairRequest.serializeBinaryToWriter = function(message, writer)
 
 
 /**
- * optional int32 pairIndex = 1;
+ * optional int32 pair_index = 1;
  * @return {number}
  */
-proto.public.PickPairRequest.prototype.getPairindex = function() {
+proto.public.PickPairRequest.prototype.getPairIndex = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
@@ -234,7 +234,7 @@ proto.public.PickPairRequest.prototype.getPairindex = function() {
  * @param {number} value
  * @return {!proto.public.PickPairRequest} returns this
  */
-proto.public.PickPairRequest.prototype.setPairindex = function(value) {
+proto.public.PickPairRequest.prototype.setPairIndex = function(value) {
   return jspb.Message.setProto3IntField(this, 1, value);
 };
 
@@ -561,7 +561,7 @@ proto.public.RevealRequest.prototype.toObject = function(opt_includeInstance) {
  */
 proto.public.RevealRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-    creatureindex: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    creatureIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -600,7 +600,7 @@ proto.public.RevealRequest.deserializeBinaryFromReader = function(msg, reader) {
     switch (field) {
     case 1:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setCreatureindex(value);
+      msg.setCreatureIndex(value);
       break;
     default:
       reader.skipField();
@@ -631,7 +631,7 @@ proto.public.RevealRequest.prototype.serializeBinary = function() {
  */
 proto.public.RevealRequest.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = message.getCreatureindex();
+  f = message.getCreatureIndex();
   if (f !== 0) {
     writer.writeInt32(
       1,
@@ -642,10 +642,10 @@ proto.public.RevealRequest.serializeBinaryToWriter = function(message, writer) {
 
 
 /**
- * optional int32 creatureIndex = 1;
+ * optional int32 creature_index = 1;
  * @return {number}
  */
-proto.public.RevealRequest.prototype.getCreatureindex = function() {
+proto.public.RevealRequest.prototype.getCreatureIndex = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
@@ -654,7 +654,7 @@ proto.public.RevealRequest.prototype.getCreatureindex = function() {
  * @param {number} value
  * @return {!proto.public.RevealRequest} returns this
  */
-proto.public.RevealRequest.prototype.setCreatureindex = function(value) {
+proto.public.RevealRequest.prototype.setCreatureIndex = function(value) {
   return jspb.Message.setProto3IntField(this, 1, value);
 };
 

@@ -4,8 +4,8 @@
 import * as jspb from "google-protobuf";
 
 export class PickPairRequest extends jspb.Message {
-  getPairindex(): number;
-  setPairindex(value: number): void;
+  getPairIndex(): number;
+  setPairIndex(value: number): void;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): PickPairRequest.AsObject;
@@ -19,7 +19,7 @@ export class PickPairRequest extends jspb.Message {
 
 export namespace PickPairRequest {
   export type AsObject = {
-    pairindex: number,
+    pairIndex: number,
   }
 }
 
@@ -68,8 +68,8 @@ export namespace ArtifactRequest {
 }
 
 export class RevealRequest extends jspb.Message {
-  getCreatureindex(): number;
-  setCreatureindex(value: number): void;
+  getCreatureIndex(): number;
+  setCreatureIndex(value: number): void;
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): RevealRequest.AsObject;
@@ -83,7 +83,7 @@ export class RevealRequest extends jspb.Message {
 
 export namespace RevealRequest {
   export type AsObject = {
-    creatureindex: number,
+    creatureIndex: number,
   }
 }
 
