@@ -3,7 +3,7 @@ syntax = "proto3";
 package public;
 
 message PickPairRequest {
-    int32 pairIndex = 1;
+    int32 pair_index = 1;
 }
 
 message PickBanRequest {
@@ -16,5 +16,5 @@ message ArtifactRequest {
 }
 
 message RevealRequest {
-    int32 creatureIndex = 1;
+    int32 creature_index = 1;
 }
