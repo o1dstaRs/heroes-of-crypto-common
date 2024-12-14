@@ -272,7 +272,7 @@
             "hp": 10,
             "steps": 3.8,
             "speed": 5.2,
-            "armor": 9,
+            "armor": 8,
             "attack_type": "MELEE",
             "attack": 9,
             "attack_damage_min": 2,
