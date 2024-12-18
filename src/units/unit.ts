@@ -1772,6 +1772,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.possibleAttackTypes.push(AttackType.NO_TYPE);
         }
 
+        if (!this.possibleAttackTypes.length) {
+            return false;
+        }
+
         this.unitProperties.attack_type_selected = this.possibleAttackTypes[0];
         this.selectedAttackType = this.possibleAttackTypes[0];
         return currentSelectedAttackType !== this.selectedAttackType;
