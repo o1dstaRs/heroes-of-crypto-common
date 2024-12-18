@@ -42,7 +42,7 @@ export function stringToBoolean(str: string | null | undefined): boolean {
     if (str === null || str === undefined) {
         return false;
     }
-    return str.toLowerCase() === "true";
+    return str.toLowerCase() === "true" || str.toString() === "1";
 }
 
 export function removeItemOnce<T>(arr: T[], value: T): boolean {

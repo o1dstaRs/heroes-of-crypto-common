@@ -917,7 +917,7 @@ export class PathHelper {
 
     public getClosestSquareCellIndices(
         mousePosition: XY,
-        allowedPlacementCellHashes: Set<number>,
+        allowedPlacementCellHashes?: Set<number>,
         occupiedCellKeys?: string[],
         unitCells?: XY[],
         allowedToMoveThere?: Set<number>,
@@ -944,11 +944,13 @@ export class PathHelper {
         };
 
         const isAllowed = (cellKey: number): boolean => {
-            if (!allowedPlacementCellHashes.size && !allowedToMoveThere) {
+            if (!allowedPlacementCellHashes?.size && !allowedToMoveThere) {
                 return false;
             }
 
-            return allowedPlacementCellHashes.has(cellKey) || (!!allowedToMoveThere && allowedToMoveThere.has(cellKey));
+            return (
+                allowedPlacementCellHashes?.has(cellKey) || (!!allowedToMoveThere && allowedToMoveThere.has(cellKey))
+            );
         };
 
         const getReachable = (): XY[] => {
