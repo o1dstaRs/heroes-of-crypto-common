@@ -165,7 +165,7 @@
             "hp": 70,
             "steps": 5.5,
             "speed": 8,
-            "armor": 23,
+            "armor": 24,
             "attack_type": "MELEE",
             "attack": 22,
             "attack_damage_min": 16,
