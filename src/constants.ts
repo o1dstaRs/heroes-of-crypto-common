@@ -16,7 +16,7 @@ export const MAX_UNIT_STACK_POWER = 5;
 
 // teams, augments and synergies
 export const MAX_UNITS_PER_TEAM = 8;
-export const MAX_AUGMENT_POINTS = 6;
+export const MAX_AUGMENT_POINTS = 7;
 export const MAX_SYNERGY_LEVEL = 3;
 
 // map
