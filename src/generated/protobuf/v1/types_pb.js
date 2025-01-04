@@ -21,7 +21,10 @@ var global =
     (function () { return this; }).call(null) ||
     Function('return this')();
 
+goog.exportSymbol('proto.public.AllUnitsScoutAugment', null, global);
 goog.exportSymbol('proto.public.AttackType', null, global);
+goog.exportSymbol('proto.public.AugmentType', null, global);
+goog.exportSymbol('proto.public.AugmentsAndMapScoutAugment', null, global);
 goog.exportSymbol('proto.public.Creature', null, global);
 goog.exportSymbol('proto.public.GridType', null, global);
 goog.exportSymbol('proto.public.PickPhase', null, global);
@@ -341,6 +344,31 @@ proto.public.PickPhaseActionType = {
   SELECT_ARTIFACT: 4,
   AUGMENT: 5,
   REVEAL: 6
+};
+
+/**
+ * @enum {number}
+ */
+proto.public.AugmentType = {
+  NO_AUGMENT: 0,
+  AUGMENTS_AND_MAP_SCOUT: 1,
+  ALL_UNITS_SCOUT: 2
+};
+
+/**
+ * @enum {number}
+ */
+proto.public.AllUnitsScoutAugment = {
+  NO_AUGMENTED_ALL_UNITS_SCOUT: 0,
+  AUGMENTED_ALL_UNITS_SCOUT: 1
+};
+
+/**
+ * @enum {number}
+ */
+proto.public.AugmentsAndMapScoutAugment = {
+  NO_AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 0,
+  AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 1
 };
 
 goog.object.extend(exports, proto.public);
