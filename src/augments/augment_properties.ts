@@ -23,7 +23,7 @@ export enum PlacementAugment {
     LEVEL_3 = 2,
 }
 
-export const ToPlacementAugment: { [placementAugemtValue: string]: PlacementAugment } = {
+export const ToPlacementAugment: { [placementAugmentValue: string]: PlacementAugment } = {
     "": PlacementAugment.LEVEL_1,
     "0": PlacementAugment.LEVEL_1,
     "1": PlacementAugment.LEVEL_2,
@@ -73,7 +73,7 @@ export enum ArmorAugment {
     LEVEL_3 = 3,
 }
 
-export const ToArmorAugment: { [armorAugemtValue: string]: ArmorAugment } = {
+export const ToArmorAugment: { [armorAugmentValue: string]: ArmorAugment } = {
     "": ArmorAugment.NO_AUGMENT,
     "0": ArmorAugment.NO_AUGMENT,
     "1": ArmorAugment.LEVEL_1,
@@ -103,7 +103,7 @@ export enum MightAugment {
     LEVEL_3 = 3,
 }
 
-export const ToMightAugment: { [mightAugemtValue: string]: MightAugment } = {
+export const ToMightAugment: { [mightAugmentValue: string]: MightAugment } = {
     "": MightAugment.NO_AUGMENT,
     "0": MightAugment.NO_AUGMENT,
     "1": MightAugment.LEVEL_1,
@@ -133,7 +133,7 @@ export enum SniperAugment {
     LEVEL_3 = 3,
 }
 
-export const ToSniperAugment: { [sniperAugemtValue: string]: SniperAugment } = {
+export const ToSniperAugment: { [sniperAugmentValue: string]: SniperAugment } = {
     "": SniperAugment.NO_AUGMENT,
     "0": SniperAugment.NO_AUGMENT,
     "1": SniperAugment.LEVEL_1,
@@ -162,7 +162,7 @@ export enum MovementAugment {
     LEVEL_2 = 2,
 }
 
-export const ToMovementAugment: { [movementAugemtValue: string]: MovementAugment } = {
+export const ToMovementAugment: { [movementAugmentValue: string]: MovementAugment } = {
     "": MovementAugment.NO_AUGMENT,
     "0": MovementAugment.NO_AUGMENT,
     "1": MovementAugment.LEVEL_1,
@@ -180,6 +180,30 @@ export const getMovementPower = (augment: MovementAugment): number => {
         default:
             throw new Error("Invalid movement augment");
     }
+};
+
+export enum AllUnitsScoutAugment {
+    NO_AUGMENT = 0,
+    AUGMENTED = 1,
+}
+
+export const ToAllUnitsScoutAugment: { [allUnitsScoutAugmentValue: string]: AllUnitsScoutAugment } = {
+    "": AllUnitsScoutAugment.NO_AUGMENT,
+    "0": AllUnitsScoutAugment.NO_AUGMENT,
+    "1": AllUnitsScoutAugment.AUGMENTED,
+};
+
+export enum AugmentsAndMapScoutAugment {
+    NO_AUGMENT = 0,
+    AUGMENTED = 1,
+}
+
+export const ToAugmentsAndMapScoutAugment: {
+    [augmentsAndMapScoutAugmentValue: string]: AugmentsAndMapScoutAugment;
+} = {
+    "": AugmentsAndMapScoutAugment.NO_AUGMENT,
+    "0": AugmentsAndMapScoutAugment.NO_AUGMENT,
+    "1": AugmentsAndMapScoutAugment.AUGMENTED,
 };
 
 export type AugmentType =

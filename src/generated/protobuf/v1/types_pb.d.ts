@@ -151,3 +151,25 @@ export interface PickPhaseActionTypeMap {
 
 export const PickPhaseActionType: PickPhaseActionTypeMap;
 
+export interface AugmentTypeMap {
+  NO_AUGMENT: 0;
+  AUGMENTS_AND_MAP_SCOUT: 1;
+  ALL_UNITS_SCOUT: 2;
+}
+
+export const AugmentType: AugmentTypeMap;
+
+export interface AllUnitsScoutAugmentMap {
+  NO_AUGMENTED_ALL_UNITS_SCOUT: 0;
+  AUGMENTED_ALL_UNITS_SCOUT: 1;
+}
+
+export const AllUnitsScoutAugment: AllUnitsScoutAugmentMap;
+
+export interface AugmentsAndMapScoutAugmentMap {
+  NO_AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 0;
+  AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 1;
+}
+
+export const AugmentsAndMapScoutAugment: AugmentsAndMapScoutAugmentMap;
+

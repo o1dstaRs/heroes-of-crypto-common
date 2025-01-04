@@ -113,3 +113,19 @@ enum PickPhaseActionType {
     AUGMENT = 5;
     REVEAL = 6;
 }
+
+enum AugmentType {
+    NO_AUGMENT = 0;
+    AUGMENTS_AND_MAP_SCOUT = 1;
+    ALL_UNITS_SCOUT = 2;
+}
+
+enum AllUnitsScoutAugment {
+    NO_AUGMENTED_ALL_UNITS_SCOUT = 0;
+    AUGMENTED_ALL_UNITS_SCOUT = 1;
+}
+
+enum AugmentsAndMapScoutAugment {
+    NO_AUGMENTED_AUGMENTS_AND_MAP_SCOUT = 0;
+    AUGMENTED_AUGMENTS_AND_MAP_SCOUT = 1;
+}
