@@ -9,8 +9,12 @@
  * -----------------------------------------------------------------------------
  */
 
-export interface IStatisticHolder<T> {
-    add(singleDamageStatistic: T): void;
-    get(): T[];
-    has(lap: number): boolean;
+import { Unit } from "../units/unit";
+import { FightStateManager } from "../fights/fight_state_manager";
+
+export function processOneInTheFieldAbility(unit: Unit): void {
+    if (!unit.hasAbilityActive("One in the Field")) {
+        FightStateManager.getInstance().getFightProperties().addRepliedAttack(unit.getId());
+        unit.setResponded(true);
+    }
 }

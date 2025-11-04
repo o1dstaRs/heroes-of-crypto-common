@@ -1,0 +1,106 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import * as HoCLib from "../utils/lib";
+import { AbilityType } from "./ability_properties";
+import { ISceneLog } from "../scene/scene_log_interface";
+import { Unit } from "../units/unit";
+import { IStatisticHolder } from "../scene/statistic_holder_interface";
+import { IDamageStatistic } from "../scene/scene_stats";
+import { FightStateManager } from "../fights/fight_state_manager";
+
+export function processPetrifyingGazeAbility(
+    fromUnit: Unit,
+    toUnit: Unit,
+    damageFromAttack: number,
+    sceneLog: ISceneLog,
+    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+): void {
+    if (toUnit.isDead() || damageFromAttack <= 0) {
+        return;
+    }
+
+    const petrifyingGazeAbility = fromUnit.getAbility("Petrifying Gaze");
+    if (
+        !petrifyingGazeAbility ||
+        (petrifyingGazeAbility.getType() === AbilityType.MIND && toUnit.hasMindAttackResistance())
+    ) {
+        return;
+    }
+
+    const percentageMax = Math.floor(
+        fromUnit.calculateAbilityApplyChance(
+            petrifyingGazeAbility,
+            FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
+        ),
+    );
+    const percentageMin = Math.floor((percentageMax / 3) * 2);
+
+    const randomCoeff = HoCLib.getRandomInt(percentageMin, percentageMax) / 100;
+    const randomAdditionalDamage = damageFromAttack * randomCoeff;
+    const unitsKilled = randomAdditionalDamage / toUnit.getMaxHp();
+    let amountOfUnitsKilled = Math.min(Math.floor(unitsKilled), toUnit.getAmountAlive() - 1);
+    let damageFromAbility = amountOfUnitsKilled * toUnit.getMaxHp();
+
+    let proc = false;
+    if (amountOfUnitsKilled < toUnit.getAmountAlive()) {
+        const coeff1 = toUnit.getHp() / toUnit.getMaxHp();
+        const coeff2 = 1 - (unitsKilled - Math.floor(unitsKilled));
+
+        if (fromUnit.getStackPower() > coeff1 * 100) {
+            damageFromAbility += toUnit.getHp();
+            proc = true;
+        } else {
+            const startSpread =
+                (toUnit.getLevel() === 3 ? fromUnit.getStackPower() * 3 : fromUnit.getStackPower()) +
+                fromUnit.getLuck();
+            const minimumSpread = Math.min(0, fromUnit.getStackPower() + fromUnit.getLuck());
+            const chanceToKillLastUnit = HoCLib.getRandomInt(minimumSpread, Math.max(startSpread + 1, 1));
+            const coeff2Int = Math.floor((coeff2 * 100) / (toUnit.getLevel() === 3 ? 2 : 1));
+            if (chanceToKillLastUnit >= coeff2Int) {
+                damageFromAbility += toUnit.getHp();
+                proc = true;
+            } else {
+                const rnd = HoCLib.getRandomInt(0, coeff2Int);
+                if (rnd < chanceToKillLastUnit) {
+                    damageFromAbility += toUnit.getHp();
+                    proc = true;
+                }
+            }
+        }
+    } else {
+        amountOfUnitsKilled = toUnit.getAmountAlive();
+    }
+
+    if (amountOfUnitsKilled || proc) {
+        let damageFromAbilityTmp = damageFromAbility;
+
+        if (damageFromAbility >= toUnit.getHp()) {
+            amountOfUnitsKilled = 1;
+            damageFromAbilityTmp -= toUnit.getHp();
+        }
+        amountOfUnitsKilled += Math.floor(damageFromAbilityTmp / toUnit.getMaxHp());
+
+        // apply the ability damage
+        damageStatisticHolder.add({
+            unitName: fromUnit.getName(),
+            damage: toUnit.applyDamage(
+                damageFromAbility,
+                FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
+                sceneLog,
+            ),
+            team: fromUnit.getTeam(),
+            lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+        });
+
+        sceneLog.updateLog(`${amountOfUnitsKilled} ${toUnit.getName()} killed by ${petrifyingGazeAbility.getName()}`);
+    }
+}

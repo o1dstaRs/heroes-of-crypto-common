@@ -18,3 +18,10 @@ export interface IAnimationData {
     fromPosition?: XY;
     bodyUnit?: Unit;
 }
+
+export interface IVisibleDamage {
+    amount: number;
+    render: boolean;
+    unitPosition: XY;
+    unitIsSmall: boolean;
+}
