@@ -8,34 +8,26 @@
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
  */
-
-export enum FactionType {
-    NO_TYPE = "",
-    CHAOS = "Chaos",
-    MIGHT = "Might",
-    NATURE = "Nature",
-    LIFE = "Life",
-    DEATH = "Death",
-    ORDER = "Order",
-}
+import { FactionType } from "@heroesofcrypto/common/src/generated/protobuf/v1/types_gen";
+import { FactionVals } from "@heroesofcrypto/common/src/generated/protobuf/v1/types_pb";
 
 export const AllFactions = [
-    FactionType.CHAOS,
-    FactionType.MIGHT,
-    FactionType.NATURE,
-    FactionType.LIFE,
-    FactionType.DEATH,
-    FactionType.ORDER,
+    FactionVals.NO_FACTION,
+    FactionVals.CHAOS,
+    FactionVals.MIGHT,
+    FactionVals.NATURE,
+    FactionVals.LIFE,
+    FactionVals.DEATH,
+    FactionVals.ORDER,
 ];
 
-export type AllFactionsType = (typeof AllFactions)[number];
-
-export const ToFactionType: { [key in AllFactionsType]: FactionType } = {
-    "": FactionType.NO_TYPE,
-    Chaos: FactionType.CHAOS,
-    Might: FactionType.MIGHT,
-    Nature: FactionType.NATURE,
-    Life: FactionType.LIFE,
-    Death: FactionType.DEATH,
-    Order: FactionType.ORDER,
+export const ToFactionType: { [factionTypeValue: string]: FactionType } = {
+    "": FactionVals.NO_FACTION,
+    NO_FACTION: FactionVals.NO_FACTION,
+    Chaos: FactionVals.CHAOS,
+    Might: FactionVals.MIGHT,
+    Nature: FactionVals.NATURE,
+    Life: FactionVals.LIFE,
+    Death: FactionVals.DEATH,
+    Order: FactionVals.ORDER,
 };

@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { FactionType } from "../factions/faction_type";
+import { FactionType } from "../generated/protobuf/v1/types_gen";
 
 export enum SpellTargetType {
     NO_TYPE = 0,

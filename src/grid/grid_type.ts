@@ -9,22 +9,13 @@
  * -----------------------------------------------------------------------------
  */
 
-export enum GridType {
-    NO_TYPE = 0,
-    NORMAL = 1,
-    LAVA_CENTER = 2,
-    BLOCK_CENTER = 3,
-    WATER_CENTER = 4,
-}
-
-export const AllGridTypes = [GridType.NORMAL, GridType.LAVA_CENTER, GridType.BLOCK_CENTER]; //, GridType.WATER_CENTER];
-
-export type AllGridType = (typeof AllGridTypes)[number];
+import { GridVals } from "../generated/protobuf/v1/types_pb";
+import { GridType } from "../generated/protobuf/v1/types_gen";
 
 export const ToGridType: { [gridTypeValue: string]: GridType } = {
-    "": GridType.NO_TYPE,
-    "1": GridType.NORMAL,
-    "2": GridType.LAVA_CENTER,
-    "3": GridType.BLOCK_CENTER,
+    "": GridVals.NO_TYPE,
+    "1": GridVals.NORMAL,
+    "2": GridVals.LAVA_CENTER,
+    "3": GridVals.BLOCK_CENTER,
     // "4": GridType.WATER_CENTER,
 };

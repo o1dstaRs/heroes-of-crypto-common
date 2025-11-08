@@ -36,6 +36,8 @@ export interface FactionValsMap {
   MIGHT: 2;
   NATURE: 3;
   LIFE: 4;
+  DEATH: 5;
+  ORDER: 6;
 }
 
 export const FactionVals: FactionValsMap;
@@ -196,4 +198,3 @@ export interface CreatureValsMap {
 }
 
 export const CreatureVals: CreatureValsMap;
-

@@ -20,6 +20,7 @@
         "build": "npm test && tsc && yarn run copy-generated",
         "build:proto": "scripts/protoc_generate.sh",
         "copy-generated": "cpy \"src/generated/**/*\" \"dist/generated\"",
+        "fmt": "prettier \"src/**/*.ts\" --write",
         "lint": "yarn run lint:es && yarn run lint:package && yarn run lint:style",
         "lint:es": "eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",
         "lint:es:fix": "yarn run lint:es --fix",
@@ -29,7 +30,6 @@
         "lint:style": "yarn run lint:style:base --check",
         "lint:style:base": "prettier \"src/**/*.{ts,tsx,js,json}\"",
         "lint:style:fix": "yarn run lint:style:base --write",
-        "fmt": "prettier \"src/**/*.ts\" --write",
         "test": "jest"
     },
     "browserslist": [

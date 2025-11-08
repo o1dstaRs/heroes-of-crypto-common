@@ -27,7 +27,7 @@ import {
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
 import { EffectFactory } from "../effects/effect_factory";
-import { AllFactionsType, FactionType, ToFactionType } from "../factions/faction_type";
+import { ToFactionType } from "../factions/faction_type";
 import {
     getCellForPosition,
     getCellsAroundCell,
@@ -45,8 +45,8 @@ import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, XY } from "../utils/math";
 import { UnitProperties } from "./unit_properties";
-import { AttackType, MovementType, TeamType, UnitType } from "../generated/protobuf/v1/types_gen";
-import { AttackVals, TeamVals, MovementVals, UnitVals } from "../generated/protobuf/v1/types_pb";
+import { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
+import { AttackVals, TeamVals, MovementVals, UnitVals, FactionVals } from "../generated/protobuf/v1/types_pb";
 
 export interface IAttackTargets {
     unitIds: Set<string>;
@@ -1187,7 +1187,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
         if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
-            const spellProperties = getSpellConfig(FactionType.NO_TYPE, "Made of Fire");
+            const spellProperties = getSpellConfig(FactionVals.NO_FACTION, "Made of Fire");
             this.applyBuff(
                 new Spell({
                     spellProperties: spellProperties,
@@ -1249,7 +1249,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (hasWaterCell && this.hasAbilityActive("Made of Water") && !this.hasBuffActive("Made of Water")) {
             this.applyBuff(
                 new Spell({
-                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Made of Water"),
+                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Made of Water"),
                     amount: 1,
                 }),
                 undefined,
@@ -2054,7 +2054,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (this.hasBuffActive("Spiritual Armor")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionType.LIFE, "Spiritual Armor"),
+                spellProperties: getSpellConfig(FactionVals.LIFE, "Spiritual Armor"),
                 amount: 1,
             });
             armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
@@ -2224,13 +2224,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (this.hasBuffActive("Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionType.CHAOS, "Riot"),
+                spellProperties: getSpellConfig(FactionVals.CHAOS, "Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
         } else if (this.hasBuffActive("Mass Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionType.CHAOS, "Mass Riot"),
+                spellProperties: getSpellConfig(FactionVals.CHAOS, "Mass Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
@@ -2530,7 +2530,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 continue;
             }
             // can return us undefined
-            const faction = ToFactionType[spArr[0] as AllFactionsType] ?? FactionType.NO_TYPE;
+            const faction = ToFactionType[spArr[0] as keyof typeof ToFactionType] ?? FactionVals.NO_FACTION;
             if (faction === undefined) {
                 continue;
             }

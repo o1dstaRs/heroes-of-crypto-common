@@ -11,7 +11,7 @@
 
 import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
 import { EffectFactory } from "../effects/effect_factory";
-import { FactionType } from "../factions/faction_type";
+import { FactionVals } from "../../src/generated/protobuf/v1/types_pb";
 import { Spell } from "../spells/spell";
 import { Ability } from "./ability";
 
@@ -27,7 +27,10 @@ export class AbilityFactory {
         const abilityConfig = getAbilityConfig(name);
         let spell: Spell | undefined = undefined;
         if (abilityConfig.can_be_cast) {
-            spell = new Spell({ spellProperties: getSpellConfig(FactionType.NO_TYPE, abilityConfig.name), amount: 1 });
+            spell = new Spell({
+                spellProperties: getSpellConfig(FactionVals.NO_FACTION, abilityConfig.name),
+                amount: 1,
+            });
         }
 
         return new Ability(

@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { EffectHelper, FactionType, IPlacement, Spell } from "..";
+import { EffectHelper, IPlacement, Spell } from "..";
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
@@ -21,7 +21,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
 import { IUnitAIRepr, Unit } from "./unit";
-import { AttackVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { AttackVals, TeamVals, FactionVals } from "../../src/generated/protobuf/v1/types_pb";
 import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { UnitProperties } from "./unit_properties";
 
@@ -254,7 +254,7 @@ export class UnitsHolder {
             unit.deleteBuff("Armor Augment");
             if (augmentArmor && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentArmorBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Armor Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Armor Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -275,7 +275,7 @@ export class UnitsHolder {
             unit.deleteBuff("Might Augment");
             if (augmentMight && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMightBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Might Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Might Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -300,7 +300,7 @@ export class UnitsHolder {
                 isPositionWithinGrid(this.gridSettings, unit.getPosition())
             ) {
                 const augmentSniperBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Sniper Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Sniper Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -324,7 +324,7 @@ export class UnitsHolder {
             unit.deleteBuff("Movement Augment");
             if (augmentMovement && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMovementBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionType.NO_TYPE, "Movement Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Movement Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -531,7 +531,7 @@ export class UnitsHolder {
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
                             new Spell({
-                                spellProperties: getSpellConfig(FactionType.NO_TYPE, "Visible"),
+                                spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Visible"),
                                 amount: 1,
                             }),
                         );
@@ -541,7 +541,7 @@ export class UnitsHolder {
                     if (!u.hasBuffActive("Hidden")) {
                         u.applyBuff(
                             new Spell({
-                                spellProperties: getSpellConfig(FactionType.NO_TYPE, "Hidden"),
+                                spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Hidden"),
                                 amount: 1,
                             }),
                         );

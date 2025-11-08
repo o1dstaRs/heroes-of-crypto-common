@@ -12,7 +12,7 @@
 import { AttackVals } from "../generated/protobuf/v1/types_pb";
 import * as HoCLib from "../utils/lib";
 import * as HoCConfig from "../configuration/config_provider";
-import { ToFactionType, AllFactionsType } from "../factions/faction_type";
+import { ToFactionType } from "../factions/faction_type";
 import { Grid } from "../grid/grid";
 import { Spell } from "../spells/spell";
 import { SpellPowerType } from "../spells/spell_properties";
@@ -84,7 +84,9 @@ export function processSpitBallAbility(
         let applied = true;
         const faction =
             ToFactionType[
-                POSSIBLE_DEBUFFS_TO_FACTIONS[debuffName as keyof typeof POSSIBLE_DEBUFFS_TO_FACTIONS] as AllFactionsType
+                POSSIBLE_DEBUFFS_TO_FACTIONS[
+                    debuffName as keyof typeof POSSIBLE_DEBUFFS_TO_FACTIONS
+                ] as keyof typeof ToFactionType
             ];
 
         if (faction === undefined) {

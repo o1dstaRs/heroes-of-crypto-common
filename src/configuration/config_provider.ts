@@ -26,10 +26,9 @@ import {
     ToSpellPowerType,
     ToSpellTargetType,
 } from "../spells/spell_properties";
-import { FactionType } from "../factions/faction_type";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
-import { AttackVals, UnitVals, MovementVals } from "../../src/generated/protobuf/v1/types_pb";
-import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { AttackVals, UnitVals, MovementVals, FactionVals } from "../../src/generated/protobuf/v1/types_pb";
+import { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 
 const DEFAULT_HERO_CONFIG = {
@@ -73,23 +72,23 @@ const DEFAULT_HERO_CONFIG = {
 };
 
 const DEFAULT_LUCK_PER_FACTION = {
-    [FactionType.NO_TYPE]: 0,
-    [FactionType.MIGHT]: 1,
-    [FactionType.CHAOS]: -1,
-    [FactionType.NATURE]: 4,
-    [FactionType.LIFE]: 1,
-    [FactionType.DEATH]: -2,
-    [FactionType.ORDER]: 3,
+    [FactionVals.NO_FACTION]: 0,
+    [FactionVals.MIGHT]: 1,
+    [FactionVals.CHAOS]: -1,
+    [FactionVals.NATURE]: 4,
+    [FactionVals.LIFE]: 1,
+    [FactionVals.DEATH]: -2,
+    [FactionVals.ORDER]: 3,
 };
 
 const DEFAULT_MORALE_PER_FACTION = {
-    [FactionType.NO_TYPE]: 0,
-    [FactionType.MIGHT]: 2,
-    [FactionType.CHAOS]: -1,
-    [FactionType.NATURE]: 1,
-    [FactionType.LIFE]: 4,
-    [FactionType.DEATH]: -4,
-    [FactionType.ORDER]: 3,
+    [FactionVals.NO_FACTION]: 0,
+    [FactionVals.MIGHT]: 2,
+    [FactionVals.CHAOS]: -1,
+    [FactionVals.NATURE]: 1,
+    [FactionVals.LIFE]: 4,
+    [FactionVals.DEATH]: -4,
+    [FactionVals.ORDER]: 3,
 };
 
 export const getHeroConfig = (

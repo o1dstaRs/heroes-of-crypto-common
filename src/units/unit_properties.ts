@@ -11,9 +11,8 @@
 
 import { v4 as uuidv4 } from "uuid";
 
-import { FactionType } from "../factions/faction_type";
 import { AttackVals, FactionVals, UnitLevelVals, CreatureVals, MovementVals } from "../generated/protobuf/v1/types_pb";
-import type { TeamType, UnitType, AttackType, MovementType } from "../generated/protobuf/v1/types_gen";
+import type { TeamType, UnitType, AttackType, MovementType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
     CreatureLevels as GenCreatureLevels,
     CreatureByLevel as GenCreatureByLevel,

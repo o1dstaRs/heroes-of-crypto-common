@@ -33,7 +33,7 @@ import { IBoardObj } from "../units/unit";
 import { IVisibleDamage } from "../scene/animations";
 import { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { IDamageStatistic } from "../scene/scene_stats";
-import { GridType } from "../grid/grid_type";
+import { GridVals } from "../generated/protobuf/v1/types_pb";
 
 export interface IRangeAttackEvaluation {
     rangeAttackDivisors: number[];
@@ -1623,8 +1623,8 @@ export class AttackHandler {
         const targetCell = GridMath.getCellForPosition(this.gridSettings, targetPosition);
         const animationData: IAnimationData[] = [];
         if (
-            this.grid.getGridType() !== GridType.BLOCK_CENTER ||
-            FightStateManager.getInstance().getFightProperties().getGridType() !== GridType.BLOCK_CENTER ||
+            this.grid.getGridType() !== GridVals.BLOCK_CENTER ||
+            FightStateManager.getInstance().getFightProperties().getGridType() !== GridVals.BLOCK_CENTER ||
             FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() <= 0 ||
             !attackerUnit ||
             attackerUnit.isDead() ||
