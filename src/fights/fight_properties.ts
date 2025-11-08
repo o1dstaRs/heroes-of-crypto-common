@@ -12,7 +12,6 @@
 import { v4 as uuidv4 } from "uuid";
 import Denque from "denque";
 
-import { TeamType } from "../units/unit_properties";
 import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
     MAX_AUGMENT_POINTS,
@@ -28,7 +27,8 @@ import {
     TOTAL_TIME_TO_MAKE_TURN_MILLIS,
 } from "../constants";
 import { Fight } from "../generated/protobuf/v1/fight_pb";
-import { StringList } from "../generated/protobuf/v1/types_pb";
+import { StringList, TeamVals } from "../generated/protobuf/v1/types_pb";
+import { TeamType } from "../generated/protobuf/v1/types_gen";
 import { GridType } from "../grid/grid_type";
 import {
     ArmorAugment,
@@ -63,79 +63,42 @@ import { AllFactionsType, FactionType, ToFactionType } from "../factions/faction
 
 export class FightProperties {
     private id: string;
-
     private currentLap: number;
-
     private gridType: GridType;
-
     private placementType: PlacementType;
-
     private firstTurnMade: boolean;
-
     private fightStarted: boolean;
-
     private fightFinished: boolean;
-
     private previousTurnTeam: TeamType;
-
     private highestSpeedThisTurn: number;
-
     private alreadyMadeTurn: Set<string>;
-
     private alreadyMadeTurnByTeam: Map<TeamType, Set<string>>;
-
     private alreadyHourglass: Set<string>;
-
     private alreadyRepliedAttack: Set<string>;
-
     private teamUnitsAlive: Map<TeamType, number>;
-
     private hourglassQueue: Denque<string>;
-
     private moralePlusQueue: Denque<string>;
-
     private moraleMinusQueue: Denque<string>;
-
     private currentTurnStart: number;
-
     private currentTurnEnd: number;
-
     private currentLapTotalTimePerTeam: Map<TeamType, number>;
-
     private upNextQueue: Denque<string>;
-
     private stepsMoraleMultiplier: number;
-
     private hasAdditionalTimeRequestedPerTeam: Map<TeamType, boolean>;
-
     private defaultPlacementPerTeam: Map<TeamType, DefaultPlacementLevel1>;
-
     private augmentPlacementPerTeam: Map<TeamType, PlacementAugment>;
-
     private augmentArmorPerTeam: Map<TeamType, ArmorAugment>;
-
     private augmentMightPerTeam: Map<TeamType, MightAugment>;
-
     private augmentSniperPerTeam: Map<TeamType, SniperAugment>;
-
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
-
     private synergyUnitsLifePerTeam: Map<TeamType, number>;
-
     private synergyUnitsChaosPerTeam: Map<TeamType, number>;
-
     private synergyUnitsMightPerTeam: Map<TeamType, number>;
-
     private synergyUnitsNaturePerTeam: Map<TeamType, number>;
-
     private damageDealFactPerLap: Map<number, boolean>;
-
     private synergiesPerTeam: Map<TeamType, string[]>;
-
     private obstacleHitsLeft: number = 0;
-
     private additionalNarrowingLaps: number = 0;
-
     public constructor() {
         this.id = uuidv4();
         this.currentLap = 1;
@@ -147,7 +110,7 @@ export class FightProperties {
         this.firstTurnMade = false;
         this.fightStarted = false;
         this.fightFinished = false;
-        this.previousTurnTeam = TeamType.NO_TEAM;
+        this.previousTurnTeam = TeamVals.NO_TEAM;
         this.highestSpeedThisTurn = 0;
         this.alreadyMadeTurn = new Set();
         this.alreadyMadeTurnByTeam = new Map();
@@ -176,91 +139,69 @@ export class FightProperties {
         this.synergiesPerTeam = new Map();
         this.damageDealFactPerLap = new Map();
     }
-
     public getId(): string {
         return this.id;
     }
-
     public getCurrentLap(): number {
         return this.currentLap;
     }
-
     public getGridType(): GridType {
         return this.gridType;
     }
-
     public getPlacementType(): PlacementType {
         return this.placementType;
     }
-
     public getFirstTurnMade(): boolean {
         return this.firstTurnMade;
     }
-
     public hasFightFinished(): boolean {
         return this.fightFinished;
     }
-
     public getPreviousTurnTeam(): TeamType {
         return this.previousTurnTeam;
     }
-
     public getHighestSpeedThisTurn(): number {
         return this.highestSpeedThisTurn;
     }
-
     public hasAlreadyMadeTurn(unitId: string): boolean {
         return this.alreadyMadeTurn.has(unitId);
     }
-
     public hasAlreadyHourglass(unitId: string): boolean {
         return this.alreadyHourglass.has(unitId);
     }
-
     public hasAlreadyRepliedAttack(unitId: string): boolean {
         return this.alreadyRepliedAttack.has(unitId);
     }
-
     public getAlreadyMadeTurnSize(): number {
         return this.alreadyMadeTurn.size;
     }
-
     public getMoraleMinusQueueSize(): number {
         return this.moraleMinusQueue.length;
     }
-
     public getMoralePlusQueueSize(): number {
         return this.moralePlusQueue.length;
     }
-
     public getHourglassQueueSize(): number {
         return this.hourglassQueue.length;
     }
-
     public getUpNextQueueSize(): number {
         return this.upNextQueue.length;
     }
-
     public getCurrentTurnStart(): number {
         return this.currentTurnStart;
     }
-
     public getCurrentTurnEnd(): number {
         return this.currentTurnEnd;
     }
-
     public getObstacleHitsLeft(): number {
         return this.obstacleHitsLeft;
     }
-
     public hasDamageDealFactPerLap(lap: number): boolean {
         return this.damageDealFactPerLap.get(lap) ?? false;
     }
-
     public encounterDamageDealFact(): void {
         this.damageDealFactPerLap.set(this.currentLap, true);
     }
-
     public encounterObstacleHit(): void {
         if (this.obstacleHitsLeft > 0) {
             this.damageDealFactPerLap.set(this.currentLap, true);
@@ -271,7 +212,6 @@ export class FightProperties {
             this.obstacleHitsLeft = 0;
         }
     }
-
     public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
         return (
             MAX_UNITS_PER_TEAM +
@@ -280,7 +220,6 @@ export class FightProperties {
             (this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1)
         );
     }
-
     public upNextIncludes(unitId: string): boolean {
         for (let i = 0; i < this.upNextQueue.length; i++) {
             if (this.upNextQueue.get(i) === unitId) {
@@ -290,7 +229,6 @@ export class FightProperties {
 
         return false;
     }
-
     public moralePlusIncludes(unitId: string): boolean {
         for (let i = 0; i < this.moralePlusQueue.length; i++) {
             if (this.moralePlusQueue.get(i) === unitId) {
@@ -300,7 +238,6 @@ export class FightProperties {
 
         return false;
     }
-
     public moraleMinusIncludes(unitId: string): boolean {
         for (let i = 0; i < this.moraleMinusQueue.length; i++) {
             if (this.moraleMinusQueue.get(i) === unitId) {
@@ -310,7 +247,6 @@ export class FightProperties {
 
         return false;
     }
-
     public hourglassIncludes(unitId: string): boolean {
         for (let i = 0; i < this.hourglassQueue.length; i++) {
             if (this.hourglassQueue.get(i) === unitId) {
@@ -320,14 +256,12 @@ export class FightProperties {
 
         return false;
     }
-
     public getStepsMoraleMultiplier(): number {
         return this.stepsMoraleMultiplier;
     }
     public getHasAdditionalTimeRequestedPerTeam(): Map<TeamType, boolean> {
         return this.hasAdditionalTimeRequestedPerTeam;
     }
-
     public setGridType(gridType: GridType): void {
         if (!this.fightStarted) {
             this.gridType = gridType;
@@ -338,27 +272,21 @@ export class FightProperties {
             }
         }
     }
-
     public dequeueNextUnitId(): string | undefined {
         return this.upNextQueue.shift();
     }
-
     public dequeueMoraleMinus(): string | undefined {
         return this.moraleMinusQueue.shift();
     }
-
     public dequeueMoralePlus(): string | undefined {
         return this.moralePlusQueue.shift();
     }
-
     public dequeueHourglassQueue(): string | undefined {
         return this.hourglassQueue.shift();
     }
-
     public setHighestSpeedThisTurn(highestSpeedThisTurn: number): void {
         this.highestSpeedThisTurn = highestSpeedThisTurn;
     }
-
     public startTurn(teamType: TeamType): void {
         let currentTotalTimePerTeam = this.currentLapTotalTimePerTeam.get(teamType);
         if (currentTotalTimePerTeam === undefined) {
@@ -371,9 +299,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === TeamType.LOWER
-                ? (this.teamUnitsAlive.get(TeamType.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(TeamType.UPPER) ?? 0);
+            teamType === TeamVals.LOWER
+                ? (this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0)
+                : (this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0);
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers - 1;
         if (teamMembersToMakeTurn < 0) {
             teamMembersToMakeTurn = 0;
@@ -399,7 +327,6 @@ export class FightProperties {
         // `timeRemaining:${timeRemaining} currentTotalTimePerTeam:${currentTotalTimePerTeam} maxTimeToMakeTurn:${maxTimeToMakeTurn} alreadyMadeTurnTeamMembers:${alreadyMadeTurnTeamMembers}`,
         // );
     }
-
     public requestAdditionalTurnTime(teamType?: TeamType, justCheck = false): number {
         if (!teamType) {
             return 0;
@@ -421,9 +348,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === TeamType.LOWER
-                ? (this.teamUnitsAlive.get(TeamType.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(TeamType.UPPER) ?? 0);
+            teamType === TeamVals.LOWER
+                ? (this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0)
+                : (this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0);
 
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers;
         if (teamMembersToMakeTurn < 0) {
@@ -449,19 +376,15 @@ export class FightProperties {
 
         return 0;
     }
-
     public markFirstTurn(): void {
         this.firstTurnMade = true;
     }
-
     public startFight(): void {
         this.fightStarted = true;
     }
-
     public finishFight(): void {
         this.fightFinished = true;
     }
-
     public flipLap(): void {
         this.alreadyMadeTurn.clear();
         this.alreadyMadeTurnByTeam.clear();
@@ -475,18 +398,15 @@ export class FightProperties {
         this.hasAdditionalTimeRequestedPerTeam.clear();
         this.currentLapTotalTimePerTeam.clear();
     }
-
     public isNarrowingLap(): boolean {
         return (
             this.currentLap > this.getNumberOfLapsTillNarrowing() &&
             this.currentLap % this.getNumberOfLapsTillNarrowing() === 1
         );
     }
-
     public getArmageddonWave(): number {
         return Math.floor(this.currentLap - NUMBER_OF_LAPS_FIRST_ARMAGEDDON + 1);
     }
-
     public isTimeToDryCenter(): boolean {
         let isTimeToDryCenter = false;
         if (this.gridType === GridType.LAVA_CENTER || this.gridType === GridType.WATER_CENTER) {
@@ -500,39 +420,31 @@ export class FightProperties {
 
         return isTimeToDryCenter;
     }
-
     public hasFightStarted(): boolean {
         return this.fightStarted;
     }
-
     public getTeamUnitsAlive(teamType: TeamType): number {
         return this.teamUnitsAlive.get(teamType) ?? 0;
     }
-
     public getNumberOfLapsTillNarrowing(): number {
         return this.getGridType() === GridType.BLOCK_CENTER
             ? NUMBER_OF_LAPS_TILL_NARROWING_BLOCK
             : NUMBER_OF_LAPS_TILL_NARROWING_NORMAL;
     }
-
     public encounterAdditionalNarrowingLap(): void {
         this.additionalNarrowingLaps++;
     }
-
     public getAdditionalNarrowingLaps(): number {
         return this.additionalNarrowingLaps;
     }
-
     public getLapsNarrowed(): number {
         return Math.floor((this.currentLap - 1) / this.getNumberOfLapsTillNarrowing()) + this.additionalNarrowingLaps;
     }
-
     public setTeamUnitsAlive(teamType: TeamType, unitsAlive: number): void {
         if (teamType) {
             this.teamUnitsAlive.set(teamType, unitsAlive);
         }
     }
-
     public setSynergyUnitsPerFactions(
         teamType: TeamType,
         nLife: number,
@@ -540,7 +452,7 @@ export class FightProperties {
         nMight: number,
         nNature: number,
     ): void {
-        if (teamType === TeamType.NO_TEAM) {
+        if (teamType === TeamVals.NO_TEAM) {
             return;
         }
 
@@ -701,7 +613,6 @@ export class FightProperties {
             );
         }
     }
-
     public getAdditionalAuraRangePerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
         if (!synergyLevel) {
@@ -710,7 +621,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getAdditionalMovementStepsPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.CHAOS, ChaosSynergy.MOVEMENT);
         if (!synergyLevel) {
@@ -719,7 +629,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getBreakChancePerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
         if (!synergyLevel) {
@@ -728,7 +637,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(
             teamType,
@@ -741,7 +649,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getAdditionalFlyArmorPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.NATURE, NatureSynergy.PLUS_FLY_ARMOR);
         if (!synergyLevel) {
@@ -750,7 +657,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Nature:${NatureSynergy.PLUS_FLY_ARMOR}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getAdditionalMoralePerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
         if (!synergyLevel) {
@@ -759,7 +665,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getAdditionalLuckPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
         if (!synergyLevel) {
@@ -768,7 +673,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[1] ?? 0;
     }
-
     public getAdditionalSupplyPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.LIFE, LifeSynergy.PLUS_SUPPLY_PERCENTAGE);
         if (!synergyLevel) {
@@ -777,11 +681,9 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     public getSynergiesPerTeam(teamType: TeamType): string[] {
         return this.synergiesPerTeam.get(teamType) ?? [];
     }
-
     public updateSynergyPerTeam(
         teamType: TeamType,
         faction: FactionType,
@@ -867,7 +769,6 @@ export class FightProperties {
 
         return true;
     }
-
     public getPossibleSynergies(teamType: TeamType): SynergyWithLevel[] {
         const synergies: SynergyWithLevel[] = [];
         const sizes = [6, 4, 2, 0]; // Check higher levels first
@@ -923,13 +824,11 @@ export class FightProperties {
 
         return synergies;
     }
-
     public addRepliedAttack(unitId: string): void {
         this.alreadyRepliedAttack.add(unitId);
     }
-
     public addAlreadyMadeTurn(teamType: TeamType, unitId: string): void {
-        if (teamType === TeamType.NO_TEAM) {
+        if (teamType === TeamVals.NO_TEAM) {
             return;
         }
 
@@ -948,56 +847,44 @@ export class FightProperties {
         currentTotalTimePerTeam += Math.floor(getTimeMillis() - this.currentTurnStart);
         this.currentLapTotalTimePerTeam.set(teamType, currentTotalTimePerTeam);
     }
-
     public enqueueHourglass(unitId: string) {
         this.alreadyHourglass.add(unitId);
         this.hourglassQueue.push(unitId);
     }
-
     public enqueueMoraleMinus(unitId: string) {
         this.moraleMinusQueue.push(unitId);
     }
-
     public enqueueMoralePlus(unitId: string) {
         this.moralePlusQueue.push(unitId);
     }
-
     public enqueueUpNext(unitId: string) {
         this.upNextQueue.push(unitId);
     }
-
     public getUpNextQueueIterable(): Iterable<string> {
         return {
             [Symbol.iterator]: () => this.upNextQueue.toArray()[Symbol.iterator](),
         };
     }
-
     public removeFromUpNext(unitId: string): boolean {
         return this.removeItemOnce(this.upNextQueue, unitId);
     }
-
     public removeFromHourglassQueue(unitId: string): void {
         this.removeItemOnce(this.hourglassQueue, unitId);
     }
-
     public removeFromMoraleMinusQueue(unitId: string): void {
         this.removeItemOnce(this.moraleMinusQueue, unitId);
     }
-
     public removeFromMoralePlusQueue(unitId: string): void {
         this.removeItemOnce(this.moralePlusQueue, unitId);
     }
-
     public increaseStepsMoraleMultiplier(): void {
         this.stepsMoraleMultiplier += STEPS_MORALE_MULTIPLIER;
     }
-
     public updatePreviousTurnTeam(teamType: TeamType): void {
         this.previousTurnTeam = teamType;
     }
-
     public setDefaultPlacementPerTeam(teamType: TeamType, placement: DefaultPlacementLevel1): void {
-        if (teamType === TeamType.NO_TEAM) {
+        if (teamType === TeamVals.NO_TEAM) {
             return;
         }
 
@@ -1010,9 +897,8 @@ export class FightProperties {
             this.augmentMovementPerTeam.set(teamType, MovementAugment.NO_AUGMENT);
         }
     }
-
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
-        if (teamType === TeamType.NO_TEAM) {
+        if (teamType === TeamVals.NO_TEAM) {
             return false;
         }
 
@@ -1037,9 +923,8 @@ export class FightProperties {
 
         return false;
     }
-
     public getAugmentPlacement(teamType: TeamType): number[] {
-        if (teamType === TeamType.NO_TEAM) {
+        if (teamType === TeamVals.NO_TEAM) {
             return [];
         }
 
@@ -1055,25 +940,20 @@ export class FightProperties {
 
         return getPlacementSizes(this.placementType, augmentPlacement, defaultPlacement);
     }
-
     public getAugmentArmor(teamType: TeamType): ArmorAugment {
         return this.augmentArmorPerTeam.get(teamType) ?? ArmorAugment.NO_AUGMENT;
     }
-
     public getAugmentMight(teamType: TeamType): MightAugment {
         return this.augmentMightPerTeam.get(teamType) ?? MightAugment.NO_AUGMENT;
     }
-
     public getAugmentSniper(teamType: TeamType): SniperAugment {
         return this.augmentSniperPerTeam.get(teamType) ?? SniperAugment.NO_AUGMENT;
     }
-
     public getAugmentMovement(teamType: TeamType): MovementAugment {
         return this.augmentMovementPerTeam.get(teamType) ?? MovementAugment.NO_AUGMENT;
     }
-
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
-        if (teamType === TeamType.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
+        if (teamType === TeamVals.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
             return false;
         }
 
@@ -1120,7 +1000,6 @@ export class FightProperties {
 
         return true;
     }
-
     public static deserialize(bytes: Uint8Array): FightProperties {
         const fight = Fight.deserializeBinary(bytes);
         const fightProperties = new FightProperties();
@@ -1137,8 +1016,8 @@ export class FightProperties {
 
         // Deserialize alreadyMadeTurnByTeam
         const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
-        alreadyMadeTurnByTeamMap.forEach((value: StringList, key: TeamType) => {
-            fightProperties.alreadyMadeTurnByTeam.set(key, new Set(value.getValuesList()));
+        alreadyMadeTurnByTeamMap.forEach((value: StringList, key: number) => {
+            fightProperties.alreadyMadeTurnByTeam.set(key as TeamType, new Set(value.getValuesList()));
         });
 
         fightProperties.alreadyHourglass = new Set(fight.getAlreadyHourglassList());
@@ -1146,8 +1025,8 @@ export class FightProperties {
 
         // Deserialize teamUnitsAlive
         const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
-        teamUnitsAliveMap.forEach((value: number, key: TeamType) => {
-            fightProperties.teamUnitsAlive.set(key, value);
+        teamUnitsAliveMap.forEach((value: number, key: number) => {
+            fightProperties.teamUnitsAlive.set(key as TeamType, value);
         });
 
         fightProperties.hourglassQueue = new Denque(fight.getHourglassQueueList());
@@ -1159,21 +1038,20 @@ export class FightProperties {
 
         // Deserialize currentLapTotalTimePerTeam
         const currentLapTotalTimePerTeamMap = fight.getCurrentLapTotalTimePerTeamMap();
-        currentLapTotalTimePerTeamMap.forEach((value: number, key: TeamType) => {
-            fightProperties.currentLapTotalTimePerTeam.set(key, value);
+        currentLapTotalTimePerTeamMap.forEach((value: number, key: number) => {
+            fightProperties.currentLapTotalTimePerTeam.set(key as TeamType, value);
         });
 
         fightProperties.upNextQueue = new Denque(fight.getUpNextList());
         fightProperties.stepsMoraleMultiplier = fight.getStepsMoraleMultiplier();
         // Deserialize hasAdditionalTimeRequestedPerTeam
         const hasAdditionalTimeRequestedPerTeamMap = fight.getHasAdditionalTimeRequestedPerTeamMap();
-        hasAdditionalTimeRequestedPerTeamMap.forEach((value: boolean, key: TeamType) => {
-            fightProperties.hasAdditionalTimeRequestedPerTeam.set(key, value);
+        hasAdditionalTimeRequestedPerTeamMap.forEach((value: boolean, key: number) => {
+            fightProperties.hasAdditionalTimeRequestedPerTeam.set(key as TeamType, value);
         });
 
         return fightProperties;
     }
-
     public serialize(): Uint8Array {
         const fight = new Fight();
         fight.setId(uuidToUint8Array(this.id));
@@ -1185,8 +1063,8 @@ export class FightProperties {
         fight.setPreviousTurnTeam(this.previousTurnTeam);
         fight.setHighestSpeedThisTurn(this.highestSpeedThisTurn);
         fight.setAlreadyMadeTurnList(Array.from(this.alreadyMadeTurn));
-        const alreadyMadeTurnByUpperTeam = this.alreadyMadeTurnByTeam.get(TeamType.UPPER);
-        const alreadyMadeTurnByLowerTeam = this.alreadyMadeTurnByTeam.get(TeamType.LOWER);
+        const alreadyMadeTurnByUpperTeam = this.alreadyMadeTurnByTeam.get(TeamVals.UPPER);
+        const alreadyMadeTurnByLowerTeam = this.alreadyMadeTurnByTeam.get(TeamVals.LOWER);
         const alreadyMadeTurnByUpperTeamList = new StringList();
         const alreadyMadeTurnByLowerTeamList = new StringList();
         if (alreadyMadeTurnByUpperTeam?.size) {
@@ -1196,36 +1074,35 @@ export class FightProperties {
             alreadyMadeTurnByLowerTeamList.setValuesList(Array.from(alreadyMadeTurnByLowerTeam));
         }
         const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
-        alreadyMadeTurnByTeamMap.set(TeamType.UPPER, alreadyMadeTurnByUpperTeamList);
-        alreadyMadeTurnByTeamMap.set(TeamType.LOWER, alreadyMadeTurnByLowerTeamList);
+        alreadyMadeTurnByTeamMap.set(TeamVals.UPPER, alreadyMadeTurnByUpperTeamList);
+        alreadyMadeTurnByTeamMap.set(TeamVals.LOWER, alreadyMadeTurnByLowerTeamList);
         fight.setAlreadyHourglassList(Array.from(this.alreadyHourglass));
         fight.setAlreadyRepliedAttackList(Array.from(this.alreadyRepliedAttack));
-        const upperTeamUnitsAlive = this.teamUnitsAlive.get(TeamType.UPPER) ?? 0;
-        const lowerTeamUnitsAlive = this.teamUnitsAlive.get(TeamType.LOWER) ?? 0;
+        const upperTeamUnitsAlive = this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0;
+        const lowerTeamUnitsAlive = this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0;
         const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
-        teamUnitsAliveMap.set(TeamType.UPPER, upperTeamUnitsAlive);
-        teamUnitsAliveMap.set(TeamType.LOWER, lowerTeamUnitsAlive);
+        teamUnitsAliveMap.set(TeamVals.UPPER, upperTeamUnitsAlive);
+        teamUnitsAliveMap.set(TeamVals.LOWER, lowerTeamUnitsAlive);
         fight.setHourglassQueueList(this.hourglassQueue.toArray());
         fight.setMoralePlusQueueList(this.moralePlusQueue.toArray());
         fight.setMoraleMinusQueueList(this.moraleMinusQueue.toArray());
         fight.setCurrentTurnStart(Math.round(this.currentTurnStart));
         fight.setCurrentTurnEnd(Math.round(this.currentTurnEnd));
         const currentLapTotalTimePerTeam = fight.getCurrentLapTotalTimePerTeamMap();
-        const upperCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamType.UPPER) ?? 0;
-        const lowerCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamType.LOWER) ?? 0;
-        currentLapTotalTimePerTeam.set(TeamType.UPPER, upperCurrentLapTotalTime);
-        currentLapTotalTimePerTeam.set(TeamType.LOWER, lowerCurrentLapTotalTime);
+        const upperCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamVals.UPPER) ?? 0;
+        const lowerCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamVals.LOWER) ?? 0;
+        currentLapTotalTimePerTeam.set(TeamVals.UPPER, upperCurrentLapTotalTime);
+        currentLapTotalTimePerTeam.set(TeamVals.LOWER, lowerCurrentLapTotalTime);
         fight.setUpNextList(this.upNextQueue.toArray());
         const hasAdditionalTimeRequestedPerTeam = fight.getHasAdditionalTimeRequestedPerTeamMap();
-        const upperAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamType.UPPER) ?? false;
-        const lowerAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamType.LOWER) ?? false;
-        hasAdditionalTimeRequestedPerTeam.set(TeamType.UPPER, upperAdditionalTimeRequested);
-        hasAdditionalTimeRequestedPerTeam.set(TeamType.LOWER, lowerAdditionalTimeRequested);
+        const upperAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamVals.UPPER) ?? false;
+        const lowerAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamVals.LOWER) ?? false;
+        hasAdditionalTimeRequestedPerTeam.set(TeamVals.UPPER, upperAdditionalTimeRequested);
+        hasAdditionalTimeRequestedPerTeam.set(TeamVals.LOWER, lowerAdditionalTimeRequested);
         fight.setStepsMoraleMultiplier(this.stepsMoraleMultiplier);
 
         return fight.serializeBinary();
     }
-
     public prefetchNextUnitsToTurn(allUnits: ReadonlyMap<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): void {
         const upNextUnitsCount = unitsUpper.length + unitsLower.length;
 
@@ -1252,7 +1129,6 @@ export class FightProperties {
             }
         }
     }
-
     public setUnitsCalculatedStacksPower(gridSettings: GridSettings, allUnits: Map<string, Unit>): void {
         let maxTotalExp = Number.MIN_SAFE_INTEGER;
         for (const u of allUnits.values()) {
@@ -1280,7 +1156,6 @@ export class FightProperties {
             }
         }
     }
-
     private findSynergyLevel(teamType: TeamType, faction: FactionType, specificSynergy: SpecificSynergy): number {
         let synergyLevel = 0;
         const synergies = this.synergiesPerTeam.get(teamType);
@@ -1311,7 +1186,6 @@ export class FightProperties {
 
         return synergyLevel;
     }
-
     private getAdditionalBoardUnitsPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, FactionType.NATURE, NatureSynergy.INCREASE_BOARD_UNITS);
         if (!synergyLevel) {
@@ -1320,7 +1194,6 @@ export class FightProperties {
 
         return SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${synergyLevel}`]?.[0] ?? 0;
     }
-
     private removeItemOnce(deque: Denque<string>, item: string): boolean {
         const index = deque.toArray().indexOf(item); // Find the index of the item
         let removed = false;
@@ -1342,7 +1215,6 @@ export class FightProperties {
 
         return removed;
     }
-
     private getNextTurnUnitId(
         allUnits: ReadonlyMap<string, Unit>,
         unitsUpper: Unit[],
@@ -1366,7 +1238,7 @@ export class FightProperties {
         let secondBatch: Unit[];
 
         // total morale based
-        if (this.previousTurnTeam == TeamType.NO_TEAM) {
+        if (this.previousTurnTeam == TeamVals.NO_TEAM) {
             for (const u of unitsUpper) {
                 this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
                 totalArmyMoraleUpper += u.getMorale();
@@ -1412,7 +1284,7 @@ export class FightProperties {
                     }
                 }
             }
-        } else if (this.previousTurnTeam === TeamType.LOWER) {
+        } else if (this.previousTurnTeam === TeamVals.LOWER) {
             firstBatch = unitsUpper;
             secondBatch = unitsLower;
         } else {
@@ -1466,7 +1338,6 @@ export class FightProperties {
 
         return undefined;
     }
-
     private getRandomGridType(): GridType {
         const randomValue = getRandomInt(0, 12);
         if (randomValue < 4) {

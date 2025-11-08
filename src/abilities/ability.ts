@@ -16,13 +16,9 @@ import { AbilityPowerType, AbilityProperties, AbilityType } from "./ability_prop
 
 export class Ability {
     private readonly abilityProperties: AbilityProperties;
-
     private readonly effect: Effect | undefined;
-
     private readonly auraEffect: AuraEffect | undefined;
-
     private readonly spell: Spell | undefined;
-
     public constructor(
         abilityProperties: AbilityProperties,
         effect: Effect | undefined,
@@ -34,31 +30,24 @@ export class Ability {
         this.auraEffect = auraEffect;
         this.spell = spell;
     }
-
     public getName(): string {
         return this.abilityProperties.name;
     }
-
     public getType(): AbilityType {
         return this.abilityProperties.type;
     }
-
     public getDesc(): string[] {
         return this.abilityProperties.desc;
     }
-
     public getPower(): number {
         return this.abilityProperties.power;
     }
-
     public getPowerType(): AbilityPowerType {
         return this.abilityProperties.power_type;
     }
-
     public getSkipResponse(): boolean {
         return this.abilityProperties.skip_response;
     }
-
     public getEffect(): Effect | undefined {
         if (this.effect) {
             return new Effect(this.effect.getDefaultProperties());
@@ -66,15 +55,12 @@ export class Ability {
 
         return undefined;
     }
-
     public getEffectName(): string | undefined {
         return this.effect?.getName();
     }
-
     public getSpell(): Spell | undefined {
         return this.spell;
     }
-
     public getAuraEffect(): AuraEffect | undefined {
         if (this.auraEffect) {
             this.auraEffect.toDefault();
@@ -83,15 +69,12 @@ export class Ability {
 
         return undefined;
     }
-
     public getAuraEffectName(): string | undefined {
         return this.auraEffect?.getName();
     }
-
     public getProperties(): AbilityProperties {
         return structuredClone(this.abilityProperties);
     }
-
     public isStackPowered(): boolean {
         return this.abilityProperties.stack_powered;
     }

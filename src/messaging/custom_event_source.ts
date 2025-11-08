@@ -18,33 +18,19 @@ type EventSourceOptions = {
 
 class CustomEventSource<T> {
     private url: string;
-
     private token: string | null;
-
     private listeners: Record<string, EventListener[]> = {};
-
     private isClosed: boolean = false;
-
     private reconnectAttempts: number = 0;
-
     private debug: boolean;
-
     private controller: AbortController | null = null;
-
     private reconnectDelay: number;
-
     private maxReconnectAttempts: number;
-
     public readyState: number = 0;
-
     public onopen: ((event?: T) => void) | null = null;
-
     public onmessage: ((event: T) => void) | null = null;
-
     public onerror: ((error: Error) => void) | null = null;
-
     public onreconnect: (() => void) | null = null;
-
     public constructor(url: string, options: EventSourceOptions = {}) {
         this.url = url;
         this.token = options.token || null;
@@ -55,14 +41,12 @@ class CustomEventSource<T> {
         this.debugLog("Initializing CustomEventSource with URL:", url);
         this.connect();
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private debugLog(...args: any[]) {
         if (this.debug) {
             console.log("[CustomEventSource]", ...args);
         }
     }
-
     private async connect(): Promise<boolean> {
         if (this.isClosed) {
             this.debugLog("Connection attempt aborted - EventSource is closed");
@@ -210,7 +194,6 @@ class CustomEventSource<T> {
             return false;
         }
     }
-
     private handleReconnection(err?: Error) {
         if (this.isClosed) {
             this.debugLog("Reconnection aborted - EventSource is closed");
@@ -247,20 +230,17 @@ class CustomEventSource<T> {
             }
         }, delay);
     }
-
     public addEventListener(event: string, callback: EventListener) {
         if (!this.listeners[event]) {
             this.listeners[event] = [];
         }
         this.listeners[event].push(callback);
     }
-
     public removeEventListener(event: string, callback: EventListener) {
         if (this.listeners[event]) {
             this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback);
         }
     }
-
     public close() {
         this.debugLog("Closing EventSource");
         this.isClosed = true;

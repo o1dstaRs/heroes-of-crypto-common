@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackType, TeamType } from "../units/unit_properties";
+import { AttackVals, TeamVals } from "../generated/protobuf/v1/types_pb";
 import { Grid } from "../grid/grid";
 import { ObstacleType } from "../obstacles/obstacle_type";
 import * as HoCMath from "../utils/math";
@@ -65,7 +65,6 @@ export class BasicAIAction implements IAIAction {
     private readonly cellToMoveTo: HoCMath.XY | undefined;
     private readonly cellToAttackTo: HoCMath.XY | undefined;
     private readonly activeKnownPaths: Map<number, IWeightedRoute[]>;
-
     public constructor(
         type: AIActionType,
         cellToMoveTo: HoCMath.XY | undefined,
@@ -77,19 +76,15 @@ export class BasicAIAction implements IAIAction {
         this.cellToAttackTo = cellToAttackTo;
         this.activeKnownPaths = activeKnownPaths;
     }
-
     public actionType(): AIActionType {
         return this.type;
     }
-
     public cellToMove(): HoCMath.XY | undefined {
         return this.cellToMoveTo;
     }
-
     public cellToAttack(): HoCMath.XY | undefined {
         return this.cellToAttackTo;
     }
-
     public currentActiveKnownPaths(): Map<number, IWeightedRoute[]> {
         return this.activeKnownPaths;
     }
@@ -232,7 +227,7 @@ function doFindTarget(
         unitCell,
         matrix,
         max_steps + unit.getSteps(),
-        grid.getAggrMatrixByTeam(unit.getTeam() === TeamType.LOWER ? TeamType.UPPER : TeamType.LOWER),
+        grid.getAggrMatrixByTeam(unit.getTeam() === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER),
         unit.canFly(),
         unit.isSmallSize(),
         unit.hasAbilityActive("Made of Fire"),
@@ -242,7 +237,7 @@ function doFindTarget(
         unitCell,
         matrix,
         unit.getSteps(),
-        grid.getAggrMatrixByTeam(unit.getTeam() === TeamType.LOWER ? TeamType.UPPER : TeamType.LOWER),
+        grid.getAggrMatrixByTeam(unit.getTeam() === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER),
         unit.canFly(),
         unit.isSmallSize(),
         unit.hasAbilityActive("Made of Fire"),
@@ -638,7 +633,7 @@ function doFindTarget(
         return undefined;
     }
 
-    if (unit.getAttackType() === AttackType.RANGE) {
+    if (unit.getAttackType() === AttackVals.RANGE) {
         const occupantUnitId = grid.getOccupantUnitId({ x: closestTarget.x, y: closestTarget.y });
         if (occupantUnitId) {
             previousTargets.set(unit.getId(), occupantUnitId);

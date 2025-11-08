@@ -151,7 +151,7 @@ proto.public.Fight.deserializeBinaryFromReader = function(msg, reader) {
       msg.setCurrentLap(value);
       break;
     case 3:
-      var value = /** @type {!proto.public.GridType} */ (reader.readEnum());
+      var value = /** @type {!proto.public.GridVals} */ (reader.readEnum());
       msg.setGridType(value);
       break;
     case 4:
@@ -167,7 +167,7 @@ proto.public.Fight.deserializeBinaryFromReader = function(msg, reader) {
       msg.setFightFinished(value);
       break;
     case 7:
-      var value = /** @type {!proto.public.Team} */ (reader.readEnum());
+      var value = /** @type {!proto.public.TeamVals} */ (reader.readEnum());
       msg.setPreviousTurnTeam(value);
       break;
     case 8:
@@ -473,16 +473,16 @@ proto.public.Fight.prototype.setCurrentLap = function(value) {
 
 
 /**
- * optional GridType grid_type = 3;
- * @return {!proto.public.GridType}
+ * optional GridVals grid_type = 3;
+ * @return {!proto.public.GridVals}
  */
 proto.public.Fight.prototype.getGridType = function() {
-  return /** @type {!proto.public.GridType} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
+  return /** @type {!proto.public.GridVals} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
 
 /**
- * @param {!proto.public.GridType} value
+ * @param {!proto.public.GridVals} value
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setGridType = function(value) {
@@ -545,16 +545,16 @@ proto.public.Fight.prototype.setFightFinished = function(value) {
 
 
 /**
- * optional Team previous_turn_team = 7;
- * @return {!proto.public.Team}
+ * optional TeamVals previous_turn_team = 7;
+ * @return {!proto.public.TeamVals}
  */
 proto.public.Fight.prototype.getPreviousTurnTeam = function() {
-  return /** @type {!proto.public.Team} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
+  return /** @type {!proto.public.TeamVals} */ (jspb.Message.getFieldWithDefault(this, 7, 0));
 };
 
 
 /**
- * @param {!proto.public.Team} value
+ * @param {!proto.public.TeamVals} value
  * @return {!proto.public.Fight} returns this
  */
 proto.public.Fight.prototype.setPreviousTurnTeam = function(value) {

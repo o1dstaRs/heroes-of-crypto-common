@@ -10,7 +10,7 @@
  */
 
 import * as AllAbilities from "../abilities";
-import { AttackType } from "../units/unit_properties";
+import { AttackVals } from "../generated/protobuf/v1/types_pb";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as GridMath from "../grid/grid_math";
@@ -56,29 +56,22 @@ export interface IAttackObstacle {
 
 export class AttackTarget implements IBoardObj {
     private readonly position: HoCMath.XY;
-
     private readonly size: number;
-
     private renderPosition: HoCMath.XY;
-
     public constructor(position: HoCMath.XY, size: number) {
         this.position = position;
         this.size = size;
         this.renderPosition = structuredClone(position);
     }
-
     public getPosition(): HoCMath.XY {
         return this.position;
     }
-
     public getRenderPosition(): HoCMath.XY {
         return this.renderPosition;
     }
-
     public isSmallSize(): boolean {
         return this.size === 1;
     }
-
     public setRenderPosition(x: number, y: number): void {
         this.renderPosition.x = x;
         this.renderPosition.y = y;
@@ -87,13 +80,9 @@ export class AttackTarget implements IBoardObj {
 
 export class AttackHandler {
     public readonly gridSettings: GridSettings;
-
     public readonly grid: Grid;
-
     public readonly sceneLog: ISceneLog;
-
     public readonly damageStatisticHolder: IStatisticHolder<IDamageStatistic>;
-
     public constructor(
         gridSettings: GridSettings,
         grid: Grid,
@@ -105,11 +94,9 @@ export class AttackHandler {
         this.sceneLog = sceneLog;
         this.damageStatisticHolder = damageStatisticHolder;
     }
-
     public getDamageStatisticHolder(): IStatisticHolder<IDamageStatistic> {
         return this.damageStatisticHolder;
     }
-
     public getRangeAttackDivisor(attackerUnit: Unit, attackPosition: HoCMath.XY): number {
         let rangeAttackDivisor = 1;
 
@@ -130,7 +117,6 @@ export class AttackHandler {
 
         return Math.floor(rangeAttackDivisor);
     }
-
     public evaluateRangeAttack(
         allUnits: ReadonlyMap<string, Unit>,
         fromUnit: Unit,
@@ -153,17 +139,15 @@ export class AttackHandler {
             isAOEShot,
         );
     }
-
     public canLandRangeAttack(unit: Unit, aggrMatrix?: number[][]): boolean {
         return (
-            unit.getAttackType() === AttackType.RANGE &&
+            unit.getAttackType() === AttackVals.RANGE &&
             !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
             !unit.hasDebuffActive("Rangebane")
         );
     }
-
     public canBeAttackedByMelee(unitPosition: HoCMath.XY, isSmallUnit: boolean, enemyAggrMatrix?: number[][]): boolean {
         let cells: HoCMath.XY[];
         if (isSmallUnit) {
@@ -185,7 +169,6 @@ export class AttackHandler {
 
         return false;
     }
-
     public handleMagicAttack(
         gridMatrix: number[][],
         unitsHolder: UnitsHolder,
@@ -415,7 +398,6 @@ export class AttackHandler {
 
         return { completed: false, unitIdsDied, animationData };
     }
-
     public handleRangeAttack(
         unitsHolder: UnitsHolder,
         hoverRangeAttackDivisors: number[],
@@ -437,7 +419,7 @@ export class AttackHandler {
             (!targetUnits?.length && !isAOE) ||
             !hoverRangeAttackDivisors.length ||
             !hoverRangeAttackPosition ||
-            attackerUnit.getAttackTypeSelection() !== AttackType.RANGE ||
+            attackerUnit.getAttackTypeSelection() !== AttackVals.RANGE ||
             !this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
             return { completed: false, unitIdsDied, animationData };
@@ -552,7 +534,7 @@ export class AttackHandler {
             rangeResponseUnit &&
             !attackerUnit.canSkipResponse() &&
             !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
-            targetUnit.canRespond(AttackType.RANGE) &&
+            targetUnit.canRespond(AttackVals.RANGE) &&
             this.canLandRangeAttack(targetUnit, this.grid.getEnemyAggrMatrixByUnitId(targetUnit.getId())) &&
             !(
                 targetUnit.hasDebuffActive("Cowardice") &&
@@ -611,7 +593,7 @@ export class AttackHandler {
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
-                    AttackType.RANGE,
+                    AttackVals.RANGE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
@@ -672,7 +654,7 @@ export class AttackHandler {
                     targetUnit,
                     targetUnit.calculateAttackDamage(
                         rangeResponseUnit,
-                        AttackType.RANGE,
+                        AttackVals.RANGE,
                         FightStateManager.getInstance()
                             .getFightProperties()
                             .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
@@ -939,7 +921,6 @@ export class AttackHandler {
 
         return { completed: true, unitIdsDied, animationData };
     }
-
     public handleMeleeAttack(
         unitsHolder: UnitsHolder,
         moveHandler: MoveHandler,
@@ -964,8 +945,8 @@ export class AttackHandler {
             !targetUnit ||
             targetUnit.isDead() ||
             !attackFromCell ||
-            (attackerUnit.getAttackTypeSelection() !== AttackType.MELEE &&
-                attackerUnit.getAttackTypeSelection() !== AttackType.MELEE_MAGIC) ||
+            (attackerUnit.getAttackTypeSelection() !== AttackVals.MELEE &&
+                attackerUnit.getAttackTypeSelection() !== AttackVals.MELEE_MAGIC) ||
             attackerUnit.hasAbilityActive("No Melee") ||
             attackerUnit.getTeam() === targetUnit.getTeam() ||
             (attackerUnit.hasDebuffActive("Cowardice") && attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
@@ -1195,7 +1176,7 @@ export class AttackHandler {
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
-                    AttackType.MELEE,
+                    AttackVals.MELEE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
@@ -1282,7 +1263,7 @@ export class AttackHandler {
             hasLightningSpinResponseLanded = false;
             if (
                 !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
-                targetUnit.canRespond(AttackType.MELEE) &&
+                targetUnit.canRespond(AttackVals.MELEE) &&
                 !attackerUnit.canSkipResponse() &&
                 !targetUnit.hasAbilityActive("No Melee") &&
                 !(
@@ -1387,7 +1368,7 @@ export class AttackHandler {
                             targetUnit,
                             targetUnit.calculateAttackDamage(
                                 attackerUnit,
-                                AttackType.MELEE,
+                                AttackVals.MELEE,
                                 FightStateManager.getInstance()
                                     .getFightProperties()
                                     .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
@@ -1631,7 +1612,6 @@ export class AttackHandler {
 
         return { completed: true, unitIdsDied, animationData };
     }
-
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,
         unitsHolder: UnitsHolder,
@@ -1678,7 +1658,7 @@ export class AttackHandler {
         // range attack
         let rangeLanded = false;
         if (
-            attackerUnit.getAttackTypeSelection() === AttackType.RANGE &&
+            attackerUnit.getAttackTypeSelection() === AttackVals.RANGE &&
             this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
             animationData.push({
@@ -1697,7 +1677,7 @@ export class AttackHandler {
             const doubleShotAbility = attackerUnit.getAbility("Double Shot");
             if (
                 doubleShotAbility &&
-                attackerUnit.getAttackTypeSelection() === AttackType.RANGE &&
+                attackerUnit.getAttackTypeSelection() === AttackVals.RANGE &&
                 this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
             ) {
                 animationData.push({
@@ -1902,7 +1882,6 @@ export class AttackHandler {
 
         return { completed: true, unitIdsDied: [], animationData };
     }
-
     private getAffectedUnitsAndObstacles(
         allUnits: ReadonlyMap<string, Unit>,
         cellsToPositions: [HoCMath.XY, HoCMath.XY][],
@@ -2019,7 +1998,6 @@ export class AttackHandler {
             attackObstacle,
         };
     }
-
     private getCellsToPositions(positions: HoCMath.XY[]): Array<[HoCMath.XY, HoCMath.XY]> {
         const cells: Array<[HoCMath.XY, HoCMath.XY]> = [];
         const cellKeys: number[] = [];
@@ -2038,7 +2016,6 @@ export class AttackHandler {
         }
         return cells;
     }
-
     private getIntersectedPositions(start: HoCMath.XY, end: HoCMath.XY): HoCMath.XY[] {
         const positions: HoCMath.XY[] = [];
 
@@ -2075,7 +2052,6 @@ export class AttackHandler {
 
         return positions;
     }
-
     private updateMoraleDecreaseForTheUnitTeam(
         initialRecord: Record<string, number>,
         updateBy: Record<string, number>,

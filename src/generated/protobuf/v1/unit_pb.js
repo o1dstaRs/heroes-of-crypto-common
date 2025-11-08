@@ -85,7 +85,7 @@ proto.public.Unit.prototype.toObject = function(opt_includeInstance) {
 proto.public.Unit.toObject = function(includeInstance, msg) {
   var f, obj = {
     id: msg.getId_asB64(),
-    race: jspb.Message.getFieldWithDefault(msg, 2, 0),
+    faction: jspb.Message.getFieldWithDefault(msg, 2, 0),
     name: jspb.Message.getFieldWithDefault(msg, 3, ""),
     team: jspb.Message.getFieldWithDefault(msg, 4, 0),
     maxHp: jspb.Message.getFieldWithDefault(msg, 5, 0),
@@ -161,15 +161,15 @@ proto.public.Unit.deserializeBinaryFromReader = function(msg, reader) {
       msg.setId(value);
       break;
     case 2:
-      var value = /** @type {!proto.public.Race} */ (reader.readEnum());
-      msg.setRace(value);
+      var value = /** @type {!proto.public.FactionVals} */ (reader.readEnum());
+      msg.setFaction(value);
       break;
     case 3:
       var value = /** @type {string} */ (reader.readString());
       msg.setName(value);
       break;
     case 4:
-      var value = /** @type {!proto.public.Team} */ (reader.readEnum());
+      var value = /** @type {!proto.public.TeamVals} */ (reader.readEnum());
       msg.setTeam(value);
       break;
     case 5:
@@ -209,11 +209,11 @@ proto.public.Unit.deserializeBinaryFromReader = function(msg, reader) {
       msg.setBaseArmor(value);
       break;
     case 14:
-      var value = /** @type {!proto.public.AttackType} */ (reader.readEnum());
+      var value = /** @type {!proto.public.AttackVals} */ (reader.readEnum());
       msg.setAttackType(value);
       break;
     case 15:
-      var value = /** @type {!proto.public.AttackType} */ (reader.readEnum());
+      var value = /** @type {!proto.public.AttackVals} */ (reader.readEnum());
       msg.setAttackTypeSelected(value);
       break;
     case 16:
@@ -265,11 +265,11 @@ proto.public.Unit.deserializeBinaryFromReader = function(msg, reader) {
       msg.setExp(value);
       break;
     case 28:
-      var value = /** @type {!proto.public.UnitSize} */ (reader.readEnum());
+      var value = /** @type {!proto.public.UnitSizeVals} */ (reader.readEnum());
       msg.setSize(value);
       break;
     case 29:
-      var value = /** @type {!proto.public.UnitLevel} */ (reader.readEnum());
+      var value = /** @type {!proto.public.UnitLevelVals} */ (reader.readEnum());
       msg.setLevel(value);
       break;
     case 30:
@@ -336,7 +336,7 @@ proto.public.Unit.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getRace();
+  f = message.getFaction();
   if (f !== 0.0) {
     writer.writeEnum(
       2,
@@ -627,19 +627,19 @@ proto.public.Unit.prototype.setId = function(value) {
 
 
 /**
- * optional Race race = 2;
- * @return {!proto.public.Race}
+ * optional FactionVals faction = 2;
+ * @return {!proto.public.FactionVals}
  */
-proto.public.Unit.prototype.getRace = function() {
-  return /** @type {!proto.public.Race} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
+proto.public.Unit.prototype.getFaction = function() {
+  return /** @type {!proto.public.FactionVals} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
 
 /**
- * @param {!proto.public.Race} value
+ * @param {!proto.public.FactionVals} value
  * @return {!proto.public.Unit} returns this
  */
-proto.public.Unit.prototype.setRace = function(value) {
+proto.public.Unit.prototype.setFaction = function(value) {
   return jspb.Message.setProto3EnumField(this, 2, value);
 };
 
@@ -663,16 +663,16 @@ proto.public.Unit.prototype.setName = function(value) {
 
 
 /**
- * optional Team team = 4;
- * @return {!proto.public.Team}
+ * optional TeamVals team = 4;
+ * @return {!proto.public.TeamVals}
  */
 proto.public.Unit.prototype.getTeam = function() {
-  return /** @type {!proto.public.Team} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
+  return /** @type {!proto.public.TeamVals} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
 };
 
 
 /**
- * @param {!proto.public.Team} value
+ * @param {!proto.public.TeamVals} value
  * @return {!proto.public.Unit} returns this
  */
 proto.public.Unit.prototype.setTeam = function(value) {
@@ -843,16 +843,16 @@ proto.public.Unit.prototype.setBaseArmor = function(value) {
 
 
 /**
- * optional AttackType attack_type = 14;
- * @return {!proto.public.AttackType}
+ * optional AttackVals attack_type = 14;
+ * @return {!proto.public.AttackVals}
  */
 proto.public.Unit.prototype.getAttackType = function() {
-  return /** @type {!proto.public.AttackType} */ (jspb.Message.getFieldWithDefault(this, 14, 0));
+  return /** @type {!proto.public.AttackVals} */ (jspb.Message.getFieldWithDefault(this, 14, 0));
 };
 
 
 /**
- * @param {!proto.public.AttackType} value
+ * @param {!proto.public.AttackVals} value
  * @return {!proto.public.Unit} returns this
  */
 proto.public.Unit.prototype.setAttackType = function(value) {
@@ -861,16 +861,16 @@ proto.public.Unit.prototype.setAttackType = function(value) {
 
 
 /**
- * optional AttackType attack_type_selected = 15;
- * @return {!proto.public.AttackType}
+ * optional AttackVals attack_type_selected = 15;
+ * @return {!proto.public.AttackVals}
  */
 proto.public.Unit.prototype.getAttackTypeSelected = function() {
-  return /** @type {!proto.public.AttackType} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
+  return /** @type {!proto.public.AttackVals} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
 };
 
 
 /**
- * @param {!proto.public.AttackType} value
+ * @param {!proto.public.AttackVals} value
  * @return {!proto.public.Unit} returns this
  */
 proto.public.Unit.prototype.setAttackTypeSelected = function(value) {
@@ -1095,16 +1095,16 @@ proto.public.Unit.prototype.setExp = function(value) {
 
 
 /**
- * optional UnitSize size = 28;
- * @return {!proto.public.UnitSize}
+ * optional UnitSizeVals size = 28;
+ * @return {!proto.public.UnitSizeVals}
  */
 proto.public.Unit.prototype.getSize = function() {
-  return /** @type {!proto.public.UnitSize} */ (jspb.Message.getFieldWithDefault(this, 28, 0));
+  return /** @type {!proto.public.UnitSizeVals} */ (jspb.Message.getFieldWithDefault(this, 28, 0));
 };
 
 
 /**
- * @param {!proto.public.UnitSize} value
+ * @param {!proto.public.UnitSizeVals} value
  * @return {!proto.public.Unit} returns this
  */
 proto.public.Unit.prototype.setSize = function(value) {
@@ -1113,16 +1113,16 @@ proto.public.Unit.prototype.setSize = function(value) {
 
 
 /**
- * optional UnitLevel level = 29;
- * @return {!proto.public.UnitLevel}
+ * optional UnitLevelVals level = 29;
+ * @return {!proto.public.UnitLevelVals}
  */
 proto.public.Unit.prototype.getLevel = function() {
-  return /** @type {!proto.public.UnitLevel} */ (jspb.Message.getFieldWithDefault(this, 29, 0));
+  return /** @type {!proto.public.UnitLevelVals} */ (jspb.Message.getFieldWithDefault(this, 29, 0));
 };
 
 
 /**
- * @param {!proto.public.UnitLevel} value
+ * @param {!proto.public.UnitLevelVals} value
  * @return {!proto.public.Unit} returns this
  */
 proto.public.Unit.prototype.setLevel = function(value) {

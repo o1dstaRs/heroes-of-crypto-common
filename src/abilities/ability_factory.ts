@@ -17,15 +17,12 @@ import { Ability } from "./ability";
 
 export class AbilityFactory {
     protected readonly effectFactory: EffectFactory;
-
     public constructor(effectFactory: EffectFactory) {
         this.effectFactory = effectFactory;
     }
-
     public getEffectsFactory(): EffectFactory {
         return this.effectFactory;
     }
-
     public makeAbility(name: string) {
         const abilityConfig = getAbilityConfig(name);
         let spell: Spell | undefined = undefined;

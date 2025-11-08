@@ -17,7 +17,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { TeamType } from "../units/unit_properties";
+import { TeamVals } from "../generated/protobuf/v1/types_pb";
 import { XY } from "../utils/math";
 
 export interface ISystemMoveResult {
@@ -34,17 +34,13 @@ export interface IDirectedMoveResult {
 
 export class MoveHandler {
     public readonly gridSettings: GridSettings;
-
     private readonly grid: Grid;
-
     private readonly unitsHolder: UnitsHolder;
-
     public constructor(gridSettings: GridSettings, grid: Grid, unitsHolder: UnitsHolder) {
         this.gridSettings = gridSettings;
         this.grid = grid;
         this.unitsHolder = unitsHolder;
     }
-
     public moveUnitTowardsCenter(cell: XY, updatePositionMask: number, lapsNarrowed: number): ISystemMoveResult {
         const possibleUnitId = this.grid.getOccupantUnitId(cell);
         const logs: string[] = [];
@@ -104,16 +100,16 @@ export class MoveHandler {
                 let moveY = false;
                 let priorityShift = 0;
                 if (updatePositionMask & UPDATE_UP) {
-                    priorityShift = unit.getTeam() === TeamType.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_DOWN) {
-                    priorityShift = unit.getTeam() === TeamType.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_LEFT) {
-                    priorityShift = unit.getTeam() === TeamType.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
                     moveY = true;
                 } else if (updatePositionMask & UPDATE_RIGHT) {
-                    priorityShift = unit.getTeam() === TeamType.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
                     moveY = true;
                 }
                 const initialTargetCells = structuredClone(targetCells);
@@ -221,7 +217,6 @@ export class MoveHandler {
 
         return { log: logs.join("\n"), unitIdsDestroyed, unitIdToNewPosition };
     }
-
     public applyMoveModifiers(
         toCell: XY,
         unit: Unit,
@@ -260,7 +255,6 @@ export class MoveHandler {
 
         return true;
     }
-
     public finishDirectedUnitMove(
         unit: Unit,
         targetCells: XY[],
@@ -325,7 +319,6 @@ export class MoveHandler {
 
         return { log: "", newPosition: bodyNewPosition, deleteUnit: deleteUnit };
     }
-
     private getShiftedCells(
         cells: XY[],
         shiftFactor: number,

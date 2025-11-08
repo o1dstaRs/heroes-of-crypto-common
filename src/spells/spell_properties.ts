@@ -109,37 +109,21 @@ export const ToSpellMultiplierType: { [spellMultiplierTypeName: string]: SpellMu
 
 export class SpellProperties {
     public readonly name: string;
-
     public readonly faction: FactionType;
-
     public readonly level: number;
-
     public desc: string[];
-
     public readonly spell_target_type: SpellTargetType;
-
     public power: number;
-
     public readonly power_type: SpellPowerType;
-
     public readonly multiplier_type: SpellMultiplierType;
-
     public readonly laps: number;
-
     public readonly is_buff: boolean;
-
     public readonly self_cast_allowed: boolean;
-
     public readonly self_debuff_applies: boolean;
-
     public readonly minimal_caster_stack_power: number;
-
     public readonly conflicts_with: string[];
-
     public readonly is_giftable: boolean;
-
     public readonly maximum_gift_level: number;
-
     public constructor(
         faction: FactionType,
         name: string,

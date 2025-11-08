@@ -2,6 +2,7 @@
 // file: types.proto
 
 import * as jspb from "google-protobuf";
+import * as google_protobuf_descriptor_pb from "google-protobuf/google/protobuf/descriptor_pb";
 
 export class StringList extends jspb.Message {
   clearValuesList(): void;
@@ -25,41 +26,47 @@ export namespace StringList {
   }
 }
 
-export interface RaceMap {
-  CHAOS: 0;
-  MIGHT: 1;
-  NATURE: 2;
-  LIFE: 3;
+  export const creatureLevel: jspb.ExtensionFieldInfo<UnitLevelValsMap>;
+
+  export const creatureFaction: jspb.ExtensionFieldInfo<FactionValsMap>;
+
+export interface FactionValsMap {
+  NO_FACTION: 0;
+  CHAOS: 1;
+  MIGHT: 2;
+  NATURE: 3;
+  LIFE: 4;
 }
 
-export const Race: RaceMap;
+export const FactionVals: FactionValsMap;
 
-export interface TeamMap {
+export interface TeamValsMap {
   NO_TEAM: 0;
   UPPER: 1;
   LOWER: 2;
 }
 
-export const Team: TeamMap;
+export const TeamVals: TeamValsMap;
 
-export interface AttackTypeMap {
-  MELEE: 0;
-  RANGE: 1;
-  MAGIC: 2;
-  MELEE_MAGIC: 3;
+export interface AttackValsMap {
+  NO_ATTACK: 0;
+  MELEE: 1;
+  RANGE: 2;
+  MAGIC: 3;
+  MELEE_MAGIC: 4;
 }
 
-export const AttackType: AttackTypeMap;
+export const AttackVals: AttackValsMap;
 
-export interface UnitSizeMap {
+export interface UnitSizeValsMap {
   NO_SIZE: 0;
   SMALL: 1;
   LARGE: 2;
 }
 
-export const UnitSize: UnitSizeMap;
+export const UnitSizeVals: UnitSizeValsMap;
 
-export interface UnitLevelMap {
+export interface UnitLevelValsMap {
   NO_LEVEL: 0;
   FIRST: 1;
   SECOND: 2;
@@ -67,9 +74,9 @@ export interface UnitLevelMap {
   FOURTH: 4;
 }
 
-export const UnitLevel: UnitLevelMap;
+export const UnitLevelVals: UnitLevelValsMap;
 
-export interface GridTypeMap {
+export interface GridValsMap {
   NO_TYPE: 0;
   NORMAL: 1;
   WATER_CENTER: 2;
@@ -77,9 +84,9 @@ export interface GridTypeMap {
   BLOCK_CENTER: 4;
 }
 
-export const GridType: GridTypeMap;
+export const GridVals: GridValsMap;
 
-export interface PickPhaseMap {
+export interface PickPhaseValsMap {
   INITIAL_PICK: 0;
   EXTENDED_PICK: 1;
   EXTENDED_BAN: 2;
@@ -91,9 +98,60 @@ export interface PickPhaseMap {
   AUGMENTS_SCOUT: 8;
 }
 
-export const PickPhase: PickPhaseMap;
+export const PickPhaseVals: PickPhaseValsMap;
 
-export interface CreatureMap {
+export interface PickPhaseActionValsMap {
+  NO_ACTION: 0;
+  PICK_INITIAL_PAIR: 1;
+  PICK_UNIT: 2;
+  BAN_UNIT: 3;
+  SELECT_ARTIFACT: 4;
+  AUGMENT: 5;
+  REVEAL: 6;
+}
+
+export const PickPhaseActionVals: PickPhaseActionValsMap;
+
+export interface AugmentValsMap {
+  NO_AUGMENT: 0;
+  AUGMENTS_AND_MAP_SCOUT: 1;
+  ALL_UNITS_SCOUT: 2;
+}
+
+export const AugmentVals: AugmentValsMap;
+
+export interface AllUnitsScoutAugmentValsMap {
+  NO_AUGMENTED_ALL_UNITS_SCOUT: 0;
+  AUGMENTED_ALL_UNITS_SCOUT: 1;
+}
+
+export const AllUnitsScoutAugmentVals: AllUnitsScoutAugmentValsMap;
+
+export interface AugmentsAndMapScoutAugmentValsMap {
+  NO_AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 0;
+  AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 1;
+}
+
+export const AugmentsAndMapScoutAugmentVals: AugmentsAndMapScoutAugmentValsMap;
+
+export interface MovementValsMap {
+  NO_MOVEMENT: 0;
+  WALK: 1;
+  FLY: 2;
+  TELEPORT: 3;
+}
+
+export const MovementVals: MovementValsMap;
+
+export interface UnitValsMap {
+  NO_UNIT: 0;
+  CREATURE: 1;
+  HERO: 2;
+}
+
+export const UnitVals: UnitValsMap;
+
+export interface CreatureValsMap {
   NO_CREATURE: 0;
   ORC: 1;
   SCAVENGER: 2;
@@ -137,39 +195,5 @@ export interface CreatureMap {
   ANGEL: 40;
 }
 
-export const Creature: CreatureMap;
-
-export interface PickPhaseActionTypeMap {
-  NO_ACTION: 0;
-  PICK_INITIAL_PAIR: 1;
-  PICK_UNIT: 2;
-  BAN_UNIT: 3;
-  SELECT_ARTIFACT: 4;
-  AUGMENT: 5;
-  REVEAL: 6;
-}
-
-export const PickPhaseActionType: PickPhaseActionTypeMap;
-
-export interface AugmentTypeMap {
-  NO_AUGMENT: 0;
-  AUGMENTS_AND_MAP_SCOUT: 1;
-  ALL_UNITS_SCOUT: 2;
-}
-
-export const AugmentType: AugmentTypeMap;
-
-export interface AllUnitsScoutAugmentMap {
-  NO_AUGMENTED_ALL_UNITS_SCOUT: 0;
-  AUGMENTED_ALL_UNITS_SCOUT: 1;
-}
-
-export const AllUnitsScoutAugment: AllUnitsScoutAugmentMap;
-
-export interface AugmentsAndMapScoutAugmentMap {
-  NO_AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 0;
-  AUGMENTED_AUGMENTS_AND_MAP_SCOUT: 1;
-}
-
-export const AugmentsAndMapScoutAugment: AugmentsAndMapScoutAugmentMap;
+export const CreatureVals: CreatureValsMap;
 

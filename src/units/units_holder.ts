@@ -21,34 +21,28 @@ import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
 import { IUnitAIRepr, Unit } from "./unit";
-import { AttackType, TeamType, UnitProperties } from "./unit_properties";
+import { AttackVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { UnitProperties } from "./unit_properties";
 
 export class UnitsHolder {
     private readonly grid: Grid;
-
     private readonly allUnits: Map<string, Unit> = new Map();
-
     private readonly gridSettings: GridSettings;
-
     private teamsAuraEffects: Map<TeamType, Map<number, AppliedAuraEffectProperties[]>>;
-
     private distancesToClosestEnemies: Map<string, number> = new Map();
-
     public constructor(grid: Grid) {
         this.grid = grid;
         this.gridSettings = grid.getSettings();
         this.teamsAuraEffects = new Map();
         this.distancesToClosestEnemies = new Map();
     }
-
     public getAllUnitsIterator(): IterableIterator<Unit> {
         return this.allUnits.values();
     }
-
     public getAllUnits(): ReadonlyMap<string, Unit> {
         return this.allUnits;
     }
-
     public getAllEnemyUnits(myTeamType: TeamType): Unit[] {
         const enemyUnits: Unit[] = [];
         for (const unit of this.allUnits.values()) {
@@ -59,7 +53,6 @@ export class UnitsHolder {
 
         return enemyUnits;
     }
-
     public getAllAllies(teamType: TeamType): Unit[] {
         const allies: Unit[] = [];
         for (const unit of this.allUnits.values()) {
@@ -70,7 +63,6 @@ export class UnitsHolder {
 
         return allies;
     }
-
     public getAllAlliesPlaced(
         teamType: TeamType,
         lowerLeftPlacement: IPlacement,
@@ -95,10 +87,10 @@ export class UnitsHolder {
 
                     if (
                         !(
-                            (teamType === TeamType.LOWER &&
+                            (teamType === TeamVals.LOWER &&
                                 (lowerLeftPlacement.isAllowed(cellPosition) ||
                                     (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                            (teamType === TeamType.UPPER &&
+                            (teamType === TeamVals.UPPER &&
                                 (upperRightPlacement.isAllowed(cellPosition) ||
                                     (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
                                 isPositionWithinGrid(this.gridSettings, cellPosition))
@@ -117,7 +109,6 @@ export class UnitsHolder {
 
         return allies;
     }
-
     public toCleanupRandomUnitsTillTeamSize(
         targetTeamSize: number,
         teamType: TeamType,
@@ -152,7 +143,6 @@ export class UnitsHolder {
 
         return ret;
     }
-
     public getAllTeamUnitsBuffs(teamType: TeamType): Map<string, AppliedSpell[]> {
         const teamUnitBuffs: Map<string, AppliedSpell[]> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -163,7 +153,6 @@ export class UnitsHolder {
 
         return teamUnitBuffs;
     }
-
     public haveDistancesToClosestEnemiesDecreased(): boolean {
         let distanceDecreased = false;
 
@@ -198,7 +187,6 @@ export class UnitsHolder {
 
         return distanceDecreased;
     }
-
     public getAllEnemyUnitsBuffs(myTeamType: TeamType): Map<string, AppliedSpell[]> {
         const enemyTeamUnitBuffs: Map<string, AppliedSpell[]> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -209,7 +197,6 @@ export class UnitsHolder {
 
         return enemyTeamUnitBuffs;
     }
-
     public getAllEnemyUnitsDebuffs(myTeamType: TeamType): Map<string, AppliedSpell[]> {
         const teamUnitBuffs: Map<string, AppliedSpell[]> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -220,7 +207,6 @@ export class UnitsHolder {
 
         return teamUnitBuffs;
     }
-
     public getAllTeamUnitsCanFly(teamType: TeamType): Map<string, boolean> {
         const teamUnitCanFly: Map<string, boolean> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -231,7 +217,6 @@ export class UnitsHolder {
 
         return teamUnitCanFly;
     }
-
     public getAllEnemyUnitsCanFly(teamType: TeamType): Map<string, boolean> {
         const enemyTeamUnitCanFly: Map<string, boolean> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -242,7 +227,6 @@ export class UnitsHolder {
 
         return enemyTeamUnitCanFly;
     }
-
     public getAllTeamUnitsMagicResist(teamType: TeamType): Map<string, number> {
         const teamUnitMagicResist: Map<string, number> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -253,7 +237,6 @@ export class UnitsHolder {
 
         return teamUnitMagicResist;
     }
-
     public getAllTeamUnitsHp(teamType: TeamType): Map<string, number> {
         const teamUnitHp: Map<string, number> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -264,7 +247,6 @@ export class UnitsHolder {
 
         return teamUnitHp;
     }
-
     public applyAugments(): void {
         for (const unit of this.getAllUnitsIterator()) {
             const augmentArmor = FightStateManager.getInstance().getFightProperties().getAugmentArmor(unit.getTeam());
@@ -314,7 +296,7 @@ export class UnitsHolder {
             unit.deleteBuff("Sniper Augment");
             if (
                 augmentSniper &&
-                unit.getAttackType() === AttackType.RANGE &&
+                unit.getAttackType() === AttackVals.RANGE &&
                 isPositionWithinGrid(this.gridSettings, unit.getPosition())
             ) {
                 const augmentSniperBuff = new Spell({
@@ -359,7 +341,6 @@ export class UnitsHolder {
             }
         }
     }
-
     public getAllTeamUnitsMaxHp(teamType: TeamType): Map<string, number> {
         const teamUnitMaxHp: Map<string, number> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -370,7 +351,6 @@ export class UnitsHolder {
 
         return teamUnitMaxHp;
     }
-
     public getAllEnemyUnitsMagicResist(myTeamType: TeamType): Map<string, number> {
         const enemyUnitMagicResist: Map<string, number> = new Map();
         for (const unit of this.allUnits.values()) {
@@ -381,7 +361,6 @@ export class UnitsHolder {
 
         return enemyUnitMagicResist;
     }
-
     public getUnitByStats(unitProperties: UnitProperties): Unit | undefined {
         if (!unitProperties) {
             return undefined;
@@ -394,9 +373,8 @@ export class UnitsHolder {
 
         return this.allUnits.get(unitId);
     }
-
     public refreshUnitsForAllTeams(): Unit[][] {
-        const unitForAllTeams: Unit[][] = new Array((Object.keys(TeamType).length - 2) >> 1);
+        const unitForAllTeams: Unit[][] = new Array((Object.keys(TeamVals).length - 2) >> 1);
         for (const unit of this.allUnits.values()) {
             const teamId = unit.getTeam() - 1;
             if (!(teamId in unitForAllTeams)) {
@@ -406,7 +384,6 @@ export class UnitsHolder {
         }
         return unitForAllTeams;
     }
-
     public deleteUnitById(unitId: string, checkForResurrection = false): boolean {
         if (!unitId) {
             return false;
@@ -455,7 +432,6 @@ export class UnitsHolder {
 
         return false;
     }
-
     public getSummonedUnitByName(teamType: TeamType, unitName: string): Unit | undefined {
         if (!unitName) {
             return undefined;
@@ -469,7 +445,6 @@ export class UnitsHolder {
 
         return undefined;
     }
-
     public getDistanceToClosestEnemy(enemyTeam: TeamType, position: XY): number {
         let closestDistance = Number.MAX_SAFE_INTEGER;
         for (const u of this.getAllUnitsIterator()) {
@@ -480,7 +455,6 @@ export class UnitsHolder {
 
         return closestDistance;
     }
-
     public allEnemiesAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): Unit[] {
         const enemyList: Unit[] = [];
         const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
@@ -521,7 +495,6 @@ export class UnitsHolder {
 
         return enemyList;
     }
-
     public refreshStackPowerForAllUnits(): void {
         FightStateManager.getInstance()
             .getFightProperties()
@@ -577,7 +550,6 @@ export class UnitsHolder {
             }
         }
     }
-
     public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
         const enemyIdsSpotted: string[] = [];
         const enemyIds: string[] = [];
@@ -601,7 +573,6 @@ export class UnitsHolder {
 
         return enemyIdsSpotted.length;
     }
-
     public getUnitAuraAttackMod(unit: Unit, cells?: XY[]): number {
         let auraAttackMod = 0;
         const warAngerAuraEffect = unit.getAuraEffect("War Anger");
@@ -640,12 +611,11 @@ export class UnitsHolder {
 
         return auraAttackMod;
     }
-
     public refreshAuraEffectsForAllUnits(): void {
         // setup the initial empty maps
         this.teamsAuraEffects = new Map();
-        for (let i = 0; i < (Object.keys(TeamType).length - 2) >> 1; i++) {
-            this.teamsAuraEffects.set(i + 1, new Map());
+        for (let i = 0; i < (Object.keys(TeamVals).length - 2) >> 1; i++) {
+            this.teamsAuraEffects.set((i + 1) as TeamType, new Map());
         }
 
         // fill the maps with the aura effects, duplicate auras allowed
@@ -776,11 +746,9 @@ export class UnitsHolder {
             }
         }
     }
-
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);
     }
-
     public decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam: Record<string, number>): void {
         for (const unitNameKey of Object.keys(moraleDecreaseForTheUnitTeam)) {
             const moraleDecrease = moraleDecreaseForTheUnitTeam[unitNameKey];
@@ -788,7 +756,7 @@ export class UnitsHolder {
             if (unitNameKeySplit.length === 2) {
                 const unitName = unitNameKeySplit[0];
                 const unitTeam = parseInt(unitNameKeySplit[1]);
-                if (unitTeam !== TeamType.LOWER && unitTeam !== TeamType.UPPER) {
+                if (unitTeam !== TeamVals.LOWER && unitTeam !== TeamVals.UPPER) {
                     continue;
                 }
                 for (const u of this.getAllUnitsIterator()) {
@@ -804,7 +772,6 @@ export class UnitsHolder {
             }
         }
     }
-
     public increaseUnitsSupplyIfNeededPerTeam(team: TeamType): void {
         if (
             FightStateManager.getInstance().getFightProperties().hasFightStarted() ||
@@ -819,7 +786,6 @@ export class UnitsHolder {
             }
         }
     }
-
     public deleteUnitIfNotAllowed(
         unitId: string,
         lowerLeftPlacement?: IPlacement,
@@ -847,18 +813,18 @@ export class UnitsHolder {
 
             const isWithinGrid = isPositionWithinGrid(this.gridSettings, cellPosition);
             if (
-                (enemyTeamType === TeamType.LOWER &&
+                (enemyTeamType === TeamVals.LOWER &&
                     ((lowerLeftPlacement && lowerLeftPlacement.isAllowed(cellPosition)) ||
                         (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                (enemyTeamType === TeamType.UPPER &&
+                (enemyTeamType === TeamVals.UPPER &&
                     ((upperRightPlacement && upperRightPlacement.isAllowed(cellPosition)) ||
                         (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition)))) ||
                 (isWithinGrid &&
-                    teamType === TeamType.LOWER &&
+                    teamType === TeamVals.LOWER &&
                     !lowerLeftPlacement?.isAllowed(cellPosition) &&
                     !lowerRightPlacement?.isAllowed(cellPosition)) ||
                 (isWithinGrid &&
-                    teamType === TeamType.UPPER &&
+                    teamType === TeamVals.UPPER &&
                     !upperRightPlacement?.isAllowed(cellPosition) &&
                     !upperLeftPlacement?.isAllowed(cellPosition)) ||
                 (verifyWithinGridPosition && !isWithinGrid)

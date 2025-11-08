@@ -12,7 +12,8 @@
 import { Grid } from "../grid/grid";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { TeamType } from "../units/unit_properties";
+import { TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { getDistance, XY } from "../utils/math";
 import { Ability } from "./ability";
 
@@ -33,11 +34,11 @@ export function getAbilitiesWithPosisionCoefficient(
             const aY = fromCell.y;
             const tY = toCell.y;
 
-            if (fromUnitTeam === TeamType.LOWER && aY > tY) {
+            if (fromUnitTeam === TeamVals.LOWER && aY > tY) {
                 abilities.push(a);
             }
 
-            if (fromUnitTeam === TeamType.UPPER && aY < tY - (toUnitSmallSize ? 0 : 1)) {
+            if (fromUnitTeam === TeamVals.UPPER && aY < tY - (toUnitSmallSize ? 0 : 1)) {
                 abilities.push(a);
             }
         }

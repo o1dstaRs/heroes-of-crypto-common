@@ -13,7 +13,7 @@ import * as EffectHelper from "../effects/effect_helper";
 import * as HoCConstants from "../constants";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
-import { TeamType } from "../units/unit_properties";
+import { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Unit } from "../units/unit";
 import { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";

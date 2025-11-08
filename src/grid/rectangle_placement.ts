@@ -15,23 +15,14 @@ import { IPlacement, PlacementPositionType, PlacementType } from "./placement_pr
 
 export class RectanglePlacement implements IPlacement {
     private readonly gridSettings: GridSettings;
-
     protected readonly placementPositionType: PlacementPositionType;
-
     protected readonly placementType: PlacementType = PlacementType.RECTANGLE;
-
     private readonly size: number;
-
     protected readonly xLeft: number;
-
     protected readonly xRight: number;
-
     protected readonly yLower: number;
-
     protected readonly yUpper: number;
-
     private readonly possibleCellHashesSet: Set<number>;
-
     public constructor(gridSettings: GridSettings, placementPositionType: PlacementPositionType, size = 3) {
         if (![3, 4, 5].includes(size)) {
             throw new Error("Only the following placements heights are supported: 3, 4, 5.");
@@ -81,23 +72,18 @@ export class RectanglePlacement implements IPlacement {
             this.possibleCellHashesSet.add((c.x << 4) | c.y);
         }
     }
-
     public getType(): PlacementType {
         return this.placementType;
     }
-
     public getSize(): number {
         return this.size;
     }
-
     public isAllowed(v: XY): boolean {
         return v.x >= this.xLeft && v.x < this.xRight && v.y >= this.yLower && v.y < this.yUpper;
     }
-
     public possibleCellHashes(): Set<number> {
         return this.possibleCellHashesSet;
     }
-
     public possibleCellPositions(isSmallUnit = true): XY[] {
         let x;
         let y;

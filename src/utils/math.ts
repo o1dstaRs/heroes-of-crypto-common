@@ -34,11 +34,8 @@ export interface IXYDistance {
 
 export class Intersect2DResult {
     public intesectionType: EIntersectionType;
-
     public x?: number | null | undefined;
-
     public y?: number | null | undefined;
-
     public constructor(intesectionType: EIntersectionType, x?: number | null, y?: number) {
         this.intesectionType = intesectionType;
         this.x = x;

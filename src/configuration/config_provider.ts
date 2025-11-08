@@ -27,15 +27,9 @@ import {
     ToSpellTargetType,
 } from "../spells/spell_properties";
 import { FactionType } from "../factions/faction_type";
-import {
-    AttackType,
-    MovementType,
-    TeamType,
-    ToAttackType,
-    ToMovementType,
-    UnitProperties,
-    UnitType,
-} from "../units/unit_properties";
+import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
+import { AttackVals, UnitVals, MovementVals } from "../../src/generated/protobuf/v1/types_pb";
+import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 
 const DEFAULT_HERO_CONFIG = {
@@ -116,7 +110,7 @@ export const getHeroConfig = (
         heroConfig.attack_type && heroConfig.attack_type.constructor === String
             ? ToAttackType[heroConfig.attack_type as string]
             : undefined;
-    if (attackType === undefined || attackType === AttackType.NO_TYPE) {
+    if (attackType === undefined || attackType === AttackVals.NO_ATTACK) {
         throw new TypeError(`Invalid attack type for hero ${heroName} = ${attackType}`);
     }
 
@@ -124,7 +118,7 @@ export const getHeroConfig = (
         heroConfig.movement_type && heroConfig.movement_type.constructor === String
             ? ToMovementType[heroConfig.movement_type as string]
             : undefined;
-    if (movementType === undefined || movementType === MovementType.NO_TYPE) {
+    if (movementType === undefined || movementType === MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for hero ${heroName} = ${movementType}`);
     }
 
@@ -173,7 +167,7 @@ export const getHeroConfig = (
         1,
         0,
         team,
-        UnitType.HERO,
+        UnitVals.HERO,
         `${largeTextureName.split("_").slice(0, -1).join("_")}${heroConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MIN_UNIT_STACK_POWER,
@@ -251,7 +245,7 @@ export const getCreatureConfig = (
         creatureConfig.attack_type && creatureConfig.attack_type.constructor === String
             ? ToAttackType[creatureConfig.attack_type]
             : undefined;
-    if (attackType === undefined || attackType === AttackType.NO_TYPE) {
+    if (attackType === undefined || attackType === AttackVals.NO_ATTACK) {
         throw new TypeError(`Invalid attack type for creature ${creatureName} = ${attackType}`);
     }
 
@@ -259,7 +253,7 @@ export const getCreatureConfig = (
         creatureConfig.movement_type && creatureConfig.movement_type.constructor === String
             ? ToMovementType[creatureConfig.movement_type as string]
             : undefined;
-    if (movementType === undefined || movementType === MovementType.NO_TYPE) {
+    if (movementType === undefined || movementType === MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
     }
 
@@ -367,7 +361,7 @@ export const getCreatureConfig = (
         amount > 0 ? amount : Math.ceil((totalExp ?? 0) / creatureConfig.exp),
         0,
         team,
-        UnitType.CREATURE,
+        UnitVals.CREATURE,
         `${largeTextureName.split("_").slice(0, -1).join("_")}${creatureConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MAX_UNIT_STACK_POWER,

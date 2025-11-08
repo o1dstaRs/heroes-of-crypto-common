@@ -10,7 +10,7 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamType } from "../units/unit_properties";
+import { TeamVals } from "../generated/protobuf/v1/types_pb";
 import { isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { XY, updateMatrixElementIfExists } from "../utils/math";
@@ -22,23 +22,14 @@ const NO_UNIT = "";
 
 export class Grid {
     private cellsByUnitId: { [unitId: string]: XY[] } = {};
-
     private unitIdToTeam: { [unitId: string]: number } = {};
-
     private boardAggrPerTeam: Map<number, number[][]> = new Map();
-
     private gridType: GridType;
-
     private readonly boardCoord: string[][];
-
     private readonly gridSettings: GridSettings;
-
     private availableCenterStart: number;
-
     private availableCenterEnd: number;
-
     private cleanedUpCenter = false;
-
     public constructor(gridSettings: GridSettings, gridType: GridType) {
         this.gridSettings = gridSettings;
         const gridSize = gridSettings.getGridSize();
@@ -83,7 +74,6 @@ export class Grid {
         this.boardAggrPerTeam.set(1, boardAggTeamUpper);
         this.boardAggrPerTeam.set(2, boardAggTeamLower);
     }
-
     public cleanupCenterObstacle(): void {
         if (
             !this.cleanedUpCenter &&
@@ -116,7 +106,6 @@ export class Grid {
             this.cleanedUpCenter = true;
         }
     }
-
     public refreshWithNewType(gridType: GridType): void {
         this.gridType = gridType;
 
@@ -148,7 +137,6 @@ export class Grid {
         }
         this.cleanedUpCenter = false;
     }
-
     public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
         if (!cells1.length || !cells2.length) {
             return false;
@@ -166,7 +154,6 @@ export class Grid {
 
         return false;
     }
-
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
@@ -207,7 +194,6 @@ export class Grid {
             this.cellsByUnitId[unitId] = [];
         }
     }
-
     public occupyCell(
         cell: XY,
         unitId: string,
@@ -284,15 +270,12 @@ export class Grid {
 
         return true;
     }
-
     public getGridType(): GridType {
         return this.gridType;
     }
-
     public getSettings(): GridSettings {
         return this.gridSettings;
     }
-
     public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean): boolean {
         if (cells.length !== 1 && cells.length !== 4) {
             return false;
@@ -311,7 +294,6 @@ export class Grid {
 
         return true;
     }
-
     public areAllCellsEmpty(cells: XY[], unitId?: string) {
         for (const c of cells) {
             const occupantUnitId = this.getOccupantUnitId(c);
@@ -324,26 +306,22 @@ export class Grid {
 
         return true;
     }
-
     public occupyByHole(cell: XY) {
         if (isCellWithinGrid(this.gridSettings, cell)) {
             this.boardCoord[cell.x][cell.y] = "H";
         }
     }
-
     public getAggrMatrixByTeam(team: number): number[][] | undefined {
         return this.boardAggrPerTeam.get(team);
     }
-
     public getEnemyAggrMatrixByUnitId(unitId: string): number[][] | undefined {
         const team = this.unitIdToTeam[unitId];
         if (!team) {
             return undefined;
         }
 
-        return this.getAggrMatrixByTeam(team === TeamType.LOWER ? TeamType.UPPER : TeamType.LOWER);
+        return this.getAggrMatrixByTeam(team === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER);
     }
-
     public occupyCells(
         cells: XY[],
         unitId: string,
@@ -468,7 +446,6 @@ export class Grid {
 
         return true;
     }
-
     public getOccupantUnitId(cell: XY): string | undefined {
         const subArray = this.boardCoord[cell.x];
         if (!subArray) {
@@ -476,7 +453,6 @@ export class Grid {
         }
         return subArray[cell.y];
     }
-
     public print(unitId: string, printAggrGrids = true) {
         let msg = "";
         for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
@@ -528,7 +504,6 @@ export class Grid {
             }
         }
     }
-
     /**
      * Always generates a new two-dimensional array
      */
@@ -543,7 +518,6 @@ export class Grid {
         }
         return matrix;
     }
-
     /**
      * Always generates a new two-dimensional array
      */
@@ -558,7 +532,6 @@ export class Grid {
         }
         return matrix;
     }
-
     public getCenterCells(excludeInner = false): XY[] {
         const quarter = this.gridSettings.getGridSize() >> 2;
         const halfQuarter = quarter >> 1;
@@ -582,7 +555,6 @@ export class Grid {
 
         return centerCells;
     }
-
     private getOccupantNumeric(row: number, column: number, excludeUnits = false): number {
         const r = this.boardCoord[row];
         if (r === undefined) {
@@ -619,7 +591,6 @@ export class Grid {
 
         return 0;
     }
-
     private getObstacleTypePerGrid(): ObstacleType | undefined {
         if (this.gridType === GridType.BLOCK_CENTER) {
             return ObstacleType.BLOCK;
@@ -635,7 +606,6 @@ export class Grid {
 
         return undefined;
     }
-
     private updateAggrGrid(
         cell: XY,
         range: number,

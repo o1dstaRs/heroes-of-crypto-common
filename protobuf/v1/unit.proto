@@ -6,9 +6,9 @@ import "types.proto";
 
 message Unit {
   bytes id = 1;
-  Race race = 2;
+  FactionVals faction = 2;
   string name = 3;
-  Team team = 4;
+  TeamVals team = 4;
   uint32 max_hp = 5;
   uint32 hp = 6;
   double steps = 7;
@@ -18,8 +18,8 @@ message Unit {
   uint32 speed = 11;
   double armor_mod = 12;
   double base_armor = 13;
-  AttackType attack_type = 14;
-  AttackType attack_type_selected = 15;
+  AttackVals attack_type = 14;
+  AttackVals attack_type_selected = 15;
   uint32 attack = 16;
   uint32 attack_damage_min = 17;
   uint32 attack_damage_max = 18;
@@ -32,8 +32,8 @@ message Unit {
   bool can_cast_spells = 25;
   bool can_fly = 26;
   double exp = 27;
-  UnitSize size = 28;
-  UnitLevel level = 29;
+  UnitSizeVals size = 28;
+  UnitLevelVals level = 29;
   repeated string spells = 30;
   repeated string abilities = 31;
   repeated string effects = 32;

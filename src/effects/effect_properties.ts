@@ -21,13 +21,9 @@ export interface IAuraOnMap {
 
 export class EffectProperties {
     public readonly name: string;
-
     public laps: number;
-
     public readonly desc: string;
-
     public power: number;
-
     public constructor(name: string, laps: number, desc: string, power: number) {
         this.name = name;
         this.laps = laps;
@@ -38,17 +34,11 @@ export class EffectProperties {
 
 export class AuraEffectProperties {
     public readonly name: string;
-
     public range: number;
-
     public readonly desc: string;
-
     public power: number;
-
     public readonly is_buff: boolean;
-
     public readonly power_type: AbilityPowerType;
-
     public constructor(
         name: string,
         range: number,
@@ -68,22 +58,17 @@ export class AuraEffectProperties {
 
 export class AppliedAuraEffectProperties {
     private readonly auraEffectProperties: AuraEffectProperties;
-
     private readonly sourceCell: XY;
-
     public constructor(auraEffectProperties: AuraEffectProperties, sourceCell: XY) {
         this.auraEffectProperties = auraEffectProperties;
         this.sourceCell = sourceCell;
     }
-
     public getSourceCell(): XY {
         return this.sourceCell;
     }
-
     public getSourceCellAsString(): string {
         return `${this.sourceCell.x};${this.sourceCell.y}`;
     }
-
     public getAuraEffectProperties(): AuraEffectProperties {
         return this.auraEffectProperties;
     }

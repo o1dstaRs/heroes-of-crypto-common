@@ -15,9 +15,7 @@ export class SceneLogMock implements ISceneLog {
     public getLog(): string {
         return "";
     }
-
     public updateLog(_newLog?: string): void {}
-
     public hasBeenUpdated(): boolean {
         return false;
     }

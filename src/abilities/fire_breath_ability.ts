@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackType } from "../units/unit_properties";
+import { AttackVals } from "../generated/protobuf/v1/types_pb";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -80,7 +80,7 @@ export function processFireBreathAbility(
         const fireBreathAttackDamage = Math.floor(
             fromUnit.calculateAttackDamage(
                 nextStandingTarget,
-                AttackType.MELEE,
+                AttackVals.MELEE,
                 FightStateManager.getInstance()
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),

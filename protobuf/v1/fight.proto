@@ -7,11 +7,11 @@ import "types.proto";
 message Fight {
     bytes id = 1;
     uint32 current_lap = 2;
-    GridType grid_type = 3;
+    GridVals grid_type = 3;
     bool first_turn_made = 4;
     bool fight_started = 5;
     bool fight_finished = 6;
-    Team previous_turn_team = 7;
+    TeamVals previous_turn_team = 7;
     int32 highest_speed_this_turn = 8;
     repeated string already_made_turn = 9;
     map<uint32, StringList> already_made_turn_by_team = 10;

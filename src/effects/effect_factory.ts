@@ -27,7 +27,6 @@ export class EffectFactory {
 
         return new Effect(config);
     }
-
     public makeAuraEffect(name: string | null): AuraEffect | undefined {
         if (!name) {
             return undefined;

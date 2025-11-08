@@ -13,8 +13,8 @@ export class Fight extends jspb.Message {
   getCurrentLap(): number;
   setCurrentLap(value: number): void;
 
-  getGridType(): types_pb.GridTypeMap[keyof types_pb.GridTypeMap];
-  setGridType(value: types_pb.GridTypeMap[keyof types_pb.GridTypeMap]): void;
+  getGridType(): types_pb.GridValsMap[keyof types_pb.GridValsMap];
+  setGridType(value: types_pb.GridValsMap[keyof types_pb.GridValsMap]): void;
 
   getFirstTurnMade(): boolean;
   setFirstTurnMade(value: boolean): void;
@@ -25,8 +25,8 @@ export class Fight extends jspb.Message {
   getFightFinished(): boolean;
   setFightFinished(value: boolean): void;
 
-  getPreviousTurnTeam(): types_pb.TeamMap[keyof types_pb.TeamMap];
-  setPreviousTurnTeam(value: types_pb.TeamMap[keyof types_pb.TeamMap]): void;
+  getPreviousTurnTeam(): types_pb.TeamValsMap[keyof types_pb.TeamValsMap];
+  setPreviousTurnTeam(value: types_pb.TeamValsMap[keyof types_pb.TeamValsMap]): void;
 
   getHighestSpeedThisTurn(): number;
   setHighestSpeedThisTurn(value: number): void;
@@ -97,11 +97,11 @@ export namespace Fight {
   export type AsObject = {
     id: Uint8Array | string,
     currentLap: number,
-    gridType: types_pb.GridTypeMap[keyof types_pb.GridTypeMap],
+    gridType: types_pb.GridValsMap[keyof types_pb.GridValsMap],
     firstTurnMade: boolean,
     fightStarted: boolean,
     fightFinished: boolean,
-    previousTurnTeam: types_pb.TeamMap[keyof types_pb.TeamMap],
+    previousTurnTeam: types_pb.TeamValsMap[keyof types_pb.TeamValsMap],
     highestSpeedThisTurn: number,
     alreadyMadeTurnList: Array<string>,
     alreadyMadeTurnByTeamMap: Array<[number, types_pb.StringList.AsObject]>,
@@ -120,6 +120,3 @@ export namespace Fight {
   }
 }
 
-StringList.prototype.toArray = function () {
-    return this.getValuesList();
-};

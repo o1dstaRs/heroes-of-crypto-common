@@ -239,25 +239,15 @@ export const ToAbilityType: { [abilityTypeName: string]: AbilityType } = {
 
 export class AbilityProperties {
     public readonly name: string;
-
     public readonly type: AbilityType;
-
     public readonly desc: string[];
-
     public readonly power: number;
-
     public readonly power_type: AbilityPowerType;
-
     public readonly skip_response: boolean;
-
     public readonly stack_powered: boolean;
-
     public readonly effect: string | null;
-
     public readonly aura_effect: string | null;
-
     public readonly can_be_cast: boolean;
-
     public constructor(
         name: string,
         type: AbilityType,

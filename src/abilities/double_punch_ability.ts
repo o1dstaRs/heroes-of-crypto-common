@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackType } from "../units/unit_properties";
+import { AttackVals } from "../generated/protobuf/v1/types_pb";
 import * as HoCLib from "../utils/lib";
 import { Unit } from "../units/unit";
 import { ISceneLog } from "../scene/scene_log_interface";
@@ -79,7 +79,7 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
                 fromUnit,
                 fromUnit.calculateAttackDamage(
                     toUnit,
-                    AttackType.MELEE,
+                    AttackVals.MELEE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),

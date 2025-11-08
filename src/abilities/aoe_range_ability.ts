@@ -9,7 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackType } from "../units/unit_properties";
 import { Grid } from "../grid/grid";
 import * as HoCConstants from "../constants";
 import * as HoCMath from "../utils/math";
@@ -25,6 +24,7 @@ import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
+import { AttackVals } from "../generated/protobuf/v1/types_pb";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -87,7 +87,7 @@ export function processRangeAOEAbility(
                     attackerUnit,
                     attackerUnit.calculateAttackDamage(
                         unit,
-                        AttackType.RANGE,
+                        AttackVals.RANGE,
                         FightStateManager.getInstance()
                             .getFightProperties()
                             .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),

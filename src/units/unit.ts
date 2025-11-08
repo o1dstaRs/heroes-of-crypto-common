@@ -44,7 +44,9 @@ import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, XY } from "../utils/math";
-import { AttackType, MovementType, TeamType, UnitProperties, UnitType } from "./unit_properties";
+import { UnitProperties } from "./unit_properties";
+import { AttackType, MovementType, TeamType, UnitType } from "../generated/protobuf/v1/types_gen";
+import { AttackVals, TeamVals, MovementVals, UnitVals } from "../generated/protobuf/v1/types_pb";
 
 export interface IAttackTargets {
     unitIds: Set<string>;
@@ -186,53 +188,29 @@ interface IDamager {
 
 export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUnitAIRepr, IBoardObj {
     protected readonly unitProperties: UnitProperties;
-
     protected readonly initialUnitProperties: UnitProperties;
-
     protected readonly gridSettings: GridSettings;
-
     protected readonly teamType: TeamType;
-
     protected readonly unitType: UnitType;
-
     protected readonly summoned: boolean;
-
     protected buffs: AppliedSpell[];
-
     protected debuffs: AppliedSpell[];
-
     protected readonly position: XY;
-
     protected renderPosition: XY;
-
     protected spells: Spell[];
-
     protected effects: Effect[];
-
     protected abilities: Ability[] = [];
-
     protected readonly auraEffects: AuraEffect[] = [];
-
     protected readonly effectFactory: EffectFactory;
-
     protected readonly abilityFactory: AbilityFactory;
-
     protected selectedAttackType: AttackType;
-
     protected possibleAttackTypes: AttackType[] = [];
-
     protected maxRangeShots = 0;
-
     protected responded = false;
-
     protected onHourglass = false;
-
     protected currentAttackModIncrease = 0;
-
     protected adjustedBaseStatsLaps: number[] = [];
-
     protected luckPerTurn: number = 0;
-
     protected constructor(
         unitProperties: UnitProperties,
         gridSettings: GridSettings,
@@ -250,14 +228,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.effectFactory = effectFactory;
         this.summoned = summoned;
 
-        if (this.unitProperties.attack_type === AttackType.MELEE) {
-            this.selectedAttackType = AttackType.MELEE;
-        } else if (this.unitProperties.attack_type === AttackType.MELEE_MAGIC) {
-            this.selectedAttackType = AttackType.MELEE_MAGIC;
-        } else if (this.unitProperties.attack_type === AttackType.RANGE) {
-            this.selectedAttackType = AttackType.RANGE;
+        if (this.unitProperties.attack_type === AttackVals.MELEE) {
+            this.selectedAttackType = AttackVals.MELEE;
+        } else if (this.unitProperties.attack_type === AttackVals.MELEE_MAGIC) {
+            this.selectedAttackType = AttackVals.MELEE_MAGIC;
+        } else if (this.unitProperties.attack_type === AttackVals.RANGE) {
+            this.selectedAttackType = AttackVals.RANGE;
         } else {
-            this.selectedAttackType = AttackType.MAGIC;
+            this.selectedAttackType = AttackVals.MAGIC;
         }
 
         this.renderPosition = { x: 0, y: 0 };
@@ -271,7 +249,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities();
         this.parseAuraEffects();
     }
-
     public static createUnit(
         unitProperties: UnitProperties,
         gridSettings: GridSettings,
@@ -293,11 +270,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         unit.parseSpells();
         return unit;
     }
-
     public getSpells(): Spell[] {
         return this.spells;
     }
-
     public getBuff(buffName: string): AppliedSpell | undefined {
         for (const b of this.buffs) {
             if (buffName === b.getName()) {
@@ -307,11 +282,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getBuffs(): AppliedSpell[] {
         return this.buffs;
     }
-
     public getDebuff(debuffName: string): AppliedSpell | undefined {
         for (const db of this.debuffs) {
             if (debuffName === db.getName()) {
@@ -321,11 +294,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getDebuffs(): AppliedSpell[] {
         return this.debuffs;
     }
-
     public deleteAbility(abilityName: string): Ability | undefined {
         let abilityToDelete: Ability | undefined = undefined;
         const updatedAbilities: Ability[] = [];
@@ -360,7 +331,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return abilityToDelete;
     }
-
     public addAbility(ability: Ability): void {
         this.unitProperties.abilities.push(ability.getName());
         if (ability.getName() === "Chain Lightning") {
@@ -392,19 +362,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.parseSpells();
         }
     }
-
     public getTarget(): string {
         return this.unitProperties.target;
     }
-
     public setTarget(targetUnitId: string): void {
         this.unitProperties.target = targetUnitId;
     }
-
     public resetTarget(): void {
         this.unitProperties.target = this.initialUnitProperties.target;
     }
-
     public getAbilities(): Ability[] {
         if (this.hasEffectActive("Break")) {
             return [];
@@ -412,7 +378,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return this.abilities;
     }
-
     public getAuraEffects(): AuraEffect[] {
         if (this.hasEffectActive("Break")) {
             return [];
@@ -420,7 +385,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return this.auraEffects;
     }
-
     public hasAuraEffect(auraEffectName: string): boolean {
         for (const ae of this.auraEffects) {
             if (auraEffectName === ae.getName()) {
@@ -430,7 +394,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public getAbility(abilityName: string): Ability | undefined {
         if (this.hasEffectActive("Break")) {
             return undefined;
@@ -444,7 +407,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getEffect(effectName: string): Effect | undefined {
         for (const e of this.effects) {
             if (effectName === e.getName()) {
@@ -454,7 +416,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getAuraEffect(auraEffectName: string): AuraEffect | undefined {
         for (const ae of this.auraEffects) {
             if (auraEffectName === ae.getName()) {
@@ -464,7 +425,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getCumulativeHp(): number {
         if (this.isDead()) {
             return 0;
@@ -477,15 +437,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return (this.unitProperties.amount_alive - 1) * this.unitProperties.max_hp + cumulativeHp;
     }
-
     public getCumulativeMaxHp(): number {
         return this.unitProperties.amount_alive * this.unitProperties.max_hp;
     }
-
     public getEffects(): Effect[] {
         return this.effects;
     }
-
     public isSkippingThisTurn(): boolean {
         const effects = this.getEffects();
         for (const e of effects) {
@@ -496,7 +453,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public applyEffect(effect: Effect): boolean {
         // not checking for duplicates here, do it on a caller side
         if (
@@ -517,7 +473,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public refreshPreTurnState(sceneLog: ISceneLog) {
         if (this.unitProperties.hp !== this.unitProperties.max_hp && this.hasAbilityActive("Wild Regeneration")) {
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
@@ -526,7 +481,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
-
     public deleteEffect(effectName: string): void {
         this.effects = this.effects.filter((e) => e.getName() !== effectName);
 
@@ -545,7 +499,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public deleteAllEffects(): void {
         this.effects = [];
 
@@ -562,7 +515,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public deleteBuff(buffName: string): void {
         this.buffs = this.buffs.filter((b) => b.getName() !== buffName);
 
@@ -581,7 +533,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public deleteAllBuffs(): void {
         this.buffs = [];
 
@@ -601,7 +552,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public deleteDebuff(debuffName: string): void {
         this.debuffs = this.debuffs.filter((d) => d.getName() !== debuffName);
 
@@ -620,7 +570,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public deleteAllDebuffs(): void {
         this.debuffs = [];
 
@@ -637,7 +586,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public minusLap(): void {
         const dismoraleDebuff = this.getDebuff("Dismorale");
         if (!dismoraleDebuff) {
@@ -725,7 +673,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public hasDebuffActive(debuffName: string): boolean {
         for (const b of this.getDebuffs()) {
             if (b.getName() === debuffName) {
@@ -735,7 +682,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public hasBuffActive(buffName: string): boolean {
         for (const b of this.getBuffs()) {
             if (b.getName() === buffName) {
@@ -745,7 +691,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public hasEffectActive(effectName: string): boolean {
         for (const ef of this.getEffects()) {
             if (ef.getName() === effectName) {
@@ -755,7 +700,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public hasAbilityActive(abilityName: string): boolean {
         if (this.hasEffectActive("Break")) {
             return false;
@@ -769,7 +713,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public hasSpellRemaining(spellName: string): boolean {
         for (const s of this.spells) {
             if (s.getName() === spellName && s.isRemaining()) {
@@ -779,7 +722,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public getAppliedAuraEffect(auraEffectName: string): AuraEffect | undefined {
         if (
             this.unitProperties.applied_buffs.length === this.unitProperties.applied_buffs_laps.length &&
@@ -804,7 +746,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-
     public getAbilityPower(abilityName: string): number {
         if (this.hasEffectActive("Break")) {
             return 0;
@@ -818,27 +759,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return 0;
     }
-
     public getFaction(): FactionType {
         return this.unitProperties.faction;
     }
-
     public getName(): string {
         return this.unitProperties.name;
     }
-
     public getHp(): number {
         return this.unitProperties.hp;
     }
-
     public getMaxHp(): number {
         return this.unitProperties.max_hp;
     }
-
     public getSteps(): number {
         return this.unitProperties.steps + this.unitProperties.steps_mod;
     }
-
     public getMorale(): number {
         const { morale } = this.unitProperties;
         if (morale > MORALE_MAX_VALUE_TOTAL) {
@@ -853,7 +788,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return morale;
     }
-
     public getLuck(): number {
         const luck = this.unitProperties.luck + this.unitProperties.luck_mod;
         if (luck > LUCK_MAX_VALUE_TOTAL) {
@@ -864,53 +798,41 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         return luck;
     }
-
     public getSpeed(): number {
         return this.unitProperties.speed;
     }
-
     public getBaseArmor(): number {
         return this.unitProperties.base_armor;
     }
-
     public getBaseAttack(): number {
         return this.unitProperties.base_attack;
     }
-
     public getArmor(): number {
         return Math.max(1, this.unitProperties.base_armor + this.unitProperties.armor_mod);
     }
-
     public getRangeArmor(): number {
         return Math.max(1, this.unitProperties.range_armor + this.unitProperties.armor_mod);
     }
-
     public getAttackType(): AttackType {
         return this.unitProperties.attack_type;
     }
-
     public getAttack(): number {
         return this.unitProperties.base_attack + this.unitProperties.attack_mod;
     }
-
     public getAttackDamageMin(): number {
         return this.unitProperties.attack_damage_min;
     }
-
     public getAttackDamageMax(): number {
         return this.unitProperties.attack_damage_max;
     }
-
     public getAttackRange(): number {
         return this.unitProperties.attack_range;
     }
-
     public getRangeShots(): number {
         return this.unitProperties.range_shots_mod
             ? this.unitProperties.range_shots_mod
             : this.unitProperties.range_shots;
     }
-
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
         if (this.unitProperties.range_shots < 0) {
@@ -918,85 +840,68 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.range_shots = Math.floor(this.unitProperties.range_shots);
     }
-
     public getRangeShotDistance(): number {
         return this.unitProperties.shot_distance;
     }
-
     public getMagicResist(): number {
         return this.unitProperties.magic_resist_mod
             ? this.unitProperties.magic_resist_mod
             : this.unitProperties.magic_resist;
     }
-
     public getSpellsCount(): number {
-        if (this.unitType === UnitType.CREATURE && this.hasEffectActive("Break")) {
+        if (this.unitType === UnitVals.CREATURE && this.hasEffectActive("Break")) {
             return 0;
         }
 
         return this.unitProperties.spells.length;
     }
-
     public getCanCastSpells(): boolean {
         return this.unitProperties.can_cast_spells;
     }
-
     public getMovementType(): MovementType {
         return this.unitProperties.movement_type;
     }
-
     public canFly(): boolean {
-        return this.unitProperties.movement_type === MovementType.FLY;
+        return this.unitProperties.movement_type === MovementVals.FLY;
     }
-
     public getExp(): number {
         return this.unitProperties.exp;
     }
-
     public getTeam(): TeamType {
         return this.teamType;
     }
-
     public getOppositeTeam(): TeamType {
-        if (this.teamType === TeamType.NO_TEAM) {
-            return TeamType.NO_TEAM;
+        if (this.teamType === TeamVals.NO_TEAM) {
+            return TeamVals.NO_TEAM;
         }
 
-        if (this.teamType === TeamType.LOWER) {
-            return TeamType.UPPER;
+        if (this.teamType === TeamVals.LOWER) {
+            return TeamVals.UPPER;
         }
 
-        return TeamType.LOWER;
+        return TeamVals.LOWER;
     }
-
     public getUnitType(): UnitType {
         return this.unitType;
     }
-
     public getSmallTextureName(): string {
         return this.unitProperties.small_texture_name;
     }
-
     public getLargeTextureName(): string {
         return this.unitProperties.large_texture_name;
     }
-
     public getAmountAlive(): number {
         return this.unitProperties.amount_alive;
     }
-
     public getAmountDied(): number {
         return this.unitProperties.amount_died;
     }
-
     public getAuraRanges(): number[] {
         return this.unitProperties.aura_ranges;
     }
-
     public getAuraIsBuff(): boolean[] {
         return this.unitProperties.aura_is_buff;
     }
-
     public getStackPower(): number {
         if (this.unitProperties.stack_power > MAX_UNIT_STACK_POWER) {
             return MAX_UNIT_STACK_POWER;
@@ -1006,15 +911,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         return this.unitProperties.stack_power;
     }
-
     public getId(): string {
         return this.unitProperties.id;
     }
-
     public setSynergies(synergies: string[]): void {
         this.unitProperties.synergies = synergies;
     }
-
     public setPosition(x: number, y: number, setRender = true): void {
         if (this.hasAbilityActive("Sniper")) {
             this.setRangeShotDistance(
@@ -1034,20 +936,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.setRenderPosition(x, y);
         }
     }
-
     public setRenderPosition(x: number, y: number) {
         this.renderPosition.x = x;
         this.renderPosition.y = y;
     }
-
     public getPosition(): XY {
         return this.position;
     }
-
     public getBaseCell(): XY {
         return getCellForPosition(this.gridSettings, this.getPosition());
     }
-
     public getCells(): XY[] {
         if (this.isSmallSize()) {
             const bodyCellPos = getCellForPosition(this.gridSettings, this.getPosition());
@@ -1060,33 +958,26 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return getCellsAroundPosition(this.gridSettings, this.getPosition());
     }
-
     public getSize(): number {
         return this.unitProperties.size;
     }
-
     public isSmallSize(): boolean {
         return this.unitProperties.size === 1;
     }
-
     public isSummoned(): boolean {
         return this.summoned;
     }
-
     public getLevel(): number {
         return this.unitProperties.level;
     }
-
     public canMove(): boolean {
         return !this.hasEffectActive("Paralysis");
     }
-
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
             this.unitProperties.amount_alive += increaseBy;
         }
     }
-
     public increaseAttackMod(increaseBy: number): void {
         if (increaseBy > 0) {
             this.unitProperties.attack_mod = Number((this.unitProperties.attack_mod + increaseBy).toFixed(2));
@@ -1095,22 +986,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.currentAttackModIncrease = 0;
         }
     }
-
     public cleanupAttackModIncrease(): void {
         const newAttackMod = this.unitProperties.attack_mod - this.currentAttackModIncrease;
         this.unitProperties.attack_mod = Math.max(0, newAttackMod);
     }
-
     public getCurrentAttackModIncrease(): number {
         return this.currentAttackModIncrease;
     }
-
     public decreaseAmountDied(decreaseBy: number): void {
         if (!this.isDead() && !this.isSummoned()) {
             this.unitProperties.amount_died -= Math.min(this.unitProperties.amount_died, decreaseBy);
         }
     }
-
     public randomizeLuckPerTurn(): void {
         let calculatedLuck = getRandomInt(-LUCK_MAX_CHANGE_FOR_TURN, LUCK_MAX_CHANGE_FOR_TURN + 1);
         if (calculatedLuck + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
@@ -1121,12 +1008,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.luck_mod = calculatedLuck;
         this.luckPerTurn = calculatedLuck;
     }
-
     public cleanupLuckPerTurn(): void {
         // this.unitProperties.luck_mod = 0;
         this.luckPerTurn = 0;
     }
-
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): void {
         const aw = Math.floor(armageddonWave);
         if (aw <= 0 || aw > NUMBER_OF_ARMAGEDDON_WAVES) {
@@ -1151,7 +1036,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         sceneLog.updateLog(`${this.getName()} got hit by armageddon for ${armageddonDamage} damage`);
         this.applyDamage(armageddonDamage, 0, sceneLog, false);
     }
-
     public applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak = false): number {
         if (minusHp <= 0) {
             return 0;
@@ -1208,11 +1092,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return minusHp + substracted;
     }
-
     public isDead(): boolean {
         return this.unitProperties.amount_alive <= 0;
     }
-
     public setAmountAlive(amountAlive: number): void {
         if (amountAlive <= 0) {
             return;
@@ -1221,7 +1103,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.amount_alive = Math.floor(amountAlive);
         this.initialUnitProperties.amount_alive = Math.floor(amountAlive);
     }
-
     public increaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
         if (
             moraleAmount <= 0 ||
@@ -1244,20 +1125,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
     }
-
     public decreaseBaseArmor(armorAmount: number): void {
         this.initialUnitProperties.base_armor = Math.max(
             1,
             Number((this.initialUnitProperties.base_armor - armorAmount).toFixed(2)),
         );
     }
-
     public increaseBaseArmor(armorAmount: number): void {
         this.initialUnitProperties.base_armor = Number(
             (this.initialUnitProperties.base_armor + armorAmount).toFixed(2),
         );
     }
-
     public increaseSupply(supplyIncreasePercentage: number): void {
         if (supplyIncreasePercentage <= 0) {
             return;
@@ -1268,7 +1146,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
         this.unitProperties.amount_alive = this.initialUnitProperties.amount_alive;
     }
-
     public decreaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
         if (
             moraleAmount <= 0 ||
@@ -1291,7 +1168,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
     }
-
     public applyTravelledDistanceModifier(cellsTravelled: number, synergyAbilityPowerIncrease: number): void {
         const cruradeAbility = this.getAbility("Crusade");
         if (cruradeAbility) {
@@ -1309,7 +1185,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.initialUnitProperties.base_armor = Math.min(50, this.initialUnitProperties.base_armor);
         }
     }
-
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
         if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
             const spellProperties = getSpellConfig(FactionType.NO_TYPE, "Made of Fire");
@@ -1383,7 +1258,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
     }
-
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;
         const currentHp = this.unitProperties.hp;
@@ -1402,7 +1276,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return amountDied;
     }
-
     public calculateAuraPower(auraEffect: AuraEffect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
 
@@ -1438,7 +1311,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
     }
-
     public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
         let combinedPower = effect.getPower() + this.getLuck() + synergyAbilityPowerIncrease;
@@ -1454,15 +1326,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return calculatedCoeff;
     }
-
     public hasMindAttackResistance(): boolean {
         return this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism");
     }
-
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
-
     public calculateAbilityCount(ability: Ability, synergyAbilityPowerIncrease: number): number {
         if (
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&
@@ -1515,7 +1384,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ).toFixed(1),
         );
     }
-
     public calculateAbilityMultiplier(ability: Ability, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
         const madeOfFireBuff = this.getBuff("Made of Fire");
@@ -1552,7 +1420,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return calculatedCoeff;
     }
-
     public calculateMissChance(enemyUnit: Unit, enemySynergyAbilityPowerIncrease: number): number {
         const combinedMissChances = [];
         const selfBoarSalivaEffect = this.getEffect("Boar Saliva");
@@ -1584,7 +1451,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return 0;
     }
-
     public calculateAbilityApplyChance(ability: Ability, synergyAbilityPowerIncrease: number): number {
         const madeOfFireBuff = this.getBuff("Made of Fire");
         const combinedPower =
@@ -1599,7 +1465,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return combinedPower;
     }
-
     public calculateAttackDamageMin(
         attackRate: number,
         enemyUnit: Unit,
@@ -1624,7 +1489,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ),
         );
     }
-
     public calculateAttackDamageMax(
         attackRate: number,
         enemyUnit: Unit,
@@ -1648,7 +1512,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ),
         );
     }
-
     public calculateAttackDamage(
         enemyUnit: Unit,
         attackType: AttackType,
@@ -1660,19 +1523,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const min = this.calculateAttackDamageMin(
             this.getAttack(),
             enemyUnit,
-            attackType === AttackType.RANGE,
+            attackType === AttackVals.RANGE,
             synergyAbilityPowerIncrease,
             divisor,
         );
         const max = this.calculateAttackDamageMax(
             this.getAttack(),
             enemyUnit,
-            attackType === AttackType.RANGE,
+            attackType === AttackVals.RANGE,
             synergyAbilityPowerIncrease,
             divisor,
         );
-        const attackingByMelee = attackType === AttackType.MELEE || attackType === AttackType.MELEE_MAGIC;
-        if (!attackingByMelee && attackType === AttackType.RANGE) {
+        const attackingByMelee = attackType === AttackVals.MELEE || attackType === AttackVals.MELEE_MAGIC;
+        if (!attackingByMelee && attackType === AttackVals.RANGE) {
             if (this.getRangeShots() <= 0) {
                 return 0;
             }
@@ -1689,14 +1552,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const attackTypeMultiplier =
             attackingByMelee &&
-            this.unitProperties.attack_type === AttackType.RANGE &&
+            this.unitProperties.attack_type === AttackVals.RANGE &&
             !this.hasAbilityActive("Handyman")
                 ? 0.5
                 : 1;
 
         return Math.floor(getRandomInt(min, max) * attackTypeMultiplier * abilityMultiplier);
     }
-
     public canSkipResponse(): boolean {
         if (!this.hasAbilityActive("Break")) {
             for (const a of this.abilities) {
@@ -1708,7 +1570,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return false;
     }
-
     public canRespond(attackType: AttackType): boolean {
         for (const e of this.effects) {
             if (e.getName() === "Stun" || e.getName() === "Blindness") {
@@ -1720,8 +1581,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             for (const a of this.abilities) {
                 if (
                     (a.getName() === "No Melee" &&
-                        (attackType === AttackType.MELEE || attackType === AttackType.MELEE_MAGIC)) ||
-                    (a.getName() === "Through Shot" && attackType === AttackType.RANGE)
+                        (attackType === AttackVals.MELEE || attackType === AttackVals.MELEE_MAGIC)) ||
+                    (a.getName() === "Through Shot" && attackType === AttackVals.RANGE)
                 ) {
                     return false;
                 }
@@ -1730,46 +1591,42 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return true;
     }
-
     public setResponded(hasResponded: boolean) {
         this.responded = hasResponded;
     }
-
     public setOnHourglass(onHourglass: boolean) {
         this.onHourglass = onHourglass;
     }
-
     public isOnHourglass(): boolean {
         return this.onHourglass;
     }
-
     public refreshPossibleAttackTypes(canLandRangeAttack: boolean): boolean {
         const currentSelectedAttackType = this.selectedAttackType;
         this.possibleAttackTypes = [];
-        if (this.getAttackType() === AttackType.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
-            this.possibleAttackTypes.push(AttackType.MAGIC);
-        } else if (this.getAttackType() === AttackType.RANGE && this.getRangeShots() > 0 && canLandRangeAttack) {
-            this.possibleAttackTypes.push(AttackType.RANGE);
+        if (this.getAttackType() === AttackVals.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
+            this.possibleAttackTypes.push(AttackVals.MAGIC);
+        } else if (this.getAttackType() === AttackVals.RANGE && this.getRangeShots() > 0 && canLandRangeAttack) {
+            this.possibleAttackTypes.push(AttackVals.RANGE);
         }
 
         if (!this.hasAbilityActive("No Melee")) {
-            if (this.getAttackType() === AttackType.MELEE_MAGIC) {
-                this.possibleAttackTypes.push(AttackType.MELEE_MAGIC);
+            if (this.getAttackType() === AttackVals.MELEE_MAGIC) {
+                this.possibleAttackTypes.push(AttackVals.MELEE_MAGIC);
             } else {
-                this.possibleAttackTypes.push(AttackType.MELEE);
+                this.possibleAttackTypes.push(AttackVals.MELEE);
             }
         }
 
         if (
             this.getSpellsCount() > 0 &&
             this.getCanCastSpells() &&
-            !this.possibleAttackTypes.includes(AttackType.MAGIC)
+            !this.possibleAttackTypes.includes(AttackVals.MAGIC)
         ) {
-            this.possibleAttackTypes.push(AttackType.MAGIC);
+            this.possibleAttackTypes.push(AttackVals.MAGIC);
         }
 
         if (!this.possibleAttackTypes.length) {
-            this.possibleAttackTypes.push(AttackType.NO_TYPE);
+            this.possibleAttackTypes.push(AttackVals.NO_ATTACK);
         }
 
         if (!this.possibleAttackTypes.length) {
@@ -1780,19 +1637,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.selectedAttackType = this.possibleAttackTypes[0];
         return currentSelectedAttackType !== this.selectedAttackType;
     }
-
     public getAttackTypeSelection(): AttackType {
         return this.selectedAttackType;
     }
-
     public getPossibleAttackTypes(): AttackType[] {
         return this.possibleAttackTypes;
     }
-
     public getAttackTypeSelectionIndex(): [number, number] {
         return [this.possibleAttackTypes.indexOf(this.selectedAttackType), this.possibleAttackTypes.length];
     }
-
     public selectNextAttackType(): boolean {
         let index = this.possibleAttackTypes.indexOf(this.selectedAttackType);
         let initialIndex = index;
@@ -1804,52 +1657,50 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } while (index !== initialIndex);
         return false;
     }
-
     public selectAttackType(selectedAttackType: AttackType): boolean {
         if (
             this.selectedAttackType !== selectedAttackType &&
-            ((selectedAttackType === AttackType.MELEE && this.possibleAttackTypes.includes(AttackType.MELEE)) ||
-                (selectedAttackType === AttackType.MELEE_MAGIC &&
-                    this.possibleAttackTypes.includes(AttackType.MELEE_MAGIC)))
+            ((selectedAttackType === AttackVals.MELEE && this.possibleAttackTypes.includes(AttackVals.MELEE)) ||
+                (selectedAttackType === AttackVals.MELEE_MAGIC &&
+                    this.possibleAttackTypes.includes(AttackVals.MELEE_MAGIC)))
         ) {
-            if (this.possibleAttackTypes.includes(AttackType.MELEE_MAGIC)) {
-                this.selectedAttackType = AttackType.MELEE_MAGIC;
-                this.unitProperties.attack_type_selected = AttackType.MELEE_MAGIC;
+            if (this.possibleAttackTypes.includes(AttackVals.MELEE_MAGIC)) {
+                this.selectedAttackType = AttackVals.MELEE_MAGIC;
+                this.unitProperties.attack_type_selected = AttackVals.MELEE_MAGIC;
             } else {
-                this.selectedAttackType = AttackType.MELEE;
-                this.unitProperties.attack_type_selected = AttackType.MELEE;
+                this.selectedAttackType = AttackVals.MELEE;
+                this.unitProperties.attack_type_selected = AttackVals.MELEE;
             }
 
             return true;
         }
 
         if (
-            selectedAttackType === AttackType.RANGE &&
-            this.unitProperties.attack_type === AttackType.RANGE &&
+            selectedAttackType === AttackVals.RANGE &&
+            this.unitProperties.attack_type === AttackVals.RANGE &&
             this.getRangeShots() &&
             this.selectedAttackType !== selectedAttackType &&
-            this.possibleAttackTypes.includes(AttackType.RANGE)
+            this.possibleAttackTypes.includes(AttackVals.RANGE)
         ) {
             this.selectedAttackType = selectedAttackType;
-            this.unitProperties.attack_type_selected = AttackType.RANGE;
+            this.unitProperties.attack_type_selected = AttackVals.RANGE;
             return true;
         }
 
         if (
-            selectedAttackType === AttackType.MAGIC &&
+            selectedAttackType === AttackVals.MAGIC &&
             this.unitProperties.spells.length &&
             this.unitProperties.can_cast_spells &&
             this.selectedAttackType !== selectedAttackType &&
-            this.possibleAttackTypes.includes(AttackType.MAGIC)
+            this.possibleAttackTypes.includes(AttackVals.MAGIC)
         ) {
             this.selectedAttackType = selectedAttackType;
-            this.unitProperties.attack_type_selected = AttackType.MAGIC;
+            this.unitProperties.attack_type_selected = AttackVals.MAGIC;
             return true;
         }
 
         return false;
     }
-
     public cleanAuraEffects(): void {
         if (
             this.unitProperties.applied_buffs.length === this.unitProperties.applied_buffs_laps.length &&
@@ -1875,7 +1726,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public applyAuraEffect(
         auraEffectName: string,
         auraEffectDescription: string,
@@ -1909,7 +1759,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.applied_debuffs_powers.push(power);
         }
     }
-
     public applyBuff(
         buff: Spell,
         firstBuffProperty?: number,
@@ -1934,7 +1783,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
         this.unitProperties.applied_buffs_powers.push(0);
     }
-
     public getBuffProperties(buffName: string): [string, string] {
         const buffProperties: [string, string] = ["", ""];
         for (let i = 0; i < this.unitProperties.applied_buffs_descriptions.length; i++) {
@@ -1949,7 +1797,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return buffProperties;
     }
-
     public applyDebuff(
         debuff: Spell,
         firstDebuffProperty?: number,
@@ -1974,7 +1821,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
         this.unitProperties.applied_debuffs_powers.push(0);
     }
-
     public useSpell(spellName: string): void {
         for (const s of this.spells) {
             if (s.getName() === spellName) {
@@ -1992,11 +1838,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     public getAllProperties(): UnitProperties {
         return structuredClone(this.unitProperties);
     }
-
     // returns number of units resurrected
     public applyResurrection(resurrectionPower: number): number {
         const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
@@ -2024,7 +1868,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return actualAmountResurrected;
     }
-
     public applyHeal(healPower: number): number {
         if (healPower < 0) {
             return 0;
@@ -2040,9 +1883,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return healedFor;
     }
-
     public handleResurrectionAnimation(): void {}
-
     public reduceBaseAttack(reduceBy: number): number {
         if (reduceBy <= 0) {
             return 0;
@@ -2053,7 +1894,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Number((oldBaseAttack - this.initialUnitProperties.base_attack).toFixed(1));
     }
-
     public adjustBaseStats(
         hasFightStarted: boolean,
         currentLap: number,
@@ -2209,7 +2049,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.armor_mod =
             shatterArmorEffectPower > 0 ? -shatterArmorEffectPower : this.initialUnitProperties.armor_mod;
         let armorModMultiplier = 0;
-        if (this.getMovementType() === MovementType.FLY && synergyFlyArmorIncrease > 0) {
+        if (this.getMovementType() === MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
         if (this.hasBuffActive("Spiritual Armor")) {
@@ -2348,14 +2188,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const mightAugmentBuff = this.getBuff("Might Augment");
 
-        if (this.getAttackTypeSelection() !== AttackType.RANGE && mightAugmentBuff) {
+        if (this.getAttackTypeSelection() !== AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += Number(
                 ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
             );
         }
 
         const sniperAugmentBuff = this.getBuff("Sniper Augment");
-        if (this.getAttackTypeSelection() === AttackType.RANGE && sniperAugmentBuff) {
+        if (this.getAttackTypeSelection() === AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
                 this.unitProperties.base_attack += Number(
@@ -2423,15 +2263,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
     }
-
     public setRangeShotDistance(distance: number) {
         this.unitProperties.shot_distance = distance;
     }
-
     public setStackPower(stackPower: number): void {
         this.unitProperties.stack_power = stackPower;
     }
-
     public attackMeleeAllowed(
         enemyTeam: Unit[],
         positions: ReadonlyMap<string, XY>,
@@ -2651,7 +2488,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             attackCellHashesToLargeCells: possibleAttackCellHashesToLargeCells,
         };
     }
-
     protected parseAbilities(): boolean {
         let spellAdded = false;
         for (const abilityName of this.unitProperties.abilities) {
@@ -2669,9 +2505,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return spellAdded;
     }
-
     protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {}
-
     protected parseSpellData(spellData: string[]): Map<string, number> {
         const spells: Map<string, number> = new Map();
 
@@ -2686,7 +2520,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return spells;
     }
-
     protected parseSpells(): void {
         const spells: Map<string, number> = this.parseSpellData(this.unitProperties.spells);
         const newSpells: Spell[] = [];
@@ -2707,7 +2540,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.spells = newSpells;
     }
-
     protected parseAuraEffects(): void {
         for (const auraEffectName of this.unitProperties.aura_effects) {
             const auraEffect = this.effectFactory.makeAuraEffect(auraEffectName);
@@ -2716,9 +2548,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
     }
-
     protected handleDamageAnimation(_unitsDied: number): void {}
-
     protected getEnemyArmor(enemyUnit: Unit, isRangeAttack: boolean, synergyAbilityPowerIncrease: number): number {
         const piercingSpearAbility = this.getAbility("Piercing Spear");
         const armor = isRangeAttack ? enemyUnit.getRangeArmor() : enemyUnit.getArmor();
@@ -2728,7 +2558,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return armor;
     }
-
     protected refreshAndGetAdjustedMaxHp(
         currentLap: number,
         synergyAbilityPowerIncrease: number,

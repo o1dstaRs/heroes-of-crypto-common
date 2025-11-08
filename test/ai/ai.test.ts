@@ -10,8 +10,8 @@
  */
 
 import { AIActionType, findTarget } from "../../src/ai/ai";
-
-import { TeamType, AttackType } from "../../src/units/unit_properties";
+import { AttackVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
 import { GridType } from "../../src/grid/grid_type";
 import * as HoCMath from "../../src/utils/math";
@@ -21,15 +21,7 @@ import { UnitsHolder } from "../../src/units/units_holder";
 import { IUnitAIRepr } from "../../src/units/unit";
 import { v4 as uuidv4 } from "uuid";
 
-import {
-    GRID_SIZE,
-    MAX_Y,
-    MIN_Y,
-    MAX_X,
-    MIN_X,
-    MOVEMENT_DELTA,
-    UNIT_SIZE_DELTA,
-} from "../../src/grid/grid_constants";
+import { GRID_SIZE, MAX_Y, MIN_Y, MAX_X, MIN_X, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../../src/grid/grid_constants";
 
 /**
  * The Unit tests for AI
@@ -49,9 +41,9 @@ const generateUnits = (
     anotherUnitCell?: HoCMath.XY,
 ): UnitRepr => {
     const unitFrom = isSmallUnit
-        ? stubSmallUnit(TeamType.UPPER, steps, baseCellFrom)
-        : stubBigUnit(TeamType.UPPER, steps, baseCellFrom);
-    const unitTo = stubSmallUnit(TeamType.LOWER, steps, baseCellTo);
+        ? stubSmallUnit(TeamVals.UPPER, steps, baseCellFrom)
+        : stubBigUnit(TeamVals.UPPER, steps, baseCellFrom);
+    const unitTo = stubSmallUnit(TeamVals.LOWER, steps, baseCellTo);
     grid.occupyCell(
         baseCellFrom,
         unitFrom.getId(),
@@ -69,7 +61,7 @@ const generateUnits = (
         unitTo.hasAbilityActive("Made of Water"),
     );
     if (anotherUnitCell) {
-        const unitEnemy = stubSmallUnit(TeamType.LOWER, steps /* steps */, anotherUnitCell);
+        const unitEnemy = stubSmallUnit(TeamVals.LOWER, steps /* steps */, anotherUnitCell);
         grid.occupyCell(
             anotherUnitCell,
             unitEnemy.getId(),
@@ -480,7 +472,7 @@ describe("BigUnit", () => {
 });
 
 function stubSmallUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
-    return new UnitRepr(uuidv4(), teamType, steps, 1, 1, true, true, baseCell, [baseCell], AttackType.MELEE, "");
+    return new UnitRepr(uuidv4(), teamType, steps, 1, 1, true, true, baseCell, [baseCell], AttackVals.MELEE, "");
 }
 
 function stubBigUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
@@ -499,7 +491,7 @@ function stubBigUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): U
             { x: baseCell.x - 1, y: baseCell.y - 1 },
             { x: baseCell.x, y: baseCell.y - 1 },
         ],
-        AttackType.MELEE,
+        AttackVals.MELEE,
         "",
     );
 }

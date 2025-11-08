@@ -10,14 +10,14 @@ export class Unit extends jspb.Message {
   getId_asB64(): string;
   setId(value: Uint8Array | string): void;
 
-  getRace(): types_pb.RaceMap[keyof types_pb.RaceMap];
-  setRace(value: types_pb.RaceMap[keyof types_pb.RaceMap]): void;
+  getFaction(): types_pb.FactionValsMap[keyof types_pb.FactionValsMap];
+  setFaction(value: types_pb.FactionValsMap[keyof types_pb.FactionValsMap]): void;
 
   getName(): string;
   setName(value: string): void;
 
-  getTeam(): types_pb.TeamMap[keyof types_pb.TeamMap];
-  setTeam(value: types_pb.TeamMap[keyof types_pb.TeamMap]): void;
+  getTeam(): types_pb.TeamValsMap[keyof types_pb.TeamValsMap];
+  setTeam(value: types_pb.TeamValsMap[keyof types_pb.TeamValsMap]): void;
 
   getMaxHp(): number;
   setMaxHp(value: number): void;
@@ -46,11 +46,11 @@ export class Unit extends jspb.Message {
   getBaseArmor(): number;
   setBaseArmor(value: number): void;
 
-  getAttackType(): types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap];
-  setAttackType(value: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap]): void;
+  getAttackType(): types_pb.AttackValsMap[keyof types_pb.AttackValsMap];
+  setAttackType(value: types_pb.AttackValsMap[keyof types_pb.AttackValsMap]): void;
 
-  getAttackTypeSelected(): types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap];
-  setAttackTypeSelected(value: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap]): void;
+  getAttackTypeSelected(): types_pb.AttackValsMap[keyof types_pb.AttackValsMap];
+  setAttackTypeSelected(value: types_pb.AttackValsMap[keyof types_pb.AttackValsMap]): void;
 
   getAttack(): number;
   setAttack(value: number): void;
@@ -88,11 +88,11 @@ export class Unit extends jspb.Message {
   getExp(): number;
   setExp(value: number): void;
 
-  getSize(): types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap];
-  setSize(value: types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap]): void;
+  getSize(): types_pb.UnitSizeValsMap[keyof types_pb.UnitSizeValsMap];
+  setSize(value: types_pb.UnitSizeValsMap[keyof types_pb.UnitSizeValsMap]): void;
 
-  getLevel(): types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap];
-  setLevel(value: types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap]): void;
+  getLevel(): types_pb.UnitLevelValsMap[keyof types_pb.UnitLevelValsMap];
+  setLevel(value: types_pb.UnitLevelValsMap[keyof types_pb.UnitLevelValsMap]): void;
 
   clearSpellsList(): void;
   getSpellsList(): Array<string>;
@@ -134,9 +134,9 @@ export class Unit extends jspb.Message {
 export namespace Unit {
   export type AsObject = {
     id: Uint8Array | string,
-    race: types_pb.RaceMap[keyof types_pb.RaceMap],
+    faction: types_pb.FactionValsMap[keyof types_pb.FactionValsMap],
     name: string,
-    team: types_pb.TeamMap[keyof types_pb.TeamMap],
+    team: types_pb.TeamValsMap[keyof types_pb.TeamValsMap],
     maxHp: number,
     hp: number,
     steps: number,
@@ -146,8 +146,8 @@ export namespace Unit {
     speed: number,
     armorMod: number,
     baseArmor: number,
-    attackType: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap],
-    attackTypeSelected: types_pb.AttackTypeMap[keyof types_pb.AttackTypeMap],
+    attackType: types_pb.AttackValsMap[keyof types_pb.AttackValsMap],
+    attackTypeSelected: types_pb.AttackValsMap[keyof types_pb.AttackValsMap],
     attack: number,
     attackDamageMin: number,
     attackDamageMax: number,
@@ -160,8 +160,8 @@ export namespace Unit {
     canCastSpells: boolean,
     canFly: boolean,
     exp: number,
-    size: types_pb.UnitSizeMap[keyof types_pb.UnitSizeMap],
-    level: types_pb.UnitLevelMap[keyof types_pb.UnitLevelMap],
+    size: types_pb.UnitSizeValsMap[keyof types_pb.UnitSizeValsMap],
+    level: types_pb.UnitLevelValsMap[keyof types_pb.UnitLevelValsMap],
     spellsList: Array<string>,
     abilitiesList: Array<string>,
     effectsList: Array<string>,

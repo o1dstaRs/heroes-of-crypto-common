@@ -13,17 +13,13 @@ import { FightProperties } from "./fight_properties";
 
 export class FightStateManager {
     private static instance: FightStateManager;
-
     private fightProperties: FightProperties;
-
     private constructor() {
         this.fightProperties = new FightProperties();
     }
-
     public reset(): void {
         this.fightProperties = new FightProperties();
     }
-
     public static getInstance(): FightStateManager {
         if (!FightStateManager.instance) {
             FightStateManager.instance = new FightStateManager();
@@ -31,7 +27,6 @@ export class FightStateManager {
 
         return FightStateManager.instance;
     }
-
     public getFightProperties(): FightProperties {
         return this.fightProperties;
     }

@@ -15,6 +15,7 @@ export default [
         },
         rules: {
             ...typescriptPlugin.configs.recommended.rules,
+
             "selector-id-pattern": "off",
             "max-classes-per-file": "off",
             "no-useless-constructor": "off",
@@ -26,11 +27,7 @@ export default [
             "@typescript-eslint/no-empty-function": "off",
             "@typescript-eslint/no-useless-constructor": "error",
             "@typescript-eslint/explicit-member-accessibility": "error",
-            // Fixme: These are nice for finding errors, but ugly to handle userData with.
-            // "@typescript-eslint/no-unsafe-call": "error",
-            // "@typescript-eslint/no-unsafe-return": "error",
-            // "@typescript-eslint/no-unsafe-member-access": "error",
-            // "@typescript-eslint/no-unsafe-assignment": "error",
+
             "@typescript-eslint/ban-ts-comment": [
                 "error",
                 {
@@ -41,6 +38,10 @@ export default [
                 },
             ],
             "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+
+            // ✅ use the CORE rule (not the plugin) to remove blank lines
+            "lines-between-class-members": ["error", "never"],
+            // (if you had the plugin version before, remove it entirely)
         },
     },
 ];
