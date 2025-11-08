@@ -238,3 +238,86 @@ export const getCreaturesByLevel = (lvl: UnitLevelId): ReadonlyArray<CreatureId>
     (GenCreatureByLevel as ReadonlyArray<ReadonlyArray<CreatureId>>)[lvl] ?? [];
 
 export const CreaturePoolByLevel = [2, 2, 1, 1] as const;
+
+export const allCreatureIds: readonly CreatureId[] = Object.keys(CreatureLevels)
+    .map((k) => Number(k) as CreatureId)
+    .filter((id) => id !== (CreatureVals.NO_CREATURE as unknown as CreatureId));
+Object.freeze(allCreatureIds);
+
+/** All faction ids we care about (customize if you have more) */
+export const allFactions: readonly FactionType[] = [
+    FactionVals.LIFE,
+    FactionVals.NATURE,
+    FactionVals.CHAOS,
+    FactionVals.MIGHT,
+] as const;
+Object.freeze(allFactions);
+
+/** Safe accessors that return strongly typed values */
+export const getFactionOf = (c: CreatureId): FactionType =>
+    ((CreatureFactions as Record<number, FactionType>)[c] ?? FactionVals.MIGHT) as FactionType;
+
+export const getLevelOf = (c: CreatureId): UnitLevelId =>
+    (CreatureLevels as Record<number, UnitLevelId>)[c] ?? UnitLevelVals.NO_LEVEL;
+
+/** Group creatures by faction, typed and readonly */
+const _byFaction: Record<FactionType, CreatureId[]> = Object.fromEntries(
+    allFactions.map((f) => [f, [] as CreatureId[]]),
+) as Record<FactionType, CreatureId[]>;
+
+for (const id of allCreatureIds) {
+    const f = getFactionOf(id);
+    // Only collect if the faction is among allFactions; drop or route to a "Neutral" if you have one.
+    if (f in _byFaction) _byFaction[f].push(id);
+}
+
+/** Freeze each array and the container */
+for (const f of allFactions) Object.freeze(_byFaction[f]);
+export const CreaturesByFaction: Readonly<Record<FactionType, readonly CreatureId[]>> = Object.freeze(_byFaction);
+
+/** Count of creatures per (level, faction), useful for layout math */
+export type LevelsByFactionCounts = Readonly<Record<UnitLevelId, Readonly<Record<FactionType, number>>>>;
+
+const _levelsByFaction: Record<UnitLevelId, Record<FactionType, number>> = {} as any;
+
+for (let lvl = UnitLevelVals.FIRST; lvl <= UnitLevelVals.FOURTH; lvl++) {
+    const levelId = lvl as UnitLevelId;
+    const atLevel = getCreaturesByLevel(levelId);
+    const counts: Record<FactionType, number> = Object.fromEntries(allFactions.map((f) => [f, 0])) as any;
+
+    for (const cid of atLevel) {
+        const f = getFactionOf(cid);
+        if (f in counts) counts[f] += 1;
+    }
+    _levelsByFaction[levelId] = counts;
+}
+
+for (const lvl of Object.keys(_levelsByFaction).map((k) => Number(k) as UnitLevelId)) {
+    Object.freeze(_levelsByFaction[lvl]);
+}
+export const LevelFactionCounts: LevelsByFactionCounts = Object.freeze(_levelsByFaction);
+
+/**
+ * Precomputed level buckets for UI:
+ * - label: "Level N"
+ * - count: max per-faction count at that level (so columns align)
+ * - unitSize: your 2× icon rule for level 4
+ */
+export const LevelBuckets: ReadonlyArray<Readonly<{ label: string; count: number; unitSize: 1 | 2 }>> = Object.freeze(
+    [UnitLevelVals.FIRST, UnitLevelVals.SECOND, UnitLevelVals.THIRD, UnitLevelVals.FOURTH].map((lvl, i) => {
+        const counts = LevelFactionCounts[lvl];
+        const max = Math.max(...allFactions.map((f) => counts[f] ?? 0));
+        return Object.freeze({
+            label: `Level ${i + 1}`,
+            count: max,
+            unitSize: i + 1 === 4 ? 2 : 1,
+        });
+    }),
+);
+
+/** Convenience: creatures of a level *and* faction, already sorted by level-stable id */
+export const getCreaturesOf = (f: FactionType, lvl?: UnitLevelId): readonly CreatureId[] => {
+    const ids = CreaturesByFaction[f] ?? [];
+    if (lvl == null) return ids;
+    return ids.filter((id) => getLevelOf(id) === lvl);
+};

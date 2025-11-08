@@ -10,10 +10,9 @@
  */
 
 import { AIActionType, findTarget } from "../../src/ai/ai";
-import { AttackVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { AttackVals, GridVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
-import { GridType } from "../../src/grid/grid_type";
 import * as HoCMath from "../../src/utils/math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { GridSettings } from "../../src/grid/grid_settings";
@@ -88,7 +87,7 @@ describe("SmallUnit", () => {
             */
             const baseCellFrom = { x: 3, y: 0 };
             const baseCellTo = { x: 0, y: 3 };
-            const grid = new Grid(gridSettings, GridType.NORMAL);
+            const grid = new Grid(gridSettings, GridVals.NORMAL);
             const unitFrom = generateUnits(grid, 2, true, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -105,7 +104,7 @@ describe("SmallUnit", () => {
                 */
                 const baseCellFrom = { x: 2, y: 0 };
                 const baseCellTo = { x: 1, y: 3 };
-                const grid = new Grid(gridSettings, GridType.NORMAL);
+                const grid = new Grid(gridSettings, GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 1, true, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -122,7 +121,7 @@ describe("SmallUnit", () => {
                */
                 const baseCellFrom = { x: 3, y: 1 };
                 const baseCellTo = { x: 0, y: 2 };
-                const grid = new Grid(gridSettings, GridType.NORMAL);
+                const grid = new Grid(gridSettings, GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 1, true, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -139,7 +138,7 @@ describe("SmallUnit", () => {
                */
                 const baseCellFrom = { x: 5, y: 5 };
                 const baseCellTo = { x: 10, y: 10 };
-                const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 4 /* steps */, true, baseCellFrom, baseCellTo);
                 // grid.print(unitFrom.getId(), false);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
@@ -160,7 +159,7 @@ describe("SmallUnit", () => {
                 const baseCellFrom = { x: 2, y: 0 };
                 const baseCellTo = { x: 1, y: 2 };
                 const anotherEnemyCell = { x: 1, y: 3 };
-                const grid = new Grid(gridSettings, GridType.NORMAL);
+                const grid = new Grid(gridSettings, GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 10, true, baseCellFrom, baseCellTo, anotherEnemyCell);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -178,7 +177,7 @@ describe("SmallUnit", () => {
                     */
                     const baseCellFrom = { x: 2, y: 0 };
                     const baseCellTo = { x: 1, y: 3 };
-                    const grid = new Grid(gridSettings, GridType.NORMAL);
+                    const grid = new Grid(gridSettings, GridVals.NORMAL);
                     const unitFrom = generateUnits(grid, 2, true, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -201,7 +200,7 @@ describe("SmallUnit", () => {
                     */
                     const baseCellFrom = { x: 3, y: 0 };
                     const baseCellTo = { x: 0, y: 3 };
-                    const grid = new Grid(gridSettings, GridType.NORMAL);
+                    const grid = new Grid(gridSettings, GridVals.NORMAL);
                     const unitFrom = generateUnits(grid, 3, true, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -381,7 +380,7 @@ describe("BigUnit", () => {
             */
             const baseCellFrom = { x: 3, y: 1 };
             const baseCellTo = { x: 0, y: 3 };
-            const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+            const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
             const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -399,7 +398,7 @@ describe("BigUnit", () => {
             */
             const baseCellFrom = { x: 0, y: 1 };
             const baseCellTo = { x: 3, y: 3 };
-            const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+            const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
             const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 1, y: 1 });
@@ -418,7 +417,7 @@ describe("BigUnit", () => {
                 */
                 const baseCellFrom = { x: 3, y: 1 };
                 const baseCellTo = { x: 0, y: 3 };
-                const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 2 /* steps */, false, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 2 });
@@ -436,7 +435,7 @@ describe("BigUnit", () => {
                     */
                     const baseCellFrom = { x: 1, y: 1 };
                     const baseCellTo = { x: 1, y: 3 };
-                    const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+                    const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
                     const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -461,7 +460,7 @@ describe("BigUnit", () => {
                 */
                 const baseCellFrom = { x: 2, y: 2 };
                 const baseCellTo = { x: 0, y: 3 };
-                const grid = new Grid(gridSettings, GridType.LAVA_CENTER);
+                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 2 });
