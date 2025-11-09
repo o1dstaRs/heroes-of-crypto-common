@@ -11,12 +11,12 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { TeamType } from "../generated/protobuf/v1/types_gen";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, shuffle } from "../utils/lib";
-import { getDistance, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
+import { getDistance, type IXYDistance, matrixElementOrDefault, type XY } from "../utils/math";
 import { getCellForPosition, getPositionForCell, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
-import { IMovePath, IWeightedRoute } from "./path_definitions";
+import type { IMovePath, IWeightedRoute } from "./path_definitions";
 
 export class PathHelper {
     public static DIAGONAL_MOVE_COST = 1.4142135623730951;

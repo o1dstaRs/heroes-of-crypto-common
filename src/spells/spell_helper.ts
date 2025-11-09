@@ -12,11 +12,11 @@
 import { isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
-import { IModifyableUnitProperties } from "../units/unit_properties";
+import type { IModifyableUnitProperties } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
-import { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
+import type { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
 import { SpellPowerType, SpellTargetType } from "./spell_properties";
 
 const verifyEmptyCell = (gridMatrix: number[][], emptyGridCell?: XY): boolean => {

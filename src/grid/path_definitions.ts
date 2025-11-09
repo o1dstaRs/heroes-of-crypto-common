@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 
 export interface IMovePath {
     cells: XY[];

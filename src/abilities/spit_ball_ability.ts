@@ -16,7 +16,7 @@ import { ToFactionType } from "../factions/faction_type";
 import { Grid } from "../grid/grid";
 import { Spell } from "../spells/spell";
 import { SpellPowerType } from "../spells/spell_properties";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import * as SpellHelper from "../spells/spell_helper";
 import { UnitsHolder } from "../units/units_holder";

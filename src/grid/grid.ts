@@ -11,10 +11,10 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { GridType } from "../generated/protobuf/v1/types_gen";
+import type { GridType } from "../generated/protobuf/v1/types_gen";
 import { isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
-import { XY, updateMatrixElementIfExists } from "../utils/math";
+import { type XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];

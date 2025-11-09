@@ -37,15 +37,15 @@ import {
     getDistanceToFurthestCorner,
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
-import { IWeightedRoute } from "../grid/path_definitions";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { IWeightedRoute } from "../grid/path_definitions";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
-import { winningAtLeastOneEventProbability, XY } from "../utils/math";
+import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
 import { UnitProperties } from "./unit_properties";
-import { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
+import type { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 
 export interface IAttackTargets {

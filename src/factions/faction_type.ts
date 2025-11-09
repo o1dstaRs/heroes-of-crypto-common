@@ -8,8 +8,8 @@
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
  */
-import { FactionType } from "@heroesofcrypto/common/src/generated/protobuf/v1/types_gen";
-import { PBTypes } from "@heroesofcrypto/common/src/generated/protobuf/v1/types";
+import type { FactionType } from "../generated/protobuf/v1/types_gen";
+import { PBTypes } from "../generated/protobuf/v1/types";
 
 export const AllFactions = [
     PBTypes.FactionVals.NO_FACTION,

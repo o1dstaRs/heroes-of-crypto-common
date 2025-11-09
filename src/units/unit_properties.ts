@@ -225,10 +225,10 @@ export type UnitLevelId = (typeof PBTypes.UnitLevelVals)[keyof typeof PBTypes.Un
 export type FactionId = (typeof PBTypes.FactionVals)[keyof typeof PBTypes.FactionVals]; // number
 
 // Use the generated numeric tables directly with ergonomic aliases
-export const CreatureLevels: Record<number, number> = GenCreatureLevels;
-export const CreatureByLevel: ReadonlyArray<ReadonlyArray<number>> = GenCreatureByLevel;
+export const CreatureLevelMap: Record<number, number> = GenCreatureLevels;
+export const CreatureLevelList: ReadonlyArray<ReadonlyArray<number>> = GenCreatureByLevel;
 // Optional factions map (if emitted)
-export const CreatureFactions: Record<number, number> = GenCreatureFactions ?? {};
+export const CreatureFactionsMap: Record<number, number> = GenCreatureFactions ?? {};
 
 // Helpers with typed params/returns (still numbers under the hood)
 export const getCreatureLevel = (c: CreatureId): UnitLevelId =>
@@ -239,7 +239,7 @@ export const getCreaturesByLevel = (lvl: UnitLevelId): ReadonlyArray<CreatureId>
 
 export const CreaturePoolByLevel = [2, 2, 1, 1] as const;
 
-export const allCreatureIds: readonly CreatureId[] = Object.keys(CreatureLevels)
+export const allCreatureIds: readonly CreatureId[] = Object.keys(GenCreatureLevels)
     .map((k) => Number(k) as CreatureId)
     .filter((id) => id !== (PBTypes.CreatureVals.NO_CREATURE as unknown as CreatureId));
 Object.freeze(allCreatureIds);
@@ -257,10 +257,10 @@ Object.freeze(allFactions);
 
 /** Safe accessors that return strongly typed values */
 export const getFactionOf = (c: CreatureId): FactionType =>
-    ((CreatureFactions as Record<number, FactionType>)[c] ?? PBTypes.FactionVals.MIGHT) as FactionType;
+    ((GenCreatureFactions as Record<number, FactionType>)[c] ?? PBTypes.FactionVals.MIGHT) as FactionType;
 
 export const getLevelOf = (c: CreatureId): UnitLevelId =>
-    (CreatureLevels as Record<number, UnitLevelId>)[c] ?? PBTypes.UnitLevelVals.NO_LEVEL;
+    (GenCreatureLevels as Record<number, UnitLevelId>)[c] ?? PBTypes.UnitLevelVals.NO_LEVEL;
 
 /** Group creatures by faction, typed and readonly */
 const _byFaction: Record<FactionType, CreatureId[]> = Object.fromEntries(

@@ -55,3 +55,4 @@ export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export * as HoCConstants from "./constants";
+export * from "./generated/protobuf/v1";

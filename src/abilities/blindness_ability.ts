@@ -8,11 +8,10 @@
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
  */
-
 import { AbilityType } from "./ability_properties";
 import * as HoCLib from "../utils/lib";
 import { Unit } from "../units/unit";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 export function processBlindnessAbility(

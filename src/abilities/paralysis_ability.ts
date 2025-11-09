@@ -10,7 +10,7 @@
  */
 
 import { AbilityType } from "./ability_properties";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import * as HoCLib from "../utils/lib";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";

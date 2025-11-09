@@ -28,10 +28,10 @@ import {
 } from "../constants";
 import { PBTypes as PBFight } from "../generated/protobuf/v1/fight";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { TeamType, GridType, FactionType } from "../generated/protobuf/v1/types_gen";
+import type { TeamType, GridType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
     ArmorAugment,
-    AugmentType,
+    type AugmentType,
     DefaultPlacementLevel1,
     getPlacementSizes,
     MightAugment,
@@ -48,10 +48,10 @@ import {
     LifeSynergy,
     MightSynergy,
     NatureSynergy,
-    SpecificSynergy,
+    type SpecificSynergy,
     SynergyKeysToPower,
     SynergyLevel,
-    SynergyWithLevel,
+    type SynergyWithLevel,
     ToChaosSynergy,
     ToLifeSynergy,
     ToMightSynergy,

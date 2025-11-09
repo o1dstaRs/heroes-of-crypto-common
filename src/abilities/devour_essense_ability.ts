@@ -8,8 +8,7 @@
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
  */
-
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { FightStateManager } from "../fights/fight_state_manager";

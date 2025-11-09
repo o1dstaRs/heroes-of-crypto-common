@@ -11,10 +11,10 @@
 
 import * as HoCLib from "../utils/lib";
 import { AbilityType } from "./ability_properties";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
-import { IStatisticHolder } from "../scene/statistic_holder_interface";
-import { IDamageStatistic } from "../scene/scene_stats";
+import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import type { IDamageStatistic } from "../scene/scene_stats";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 export function processPetrifyingGazeAbility(

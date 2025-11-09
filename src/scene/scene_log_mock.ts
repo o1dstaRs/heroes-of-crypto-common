@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { ISceneLog } from "./scene_log_interface";
+import type { ISceneLog } from "./scene_log_interface";
 
 export class SceneLogMock implements ISceneLog {
     public getLog(): string {

@@ -13,8 +13,8 @@ import { Grid } from "../grid/grid";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
-import { getDistance, XY } from "../utils/math";
+import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { getDistance, type XY } from "../utils/math";
 import { Ability } from "./ability";
 
 export function getAbilitiesWithPosisionCoefficient(

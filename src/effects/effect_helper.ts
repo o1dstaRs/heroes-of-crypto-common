@@ -17,7 +17,7 @@ import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getRandomInt } from "../utils/lib";
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
 export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectProperties): boolean {

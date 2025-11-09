@@ -17,21 +17,21 @@ import { GridSettings } from "../grid/grid_settings";
 import { Grid } from "../grid/grid";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
-import { IWeightedRoute } from "../grid/path_definitions";
+import type { IWeightedRoute } from "../grid/path_definitions";
 import { Spell } from "../spells/spell";
 import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import * as EffectHelper from "../effects/effect_helper";
 import { MoveHandler } from "./move_handler";
-import { IAnimationData } from "../scene/animations";
-import { IBoardObj } from "../units/unit";
-import { IVisibleDamage } from "../scene/animations";
-import { IStatisticHolder } from "../scene/statistic_holder_interface";
-import { IDamageStatistic } from "../scene/scene_stats";
+import type { IAnimationData } from "../scene/animations";
+import type { IBoardObj } from "../units/unit";
+import type { IVisibleDamage } from "../scene/animations";
+import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import type { IDamageStatistic } from "../scene/scene_stats";
 import { PBTypes } from "../generated/protobuf/v1/types";
 
 export interface IRangeAttackEvaluation {

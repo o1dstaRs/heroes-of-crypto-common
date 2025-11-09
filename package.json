@@ -8,17 +8,28 @@
         "url": "https://github.com/o1dstaRs/heroes-of-crypto-common.git"
     },
     "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./generated/*": {
+            "types": "./dist/generated/*",
+            "import": "./dist/generated/*"
+        }
+    },
     "main": "./dist/index.js",
+    "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "files": [
-        "dist",
-        "src/generated"
+        "dist"
     ],
     "scripts": {
         "prebuild": "rimraf dist && bun run fmt",
-        "build": "bun test && tsc -p tsconfig.json && bun run copy-generated",
+        "build": "bun test && tsc -p tsconfig.build.json && bun run copy-json && bun run copy-generated",
         "build:proto": "npm i protoc-gen-ts --legacy-peer-deps; npm i protoc-gen-js --legacy-peer-deps; scripts/protoc_generate.sh",
         "copy-generated": "bunx cpy \"src/generated/**/*\" \"dist/generated\"",
+        "copy-json": "bunx cpy \"src/**/*.json\" dist --parents",
         "fmt": "bunx prettier \"src/**/*.ts\" --write",
         "lint": "bun run lint:es && bun run lint:package && bun run lint:style",
         "lint:es": "bunx eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",

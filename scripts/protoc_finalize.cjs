@@ -1,4 +1,19 @@
-/* eslint-disable */
+/* eslint-disable no-console */
+/**
+ * scripts/gen_from_protoset.js
+ *
+ * Generates:
+ *  - src/generated/protobuf/v1/creature_gen.ts
+ *  - src/generated/protobuf/v1/types_gen.ts        (TeamType, FactionType, …) — type aliases to PBTypes.*
+ *  - src/generated/protobuf/v1/enums_reexports.ts  (TeamVals, CreatureVals, …) — re-export ORIGINAL PBTypes enums
+ *  - src/generated/protobuf/v1/index.ts            (barrel)
+ *
+ * Expects:
+ *  - src/generated/protobuf/v1/types.protoset
+ *  - src/generated/protobuf/v1/types_pb.js         (CJS google-protobuf stubs with extensions)
+ *  - src/generated/protobuf/v1/types.ts            (exports PBTypes { ...enums... })
+ */
+
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -9,13 +24,30 @@ const { FileDescriptorSet } = require("google-protobuf/google/protobuf/descripto
 const gen = require("../src/generated/protobuf/v1/types_pb.js");
 const { creatureLevel, creatureFaction, UnitLevelVals, FactionVals } = gen;
 
+/* --------------------------
+   Paths
+--------------------------- */
 const ROOT = __dirname;
-const GEN_DIR = path.resolve(ROOT, "../src/generated/protobuf/v1");
+const PKG_SRC_DIR = path.resolve(ROOT, "../src");
+const GEN_DIR = path.resolve(PKG_SRC_DIR, "generated/protobuf/v1");
 const PROTOSET = path.join(GEN_DIR, "types.protoset");
+
 const creatureOutTs = path.join(GEN_DIR, "creature_gen.ts");
 const valsTypesOutTs = path.join(GEN_DIR, "types_gen.ts");
+const enumsReexportsOutTs = path.join(GEN_DIR, "enums_reexports.ts");
+const genIndexOutTs = path.join(GEN_DIR, "index.ts");
 
-// Read & parse the descriptor set
+/* --------------------------
+   Ensure dirs exist
+--------------------------- */
+fs.mkdirSync(GEN_DIR, { recursive: true });
+
+/* --------------------------
+   Read & parse the descriptor set
+--------------------------- */
+if (!fs.existsSync(PROTOSET)) {
+    throw new Error(`Missing protoset at ${PROTOSET}. Run protoc to produce it first.`);
+}
 const bytes = fs.readFileSync(PROTOSET);
 const fds = FileDescriptorSet.deserializeBinary(bytes);
 
@@ -24,13 +56,14 @@ const fds = FileDescriptorSet.deserializeBinary(bytes);
 --------------------------- */
 const levels = {};
 const factions = {};
+// adjust the array size if you add more levels later
 const byLevel = [[], [], [], [], []]; // 0..4
 
 for (const file of fds.getFileList()) {
     for (const ed of file.getEnumTypeList()) {
         if (ed.getName() !== "CreatureVals") continue;
         for (const v of ed.getValueList()) {
-            const num = v.getNumber(); // numeric Creature value
+            const num = v.getNumber();
             const opts = v.getOptions();
             const lvl = (opts && opts.getExtension(creatureLevel)) ?? UnitLevelVals.NO_LEVEL;
             const fac = (opts && opts.getExtension(creatureFaction)) ?? FactionVals.NO_FACTION;
@@ -40,13 +73,28 @@ for (const file of fds.getFileList()) {
             if (byLevel[lvl]) byLevel[lvl].push(num);
         }
     }
+    // if CreatureVals ever becomes nested:
+    for (const md of file.getMessageTypeList()) {
+        for (const ed of md.getEnumTypeList()) {
+            if (ed.getName() !== "CreatureVals") continue;
+            for (const v of ed.getValueList()) {
+                const num = v.getNumber();
+                const opts = v.getOptions();
+                const lvl = (opts && opts.getExtension(creatureLevel)) ?? UnitLevelVals.NO_LEVEL;
+                const fac = (opts && opts.getExtension(creatureFaction)) ?? FactionVals.NO_FACTION;
+
+                levels[num] = lvl;
+                factions[num] = fac;
+                if (byLevel[lvl]) byLevel[lvl].push(num);
+            }
+        }
+    }
 }
 
-// Emit numeric shape to avoid google-protobuf enum typing quirks
 const creatureHeader =
     `// AUTO-GENERATED. DO NOT EDIT.\n` +
     `// Derived from types.protoset enum value options.\n` +
-    `// NOTE: Values are numeric. Compare against UnitLevelVals.FIRST / FactionVals.LIFE, etc.\n`;
+    `// NOTE: Values are numeric. Compare against UnitLevelVals.* / FactionVals.*.\n`;
 
 const creatureBody =
     `export const CreatureLevels: Record<number, number> = ${JSON.stringify(levels, null, 2)};\n` +
@@ -57,47 +105,79 @@ fs.writeFileSync(creatureOutTs, creatureHeader + creatureBody);
 console.log("✓ Wrote", path.relative(process.cwd(), creatureOutTs));
 
 /* --------------------------
-   Emit *Type aliases for each *Vals enum
-   TeamVals -> TeamType, UnitVals -> UnitType, etc.
-   Types use the "...Map" interfaces exported by google-protobuf d.ts:
-   e.g. export interface TeamValsMap { NO_TEAM: 0; UPPER: 1; LOWER: 2; }
-   Then: type TeamType = TeamValsMap[keyof TeamValsMap];
+   Collect enums (names only) so we can:
+   - make type aliases (FooType) pointing to PBTypes.FooVals
+   - re-export the ORIGINAL runtime enums by destructuring PBTypes
 --------------------------- */
-const valsEnumNames = new Set();
+const enumNames = new Set();
 
-/** Walk file and (optionally) nested enums if you add them later */
 for (const file of fds.getFileList()) {
+    // top-level enums
     for (const ed of file.getEnumTypeList()) {
-        const name = ed.getName();
-        if (name.endsWith("Vals")) valsEnumNames.add(name);
+        enumNames.add(ed.getName());
     }
-    // If you ever nest enums inside messages, you can also iterate:
-    // for (const md of file.getMessageTypeList()) {
-    //   for (const ed of md.getEnumTypeList()) { ... }
-    // }
+    // nested enums (inside messages)
+    for (const md of file.getMessageTypeList()) {
+        for (const ed of md.getEnumTypeList()) {
+            enumNames.add(ed.getName());
+        }
+    }
 }
 
-const sortedNames = Array.from(valsEnumNames).sort(); // deterministic output
-// const importTypeEntries = sortedNames.map((n) => `${n}Map`);
-// const typeAliasLines = sortedNames.map((n) => {
-//     const base = n.replace(/Vals$/, ""); // TeamVals -> Team
-//     const typeName = `${base}Type`; // TeamType
-//     const mapName = `${n}Map`; // TeamValsMap
-//     return `export type ${typeName} = ${mapName}[keyof ${mapName}];`;
-// });
+const sortedEnumNames = Array.from(enumNames).sort();
 
-const valsHeader =
+/* --------------------------
+   types_gen.ts  (TeamType, FactionType, ...)
+   ONLY for *Vals enums (Type = PBTypes.FooVals)
+--------------------------- */
+const valsEnumNames = sortedEnumNames.filter((n) => n.endsWith("Vals"));
+
+const typesHeader =
     `// AUTO-GENERATED. DO NOT EDIT.\n` +
-    `// Type aliases for numeric proto enums (*Vals) using their "...Map" interfaces.\n` +
+    `// Type aliases for numeric proto enums (*Vals) using PBTypes.*.\n` +
     `// Safe: no runtime imports, purely types.\n` +
     `import { PBTypes } from "./types";\n\n`;
 
-const typeAliasLines = sortedNames.map((name) => {
-    const typeName = name.replace(/Vals$/, "Type");
+const typeAliasLines = valsEnumNames.map((name) => {
+    const typeName = name.replace(/Vals$/, "Type"); // TeamVals -> TeamType
     return `export type ${typeName} = PBTypes.${name};`;
 });
 
-const valsBody = typeAliasLines.join("\n") + "\n";
-
-fs.writeFileSync(valsTypesOutTs, valsHeader + valsBody);
+fs.writeFileSync(valsTypesOutTs, typesHeader + typeAliasLines.join("\n") + "\n");
 console.log("✓ Wrote", path.relative(process.cwd(), valsTypesOutTs));
+
+/* --------------------------
+   enums_reexports.ts  (re-export ORIGINAL runtime enums)
+   We DO NOT regenerate enums; we re-export the ones on PBTypes.
+--------------------------- */
+const enumsHeader =
+    `// AUTO-GENERATED. DO NOT EDIT.\n` +
+    `// Re-exports ORIGINAL runtime enums from PBTypes (no regeneration).\n` +
+    `import { PBTypes } from "./types";\n\n` +
+    `// Re-export as named constants so consumers can do:\n` +
+    `//   import { TeamVals, CreatureVals } from "@heroesofcrypto/common";\n`;
+
+const reexportNames = valsEnumNames; // limit to *Vals enums; add others if you also want them
+const reexportLines = [
+    `export const {`,
+    reexportNames.map((n, i) => `  ${n}${i < reexportNames.length - 1 ? "," : ""}`).join("\n"),
+    `} = PBTypes;\n`,
+];
+
+fs.writeFileSync(enumsReexportsOutTs, enumsHeader + reexportLines.join("\n"));
+console.log("✓ Wrote", path.relative(process.cwd(), enumsReexportsOutTs));
+
+/* --------------------------
+   generated/protobuf/v1/index.ts  (barrel)
+--------------------------- */
+const genIndexHeader = `// AUTO-GENERATED. DO NOT EDIT.\n` + `// Public barrel for generated v1 API.\n`;
+
+const genIndexBody =
+    [
+        `export * from "./enums_reexports";`, // ORIGINAL runtime enums (TeamVals, CreatureVals, …)
+        `export * from "./types_gen";`, // type aliases (TeamType, CreatureType, …)
+        `export * from "./creature_gen";`, // derived maps
+    ].join("\n") + "\n";
+
+fs.writeFileSync(genIndexOutTs, genIndexHeader + genIndexBody);
+console.log("✓ Wrote", path.relative(process.cwd(), genIndexOutTs));

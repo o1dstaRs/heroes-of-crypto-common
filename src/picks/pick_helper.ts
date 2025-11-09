@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { CreatureByLevel, CreatureLevels, CreaturePoolByLevel } from "../units/unit_properties";
+import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 
 export const canBanCreatureLevel = (
     creatureLevel: number,
@@ -18,10 +18,10 @@ export const canBanCreatureLevel = (
     creaturesPickedPerTeam: number[],
 ): boolean => {
     let minimumCreaturesOfThisLevelRequired = 2;
-    let totalNumberOfCreaturesRemaining = CreatureByLevel[creatureLevel - 1].length ?? 0;
+    let totalNumberOfCreaturesRemaining = CreatureLevelList[creatureLevel - 1].length ?? 0;
 
     for (const cb of creaturesBanned) {
-        if (creatureLevel === CreatureLevels[cb as keyof typeof CreatureLevels]) {
+        if (creatureLevel === CreatureLevelMap[cb as keyof typeof CreatureLevelMap]) {
             totalNumberOfCreaturesRemaining -= 1;
         }
     }
@@ -33,7 +33,7 @@ export const canBanCreatureLevel = (
     pool[3] -= 1;
 
     for (const kc of knownCreatures) {
-        if (creatureLevel === CreatureLevels[kc as keyof typeof CreatureLevels]) {
+        if (creatureLevel === CreatureLevelMap[kc as keyof typeof CreatureLevelMap]) {
             if (pool[creatureLevel] < 1) {
                 minimumCreaturesOfThisLevelRequired -= 1;
             } else {
@@ -51,12 +51,12 @@ export const canBanCreatureLevel = (
     for (let i = 0; i < creaturesPickedPerTeam.length; i++) {
         const p = creaturesPickedPerTeam[i];
         if (i < 2) {
-            if (creatureLevel === CreatureLevels[p as keyof typeof CreatureLevels]) {
+            if (creatureLevel === CreatureLevelMap[p as keyof typeof CreatureLevelMap]) {
                 totalNumberOfCreaturesRemaining -= 1;
             }
             continue;
         }
-        if (creatureLevel === CreatureLevels[p as keyof typeof CreatureLevels]) {
+        if (creatureLevel === CreatureLevelMap[p as keyof typeof CreatureLevelMap]) {
             minimumCreaturesOfThisLevelRequired -= 1;
             totalNumberOfCreaturesRemaining -= 1;
         }

@@ -11,11 +11,18 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { TeamType } from "../generated/protobuf/v1/types_gen";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
-import { getDistance, intersect2D, Intersect2DResult, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
+import {
+    getDistance,
+    intersect2D,
+    Intersect2DResult,
+    type IXYDistance,
+    matrixElementOrDefault,
+    type XY,
+} from "../utils/math";
 import { GridSettings } from "./grid_settings";
-import { IWeightedRoute } from "./path_definitions";
+import type { IWeightedRoute } from "./path_definitions";
 
 export function getCellForPosition(gridSettings: GridSettings, position: XY): XY {
     return {

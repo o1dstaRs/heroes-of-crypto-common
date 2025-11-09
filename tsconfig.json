@@ -1,12 +1,8 @@
 {
     "extends": "../../tsconfig.json",
     "compilerOptions": {
-        "outDir": "dist",
-        "skipLibCheck": true,
         "esModuleInterop": true,
-
-        "module": "ESNext",
-        "target": "ES2022",
+        "skipLibCheck": true,
         "lib": ["ES2022", "DOM"],
         "types": ["node", "bun"]
     },

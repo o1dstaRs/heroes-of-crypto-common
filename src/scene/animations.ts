@@ -9,8 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { IBoardObj, Unit } from "../units/unit";
-import { XY } from "../utils/math";
+import type { IBoardObj, Unit } from "../units/unit";
+import type { XY } from "../utils/math";
 
 export interface IAnimationData {
     toPosition: XY;

@@ -13,13 +13,13 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import * as AbilityHelper from "../abilities/ability_helper";
-import { IStatisticHolder } from "../scene/statistic_holder_interface";
-import { IDamageStatistic } from "../scene/scene_stats";
+import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import type { IDamageStatistic } from "../scene/scene_stats";
 
 export interface IFireBreathResult {
     increaseMorale: number;

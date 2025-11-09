@@ -12,14 +12,14 @@
 import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Grid } from "../grid/grid";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { IAnimationData } from "../scene/animations";
-import { IStatisticHolder } from "../scene/statistic_holder_interface";
-import { IDamageStatistic } from "../scene/scene_stats";
-import { IVisibleDamage } from "../scene/animations";
+import type { IAnimationData } from "../scene/animations";
+import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import type { IDamageStatistic } from "../scene/scene_stats";
+import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { processRangeAOEAbility } from "./aoe_range_ability";

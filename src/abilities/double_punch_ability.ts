@@ -12,7 +12,7 @@
 import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import { Unit } from "../units/unit";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";

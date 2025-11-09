@@ -8,12 +8,11 @@
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
  */
-
 import { getRandomInt, getLapString } from "../utils/lib";
 import { AbilityType } from "./ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Unit } from "../units/unit";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 
 export function processAggrAbility(
     fromUnit: Unit,

@@ -13,12 +13,12 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
-import { ISceneLog } from "../scene/scene_log_interface";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
-import { IStatisticHolder } from "../scene/statistic_holder_interface";
-import { IDamageStatistic } from "../scene/scene_stats";
+import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import type { IDamageStatistic } from "../scene/scene_stats";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";

@@ -15,9 +15,9 @@ import { ObstacleType } from "../obstacles/obstacle_type";
 import * as HoCMath from "../utils/math";
 import { PathHelper } from "../grid/path_helper";
 import * as GridMath from "../grid/grid_math";
-import { IWeightedRoute } from "../grid/path_definitions";
+import type { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
-import { IUnitAIRepr } from "./../units/unit";
+import type { IUnitAIRepr } from "./../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import * as HoCLib from "../utils/lib";
 

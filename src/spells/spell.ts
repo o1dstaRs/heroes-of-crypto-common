@@ -9,9 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { FactionType } from "../generated/protobuf/v1/types_gen";
+import type { FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { IModifyableUnitProperties } from "../units/unit_properties";
+import type { IModifyableUnitProperties } from "../units/unit_properties";
 import { SpellMultiplierType, SpellPowerType, SpellProperties, SpellTargetType } from "./spell_properties";
 
 export interface ICalculatedBuffsDebuffsEffect {

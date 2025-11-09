@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { FactionType } from "../generated/protobuf/v1/types_gen";
+import type { FactionType } from "../generated/protobuf/v1/types_gen";
 
 export const SynergyKeysToPower: { [key: string]: number[] } = {
     "Life:1:1": [6],

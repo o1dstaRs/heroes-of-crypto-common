@@ -14,11 +14,11 @@ import { Grid } from "../grid/grid";
 import { NO_UPDATE, UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
 import { getCellsAroundPosition, getPositionForCell, getPositionForCells } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
-import { IWeightedRoute } from "../grid/path_definitions";
+import type { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 
 export interface ISystemMoveResult {
     log: string;

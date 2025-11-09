@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { EffectHelper, IPlacement, Spell } from "..";
+import { EffectHelper, type IPlacement, Spell } from "..";
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
@@ -19,10 +19,10 @@ import { Grid } from "../grid/grid";
 import { getCellsAroundCell, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
-import { getDistance, XY } from "../utils/math";
-import { IUnitAIRepr, Unit } from "./unit";
+import { getDistance, type XY } from "../utils/math";
+import { type IUnitAIRepr, Unit } from "./unit";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { UnitProperties } from "./unit_properties";
 
 export class UnitsHolder {

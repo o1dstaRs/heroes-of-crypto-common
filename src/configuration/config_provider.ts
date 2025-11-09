@@ -28,7 +28,7 @@ import {
 } from "../spells/spell_properties";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
+import type { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 
 const DEFAULT_HERO_CONFIG = {

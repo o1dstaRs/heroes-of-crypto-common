@@ -1,7 +1,7 @@
 // @ts-nocheck
 // AUTO-GENERATED. DO NOT EDIT.
 // Derived from types.protoset enum value options.
-// NOTE: Values are numeric. Compare against UnitLevelVals.FIRST / FactionVals.LIFE, etc.
+// NOTE: Values are numeric. Compare against UnitLevelVals.* / FactionVals.*.
 export const CreatureLevels: Record<number, number> = {
   "0": 0,
   "1": 1,

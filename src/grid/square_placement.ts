@@ -9,9 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 import { GridSettings } from "./grid_settings";
-import { IPlacement, PlacementPositionType, PlacementType } from "./placement_properties";
+import { type IPlacement, PlacementPositionType, PlacementType } from "./placement_properties";
 
 export class SquarePlacement implements IPlacement {
     private readonly gridSettings: GridSettings;

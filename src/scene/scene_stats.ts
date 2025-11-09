@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { TeamType } from "../generated/protobuf/v1/types_gen";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
 
 export interface IDamageStatistic {
     unitName: string;

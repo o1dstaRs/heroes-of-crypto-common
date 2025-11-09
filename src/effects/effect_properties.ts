@@ -10,7 +10,7 @@
  */
 
 import { AbilityPowerType } from "../abilities/ability_properties";
-import { XY } from "../utils/math";
+import type { XY } from "../utils/math";
 
 export interface IAuraOnMap {
     xy: XY;

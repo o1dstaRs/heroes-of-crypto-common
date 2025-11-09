@@ -10,7 +10,7 @@
  */
 
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { GridType } from "../generated/protobuf/v1/types_gen";
+import type { GridType } from "../generated/protobuf/v1/types_gen";
 
 export const ToGridType: { [gridTypeValue: string]: GridType } = {
     "": PBTypes.GridVals.NO_TYPE,
