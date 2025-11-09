@@ -451,7 +451,6 @@ google_protobuf_descriptor_pb.EnumValueOptions.extensionsBinary[1002] = new jspb
 google_protobuf_descriptor_pb.EnumValueOptions.extensions[1002] = proto.PBTypes.creatureFaction;
 
 goog.object.extend(exports, proto.PBTypes);
-
 // ---- BEGIN shim: StringList.prototype.toArray ----
 if (typeof exports.StringList === 'function' &&
     exports.StringList.prototype &&

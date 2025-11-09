@@ -4,7 +4,7 @@ package PBTypes;
 
 import "types.proto";
 
-message Unit {
+message UnitData {
   bytes id = 1;
   FactionVals faction = 2;
   string name = 3;

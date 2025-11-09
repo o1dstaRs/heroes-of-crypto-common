@@ -4,23 +4,23 @@
  *
  * Generates:
  *  - src/generated/protobuf/v1/creature_gen.ts
- *  - src/generated/protobuf/v1/types_gen.ts        (TeamType, FactionType, …) — type aliases to PBTypes.*
- *  - src/generated/protobuf/v1/enums_reexports.ts  (TeamVals, CreatureVals, …) — re-export ORIGINAL PBTypes enums
- *  - src/generated/protobuf/v1/index.ts            (barrel)
+ *  - src/generated/protobuf/v1/types_gen.ts           (TeamType, FactionType, …) — type aliases to PBTypes.*
+ *  - src/generated/protobuf/v1/enums_reexports.ts     (TeamVals, CreatureVals, …) — re-export ORIGINAL PBTypes enums
+ *  - src/generated/protobuf/v1/messages_reexports.ts  (ConfirmCode, NewPlayer, ...) — flatten PBTypes.<Msg> to top-level
+ *      also exports FooObject = ReturnType<InstanceType<typeof Foo>["toObject"]>
+ *  - src/generated/protobuf/v1/index.ts               (barrel)
  *
  * Expects:
  *  - src/generated/protobuf/v1/types.protoset
- *  - src/generated/protobuf/v1/types_pb.js         (CJS google-protobuf stubs with extensions)
- *  - src/generated/protobuf/v1/types.ts            (exports PBTypes { ...enums... })
+ *  - src/generated/protobuf/v1/*_pb.js    (CJS google-protobuf stubs with PBTypes for your app protos)
+ *  - src/generated/protobuf/v1/types.ts   (exports PBTypes { ...enums... })
  */
 
 const fs = require("node:fs");
 const path = require("node:path");
-
-// descriptor_pb.js is CommonJS
 const { FileDescriptorSet } = require("google-protobuf/google/protobuf/descriptor_pb.js");
 
-// Generated stubs (CommonJS via package.json type=commonjs in gen folder)
+// Need extensions for Creature maps
 const gen = require("../src/generated/protobuf/v1/types_pb.js");
 const { creatureLevel, creatureFaction, UnitLevelVals, FactionVals } = gen;
 
@@ -35,6 +35,7 @@ const PROTOSET = path.join(GEN_DIR, "types.protoset");
 const creatureOutTs = path.join(GEN_DIR, "creature_gen.ts");
 const valsTypesOutTs = path.join(GEN_DIR, "types_gen.ts");
 const enumsReexportsOutTs = path.join(GEN_DIR, "enums_reexports.ts");
+const messagesReexportsOutTs = path.join(GEN_DIR, "messages_reexports.ts");
 const genIndexOutTs = path.join(GEN_DIR, "index.ts");
 
 /* --------------------------
@@ -56,7 +57,6 @@ const fds = FileDescriptorSet.deserializeBinary(bytes);
 --------------------------- */
 const levels = {};
 const factions = {};
-// adjust the array size if you add more levels later
 const byLevel = [[], [], [], [], []]; // 0..4
 
 for (const file of fds.getFileList()) {
@@ -73,7 +73,6 @@ for (const file of fds.getFileList()) {
             if (byLevel[lvl]) byLevel[lvl].push(num);
         }
     }
-    // if CreatureVals ever becomes nested:
     for (const md of file.getMessageTypeList()) {
         for (const ed of md.getEnumTypeList()) {
             if (ed.getName() !== "CreatureVals") continue;
@@ -105,33 +104,33 @@ fs.writeFileSync(creatureOutTs, creatureHeader + creatureBody);
 console.log("✓ Wrote", path.relative(process.cwd(), creatureOutTs));
 
 /* --------------------------
-   Collect enums (names only) so we can:
-   - make type aliases (FooType) pointing to PBTypes.FooVals
-   - re-export the ORIGINAL runtime enums by destructuring PBTypes
+   Collect enums & messages
 --------------------------- */
 const enumNames = new Set();
+const files = []; // [{ protoName, baseName, messages: [msgName, ...] }]
 
 for (const file of fds.getFileList()) {
+    const protoName = file.getName(); // e.g. "confirm_code.proto" or "google/protobuf/descriptor.proto"
+    const baseName = protoName.replace(/\.proto$/, ""); // e.g. "confirm_code" or "google/protobuf/descriptor"
+
+    const messages = file.getMessageTypeList().map((m) => m.getName());
+
     // top-level enums
-    for (const ed of file.getEnumTypeList()) {
-        enumNames.add(ed.getName());
-    }
+    for (const ed of file.getEnumTypeList()) enumNames.add(ed.getName());
     // nested enums (inside messages)
     for (const md of file.getMessageTypeList()) {
-        for (const ed of md.getEnumTypeList()) {
-            enumNames.add(ed.getName());
-        }
+        for (const ed of md.getEnumTypeList()) enumNames.add(ed.getName());
     }
+
+    files.push({ protoName, baseName, messages });
 }
 
 const sortedEnumNames = Array.from(enumNames).sort();
+const valsEnumNames = sortedEnumNames.filter((n) => n.endsWith("Vals"));
 
 /* --------------------------
    types_gen.ts  (TeamType, FactionType, ...)
-   ONLY for *Vals enums (Type = PBTypes.FooVals)
 --------------------------- */
-const valsEnumNames = sortedEnumNames.filter((n) => n.endsWith("Vals"));
-
 const typesHeader =
     `// AUTO-GENERATED. DO NOT EDIT.\n` +
     `// Type aliases for numeric proto enums (*Vals) using PBTypes.*.\n` +
@@ -139,7 +138,7 @@ const typesHeader =
     `import { PBTypes } from "./types";\n\n`;
 
 const typeAliasLines = valsEnumNames.map((name) => {
-    const typeName = name.replace(/Vals$/, "Type"); // TeamVals -> TeamType
+    const typeName = name.replace(/Vals$/, "Type");
     return `export type ${typeName} = PBTypes.${name};`;
 });
 
@@ -148,24 +147,51 @@ console.log("✓ Wrote", path.relative(process.cwd(), valsTypesOutTs));
 
 /* --------------------------
    enums_reexports.ts  (re-export ORIGINAL runtime enums)
-   We DO NOT regenerate enums; we re-export the ones on PBTypes.
 --------------------------- */
 const enumsHeader =
     `// AUTO-GENERATED. DO NOT EDIT.\n` +
     `// Re-exports ORIGINAL runtime enums from PBTypes (no regeneration).\n` +
     `import { PBTypes } from "./types";\n\n` +
-    `// Re-export as named constants so consumers can do:\n` +
-    `//   import { TeamVals, CreatureVals } from "@heroesofcrypto/common";\n`;
+    `// Usage: import { TeamVals, CreatureVals } from "@heroesofcrypto/common";\n`;
 
-const reexportNames = valsEnumNames; // limit to *Vals enums; add others if you also want them
 const reexportLines = [
     `export const {`,
-    reexportNames.map((n, i) => `  ${n}${i < reexportNames.length - 1 ? "," : ""}`).join("\n"),
+    valsEnumNames.map((n, i) => `  ${n}${i < valsEnumNames.length - 1 ? "," : ""}`).join("\n"),
     `} = PBTypes;\n`,
 ];
 
 fs.writeFileSync(enumsReexportsOutTs, enumsHeader + reexportLines.join("\n"));
 console.log("✓ Wrote", path.relative(process.cwd(), enumsReexportsOutTs));
+
+/* --------------------------
+   messages_reexports.ts  (flatten PBTypes.<Message> => top-level exports)
+   Skip any google/protobuf/* protos (their TS entry paths differ and you don't need them here).
+--------------------------- */
+let msgHeader =
+    `// AUTO-GENERATED. DO NOT EDIT.\n` +
+    `// Re-exports message classes from PBTypes.* as top-level named exports.\n\n`;
+
+let msgBody = ``;
+
+const publicProtoFiles = files.filter((f) => !f.baseName.startsWith("google/protobuf/"));
+
+for (const f of publicProtoFiles) {
+    const modAlias = `m_${f.baseName.replace(/[^a-zA-Z0-9_]/g, "_")}`;
+    // Your app runtime JS stubs are "*_pb"
+    msgBody += `import * as ${modAlias} from "./${f.baseName}";\n`;
+    for (const m of f.messages) {
+        // value export: the constructor (class)
+        msgBody += `export const ${m} = ${modAlias}.PBTypes.${m};\n`;
+        // type export: instance type of that constructor
+        msgBody += `export type ${m} = InstanceType<typeof ${modAlias}.PBTypes.${m}>;\n`;
+        // object-shape type: what .toObject() returns
+        msgBody += `export type ${m}Object = ReturnType<InstanceType<typeof ${modAlias}.PBTypes.${m}>["toObject"]>;\n`;
+    }
+    msgBody += `\n`;
+}
+
+fs.writeFileSync(messagesReexportsOutTs, msgHeader + msgBody);
+console.log("✓ Wrote", path.relative(process.cwd(), messagesReexportsOutTs));
 
 /* --------------------------
    generated/protobuf/v1/index.ts  (barrel)
@@ -174,9 +200,10 @@ const genIndexHeader = `// AUTO-GENERATED. DO NOT EDIT.\n` + `// Public barrel f
 
 const genIndexBody =
     [
-        `export * from "./enums_reexports";`, // ORIGINAL runtime enums (TeamVals, CreatureVals, …)
-        `export * from "./types_gen";`, // type aliases (TeamType, CreatureType, …)
-        `export * from "./creature_gen";`, // derived maps
+        `export * from "./enums_reexports";`,
+        `export * from "./types_gen";`,
+        `export * from "./creature_gen";`,
+        `export * from "./messages_reexports";`,
     ].join("\n") + "\n";
 
 fs.writeFileSync(genIndexOutTs, genIndexHeader + genIndexBody);

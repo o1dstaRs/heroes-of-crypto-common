@@ -56,3 +56,5 @@ export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";
+export { default as CREATURES_JSON } from "./configuration/creatures.json";
+export { default as CustomEventSource } from "./messaging/custom_event_source";

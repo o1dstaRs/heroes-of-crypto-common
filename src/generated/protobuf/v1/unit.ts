@@ -7,7 +7,7 @@
 import * as dependency_1 from "./types";
 import * as pb_1 from "google-protobuf";
 export namespace PBTypes {
-    export class Unit extends pb_1.Message {
+    export class UnitData extends pb_1.Message {
         #one_of_decls: number[][] = [];
         constructor(data?: any[] | {
             id?: Uint8Array;
@@ -413,8 +413,8 @@ export namespace PBTypes {
             amount_died?: number;
             luck_mod?: number;
             attack_multiplier?: number;
-        }): Unit {
-            const message = new Unit({});
+        }): UnitData {
+            const message = new UnitData({});
             if (data.id != null) {
                 message.id = data.id;
             }
@@ -753,8 +753,8 @@ export namespace PBTypes {
             if (!w)
                 return writer.getResultBuffer();
         }
-        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): Unit {
-            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new Unit();
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): UnitData {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new UnitData();
             while (reader.nextField()) {
                 if (reader.isEndGroup())
                     break;
@@ -875,8 +875,8 @@ export namespace PBTypes {
         serializeBinary(): Uint8Array {
             return this.serialize();
         }
-        static deserializeBinary(bytes: Uint8Array): Unit {
-            return Unit.deserialize(bytes);
+        static deserializeBinary(bytes: Uint8Array): UnitData {
+            return UnitData.deserialize(bytes);
         }
     }
 }

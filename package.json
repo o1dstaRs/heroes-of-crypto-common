@@ -27,7 +27,7 @@
     "scripts": {
         "prebuild": "rimraf dist && bun run fmt",
         "build": "bun test && tsc -p tsconfig.build.json && bun run copy-json && bun run copy-generated",
-        "build:proto": "npm i protoc-gen-ts --legacy-peer-deps; npm i protoc-gen-js --legacy-peer-deps; scripts/protoc_generate.sh",
+        "build:proto": "bun add -d protoc-gen-ts; scripts/protoc_generate.sh",
         "copy-generated": "bunx cpy \"src/generated/**/*\" \"dist/generated\"",
         "copy-json": "bunx cpy \"src/**/*.json\" dist --parents",
         "fmt": "bunx prettier \"src/**/*.ts\" --write",
@@ -50,8 +50,6 @@
         "@types/google-protobuf": "^3.15.12",
         "@types/uuid": "^9.0.8",
         "denque": "^2.1.0",
-        "protoc-gen-js": "^3.21.4-4",
-        "protoc-gen-ts": "^0.8.7",
         "uuid": "^10.0.0"
     },
     "devDependencies": {
@@ -64,6 +62,7 @@
         "idtsc": "^1.1.0",
         "prettier": "^3.3.3",
         "protobufjs": "^7.3.2",
+        "protoc-gen-ts": "^0.8.7",
         "rimraf": "^5.0.7",
         "sort-package-json": "^1.57.0",
         "ts-protoc-gen": "^0.15.0",

@@ -1,19 +1,18 @@
 #!/usr/bin/env bash -x
 set -euo pipefail
-
 # Ensure git exists
 git --version >/dev/null 2>&1 || { echo "Git is not installed!"; exit 1; }
 
-ROOT_DIR="$(git rev-parse --show-toplevel)"
+MONOREPO_ROOT="$(git rev-parse --show-toplevel)"  # Keep for monorepo-wide (e.g., protoc_finalize.cjs)
+LOCAL_DIR="$(pwd)"  # Workspace root (game/heroes-of-crypto-common)
 
-# Binaries/paths
-export PATH="${PATH}:${ROOT_DIR}/node_modules/.bin"
+# Binaries/paths: No PATH modification—rely on shell's PATH like manual command
 PROTOC_BIN="${PROTOC_BIN:-protoc}"
-PROTOC_GEN_TS_PATH="${ROOT_DIR}/../../node_modules/.bin/protoc-gen-ts"
+PROTOC_GEN_TS_PATH="${LOCAL_DIR}/node_modules/.bin/protoc-gen-ts"
 
 TREE="protobuf/v1"
-SRC_DIR="${ROOT_DIR}/protobuf/v1"
-OUT_DIR="${ROOT_DIR}/src/generated"
+SRC_DIR="${LOCAL_DIR}/protobuf/v1"
+OUT_DIR="${LOCAL_DIR}/src/generated"
 OUT_TREE="${OUT_DIR}/${TREE}"
 DESC_OUT="${OUT_TREE}/types.protoset"
 
@@ -50,7 +49,6 @@ echo "✓ Wrote descriptor set to ${DESC_OUT}"
 JS_FILE="${OUT_TREE}/types_pb.js"
 if [ -f "${JS_FILE}" ]; then
   cat >> "${JS_FILE}" <<'EOS'
-
 // ---- BEGIN shim: StringList.prototype.toArray ----
 if (typeof exports.StringList === 'function' &&
     exports.StringList.prototype &&
@@ -71,14 +69,12 @@ if command -v node >/dev/null 2>&1; then
   # Ensure generated stubs run as CommonJS, even in an ESM repo
   echo '{ "type": "commonjs" }' > "${OUT_TREE}/package.json"
   echo "✓ Wrote ${OUT_TREE}/package.json (type=commonjs)"
-
-  # Now run finalize
-  node "${ROOT_DIR}/scripts/protoc_finalize.cjs"
+  # Now run finalize (assumes in monorepo root/scripts)
+  node "${MONOREPO_ROOT}/scripts/protoc_finalize.cjs"
 else
   echo "⚠ Node not found; skipped protoc_finalize.cjs"
 fi
 
-# ADD THIS BLOCK AT THE END
 # Prepend // @ts-nocheck to every generated .ts file
 echo "Adding // @ts-nocheck to all generated TypeScript files..."
 find "${OUT_TREE}" -type f -name "*.ts" -print0 | while IFS= read -r -d '' file; do

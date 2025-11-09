@@ -4,3 +4,4 @@
 export * from "./enums_reexports";
 export * from "./types_gen";
 export * from "./creature_gen";
+export * from "./messages_reexports";
