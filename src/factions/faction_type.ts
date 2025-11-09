@@ -9,25 +9,25 @@
  * -----------------------------------------------------------------------------
  */
 import { FactionType } from "@heroesofcrypto/common/src/generated/protobuf/v1/types_gen";
-import { FactionVals } from "@heroesofcrypto/common/src/generated/protobuf/v1/types_pb";
+import { PBTypes } from "@heroesofcrypto/common/src/generated/protobuf/v1/types";
 
 export const AllFactions = [
-    FactionVals.NO_FACTION,
-    FactionVals.CHAOS,
-    FactionVals.MIGHT,
-    FactionVals.NATURE,
-    FactionVals.LIFE,
-    FactionVals.DEATH,
-    FactionVals.ORDER,
+    PBTypes.FactionVals.NO_FACTION,
+    PBTypes.FactionVals.CHAOS,
+    PBTypes.FactionVals.MIGHT,
+    PBTypes.FactionVals.NATURE,
+    PBTypes.FactionVals.LIFE,
+    PBTypes.FactionVals.DEATH,
+    PBTypes.FactionVals.ORDER,
 ];
 
 export const ToFactionType: { [factionTypeValue: string]: FactionType } = {
-    "": FactionVals.NO_FACTION,
-    NO_FACTION: FactionVals.NO_FACTION,
-    Chaos: FactionVals.CHAOS,
-    Might: FactionVals.MIGHT,
-    Nature: FactionVals.NATURE,
-    Life: FactionVals.LIFE,
-    Death: FactionVals.DEATH,
-    Order: FactionVals.ORDER,
+    "": PBTypes.FactionVals.NO_FACTION,
+    NO_FACTION: PBTypes.FactionVals.NO_FACTION,
+    Chaos: PBTypes.FactionVals.CHAOS,
+    Might: PBTypes.FactionVals.MIGHT,
+    Nature: PBTypes.FactionVals.NATURE,
+    Life: PBTypes.FactionVals.LIFE,
+    Death: PBTypes.FactionVals.DEATH,
+    Order: PBTypes.FactionVals.ORDER,
 };

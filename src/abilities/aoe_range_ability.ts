@@ -24,7 +24,7 @@ import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -87,7 +87,7 @@ export function processRangeAOEAbility(
                     attackerUnit,
                     attackerUnit.calculateAttackDamage(
                         unit,
-                        AttackVals.RANGE,
+                        PBTypes.AttackVals.RANGE,
                         FightStateManager.getInstance()
                             .getFightProperties()
                             .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),

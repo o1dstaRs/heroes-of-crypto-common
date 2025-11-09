@@ -10,7 +10,6 @@
  */
 
 import * as AllAbilities from "../abilities";
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as GridMath from "../grid/grid_math";
@@ -33,7 +32,7 @@ import { IBoardObj } from "../units/unit";
 import { IVisibleDamage } from "../scene/animations";
 import { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { IDamageStatistic } from "../scene/scene_stats";
-import { GridVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 
 export interface IRangeAttackEvaluation {
     rangeAttackDivisors: number[];
@@ -141,7 +140,7 @@ export class AttackHandler {
     }
     public canLandRangeAttack(unit: Unit, aggrMatrix?: number[][]): boolean {
         return (
-            unit.getAttackType() === AttackVals.RANGE &&
+            unit.getAttackType() === PBTypes.AttackVals.RANGE &&
             !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
@@ -419,7 +418,7 @@ export class AttackHandler {
             (!targetUnits?.length && !isAOE) ||
             !hoverRangeAttackDivisors.length ||
             !hoverRangeAttackPosition ||
-            attackerUnit.getAttackTypeSelection() !== AttackVals.RANGE ||
+            attackerUnit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE ||
             !this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
             return { completed: false, unitIdsDied, animationData };
@@ -534,7 +533,7 @@ export class AttackHandler {
             rangeResponseUnit &&
             !attackerUnit.canSkipResponse() &&
             !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
-            targetUnit.canRespond(AttackVals.RANGE) &&
+            targetUnit.canRespond(PBTypes.AttackVals.RANGE) &&
             this.canLandRangeAttack(targetUnit, this.grid.getEnemyAggrMatrixByUnitId(targetUnit.getId())) &&
             !(
                 targetUnit.hasDebuffActive("Cowardice") &&
@@ -593,7 +592,7 @@ export class AttackHandler {
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
-                    AttackVals.RANGE,
+                    PBTypes.AttackVals.RANGE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
@@ -654,7 +653,7 @@ export class AttackHandler {
                     targetUnit,
                     targetUnit.calculateAttackDamage(
                         rangeResponseUnit,
-                        AttackVals.RANGE,
+                        PBTypes.AttackVals.RANGE,
                         FightStateManager.getInstance()
                             .getFightProperties()
                             .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
@@ -945,8 +944,8 @@ export class AttackHandler {
             !targetUnit ||
             targetUnit.isDead() ||
             !attackFromCell ||
-            (attackerUnit.getAttackTypeSelection() !== AttackVals.MELEE &&
-                attackerUnit.getAttackTypeSelection() !== AttackVals.MELEE_MAGIC) ||
+            (attackerUnit.getAttackTypeSelection() !== PBTypes.AttackVals.MELEE &&
+                attackerUnit.getAttackTypeSelection() !== PBTypes.AttackVals.MELEE_MAGIC) ||
             attackerUnit.hasAbilityActive("No Melee") ||
             attackerUnit.getTeam() === targetUnit.getTeam() ||
             (attackerUnit.hasDebuffActive("Cowardice") && attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
@@ -1176,7 +1175,7 @@ export class AttackHandler {
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
-                    AttackVals.MELEE,
+                    PBTypes.AttackVals.MELEE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
@@ -1263,7 +1262,7 @@ export class AttackHandler {
             hasLightningSpinResponseLanded = false;
             if (
                 !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
-                targetUnit.canRespond(AttackVals.MELEE) &&
+                targetUnit.canRespond(PBTypes.AttackVals.MELEE) &&
                 !attackerUnit.canSkipResponse() &&
                 !targetUnit.hasAbilityActive("No Melee") &&
                 !(
@@ -1368,7 +1367,7 @@ export class AttackHandler {
                             targetUnit,
                             targetUnit.calculateAttackDamage(
                                 attackerUnit,
-                                AttackVals.MELEE,
+                                PBTypes.AttackVals.MELEE,
                                 FightStateManager.getInstance()
                                     .getFightProperties()
                                     .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
@@ -1623,8 +1622,8 @@ export class AttackHandler {
         const targetCell = GridMath.getCellForPosition(this.gridSettings, targetPosition);
         const animationData: IAnimationData[] = [];
         if (
-            this.grid.getGridType() !== GridVals.BLOCK_CENTER ||
-            FightStateManager.getInstance().getFightProperties().getGridType() !== GridVals.BLOCK_CENTER ||
+            this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            FightStateManager.getInstance().getFightProperties().getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
             FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() <= 0 ||
             !attackerUnit ||
             attackerUnit.isDead() ||
@@ -1658,7 +1657,7 @@ export class AttackHandler {
         // range attack
         let rangeLanded = false;
         if (
-            attackerUnit.getAttackTypeSelection() === AttackVals.RANGE &&
+            attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
             this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
             animationData.push({
@@ -1677,7 +1676,7 @@ export class AttackHandler {
             const doubleShotAbility = attackerUnit.getAbility("Double Shot");
             if (
                 doubleShotAbility &&
-                attackerUnit.getAttackTypeSelection() === AttackVals.RANGE &&
+                attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
                 this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
             ) {
                 animationData.push({

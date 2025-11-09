@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package public;
+package PBTypes;
 
 message ConfirmCode {
     string email = 1;

@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCConfig from "../configuration/config_provider";
 import { ToFactionType } from "../factions/faction_type";
@@ -52,7 +52,7 @@ export function processSpitBallAbility(
 
     const debuffsNames = Object.keys(POSSIBLE_DEBUFFS_TO_FACTIONS);
     const debuffs = new Set(debuffsNames);
-    if (targetUnit.getAttackType() !== AttackVals.RANGE) {
+    if (targetUnit.getAttackType() !== PBTypes.AttackVals.RANGE) {
         debuffs.delete("Rangebane");
     }
 

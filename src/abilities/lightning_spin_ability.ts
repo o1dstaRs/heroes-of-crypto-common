@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -121,7 +121,7 @@ export function processLightningSpinAbility(
             const damageFromAttack =
                 processLuckyStrikeAbility(
                     fromUnit,
-                    fromUnit.calculateAttackDamage(enemy, AttackVals.MELEE, 1, abilityMultiplier),
+                    fromUnit.calculateAttackDamage(enemy, PBTypes.AttackVals.MELEE, 1, abilityMultiplier),
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
 

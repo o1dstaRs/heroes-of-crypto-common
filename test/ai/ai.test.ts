@@ -9,8 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
+import { describe, it, expect } from "bun:test";
+
 import { AIActionType, findTarget } from "../../src/ai/ai";
-import { AttackVals, GridVals, TeamVals } from "../../src/generated/protobuf/v1/types_pb";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
 import * as HoCMath from "../../src/utils/math";
@@ -18,7 +20,6 @@ import { PathHelper } from "../../src/grid/path_helper";
 import { GridSettings } from "../../src/grid/grid_settings";
 import { UnitsHolder } from "../../src/units/units_holder";
 import { IUnitAIRepr } from "../../src/units/unit";
-import { v4 as uuidv4 } from "uuid";
 
 import { GRID_SIZE, MAX_Y, MIN_Y, MAX_X, MIN_X, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../../src/grid/grid_constants";
 
@@ -40,9 +41,9 @@ const generateUnits = (
     anotherUnitCell?: HoCMath.XY,
 ): UnitRepr => {
     const unitFrom = isSmallUnit
-        ? stubSmallUnit(TeamVals.UPPER, steps, baseCellFrom)
-        : stubBigUnit(TeamVals.UPPER, steps, baseCellFrom);
-    const unitTo = stubSmallUnit(TeamVals.LOWER, steps, baseCellTo);
+        ? stubSmallUnit(PBTypes.TeamVals.UPPER, steps, baseCellFrom)
+        : stubBigUnit(PBTypes.TeamVals.UPPER, steps, baseCellFrom);
+    const unitTo = stubSmallUnit(PBTypes.TeamVals.LOWER, steps, baseCellTo);
     grid.occupyCell(
         baseCellFrom,
         unitFrom.getId(),
@@ -60,7 +61,7 @@ const generateUnits = (
         unitTo.hasAbilityActive("Made of Water"),
     );
     if (anotherUnitCell) {
-        const unitEnemy = stubSmallUnit(TeamVals.LOWER, steps /* steps */, anotherUnitCell);
+        const unitEnemy = stubSmallUnit(PBTypes.TeamVals.LOWER, steps /* steps */, anotherUnitCell);
         grid.occupyCell(
             anotherUnitCell,
             unitEnemy.getId(),
@@ -87,7 +88,7 @@ describe("SmallUnit", () => {
             */
             const baseCellFrom = { x: 3, y: 0 };
             const baseCellTo = { x: 0, y: 3 };
-            const grid = new Grid(gridSettings, GridVals.NORMAL);
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
             const unitFrom = generateUnits(grid, 2, true, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -104,7 +105,7 @@ describe("SmallUnit", () => {
                 */
                 const baseCellFrom = { x: 2, y: 0 };
                 const baseCellTo = { x: 1, y: 3 };
-                const grid = new Grid(gridSettings, GridVals.NORMAL);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 1, true, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -121,7 +122,7 @@ describe("SmallUnit", () => {
                */
                 const baseCellFrom = { x: 3, y: 1 };
                 const baseCellTo = { x: 0, y: 2 };
-                const grid = new Grid(gridSettings, GridVals.NORMAL);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 1, true, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -138,7 +139,7 @@ describe("SmallUnit", () => {
                */
                 const baseCellFrom = { x: 5, y: 5 };
                 const baseCellTo = { x: 10, y: 10 };
-                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 4 /* steps */, true, baseCellFrom, baseCellTo);
                 // grid.print(unitFrom.getId(), false);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
@@ -159,7 +160,7 @@ describe("SmallUnit", () => {
                 const baseCellFrom = { x: 2, y: 0 };
                 const baseCellTo = { x: 1, y: 2 };
                 const anotherEnemyCell = { x: 1, y: 3 };
-                const grid = new Grid(gridSettings, GridVals.NORMAL);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
                 const unitFrom = generateUnits(grid, 10, true, baseCellFrom, baseCellTo, anotherEnemyCell);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -177,7 +178,7 @@ describe("SmallUnit", () => {
                     */
                     const baseCellFrom = { x: 2, y: 0 };
                     const baseCellTo = { x: 1, y: 3 };
-                    const grid = new Grid(gridSettings, GridVals.NORMAL);
+                    const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
                     const unitFrom = generateUnits(grid, 2, true, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -200,7 +201,7 @@ describe("SmallUnit", () => {
                     */
                     const baseCellFrom = { x: 3, y: 0 };
                     const baseCellTo = { x: 0, y: 3 };
-                    const grid = new Grid(gridSettings, GridVals.NORMAL);
+                    const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
                     const unitFrom = generateUnits(grid, 3, true, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -380,7 +381,7 @@ describe("BigUnit", () => {
             */
             const baseCellFrom = { x: 3, y: 1 };
             const baseCellTo = { x: 0, y: 3 };
-            const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+            const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
             const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 1 });
@@ -398,7 +399,7 @@ describe("BigUnit", () => {
             */
             const baseCellFrom = { x: 0, y: 1 };
             const baseCellTo = { x: 3, y: 3 };
-            const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+            const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
             const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
             const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(closestTarget?.cellToMove()).toEqual({ x: 1, y: 1 });
@@ -417,7 +418,7 @@ describe("BigUnit", () => {
                 */
                 const baseCellFrom = { x: 3, y: 1 };
                 const baseCellTo = { x: 0, y: 3 };
-                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 2 /* steps */, false, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 2 });
@@ -435,7 +436,7 @@ describe("BigUnit", () => {
                     */
                     const baseCellFrom = { x: 1, y: 1 };
                     const baseCellTo = { x: 1, y: 3 };
-                    const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+                    const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
                     const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
                     const closestTarget = findTarget(
                         unitFrom,
@@ -460,7 +461,7 @@ describe("BigUnit", () => {
                 */
                 const baseCellFrom = { x: 2, y: 2 };
                 const baseCellTo = { x: 0, y: 3 };
-                const grid = new Grid(gridSettings, GridVals.LAVA_CENTER);
+                const grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
                 const unitFrom = generateUnits(grid, 1 /* steps */, false, baseCellFrom, baseCellTo);
                 const closestTarget = findTarget(unitFrom, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
                 expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 2 });
@@ -471,12 +472,24 @@ describe("BigUnit", () => {
 });
 
 function stubSmallUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
-    return new UnitRepr(uuidv4(), teamType, steps, 1, 1, true, true, baseCell, [baseCell], AttackVals.MELEE, "");
+    return new UnitRepr(
+        crypto.randomUUID(),
+        teamType,
+        steps,
+        1,
+        1,
+        true,
+        true,
+        baseCell,
+        [baseCell],
+        PBTypes.AttackVals.MELEE,
+        "",
+    );
 }
 
 function stubBigUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
     return new UnitRepr(
-        uuidv4(),
+        crypto.randomUUID(),
         teamType,
         steps,
         1,
@@ -490,7 +503,7 @@ function stubBigUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): U
             { x: baseCell.x - 1, y: baseCell.y - 1 },
             { x: baseCell.x, y: baseCell.y - 1 },
         ],
-        AttackVals.MELEE,
+        PBTypes.AttackVals.MELEE,
         "",
     );
 }
@@ -564,7 +577,7 @@ class UnitRepr implements IUnitAIRepr {
         return 1;
     }
 
-    public hasAbilityActive(abilityName: string): boolean {
+    public hasAbilityActive(_abilityName: string): boolean {
         return false;
     }
 }

@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import { ISceneLog } from "../scene/scene_log_interface";
@@ -126,7 +126,7 @@ export function processDoubleShotAbility(
             fromUnit,
             fromUnit.calculateAttackDamage(
                 toUnit,
-                AttackVals.RANGE,
+                PBTypes.AttackVals.RANGE,
                 FightStateManager.getInstance()
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),

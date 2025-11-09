@@ -1,3 +1,4 @@
+// @ts-nocheck
 // AUTO-GENERATED. DO NOT EDIT.
 // Derived from types.protoset enum value options.
 // NOTE: Values are numeric. Compare against UnitLevelVals.FIRST / FactionVals.LIFE, etc.

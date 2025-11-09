@@ -11,7 +11,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 
-import { AttackVals, FactionVals, UnitLevelVals, CreatureVals, MovementVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType, UnitType, AttackType, MovementType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
     CreatureLevels as GenCreatureLevels,
@@ -20,20 +20,20 @@ import {
 } from "../generated/protobuf/v1/creature_gen";
 
 export const ToAttackType: { [attackTypeName: string]: AttackType } = {
-    "": AttackVals.NO_ATTACK,
-    NO_ATTACK: AttackVals.NO_ATTACK,
-    MELEE: AttackVals.MELEE,
-    RANGE: AttackVals.RANGE,
-    MAGIC: AttackVals.MAGIC,
-    MELEE_MAGIC: AttackVals.MELEE_MAGIC,
+    "": PBTypes.AttackVals.NO_ATTACK,
+    NO_ATTACK: PBTypes.AttackVals.NO_ATTACK,
+    MELEE: PBTypes.AttackVals.MELEE,
+    RANGE: PBTypes.AttackVals.RANGE,
+    MAGIC: PBTypes.AttackVals.MAGIC,
+    MELEE_MAGIC: PBTypes.AttackVals.MELEE_MAGIC,
 };
 
 export const ToMovementType: { [movementTypeName: string]: MovementType } = {
-    "": MovementVals.NO_MOVEMENT,
-    NO_MOVEMENT: MovementVals.NO_MOVEMENT,
-    WALK: MovementVals.WALK,
-    FLY: MovementVals.FLY,
-    TELEPORT: MovementVals.TELEPORT,
+    "": PBTypes.MovementVals.NO_MOVEMENT,
+    NO_MOVEMENT: PBTypes.MovementVals.NO_MOVEMENT,
+    WALK: PBTypes.MovementVals.WALK,
+    FLY: PBTypes.MovementVals.FLY,
+    TELEPORT: PBTypes.MovementVals.TELEPORT,
 };
 
 export interface IModifyableUnitProperties {
@@ -220,9 +220,9 @@ export class UnitProperties {
     }
 }
 
-export type CreatureId = (typeof CreatureVals)[keyof typeof CreatureVals]; // number
-export type UnitLevelId = (typeof UnitLevelVals)[keyof typeof UnitLevelVals]; // number
-export type FactionId = (typeof FactionVals)[keyof typeof FactionVals]; // number
+export type CreatureId = (typeof PBTypes.CreatureVals)[keyof typeof PBTypes.CreatureVals]; // number
+export type UnitLevelId = (typeof PBTypes.UnitLevelVals)[keyof typeof PBTypes.UnitLevelVals]; // number
+export type FactionId = (typeof PBTypes.FactionVals)[keyof typeof PBTypes.FactionVals]; // number
 
 // Use the generated numeric tables directly with ergonomic aliases
 export const CreatureLevels: Record<number, number> = GenCreatureLevels;
@@ -232,7 +232,7 @@ export const CreatureFactions: Record<number, number> = GenCreatureFactions ?? {
 
 // Helpers with typed params/returns (still numbers under the hood)
 export const getCreatureLevel = (c: CreatureId): UnitLevelId =>
-    (GenCreatureLevels as Record<number, UnitLevelId>)[c] ?? UnitLevelVals.NO_LEVEL;
+    (GenCreatureLevels as Record<number, UnitLevelId>)[c] ?? PBTypes.UnitLevelVals.NO_LEVEL;
 
 export const getCreaturesByLevel = (lvl: UnitLevelId): ReadonlyArray<CreatureId> =>
     (GenCreatureByLevel as ReadonlyArray<ReadonlyArray<CreatureId>>)[lvl] ?? [];
@@ -241,24 +241,26 @@ export const CreaturePoolByLevel = [2, 2, 1, 1] as const;
 
 export const allCreatureIds: readonly CreatureId[] = Object.keys(CreatureLevels)
     .map((k) => Number(k) as CreatureId)
-    .filter((id) => id !== (CreatureVals.NO_CREATURE as unknown as CreatureId));
+    .filter((id) => id !== (PBTypes.CreatureVals.NO_CREATURE as unknown as CreatureId));
 Object.freeze(allCreatureIds);
 
 /** All faction ids we care about (customize if you have more) */
 export const allFactions: readonly FactionType[] = [
-    FactionVals.LIFE,
-    FactionVals.NATURE,
-    FactionVals.CHAOS,
-    FactionVals.MIGHT,
+    PBTypes.FactionVals.LIFE,
+    PBTypes.FactionVals.NATURE,
+    PBTypes.FactionVals.CHAOS,
+    PBTypes.FactionVals.MIGHT,
+    PBTypes.FactionVals.DEATH,
+    PBTypes.FactionVals.ORDER,
 ] as const;
 Object.freeze(allFactions);
 
 /** Safe accessors that return strongly typed values */
 export const getFactionOf = (c: CreatureId): FactionType =>
-    ((CreatureFactions as Record<number, FactionType>)[c] ?? FactionVals.MIGHT) as FactionType;
+    ((CreatureFactions as Record<number, FactionType>)[c] ?? PBTypes.FactionVals.MIGHT) as FactionType;
 
 export const getLevelOf = (c: CreatureId): UnitLevelId =>
-    (CreatureLevels as Record<number, UnitLevelId>)[c] ?? UnitLevelVals.NO_LEVEL;
+    (CreatureLevels as Record<number, UnitLevelId>)[c] ?? PBTypes.UnitLevelVals.NO_LEVEL;
 
 /** Group creatures by faction, typed and readonly */
 const _byFaction: Record<FactionType, CreatureId[]> = Object.fromEntries(
@@ -280,7 +282,7 @@ export type LevelsByFactionCounts = Readonly<Record<UnitLevelId, Readonly<Record
 
 const _levelsByFaction: Record<UnitLevelId, Record<FactionType, number>> = {} as any;
 
-for (let lvl = UnitLevelVals.FIRST; lvl <= UnitLevelVals.FOURTH; lvl++) {
+for (let lvl = PBTypes.UnitLevelVals.FIRST; lvl <= PBTypes.UnitLevelVals.FOURTH; lvl++) {
     const levelId = lvl as UnitLevelId;
     const atLevel = getCreaturesByLevel(levelId);
     const counts: Record<FactionType, number> = Object.fromEntries(allFactions.map((f) => [f, 0])) as any;
@@ -304,7 +306,12 @@ export const LevelFactionCounts: LevelsByFactionCounts = Object.freeze(_levelsBy
  * - unitSize: your 2× icon rule for level 4
  */
 export const LevelBuckets: ReadonlyArray<Readonly<{ label: string; count: number; unitSize: 1 | 2 }>> = Object.freeze(
-    [UnitLevelVals.FIRST, UnitLevelVals.SECOND, UnitLevelVals.THIRD, UnitLevelVals.FOURTH].map((lvl, i) => {
+    [
+        PBTypes.UnitLevelVals.FIRST,
+        PBTypes.UnitLevelVals.SECOND,
+        PBTypes.UnitLevelVals.THIRD,
+        PBTypes.UnitLevelVals.FOURTH,
+    ].map((lvl, i) => {
         const counts = LevelFactionCounts[lvl];
         const max = Math.max(...allFactions.map((f) => counts[f] ?? 0));
         return Object.freeze({

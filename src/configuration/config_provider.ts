@@ -27,7 +27,7 @@ import {
     ToSpellTargetType,
 } from "../spells/spell_properties";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
-import { AttackVals, UnitVals, MovementVals, FactionVals } from "../../src/generated/protobuf/v1/types_pb";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 
@@ -72,23 +72,23 @@ const DEFAULT_HERO_CONFIG = {
 };
 
 const DEFAULT_LUCK_PER_FACTION = {
-    [FactionVals.NO_FACTION]: 0,
-    [FactionVals.MIGHT]: 1,
-    [FactionVals.CHAOS]: -1,
-    [FactionVals.NATURE]: 4,
-    [FactionVals.LIFE]: 1,
-    [FactionVals.DEATH]: -2,
-    [FactionVals.ORDER]: 3,
+    [PBTypes.FactionVals.NO_FACTION]: 0,
+    [PBTypes.FactionVals.MIGHT]: 1,
+    [PBTypes.FactionVals.CHAOS]: -1,
+    [PBTypes.FactionVals.NATURE]: 4,
+    [PBTypes.FactionVals.LIFE]: 1,
+    [PBTypes.FactionVals.DEATH]: -2,
+    [PBTypes.FactionVals.ORDER]: 3,
 };
 
 const DEFAULT_MORALE_PER_FACTION = {
-    [FactionVals.NO_FACTION]: 0,
-    [FactionVals.MIGHT]: 2,
-    [FactionVals.CHAOS]: -1,
-    [FactionVals.NATURE]: 1,
-    [FactionVals.LIFE]: 4,
-    [FactionVals.DEATH]: -4,
-    [FactionVals.ORDER]: 3,
+    [PBTypes.FactionVals.NO_FACTION]: 0,
+    [PBTypes.FactionVals.MIGHT]: 2,
+    [PBTypes.FactionVals.CHAOS]: -1,
+    [PBTypes.FactionVals.NATURE]: 1,
+    [PBTypes.FactionVals.LIFE]: 4,
+    [PBTypes.FactionVals.DEATH]: -4,
+    [PBTypes.FactionVals.ORDER]: 3,
 };
 
 export const getHeroConfig = (
@@ -109,7 +109,7 @@ export const getHeroConfig = (
         heroConfig.attack_type && heroConfig.attack_type.constructor === String
             ? ToAttackType[heroConfig.attack_type as string]
             : undefined;
-    if (attackType === undefined || attackType === AttackVals.NO_ATTACK) {
+    if (attackType === undefined || attackType === PBTypes.AttackVals.NO_ATTACK) {
         throw new TypeError(`Invalid attack type for hero ${heroName} = ${attackType}`);
     }
 
@@ -117,7 +117,7 @@ export const getHeroConfig = (
         heroConfig.movement_type && heroConfig.movement_type.constructor === String
             ? ToMovementType[heroConfig.movement_type as string]
             : undefined;
-    if (movementType === undefined || movementType === MovementVals.NO_MOVEMENT) {
+    if (movementType === undefined || movementType === PBTypes.MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for hero ${heroName} = ${movementType}`);
     }
 
@@ -166,7 +166,7 @@ export const getHeroConfig = (
         1,
         0,
         team,
-        UnitVals.HERO,
+        PBTypes.UnitVals.HERO,
         `${largeTextureName.split("_").slice(0, -1).join("_")}${heroConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MIN_UNIT_STACK_POWER,
@@ -244,7 +244,7 @@ export const getCreatureConfig = (
         creatureConfig.attack_type && creatureConfig.attack_type.constructor === String
             ? ToAttackType[creatureConfig.attack_type]
             : undefined;
-    if (attackType === undefined || attackType === AttackVals.NO_ATTACK) {
+    if (attackType === undefined || attackType === PBTypes.AttackVals.NO_ATTACK) {
         throw new TypeError(`Invalid attack type for creature ${creatureName} = ${attackType}`);
     }
 
@@ -252,7 +252,7 @@ export const getCreatureConfig = (
         creatureConfig.movement_type && creatureConfig.movement_type.constructor === String
             ? ToMovementType[creatureConfig.movement_type as string]
             : undefined;
-    if (movementType === undefined || movementType === MovementVals.NO_MOVEMENT) {
+    if (movementType === undefined || movementType === PBTypes.MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
     }
 
@@ -360,7 +360,7 @@ export const getCreatureConfig = (
         amount > 0 ? amount : Math.ceil((totalExp ?? 0) / creatureConfig.exp),
         0,
         team,
-        UnitVals.CREATURE,
+        PBTypes.UnitVals.CREATURE,
         `${largeTextureName.split("_").slice(0, -1).join("_")}${creatureConfig.size === 1 ? "_128" : "_256"}`,
         largeTextureName,
         MAX_UNIT_STACK_POWER,

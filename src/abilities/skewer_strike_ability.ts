@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -99,7 +99,7 @@ export function processSkewerStrikeAbility(
 
         const damageFromAttack = fromUnit.calculateAttackDamage(
             nextStandingTarget,
-            AttackVals.MELEE,
+            PBTypes.AttackVals.MELEE,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
             1,
             fromUnit.calculateAbilityMultiplier(

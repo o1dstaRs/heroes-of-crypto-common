@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package public;
+package PBTypes;
 
 message PickPairRequest {
     int32 pair_index = 1;

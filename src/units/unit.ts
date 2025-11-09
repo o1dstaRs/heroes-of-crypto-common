@@ -46,7 +46,7 @@ import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, XY } from "../utils/math";
 import { UnitProperties } from "./unit_properties";
 import { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
-import { AttackVals, TeamVals, MovementVals, UnitVals, FactionVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 
 export interface IAttackTargets {
     unitIds: Set<string>;
@@ -228,14 +228,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.effectFactory = effectFactory;
         this.summoned = summoned;
 
-        if (this.unitProperties.attack_type === AttackVals.MELEE) {
-            this.selectedAttackType = AttackVals.MELEE;
-        } else if (this.unitProperties.attack_type === AttackVals.MELEE_MAGIC) {
-            this.selectedAttackType = AttackVals.MELEE_MAGIC;
-        } else if (this.unitProperties.attack_type === AttackVals.RANGE) {
-            this.selectedAttackType = AttackVals.RANGE;
+        if (this.unitProperties.attack_type === PBTypes.AttackVals.MELEE) {
+            this.selectedAttackType = PBTypes.AttackVals.MELEE;
+        } else if (this.unitProperties.attack_type === PBTypes.AttackVals.MELEE_MAGIC) {
+            this.selectedAttackType = PBTypes.AttackVals.MELEE_MAGIC;
+        } else if (this.unitProperties.attack_type === PBTypes.AttackVals.RANGE) {
+            this.selectedAttackType = PBTypes.AttackVals.RANGE;
         } else {
-            this.selectedAttackType = AttackVals.MAGIC;
+            this.selectedAttackType = PBTypes.AttackVals.MAGIC;
         }
 
         this.renderPosition = { x: 0, y: 0 };
@@ -849,7 +849,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             : this.unitProperties.magic_resist;
     }
     public getSpellsCount(): number {
-        if (this.unitType === UnitVals.CREATURE && this.hasEffectActive("Break")) {
+        if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
             return 0;
         }
 
@@ -862,7 +862,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.movement_type;
     }
     public canFly(): boolean {
-        return this.unitProperties.movement_type === MovementVals.FLY;
+        return this.unitProperties.movement_type === PBTypes.MovementVals.FLY;
     }
     public getExp(): number {
         return this.unitProperties.exp;
@@ -871,15 +871,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.teamType;
     }
     public getOppositeTeam(): TeamType {
-        if (this.teamType === TeamVals.NO_TEAM) {
-            return TeamVals.NO_TEAM;
+        if (this.teamType === PBTypes.TeamVals.NO_TEAM) {
+            return PBTypes.TeamVals.NO_TEAM;
         }
 
-        if (this.teamType === TeamVals.LOWER) {
-            return TeamVals.UPPER;
+        if (this.teamType === PBTypes.TeamVals.LOWER) {
+            return PBTypes.TeamVals.UPPER;
         }
 
-        return TeamVals.LOWER;
+        return PBTypes.TeamVals.LOWER;
     }
     public getUnitType(): UnitType {
         return this.unitType;
@@ -1187,7 +1187,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
         if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
-            const spellProperties = getSpellConfig(FactionVals.NO_FACTION, "Made of Fire");
+            const spellProperties = getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Made of Fire");
             this.applyBuff(
                 new Spell({
                     spellProperties: spellProperties,
@@ -1249,7 +1249,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (hasWaterCell && this.hasAbilityActive("Made of Water") && !this.hasBuffActive("Made of Water")) {
             this.applyBuff(
                 new Spell({
-                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Made of Water"),
+                    spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Made of Water"),
                     amount: 1,
                 }),
                 undefined,
@@ -1523,19 +1523,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const min = this.calculateAttackDamageMin(
             this.getAttack(),
             enemyUnit,
-            attackType === AttackVals.RANGE,
+            attackType === PBTypes.AttackVals.RANGE,
             synergyAbilityPowerIncrease,
             divisor,
         );
         const max = this.calculateAttackDamageMax(
             this.getAttack(),
             enemyUnit,
-            attackType === AttackVals.RANGE,
+            attackType === PBTypes.AttackVals.RANGE,
             synergyAbilityPowerIncrease,
             divisor,
         );
-        const attackingByMelee = attackType === AttackVals.MELEE || attackType === AttackVals.MELEE_MAGIC;
-        if (!attackingByMelee && attackType === AttackVals.RANGE) {
+        const attackingByMelee =
+            attackType === PBTypes.AttackVals.MELEE || attackType === PBTypes.AttackVals.MELEE_MAGIC;
+        if (!attackingByMelee && attackType === PBTypes.AttackVals.RANGE) {
             if (this.getRangeShots() <= 0) {
                 return 0;
             }
@@ -1552,7 +1553,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const attackTypeMultiplier =
             attackingByMelee &&
-            this.unitProperties.attack_type === AttackVals.RANGE &&
+            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE &&
             !this.hasAbilityActive("Handyman")
                 ? 0.5
                 : 1;
@@ -1581,8 +1582,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             for (const a of this.abilities) {
                 if (
                     (a.getName() === "No Melee" &&
-                        (attackType === AttackVals.MELEE || attackType === AttackVals.MELEE_MAGIC)) ||
-                    (a.getName() === "Through Shot" && attackType === AttackVals.RANGE)
+                        (attackType === PBTypes.AttackVals.MELEE || attackType === PBTypes.AttackVals.MELEE_MAGIC)) ||
+                    (a.getName() === "Through Shot" && attackType === PBTypes.AttackVals.RANGE)
                 ) {
                     return false;
                 }
@@ -1603,30 +1604,34 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public refreshPossibleAttackTypes(canLandRangeAttack: boolean): boolean {
         const currentSelectedAttackType = this.selectedAttackType;
         this.possibleAttackTypes = [];
-        if (this.getAttackType() === AttackVals.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
-            this.possibleAttackTypes.push(AttackVals.MAGIC);
-        } else if (this.getAttackType() === AttackVals.RANGE && this.getRangeShots() > 0 && canLandRangeAttack) {
-            this.possibleAttackTypes.push(AttackVals.RANGE);
+        if (this.getAttackType() === PBTypes.AttackVals.MAGIC && this.getSpellsCount() > 0 && this.getCanCastSpells()) {
+            this.possibleAttackTypes.push(PBTypes.AttackVals.MAGIC);
+        } else if (
+            this.getAttackType() === PBTypes.AttackVals.RANGE &&
+            this.getRangeShots() > 0 &&
+            canLandRangeAttack
+        ) {
+            this.possibleAttackTypes.push(PBTypes.AttackVals.RANGE);
         }
 
         if (!this.hasAbilityActive("No Melee")) {
-            if (this.getAttackType() === AttackVals.MELEE_MAGIC) {
-                this.possibleAttackTypes.push(AttackVals.MELEE_MAGIC);
+            if (this.getAttackType() === PBTypes.AttackVals.MELEE_MAGIC) {
+                this.possibleAttackTypes.push(PBTypes.AttackVals.MELEE_MAGIC);
             } else {
-                this.possibleAttackTypes.push(AttackVals.MELEE);
+                this.possibleAttackTypes.push(PBTypes.AttackVals.MELEE);
             }
         }
 
         if (
             this.getSpellsCount() > 0 &&
             this.getCanCastSpells() &&
-            !this.possibleAttackTypes.includes(AttackVals.MAGIC)
+            !this.possibleAttackTypes.includes(PBTypes.AttackVals.MAGIC)
         ) {
-            this.possibleAttackTypes.push(AttackVals.MAGIC);
+            this.possibleAttackTypes.push(PBTypes.AttackVals.MAGIC);
         }
 
         if (!this.possibleAttackTypes.length) {
-            this.possibleAttackTypes.push(AttackVals.NO_ATTACK);
+            this.possibleAttackTypes.push(PBTypes.AttackVals.NO_ATTACK);
         }
 
         if (!this.possibleAttackTypes.length) {
@@ -1660,42 +1665,43 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public selectAttackType(selectedAttackType: AttackType): boolean {
         if (
             this.selectedAttackType !== selectedAttackType &&
-            ((selectedAttackType === AttackVals.MELEE && this.possibleAttackTypes.includes(AttackVals.MELEE)) ||
-                (selectedAttackType === AttackVals.MELEE_MAGIC &&
-                    this.possibleAttackTypes.includes(AttackVals.MELEE_MAGIC)))
+            ((selectedAttackType === PBTypes.AttackVals.MELEE &&
+                this.possibleAttackTypes.includes(PBTypes.AttackVals.MELEE)) ||
+                (selectedAttackType === PBTypes.AttackVals.MELEE_MAGIC &&
+                    this.possibleAttackTypes.includes(PBTypes.AttackVals.MELEE_MAGIC)))
         ) {
-            if (this.possibleAttackTypes.includes(AttackVals.MELEE_MAGIC)) {
-                this.selectedAttackType = AttackVals.MELEE_MAGIC;
-                this.unitProperties.attack_type_selected = AttackVals.MELEE_MAGIC;
+            if (this.possibleAttackTypes.includes(PBTypes.AttackVals.MELEE_MAGIC)) {
+                this.selectedAttackType = PBTypes.AttackVals.MELEE_MAGIC;
+                this.unitProperties.attack_type_selected = PBTypes.AttackVals.MELEE_MAGIC;
             } else {
-                this.selectedAttackType = AttackVals.MELEE;
-                this.unitProperties.attack_type_selected = AttackVals.MELEE;
+                this.selectedAttackType = PBTypes.AttackVals.MELEE;
+                this.unitProperties.attack_type_selected = PBTypes.AttackVals.MELEE;
             }
 
             return true;
         }
 
         if (
-            selectedAttackType === AttackVals.RANGE &&
-            this.unitProperties.attack_type === AttackVals.RANGE &&
+            selectedAttackType === PBTypes.AttackVals.RANGE &&
+            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE &&
             this.getRangeShots() &&
             this.selectedAttackType !== selectedAttackType &&
-            this.possibleAttackTypes.includes(AttackVals.RANGE)
+            this.possibleAttackTypes.includes(PBTypes.AttackVals.RANGE)
         ) {
             this.selectedAttackType = selectedAttackType;
-            this.unitProperties.attack_type_selected = AttackVals.RANGE;
+            this.unitProperties.attack_type_selected = PBTypes.AttackVals.RANGE;
             return true;
         }
 
         if (
-            selectedAttackType === AttackVals.MAGIC &&
+            selectedAttackType === PBTypes.AttackVals.MAGIC &&
             this.unitProperties.spells.length &&
             this.unitProperties.can_cast_spells &&
             this.selectedAttackType !== selectedAttackType &&
-            this.possibleAttackTypes.includes(AttackVals.MAGIC)
+            this.possibleAttackTypes.includes(PBTypes.AttackVals.MAGIC)
         ) {
             this.selectedAttackType = selectedAttackType;
-            this.unitProperties.attack_type_selected = AttackVals.MAGIC;
+            this.unitProperties.attack_type_selected = PBTypes.AttackVals.MAGIC;
             return true;
         }
 
@@ -2049,12 +2055,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.armor_mod =
             shatterArmorEffectPower > 0 ? -shatterArmorEffectPower : this.initialUnitProperties.armor_mod;
         let armorModMultiplier = 0;
-        if (this.getMovementType() === MovementVals.FLY && synergyFlyArmorIncrease > 0) {
+        if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
         if (this.hasBuffActive("Spiritual Armor")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionVals.LIFE, "Spiritual Armor"),
+                spellProperties: getSpellConfig(PBTypes.FactionVals.LIFE, "Spiritual Armor"),
                 amount: 1,
             });
             armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
@@ -2188,14 +2194,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const mightAugmentBuff = this.getBuff("Might Augment");
 
-        if (this.getAttackTypeSelection() !== AttackVals.RANGE && mightAugmentBuff) {
+        if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += Number(
                 ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
             );
         }
 
         const sniperAugmentBuff = this.getBuff("Sniper Augment");
-        if (this.getAttackTypeSelection() === AttackVals.RANGE && sniperAugmentBuff) {
+        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
                 this.unitProperties.base_attack += Number(
@@ -2224,13 +2230,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (this.hasBuffActive("Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionVals.CHAOS, "Riot"),
+                spellProperties: getSpellConfig(PBTypes.FactionVals.CHAOS, "Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
         } else if (this.hasBuffActive("Mass Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(FactionVals.CHAOS, "Mass Riot"),
+                spellProperties: getSpellConfig(PBTypes.FactionVals.CHAOS, "Mass Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
@@ -2530,7 +2536,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 continue;
             }
             // can return us undefined
-            const faction = ToFactionType[spArr[0] as keyof typeof ToFactionType] ?? FactionVals.NO_FACTION;
+            const faction = ToFactionType[spArr[0] as keyof typeof ToFactionType] ?? PBTypes.FactionVals.NO_FACTION;
             if (faction === undefined) {
                 continue;
             }

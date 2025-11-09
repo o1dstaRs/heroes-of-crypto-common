@@ -21,7 +21,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, XY } from "../utils/math";
 import { IUnitAIRepr, Unit } from "./unit";
-import { AttackVals, TeamVals, FactionVals } from "../../src/generated/protobuf/v1/types_pb";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { UnitProperties } from "./unit_properties";
 
@@ -87,10 +87,10 @@ export class UnitsHolder {
 
                     if (
                         !(
-                            (teamType === TeamVals.LOWER &&
+                            (teamType === PBTypes.TeamVals.LOWER &&
                                 (lowerLeftPlacement.isAllowed(cellPosition) ||
                                     (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                            (teamType === TeamVals.UPPER &&
+                            (teamType === PBTypes.TeamVals.UPPER &&
                                 (upperRightPlacement.isAllowed(cellPosition) ||
                                     (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
                                 isPositionWithinGrid(this.gridSettings, cellPosition))
@@ -254,7 +254,11 @@ export class UnitsHolder {
             unit.deleteBuff("Armor Augment");
             if (augmentArmor && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentArmorBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Armor Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(
+                        PBTypes.FactionVals.NO_FACTION,
+                        "Armor Augment",
+                        NUMBER_OF_LAPS_TOTAL,
+                    ),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -275,7 +279,11 @@ export class UnitsHolder {
             unit.deleteBuff("Might Augment");
             if (augmentMight && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMightBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Might Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(
+                        PBTypes.FactionVals.NO_FACTION,
+                        "Might Augment",
+                        NUMBER_OF_LAPS_TOTAL,
+                    ),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -296,11 +304,15 @@ export class UnitsHolder {
             unit.deleteBuff("Sniper Augment");
             if (
                 augmentSniper &&
-                unit.getAttackType() === AttackVals.RANGE &&
+                unit.getAttackType() === PBTypes.AttackVals.RANGE &&
                 isPositionWithinGrid(this.gridSettings, unit.getPosition())
             ) {
                 const augmentSniperBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Sniper Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(
+                        PBTypes.FactionVals.NO_FACTION,
+                        "Sniper Augment",
+                        NUMBER_OF_LAPS_TOTAL,
+                    ),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -324,7 +336,11 @@ export class UnitsHolder {
             unit.deleteBuff("Movement Augment");
             if (augmentMovement && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMovementBuff = new Spell({
-                    spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Movement Augment", NUMBER_OF_LAPS_TOTAL),
+                    spellProperties: getSpellConfig(
+                        PBTypes.FactionVals.NO_FACTION,
+                        "Movement Augment",
+                        NUMBER_OF_LAPS_TOTAL,
+                    ),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -374,7 +390,7 @@ export class UnitsHolder {
         return this.allUnits.get(unitId);
     }
     public refreshUnitsForAllTeams(): Unit[][] {
-        const unitForAllTeams: Unit[][] = new Array((Object.keys(TeamVals).length - 2) >> 1);
+        const unitForAllTeams: Unit[][] = new Array((Object.keys(PBTypes.TeamVals).length - 2) >> 1);
         for (const unit of this.allUnits.values()) {
             const teamId = unit.getTeam() - 1;
             if (!(teamId in unitForAllTeams)) {
@@ -531,7 +547,7 @@ export class UnitsHolder {
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
                             new Spell({
-                                spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Visible"),
+                                spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Visible"),
                                 amount: 1,
                             }),
                         );
@@ -541,7 +557,7 @@ export class UnitsHolder {
                     if (!u.hasBuffActive("Hidden")) {
                         u.applyBuff(
                             new Spell({
-                                spellProperties: getSpellConfig(FactionVals.NO_FACTION, "Hidden"),
+                                spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Hidden"),
                                 amount: 1,
                             }),
                         );
@@ -614,7 +630,7 @@ export class UnitsHolder {
     public refreshAuraEffectsForAllUnits(): void {
         // setup the initial empty maps
         this.teamsAuraEffects = new Map();
-        for (let i = 0; i < (Object.keys(TeamVals).length - 2) >> 1; i++) {
+        for (let i = 0; i < (Object.keys(PBTypes.TeamVals).length - 2) >> 1; i++) {
             this.teamsAuraEffects.set((i + 1) as TeamType, new Map());
         }
 
@@ -756,7 +772,7 @@ export class UnitsHolder {
             if (unitNameKeySplit.length === 2) {
                 const unitName = unitNameKeySplit[0];
                 const unitTeam = parseInt(unitNameKeySplit[1]);
-                if (unitTeam !== TeamVals.LOWER && unitTeam !== TeamVals.UPPER) {
+                if (unitTeam !== PBTypes.TeamVals.LOWER && unitTeam !== PBTypes.TeamVals.UPPER) {
                     continue;
                 }
                 for (const u of this.getAllUnitsIterator()) {
@@ -813,18 +829,18 @@ export class UnitsHolder {
 
             const isWithinGrid = isPositionWithinGrid(this.gridSettings, cellPosition);
             if (
-                (enemyTeamType === TeamVals.LOWER &&
+                (enemyTeamType === PBTypes.TeamVals.LOWER &&
                     ((lowerLeftPlacement && lowerLeftPlacement.isAllowed(cellPosition)) ||
                         (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                (enemyTeamType === TeamVals.UPPER &&
+                (enemyTeamType === PBTypes.TeamVals.UPPER &&
                     ((upperRightPlacement && upperRightPlacement.isAllowed(cellPosition)) ||
                         (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition)))) ||
                 (isWithinGrid &&
-                    teamType === TeamVals.LOWER &&
+                    teamType === PBTypes.TeamVals.LOWER &&
                     !lowerLeftPlacement?.isAllowed(cellPosition) &&
                     !lowerRightPlacement?.isAllowed(cellPosition)) ||
                 (isWithinGrid &&
-                    teamType === TeamVals.UPPER &&
+                    teamType === PBTypes.TeamVals.UPPER &&
                     !upperRightPlacement?.isAllowed(cellPosition) &&
                     !upperLeftPlacement?.isAllowed(cellPosition)) ||
                 (verifyWithinGridPosition && !isWithinGrid)

@@ -15,7 +15,7 @@ import { getCellsAroundCell } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { getRandomInt } from "../utils/lib";
 import { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
@@ -41,16 +41,16 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
     }
 
     if (
-        unit.getAttackType() === AttackVals.RANGE &&
+        unit.getAttackType() === PBTypes.AttackVals.RANGE &&
         auraEffectProperties.power_type === AbilityPowerType.DISABLE_RANGE_ATTACK
     ) {
         return true;
     }
 
     if (
-        (unit.getAttackType() === AttackVals.MELEE ||
-            unit.getAttackType() === AttackVals.MAGIC ||
-            unit.getAttackType() === AttackVals.MELEE_MAGIC) &&
+        (unit.getAttackType() === PBTypes.AttackVals.MELEE ||
+            unit.getAttackType() === PBTypes.AttackVals.MAGIC ||
+            unit.getAttackType() === PBTypes.AttackVals.MELEE_MAGIC) &&
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE
     ) {
         return true;

@@ -1,5 +1,6 @@
 import typescriptPlugin from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
+import globals from "globals";
 
 export default [
     {
@@ -9,9 +10,26 @@ export default [
             "@typescript-eslint": typescriptPlugin,
         },
         languageOptions: {
-            ecmaVersion: 2018,
+            ecmaVersion: 2022,
             sourceType: "module",
             parser: typescriptParser,
+            parserOptions: {
+                tsconfigRootDir: import.meta.dirname,
+            },
+            globals: {
+                ...globals.node,
+                Bun: "readonly",
+                console: "readonly",
+                expect: "readonly",
+                describe: "readonly",
+                it: "readonly",
+
+                // ── DOM globals used by CustomEventSource ──
+                EventListener: "readonly",
+                navigator: "readonly",
+                EventSource: "readonly",
+                // (add any other DOM APIs you use)
+            },
         },
         rules: {
             ...typescriptPlugin.configs.recommended.rules,
@@ -27,7 +45,6 @@ export default [
             "@typescript-eslint/no-empty-function": "off",
             "@typescript-eslint/no-useless-constructor": "error",
             "@typescript-eslint/explicit-member-accessibility": "error",
-
             "@typescript-eslint/ban-ts-comment": [
                 "error",
                 {
@@ -38,10 +55,17 @@ export default [
                 },
             ],
             "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-
-            // ✅ use the CORE rule (not the plugin) to remove blank lines
             "lines-between-class-members": ["error", "never"],
-            // (if you had the plugin version before, remove it entirely)
+        },
+    },
+
+    // Test files (Jest globals only here)
+    {
+        files: ["test/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+        languageOptions: {
+            globals: {
+                ...globals.jest,
+            },
         },
     },
 ];

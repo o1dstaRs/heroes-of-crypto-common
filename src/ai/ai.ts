@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals, TeamVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import { ObstacleType } from "../obstacles/obstacle_type";
 import * as HoCMath from "../utils/math";
@@ -20,6 +20,8 @@ import { Unit } from "../units/unit";
 import { IUnitAIRepr } from "./../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import * as HoCLib from "../utils/lib";
+
+const DEBUG_AI = false;
 
 export interface IAI {
     nextMovingTarget(): HoCMath.XY | undefined;
@@ -100,8 +102,7 @@ export function findTarget(
     unitsHolder: UnitsHolder,
     pathHelper: PathHelper,
 ): BasicAIAction | undefined {
-    const debug = process.env.DEBUG_AI === "true";
-    if (debug === true) {
+    if (DEBUG_AI) {
         console.group("Start AI check");
         console.time("AI step");
     }
@@ -159,11 +160,11 @@ export function findTarget(
             return undefined;
         }
 
-        action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, debug);
+        action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
     }
 
-    if (debug === true) {
-        logAction(action, debug);
+    if (DEBUG_AI) {
+        logAction(action, DEBUG_AI);
         console.timeEnd("AI step");
         console.groupEnd();
     }
@@ -227,7 +228,9 @@ function doFindTarget(
         unitCell,
         matrix,
         max_steps + unit.getSteps(),
-        grid.getAggrMatrixByTeam(unit.getTeam() === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER),
+        grid.getAggrMatrixByTeam(
+            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+        ),
         unit.canFly(),
         unit.isSmallSize(),
         unit.hasAbilityActive("Made of Fire"),
@@ -237,7 +240,9 @@ function doFindTarget(
         unitCell,
         matrix,
         unit.getSteps(),
-        grid.getAggrMatrixByTeam(unit.getTeam() === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER),
+        grid.getAggrMatrixByTeam(
+            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+        ),
         unit.canFly(),
         unit.isSmallSize(),
         unit.hasAbilityActive("Made of Fire"),
@@ -633,7 +638,7 @@ function doFindTarget(
         return undefined;
     }
 
-    if (unit.getAttackType() === AttackVals.RANGE) {
+    if (unit.getAttackType() === PBTypes.AttackVals.RANGE) {
         const occupantUnitId = grid.getOccupantUnitId({ x: closestTarget.x, y: closestTarget.y });
         if (occupantUnitId) {
             previousTargets.set(unit.getId(), occupantUnitId);

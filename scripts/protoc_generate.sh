@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 set -euo pipefail
 
 # Ensure git exists
@@ -9,7 +9,7 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 # Binaries/paths
 export PATH="${PATH}:${ROOT_DIR}/node_modules/.bin"
 PROTOC_BIN="${PROTOC_BIN:-protoc}"
-PROTOC_GEN_TS_PATH="${ROOT_DIR}/node_modules/.bin/protoc-gen-ts"
+PROTOC_GEN_TS_PATH="${ROOT_DIR}/../../node_modules/.bin/protoc-gen-ts"
 
 TREE="protobuf/v1"
 SRC_DIR="${ROOT_DIR}/protobuf/v1"
@@ -77,3 +77,21 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "⚠ Node not found; skipped protoc_finalize.cjs"
 fi
+
+# ADD THIS BLOCK AT THE END
+# Prepend // @ts-nocheck to every generated .ts file
+echo "Adding // @ts-nocheck to all generated TypeScript files..."
+find "${OUT_TREE}" -type f -name "*.ts" -print0 | while IFS= read -r -d '' file; do
+  # Only add if not already present (idempotent)
+  if ! head -n1 "$file" | grep -q "^// @ts-nocheck"; then
+    # macOS/BSD sed needs backup extension; GNU sed doesn't care
+    if sed --version >/dev/null 2>&1 2>&1; then
+      sed -i "1i // @ts-nocheck" "$file"
+    else
+      sed -i '' "1i\\
+// @ts-nocheck
+" "$file"
+    fi
+  fi
+done
+echo "All generated .ts files now have // @ts-nocheck"

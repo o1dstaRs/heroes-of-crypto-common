@@ -78,19 +78,24 @@ for (const file of fds.getFileList()) {
 }
 
 const sortedNames = Array.from(valsEnumNames).sort(); // deterministic output
-const importTypeEntries = sortedNames.map((n) => `${n}Map`);
-const typeAliasLines = sortedNames.map((n) => {
-    const base = n.replace(/Vals$/, ""); // TeamVals -> Team
-    const typeName = `${base}Type`; // TeamType
-    const mapName = `${n}Map`; // TeamValsMap
-    return `export type ${typeName} = ${mapName}[keyof ${mapName}];`;
-});
+// const importTypeEntries = sortedNames.map((n) => `${n}Map`);
+// const typeAliasLines = sortedNames.map((n) => {
+//     const base = n.replace(/Vals$/, ""); // TeamVals -> Team
+//     const typeName = `${base}Type`; // TeamType
+//     const mapName = `${n}Map`; // TeamValsMap
+//     return `export type ${typeName} = ${mapName}[keyof ${mapName}];`;
+// });
 
 const valsHeader =
     `// AUTO-GENERATED. DO NOT EDIT.\n` +
     `// Type aliases for numeric proto enums (*Vals) using their "...Map" interfaces.\n` +
     `// Safe: no runtime imports, purely types.\n` +
-    `import type { ${importTypeEntries.join(", ")} } from "./types_pb";\n\n`;
+    `import { PBTypes } from "./types";\n\n`;
+
+const typeAliasLines = sortedNames.map((name) => {
+    const typeName = name.replace(/Vals$/, "Type");
+    return `export type ${typeName} = PBTypes.${name};`;
+});
 
 const valsBody = typeAliasLines.join("\n") + "\n";
 

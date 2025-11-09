@@ -10,7 +10,7 @@
  */
 
 import { FactionType } from "../generated/protobuf/v1/types_gen";
-import { FactionVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { IModifyableUnitProperties } from "../units/unit_properties";
 import { SpellMultiplierType, SpellPowerType, SpellProperties, SpellTargetType } from "./spell_properties";
 
@@ -28,7 +28,7 @@ export class Spell {
     private readonly spellProperties: SpellProperties;
     protected amountRemaining: number;
     private readonly isSummonSpell: boolean;
-    private readonly summonUnitFaction: FactionType = FactionVals.NO_FACTION;
+    private readonly summonUnitFaction: FactionType = PBTypes.FactionVals.NO_FACTION;
     private readonly summonUnitName: string = "";
     public constructor(spellParams: ISpellParams) {
         this.spellProperties = spellParams.spellProperties;
@@ -36,7 +36,7 @@ export class Spell {
         this.isSummonSpell = this.spellProperties.name.startsWith("Summon ");
         if (this.isSummonSpell) {
             if (this.spellProperties.name.endsWith(" Wolves")) {
-                this.summonUnitFaction = FactionVals.NATURE;
+                this.summonUnitFaction = PBTypes.FactionVals.NATURE;
                 this.summonUnitName = "Wolf";
             }
         }

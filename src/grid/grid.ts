@@ -10,7 +10,7 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamVals, GridVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { GridType } from "../generated/protobuf/v1/types_gen";
 import { isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
@@ -77,9 +77,9 @@ export class Grid {
     public cleanupCenterObstacle(): void {
         if (
             !this.cleanedUpCenter &&
-            (this.gridType === GridVals.LAVA_CENTER ||
-                this.gridType === GridVals.WATER_CENTER ||
-                this.gridType === GridVals.BLOCK_CENTER)
+            (this.gridType === PBTypes.GridVals.LAVA_CENTER ||
+                this.gridType === PBTypes.GridVals.WATER_CENTER ||
+                this.gridType === PBTypes.GridVals.BLOCK_CENTER)
         ) {
             const quarter = this.gridSettings.getGridSize() >> 2;
             const halfQuarter = quarter >> 1;
@@ -91,9 +91,9 @@ export class Grid {
                     const boardVal = this.boardCoord[row][column];
                     if (
                         // lava and water cells may be taken by certain units
-                        ((this.gridType === GridVals.LAVA_CENTER && boardVal === "L") ||
-                            (this.gridType === GridVals.WATER_CENTER && boardVal === "W") ||
-                            this.gridType === GridVals.BLOCK_CENTER) &&
+                        ((this.gridType === PBTypes.GridVals.LAVA_CENTER && boardVal === "L") ||
+                            (this.gridType === PBTypes.GridVals.WATER_CENTER && boardVal === "W") ||
+                            this.gridType === PBTypes.GridVals.BLOCK_CENTER) &&
                         row >= this.availableCenterStart &&
                         row < this.availableCenterEnd &&
                         column >= this.availableCenterStart &&
@@ -240,8 +240,8 @@ export class Grid {
         if (occupiedCells?.length) {
             for (const oc of occupiedCells) {
                 if (this.boardCoord[oc.x][oc.y] === unitId) {
-                    const isLava = !this.cleanedUpCenter && this.gridType === GridVals.LAVA_CENTER;
-                    const isWater = !this.cleanedUpCenter && this.gridType === GridVals.WATER_CENTER;
+                    const isLava = !this.cleanedUpCenter && this.gridType === PBTypes.GridVals.LAVA_CENTER;
+                    const isWater = !this.cleanedUpCenter && this.gridType === PBTypes.GridVals.WATER_CENTER;
                     if (
                         (isLava || isWater) &&
                         oc.x >= this.availableCenterStart &&
@@ -320,7 +320,9 @@ export class Grid {
             return undefined;
         }
 
-        return this.getAggrMatrixByTeam(team === TeamVals.LOWER ? TeamVals.UPPER : TeamVals.LOWER);
+        return this.getAggrMatrixByTeam(
+            team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+        );
     }
     public occupyCells(
         cells: XY[],
@@ -377,8 +379,8 @@ export class Grid {
                     continue;
                 }
                 if (this.boardCoord[oc.x][oc.y] === unitId) {
-                    const isLava = !this.cleanedUpCenter && this.gridType === GridVals.LAVA_CENTER;
-                    const isWater = !this.cleanedUpCenter && this.gridType === GridVals.WATER_CENTER;
+                    const isLava = !this.cleanedUpCenter && this.gridType === PBTypes.GridVals.LAVA_CENTER;
+                    const isWater = !this.cleanedUpCenter && this.gridType === PBTypes.GridVals.WATER_CENTER;
                     if (
                         (isLava || isWater) &&
                         oc.x >= this.availableCenterStart &&
@@ -592,15 +594,15 @@ export class Grid {
         return 0;
     }
     private getObstacleTypePerGrid(): ObstacleType | undefined {
-        if (this.gridType === GridVals.BLOCK_CENTER) {
+        if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
             return ObstacleType.BLOCK;
         }
 
-        if (this.gridType === GridVals.LAVA_CENTER) {
+        if (this.gridType === PBTypes.GridVals.LAVA_CENTER) {
             return ObstacleType.LAVA;
         }
 
-        if (this.gridType === GridVals.WATER_CENTER) {
+        if (this.gridType === PBTypes.GridVals.WATER_CENTER) {
             return ObstacleType.WATER;
         }
 

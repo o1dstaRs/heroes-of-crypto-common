@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package public;
+package PBTypes;
 
 message RequestCode {
     string email = 1;

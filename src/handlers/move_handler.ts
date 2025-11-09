@@ -17,7 +17,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { TeamVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { XY } from "../utils/math";
 
 export interface ISystemMoveResult {
@@ -100,16 +100,16 @@ export class MoveHandler {
                 let moveY = false;
                 let priorityShift = 0;
                 if (updatePositionMask & UPDATE_UP) {
-                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_DOWN) {
-                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_LEFT) {
-                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
                     moveY = true;
                 } else if (updatePositionMask & UPDATE_RIGHT) {
-                    priorityShift = unit.getTeam() === TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
                     moveY = true;
                 }
                 const initialTargetCells = structuredClone(targetCells);

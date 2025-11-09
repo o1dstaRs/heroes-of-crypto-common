@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AttackVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -102,7 +102,7 @@ export function processThroughShotAbility(
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
-                    AttackVals.RANGE,
+                    PBTypes.AttackVals.RANGE,
                     FightStateManager.getInstance()
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),

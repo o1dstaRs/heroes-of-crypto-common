@@ -10,7 +10,7 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
 import { getDistance, intersect2D, Intersect2DResult, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
@@ -224,7 +224,7 @@ export function getRandomGridCellAroundPosition(
     let proposedCells: XY[] = [];
     let hasHashes: number[] = [];
 
-    if (teamType === TeamVals.LOWER) {
+    if (teamType === PBTypes.TeamVals.LOWER) {
         if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y + 1, 0)) {
             proposedCells.push({ x: cell.x, y: cell.y + 1 });
             hasHashes.push((cell.x << 4) | (cell.y + 1));
@@ -242,7 +242,7 @@ export function getRandomGridCellAroundPosition(
             proposedCells.push({ x: cell.x + 1, y: cell.y + 1 });
             hasHashes.push(((cell.x + 1) << 4) | (cell.y + 1));
         }
-    } else if (teamType === TeamVals.UPPER) {
+    } else if (teamType === PBTypes.TeamVals.UPPER) {
         if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y - 1, 0)) {
             proposedCells.push({ x: cell.x, y: cell.y - 1 });
             hasHashes.push((cell.x << 4) | (cell.y - 1));

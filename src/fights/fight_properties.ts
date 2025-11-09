@@ -26,8 +26,8 @@ import {
     STEPS_MORALE_MULTIPLIER,
     TOTAL_TIME_TO_MAKE_TURN_MILLIS,
 } from "../constants";
-import { Fight } from "../generated/protobuf/v1/fight_pb";
-import { StringList, TeamVals, GridVals, FactionVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes as PBFight } from "../generated/protobuf/v1/fight";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { TeamType, GridType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
     ArmorAugment,
@@ -103,13 +103,13 @@ export class FightProperties {
         this.currentLap = 1;
         this.gridType = this.getRandomGridType();
         this.placementType = PlacementType.RECTANGLE;
-        if (this.gridType === GridVals.BLOCK_CENTER) {
+        if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
             this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
         }
         this.firstTurnMade = false;
         this.fightStarted = false;
         this.fightFinished = false;
-        this.previousTurnTeam = TeamVals.NO_TEAM;
+        this.previousTurnTeam = PBTypes.TeamVals.NO_TEAM;
         this.highestSpeedThisTurn = 0;
         this.alreadyMadeTurn = new Set();
         this.alreadyMadeTurnByTeam = new Map();
@@ -264,7 +264,7 @@ export class FightProperties {
     public setGridType(gridType: GridType): void {
         if (!this.fightStarted) {
             this.gridType = gridType;
-            if (this.gridType === GridVals.BLOCK_CENTER) {
+            if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
                 this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
             } else {
                 this.obstacleHitsLeft = 0;
@@ -298,9 +298,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === TeamVals.LOWER
-                ? (this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0);
+            teamType === PBTypes.TeamVals.LOWER
+                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LOWER) ?? 0)
+                : (this.teamUnitsAlive.get(PBTypes.TeamVals.UPPER) ?? 0);
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers - 1;
         if (teamMembersToMakeTurn < 0) {
             teamMembersToMakeTurn = 0;
@@ -347,9 +347,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === TeamVals.LOWER
-                ? (this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0);
+            teamType === PBTypes.TeamVals.LOWER
+                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LOWER) ?? 0)
+                : (this.teamUnitsAlive.get(PBTypes.TeamVals.UPPER) ?? 0);
 
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers;
         if (teamMembersToMakeTurn < 0) {
@@ -408,7 +408,7 @@ export class FightProperties {
     }
     public isTimeToDryCenter(): boolean {
         let isTimeToDryCenter = false;
-        if (this.gridType === GridVals.LAVA_CENTER || this.gridType === GridVals.WATER_CENTER) {
+        if (this.gridType === PBTypes.GridVals.LAVA_CENTER || this.gridType === PBTypes.GridVals.WATER_CENTER) {
             const numberOfLapsTillNarrowing = this.getNumberOfLapsTillNarrowing();
             const narrowedTimes =
                 Math.floor((this.currentLap - 1) / numberOfLapsTillNarrowing) + this.additionalNarrowingLaps;
@@ -426,7 +426,7 @@ export class FightProperties {
         return this.teamUnitsAlive.get(teamType) ?? 0;
     }
     public getNumberOfLapsTillNarrowing(): number {
-        return this.getGridType() === GridVals.BLOCK_CENTER
+        return this.getGridType() === PBTypes.GridVals.BLOCK_CENTER
             ? NUMBER_OF_LAPS_TILL_NARROWING_BLOCK
             : NUMBER_OF_LAPS_TILL_NARROWING_NORMAL;
     }
@@ -451,7 +451,7 @@ export class FightProperties {
         nMight: number,
         nNature: number,
     ): void {
-        if (teamType === TeamVals.NO_TEAM) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
 
@@ -461,26 +461,26 @@ export class FightProperties {
         if (synergyLevelLife) {
             const firstSynergyLevel = this.findSynergyLevel(
                 teamType,
-                FactionVals.LIFE,
+                PBTypes.FactionVals.LIFE,
                 LifeSynergy.PLUS_MORALE_AND_LUCK,
             );
             if (firstSynergyLevel) {
                 this.updateSynergyPerTeam(
                     teamType,
-                    FactionVals.LIFE,
+                    PBTypes.FactionVals.LIFE,
                     LifeSynergy.PLUS_MORALE_AND_LUCK,
                     synergyLevelLife,
                 );
             } else {
                 const secondSynergyLevel = this.findSynergyLevel(
                     teamType,
-                    FactionVals.LIFE,
+                    PBTypes.FactionVals.LIFE,
                     LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
                 );
                 if (secondSynergyLevel) {
                     this.updateSynergyPerTeam(
                         teamType,
-                        FactionVals.LIFE,
+                        PBTypes.FactionVals.LIFE,
                         LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
                         synergyLevelLife,
                     );
@@ -489,13 +489,13 @@ export class FightProperties {
         } else {
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.LIFE,
+                PBTypes.FactionVals.LIFE,
                 LifeSynergy.PLUS_MORALE_AND_LUCK,
                 SynergyLevel.NO_SYNERGY,
             );
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.LIFE,
+                PBTypes.FactionVals.LIFE,
                 LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
                 SynergyLevel.NO_SYNERGY,
             );
@@ -505,47 +505,74 @@ export class FightProperties {
         this.synergyUnitsChaosPerTeam.set(teamType, numberOfUnitsChaos);
         const synergyLevelChaos = Math.min(Math.floor(numberOfUnitsChaos / 2), MAX_SYNERGY_LEVEL);
         if (synergyLevelChaos) {
-            const firstSynergyLevel = this.findSynergyLevel(teamType, FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
+            const firstSynergyLevel = this.findSynergyLevel(
+                teamType,
+                PBTypes.FactionVals.CHAOS,
+                ChaosSynergy.BREAK_ON_ATTACK,
+            );
             if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(teamType, FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK, synergyLevelChaos);
+                this.updateSynergyPerTeam(
+                    teamType,
+                    PBTypes.FactionVals.CHAOS,
+                    ChaosSynergy.BREAK_ON_ATTACK,
+                    synergyLevelChaos,
+                );
             } else {
-                const secondSynergyLevel = this.findSynergyLevel(teamType, FactionVals.CHAOS, ChaosSynergy.MOVEMENT);
+                const secondSynergyLevel = this.findSynergyLevel(
+                    teamType,
+                    PBTypes.FactionVals.CHAOS,
+                    ChaosSynergy.MOVEMENT,
+                );
                 if (secondSynergyLevel) {
-                    this.updateSynergyPerTeam(teamType, FactionVals.CHAOS, ChaosSynergy.MOVEMENT, synergyLevelChaos);
+                    this.updateSynergyPerTeam(
+                        teamType,
+                        PBTypes.FactionVals.CHAOS,
+                        ChaosSynergy.MOVEMENT,
+                        synergyLevelChaos,
+                    );
                 }
             }
         } else {
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.CHAOS,
+                PBTypes.FactionVals.CHAOS,
                 ChaosSynergy.BREAK_ON_ATTACK,
                 SynergyLevel.NO_SYNERGY,
             );
-            this.updateSynergyPerTeam(teamType, FactionVals.CHAOS, ChaosSynergy.MOVEMENT, SynergyLevel.NO_SYNERGY);
+            this.updateSynergyPerTeam(
+                teamType,
+                PBTypes.FactionVals.CHAOS,
+                ChaosSynergy.MOVEMENT,
+                SynergyLevel.NO_SYNERGY,
+            );
         }
 
         const numberOfUnitsMight = Math.floor(nMight);
         this.synergyUnitsMightPerTeam.set(teamType, numberOfUnitsMight);
         const synergyLevelMight = Math.min(Math.floor(numberOfUnitsMight / 2), MAX_SYNERGY_LEVEL);
         if (synergyLevelMight) {
-            const firstSynergyLevel = this.findSynergyLevel(teamType, FactionVals.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
+            const firstSynergyLevel = this.findSynergyLevel(
+                teamType,
+                PBTypes.FactionVals.MIGHT,
+                MightSynergy.PLUS_AURAS_RANGE,
+            );
             if (firstSynergyLevel) {
                 this.updateSynergyPerTeam(
                     teamType,
-                    FactionVals.MIGHT,
+                    PBTypes.FactionVals.MIGHT,
                     MightSynergy.PLUS_AURAS_RANGE,
                     synergyLevelMight,
                 );
             } else {
                 const secondSynergyLevel = this.findSynergyLevel(
                     teamType,
-                    FactionVals.MIGHT,
+                    PBTypes.FactionVals.MIGHT,
                     MightSynergy.PLUS_STACK_ABILITIES_POWER,
                 );
                 if (secondSynergyLevel) {
                     this.updateSynergyPerTeam(
                         teamType,
-                        FactionVals.MIGHT,
+                        PBTypes.FactionVals.MIGHT,
                         MightSynergy.PLUS_STACK_ABILITIES_POWER,
                         synergyLevelMight,
                     );
@@ -554,13 +581,13 @@ export class FightProperties {
         } else {
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.MIGHT,
+                PBTypes.FactionVals.MIGHT,
                 MightSynergy.PLUS_AURAS_RANGE,
                 SynergyLevel.NO_SYNERGY,
             );
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.MIGHT,
+                PBTypes.FactionVals.MIGHT,
                 MightSynergy.PLUS_STACK_ABILITIES_POWER,
                 SynergyLevel.NO_SYNERGY,
             );
@@ -572,26 +599,26 @@ export class FightProperties {
         if (synergyLevelNature) {
             const firstSynergyLevel = this.findSynergyLevel(
                 teamType,
-                FactionVals.NATURE,
+                PBTypes.FactionVals.NATURE,
                 NatureSynergy.INCREASE_BOARD_UNITS,
             );
             if (firstSynergyLevel) {
                 this.updateSynergyPerTeam(
                     teamType,
-                    FactionVals.NATURE,
+                    PBTypes.FactionVals.NATURE,
                     NatureSynergy.INCREASE_BOARD_UNITS,
                     synergyLevelNature,
                 );
             } else {
                 const secondSynergyLevel = this.findSynergyLevel(
                     teamType,
-                    FactionVals.NATURE,
+                    PBTypes.FactionVals.NATURE,
                     NatureSynergy.PLUS_FLY_ARMOR,
                 );
                 if (secondSynergyLevel) {
                     this.updateSynergyPerTeam(
                         teamType,
-                        FactionVals.NATURE,
+                        PBTypes.FactionVals.NATURE,
                         NatureSynergy.PLUS_FLY_ARMOR,
                         synergyLevelNature,
                     );
@@ -600,20 +627,20 @@ export class FightProperties {
         } else {
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.NATURE,
+                PBTypes.FactionVals.NATURE,
                 NatureSynergy.INCREASE_BOARD_UNITS,
                 SynergyLevel.NO_SYNERGY,
             );
             this.updateSynergyPerTeam(
                 teamType,
-                FactionVals.NATURE,
+                PBTypes.FactionVals.NATURE,
                 NatureSynergy.PLUS_FLY_ARMOR,
                 SynergyLevel.NO_SYNERGY,
             );
         }
     }
     public getAdditionalAuraRangePerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
+        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
         if (!synergyLevel) {
             return 0;
         }
@@ -621,7 +648,7 @@ export class FightProperties {
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_AURAS_RANGE}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getAdditionalMovementStepsPerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.CHAOS, ChaosSynergy.MOVEMENT);
+        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.MOVEMENT);
         if (!synergyLevel) {
             return 0;
         }
@@ -629,7 +656,7 @@ export class FightProperties {
         return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getBreakChancePerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
+        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
         if (!synergyLevel) {
             return 0;
         }
@@ -639,7 +666,7 @@ export class FightProperties {
     public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(
             teamType,
-            FactionVals.MIGHT,
+            PBTypes.FactionVals.MIGHT,
             MightSynergy.PLUS_STACK_ABILITIES_POWER,
         );
         if (!synergyLevel) {
@@ -649,7 +676,7 @@ export class FightProperties {
         return SynergyKeysToPower[`Might:${MightSynergy.PLUS_STACK_ABILITIES_POWER}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getAdditionalFlyArmorPerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.NATURE, NatureSynergy.PLUS_FLY_ARMOR);
+        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.NATURE, NatureSynergy.PLUS_FLY_ARMOR);
         if (!synergyLevel) {
             return 0;
         }
@@ -657,7 +684,11 @@ export class FightProperties {
         return SynergyKeysToPower[`Nature:${NatureSynergy.PLUS_FLY_ARMOR}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getAdditionalMoralePerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
+        const synergyLevel = this.findSynergyLevel(
+            teamType,
+            PBTypes.FactionVals.LIFE,
+            LifeSynergy.PLUS_MORALE_AND_LUCK,
+        );
         if (!synergyLevel) {
             return 0;
         }
@@ -665,7 +696,11 @@ export class FightProperties {
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getAdditionalLuckPerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.LIFE, LifeSynergy.PLUS_MORALE_AND_LUCK);
+        const synergyLevel = this.findSynergyLevel(
+            teamType,
+            PBTypes.FactionVals.LIFE,
+            LifeSynergy.PLUS_MORALE_AND_LUCK,
+        );
         if (!synergyLevel) {
             return 0;
         }
@@ -673,7 +708,11 @@ export class FightProperties {
         return SynergyKeysToPower[`Life:${LifeSynergy.PLUS_MORALE_AND_LUCK}:${synergyLevel}`]?.[1] ?? 0;
     }
     public getAdditionalSupplyPerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.LIFE, LifeSynergy.PLUS_SUPPLY_PERCENTAGE);
+        const synergyLevel = this.findSynergyLevel(
+            teamType,
+            PBTypes.FactionVals.LIFE,
+            LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
+        );
         if (!synergyLevel) {
             return 0;
         }
@@ -700,10 +739,10 @@ export class FightProperties {
         }
 
         if (
-            faction !== FactionVals.LIFE &&
-            faction !== FactionVals.CHAOS &&
-            faction !== FactionVals.MIGHT &&
-            faction !== FactionVals.NATURE
+            faction !== PBTypes.FactionVals.LIFE &&
+            faction !== PBTypes.FactionVals.CHAOS &&
+            faction !== PBTypes.FactionVals.MIGHT &&
+            faction !== PBTypes.FactionVals.NATURE
         ) {
             return false;
         }
@@ -712,13 +751,13 @@ export class FightProperties {
         if (synergyLevelInt) {
             for (const ps of this.getPossibleSynergies(teamType)) {
                 let specificSynergy: SpecificSynergy | undefined = undefined;
-                if (faction === FactionVals.LIFE) {
+                if (faction === PBTypes.FactionVals.LIFE) {
                     specificSynergy = ToLifeSynergy[ps.synergy];
-                } else if (faction === FactionVals.CHAOS) {
+                } else if (faction === PBTypes.FactionVals.CHAOS) {
                     specificSynergy = ToChaosSynergy[ps.synergy];
-                } else if (faction === FactionVals.MIGHT) {
+                } else if (faction === PBTypes.FactionVals.MIGHT) {
                     specificSynergy = ToMightSynergy[ps.synergy];
-                } else if (faction === FactionVals.NATURE) {
+                } else if (faction === PBTypes.FactionVals.NATURE) {
                     specificSynergy = ToNatureSynergy[ps.synergy];
                 }
                 if (
@@ -780,22 +819,22 @@ export class FightProperties {
             {
                 unitsPerTeam: this.synergyUnitsLifePerTeam,
                 synergyEnum: LifeSynergy as { [key: number]: string },
-                faction: FactionVals.LIFE,
+                faction: PBTypes.FactionVals.LIFE,
             },
             {
                 unitsPerTeam: this.synergyUnitsChaosPerTeam,
                 synergyEnum: ChaosSynergy as { [key: number]: string },
-                faction: FactionVals.CHAOS,
+                faction: PBTypes.FactionVals.CHAOS,
             },
             {
                 unitsPerTeam: this.synergyUnitsMightPerTeam,
                 synergyEnum: MightSynergy as { [key: number]: string },
-                faction: FactionVals.MIGHT,
+                faction: PBTypes.FactionVals.MIGHT,
             },
             {
                 unitsPerTeam: this.synergyUnitsNaturePerTeam,
                 synergyEnum: NatureSynergy as { [key: number]: string },
-                faction: FactionVals.NATURE,
+                faction: PBTypes.FactionVals.NATURE,
             },
         ];
 
@@ -827,7 +866,7 @@ export class FightProperties {
         this.alreadyRepliedAttack.add(unitId);
     }
     public addAlreadyMadeTurn(teamType: TeamType, unitId: string): void {
-        if (teamType === TeamVals.NO_TEAM) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
 
@@ -883,7 +922,7 @@ export class FightProperties {
         this.previousTurnTeam = teamType;
     }
     public setDefaultPlacementPerTeam(teamType: TeamType, placement: DefaultPlacementLevel1): void {
-        if (teamType === TeamVals.NO_TEAM) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
 
@@ -897,7 +936,7 @@ export class FightProperties {
         }
     }
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
-        if (teamType === TeamVals.NO_TEAM) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return false;
         }
 
@@ -923,7 +962,7 @@ export class FightProperties {
         return false;
     }
     public getAugmentPlacement(teamType: TeamType): number[] {
-        if (teamType === TeamVals.NO_TEAM) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return [];
         }
 
@@ -952,7 +991,7 @@ export class FightProperties {
         return this.augmentMovementPerTeam.get(teamType) ?? MovementAugment.NO_AUGMENT;
     }
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
-        if (teamType === TeamVals.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
+        if (teamType === PBTypes.TeamVals.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
             return false;
         }
 
@@ -1000,105 +1039,83 @@ export class FightProperties {
         return true;
     }
     public static deserialize(bytes: Uint8Array): FightProperties {
-        const fight = Fight.deserializeBinary(bytes);
+        const fight = PBFight.Fight.deserializeBinary(bytes);
         const fightProperties = new FightProperties();
 
-        fightProperties.id = uuidFromBytes(fight.getId_asU8());
-        fightProperties.currentLap = fight.getCurrentLap();
-        fightProperties.gridType = fight.getGridType();
-        fightProperties.firstTurnMade = fight.getFirstTurnMade();
-        fightProperties.fightStarted = fight.getFightStarted();
-        fightProperties.fightFinished = fight.getFightFinished();
-        fightProperties.previousTurnTeam = fight.getPreviousTurnTeam();
-        fightProperties.highestSpeedThisTurn = fight.getHighestSpeedThisTurn();
-        fightProperties.alreadyMadeTurn = new Set(fight.getAlreadyMadeTurnList());
+        fightProperties.id = uuidFromBytes(fight.id);
+        fightProperties.currentLap = fight.current_lap;
+        fightProperties.gridType = fight.grid_type;
+        fightProperties.firstTurnMade = fight.first_turn_made;
+        fightProperties.fightStarted = fight.fight_started;
+        fightProperties.fightFinished = fight.fight_finished;
+        fightProperties.previousTurnTeam = fight.previous_turn_team;
+        fightProperties.highestSpeedThisTurn = fight.highest_speed_this_turn;
+        fightProperties.alreadyMadeTurn = new Set(fight.already_made_turn);
 
         // Deserialize alreadyMadeTurnByTeam
-        const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
-        alreadyMadeTurnByTeamMap.forEach((value: StringList, key: number) => {
-            fightProperties.alreadyMadeTurnByTeam.set(key as TeamType, new Set(value.getValuesList()));
-        });
+        fightProperties.alreadyMadeTurnByTeam = new Map(
+            Array.from(fight.already_made_turn_by_team.entries()).map(([key, value]) => {
+                return [key, new Set(value.values as string[])];
+            }),
+        );
 
-        fightProperties.alreadyHourglass = new Set(fight.getAlreadyHourglassList());
-        fightProperties.alreadyRepliedAttack = new Set(fight.getAlreadyRepliedAttackList());
+        fightProperties.alreadyHourglass = new Set(fight.already_hourglass);
+        fightProperties.alreadyRepliedAttack = new Set(fight.already_replied_attack);
 
         // Deserialize teamUnitsAlive
-        const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
-        teamUnitsAliveMap.forEach((value: number, key: number) => {
-            fightProperties.teamUnitsAlive.set(key as TeamType, value);
-        });
+        fightProperties.teamUnitsAlive = new Map(Array.from(fight.team_units_alive.entries()));
 
-        fightProperties.hourglassQueue = new Denque(fight.getHourglassQueueList());
-        fightProperties.moralePlusQueue = new Denque(fight.getMoralePlusQueueList());
-        fightProperties.moraleMinusQueue = new Denque(fight.getMoraleMinusQueueList());
+        fightProperties.hourglassQueue = new Denque(fight.hourglass_queue);
+        fightProperties.moralePlusQueue = new Denque(fight.morale_plus_queue);
+        fightProperties.moraleMinusQueue = new Denque(fight.morale_minus_queue);
 
-        fightProperties.currentTurnStart = fight.getCurrentTurnStart();
-        fightProperties.currentTurnEnd = fight.getCurrentTurnEnd();
+        fightProperties.currentTurnStart = fight.current_turn_start;
+        fightProperties.currentTurnEnd = fight.current_turn_end;
 
         // Deserialize currentLapTotalTimePerTeam
-        const currentLapTotalTimePerTeamMap = fight.getCurrentLapTotalTimePerTeamMap();
-        currentLapTotalTimePerTeamMap.forEach((value: number, key: number) => {
-            fightProperties.currentLapTotalTimePerTeam.set(key as TeamType, value);
-        });
+        fightProperties.currentLapTotalTimePerTeam = new Map(
+            Array.from(fight.current_lap_total_time_per_team.entries()),
+        );
 
-        fightProperties.upNextQueue = new Denque(fight.getUpNextList());
-        fightProperties.stepsMoraleMultiplier = fight.getStepsMoraleMultiplier();
+        fightProperties.upNextQueue = new Denque(fight.up_next);
+        fightProperties.stepsMoraleMultiplier = fight.steps_morale_multiplier;
         // Deserialize hasAdditionalTimeRequestedPerTeam
-        const hasAdditionalTimeRequestedPerTeamMap = fight.getHasAdditionalTimeRequestedPerTeamMap();
-        hasAdditionalTimeRequestedPerTeamMap.forEach((value: boolean, key: number) => {
-            fightProperties.hasAdditionalTimeRequestedPerTeam.set(key as TeamType, value);
-        });
+        fightProperties.hasAdditionalTimeRequestedPerTeam = new Map(
+            Array.from(fight.has_additional_time_requested_per_team.entries()),
+        );
 
         return fightProperties;
     }
     public serialize(): Uint8Array {
-        const fight = new Fight();
-        fight.setId(uuidToUint8Array(this.id));
-        fight.setCurrentLap(this.currentLap);
-        fight.setGridType(this.gridType);
-        fight.setFirstTurnMade(this.firstTurnMade);
-        fight.setFightStarted(this.fightStarted);
-        fight.setFightFinished(this.fightFinished);
-        fight.setPreviousTurnTeam(this.previousTurnTeam);
-        fight.setHighestSpeedThisTurn(this.highestSpeedThisTurn);
-        fight.setAlreadyMadeTurnList(Array.from(this.alreadyMadeTurn));
-        const alreadyMadeTurnByUpperTeam = this.alreadyMadeTurnByTeam.get(TeamVals.UPPER);
-        const alreadyMadeTurnByLowerTeam = this.alreadyMadeTurnByTeam.get(TeamVals.LOWER);
-        const alreadyMadeTurnByUpperTeamList = new StringList();
-        const alreadyMadeTurnByLowerTeamList = new StringList();
-        if (alreadyMadeTurnByUpperTeam?.size) {
-            alreadyMadeTurnByUpperTeamList.setValuesList(Array.from(alreadyMadeTurnByUpperTeam));
-        }
-        if (alreadyMadeTurnByLowerTeam?.size) {
-            alreadyMadeTurnByLowerTeamList.setValuesList(Array.from(alreadyMadeTurnByLowerTeam));
-        }
-        const alreadyMadeTurnByTeamMap = fight.getAlreadyMadeTurnByTeamMap();
-        alreadyMadeTurnByTeamMap.set(TeamVals.UPPER, alreadyMadeTurnByUpperTeamList);
-        alreadyMadeTurnByTeamMap.set(TeamVals.LOWER, alreadyMadeTurnByLowerTeamList);
-        fight.setAlreadyHourglassList(Array.from(this.alreadyHourglass));
-        fight.setAlreadyRepliedAttackList(Array.from(this.alreadyRepliedAttack));
-        const upperTeamUnitsAlive = this.teamUnitsAlive.get(TeamVals.UPPER) ?? 0;
-        const lowerTeamUnitsAlive = this.teamUnitsAlive.get(TeamVals.LOWER) ?? 0;
-        const teamUnitsAliveMap = fight.getTeamUnitsAliveMap();
-        teamUnitsAliveMap.set(TeamVals.UPPER, upperTeamUnitsAlive);
-        teamUnitsAliveMap.set(TeamVals.LOWER, lowerTeamUnitsAlive);
-        fight.setHourglassQueueList(this.hourglassQueue.toArray());
-        fight.setMoralePlusQueueList(this.moralePlusQueue.toArray());
-        fight.setMoraleMinusQueueList(this.moraleMinusQueue.toArray());
-        fight.setCurrentTurnStart(Math.round(this.currentTurnStart));
-        fight.setCurrentTurnEnd(Math.round(this.currentTurnEnd));
-        const currentLapTotalTimePerTeam = fight.getCurrentLapTotalTimePerTeamMap();
-        const upperCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamVals.UPPER) ?? 0;
-        const lowerCurrentLapTotalTime = this.currentLapTotalTimePerTeam.get(TeamVals.LOWER) ?? 0;
-        currentLapTotalTimePerTeam.set(TeamVals.UPPER, upperCurrentLapTotalTime);
-        currentLapTotalTimePerTeam.set(TeamVals.LOWER, lowerCurrentLapTotalTime);
-        fight.setUpNextList(this.upNextQueue.toArray());
-        const hasAdditionalTimeRequestedPerTeam = fight.getHasAdditionalTimeRequestedPerTeamMap();
-        const upperAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamVals.UPPER) ?? false;
-        const lowerAdditionalTimeRequested = this.hasAdditionalTimeRequestedPerTeam.get(TeamVals.LOWER) ?? false;
-        hasAdditionalTimeRequestedPerTeam.set(TeamVals.UPPER, upperAdditionalTimeRequested);
-        hasAdditionalTimeRequestedPerTeam.set(TeamVals.LOWER, lowerAdditionalTimeRequested);
-        fight.setStepsMoraleMultiplier(this.stepsMoraleMultiplier);
+        const fight = new PBFight.Fight({
+            id: uuidToUint8Array(this.id),
+            current_lap: this.currentLap,
+            grid_type: this.gridType,
+            first_turn_made: this.firstTurnMade,
+            fight_started: this.fightStarted,
+            fight_finished: this.fightFinished,
+            previous_turn_team: this.previousTurnTeam,
+            highest_speed_this_turn: this.highestSpeedThisTurn,
+            already_made_turn: Array.from(this.alreadyMadeTurn),
+            already_made_turn_by_team: new Map(
+                Array.from(this.alreadyMadeTurnByTeam).map(([key, value]) => [
+                    key,
+                    new PBTypes.StringList({ values: Array.from(value) }),
+                ]),
+            ),
+            already_hourglass: Array.from(this.alreadyHourglass),
+            already_replied_attack: Array.from(this.alreadyRepliedAttack),
+            team_units_alive: new Map(Array.from(this.teamUnitsAlive)),
+            hourglass_queue: this.hourglassQueue.toArray(),
+            morale_plus_queue: this.moralePlusQueue.toArray(),
+            morale_minus_queue: this.moraleMinusQueue.toArray(),
+            current_turn_start: Math.round(this.currentTurnStart),
+            current_turn_end: Math.round(this.currentTurnEnd),
+            current_lap_total_time_per_team: new Map(Array.from(this.currentLapTotalTimePerTeam)),
+            up_next: this.upNextQueue.toArray(),
+            steps_morale_multiplier: this.stepsMoraleMultiplier,
+            has_additional_time_requested_per_team: new Map(Array.from(this.hasAdditionalTimeRequestedPerTeam)),
+        });
 
         return fight.serializeBinary();
     }
@@ -1186,7 +1203,11 @@ export class FightProperties {
         return synergyLevel;
     }
     private getAdditionalBoardUnitsPerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, FactionVals.NATURE, NatureSynergy.INCREASE_BOARD_UNITS);
+        const synergyLevel = this.findSynergyLevel(
+            teamType,
+            PBTypes.FactionVals.NATURE,
+            NatureSynergy.INCREASE_BOARD_UNITS,
+        );
         if (!synergyLevel) {
             return 0;
         }
@@ -1237,7 +1258,7 @@ export class FightProperties {
         let secondBatch: Unit[];
 
         // total morale based
-        if (this.previousTurnTeam == TeamVals.NO_TEAM) {
+        if (this.previousTurnTeam == PBTypes.TeamVals.NO_TEAM) {
             for (const u of unitsUpper) {
                 this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
                 totalArmyMoraleUpper += u.getMorale();
@@ -1283,7 +1304,7 @@ export class FightProperties {
                     }
                 }
             }
-        } else if (this.previousTurnTeam === TeamVals.LOWER) {
+        } else if (this.previousTurnTeam === PBTypes.TeamVals.LOWER) {
             firstBatch = unitsUpper;
             secondBatch = unitsLower;
         } else {
@@ -1340,16 +1361,16 @@ export class FightProperties {
     private getRandomGridType(): GridType {
         const randomValue = getRandomInt(0, 12);
         if (randomValue < 4) {
-            return GridVals.NORMAL;
+            return PBTypes.GridVals.NORMAL;
         }
         if (randomValue > 7) {
-            return GridVals.BLOCK_CENTER;
+            return PBTypes.GridVals.BLOCK_CENTER;
         }
         if (randomValue < 6) {
             // return GridVals.WATER_CENTER;
-            return GridVals.LAVA_CENTER;
+            return PBTypes.GridVals.LAVA_CENTER;
         }
 
-        return GridVals.LAVA_CENTER;
+        return PBTypes.GridVals.LAVA_CENTER;
     }
 }

@@ -10,7 +10,7 @@
  */
 
 import { ObstacleType } from "../obstacles/obstacle_type";
-import { TeamVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, shuffle } from "../utils/lib";
 import { getDistance, IXYDistance, matrixElementOrDefault, XY } from "../utils/math";
@@ -118,8 +118,8 @@ export class PathHelper {
         }
 
         if (
-            targetUnitTeam === TeamVals.UPPER ||
-            (targetUnitTeam === TeamVals.NO_TEAM &&
+            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x <= this.gridSettings.getGridSize() / 2 ||
                     unitCell.y <= this.gridSettings.getGridSize() / 2))
         ) {
@@ -130,7 +130,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
-        } else if (targetUnitTeam === TeamVals.LOWER || targetUnitTeam === TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
@@ -154,8 +154,8 @@ export class PathHelper {
         }
 
         if (
-            targetUnitTeam === TeamVals.UPPER ||
-            (targetUnitTeam === TeamVals.NO_TEAM &&
+            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
         ) {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
@@ -165,7 +165,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
-        } else if (targetUnitTeam === TeamVals.LOWER || targetUnitTeam === TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
@@ -184,8 +184,8 @@ export class PathHelper {
         targetUnitTeam: TeamType,
     ): XY | undefined {
         if (
-            targetUnitTeam === TeamVals.UPPER ||
-            (targetUnitTeam === TeamVals.NO_TEAM &&
+            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y <= this.gridSettings.getGridSize() / 2))
         ) {
             const firstUnitCellY = unitCell.y - 1;
@@ -200,7 +200,7 @@ export class PathHelper {
             ) {
                 return { x: newUnitCellX, y: secondUnitCellY };
             }
-        } else if (targetUnitTeam === TeamVals.LOWER || targetUnitTeam === TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             const firstUnitCellY = unitCell.y + 1;
             if (
                 firstUnitCellY < this.gridSettings.getGridSize() &&
@@ -224,8 +224,8 @@ export class PathHelper {
         targetUnitTeam: TeamType,
     ): XY | undefined {
         if (
-            targetUnitTeam === TeamVals.UPPER ||
-            (targetUnitTeam === TeamVals.NO_TEAM &&
+            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x <= this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
         ) {
             const firstUnitCellX = unitCell.x - 1;
@@ -240,7 +240,7 @@ export class PathHelper {
             ) {
                 return { x: secondUnitCellX, y: newUnitCellY };
             }
-        } else if (targetUnitTeam === TeamVals.LOWER) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER) {
             const firstUnitCellX = unitCell.x + 1;
             if (
                 firstUnitCellX < this.gridSettings.getGridSize() &&

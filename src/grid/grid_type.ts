@@ -9,13 +9,13 @@
  * -----------------------------------------------------------------------------
  */
 
-import { GridVals } from "../generated/protobuf/v1/types_pb";
+import { PBTypes } from "../generated/protobuf/v1/types";
 import { GridType } from "../generated/protobuf/v1/types_gen";
 
 export const ToGridType: { [gridTypeValue: string]: GridType } = {
-    "": GridVals.NO_TYPE,
-    "1": GridVals.NORMAL,
-    "2": GridVals.LAVA_CENTER,
-    "3": GridVals.BLOCK_CENTER,
+    "": PBTypes.GridVals.NO_TYPE,
+    "1": PBTypes.GridVals.NORMAL,
+    "2": PBTypes.GridVals.LAVA_CENTER,
+    "3": PBTypes.GridVals.BLOCK_CENTER,
     // "4": GridType.WATER_CENTER,
 };
