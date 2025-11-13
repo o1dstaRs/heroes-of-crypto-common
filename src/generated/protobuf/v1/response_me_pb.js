@@ -75,15 +75,15 @@ proto.PBTypes.ResponseMe.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.ResponseMe.toObject = function(includeInstance, msg) {
   var f, obj = {
-username: jspb.Message.getFieldWithDefault(msg, 1, ""),
-email: jspb.Message.getFieldWithDefault(msg, 2, ""),
-wins: jspb.Message.getFieldWithDefault(msg, 3, 0),
-losses: jspb.Message.getFieldWithDefault(msg, 4, 0),
-totalGamesPlayed: jspb.Message.getFieldWithDefault(msg, 5, 0),
-isActive: jspb.Message.getBooleanFieldWithDefault(msg, 6, false),
-matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 7, 0),
-matchMakingCooldownTill: jspb.Message.getFieldWithDefault(msg, 8, 0),
-inGameId: jspb.Message.getFieldWithDefault(msg, 9, "")
+    username: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    email: jspb.Message.getFieldWithDefault(msg, 2, ""),
+    wins: jspb.Message.getFieldWithDefault(msg, 3, 0),
+    losses: jspb.Message.getFieldWithDefault(msg, 4, 0),
+    totalGamesPlayed: jspb.Message.getFieldWithDefault(msg, 5, 0),
+    isActive: jspb.Message.getBooleanFieldWithDefault(msg, 6, false),
+    matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 7, 0),
+    matchMakingCooldownTill: jspb.Message.getFieldWithDefault(msg, 8, 0),
+    inGameId: jspb.Message.getFieldWithDefault(msg, 9, "")
   };
 
   if (includeInstance) {

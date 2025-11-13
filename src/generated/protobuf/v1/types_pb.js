@@ -100,7 +100,7 @@ proto.PBTypes.StringList.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.StringList.toObject = function(includeInstance, msg) {
   var f, obj = {
-valuesList: (f = jspb.Message.getRepeatedField(msg, 1)) == null ? undefined : f
+    valuesList: (f = jspb.Message.getRepeatedField(msg, 1)) == null ? undefined : f
   };
 
   if (includeInstance) {

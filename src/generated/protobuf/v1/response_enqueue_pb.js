@@ -75,7 +75,7 @@ proto.PBTypes.ResponseEnqueue.prototype.toObject = function(opt_includeInstance)
  */
 proto.PBTypes.ResponseEnqueue.toObject = function(includeInstance, msg) {
   var f, obj = {
-matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    matchMakingQueueAddedTime: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {

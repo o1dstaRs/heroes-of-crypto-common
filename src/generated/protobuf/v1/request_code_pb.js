@@ -75,7 +75,7 @@ proto.PBTypes.RequestCode.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.RequestCode.toObject = function(includeInstance, msg) {
   var f, obj = {
-email: jspb.Message.getFieldWithDefault(msg, 1, "")
+    email: jspb.Message.getFieldWithDefault(msg, 1, "")
   };
 
   if (includeInstance) {

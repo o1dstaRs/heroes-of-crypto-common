@@ -75,9 +75,9 @@ proto.PBTypes.ResetPassword.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.ResetPassword.toObject = function(includeInstance, msg) {
   var f, obj = {
-email: jspb.Message.getFieldWithDefault(msg, 1, ""),
-password: jspb.Message.getFieldWithDefault(msg, 2, ""),
-token: msg.getToken_asB64()
+    email: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    password: jspb.Message.getFieldWithDefault(msg, 2, ""),
+    token: msg.getToken_asB64()
   };
 
   if (includeInstance) {

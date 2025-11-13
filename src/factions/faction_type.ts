@@ -21,6 +21,16 @@ export const AllFactions = [
     PBTypes.FactionVals.ORDER,
 ];
 
+export const ToFactionName: { [factionTypeValue: number]: string } = {
+    [PBTypes.FactionVals.NO_FACTION]: "",
+    [PBTypes.FactionVals.CHAOS]: "Chaos",
+    [PBTypes.FactionVals.MIGHT]: "Might",
+    [PBTypes.FactionVals.NATURE]: "Nature",
+    [PBTypes.FactionVals.LIFE]: "Life",
+    [PBTypes.FactionVals.DEATH]: "Death",
+    [PBTypes.FactionVals.ORDER]: "Order",
+};
+
 export const ToFactionType: { [factionTypeValue: string]: FactionType } = {
     "": PBTypes.FactionVals.NO_FACTION,
     NO_FACTION: PBTypes.FactionVals.NO_FACTION,

@@ -9,138 +9,134 @@
  * -----------------------------------------------------------------------------
  */
 
-import { randomInt } from "crypto";
+import { Buffer } from "buffer";
 
-export function shuffle<T>(array: T[]): T[] {
-    let currentIndex = array.length;
-    let randomIndex;
+/* -------------------------------------------------------------------------- */
+/*                               Secure randomness                            */
+/* -------------------------------------------------------------------------- */
 
-    // While there remain elements to shuffle.
-    while (currentIndex > 0) {
-        // Pick a remaining element.
-        randomIndex = Math.floor(Math.random() * currentIndex);
-        currentIndex--;
+interface CryptoLike {
+    getRandomValues<T extends ArrayBufferView>(array: T): T;
+}
 
-        // And swap it with the current element.
-        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+function getWebCrypto(): CryptoLike | undefined {
+    // Narrow without `any`
+    const g = globalThis as unknown as { crypto?: CryptoLike };
+    return g.crypto && typeof g.crypto.getRandomValues === "function" ? g.crypto : undefined;
+}
+
+/**
+ * Secure uniform integer in [min, max) using Web Crypto when available.
+ * - Exclusive of max (matches Node's crypto.randomInt).
+ * - Uses rejection sampling (no modulo bias).
+ * - Falls back to Math.random only if crypto is unavailable.
+ * - Supports full safe JS ranges (≤ 2^53 - 1).
+ */
+export function getRandomInt(min: number, max: number): number {
+    if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error("min/max must be finite numbers");
+    if (!Number.isInteger(min) || !Number.isInteger(max)) throw new Error("min/max must be integers");
+    if (max < min) throw new Error("max must be >= min");
+    if (max === min) return min;
+
+    const spanBig = BigInt(max) - BigInt(min); // > 0
+    const TWO53 = 1n << 53n;
+
+    const c = getWebCrypto();
+    if (c) {
+        // Rejection sample 53-bit values to avoid bias
+        const limit = (TWO53 / spanBig) * spanBig; // largest multiple of span below 2^53
+        for (;;) {
+            const u32 = new Uint32Array(2);
+            c.getRandomValues(u32);
+            const hi = BigInt(u32[0] & 0x001fffff); // 21 bits
+            const lo = BigInt(u32[1]); // 32 bits
+            const rnd53 = (hi << 32n) | lo; // 53-bit integer in [0, 2^53)
+            if (rnd53 < limit) {
+                return Number(rnd53 % spanBig) + min;
+            }
+        }
     }
 
+    // Explicit, allowed fallback (non-crypto): still unbiased via float range
+    const span = max - min;
+    return Math.floor(Math.random() * span) + min;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Utils                                    */
+/* -------------------------------------------------------------------------- */
+
+export function shuffle<T>(array: T[]): T[] {
+    // Fisher–Yates with secure getRandomInt
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = getRandomInt(0, i + 1); // j ∈ [0, i]
+        [array[i], array[j]] = [array[j], array[i]];
+    }
     return array;
 }
 
 export function matrixElement(matrix: number[][], x: number, y: number): number {
-    if (!(y in matrix)) {
-        return 0;
-    }
-    if (!(x in matrix[y])) {
-        return 0;
-    }
-    return matrix[y][x];
+    return matrix[y]?.[x] ?? 0;
 }
 
 export function stringToBoolean(str: string | null | undefined): boolean {
-    if (str === null || str === undefined) {
-        return false;
-    }
-    return str.toLowerCase() === "true" || str.toString() === "1";
+    if (str == null) return false;
+    const s = String(str).toLowerCase();
+    return s === "true" || s === "1";
 }
 
 export function removeItemOnce<T>(arr: T[], value: T): boolean {
     const index = arr.indexOf(value);
-    let removed = false;
     if (index > -1) {
         arr.splice(index, 1);
-        removed = true;
+        return true;
     }
-    return removed;
-}
-
-// supports 65536 max range
-export function getRandomInt(min: number, max: number): number {
-    if (max - min > 65536 || min < -65535 || max > 65536) {
-        throw new Error(`Invalid range. Only max - min <= 65536 is supported. Provided min: ${min} max: ${max}`);
-    }
-
-    if (typeof window !== "undefined" && typeof window.document !== "undefined") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const crypto = window.crypto || (window as any).msCrypto; // For IE11 compatibility
-        const range = max - min;
-        const maxByteValue = 65536; // 2^16 = 65536
-
-        if (range === 0) {
-            return min;
-        }
-
-        if (range < 0) {
-            throw new Error("Max must be greater or equal than min");
-        }
-
-        const byteArray = new Uint16Array(1); // 16-bit array to handle values up to 65536
-        let randomValue: number;
-
-        do {
-            crypto.getRandomValues(byteArray);
-            randomValue = byteArray[0];
-        } while (randomValue >= Math.floor(maxByteValue / range) * range);
-
-        return min + (randomValue % range);
-    }
-
-    return randomInt(min, max);
+    return false;
 }
 
 export function isBrowser(): boolean {
-    return typeof window !== "undefined" && typeof window.document !== "undefined";
+    return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+interface HrtimeLike {
+    bigint?: () => bigint;
+}
+interface ProcessLike {
+    hrtime?: HrtimeLike;
 }
 
 export function getTimeMillis(): number {
-    if (typeof window !== "undefined" && typeof window.document !== "undefined") {
-        return window.performance.now();
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+        return performance.now();
     }
-
-    return Math.floor(Number(process.hrtime.bigint()) / 1000000);
+    const p = (globalThis as unknown as { process?: ProcessLike }).process;
+    if (p?.hrtime?.bigint) {
+        const ns = p.hrtime.bigint(); // bigint nanoseconds
+        return Number(ns / 1_000_000n);
+    }
+    return Date.now();
 }
 
 export function interval(func: () => void | Promise<void>, timeoutMillis: number): void {
-    const executeFunction = async () => {
+    const run = async () => {
         await func();
     };
-
-    if (isBrowser()) {
-        window.setInterval(executeFunction, timeoutMillis);
-    } else {
-        setInterval(executeFunction, timeoutMillis);
-    }
+    (isBrowser() ? window.setInterval : setInterval)(run, timeoutMillis);
 }
 
 export function uuidToUint8Array(uuid: string): Uint8Array {
-    // Remove hyphens from the UUID string
-    const hexStr = uuid.replace(/-/g, "");
-
-    // Ensure the UUID string has the correct length
-    if (hexStr.length !== 32) {
-        throw new Error("Invalid UUID format");
-    }
-
-    // Convert each pair of hexadecimal digits into a byte
-    const byteArray = new Uint8Array(16);
+    const hex = uuid.replace(/-/g, "");
+    if (hex.length !== 32) throw new Error("Invalid UUID format");
+    const out = new Uint8Array(16);
     for (let i = 0; i < 16; i++) {
-        byteArray[i] = parseInt(hexStr.substring(i * 2, 2), 16);
+        out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
     }
-
-    return byteArray;
+    return out;
 }
 
 export const uuidFromBytes = (buffer: Uint8Array): string => {
-    // Ensure the buffer has exactly 16 bytes.
-    if (buffer.length !== 16) {
-        throw new Error("Buffer must be 16 bytes long");
-    }
-
-    // Array of hex groups for the UUID string
-    const hex = Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0"));
-
-    // Format according to UUID standard (8-4-4-4-12)
+    if (buffer.length !== 16) throw new Error("Buffer must be 16 bytes long");
+    const hex = Array.from(buffer, (b) => b.toString(16).padStart(2, "0"));
     return [
         hex.slice(0, 4).join(""),
         hex.slice(4, 6).join(""),
@@ -151,15 +147,10 @@ export const uuidFromBytes = (buffer: Uint8Array): string => {
 };
 
 /**
- * Convert a Base64-encoded string to a Uint8Array in Bun runtime.
- * @param base64 - The Base64-encoded string.
- * @returns The Uint8Array.
+ * Convert a Base64-encoded string to a Uint8Array (browser/Bun/Node).
  */
 export const base64ToUint8Array = (base64: string): Uint8Array => {
-    // Decode the Base64 string to a Buffer
     const buffer = Buffer.from(base64, "base64");
-
-    // Convert the Buffer to a Uint8Array
     return new Uint8Array(buffer);
 };
 
@@ -171,24 +162,15 @@ export class RefNumber {
     public getValue(): number {
         return this.value;
     }
-    // Increment the value
     public increment(by: number = 1): void {
         this.value += by;
     }
-    // Decrement the value
     public decrement(by: number = 1): void {
         this.value -= by;
     }
-    // Reset to a specific value
     public reset(newValue: number): void {
         this.value = newValue;
     }
 }
 
-export const getLapString = (laps: number): string => {
-    if (laps === 1) {
-        return "1 lap";
-    } else {
-        return `${laps} laps`;
-    }
-};
+export const getLapString = (laps: number): string => (laps === 1 ? "1 lap" : `${laps} laps`);

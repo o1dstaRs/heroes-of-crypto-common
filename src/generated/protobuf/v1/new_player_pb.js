@@ -75,9 +75,9 @@ proto.PBTypes.NewPlayer.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.NewPlayer.toObject = function(includeInstance, msg) {
   var f, obj = {
-username: jspb.Message.getFieldWithDefault(msg, 1, ""),
-email: jspb.Message.getFieldWithDefault(msg, 2, ""),
-password: jspb.Message.getFieldWithDefault(msg, 3, "")
+    username: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    email: jspb.Message.getFieldWithDefault(msg, 2, ""),
+    password: jspb.Message.getFieldWithDefault(msg, 3, "")
   };
 
   if (includeInstance) {

@@ -141,7 +141,7 @@ proto.PBTypes.PickPairRequest.prototype.toObject = function(opt_includeInstance)
  */
 proto.PBTypes.PickPairRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-pairIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    pairIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -271,7 +271,7 @@ proto.PBTypes.PickBanRequest.prototype.toObject = function(opt_includeInstance) 
  */
 proto.PBTypes.PickBanRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-creature: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    creature: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -401,8 +401,8 @@ proto.PBTypes.ArtifactRequest.prototype.toObject = function(opt_includeInstance)
  */
 proto.PBTypes.ArtifactRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-artifact: jspb.Message.getFieldWithDefault(msg, 1, 0),
-level: jspb.Message.getFieldWithDefault(msg, 2, 0)
+    artifact: jspb.Message.getFieldWithDefault(msg, 1, 0),
+    level: jspb.Message.getFieldWithDefault(msg, 2, 0)
   };
 
   if (includeInstance) {
@@ -561,7 +561,7 @@ proto.PBTypes.RevealRequest.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.RevealRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-creatureIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
+    creatureIndex: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {

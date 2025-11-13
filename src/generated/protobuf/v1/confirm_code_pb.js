@@ -75,8 +75,8 @@ proto.PBTypes.ConfirmCode.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.ConfirmCode.toObject = function(includeInstance, msg) {
   var f, obj = {
-email: jspb.Message.getFieldWithDefault(msg, 1, ""),
-code: jspb.Message.getFieldWithDefault(msg, 2, "")
+    email: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    code: jspb.Message.getFieldWithDefault(msg, 2, "")
   };
 
   if (includeInstance) {

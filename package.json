@@ -10,16 +10,21 @@
     "type": "module",
     "exports": {
         ".": {
+            "development": "./src/index.ts",
             "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
         },
         "./generated/*": {
+            "development": "./src/generated/*",
             "types": "./dist/generated/*",
-            "import": "./dist/generated/*"
+            "import": "./dist/generated/*",
+            "default": "./dist/generated/*"
         }
     },
     "main": "./dist/index.js",
     "module": "./dist/index.js",
+    "source": "./src/index.ts",
     "types": "./dist/index.d.ts",
     "files": [
         "dist"

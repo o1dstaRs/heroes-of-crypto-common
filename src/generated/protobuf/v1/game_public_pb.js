@@ -75,11 +75,11 @@ proto.PBTypes.GamePublic.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.GamePublic.toObject = function(includeInstance, msg) {
   var f, obj = {
-id: jspb.Message.getFieldWithDefault(msg, 1, ""),
-confirmed: jspb.Message.getBooleanFieldWithDefault(msg, 2, false),
-initTime: jspb.Message.getFieldWithDefault(msg, 3, 0),
-abandoned: jspb.Message.getBooleanFieldWithDefault(msg, 4, false),
-team: jspb.Message.getFieldWithDefault(msg, 5, 0)
+    id: jspb.Message.getFieldWithDefault(msg, 1, ""),
+    confirmed: jspb.Message.getBooleanFieldWithDefault(msg, 2, false),
+    initTime: jspb.Message.getFieldWithDefault(msg, 3, 0),
+    abandoned: jspb.Message.getBooleanFieldWithDefault(msg, 4, false),
+    team: jspb.Message.getFieldWithDefault(msg, 5, 0)
   };
 
   if (includeInstance) {

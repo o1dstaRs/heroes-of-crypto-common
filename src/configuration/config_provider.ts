@@ -30,6 +30,7 @@ import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_prop
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
+import { ToFactionType } from "../factions/faction_type";
 
 const DEFAULT_HERO_CONFIG = {
     hp: 120,
@@ -71,39 +72,37 @@ const DEFAULT_HERO_CONFIG = {
     synergies: [],
 };
 
-const DEFAULT_LUCK_PER_FACTION = {
-    [PBTypes.FactionVals.NO_FACTION]: 0,
-    [PBTypes.FactionVals.MIGHT]: 1,
-    [PBTypes.FactionVals.CHAOS]: -1,
-    [PBTypes.FactionVals.NATURE]: 4,
-    [PBTypes.FactionVals.LIFE]: 1,
-    [PBTypes.FactionVals.DEATH]: -2,
-    [PBTypes.FactionVals.ORDER]: 3,
+const DEFAULT_LUCK_PER_FACTION: Record<string, number> = {
+    Might: 1,
+    Chaos: -1,
+    Nature: 4,
+    Life: 1,
+    Death: -2,
+    Order: 3,
 };
 
-const DEFAULT_MORALE_PER_FACTION = {
-    [PBTypes.FactionVals.NO_FACTION]: 0,
-    [PBTypes.FactionVals.MIGHT]: 2,
-    [PBTypes.FactionVals.CHAOS]: -1,
-    [PBTypes.FactionVals.NATURE]: 1,
-    [PBTypes.FactionVals.LIFE]: 4,
-    [PBTypes.FactionVals.DEATH]: -4,
-    [PBTypes.FactionVals.ORDER]: 3,
+const DEFAULT_MORALE_PER_FACTION: Record<string, number> = {
+    Might: 2,
+    Chaos: -1,
+    Nature: 1,
+    Life: 4,
+    Death: -4,
+    Order: 3,
 };
 
 export const getHeroConfig = (
     team: TeamType,
-    faction: FactionType,
+    factionName: string,
     heroName: string,
     largeTextureName: string,
 ): UnitProperties => {
     const heroConfig = {
         ...DEFAULT_HERO_CONFIG,
-        faction,
+        factionName,
     };
 
-    const luck = DEFAULT_LUCK_PER_FACTION[faction] ?? 0;
-    const morale = DEFAULT_MORALE_PER_FACTION[faction] ?? 0;
+    const luck = DEFAULT_LUCK_PER_FACTION[factionName] ?? 0;
+    const morale = DEFAULT_MORALE_PER_FACTION[factionName] ?? 0;
 
     const attackType =
         heroConfig.attack_type && heroConfig.attack_type.constructor === String
@@ -122,7 +121,7 @@ export const getHeroConfig = (
     }
 
     return new UnitProperties(
-        faction,
+        ToFactionType[factionName],
         heroName,
         heroConfig.hp,
         heroConfig.steps,
@@ -223,16 +222,16 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
 
 export const getCreatureConfig = (
     team: TeamType,
-    faction: FactionType,
+    factionName: string,
     creatureName: string,
     largeTextureName: string,
     amount: number,
     totalExp?: number,
 ): UnitProperties => {
     // @ts-ignore: we do not know the type here yet
-    const factionUnits = creaturesJson[faction];
+    const factionUnits = creaturesJson[factionName];
     if (!factionUnits) {
-        throw TypeError(`Unknown faction - ${faction}`);
+        throw TypeError(`Unknown faction - ${factionName}`);
     }
 
     const creatureConfig = factionUnits[creatureName];
@@ -256,8 +255,8 @@ export const getCreatureConfig = (
         throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
     }
 
-    const luck = DEFAULT_LUCK_PER_FACTION[faction] ?? 0;
-    const morale = DEFAULT_MORALE_PER_FACTION[faction] ?? 0;
+    const luck = DEFAULT_LUCK_PER_FACTION[factionName] ?? 0;
+    const morale = DEFAULT_MORALE_PER_FACTION[factionName] ?? 0;
 
     const abilityAuraRanges: number[] = [];
     const abilityDescriptions: string[] = [];
@@ -316,7 +315,7 @@ export const getCreatureConfig = (
     }
 
     return new UnitProperties(
-        faction,
+        ToFactionType[factionName],
         creatureConfig.name,
         creatureConfig.hp,
         creatureConfig.steps,
