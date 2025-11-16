@@ -28,7 +28,7 @@ import {
 } from "../spells/spell_properties";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import type { TeamType, FactionType } from "../../src/generated/protobuf/v1/types_gen";
+import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 import { ToFactionType } from "../factions/faction_type";
 
@@ -367,11 +367,11 @@ export const getCreatureConfig = (
     );
 };
 
-export const getSpellConfig = (faction: FactionType, spellName: string, laps?: number): SpellProperties => {
+export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
     // @ts-ignore: we do not know the type here yet
-    const raceSpells = spellsJson[faction ? faction : "System"];
+    const raceSpells = spellsJson[factionName ? factionName : "System"];
     if (!raceSpells) {
-        throw TypeError(`Unknown race ${faction} for the spell - ${spellName}`);
+        throw TypeError(`Unknown race ${factionName} for the spell - ${spellName}`);
     }
 
     const spellConfig = raceSpells[spellName];
@@ -440,7 +440,7 @@ export const getSpellConfig = (faction: FactionType, spellName: string, laps?: n
     }
 
     return new SpellProperties(
-        faction,
+        ToFactionType[factionName],
         spellConfig.name,
         spellConfig.level,
         spellConfig.desc,

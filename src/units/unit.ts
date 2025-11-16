@@ -27,7 +27,6 @@ import {
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
 import { EffectFactory } from "../effects/effect_factory";
-import { ToFactionType } from "../factions/faction_type";
 import {
     getCellForPosition,
     getCellsAroundCell,
@@ -296,6 +295,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public getDebuffs(): AppliedSpell[] {
         return this.debuffs;
+    }
+    public getUnitProperties(): Readonly<UnitProperties> {
+        return this.unitProperties as Readonly<UnitProperties>;
     }
     public deleteAbility(abilityName: string): Ability | undefined {
         let abilityToDelete: Ability | undefined = undefined;
@@ -1187,7 +1189,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
         if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
-            const spellProperties = getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Made of Fire");
+            const spellProperties = getSpellConfig("System", "Made of Fire");
             this.applyBuff(
                 new Spell({
                     spellProperties: spellProperties,
@@ -1249,7 +1251,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (hasWaterCell && this.hasAbilityActive("Made of Water") && !this.hasBuffActive("Made of Water")) {
             this.applyBuff(
                 new Spell({
-                    spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Made of Water"),
+                    spellProperties: getSpellConfig("System", "Made of Water"),
                     amount: 1,
                 }),
                 undefined,
@@ -2060,7 +2062,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (this.hasBuffActive("Spiritual Armor")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(PBTypes.FactionVals.LIFE, "Spiritual Armor"),
+                spellProperties: getSpellConfig("Life", "Spiritual Armor"),
                 amount: 1,
             });
             armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
@@ -2230,13 +2232,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (this.hasBuffActive("Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(PBTypes.FactionVals.CHAOS, "Riot"),
+                spellProperties: getSpellConfig("Chaos", "Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
         } else if (this.hasBuffActive("Mass Riot")) {
             const spell = new Spell({
-                spellProperties: getSpellConfig(PBTypes.FactionVals.CHAOS, "Mass Riot"),
+                spellProperties: getSpellConfig("Chaos", "Mass Riot"),
                 amount: 1,
             });
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
@@ -2536,12 +2538,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 continue;
             }
             // can return us undefined
-            const faction = ToFactionType[spArr[0] as keyof typeof ToFactionType] ?? PBTypes.FactionVals.NO_FACTION;
-            if (faction === undefined) {
+            const factionName = spArr[0];
+            if (!factionName) {
                 continue;
             }
 
-            const spellProperties = getSpellConfig(faction, spArr[1]);
+            const spellProperties = getSpellConfig(factionName, spArr[1]);
             newSpells.push(new Spell({ spellProperties: spellProperties, amount: v }));
         }
         this.spells = newSpells;

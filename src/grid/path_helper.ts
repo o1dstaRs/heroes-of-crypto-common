@@ -14,9 +14,14 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, shuffle } from "../utils/lib";
 import { getDistance, type IXYDistance, matrixElementOrDefault, type XY } from "../utils/math";
-import { getCellForPosition, getPositionForCell, isCellWithinGrid } from "./grid_math";
+import { getCellForPosition, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import type { IMovePath, IWeightedRoute } from "./path_definitions";
+import { TeamVals } from "../generated/protobuf/v1";
+import { Unit } from "../units/unit";
+import { FightStateManager } from "../fights/fight_state_manager";
+import type { IPlacement } from "./placement_properties";
+import { UnitsHolder } from "../units/units_holder";
 
 export class PathHelper {
     public static DIAGONAL_MOVE_COST = 1.4142135623730951;
@@ -856,7 +861,7 @@ export class PathHelper {
 
         return undefined;
     }
-    public areCellsFormingSquare(preStart: boolean, cells?: XY[]): boolean {
+    public areCellsFormingSquare(cells?: XY[]): boolean {
         if (!cells || cells.length !== 4) {
             return false;
         }
@@ -869,17 +874,7 @@ export class PathHelper {
         const knownHashes: Set<string> = new Set();
 
         for (const c of cells) {
-            if (preStart) {
-                if (c.x < -2 || c.x >= this.gridSettings.getGridSize() + 2) {
-                    return false;
-                }
-                if (c.x < 0 && c.y < PathHelper.Y_FACTION_ICONS_OFFSET) {
-                    return false;
-                }
-                if (c.y < -2 || c.y >= this.gridSettings.getGridSize() + 2) {
-                    return false;
-                }
-            } else if (
+            if (
                 c.x < 0 ||
                 c.y < 0 ||
                 c.x >= this.gridSettings.getGridSize() ||
@@ -1097,6 +1092,68 @@ export class PathHelper {
         }
 
         return getReachable();
+    }
+    public isAllowedPreStartUnitPosition(
+        unit: Unit,
+        cells: XY[],
+        unitsHolder: UnitsHolder,
+        lowerLeftPlacement?: IPlacement,
+        upperRightPlacement?: IPlacement,
+        lowerRightPlacement?: IPlacement,
+        upperLeftPlacement?: IPlacement,
+    ): boolean {
+        if (!lowerLeftPlacement || !upperRightPlacement) {
+            return false;
+        }
+
+        const position = unit.getPosition();
+
+        // --- core placement rule: team must be in its placement rectangles
+        const isInTeamPlacement =
+            ((unit.getTeam() === TeamVals.LOWER || unit.getTeam() === TeamVals.NO_TEAM) &&
+                ((lowerLeftPlacement.isAllowed(position) ?? false) ||
+                    (lowerRightPlacement?.isAllowed(position) ?? false))) ||
+            ((unit.getTeam() === TeamVals.UPPER || unit.getTeam() === TeamVals.NO_TEAM) &&
+                ((upperRightPlacement.isAllowed(position) ?? false) ||
+                    (upperLeftPlacement?.isAllowed(position) ?? false)));
+
+        // Determine which team the mouse is targeting (proposed team)
+        let proposedTeam: TeamType = TeamVals.NO_TEAM;
+        if ((lowerLeftPlacement.isAllowed(position) ?? false) || (lowerRightPlacement?.isAllowed(position) ?? false)) {
+            proposedTeam = TeamVals.LOWER;
+        } else if (
+            (upperRightPlacement.isAllowed(position) ?? false) ||
+            (upperLeftPlacement?.isAllowed(position) ?? false)
+        ) {
+            proposedTeam = TeamVals.UPPER;
+        }
+
+        // how many allies of this team are already placed on the field
+        const alliesPlacedCount = unitsHolder.getAllAlliesPlaced(
+            proposedTeam,
+            lowerLeftPlacement,
+            upperRightPlacement,
+            lowerRightPlacement,
+            upperLeftPlacement,
+        ).length;
+
+        const maxUnitsForTeam = FightStateManager.getInstance()
+            .getFightProperties()
+            .getNumberOfUnitsAvailableForPlacement(proposedTeam);
+
+        const canPlaceMore = alliesPlacedCount < maxUnitsForTeam;
+
+        // if the unit is already on the grid, we allow "reposition" even if cap is reached
+        const isInsideGridAtOwnPosition = isPositionWithinGrid(this.gridSettings, unit.getPosition());
+
+        const isInPlacementAndAllowedCount = isInTeamPlacement && (canPlaceMore || isInsideGridAtOwnPosition);
+
+        // --- for large units, if we have a candidate square selection, validate that shape
+        if (!isInPlacementAndAllowedCount || unit.isSmallSize()) {
+            return isInPlacementAndAllowedCount;
+        }
+
+        return this.areCellsFormingSquare(cells);
     }
     public getMovePath(
         currentCell: XY,

@@ -254,11 +254,7 @@ export class UnitsHolder {
             unit.deleteBuff("Armor Augment");
             if (augmentArmor && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentArmorBuff = new Spell({
-                    spellProperties: getSpellConfig(
-                        PBTypes.FactionVals.NO_FACTION,
-                        "Armor Augment",
-                        NUMBER_OF_LAPS_TOTAL,
-                    ),
+                    spellProperties: getSpellConfig("System", "Armor Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -279,11 +275,7 @@ export class UnitsHolder {
             unit.deleteBuff("Might Augment");
             if (augmentMight && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMightBuff = new Spell({
-                    spellProperties: getSpellConfig(
-                        PBTypes.FactionVals.NO_FACTION,
-                        "Might Augment",
-                        NUMBER_OF_LAPS_TOTAL,
-                    ),
+                    spellProperties: getSpellConfig("System", "Might Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -308,11 +300,7 @@ export class UnitsHolder {
                 isPositionWithinGrid(this.gridSettings, unit.getPosition())
             ) {
                 const augmentSniperBuff = new Spell({
-                    spellProperties: getSpellConfig(
-                        PBTypes.FactionVals.NO_FACTION,
-                        "Sniper Augment",
-                        NUMBER_OF_LAPS_TOTAL,
-                    ),
+                    spellProperties: getSpellConfig("System", "Sniper Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -336,11 +324,7 @@ export class UnitsHolder {
             unit.deleteBuff("Movement Augment");
             if (augmentMovement && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 const augmentMovementBuff = new Spell({
-                    spellProperties: getSpellConfig(
-                        PBTypes.FactionVals.NO_FACTION,
-                        "Movement Augment",
-                        NUMBER_OF_LAPS_TOTAL,
-                    ),
+                    spellProperties: getSpellConfig("System", "Movement Augment", NUMBER_OF_LAPS_TOTAL),
                     amount: 1,
                 });
                 const infoArr: string[] = [];
@@ -547,7 +531,7 @@ export class UnitsHolder {
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
                             new Spell({
-                                spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Visible"),
+                                spellProperties: getSpellConfig("System", "Visible"),
                                 amount: 1,
                             }),
                         );
@@ -557,7 +541,7 @@ export class UnitsHolder {
                     if (!u.hasBuffActive("Hidden")) {
                         u.applyBuff(
                             new Spell({
-                                spellProperties: getSpellConfig(PBTypes.FactionVals.NO_FACTION, "Hidden"),
+                                spellProperties: getSpellConfig("System", "Hidden"),
                                 amount: 1,
                             }),
                         );

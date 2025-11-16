@@ -12,7 +12,6 @@
 import { PBTypes } from "../generated/protobuf/v1/types";
 import * as HoCLib from "../utils/lib";
 import * as HoCConfig from "../configuration/config_provider";
-import { ToFactionType } from "../factions/faction_type";
 import { Grid } from "../grid/grid";
 import { Spell } from "../spells/spell";
 import { SpellPowerType } from "../spells/spell_properties";
@@ -82,18 +81,13 @@ export function processSpitBallAbility(
         }
 
         let applied = true;
-        const faction =
-            ToFactionType[
-                POSSIBLE_DEBUFFS_TO_FACTIONS[
-                    debuffName as keyof typeof POSSIBLE_DEBUFFS_TO_FACTIONS
-                ] as keyof typeof ToFactionType
-            ];
+        const factionName = POSSIBLE_DEBUFFS_TO_FACTIONS[debuffName as keyof typeof POSSIBLE_DEBUFFS_TO_FACTIONS];
 
-        if (faction === undefined) {
+        if (!factionName) {
             continue;
         }
 
-        const debuff = new Spell({ spellProperties: HoCConfig.getSpellConfig(faction, debuffName), amount: 1 });
+        const debuff = new Spell({ spellProperties: HoCConfig.getSpellConfig(factionName, debuffName), amount: 1 });
 
         if (
             HoCLib.getRandomInt(0, 100) < Math.floor(targetUnit.getMagicResist()) ||
