@@ -898,7 +898,7 @@ export class PathHelper {
     }
     public getClosestSquareCellIndices(
         mousePosition: XY,
-        allowedPlacementCellHashes?: Set<number>,
+        allowedPlacementCellHashes?: ReadonlySet<number>,
         occupiedCellKeys?: string[],
         unitCells?: XY[],
         allowedToMoveThere?: Set<number>,

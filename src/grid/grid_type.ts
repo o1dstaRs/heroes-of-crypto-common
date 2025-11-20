@@ -15,7 +15,7 @@ import type { GridType } from "../generated/protobuf/v1/types_gen";
 export const ToGridType: { [gridTypeValue: string]: GridType } = {
     "": PBTypes.GridVals.NO_TYPE,
     "1": PBTypes.GridVals.NORMAL,
-    "2": PBTypes.GridVals.LAVA_CENTER,
-    "3": PBTypes.GridVals.BLOCK_CENTER,
-    // "4": GridType.WATER_CENTER,
+    "3": PBTypes.GridVals.LAVA_CENTER,
+    "4": PBTypes.GridVals.BLOCK_CENTER,
+    // "2": GridType.WATER_CENTER,
 };
