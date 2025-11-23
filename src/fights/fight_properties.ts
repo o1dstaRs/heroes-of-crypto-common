@@ -58,7 +58,7 @@ import {
     ToNatureSynergy,
     UNITS_TO_SYNERGY_LEVEL,
 } from "../synergies/synergy_properties";
-import { ToFactionType } from "../factions/faction_type";
+import { ToFactionName, ToFactionType } from "../factions/faction_type";
 
 export class FightProperties {
     private id: string;
@@ -786,10 +786,10 @@ export class FightProperties {
         let prefix: string;
         let synergyStr: string;
         if (synergyLevelInt) {
-            prefix = `${faction}:`;
+            prefix = `${ToFactionName[faction]}:`;
             synergyStr = `${synergy}:`;
         } else {
-            prefix = `${faction}:${synergy}:`;
+            prefix = `${ToFactionName[faction]}:${synergy}:`;
             synergyStr = "";
         }
 

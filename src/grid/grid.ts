@@ -172,15 +172,21 @@ export class Grid {
                         aggrGrid = this.boardAggrPerTeam.get(team);
                     }
 
+                    // Update aggregation grid for each cell that had a unit, regardless of size
                     if (isSmallUnit) {
                         this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
-                    } else {
+                    }
+
+                    // Track bounding box for large units (for potential other logic)
+                    if (!isSmallUnit) {
                         xMin = Math.min(xMin, oc.x);
                         xMax = Math.max(xMax, oc.x);
                         yMin = Math.min(yMin, oc.y);
                         yMax = Math.max(yMax, oc.y);
                     }
                 }
+
+                // Still update corners for large units with proper mask if needed for other logic
                 if (!isSmallUnit && xMin !== xMax && yMin !== yMax && attackRange) {
                     const aggrGrid = this.boardAggrPerTeam.get(team);
                     if (aggrGrid) {
@@ -296,6 +302,10 @@ export class Grid {
     }
     public areAllCellsEmpty(cells: XY[], unitId?: string) {
         for (const c of cells) {
+            if (!isCellWithinGrid(this.gridSettings, c)) {
+                return false;
+            }
+
             const occupantUnitId = this.getOccupantUnitId(c);
             if (occupantUnitId && OBSTACLE_SHORTS.includes(occupantUnitId)) {
                 return false;
@@ -337,10 +347,6 @@ export class Grid {
         }
 
         this.unitIdToTeam[unitId] = team;
-
-        // for (const cell of cells) {
-        // console.log(`${unitId} TRY OCCUPY MANY ${cell.x} ${cell.y}`);
-        // }
 
         for (const c of cells) {
             if (!isCellWithinGrid(this.gridSettings, c)) {
@@ -396,6 +402,10 @@ export class Grid {
                     } else {
                         this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     }
+                    // Update aggregation grid for each cell that is being vacated
+                    if (aggrGrid && occupiedCells.length === 1) {
+                        this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
+                    }
                 }
 
                 xMin = Math.min(xMin, oc.x);
@@ -404,7 +414,8 @@ export class Grid {
                 yMax = Math.max(yMax, oc.y);
                 processed.add(key);
             }
-            if (xMin !== xMax && yMin !== yMax) {
+            // Still update corners for large units with proper mask if needed for other logic
+            if (xMin !== xMax && yMin !== yMax && aggrGrid) {
                 this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_LEFT);
                 this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_LEFT);
                 this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_RIGHT);
@@ -432,13 +443,18 @@ export class Grid {
                 continue;
             }
             this.boardCoord[c.x][c.y] = unitId;
+            // Update aggregation grid for each cell that is being occupied
+            if (aggrGrid && cells.length === 1) {
+                this.updateAggrGrid(c, attackRange, 1, aggrGrid);
+            }
             xMin = Math.min(xMin, c.x);
             xMax = Math.max(xMax, c.x);
             yMin = Math.min(yMin, c.y);
             yMax = Math.max(yMax, c.y);
             processed.add(key);
         }
-        if (xMin !== xMax && yMin !== yMax) {
+        // Still update corners for large units with proper mask if needed for other logic
+        if (xMin !== xMax && yMin !== yMax && aggrGrid) {
             this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
             this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
             this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
@@ -624,7 +640,7 @@ export class Grid {
         let lookDown = false;
 
         if (
-            cell.x + range < this.gridSettings.getGridSize() &&
+            cell.x + 1 < this.gridSettings.getGridSize() &&
             (!updatePositionMask ||
                 (updatePositionMask &&
                     (updatePositionMask & UPDATE_DOWN_RIGHT || updatePositionMask & UPDATE_UP_RIGHT)))
@@ -632,21 +648,21 @@ export class Grid {
             lookRight = true;
         }
         if (
-            cell.y + range < this.gridSettings.getGridSize() &&
+            cell.y + 1 < this.gridSettings.getGridSize() &&
             (!updatePositionMask ||
                 (updatePositionMask && (updatePositionMask & UPDATE_UP_RIGHT || updatePositionMask & UPDATE_UP_LEFT)))
         ) {
             lookUp = true;
         }
         if (
-            cell.x - range >= 0 &&
+            cell.x - 1 >= 0 &&
             (!updatePositionMask ||
                 (updatePositionMask && (updatePositionMask & UPDATE_DOWN_LEFT || updatePositionMask & UPDATE_UP_LEFT)))
         ) {
             lookLeft = true;
         }
         if (
-            cell.y - range >= 0 &&
+            cell.y - 1 >= 0 &&
             (!updatePositionMask ||
                 (updatePositionMask &&
                     (updatePositionMask & UPDATE_DOWN_RIGHT || updatePositionMask & UPDATE_DOWN_LEFT)))
