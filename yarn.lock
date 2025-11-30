@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.cache/
-*.tgz
-lerna-debug.log
-yarn-error.log
-.DS_Store
-src/.DS_Store
-.idea
