@@ -698,6 +698,7 @@ export class AttackHandler {
             if (!attackDamageApplied) {
                 damageForAnimation.render = true;
                 damageForAnimation.amount = damageFromAttack;
+                damageForAnimation.hits = [damageFromAttack]; // Initialize hits with first shot
                 damageForAnimation.unitPosition = targetUnit.getPosition();
                 damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
 
@@ -873,6 +874,10 @@ export class AttackHandler {
             this.damageStatisticHolder,
             isAOE,
         );
+
+        if (secondShotResult.applied && secondShotResult.damage > 0 && damageForAnimation.hits) {
+            damageForAnimation.hits.push(secondShotResult.damage);
+        }
 
         for (const ad of secondShotResult.animationData) {
             animationData.push(ad);
@@ -1453,6 +1458,9 @@ export class AttackHandler {
             damageForAnimation.amount = damageFromAttack;
             damageForAnimation.unitPosition = targetUnit.getPosition();
             damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
+            if (damageForAnimation.hits) {
+                damageForAnimation.hits.push(damageFromAttack);
+            }
             this.damageStatisticHolder.add({
                 unitName: attackerUnit.getName(),
                 damage: targetUnit.applyDamage(
@@ -1522,6 +1530,11 @@ export class AttackHandler {
         } else if (secondPunchResult.applied) {
             captureResponse();
             if (secondPunchResult.damage > 0) {
+                if (damageForAnimation.hits) {
+                    damageForAnimation.hits.push(secondPunchResult.damage);
+                    // Also accumulate total amount for fallback/legacy usage if needed
+                    damageForAnimation.amount += secondPunchResult.damage;
+                }
                 this.damageStatisticHolder.add({
                     unitName: attackerUnit.getName(),
                     damage: targetUnit.applyDamage(

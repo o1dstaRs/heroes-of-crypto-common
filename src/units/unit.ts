@@ -948,6 +948,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getBaseCell(): XY {
         return getCellForPosition(this.gridSettings, this.getPosition());
     }
+    public getCenter(): XY {
+        if (this.isSmallSize()) {
+            return this.getPosition();
+        } else {
+            return {
+                x: this.getPosition().x + this.gridSettings.getHalfStep(),
+                y: this.getPosition().y + this.gridSettings.getHalfStep(),
+            };
+        }
+    }
     public getCells(): XY[] {
         if (this.isSmallSize()) {
             const bodyCellPos = getCellForPosition(this.gridSettings, this.getPosition());

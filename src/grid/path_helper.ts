@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
-import { getRandomInt, shuffle } from "../utils/lib";
+import { getRandomInt } from "../utils/lib";
 import { getDistance, type IXYDistance, matrixElementOrDefault, type XY } from "../utils/math";
 import { getCellForPosition, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
@@ -459,7 +459,7 @@ export class PathHelper {
         const yDown = unitPositionY - part;
         const yTop = unitPositionY + part;
 
-        shuffle(attackCells);
+        // shuffle(attackCells); // Removed to prevent flickering
         const availableAttackCells: XY[] = [];
         const availableAttackCellHashes: Set<number> = new Set();
         for (const position of attackCells) {

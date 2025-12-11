@@ -319,3 +319,69 @@ export function processChainLightningAbility(
 
     return unitIdsDied;
 }
+
+export function getChainLightningTargets(targetUnit: Unit, grid: Grid, unitsHolder: UnitsHolder): Unit[] {
+    const affectedEnemies: Unit[] = [];
+    const affectedEnemiesIds: string[] = [targetUnit.getId()];
+
+    // Initial target check
+    if (targetUnit.getMagicResist() === 100 || targetUnit.hasAbilityActive("Wind Element")) {
+        return affectedEnemies;
+    }
+    // Main target is usually already highlighted by hover, but we include it here for completeness if needed.
+    // However, the caller might handle primary target separate.
+    // Let's include everything in the chain to be safe.
+    affectedEnemies.push(targetUnit);
+
+    // Layer 1
+    const enemiesLayer1: Unit[] = getEnemiesForCells(
+        targetUnit.getCells(),
+        targetUnit.getTeam(),
+        grid,
+        unitsHolder,
+        affectedEnemiesIds,
+    );
+
+    for (const e1 of enemiesLayer1) {
+        if (e1.getMagicResist() === 100 || e1.hasAbilityActive("Wind Element")) continue;
+
+        affectedEnemies.push(e1);
+        affectedEnemiesIds.push(e1.getId());
+
+        // Layer 2
+        const enemiesLayer2 = getEnemiesForCells(
+            e1.getCells(),
+            targetUnit.getTeam(),
+            grid,
+            unitsHolder,
+            affectedEnemiesIds,
+        );
+
+        for (const e2 of enemiesLayer2) {
+            if (e2.getMagicResist() === 100 || e2.hasAbilityActive("Wind Element")) continue;
+
+            affectedEnemies.push(e2);
+            affectedEnemiesIds.push(e2.getId());
+
+            // Layer 3
+            const enemiesLayer3 = getEnemiesForCells(
+                e2.getCells(),
+                targetUnit.getTeam(),
+                grid,
+                unitsHolder,
+                affectedEnemiesIds,
+            );
+
+            for (const e3 of enemiesLayer3) {
+                if (e3.getMagicResist() === 100 || e3.hasAbilityActive("Wind Element")) continue;
+
+                if (!affectedEnemiesIds.includes(e3.getId())) {
+                    affectedEnemies.push(e3);
+                    affectedEnemiesIds.push(e3.getId());
+                }
+            }
+        }
+    }
+
+    return affectedEnemies;
+}

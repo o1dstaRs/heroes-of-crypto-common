@@ -24,4 +24,5 @@ export interface IVisibleDamage {
     render: boolean;
     unitPosition: XY;
     unitIsSmall: boolean;
+    hits?: number[];
 }
