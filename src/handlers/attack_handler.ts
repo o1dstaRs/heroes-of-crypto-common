@@ -716,6 +716,7 @@ export class AttackHandler {
                 }); // Initialize hits with first shot
                 damageForAnimation.unitPosition = targetUnit.getPosition();
                 damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
+                damageForAnimation.unitId = targetUnit.getId();
 
                 this.damageStatisticHolder.add({
                     unitName: attackerUnit.getName(),
@@ -874,7 +875,10 @@ export class AttackHandler {
             }
         }
 
-        // second attack
+        // Second attack (Double Shot)
+        // Capture health state before second shot to calculate units died
+        const preSecondShotAmount = targetUnit.getAmountAlive();
+
         const secondShotResult = AllAbilities.processDoubleShotAbility(
             attackerUnit,
             targetUnit,
@@ -890,36 +894,14 @@ export class AttackHandler {
         );
 
         if (secondShotResult.applied && secondShotResult.damage > 0 && damageForAnimation.hits) {
-            // Check if units died from the second shot
-            // We can approximate or just rely on the damage numbers for now
-            // Pushing damage entry to hits array
-            // Let's rely on standard delta logic:
-            // I see we used `initialAmountAlive` in other places locally.
-            // Let's just fix the type error by pushing object.
-            // But `unitsDied` calculation requires previous state.
-            // I'll grab `damageForAnimation.hits` last entry or something? No.
-            // Let's just use 0 for now to fix compile if calculation is hard, OR better:
-            // Capture amount right before second shot if possible?
-            // Line 880 is calculate.
-            // I'll stick to calculating it if I can.
-            // Wait, double shot might kill units.
-            // Let's try to do it properly.
+            const currentAmount = targetUnit.getAmountAlive();
+            const unitsDied = Math.max(0, preSecondShotAmount - currentAmount);
 
-            // For this specific replacement, I will assume I can capture it right before pushing?
-            // But the damage is already applied inside `processDoubleShotAbility`.
-            // So `targetUnit.getAmountAlive()` is AFTER damage.
-            // So `unitsDied` = `math.ceil(damage / max_hp)` roughly? No, exact calculation is better.
-            // `processDoubleShotAbility` probably applies damage.
-            // I'll check `processDoubleShotAbility` source if I can? Not easily.
-            // But based on melee, we applied damage manually.
-            // Here `processDoubleShotAbility` likely applies it.
-            // Let's push object with unitsDied: 0 for now to FIX THE ERROR, or estimate it.
-            // Actually, best effort:
-            // Simplification: push 0 for unitsDied for now as exact tracking in this branch is complex
             damageForAnimation.hits.push({
                 amount: secondShotResult.damage,
-                unitsDied: 0,
+                unitsDied: unitsDied,
             });
+            damageForAnimation.unitId = targetUnit.getId();
         }
 
         for (const ad of secondShotResult.animationData) {
@@ -1504,6 +1486,7 @@ export class AttackHandler {
             damageForAnimation.amount = damageFromAttack;
             damageForAnimation.unitPosition = targetUnit.getPosition();
             damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
+            damageForAnimation.unitId = targetUnit.getId();
             if (damageForAnimation.hits) {
                 const damageDealt = targetUnit.applyDamage(
                     damageFromAttack,

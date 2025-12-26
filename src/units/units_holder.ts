@@ -522,9 +522,9 @@ export class UnitsHolder {
                     this.getNumberOfEnemiesWithinRange(
                         u,
                         disguiseAura.getRange() +
-                            FightStateManager.getInstance()
-                                .getFightProperties()
-                                .getAdditionalAuraRangePerTeam(u.getTeam()),
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalAuraRangePerTeam(u.getTeam()),
                     )
                 ) {
                     u.deleteBuff("Hidden");
@@ -590,9 +590,9 @@ export class UnitsHolder {
                     this.gridSettings,
                     c,
                     warAngerAuraEffect.getRange() +
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getAdditionalAuraRangePerTeam(unit.getTeam()),
+                    FightStateManager.getInstance()
+                        .getFightProperties()
+                        .getAdditionalAuraRangePerTeam(unit.getTeam()),
                 );
                 for (const ac of auraCells) {
                     const occupantId = this.grid.getOccupantUnitId(ac);

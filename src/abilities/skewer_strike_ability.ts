@@ -34,10 +34,19 @@ import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processShatterArmorAbility } from "./shatter_armor_ability";
 import { processStunAbility } from "./stun_ability";
 
+export interface ISkewerStrikeDamage {
+    unitId: string;
+    unitPosition: { x: number; y: number };
+    unitIsSmall: boolean;
+    damage: number;
+    unitsDied: number;
+}
+
 export interface ISkewerStrikeResult {
     increaseMorale: number;
     unitIdsDied: string[];
     moraleDecreaseForTheUnitTeam: Record<string, number>;
+    secondaryDamages: ISkewerStrikeDamage[];
 }
 
 export function processSkewerStrikeAbility(
@@ -56,7 +65,7 @@ export function processSkewerStrikeAbility(
     let increaseMoraleTotal = 0;
 
     if (!skewerStrikeAbility) {
-        return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam };
+        return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam, secondaryDamages: [] };
     }
 
     let actionString: string;
@@ -67,6 +76,7 @@ export function processSkewerStrikeAbility(
     }
 
     const unitsDead: Unit[] = [];
+    const secondaryDamages: ISkewerStrikeDamage[] = [];
     const targets = AbilityHelper.nextStandingTargets(
         fromUnit,
         toUnit,
@@ -110,15 +120,28 @@ export function processSkewerStrikeAbility(
             ),
         );
 
+        const amountBefore = nextStandingTarget.getAmountAlive();
+        const damageDealt = nextStandingTarget.applyDamage(
+            damageFromAttack,
+            FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
+            sceneLog,
+        );
+        const amountAfter = nextStandingTarget.getAmountAlive();
+
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
-            damage: nextStandingTarget.applyDamage(
-                damageFromAttack,
-                FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
-                sceneLog,
-            ),
+            damage: damageDealt,
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+        });
+
+        // Collect damage info for visual display
+        secondaryDamages.push({
+            unitId: nextStandingTarget.getId(),
+            unitPosition: nextStandingTarget.getPosition(),
+            unitIsSmall: nextStandingTarget.isSmallSize(),
+            damage: damageDealt,
+            unitsDied: Math.max(0, amountBefore - amountAfter),
         });
 
         sceneLog.updateLog(
@@ -156,5 +179,5 @@ export function processSkewerStrikeAbility(
             (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
     }
 
-    return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam };
+    return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam, secondaryDamages };
 }
