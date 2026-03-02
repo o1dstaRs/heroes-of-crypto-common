@@ -133,7 +133,7 @@ export const intersect2D = (a0: XY, a1: XY, b0: XY, b1: XY): Intersect2DResult =
     return new Intersect2DResult(EIntersectionType.INTERSECTION_OUTSIDE_SEGMENT, px, py);
 };
 
-export const asc = (arr: number[]) => arr.sort((a, b) => a - b);
+export const asc = (arr: number[]) => [...arr].sort((a, b) => a - b);
 
 export const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 
