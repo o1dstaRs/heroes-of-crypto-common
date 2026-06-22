@@ -471,6 +471,203 @@ describe("BigUnit", () => {
         });
 });
 
+const placeEnemy = (grid: Grid, cell: HoCMath.XY): void => {
+    const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 1, cell);
+    grid.occupyCell(
+        cell,
+        enemy.getId(),
+        enemy.getTeam(),
+        enemy.getAttackRange(),
+        enemy.hasAbilityActive("Made of Fire"),
+        enemy.hasAbilityActive("Made of Water"),
+    );
+};
+
+describe("RangeAttack", () => {
+    describe("Cyclops (Large Caliber)", () => {
+        it("Returns RANGE_ATTACK when target is in range", () => {
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+            const attacker = stubRangeUnit(
+                PBTypes.TeamVals.UPPER,
+                3,
+                { x: 5, y: 5 },
+                8,
+                6.5,
+                ["Large Caliber"],
+                true,
+            );
+            grid.occupyCell(
+                { x: 5, y: 5 },
+                attacker.getId(),
+                attacker.getTeam(),
+                attacker.getAttackRange(),
+                false,
+                false,
+            );
+            placeEnemy(grid, { x: 8, y: 5 });
+
+            const action = findTarget(
+                attacker,
+                grid,
+                grid.getMatrix(),
+                new UnitsHolder(grid),
+                pathHelper,
+            );
+            expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
+            expect(action?.cellToAttack()).toEqual({ x: 8, y: 5 });
+            expect(action?.cellToMove()).toBeUndefined();
+        });
+
+        it("Prefers clustered target over isolated one (Large Caliber AOE)", () => {
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+            const attacker = stubRangeUnit(
+                PBTypes.TeamVals.UPPER,
+                3,
+                { x: 5, y: 5 },
+                8,
+                6.5,
+                ["Large Caliber"],
+                true,
+            );
+            grid.occupyCell(
+                { x: 5, y: 5 },
+                attacker.getId(),
+                attacker.getTeam(),
+                attacker.getAttackRange(),
+                false,
+                false,
+            );
+            // Isolated enemy at equal distance
+            placeEnemy(grid, { x: 8, y: 5 });
+            // Clustered enemies: target at (5,8) has two adjacent allies
+            placeEnemy(grid, { x: 5, y: 8 });
+            placeEnemy(grid, { x: 5, y: 9 });
+            placeEnemy(grid, { x: 6, y: 8 });
+
+            const action = findTarget(
+                attacker,
+                grid,
+                grid.getMatrix(),
+                new UnitsHolder(grid),
+                pathHelper,
+            );
+            expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
+            expect(action?.cellToAttack()).toEqual({ x: 5, y: 8 });
+        });
+    });
+
+    describe("Tsar Cannon (Through Shot)", () => {
+        it("Prefers target with more enemies lined up beyond it", () => {
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+            const attacker = stubRangeUnit(
+                PBTypes.TeamVals.UPPER,
+                3,
+                { x: 1, y: 8 },
+                4,
+                8,
+                ["Through Shot", "No Melee", "Mechanism"],
+                true,
+            );
+            grid.occupyCell(
+                { x: 1, y: 8 },
+                attacker.getId(),
+                attacker.getTeam(),
+                attacker.getAttackRange(),
+                false,
+                false,
+            );
+            // Lone enemy in range, off the line
+            placeEnemy(grid, { x: 4, y: 11 });
+            // Three enemies lined up beyond (4,8) on the row y=8
+            placeEnemy(grid, { x: 4, y: 8 });
+            placeEnemy(grid, { x: 7, y: 8 });
+            placeEnemy(grid, { x: 10, y: 8 });
+
+            const action = findTarget(
+                attacker,
+                grid,
+                grid.getMatrix(),
+                new UnitsHolder(grid),
+                pathHelper,
+            );
+            expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
+            expect(action?.cellToAttack()).toEqual({ x: 4, y: 8 });
+        });
+    });
+
+    describe("Gargantuan (Double Shot + Area Throw)", () => {
+        it("Prefers clustered target (Double Shot + Area Throw combo)", () => {
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+            const attacker = stubRangeUnit(
+                PBTypes.TeamVals.UPPER,
+                3,
+                { x: 3, y: 3 },
+                14,
+                5,
+                ["Double Shot", "Area Throw"],
+                false,
+            );
+            // Big unit occupies 4 cells around (3,3)
+            for (const c of attacker.getCells()) {
+                grid.occupyCell(c, attacker.getId(), attacker.getTeam(), attacker.getAttackRange(), false, false);
+            }
+            // Isolated enemy at equal distance
+            placeEnemy(grid, { x: 6, y: 3 });
+            // Clustered enemies
+            placeEnemy(grid, { x: 3, y: 6 });
+            placeEnemy(grid, { x: 3, y: 7 });
+            placeEnemy(grid, { x: 4, y: 6 });
+
+            const action = findTarget(
+                attacker,
+                grid,
+                grid.getMatrix(),
+                new UnitsHolder(grid),
+                pathHelper,
+            );
+            expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
+            expect(action?.cellToAttack()).toEqual({ x: 3, y: 6 });
+        });
+    });
+
+    describe("OutOfRange", () => {
+        it("Falls back to MOVE when no target is in range", () => {
+            const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+            // Sniper-shot_distance of 1 with 1 shot: max range = 4 cells
+            const attacker = stubRangeUnit(
+                PBTypes.TeamVals.UPPER,
+                3,
+                { x: 1, y: 1 },
+                1,
+                1,
+                [],
+                true,
+            );
+            grid.occupyCell(
+                { x: 1, y: 1 },
+                attacker.getId(),
+                attacker.getTeam(),
+                attacker.getAttackRange(),
+                false,
+                false,
+            );
+            // Enemy at distance > maxRangeCells (4)
+            placeEnemy(grid, { x: 14, y: 14 });
+
+            const action = findTarget(
+                attacker,
+                grid,
+                grid.getMatrix(),
+                new UnitsHolder(grid),
+                pathHelper,
+            );
+            // No range attack possible; with range attack the unit can't melee-attack,
+            // so the AI either falls back to doFindTarget movement or returns undefined.
+            expect(action === undefined || action.actionType() === AIActionType.MOVE).toBe(true);
+        });
+    });
+});
+
 function stubSmallUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
     return new UnitRepr(
         crypto.randomUUID(),
@@ -484,6 +681,9 @@ function stubSmallUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY):
         [baseCell],
         PBTypes.AttackVals.MELEE,
         "",
+        0,
+        0,
+        new Set<string>(),
     );
 }
 
@@ -505,6 +705,44 @@ function stubBigUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): U
         ],
         PBTypes.AttackVals.MELEE,
         "",
+        0,
+        0,
+        new Set<string>(),
+    );
+}
+
+function stubRangeUnit(
+    teamType: TeamType,
+    steps: number,
+    baseCell: HoCMath.XY,
+    rangeShots: number,
+    shotDistance: number,
+    abilities: string[] = [],
+    isSmall = true,
+): UnitRepr {
+    const cells = isSmall
+        ? [baseCell]
+        : [
+              baseCell,
+              { x: baseCell.x - 1, y: baseCell.y },
+              { x: baseCell.x - 1, y: baseCell.y - 1 },
+              { x: baseCell.x, y: baseCell.y - 1 },
+          ];
+    return new UnitRepr(
+        crypto.randomUUID(),
+        teamType,
+        steps,
+        1,
+        1,
+        true,
+        isSmall,
+        baseCell,
+        cells,
+        PBTypes.AttackVals.RANGE,
+        "",
+        rangeShots,
+        shotDistance,
+        new Set<string>(abilities),
     );
 }
 
@@ -521,6 +759,9 @@ class UnitRepr implements IUnitAIRepr {
         public cells: HoCMath.XY[],
         public attackType: AttackType,
         public target: string,
+        public rangeShots: number,
+        public rangeShotDistance: number,
+        public abilities: Set<string>,
     ) {
         // public movePath?: IMovePath, // the IMovePath that is returned from PathHelper.getMovePath if provided
     }
@@ -577,7 +818,15 @@ class UnitRepr implements IUnitAIRepr {
         return 1;
     }
 
-    public hasAbilityActive(_abilityName: string): boolean {
-        return false;
+    public hasAbilityActive(abilityName: string): boolean {
+        return this.abilities.has(abilityName);
+    }
+
+    public getRangeShots(): number {
+        return this.rangeShots;
+    }
+
+    public getRangeShotDistance(): number {
+        return this.rangeShotDistance;
     }
 }

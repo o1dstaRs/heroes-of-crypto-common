@@ -137,6 +137,8 @@ export interface IUnitAIRepr {
     getCells(): XY[];
     getAttackType(): AttackType;
     hasAbilityActive(abilityName: string): boolean;
+    getRangeShots(): number;
+    getRangeShotDistance(): number;
 }
 
 export interface IBoardObj {

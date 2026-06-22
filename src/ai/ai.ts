@@ -110,6 +110,7 @@ export function findTarget(
     let action: BasicAIAction | undefined = undefined;
     let selectedEnemy: Unit | undefined = undefined;
     const enemiesAround = unitsHolder.allEnemiesAroundUnit(unit, false);
+    const hasNoMelee = unit.hasAbilityActive("No Melee");
     for (const e of enemiesAround) {
         if (e.isDead() || e.hasBuffActive("Hidden")) {
             continue;
@@ -136,7 +137,7 @@ export function findTarget(
         selectedEnemy = enemiesAround[HoCLib.getRandomInt(0, enemiesAround.length)];
     }
 
-    if (selectedEnemy) {
+    if (selectedEnemy && !hasNoMelee) {
         for (const ec of selectedEnemy.getCells()) {
             for (const uc of unit.getCells()) {
                 if (Math.abs(ec.x - uc.x) <= 1 && Math.abs(ec.y - uc.y) <= 1) {
@@ -153,6 +154,10 @@ export function findTarget(
                 break;
             }
         }
+    }
+
+    if (!action && unit.getAttackType() === PBTypes.AttackVals.RANGE && unit.getRangeShots() > 0) {
+        action = findRangeAttackAction(unit, grid, matrix);
     }
 
     if (!action) {
@@ -181,6 +186,171 @@ function logAction(action: BasicAIAction | undefined, debug: boolean) {
     }
     const actionType = action.actionType();
     console.log("Do action:" + AIActionType[actionType] + " unit to move to " + cellToString(action.cellToMove()));
+}
+
+/**
+ * Pick the best range-attack target for a ranged unit.
+ *
+ * Scoring accounts for the unit's passive abilities:
+ * - Sniper: ignores distance penalty
+ * - Large Caliber / Area Throw (Cyclops, Gargantuan): bonus for clustered enemies around the target
+ * - Through Shot (Tsar Cannon): bonus for enemies lined up beyond the target
+ * - Double Shot (Gargantuan, other double shotters): flat damage multiplier
+ *
+ * Returns undefined when no enemy is in range; callers fall back to movement.
+ */
+function findRangeAttackAction(
+    unit: IUnitAIRepr,
+    grid: Grid,
+    matrix: number[][],
+): BasicAIAction | undefined {
+    if (unit.getRangeShots() <= 0) {
+        return undefined;
+    }
+
+    const unitCell = unit.getBaseCell();
+    const unitTeam = unit.getTeam();
+    const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+
+    const isAOEAttacker = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
+    const isThroughShot = unit.hasAbilityActive("Through Shot");
+    const isDoubleShot = unit.hasAbilityActive("Double Shot");
+    const isSniper = unit.hasAbilityActive("Sniper");
+    const shotDistance = unit.getRangeShotDistance();
+    if (shotDistance <= 0 && !isSniper) {
+        return undefined;
+    }
+
+    // Range attacks cap the divisor at 8x (every additional shotDistance beyond the 3rd is wasted).
+    const maxRangeCells = isSniper ? Infinity : shotDistance * 4;
+
+    let bestTarget: HoCMath.XY | undefined;
+    let bestScore = -1;
+
+    const numRows = matrix.length;
+    const numCols = matrix[0].length;
+
+    for (let y = 0; y < numRows; y++) {
+        for (let x = 0; x < numCols; x++) {
+            if (matrix[y][x] !== enemyTeam) {
+                continue;
+            }
+
+            const targetCell = { x: x, y: y };
+            const distanceCells = HoCMath.getDistance(unitCell, targetCell);
+
+            if (!isSniper && distanceCells > maxRangeCells) {
+                continue;
+            }
+
+            let divisor = 1;
+            if (!isSniper && shotDistance > 0) {
+                let d = distanceCells;
+                while (d >= shotDistance) {
+                    d -= shotDistance;
+                    divisor *= 2;
+                }
+                if (divisor > 8) {
+                    divisor = 8;
+                }
+            }
+
+            // Base score: damage scales inversely with the range divisor.
+            let score = 1 / divisor;
+
+            if (isAOEAttacker) {
+                const adjacentEnemies = countAdjacentEnemies(targetCell, matrix, enemyTeam);
+                // Each additional enemy in splash range adds full-damage potential.
+                score *= 1 + adjacentEnemies;
+            }
+
+            if (isThroughShot) {
+                const beyondEnemies = countEnemiesBeyondInLine(unitCell, targetCell, matrix, enemyTeam);
+                // Through Shot applies partial damage to units behind the target.
+                score *= 1 + beyondEnemies * 0.5;
+            }
+
+            if (isDoubleShot) {
+                score *= 2;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = targetCell;
+            }
+        }
+    }
+
+    if (!bestTarget) {
+        return undefined;
+    }
+
+    const occupantUnitId = grid.getOccupantUnitId(bestTarget);
+    if (occupantUnitId) {
+        previousTargets.set(unit.getId(), occupantUnitId);
+    }
+    if (DEBUG_AI) {
+        console.log(`Range attack: picked target ${cellToString(bestTarget)} score=${bestScore.toFixed(2)}`);
+    }
+    return new BasicAIAction(AIActionType.RANGE_ATTACK, undefined, bestTarget, new Map());
+}
+
+function countAdjacentEnemies(cell: HoCMath.XY, matrix: number[][], enemyTeam: number): number {
+    const numRows = matrix.length;
+    const numCols = matrix[0].length;
+    let count = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) {
+                continue;
+            }
+            const x = cell.x + dx;
+            const y = cell.y + dy;
+            if (x < 0 || y < 0 || x >= numCols || y >= numRows) {
+                continue;
+            }
+            if (matrix[y][x] === enemyTeam) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+function countEnemiesBeyondInLine(
+    fromCell: HoCMath.XY,
+    targetCell: HoCMath.XY,
+    matrix: number[][],
+    enemyTeam: number,
+): number {
+    const numRows = matrix.length;
+    const numCols = matrix[0].length;
+    const dx = targetCell.x - fromCell.x;
+    const dy = targetCell.y - fromCell.y;
+    const len = Math.max(Math.abs(dx), Math.abs(dy));
+    if (len === 0) {
+        return 0;
+    }
+    const stepX = dx / len;
+    const stepY = dy / len;
+
+    let count = 0;
+    let curX = targetCell.x + stepX;
+    let curY = targetCell.y + stepY;
+
+    for (let i = 0; i < len; i++) {
+        const cx = Math.round(curX);
+        const cy = Math.round(curY);
+        if (cx < 0 || cy < 0 || cx >= numCols || cy >= numRows) {
+            break;
+        }
+        if (matrix[cy][cx] === enemyTeam) {
+            count++;
+        }
+        curX += stepX;
+        curY += stepY;
+    }
+    return count;
 }
 
 /**
@@ -638,12 +808,20 @@ function doFindTarget(
         return undefined;
     }
 
-    if (unit.getAttackType() === PBTypes.AttackVals.RANGE) {
+    if (unit.getAttackType() === PBTypes.AttackVals.RANGE && unit.hasAbilityActive("No Melee")) {
+        // No-Melee ranged units (e.g. Tsar Cannon) cannot perform the melee attack that
+        // MOVE_AND_MELEE_ATTACK would queue. Replace it with a plain MOVE so they reposition
+        // toward the target instead of attempting an impossible melee.
         const occupantUnitId = grid.getOccupantUnitId({ x: closestTarget.x, y: closestTarget.y });
         if (occupantUnitId) {
             previousTargets.set(unit.getId(), occupantUnitId);
         }
-        return new BasicAIAction(AIActionType.RANGE_ATTACK, undefined, closestTarget, movePath.knownPaths);
+        return new BasicAIAction(
+            AIActionType.MOVE,
+            resultRoute?.route[resultRoute?.route.length - 1],
+            undefined,
+            movePath.knownPaths,
+        );
     }
 
     if (resultRouteIndex === 0) {
