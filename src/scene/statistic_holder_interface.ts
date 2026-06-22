@@ -13,4 +13,5 @@ export interface IStatisticHolder<T> {
     add(singleDamageStatistic: T): void;
     get(): T[];
     has(lap: number): boolean;
+    clear(): void;
 }

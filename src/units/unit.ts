@@ -2548,9 +2548,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (spArr.length !== 2) {
                 continue;
             }
-            // can return us undefined
-            const factionName = spArr[0];
-            if (!factionName) {
+            // Ability-derived spells are stored with an empty faction prefix (":SpellName").
+            // Default an empty faction to "System" (as getSpellConfig does) so those auto-parsed
+            // spells are included instead of skipped.
+            const factionName = spArr[0] || "System";
+            if (!spArr[1]) {
                 continue;
             }
 
