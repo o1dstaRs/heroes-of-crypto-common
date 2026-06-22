@@ -19,6 +19,8 @@ import {
     CreatureFactions as GenCreatureFactions, // if you generated it
 } from "../generated/protobuf/v1/creature_gen";
 
+export type { TeamType, UnitType, AttackType, MovementType, FactionType };
+
 export const ToAttackType: { [attackTypeName: string]: AttackType } = {
     "": PBTypes.AttackVals.NO_ATTACK,
     NO_ATTACK: PBTypes.AttackVals.NO_ATTACK,
@@ -280,12 +282,12 @@ export const CreaturesByFaction: Readonly<Record<FactionType, readonly CreatureI
 /** Count of creatures per (level, faction), useful for layout math */
 export type LevelsByFactionCounts = Readonly<Record<UnitLevelId, Readonly<Record<FactionType, number>>>>;
 
-const _levelsByFaction: Record<UnitLevelId, Record<FactionType, number>> = {} as any;
+const _levelsByFaction = {} as Record<UnitLevelId, Record<FactionType, number>>;
 
 for (let lvl = PBTypes.UnitLevelVals.FIRST; lvl <= PBTypes.UnitLevelVals.FOURTH; lvl++) {
     const levelId = lvl as UnitLevelId;
     const atLevel = getCreaturesByLevel(levelId);
-    const counts: Record<FactionType, number> = Object.fromEntries(allFactions.map((f) => [f, 0])) as any;
+    const counts = Object.fromEntries(allFactions.map((f) => [f, 0])) as Record<FactionType, number>;
 
     for (const cid of atLevel) {
         const f = getFactionOf(cid);
