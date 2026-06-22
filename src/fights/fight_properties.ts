@@ -1269,7 +1269,7 @@ export class FightProperties {
             }
 
             const avgArmyMoraleUpper = unitsUpper.length ? totalArmyMoraleUpper / unitsUpper.length : 0;
-            const avgArmyMoraleLower = unitsLower.length ? totalArmyMoraleLower / unitsUpper.length : 0;
+            const avgArmyMoraleLower = unitsLower.length ? totalArmyMoraleLower / unitsLower.length : 0;
 
             if (avgArmyMoraleUpper > avgArmyMoraleLower) {
                 firstBatch = unitsUpper;

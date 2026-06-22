@@ -346,8 +346,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .replace("{}", Number(((percentage * 6) / 8).toFixed()).toString())
                 .replace("{}", Number(((percentage * 5) / 8).toFixed()).toString());
             this.unitProperties.abilities_descriptions.push(updatedDescription);
-        }
-        if (ability.getName() === "Paralysis") {
+        } else if (ability.getName() === "Paralysis") {
             const description = ability.getDesc().join("\n");
             const reduction = this.calculateAbilityApplyChance(ability, 0);
             const chance = Math.min(100, reduction * 2);

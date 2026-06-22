@@ -720,13 +720,7 @@ export class AttackHandler {
 
                 this.damageStatisticHolder.add({
                     unitName: attackerUnit.getName(),
-                    damage: targetUnit.applyDamage(
-                        damageFromAttack,
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getBreakChancePerTeam(attackerUnit.getTeam()),
-                        this.sceneLog,
-                    ),
+                    damage: damageDealt,
                     team: attackerUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });

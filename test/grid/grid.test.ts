@@ -3,6 +3,7 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import { Grid } from "../../src/grid/grid";
 import { GridSettings } from "../../src/grid/grid_settings";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { ObstacleType } from "../../src/obstacles/obstacle_type";
 
 describe("Grid Aggregation Matrix Tests", () => {
     let grid: Grid;
@@ -89,5 +90,78 @@ describe("Grid Aggregation Matrix Tests", () => {
 
         // External neighbor (left of 2,2 -> 1,2) should be updated
         expect(aggrMatrix[1][2]).toBe(2);
+    });
+
+    test("should clean and refresh center obstacles for every center grid type", () => {
+        const blockGrid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        const waterGrid = new Grid(gridSettings, PBTypes.GridVals.WATER_CENTER);
+        const lavaGrid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
+        const centerCell = blockGrid.getCenterCells()[0];
+
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("B");
+        expect(waterGrid.getOccupantUnitId(centerCell)).toBe("W");
+        expect(lavaGrid.getOccupantUnitId(centerCell)).toBe("L");
+
+        blockGrid.cleanupCenterObstacle();
+        waterGrid.cleanupCenterObstacle();
+        lavaGrid.cleanupCenterObstacle();
+        blockGrid.cleanupCenterObstacle();
+
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("");
+        expect(waterGrid.getOccupantUnitId(centerCell)).toBe("");
+        expect(lavaGrid.getOccupantUnitId(centerCell)).toBe("");
+
+        blockGrid.refreshWithNewType(PBTypes.GridVals.WATER_CENTER);
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("W");
+        blockGrid.refreshWithNewType(PBTypes.GridVals.LAVA_CENTER);
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("L");
+        blockGrid.refreshWithNewType(PBTypes.GridVals.BLOCK_CENTER);
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("B");
+        blockGrid.refreshWithNewType(PBTypes.GridVals.NORMAL);
+        expect(blockGrid.getOccupantUnitId(centerCell)).toBe("");
+    });
+
+    test("should expose matrices, holes, occupancy checks, and printable board state", () => {
+        const printable = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        const centerCell = printable.getCenterCells()[0];
+        const logs: string[] = [];
+        const originalLog = console.log;
+
+        printable.occupyCell({ x: 1, y: 1 }, "unit1", PBTypes.TeamVals.UPPER, 2, false, false);
+        printable.occupyCell({ x: 2, y: 2 }, "unit2", PBTypes.TeamVals.LOWER, 1, false, false);
+        printable.occupyByHole({ x: 0, y: 0 });
+        printable.occupyByHole({ x: -1, y: -1 });
+
+        expect(printable.areAllCellsEmpty([{ x: 1, y: 1 }], "unit1")).toBe(true);
+        expect(printable.areAllCellsEmpty([{ x: 1, y: 1 }])).toBe(false);
+        expect(printable.areAllCellsEmpty([{ x: 0, y: 0 }])).toBe(false);
+        expect(printable.canOccupyCells([{ x: 1, y: 1 }, { x: 2, y: 2 }], false, false)).toBe(false);
+        expect(printable.canOccupyCells([centerCell], false, false)).toBe(false);
+
+        const matrix = printable.getMatrix();
+        const matrixNoUnits = printable.getMatrixNoUnits();
+
+        expect(matrix[0][0]).toBe(ObstacleType.HOLE);
+        expect(matrix[1][1]).toBe(PBTypes.TeamVals.UPPER);
+        expect(matrix[2][2]).toBe(PBTypes.TeamVals.LOWER);
+        expect(matrix[centerCell.y][centerCell.x]).toBe(ObstacleType.BLOCK);
+        expect(matrixNoUnits[1][1]).toBe(0);
+        expect(matrixNoUnits[2][2]).toBe(0);
+        expect(matrixNoUnits[0][0]).toBe(ObstacleType.HOLE);
+
+        console.log = (message?: unknown) => {
+            logs.push(String(message));
+        };
+
+        try {
+            printable.print("unit1");
+        } finally {
+            console.log = originalLog;
+        }
+
+        expect(logs).toHaveLength(3);
+        expect(logs[0]).toContain(".");
+        expect(logs[0]).toContain("x");
+        expect(logs[0]).toContain("H");
     });
 });

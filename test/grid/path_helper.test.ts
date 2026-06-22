@@ -5,6 +5,10 @@ import { GridSettings } from "../../src/grid/grid_settings";
 import { ObstacleType } from "../../src/obstacles/obstacle_type";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { IMovePath } from "../../src/grid/path_definitions";
+import { SquarePlacement } from "../../src/grid/square_placement";
+import { PlacementPositionType } from "../../src/grid/placement_properties";
+import { getPositionForCell } from "../../src/grid/grid_math";
+import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
 
 describe("PathHelper Tests", () => {
     let pathHelper: PathHelper;
@@ -140,6 +144,209 @@ describe("PathHelper Tests", () => {
 
             expect(result).toEqual({ x: 1, y: 1 });
         });
+
+        test("should select directional attack cells around target quadrants", () => {
+            const helperAny = pathHelper as any;
+            const upperHashes = new Set<number>([
+                (4 << 4) | 4,
+                (5 << 4) | 4,
+                (4 << 4) | 5,
+                (6 << 4) | 6,
+                (6 << 4) | 5,
+                (5 << 4) | 6,
+                (4 << 4) | 6,
+                (6 << 4) | 4,
+            ]);
+
+            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, upperHashes, PBTypes.TeamVals.UPPER)).toEqual({
+                x: 4,
+                y: 4,
+            });
+            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(5 << 4) | 4]), PBTypes.TeamVals.UPPER))
+                .toEqual({ x: 5, y: 4 });
+            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(4 << 4) | 5]), PBTypes.TeamVals.LOWER))
+                .toEqual({ x: 4, y: 5 });
+
+            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, upperHashes, PBTypes.TeamVals.UPPER)).toEqual({
+                x: 6,
+                y: 6,
+            });
+            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(6 << 4) | 5]), PBTypes.TeamVals.UPPER))
+                .toEqual({ x: 6, y: 5 });
+            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(5 << 4) | 6]), PBTypes.TeamVals.LOWER))
+                .toEqual({ x: 5, y: 6 });
+
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 4]), PBTypes.TeamVals.UPPER))
+                .toEqual({ x: 6, y: 4 });
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER))
+                .toEqual({ x: 6, y: 6 });
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(4 << 4) | 6]), PBTypes.TeamVals.UPPER))
+                .toEqual({ x: 4, y: 6 });
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER))
+                .toEqual({ x: 6, y: 6 });
+        });
+
+        test("should handle large-unit attack-cell maps and invalid mouse positions", () => {
+            const targetCells = [
+                { x: 4, y: 4 },
+                { x: 5, y: 4 },
+                { x: 4, y: 5 },
+                { x: 5, y: 5 },
+            ];
+            const attackCellHashesToLargeCells = new Map<number, { x: number; y: number }[]>([
+                [(3 << 4) | 5, [{ x: 3, y: 5 }, { x: 3, y: 4 }]],
+                [(6 << 4) | 5, [{ x: 6, y: 5 }, { x: 6, y: 4 }]],
+                [(5 << 4) | 6, [{ x: 5, y: 6 }, { x: 4, y: 6 }]],
+            ]);
+
+            expect(
+                pathHelper.calculateClosestAttackFrom(
+                    { x: 99999, y: 99999 },
+                    [{ x: 3, y: 5 }],
+                    [{ x: 3, y: 4 }],
+                    targetCells,
+                    false,
+                    2,
+                    false,
+                    PBTypes.TeamVals.UPPER,
+                    attackCellHashesToLargeCells,
+                ),
+            ).toBeUndefined();
+
+            const leftEdgePosition = positionForCell({ x: 4, y: 5 });
+            const result = pathHelper.calculateClosestAttackFrom(
+                { x: leftEdgePosition.x - gridSettings.getHalfStep(), y: leftEdgePosition.y },
+                [{ x: 3, y: 5 }],
+                [{ x: 3, y: 4 }],
+                targetCells,
+                false,
+                2,
+                false,
+                PBTypes.TeamVals.UPPER,
+                attackCellHashesToLargeCells,
+            );
+
+            expect(result).toEqual({ x: 3, y: 5 });
+        });
+    });
+
+    describe("square placement helpers", () => {
+        test("should validate square cells", () => {
+            expect(pathHelper.areCellsFormingSquare()).toBe(false);
+            expect(pathHelper.areCellsFormingSquare([{ x: 1, y: 1 }])).toBe(false);
+            expect(
+                pathHelper.areCellsFormingSquare([
+                    { x: 1, y: 1 },
+                    { x: 1, y: 2 },
+                    { x: 2, y: 1 },
+                    { x: 2, y: 2 },
+                ]),
+            ).toBe(true);
+            expect(
+                pathHelper.areCellsFormingSquare([
+                    { x: 1, y: 1 },
+                    { x: 1, y: 1 },
+                    { x: 2, y: 1 },
+                    { x: 2, y: 2 },
+                ]),
+            ).toBe(false);
+            expect(
+                pathHelper.areCellsFormingSquare([
+                    { x: -1, y: 1 },
+                    { x: 1, y: 2 },
+                    { x: 2, y: 1 },
+                    { x: 2, y: 2 },
+                ]),
+            ).toBe(false);
+        });
+
+        test("should find closest square cells for placement and movement", () => {
+            const allowed = new Set<number>([
+                (1 << 4) | 1,
+                (1 << 4) | 2,
+                (2 << 4) | 1,
+                (2 << 4) | 2,
+            ]);
+            const mousePosition = positionForCell({ x: 1, y: 1 });
+
+            expect(pathHelper.getClosestSquareCellIndices(mousePosition)).toEqual([]);
+            expect(pathHelper.getClosestSquareCellIndices(mousePosition, allowed, ["2:2"])).toHaveLength(3);
+            expect(pathHelper.getClosestSquareCellIndices(mousePosition, allowed)).toEqual(
+                expect.arrayContaining([
+                    { x: 1, y: 1 },
+                    { x: 1, y: 2 },
+                    { x: 2, y: 1 },
+                    { x: 2, y: 2 },
+                ]),
+            );
+
+            const startedAllowed = new Set<number>(allowed);
+            const knownPaths = new Map<number, any[]>([
+                [(2 << 4) | 2, [{ route: [{ x: 1, y: 1 }, { x: 2, y: 2 }], weight: 1 }]],
+            ]);
+
+            expect(
+                pathHelper.getClosestSquareCellIndices(
+                    mousePosition,
+                    undefined,
+                    undefined,
+                    [{ x: 1, y: 1 }],
+                    startedAllowed,
+                    knownPaths,
+                ),
+            ).toContainEqual({ x: 2, y: 2 });
+        });
+
+        test("should validate pre-start placement for small and large units", () => {
+            const { unitsHolder } = createCombatTestContext();
+            const lowerLeft = new SquarePlacement(gridSettings, PlacementPositionType.LOWER_LEFT, 3);
+            const upperRight = new SquarePlacement(gridSettings, PlacementPositionType.UPPER_RIGHT, 3);
+            const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+            const largeLower = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                size: PBTypes.UnitSizeVals.LARGE,
+            });
+
+            lower.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            upper.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            largeLower.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            unitsHolder.addUnit(lower);
+
+            expect(pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder)).toBe(false);
+            expect(pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder, lowerLeft, upperRight))
+                .toBe(true);
+            expect(pathHelper.isAllowedPreStartUnitPosition(upper, upper.getCells(), unitsHolder, lowerLeft, upperRight))
+                .toBe(false);
+            expect(
+                pathHelper.isAllowedPreStartUnitPosition(
+                    largeLower,
+                    [
+                        { x: 1, y: 1 },
+                        { x: 1, y: 2 },
+                        { x: 2, y: 1 },
+                        { x: 2, y: 2 },
+                    ],
+                    unitsHolder,
+                    lowerLeft,
+                    upperRight,
+                ),
+            ).toBe(true);
+            expect(
+                pathHelper.isAllowedPreStartUnitPosition(
+                    largeLower,
+                    [
+                        { x: 1, y: 1 },
+                        { x: 1, y: 3 },
+                        { x: 2, y: 1 },
+                        { x: 2, y: 2 },
+                    ],
+                    unitsHolder,
+                    lowerLeft,
+                    upperRight,
+                ),
+            ).toBe(false);
+        });
     });
 
     describe("getMovePath", () => {
@@ -229,3 +436,12 @@ describe("PathHelper Tests", () => {
         });
     });
 });
+
+function positionForCell(cell: { x: number; y: number }): { x: number; y: number } {
+    return getPositionForCell(
+        cell,
+        testGridSettings.getMinX(),
+        testGridSettings.getStep(),
+        testGridSettings.getHalfStep(),
+    );
+}

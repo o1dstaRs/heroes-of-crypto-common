@@ -288,8 +288,7 @@ export const getCreatureConfig = (
                 .replace("{}", Number(((abilityConfig.power / 8) * 6).toFixed()).toString())
                 .replace("{}", Number(((abilityConfig.power / 8) * 5).toFixed()).toString());
             abilityDescriptions.push(updatedDescription);
-        }
-        if (abilityConfig.name === "Paralysis") {
+        } else if (abilityConfig.name === "Paralysis") {
             const description = abilityConfig.desc.join("\n");
             const updatedDescription = description
                 .replace("{}", Number((abilityConfig.power * 2).toFixed()).toString())
