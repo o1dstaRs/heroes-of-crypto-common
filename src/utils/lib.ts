@@ -17,6 +17,7 @@ import { Buffer } from "buffer";
 
 interface CryptoLike {
     getRandomValues<T extends ArrayBufferView>(array: T): T;
+    randomUUID?: () => string;
 }
 
 function getWebCrypto(): CryptoLike | undefined {
@@ -25,41 +26,44 @@ function getWebCrypto(): CryptoLike | undefined {
     return g.crypto && typeof g.crypto.getRandomValues === "function" ? g.crypto : undefined;
 }
 
+export function getSecureRandomValues<T extends ArrayBufferView>(array: T): T {
+    const c = getWebCrypto();
+    if (!c) {
+        throw new Error("Crypto-secure random values are unavailable in this runtime");
+    }
+    return c.getRandomValues(array);
+}
+
 /**
- * Secure uniform integer in [min, max) using Web Crypto when available.
+ * Secure uniform integer in [min, max).
  * - Exclusive of max (matches Node's crypto.randomInt).
  * - Uses rejection sampling (no modulo bias).
- * - Falls back to Math.random only if crypto is unavailable.
- * - Supports full safe JS ranges (≤ 2^53 - 1).
+ * - Fails closed if crypto-secure randomness is unavailable.
+ * - Supports safe JS integer ranges up to 2^53 possible values.
  */
 export function getRandomInt(min: number, max: number): number {
     if (!Number.isFinite(min) || !Number.isFinite(max)) throw new Error("min/max must be finite numbers");
-    if (!Number.isInteger(min) || !Number.isInteger(max)) throw new Error("min/max must be integers");
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) throw new Error("min/max must be safe integers");
     if (max < min) throw new Error("max must be >= min");
     if (max === min) return min;
 
     const spanBig = BigInt(max) - BigInt(min); // > 0
     const TWO53 = 1n << 53n;
+    if (spanBig > TWO53) throw new Error("range must contain at most 2^53 possible values");
+    if (spanBig === 1n) return min;
 
-    const c = getWebCrypto();
-    if (c) {
-        // Rejection sample 53-bit values to avoid bias
-        const limit = (TWO53 / spanBig) * spanBig; // largest multiple of span below 2^53
-        for (;;) {
-            const u32 = new Uint32Array(2);
-            c.getRandomValues(u32);
-            const hi = BigInt(u32[0] & 0x001fffff); // 21 bits
-            const lo = BigInt(u32[1]); // 32 bits
-            const rnd53 = (hi << 32n) | lo; // 53-bit integer in [0, 2^53)
-            if (rnd53 < limit) {
-                return Number(rnd53 % spanBig) + min;
-            }
+    // Rejection sample 53-bit values to avoid bias.
+    const limit = (TWO53 / spanBig) * spanBig; // largest multiple of span below 2^53
+    for (;;) {
+        const u32 = new Uint32Array(2);
+        getSecureRandomValues(u32);
+        const hi = BigInt(u32[0] & 0x001fffff); // 21 bits
+        const lo = BigInt(u32[1]); // 32 bits
+        const rnd53 = (hi << 32n) | lo; // 53-bit integer in [0, 2^53)
+        if (rnd53 < limit) {
+            return Number(rnd53 % spanBig) + min;
         }
     }
-
-    // Explicit, allowed fallback (non-crypto): still unbiased via float range
-    const span = max - min;
-    return Math.floor(Math.random() * span) + min;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -125,8 +129,10 @@ export function interval(func: () => void | Promise<void>, timeoutMillis: number
 }
 
 export function uuidToUint8Array(uuid: string): Uint8Array {
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(uuid)) {
+        throw new Error("Invalid UUID format");
+    }
     const hex = uuid.replace(/-/g, "");
-    if (hex.length !== 32) throw new Error("Invalid UUID format");
     const out = new Uint8Array(16);
     for (let i = 0; i < 16; i++) {
         out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
@@ -145,6 +151,21 @@ export const uuidFromBytes = (buffer: Uint8Array): string => {
         hex.slice(10, 16).join(""),
     ].join("-");
 };
+
+export function createSecureUuid(): string {
+    const c = getWebCrypto();
+    if (!c) {
+        throw new Error("Crypto-secure UUID generation is unavailable in this runtime");
+    }
+    if (typeof c.randomUUID === "function") {
+        return c.randomUUID();
+    }
+
+    const bytes = getSecureRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    return uuidFromBytes(bytes);
+}
 
 /**
  * Convert a Base64-encoded string to a Uint8Array (browser/Bun/Node).

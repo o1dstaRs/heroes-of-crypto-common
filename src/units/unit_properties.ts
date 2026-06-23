@@ -9,8 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import { v4 as uuidv4 } from "uuid";
-
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType, UnitType, AttackType, MovementType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
@@ -18,6 +16,7 @@ import {
     CreatureByLevel as GenCreatureByLevel,
     CreatureFactions as GenCreatureFactions, // if you generated it
 } from "../generated/protobuf/v1/creature_gen";
+import { createSecureUuid } from "../utils/lib";
 
 export type { TeamType, UnitType, AttackType, MovementType, FactionType };
 
@@ -158,7 +157,7 @@ export class UnitProperties {
         stack_power: number,
         target: string,
     ) {
-        this.id = uuidv4();
+        this.id = createSecureUuid();
         this.faction = faction;
         this.name = name;
         this.hp = max_hp;

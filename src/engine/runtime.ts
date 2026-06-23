@@ -9,9 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { v4 as uuidv4 } from "uuid";
-
-import { getRandomInt, getTimeMillis } from "../utils/lib";
+import { createSecureUuid, getRandomInt, getTimeMillis } from "../utils/lib";
 
 export interface IGameRandom {
     int(min: number, max: number): number;
@@ -39,7 +37,7 @@ export const createDefaultGameRuntime = (): IGameRuntime => ({
         nowMillis: () => getTimeMillis(),
     },
     ids: {
-        nextId: () => uuidv4(),
+        nextId: () => createSecureUuid(),
     },
 });
 

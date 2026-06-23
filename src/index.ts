@@ -31,6 +31,7 @@ export * as SpellHelper from "./spells/spell_helper";
 export * from "./spells/spell";
 export * as PickHelper from "./picks/pick_helper";
 export * from "./engine/actions";
+export * from "./engine/action_engine";
 export * from "./engine/events";
 export * from "./engine/runtime";
 export * from "./engine/turn_engine";

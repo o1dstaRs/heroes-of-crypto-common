@@ -27,7 +27,10 @@ import {
 } from "../../src/synergies/synergy_properties";
 import {
     base64ToUint8Array,
+    createSecureUuid,
     getLapString,
+    getRandomInt,
+    interval,
     isBrowser,
     matrixElement,
     RefNumber,
@@ -57,6 +60,28 @@ import {
 } from "../../src/utils/math";
 
 describe("utility functions", () => {
+    const withCryptoMock = (cryptoMock: object | undefined, fn: () => void): void => {
+        const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+        if (cryptoMock) {
+            Object.defineProperty(globalThis, "crypto", {
+                configurable: true,
+                value: cryptoMock,
+            });
+        } else {
+            Reflect.deleteProperty(globalThis, "crypto");
+        }
+
+        try {
+            fn();
+        } finally {
+            if (originalDescriptor) {
+                Object.defineProperty(globalThis, "crypto", originalDescriptor);
+            } else {
+                Reflect.deleteProperty(globalThis, "crypto");
+            }
+        }
+    };
+
     it("covers collection, UUID, base64, and ref-number helpers", () => {
         const values = [3, 1, 2];
         const ref = new RefNumber(5);
@@ -80,6 +105,7 @@ describe("utility functions", () => {
         expect(bytes).toHaveLength(16);
         expect(uuidFromBytes(bytes)).toBe(uuid);
         expect(() => uuidToUint8Array("bad")).toThrow("Invalid UUID format");
+        expect(() => uuidToUint8Array("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz")).toThrow("Invalid UUID format");
         expect(() => uuidFromBytes(new Uint8Array(1))).toThrow("Buffer must be 16 bytes long");
         expect(Array.from(base64ToUint8Array("aG9j"))).toEqual([104, 111, 99]);
 
@@ -158,9 +184,95 @@ describe("utility functions", () => {
 
         expect(effectFactory.makeEffect(null)).toBeUndefined();
         expect(effectFactory.makeEffect("missing")).toBeUndefined();
+        expect(effectFactory.makeEffect("Stun")?.getName()).toBe("Stun");
         expect(effectFactory.makeAuraEffect(null)).toBeUndefined();
         expect(effectFactory.makeAuraEffect("missing")).toBeUndefined();
+        expect(effectFactory.makeAuraEffect("Luck")?.getName()).toBe("Luck");
         expect(abilityFactory.getEffectsFactory()).toBe(effectFactory);
         expect(abilityFactory.makeAbility("Resurrection").getSpell()?.getName()).toBe("Resurrection");
+    });
+
+    it("fails closed when crypto-secure random values are unavailable", () => {
+        withCryptoMock(undefined, () => {
+            expect(() => getRandomInt(0, 2)).toThrow("Crypto-secure random values are unavailable in this runtime");
+            expect(createSecureUuid).toThrow("Crypto-secure UUID generation is unavailable in this runtime");
+        });
+    });
+
+    it("uses unbiased secure random integers and validates safe ranges", () => {
+        withCryptoMock(
+            {
+                getRandomValues<T extends ArrayBufferView>(array: T): T {
+                    const values = new Uint32Array(
+                        array.buffer,
+                        array.byteOffset,
+                        array.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+                    );
+                    values[0] = 0;
+                    values[1] = 5;
+                    return array;
+                },
+            },
+            () => {
+                expect(getRandomInt(10, 13)).toBe(12);
+                expect(getRandomInt(7, 7)).toBe(7);
+                expect(getRandomInt(7, 8)).toBe(7);
+                expect(() => getRandomInt(0.5, 2)).toThrow("min/max must be safe integers");
+                expect(() => getRandomInt(Number.MAX_SAFE_INTEGER + 1, Number.MAX_SAFE_INTEGER + 2)).toThrow(
+                    "min/max must be safe integers",
+                );
+                expect(() => getRandomInt(-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)).toThrow(
+                    "range must contain at most 2^53 possible values",
+                );
+                expect(() => getRandomInt(5, 4)).toThrow("max must be >= min");
+            },
+        );
+    });
+
+    it("creates secure v4 UUIDs from random bytes when native randomUUID is absent", () => {
+        withCryptoMock(
+            {
+                getRandomValues<T extends ArrayBufferView>(array: T): T {
+                    const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+                    for (let i = 0; i < bytes.length; i++) {
+                        bytes[i] = i;
+                    }
+                    return array;
+                },
+            },
+            () => {
+                expect(createSecureUuid()).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+            },
+        );
+    });
+
+    it("schedules interval callbacks through the host timer", async () => {
+        const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "setInterval");
+        let scheduled: (() => void | Promise<void>) | undefined;
+        let calls = 0;
+
+        Object.defineProperty(globalThis, "setInterval", {
+            configurable: true,
+            value: (handler: TimerHandler, timeout?: number): ReturnType<typeof setInterval> => {
+                expect(timeout).toBe(25);
+                scheduled = handler as () => void | Promise<void>;
+                return 1 as unknown as ReturnType<typeof setInterval>;
+            },
+        });
+
+        try {
+            interval(async () => {
+                calls += 1;
+            }, 25);
+
+            await scheduled?.();
+            expect(calls).toBe(1);
+        } finally {
+            if (originalDescriptor) {
+                Object.defineProperty(globalThis, "setInterval", originalDescriptor);
+            } else {
+                Reflect.deleteProperty(globalThis, "setInterval");
+            }
+        }
     });
 });

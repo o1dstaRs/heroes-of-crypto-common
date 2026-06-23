@@ -1025,10 +1025,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // this.unitProperties.luck_mod = 0;
         this.luckPerTurn = 0;
     }
-    public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): void {
+    public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): number {
         const aw = Math.floor(armageddonWave);
         if (aw <= 0 || aw > NUMBER_OF_ARMAGEDDON_WAVES) {
-            return;
+            return 0;
         }
 
         const canHitPartially = aw === 1;
@@ -1048,6 +1048,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         sceneLog.updateLog(`${this.getName()} got hit by armageddon for ${armageddonDamage} damage`);
         this.applyDamage(armageddonDamage, 0, sceneLog, false);
+        return armageddonDamage;
     }
     public applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak = false): number {
         if (minusHp <= 0) {

@@ -230,31 +230,64 @@ export class MoveHandler {
 
         const movePaths = currentActiveKnownPaths.get((toCell.x << 4) | toCell.y);
         if (movePaths?.length) {
-            const path = movePaths[0].route;
-            const targetPos = getPositionForCell(
-                path[path.length - 1],
-                this.gridSettings.getMinX(),
-                this.gridSettings.getStep(),
-                this.gridSettings.getHalfStep(),
+            return this.applyRouteMoveModifiers(
+                movePaths[0].route,
+                unit,
+                synergyAbilityPowerIncrease,
+                synergyMoraleIncrease,
+                movePaths[0].hasLavaCell,
+                movePaths[0].hasWaterCell,
             );
-            const distanceBefore = this.unitsHolder.getDistanceToClosestEnemy(
-                unit.getOppositeTeam(),
-                unit.getPosition(),
-            );
-            const distanceAfter = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), targetPos);
-            if (distanceAfter < distanceBefore) {
-                unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
-            } else if (distanceAfter > distanceBefore) {
-                unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
-            }
-            unit.applyTravelledDistanceModifier(path.length, synergyAbilityPowerIncrease);
-            unit.applyLavaWaterModifier(movePaths[0].hasLavaCell, movePaths[0].hasWaterCell);
         } else {
             return false;
         }
+    }
+    public applyRouteMoveModifiers(
+        route: XY[],
+        unit: Unit,
+        synergyAbilityPowerIncrease: number,
+        synergyMoraleIncrease: number,
+        hasLavaCell = false,
+        hasWaterCell = false,
+        fromPosition?: XY,
+    ): boolean {
+        const travelledRoute = this.getTravelledRoute(route, unit);
+        if (!travelledRoute.length) {
+            return false;
+        }
+
+        const targetPos = getPositionForCell(
+            travelledRoute[travelledRoute.length - 1],
+            this.gridSettings.getMinX(),
+            this.gridSettings.getStep(),
+            this.gridSettings.getHalfStep(),
+        );
+        const distanceBefore = this.unitsHolder.getDistanceToClosestEnemy(
+            unit.getOppositeTeam(),
+            fromPosition ?? unit.getPosition(),
+        );
+        const distanceAfter = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), targetPos);
+        if (distanceAfter < distanceBefore) {
+            unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
+        } else if (distanceAfter > distanceBefore) {
+            unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
+        }
+        unit.applyTravelledDistanceModifier(travelledRoute.length, synergyAbilityPowerIncrease);
+        unit.applyLavaWaterModifier(hasLavaCell, hasWaterCell);
 
         return true;
     }
+
+    private getTravelledRoute(route: XY[], unit: Unit): XY[] {
+        const currentCell = unit.getBaseCell();
+        const firstCell = route[0];
+        if (firstCell && firstCell.x === currentCell.x && firstCell.y === currentCell.y) {
+            return route.slice(1);
+        }
+
+        return route;
+    }
+
     public finishDirectedUnitMove(
         unit: Unit,
         targetCells: XY[],

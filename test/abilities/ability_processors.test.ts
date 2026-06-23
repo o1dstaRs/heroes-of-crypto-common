@@ -17,35 +17,33 @@ import {
     nextStandingTargets,
 } from "../../src/abilities/ability_helper";
 import { processBoarSalivaAbility } from "../../src/abilities/boar_saliva_ability";
-import {
-    getChainLightningTargets,
-    processChainLightningAbility,
-} from "../../src/abilities/chain_lightning_ability";
-import {
-    calculateActiveDeepWoundsEffect,
-    processDeepWoundsAbility,
-} from "../../src/abilities/deep_wounds_ability";
+import { getChainLightningTargets, processChainLightningAbility } from "../../src/abilities/chain_lightning_ability";
+import { processAggrAbility } from "../../src/abilities/aggr_ability";
+import { processBlindnessAbility } from "../../src/abilities/blindness_ability";
+import { calculateActiveDeepWoundsEffect, processDeepWoundsAbility } from "../../src/abilities/deep_wounds_ability";
 import { processDevourEssenceAbility } from "../../src/abilities/devour_essense_ability";
 import { processDoublePunchAbility } from "../../src/abilities/double_punch_ability";
-import {
-    evaluateAffectedUnits,
-    processRangeAOEAbility,
-} from "../../src/abilities/aoe_range_ability";
+import { processDullingDefenseAblity } from "../../src/abilities/dulling_defense_ability";
+import { evaluateAffectedUnits, processRangeAOEAbility } from "../../src/abilities/aoe_range_ability";
 import { processDoubleShotAbility } from "../../src/abilities/double_shot_ability";
 import { processFireShieldAbility } from "../../src/abilities/fire_shield_ability";
 import { processFireBreathAbility } from "../../src/abilities/fire_breath_ability";
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
 import { processLuckyStrikeAbility } from "../../src/abilities/lucky_strike_ability";
+import { processMinerAbility } from "../../src/abilities/miner_ability";
 import { processParalysisAbility } from "../../src/abilities/paralysis_ability";
 import { processPegasusLightAbility } from "../../src/abilities/pegasus_light_ability";
 import { processPetrifyingGazeAbility } from "../../src/abilities/petrifying_gaze_ability";
+import { processRapidChargeAbility } from "../../src/abilities/rapid_charge_ability";
 import { processShatterArmorAbility } from "../../src/abilities/shatter_armor_ability";
 import { processSkewerStrikeAbility } from "../../src/abilities/skewer_strike_ability";
 import { processSpitBallAbility } from "../../src/abilities/spit_ball_ability";
 import { processStunAbility } from "../../src/abilities/stun_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
+import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -89,15 +87,41 @@ describe("ability processors", () => {
                 PBTypes.TeamVals.LOWER,
             ).map((ability) => ability.getName()),
         ).toEqual(["Backstab"]);
+        expect(getAbilitiesWithPosisionCoefficient(attacker.getAbilities(), undefined, { x: 5, y: 5 }, true)).toEqual(
+            [],
+        );
         expect(
-            getAbilitiesWithPosisionCoefficient(attacker.getAbilities(), undefined, { x: 5, y: 5 }, true),
-        ).toEqual([]);
+            getAbilitiesWithPosisionCoefficient(
+                attacker.getAbilities(),
+                { x: 5, y: 4 },
+                { x: 5, y: 6 },
+                false,
+                PBTypes.TeamVals.UPPER,
+            ).map((ability) => ability.getName()),
+        ).toEqual(["Backstab"]);
         expect(nextStandingTargets(attacker, target, grid, unitsHolder).map((unit) => unit.getId())).toEqual([
             behindTarget.getId(),
         ]);
-        expect(nextStandingTargets(attacker, target, grid, unitsHolder, undefined, true, true)).toEqual([
-            behindTarget,
-        ]);
+        expect(nextStandingTargets(attacker, target, grid, unitsHolder, undefined, true, true)).toEqual([behindTarget]);
+
+        const largeContext = createCombatTestContext();
+        const largeAttacker = createTestUnit({
+            name: "Large Attacker",
+            team: PBTypes.TeamVals.LOWER,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+        const largeTarget = createTestUnit({
+            name: "Large Target",
+            team: PBTypes.TeamVals.UPPER,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+
+        placeUnit(largeContext.grid, largeContext.unitsHolder, largeAttacker, { x: 8, y: 8 });
+        placeUnit(largeContext.grid, largeContext.unitsHolder, largeTarget, { x: 6, y: 6 });
+
+        expect(nextStandingTargets(largeAttacker, largeTarget, largeContext.grid, largeContext.unitsHolder)).toEqual(
+            [],
+        );
     });
 
     it("chains lightning through nearby enemies and records damage", () => {
@@ -141,6 +165,59 @@ describe("ability processors", () => {
         expect(stats.get().length).toBeGreaterThanOrEqual(4);
         expect(target.getCumulativeHp()).toBeLessThan(target.getCumulativeMaxHp());
         expect(layer1.getCumulativeHp()).toBeLessThan(layer1.getCumulativeMaxHp());
+    });
+
+    it("applies chain lightning kill morale and magic mirror reflection", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const stats = new DamageStatisticHolder();
+        const attacker = createTestUnit({
+            name: "Fragile Caster",
+            team: PBTypes.TeamVals.UPPER,
+            abilities: ["Chain Lightning"],
+            amountAlive: 1,
+            maxHp: 10,
+            attack: 20,
+            damageMin: 20,
+            damageMax: 20,
+            stackPower: 5,
+        });
+        const target = createTestUnit({
+            name: "Mirrored Primary",
+            team: PBTypes.TeamVals.LOWER,
+            amountAlive: 1,
+            maxHp: 5,
+        });
+        const chainedTarget = createTestUnit({
+            name: "Chained Neighbor",
+            team: PBTypes.TeamVals.LOWER,
+            amountAlive: 3,
+            maxHp: 100,
+        });
+        const mirror = new Spell({
+            spellProperties: getSpellConfig("Chaos", "Magic Mirror"),
+            amount: 1,
+        });
+        mirror.setPower(100);
+        target.applyBuff(mirror);
+
+        placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, target, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, chainedTarget, { x: 5, y: 6 });
+
+        const unitIdsDied = processChainLightningAbility(
+            attacker,
+            target,
+            20,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            stats,
+        );
+
+        expect(unitIdsDied).toEqual(expect.arrayContaining([target.getId(), attacker.getId()]));
+        expect(target.isDead()).toBe(true);
+        expect(attacker.isDead()).toBe(true);
+        expect(stats.get()).toHaveLength(2);
     });
 
     it("runs lightning spin against adjacent enemies", () => {
@@ -202,7 +279,17 @@ describe("ability processors", () => {
         placeUnit(grid, unitsHolder, targetA, { x: 7, y: 7 });
         placeUnit(grid, unitsHolder, targetB, { x: 7, y: 8 });
 
-        expect(evaluateAffectedUnits([{ x: 7, y: 7 }, { x: 7, y: 7 }, { x: 7, y: 8 }], unitsHolder, grid)).toEqual([
+        expect(
+            evaluateAffectedUnits(
+                [
+                    { x: 7, y: 7 },
+                    { x: 7, y: 7 },
+                    { x: 7, y: 8 },
+                ],
+                unitsHolder,
+                grid,
+            ),
+        ).toEqual([
             [targetA, targetB],
             [targetA, targetB],
         ]);
@@ -407,14 +494,7 @@ describe("ability processors", () => {
         placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, behind, { x: 5, y: 3 });
 
-        const result = processSkewerStrikeAbility(
-            attacker,
-            primary,
-            new SceneLogMock(),
-            unitsHolder,
-            grid,
-            stats,
-        );
+        const result = processSkewerStrikeAbility(attacker, primary, new SceneLogMock(), unitsHolder, grid, stats);
 
         expect(result.unitIdsDied).toEqual([behind.getId()]);
         expect(result.increaseMorale).toBeGreaterThan(0);
@@ -542,6 +622,79 @@ describe("ability processors", () => {
 
         expect(mechanism.hasEffectActive("Stun")).toBe(true);
         expect(mechanism.hasEffectActive("Paralysis")).toBe(true);
+    });
+
+    it("processes low-level melee utility abilities", () => {
+        const miner = createTestUnit({
+            name: "Miner",
+            team: PBTypes.TeamVals.UPPER,
+            abilities: ["Miner", "Rapid Charge"],
+            stackPower: 100,
+            armor: 10,
+        });
+        const defender = createTestUnit({
+            name: "Defender",
+            team: PBTypes.TeamVals.LOWER,
+            armor: 10,
+        });
+        const duller = createTestUnit({
+            name: "Duller",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Dulling Defense"],
+            stackPower: 100,
+        });
+        const attacker = createTestUnit({
+            name: "Attacker",
+            team: PBTypes.TeamVals.UPPER,
+            attack: 10,
+        });
+        const sceneLog = new SceneLogMock();
+
+        processMinerAbility(miner, defender, sceneLog);
+        processDullingDefenseAblity(duller, attacker, sceneLog);
+        miner.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        defender.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+        expect(miner.getBaseArmor()).toBeGreaterThan(10);
+        expect(defender.getBaseArmor()).toBeLessThan(10);
+        expect(attacker.getBaseAttack()).toBeLessThan(10);
+        expect(processRapidChargeAbility(miner, 3)).toBeGreaterThan(1);
+        expect(processRapidChargeAbility(defender, 3)).toBe(1);
+    });
+
+    it("applies mind-control skip effects and respects mind resistance", () => {
+        const aggrCaster = createTestUnit({
+            name: "Agitator",
+            team: PBTypes.TeamVals.UPPER,
+            abilities: ["Aggr"],
+            stackPower: 3,
+        });
+        const blindCaster = createTestUnit({
+            name: "Blinder",
+            team: PBTypes.TeamVals.UPPER,
+            abilities: ["Blindness"],
+            stackPower: 5,
+        });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER });
+        const resistant = createTestUnit({
+            name: "Mechanism",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Mechanism"],
+        });
+        const sceneLog = new SceneLogMock();
+
+        processAggrAbility(aggrCaster, target, target, sceneLog);
+        processAggrAbility(aggrCaster, target, target, sceneLog);
+        processBlindnessAbility(blindCaster, target, target, sceneLog);
+        processAggrAbility(aggrCaster, resistant, resistant, sceneLog);
+        processBlindnessAbility(blindCaster, resistant, resistant, sceneLog);
+
+        expect(target.hasEffectActive("Aggr")).toBe(true);
+        expect(target.getTarget()).toBe(aggrCaster.getId());
+        expect(target.hasEffectActive("Blindness")).toBe(true);
+        expect(resistant.hasEffectActive("Aggr")).toBe(false);
+        expect(resistant.hasEffectActive("Blindness")).toBe(false);
     });
 
     it("processes petrifying gaze damage and resistant targets", () => {
@@ -719,9 +872,18 @@ describe("ability processors", () => {
 
 function installMinimumRandom(): () => void {
     const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+    let uuidSeed = 1;
     const cryptoMock = {
         getRandomValues<T extends ArrayBufferView>(array: T): T {
-            new Uint8Array(array.buffer, array.byteOffset, array.byteLength).fill(0);
+            const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+            bytes.fill(0);
+            if (bytes.length === 16) {
+                let value = uuidSeed++;
+                for (let i = bytes.length - 1; i >= 0 && value > 0; i--) {
+                    bytes[i] = value & 0xff;
+                    value >>= 8;
+                }
+            }
             return array;
         },
     };

@@ -91,15 +91,44 @@ describe("MoveHandler", () => {
 
         expect(moveHandler.applyMoveModifiers({ x: 2, y: 2 }, unit, 0, 0)).toBe(false);
         expect(moveHandler.applyMoveModifiers({ x: 3, y: 3 }, unit, 0, 0, new Map())).toBe(false);
-        expect(
-            moveHandler.applyMoveModifiers(
-                { x: 2, y: 2 },
-                unit,
-                0,
-                0,
-                new Map([[(2 << 4) | 2, [route]]]),
-            ),
-        ).toBe(true);
+        expect(moveHandler.applyMoveModifiers({ x: 2, y: 2 }, unit, 0, 0, new Map([[(2 << 4) | 2, [route]]]))).toBe(
+            true,
+        );
+    });
+
+    it("counts travelled cells without the starting cell for route modifiers", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const unit = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Crusade"],
+            attack: 10,
+            armor: 10,
+            stackPower: 5,
+        });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const crusade = unit.getAbility("Crusade");
+        const attackBefore = unit.getBaseAttack();
+        const armorBefore = unit.getBaseArmor();
+        const expectedIncrease = crusade ? unit.calculateAbilityCount(crusade, 0) : 0;
+
+        placeUnit(grid, unitsHolder, unit, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
+
+        const applied = moveHandler.applyRouteMoveModifiers(
+            [
+                { x: 1, y: 1 },
+                { x: 2, y: 1 },
+            ],
+            unit,
+            0,
+            0,
+        );
+        unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+        expect(applied).toBe(true);
+        expect(unit.getBaseAttack()).toBeCloseTo(attackBefore + expectedIncrease);
+        expect(unit.getBaseArmor()).toBeCloseTo(armorBefore + expectedIncrease);
     });
 
     it("finishes directed moves with explicit positions and update masks", () => {

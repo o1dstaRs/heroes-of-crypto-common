@@ -13,6 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
+import { EffectFactory } from "../../src/effects/effect_factory";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
@@ -167,6 +168,46 @@ describe("TurnEngine", () => {
             lap: 2,
             layers: 1,
             encounterCurrent: true,
+        });
+    });
+
+    it("completes a selected skipping unit turn through common mechanics", () => {
+        const setup = setupStartedFight();
+        const stun = new EffectFactory().makeEffect("Stun");
+        expect(stun).toBeDefined();
+        setup.lower.applyEffect(stun!);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000, 1250] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result.fightFinished).toBe(false);
+        expect(result.nextUnit).toBeUndefined();
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.lower.getMorale()).toBeLessThan(0);
+        expect(result.events).toContainEqual({
+            type: "next_unit_selected",
+            unitId: setup.lower.getId(),
+            team: PBTypes.TeamVals.LOWER,
+        });
+        expect(result.events).toContainEqual({
+            type: "unit_skipped",
+            unitId: setup.lower.getId(),
+            team: PBTypes.TeamVals.LOWER,
+            reason: "effect",
+        });
+        expect(result.events).toContainEqual({
+            type: "turn_completed",
+            unitId: setup.lower.getId(),
+            team: PBTypes.TeamVals.LOWER,
+            hourglass: false,
         });
     });
 });

@@ -9,10 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { v4 as uuidv4 } from "uuid";
 import Denque from "denque";
 
-import { getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
+import { createSecureUuid, getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
     MAX_AUGMENT_POINTS,
     MAX_HITS_MOUNTAIN,
@@ -101,7 +100,7 @@ export class FightProperties {
     private obstacleHitsLeft: number = 0;
     private additionalNarrowingLaps: number = 0;
     public constructor() {
-        this.id = uuidv4();
+        this.id = createSecureUuid();
         this.currentLap = 1;
         this.gridType = this.getRandomGridType();
         this.placementType = PlacementType.RECTANGLE;

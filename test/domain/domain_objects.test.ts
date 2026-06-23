@@ -25,6 +25,14 @@ import { AppliedSpell } from "../../src/spells/applied_spell";
 import { Spell } from "../../src/spells/spell";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { AbilityPowerType } from "../../src/abilities/ability_properties";
+import {
+    getCreatureLevel,
+    getCreaturesByLevel,
+    getCreaturesOf,
+    getFactionOf,
+    getLevelOf,
+    LevelBuckets,
+} from "../../src/units/unit_properties";
 
 describe("domain objects", () => {
     it("exposes ability data and returns defensive effect/property copies", () => {
@@ -168,5 +176,24 @@ describe("domain objects", () => {
         const infinite = new AppliedSpell("Infinite", 1, Number.MAX_SAFE_INTEGER);
         infinite.minusLap();
         expect(infinite.getLaps()).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it("exposes generated creature lookup helpers with safe fallbacks", () => {
+        const firstLevelCreature = getCreaturesByLevel(PBTypes.UnitLevelVals.FIRST)[0];
+        const missingCreature = 999999 as Parameters<typeof getCreatureLevel>[0];
+        const missingFaction = 999999 as Parameters<typeof getCreaturesOf>[0];
+        const faction = getFactionOf(firstLevelCreature);
+
+        expect(getCreatureLevel(firstLevelCreature)).toBe(PBTypes.UnitLevelVals.FIRST);
+        expect(getLevelOf(firstLevelCreature)).toBe(PBTypes.UnitLevelVals.FIRST);
+        expect(getCreatureLevel(missingCreature)).toBe(PBTypes.UnitLevelVals.NO_LEVEL);
+        expect(getLevelOf(missingCreature)).toBe(PBTypes.UnitLevelVals.NO_LEVEL);
+        expect(getFactionOf(missingCreature)).toBe(PBTypes.FactionVals.MIGHT);
+
+        expect(getCreaturesOf(faction)).toContain(firstLevelCreature);
+        expect(getCreaturesOf(faction, PBTypes.UnitLevelVals.FIRST)).toContain(firstLevelCreature);
+        expect(getCreaturesOf(missingFaction)).toEqual([]);
+        expect(LevelBuckets).toHaveLength(4);
+        expect(LevelBuckets[3]).toMatchObject({ label: "Level 4", unitSize: 2 });
     });
 });

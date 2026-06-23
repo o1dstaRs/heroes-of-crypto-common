@@ -197,4 +197,61 @@ describe("generated protobuf messages", () => {
         });
         expect(FightPB.Fight.deserializeBinary(fight.serializeBinary()).toObject()).toEqual(fight.toObject());
     });
+
+    it("constructs generated messages directly with object data", () => {
+        const responseMe = new ResponseMePB.ResponseMe({
+            username: "direct-player",
+            email: "direct@example.com",
+            wins: 11,
+            losses: 4,
+            total_games_played: 15,
+            is_active: true,
+            match_making_queue_added_time: 321,
+            match_making_cooldown_till: 654,
+            in_game_id: "direct-game",
+        });
+        expect(ResponseMePB.ResponseMe.deserializeBinary(responseMe.serializeBinary()).toObject()).toEqual(
+            responseMe.toObject(),
+        );
+
+        const unit = new UnitPB.UnitData({
+            id: new Uint8Array([1, 3, 5]),
+            faction: TypesPB.FactionVals.NATURE,
+            name: "Direct Unit",
+            team: TypesPB.TeamVals.LOWER,
+            max_hp: 40,
+            hp: 35,
+            steps: 6,
+            steps_mod: 2,
+            morale: 3,
+            luck: 2,
+            speed: 8,
+            armor_mod: 1.5,
+            base_armor: 7,
+            attack_type: TypesPB.AttackVals.RANGE,
+            attack_type_selected: TypesPB.AttackVals.RANGE,
+            attack: 12,
+            attack_damage_min: 4,
+            attack_damage_max: 9,
+            attack_range: 2,
+            range_shots: 5,
+            range_shots_mod: 2,
+            shot_distance: 3.5,
+            magic_resist: 15,
+            magic_resist_mod: 4,
+            can_cast_spells: true,
+            can_fly: true,
+            exp: 200,
+            size: TypesPB.UnitSizeVals.LARGE,
+            level: TypesPB.UnitLevelVals.THIRD,
+            spells: ["Wind Flow", "Heal"],
+            abilities: ["Area Throw"],
+            effects: ["Regeneration"],
+            amount_alive: 6,
+            amount_died: 2,
+            luck_mod: 1,
+            attack_multiplier: 1.5,
+        });
+        expect(UnitPB.UnitData.deserializeBinary(unit.serializeBinary()).toObject()).toEqual(unit.toObject());
+    });
 });

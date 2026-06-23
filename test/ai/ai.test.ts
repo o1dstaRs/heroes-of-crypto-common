@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { AIActionType, findTarget } from "../../src/ai/ai";
+import { AIActionType, findTarget, getCellsForAttacker } from "../../src/ai/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
@@ -665,6 +665,36 @@ describe("RangeAttack", () => {
             // so the AI either falls back to doFindTarget movement or returns undefined.
             expect(action === undefined || action.actionType() === AIActionType.MOVE).toBe(true);
         });
+    });
+});
+
+describe("AI attack-cell helpers", () => {
+    it("returns adjacent free cells for a small attacker around a small target", () => {
+        const attacker = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
+        const matrix = Array.from({ length: 6 }, () => new Array(6).fill(0));
+
+        const cells = getCellsForAttacker({ x: 3, y: 3 }, matrix, attacker, true, true);
+
+        expect(cells).toContainEqual({ x: 2, y: 2 });
+        expect(cells).toContainEqual({ x: 4, y: 4 });
+        expect(cells).toHaveLength(8);
+    });
+
+    it("expands legal attack cells for large targets and large attackers", () => {
+        const matrix = Array.from({ length: 8 }, () => new Array(8).fill(0));
+        const smallAttacker = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
+
+        const cellsForLargeTarget = getCellsForAttacker({ x: 3, y: 3 }, matrix, smallAttacker, true, false);
+
+        expect(cellsForLargeTarget).toContainEqual({ x: 5, y: 2 });
+        expect(cellsForLargeTarget).toContainEqual({ x: 5, y: 5 });
+        expect(cellsForLargeTarget).toContainEqual({ x: 2, y: 5 });
+
+        const bigAttacker = stubBigUnit(PBTypes.TeamVals.UPPER, 3, { x: 2, y: 2 });
+        const cellsForBigAttacker = getCellsForAttacker({ x: 4, y: 4 }, matrix, bigAttacker, false, true);
+
+        expect(cellsForBigAttacker.length).toBeGreaterThan(0);
+        expect(cellsForBigAttacker.every((cell) => cell.x >= 0 && cell.y >= 0)).toBe(true);
     });
 });
 

@@ -35,6 +35,7 @@ export interface ITurnEngineContext {
     unitsHolder: UnitsHolder;
     moveHandler: MoveHandler;
     sceneLog: ISceneLog;
+    getCurrentActiveUnitId?: () => string | undefined;
     runtime?: IGameRuntime;
 }
 
@@ -48,6 +49,8 @@ export interface IAdvanceTurnResult {
     nextUnit?: Unit;
     fightFinished: boolean;
 }
+
+export type TurnSkipReason = "effect" | "timeout" | "manual";
 
 interface IOrderedTurnUnits {
     allUnits: Unit[];
@@ -70,8 +73,21 @@ export class TurnEngine {
         this.sceneLog = context.sceneLog;
         this.runtime = context.runtime ?? createDefaultGameRuntime();
     }
-    public completeTurn(unit: Unit, opts: { hourglass?: boolean } = {}): GameEvent[] {
+    public completeTurn(
+        unit: Unit,
+        opts: { hourglass?: boolean; skipReason?: TurnSkipReason; skipLogMessage?: string } = {},
+    ): GameEvent[] {
         const hourglass = opts.hourglass ?? false;
+        const events: GameEvent[] = [];
+
+        if (opts.skipReason) {
+            unit.decreaseMorale(
+                MORALE_CHANGE_FOR_SKIP,
+                this.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
+            );
+            this.sceneLog.updateLog(opts.skipLogMessage ?? `${unit.getName()} skip turn`);
+            events.push({ type: "unit_skipped", unitId: unit.getId(), team: unit.getTeam(), reason: opts.skipReason });
+        }
 
         if (!hourglass) {
             unit.minusLap();
@@ -82,14 +98,14 @@ export class TurnEngine {
 
         this.unitsHolder.refreshStackPowerForAllUnits();
 
-        return [
-            {
-                type: "turn_completed",
-                unitId: unit.getId(),
-                team: unit.getTeam(),
-                hourglass,
-            },
-        ];
+        events.push({
+            type: "turn_completed",
+            unitId: unit.getId(),
+            team: unit.getTeam(),
+            hourglass,
+        });
+
+        return events;
     }
     public advanceAfterNoActiveUnit(opts: IAdvanceTurnOptions = {}): IAdvanceTurnResult {
         const events: GameEvent[] = [];
@@ -321,8 +337,8 @@ export class TurnEngine {
         }
 
         for (const unit of units) {
-            unit.applyArmageddonDamage(wave, this.sceneLog);
-            events.push({ type: "armageddon_applied", unitId: unit.getId(), wave });
+            const damage = unit.applyArmageddonDamage(wave, this.sceneLog);
+            events.push({ type: "armageddon_applied", unitId: unit.getId(), wave, damage });
             if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId(), wave === 1)) {
                 events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "armageddon" });
             }
@@ -375,13 +391,7 @@ export class TurnEngine {
         this.fightProperties.markFirstTurn();
 
         if (unit.isSkippingThisTurn()) {
-            unit.decreaseMorale(
-                MORALE_CHANGE_FOR_SKIP,
-                this.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
-            );
-            this.sceneLog.updateLog(`${unit.getName()} skip turn`);
-            events.push({ type: "unit_skipped", unitId: unit.getId(), team: unit.getTeam(), reason: "effect" });
-            events.push(...this.completeTurn(unit));
+            events.push(...this.completeTurn(unit, { skipReason: "effect" }));
         }
 
         return events;
