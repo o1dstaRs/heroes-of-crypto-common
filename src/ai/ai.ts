@@ -199,11 +199,7 @@ function logAction(action: BasicAIAction | undefined, debug: boolean) {
  *
  * Returns undefined when no enemy is in range; callers fall back to movement.
  */
-function findRangeAttackAction(
-    unit: IUnitAIRepr,
-    grid: Grid,
-    matrix: number[][],
-): BasicAIAction | undefined {
+function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]): BasicAIAction | undefined {
     if (unit.getRangeShots() <= 0) {
         return undefined;
     }
