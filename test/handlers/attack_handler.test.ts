@@ -39,8 +39,16 @@ describe("AttackHandler", () => {
             expect(target.isSmallSize()).toBe(true);
 
             target.setRenderPosition(3, 4);
+            damageStatisticHolder.add({
+                unitName: "Target",
+                damage: 5,
+                team: PBTypes.TeamVals.LOWER,
+                lap: 2,
+            });
 
             expect(target.getRenderPosition()).toEqual({ x: 3, y: 4 });
+            expect(damageStatisticHolder.has(2)).toBe(true);
+            expect(damageStatisticHolder.has(3)).toBe(false);
         });
 
         it("calculates range divisors and evaluates affected range targets", () => {

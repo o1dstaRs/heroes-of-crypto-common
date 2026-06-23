@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../src/constants";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
 import { EffectFactory } from "../../src/effects/effect_factory";
@@ -22,7 +23,9 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 
 const queuedZeros = (count: number): number[] => Array.from({ length: count }, () => 0);
 
-function setupStartedFight(opts: { lowerMorale?: number; upperMorale?: number } = {}) {
+function setupStartedFight(
+    opts: { lowerMorale?: number; upperMorale?: number; lowerSpeed?: number; upperSpeed?: number } = {},
+) {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
@@ -31,13 +34,13 @@ function setupStartedFight(opts: { lowerMorale?: number; upperMorale?: number } 
     const lower = createTestUnit({
         name: "Lower",
         team: PBTypes.TeamVals.LOWER,
-        speed: 5,
+        speed: opts.lowerSpeed ?? 5,
         morale: opts.lowerMorale ?? 0,
     });
     const upper = createTestUnit({
         name: "Upper",
         team: PBTypes.TeamVals.UPPER,
-        speed: 3,
+        speed: opts.upperSpeed ?? 3,
         morale: opts.upperMorale ?? 0,
     });
 
@@ -54,6 +57,15 @@ function setupStartedFight(opts: { lowerMorale?: number; upperMorale?: number } 
         sceneLog: new SceneLogMock(),
         moveHandler: new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder),
     };
+}
+
+function advanceFightToLap(
+    fightProperties: ReturnType<typeof FightStateManager.getInstance>["getFightProperties"],
+    lap: number,
+) {
+    while (fightProperties.getCurrentLap() < lap) {
+        fightProperties.flipLap();
+    }
 }
 
 describe("TurnEngine", () => {
@@ -209,5 +221,146 @@ describe("TurnEngine", () => {
             team: PBTypes.TeamVals.LOWER,
             hourglass: false,
         });
+    });
+
+    it("finishes the fight through common turn advancement when one team has no living units", () => {
+        const setup = setupStartedFight();
+        setup.unitsHolder.deleteUnitById(setup.upper.getId(), true);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result).toEqual({
+            events: [{ type: "fight_finished", winningTeam: PBTypes.TeamVals.LOWER }],
+            fightFinished: true,
+        });
+        expect(setup.fightProperties.hasFightFinished()).toBe(true);
+    });
+
+    it("applies armageddon damage and deletion through common lap mechanics", () => {
+        const setup = setupStartedFight();
+        setup.fightProperties.markFirstTurn();
+        advanceFightToLap(setup.fightProperties, NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 1);
+        setup.fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, setup.lower.getId(), 10);
+        setup.fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.UPPER, setup.upper.getId(), 10);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(24), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(setup.fightProperties.getCurrentLap()).toBe(NUMBER_OF_LAPS_FIRST_ARMAGEDDON);
+        expect(result.events).toContainEqual({
+            type: "lap_flipped",
+            previousLap: NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 1,
+            currentLap: NUMBER_OF_LAPS_FIRST_ARMAGEDDON,
+        });
+        expect(result.events).toContainEqual({
+            type: "armageddon_applied",
+            unitId: setup.lower.getId(),
+            wave: 1,
+            damage: 75,
+        });
+        expect(result.events).toContainEqual({
+            type: "unit_destroyed",
+            unitId: setup.lower.getId(),
+            reason: "armageddon",
+        });
+        expect(setup.unitsHolder.getAllUnits().has(setup.lower.getId())).toBe(false);
+    });
+
+    it("orders multi-unit teams and converts system move results into common events", () => {
+        const setup = setupStartedFight();
+        const lowerFast = createTestUnit({
+            name: "Lower Fast",
+            team: PBTypes.TeamVals.LOWER,
+            speed: 9,
+        });
+        const upperFast = createTestUnit({
+            name: "Upper Fast",
+            team: PBTypes.TeamVals.UPPER,
+            speed: 8,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, lowerFast, { x: 4, y: 3 });
+        placeUnit(setup.grid, setup.unitsHolder, upperFast, { x: 10, y: 9 });
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(24), nowMillis: [1000] }),
+        });
+        const engineAny = engine as any;
+
+        const ordered = engineAny.getOrderedTurnUnits();
+        expect(ordered.unitsLower.map((unit: { getId(): string }) => unit.getId())[0]).toBe(lowerFast.getId());
+        expect(ordered.unitsUpper.map((unit: { getId(): string }) => unit.getId())[0]).toBe(upperFast.getId());
+
+        const systemEvents = engineAny.handleSystemMoveResult({
+            log: "line one\nline two",
+            unitIdToNewPosition: new Map([[setup.upper.getId(), { x: 12, y: 12 }]]),
+            unitIdsDestroyed: [setup.upper.getId()],
+        });
+
+        expect(systemEvents).toEqual([
+            {
+                type: "unit_moved_by_system",
+                unitId: setup.upper.getId(),
+                position: { x: 12, y: 12 },
+                reason: "narrowing",
+            },
+            { type: "unit_destroyed", unitId: setup.upper.getId(), reason: "narrowing" },
+        ]);
+        expect(setup.unitsHolder.getAllUnits().has(setup.upper.getId())).toBe(false);
+    });
+
+    it("uses injected tie-break randoms for first-lap and active-lap queue prefetching", () => {
+        const firstLapSetup = setupStartedFight({ lowerSpeed: 5, upperSpeed: 5 });
+        const firstLapEngine = new TurnEngine({
+            fightProperties: firstLapSetup.fightProperties,
+            grid: firstLapSetup.grid,
+            unitsHolder: firstLapSetup.unitsHolder,
+            moveHandler: firstLapSetup.moveHandler,
+            sceneLog: firstLapSetup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: [1, 0, ...queuedZeros(12)], nowMillis: [1000] }),
+        });
+
+        const firstLapResult = firstLapEngine.advanceAfterNoActiveUnit();
+
+        expect([firstLapSetup.lower.getId(), firstLapSetup.upper.getId()]).toContain(firstLapResult.nextUnit?.getId());
+
+        const activeLapSetup = setupStartedFight({ lowerSpeed: 5, upperSpeed: 5 });
+        activeLapSetup.fightProperties.markFirstTurn();
+        activeLapSetup.fightProperties.flipLap();
+        const activeLapEngine = new TurnEngine({
+            fightProperties: activeLapSetup.fightProperties,
+            grid: activeLapSetup.grid,
+            unitsHolder: activeLapSetup.unitsHolder,
+            moveHandler: activeLapSetup.moveHandler,
+            sceneLog: activeLapSetup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: [0, 1, ...queuedZeros(12)], nowMillis: [2000] }),
+        });
+
+        const activeLapResult = activeLapEngine.advanceAfterNoActiveUnit();
+
+        expect([activeLapSetup.lower.getId(), activeLapSetup.upper.getId()]).toContain(
+            activeLapResult.nextUnit?.getId(),
+        );
     });
 });

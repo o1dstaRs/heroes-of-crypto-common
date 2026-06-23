@@ -1,4 +1,3 @@
-
 import { describe, test, expect, beforeEach } from "bun:test";
 import { PathHelper } from "../../src/grid/path_helper";
 import { GridSettings } from "../../src/grid/grid_settings";
@@ -23,15 +22,7 @@ describe("PathHelper Tests", () => {
     const UNIT_SIZE_DELTA = 0.06;
 
     beforeEach(() => {
-        gridSettings = new GridSettings(
-            GRID_SIZE,
-            MAX_Y,
-            MIN_Y,
-            MAX_X,
-            MIN_X,
-            MOVEMENT_DELTA,
-            UNIT_SIZE_DELTA
-        );
+        gridSettings = new GridSettings(GRID_SIZE, MAX_Y, MIN_Y, MAX_X, MIN_X, MOVEMENT_DELTA, UNIT_SIZE_DELTA);
         pathHelper = new PathHelper(gridSettings);
     });
 
@@ -76,16 +67,22 @@ describe("PathHelper Tests", () => {
 
     describe("filterUnallowedDestinations", () => {
         test("should filter out lava and water for normal units", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             // Set (5,5) to LAVA
             matrix[5][5] = ObstacleType.LAVA;
             // Set (5,6) to WATER
             matrix[6][5] = ObstacleType.WATER;
 
             const movePath: IMovePath = {
-                cells: [{ x: 5, y: 5 }, { x: 5, y: 6 }, { x: 4, y: 4 }],
+                cells: [
+                    { x: 5, y: 5 },
+                    { x: 5, y: 6 },
+                    { x: 4, y: 4 },
+                ],
                 knownPaths: new Map(),
-                hashes: new Set()
+                hashes: new Set(),
             };
             // Add known paths for small unit check
             movePath.knownPaths.set((5 << 4) | 5, []);
@@ -93,7 +90,7 @@ describe("PathHelper Tests", () => {
             movePath.knownPaths.set((4 << 4) | 4, []);
 
             // @ts-ignore - Accessing private method via any cast or public wrapper if available.
-            // Since it's private, we might need to test via a public method that uses it, 
+            // Since it's private, we might need to test via a public method that uses it,
             // but for unit testing internal logic, we can cast to any.
             const filtered = (pathHelper as any).filterUnallowedDestinations(movePath, matrix, true, false);
 
@@ -103,13 +100,15 @@ describe("PathHelper Tests", () => {
         });
 
         test("should allow lava for fire units", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             matrix[5][5] = ObstacleType.LAVA;
 
             const movePath: IMovePath = {
                 cells: [{ x: 5, y: 5 }],
                 knownPaths: new Map(),
-                hashes: new Set()
+                hashes: new Set(),
             };
             movePath.knownPaths.set((5 << 4) | 5, []);
 
@@ -128,7 +127,10 @@ describe("PathHelper Tests", () => {
 
             const attackerCells = [{ x: 2, y: 2 }];
             const targetCells = [{ x: 0, y: 0 }];
-            const attackCells = [{ x: 1, y: 1 }, { x: 5, y: 5 }]; // (1,1) is closer to (0,0)
+            const attackCells = [
+                { x: 1, y: 1 },
+                { x: 5, y: 5 },
+            ]; // (1,1) is closer to (0,0)
 
             const result = pathHelper.calculateClosestAttackFrom(
                 mousePos,
@@ -139,7 +141,7 @@ describe("PathHelper Tests", () => {
                 2, // range
                 true, // targetIsSmall
                 PBTypes.TeamVals.LOWER,
-                new Map()
+                new Map(),
             );
 
             expect(result).toEqual({ x: 1, y: 1 });
@@ -162,28 +164,40 @@ describe("PathHelper Tests", () => {
                 x: 4,
                 y: 4,
             });
-            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(5 << 4) | 4]), PBTypes.TeamVals.UPPER))
-                .toEqual({ x: 5, y: 4 });
-            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(4 << 4) | 5]), PBTypes.TeamVals.LOWER))
-                .toEqual({ x: 4, y: 5 });
+            expect(
+                helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(5 << 4) | 4]), PBTypes.TeamVals.UPPER),
+            ).toEqual({ x: 5, y: 4 });
+            expect(
+                helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(4 << 4) | 5]), PBTypes.TeamVals.LOWER),
+            ).toEqual({ x: 4, y: 5 });
 
             expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, upperHashes, PBTypes.TeamVals.UPPER)).toEqual({
                 x: 6,
                 y: 6,
             });
-            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(6 << 4) | 5]), PBTypes.TeamVals.UPPER))
-                .toEqual({ x: 6, y: 5 });
-            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(5 << 4) | 6]), PBTypes.TeamVals.LOWER))
-                .toEqual({ x: 5, y: 6 });
+            expect(
+                helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(6 << 4) | 5]), PBTypes.TeamVals.UPPER),
+            ).toEqual({ x: 6, y: 5 });
+            expect(
+                helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(5 << 4) | 6]), PBTypes.TeamVals.LOWER),
+            ).toEqual({ x: 5, y: 6 });
 
-            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 4]), PBTypes.TeamVals.UPPER))
-                .toEqual({ x: 6, y: 4 });
-            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER))
-                .toEqual({ x: 6, y: 6 });
-            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(4 << 4) | 6]), PBTypes.TeamVals.UPPER))
-                .toEqual({ x: 4, y: 6 });
-            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER))
-                .toEqual({ x: 6, y: 6 });
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 4]), PBTypes.TeamVals.UPPER)).toEqual({
+                x: 6,
+                y: 4,
+            });
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER)).toEqual({
+                x: 6,
+                y: 6,
+            });
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(4 << 4) | 6]), PBTypes.TeamVals.UPPER)).toEqual({
+                x: 4,
+                y: 6,
+            });
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER)).toEqual({
+                x: 6,
+                y: 6,
+            });
         });
 
         test("should handle large-unit attack-cell maps and invalid mouse positions", () => {
@@ -194,9 +208,27 @@ describe("PathHelper Tests", () => {
                 { x: 5, y: 5 },
             ];
             const attackCellHashesToLargeCells = new Map<number, { x: number; y: number }[]>([
-                [(3 << 4) | 5, [{ x: 3, y: 5 }, { x: 3, y: 4 }]],
-                [(6 << 4) | 5, [{ x: 6, y: 5 }, { x: 6, y: 4 }]],
-                [(5 << 4) | 6, [{ x: 5, y: 6 }, { x: 4, y: 6 }]],
+                [
+                    (3 << 4) | 5,
+                    [
+                        { x: 3, y: 5 },
+                        { x: 3, y: 4 },
+                    ],
+                ],
+                [
+                    (6 << 4) | 5,
+                    [
+                        { x: 6, y: 5 },
+                        { x: 6, y: 4 },
+                    ],
+                ],
+                [
+                    (5 << 4) | 6,
+                    [
+                        { x: 5, y: 6 },
+                        { x: 4, y: 6 },
+                    ],
+                ],
             ]);
 
             expect(
@@ -227,6 +259,18 @@ describe("PathHelper Tests", () => {
             );
 
             expect(result).toEqual({ x: 3, y: 5 });
+        });
+
+        test("should reverse large-unit attack-cell choice when the pointer is on a target corner", () => {
+            const helperAny = pathHelper as any;
+            const mousePosition = positionForCell({ x: 4, y: 4 });
+            const attackCells = [
+                { x: 4, y: 4 },
+                { x: 6, y: 6 },
+            ];
+
+            expect(helperAny.getClosestAttackCell(mousePosition, false, attackCells)).toEqual({ x: 4, y: 4 });
+            expect(helperAny.getClosestAttackCell(mousePosition, true, attackCells)).toEqual({ x: 6, y: 6 });
         });
     });
 
@@ -261,12 +305,7 @@ describe("PathHelper Tests", () => {
         });
 
         test("should find closest square cells for placement and movement", () => {
-            const allowed = new Set<number>([
-                (1 << 4) | 1,
-                (1 << 4) | 2,
-                (2 << 4) | 1,
-                (2 << 4) | 2,
-            ]);
+            const allowed = new Set<number>([(1 << 4) | 1, (1 << 4) | 2, (2 << 4) | 1, (2 << 4) | 2]);
             const mousePosition = positionForCell({ x: 1, y: 1 });
 
             expect(pathHelper.getClosestSquareCellIndices(mousePosition)).toEqual([]);
@@ -282,7 +321,18 @@ describe("PathHelper Tests", () => {
 
             const startedAllowed = new Set<number>(allowed);
             const knownPaths = new Map<number, any[]>([
-                [(2 << 4) | 2, [{ route: [{ x: 1, y: 1 }, { x: 2, y: 2 }], weight: 1 }]],
+                [
+                    (2 << 4) | 2,
+                    [
+                        {
+                            route: [
+                                { x: 1, y: 1 },
+                                { x: 2, y: 2 },
+                            ],
+                            weight: 1,
+                        },
+                    ],
+                ],
             ]);
 
             expect(
@@ -314,10 +364,12 @@ describe("PathHelper Tests", () => {
             unitsHolder.addUnit(lower);
 
             expect(pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder)).toBe(false);
-            expect(pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder, lowerLeft, upperRight))
-                .toBe(true);
-            expect(pathHelper.isAllowedPreStartUnitPosition(upper, upper.getCells(), unitsHolder, lowerLeft, upperRight))
-                .toBe(false);
+            expect(
+                pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder, lowerLeft, upperRight),
+            ).toBe(true);
+            expect(
+                pathHelper.isAllowedPreStartUnitPosition(upper, upper.getCells(), unitsHolder, lowerLeft, upperRight),
+            ).toBe(false);
             expect(
                 pathHelper.isAllowedPreStartUnitPosition(
                     largeLower,
@@ -351,7 +403,9 @@ describe("PathHelper Tests", () => {
 
     describe("getMovePath", () => {
         test("should find path around an obstacle (another unit)", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             // Place obstacle at (5,5) - representing another unit (Team 1)
             matrix[5][5] = 1;
 
@@ -363,7 +417,7 @@ describe("PathHelper Tests", () => {
 
             // Should find cells around (5,5)
             // (5,5) should NOT be in the allowed cells
-            const cellKeys = new Set(movePath.cells.map(c => (c.x << 4) | c.y));
+            const cellKeys = new Set(movePath.cells.map((c) => (c.x << 4) | c.y));
             expect(cellKeys.has((5 << 4) | 5)).toBe(false);
 
             // Should be able to reach (5,6) by going around
@@ -372,7 +426,9 @@ describe("PathHelper Tests", () => {
         });
 
         test("should be blocked if surrounded by obstacles", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             const startCell = { x: 5, y: 5 };
 
             // Surround (5,5) with obstacles
@@ -383,9 +439,9 @@ describe("PathHelper Tests", () => {
 
             const movePath = pathHelper.getMovePath(startCell, matrix, 5);
 
-            // Only the start cell should be in the path (or empty depending on implementation, 
+            // Only the start cell should be in the path (or empty depending on implementation,
             // but usually start cell is part of the structure or it returns reachable cells)
-            // Looking at implementation: 
+            // Looking at implementation:
             // const visited: Set<number> = new Set([(currentCell.x << 4) | currentCell.y]);
             // ...
             // return { cells: allowed, ... }
@@ -396,7 +452,9 @@ describe("PathHelper Tests", () => {
         });
 
         test("should respect max steps", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             const startCell = { x: 0, y: 0 };
             const maxSteps = 2;
 
@@ -406,13 +464,15 @@ describe("PathHelper Tests", () => {
             // (0,0) -> (0,1) -> (0,2)
             // (0,0) -> (0,3) should NOT be reachable
 
-            const cellKeys = new Set(movePath.cells.map(c => (c.x << 4) | c.y));
+            const cellKeys = new Set(movePath.cells.map((c) => (c.x << 4) | c.y));
             expect(cellKeys.has((0 << 4) | 2)).toBe(true);
             expect(cellKeys.has((0 << 4) | 3)).toBe(false);
         });
 
         test("large unit should be blocked by single cell obstacle", () => {
-            const matrix = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            const matrix = Array(GRID_SIZE)
+                .fill(0)
+                .map(() => Array(GRID_SIZE).fill(0));
             // Large unit occupies (2,2), (3,2), (2,3), (3,3)
             // Moving Right to (3,2) means occupying (3,2), (4,2), (3,3), (4,3)
             // If we block (4,2), it shouldn't be able to move right.
@@ -431,7 +491,7 @@ describe("PathHelper Tests", () => {
             // Should NOT be able to move to (4,3) (which corresponds to unit at (3,2))
             // because (4,2) is blocked and (4,4) is blocked (preventing access from top).
 
-            const cellKeys = new Set(movePath.cells.map(c => (c.x << 4) | c.y));
+            const cellKeys = new Set(movePath.cells.map((c) => (c.x << 4) | c.y));
             expect(cellKeys.has((4 << 4) | 3)).toBe(false);
         });
     });

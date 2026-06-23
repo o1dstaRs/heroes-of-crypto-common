@@ -27,6 +27,7 @@ import {
 } from "../../src/constants";
 import { FightProperties } from "../../src/fights/fight_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { PlacementType } from "../../src/grid/placement_properties";
 import {
     ChaosSynergy,
     LifeSynergy,
@@ -45,6 +46,7 @@ describe("FightProperties", () => {
             fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
 
             expect(fightProperties.getGridType()).toBe(PBTypes.GridVals.BLOCK_CENTER);
+            expect(fightProperties.getPlacementType()).toBe(PlacementType.RECTANGLE);
             expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN);
             expect(fightProperties.hasFightStarted()).toBe(false);
             expect(fightProperties.hasFightFinished()).toBe(false);
@@ -68,11 +70,13 @@ describe("FightProperties", () => {
             fightProperties.addRepliedAttack("reply");
             fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "done");
             fightProperties.increaseStepsMoraleMultiplier();
+            fightProperties.encounterDamageDealFact();
             fightProperties.encounterObstacleHit();
 
             expect(fightProperties.hasDamageDealFactPerLap(1)).toBe(true);
             expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN - 1);
             expect(fightProperties.hasAlreadyMadeTurn("done")).toBe(true);
+            expect(fightProperties.getAlreadyMadeTurnSize()).toBe(1);
             expect(fightProperties.hasAlreadyHourglass("hourglass")).toBe(true);
             expect(fightProperties.hasAlreadyRepliedAttack("reply")).toBe(true);
             expect(fightProperties.getStepsMoraleMultiplier()).toBe(STEPS_MORALE_MULTIPLIER);
@@ -198,8 +202,9 @@ describe("FightProperties", () => {
             fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.FOUR_BY_FOUR);
 
             expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([3]);
-            expect(fightProperties.canAugment(PBTypes.TeamVals.NO_TEAM, { type: "Armor", value: ArmorAugment.LEVEL_1 }))
-                .toBe(false);
+            expect(
+                fightProperties.canAugment(PBTypes.TeamVals.NO_TEAM, { type: "Armor", value: ArmorAugment.LEVEL_1 }),
+            ).toBe(false);
             expect(
                 fightProperties.canAugment(PBTypes.TeamVals.LOWER, {
                     type: "Armor",
@@ -468,6 +473,19 @@ describe("FightProperties", () => {
             expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.UPPER)).toBe(3);
             expect(restored.getStepsMoraleMultiplier()).toBe(STEPS_MORALE_MULTIPLIER);
             expect(restored.dequeueNextUnitId()).toBe("after-flip");
+        });
+
+        it("roundtrips already-made-turn team buckets", () => {
+            const fightProperties = new FightProperties();
+
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "lower-one");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "lower-two");
+
+            const restored = FightProperties.deserialize(fightProperties.serialize());
+
+            expect(restored.hasAlreadyMadeTurn("lower-one")).toBe(true);
+            expect(restored.hasAlreadyMadeTurn("lower-two")).toBe(true);
+            expect(restored.getAlreadyMadeTurnSize()).toBe(2);
         });
 
         it("assigns stack power tiers from relative total experience", () => {

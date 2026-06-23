@@ -33,6 +33,7 @@ import {
     getLevelOf,
     LevelBuckets,
 } from "../../src/units/unit_properties";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
 
 describe("domain objects", () => {
     it("exposes ability data and returns defensive effect/property copies", () => {
@@ -59,11 +60,25 @@ describe("domain objects", () => {
         const resurrection = new AbilityFactory(effectFactory).makeAbility("Resurrection");
         const luckAura = new AbilityFactory(effectFactory).makeAbility("Luck Aura");
 
+        expect(effectFactory.makeEffect(null)).toBeUndefined();
+        expect(effectFactory.makeAuraEffect(null)).toBeUndefined();
+        expect(effectFactory.makeEffect("Stun")?.getName()).toBe("Stun");
+        expect(effectFactory.makeAuraEffect("Luck")?.getName()).toBe("Luck");
         expect(resurrection.getSpell()?.getName()).toBe("Resurrection");
         expect(luckAura.getAuraEffectName()).toBe("Luck");
         expect(luckAura.getAuraEffect()?.getName()).toBe("Luck");
         expect(effectFactory.makeEffect("Missing")).toBeUndefined();
         expect(effectFactory.makeAuraEffect("Missing")).toBeUndefined();
+    });
+
+    it("keeps the scene log mock inert while satisfying the scene-log contract", () => {
+        const log = new SceneLogMock();
+
+        expect(log.getLog()).toBe("");
+        expect(log.hasBeenUpdated()).toBe(false);
+        expect(log.updateLog("ignored")).toBeUndefined();
+        expect(log.getLog()).toBe("");
+        expect(log.hasBeenUpdated()).toBe(false);
     });
 
     it("updates finite effects while preserving infinite and total-lap effects", () => {

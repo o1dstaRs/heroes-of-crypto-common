@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { AIActionType, findTarget, getCellsForAttacker } from "../../src/ai/ai";
+import { AIActionType, BasicAIAction, findTarget, getCellsForAttacker } from "../../src/ai/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
@@ -77,8 +77,8 @@ const generateUnits = (
 
 describe("SmallUnit", () => {
     const pathHelper = new PathHelper(gridSettings);
-    describe("Move", () => {
-        it("From right bottom diagonally", () => {
+    (describe("Move", () => {
+        (it("From right bottom diagonally", () => {
             /**
             Sample matrix
             [2, 0, 0, 0],
@@ -146,10 +146,10 @@ describe("SmallUnit", () => {
                 expect(closestTarget?.cellToMove()).toEqual({ x: 9, y: 5 });
                 expect(closestTarget?.cellToAttack()).toBeUndefined();
                 expect(closestTarget?.actionType()).toEqual(AIActionType.MOVE);
-            });
+            }));
     }),
         describe("MoveAndAttack", () => {
-            it("From bottom closest one", () => {
+            (it("From bottom closest one", () => {
                 /**
                 Sample matrix:
                 [0, 2, 0, 0],
@@ -213,8 +213,8 @@ describe("SmallUnit", () => {
                     expect(closestTarget?.cellToMove()).toEqual({ x: 1, y: 2 });
                     expect(closestTarget?.cellToAttack()).toEqual({ x: 0, y: 3 });
                     expect(closestTarget?.actionType()).toEqual(AIActionType.MOVE_AND_MELEE_ATTACK);
-                });
-        });
+                }));
+        }));
 
     // todo does not work because moves straig first and then by diagonal
     //
@@ -370,7 +370,7 @@ describe("SmallUnit", () => {
 const pathHelper = new PathHelper(gridSettings);
 
 describe("BigUnit", () => {
-    describe("Move", () => {
+    (describe("Move", () => {
         it("From Right", () => {
             /**
             Sample matrix
@@ -408,7 +408,7 @@ describe("BigUnit", () => {
         });
     }),
         describe("MoveAndAttack", () => {
-            it("From right bottom diagonally", () => {
+            (it("From right bottom diagonally", () => {
                 /**
                 Sample matrix
                 [2, 0, 0, 0],
@@ -448,7 +448,7 @@ describe("BigUnit", () => {
                     expect(closestTarget?.cellToMove()).toEqual({ x: 1, y: 2 });
                     expect(closestTarget?.cellToAttack()).toEqual({ x: 1, y: 3 });
                     expect(closestTarget?.actionType()).toEqual(AIActionType.MOVE_AND_MELEE_ATTACK);
-                });
+                }));
         }),
         describe("Attack", () => {
             it("From right bottom diagonally", () => {
@@ -468,7 +468,7 @@ describe("BigUnit", () => {
                 expect(closestTarget?.cellToAttack()).toEqual({ x: 0, y: 3 });
                 expect(closestTarget?.actionType()).toEqual(AIActionType.MELEE_ATTACK);
             });
-        });
+        }));
 });
 
 const placeEnemy = (grid: Grid, cell: HoCMath.XY): void => {
@@ -487,15 +487,7 @@ describe("RangeAttack", () => {
     describe("Cyclops (Large Caliber)", () => {
         it("Returns RANGE_ATTACK when target is in range", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
-            const attacker = stubRangeUnit(
-                PBTypes.TeamVals.UPPER,
-                3,
-                { x: 5, y: 5 },
-                8,
-                6.5,
-                ["Large Caliber"],
-                true,
-            );
+            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
             grid.occupyCell(
                 { x: 5, y: 5 },
                 attacker.getId(),
@@ -506,13 +498,7 @@ describe("RangeAttack", () => {
             );
             placeEnemy(grid, { x: 8, y: 5 });
 
-            const action = findTarget(
-                attacker,
-                grid,
-                grid.getMatrix(),
-                new UnitsHolder(grid),
-                pathHelper,
-            );
+            const action = findTarget(attacker, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
             expect(action?.cellToAttack()).toEqual({ x: 8, y: 5 });
             expect(action?.cellToMove()).toBeUndefined();
@@ -520,15 +506,7 @@ describe("RangeAttack", () => {
 
         it("Prefers clustered target over isolated one (Large Caliber AOE)", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
-            const attacker = stubRangeUnit(
-                PBTypes.TeamVals.UPPER,
-                3,
-                { x: 5, y: 5 },
-                8,
-                6.5,
-                ["Large Caliber"],
-                true,
-            );
+            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
             grid.occupyCell(
                 { x: 5, y: 5 },
                 attacker.getId(),
@@ -544,13 +522,7 @@ describe("RangeAttack", () => {
             placeEnemy(grid, { x: 5, y: 9 });
             placeEnemy(grid, { x: 6, y: 8 });
 
-            const action = findTarget(
-                attacker,
-                grid,
-                grid.getMatrix(),
-                new UnitsHolder(grid),
-                pathHelper,
-            );
+            const action = findTarget(attacker, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
             expect(action?.cellToAttack()).toEqual({ x: 5, y: 8 });
         });
@@ -583,13 +555,7 @@ describe("RangeAttack", () => {
             placeEnemy(grid, { x: 7, y: 8 });
             placeEnemy(grid, { x: 10, y: 8 });
 
-            const action = findTarget(
-                attacker,
-                grid,
-                grid.getMatrix(),
-                new UnitsHolder(grid),
-                pathHelper,
-            );
+            const action = findTarget(attacker, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
             expect(action?.cellToAttack()).toEqual({ x: 4, y: 8 });
         });
@@ -618,13 +584,7 @@ describe("RangeAttack", () => {
             placeEnemy(grid, { x: 3, y: 7 });
             placeEnemy(grid, { x: 4, y: 6 });
 
-            const action = findTarget(
-                attacker,
-                grid,
-                grid.getMatrix(),
-                new UnitsHolder(grid),
-                pathHelper,
-            );
+            const action = findTarget(attacker, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             expect(action?.actionType()).toEqual(AIActionType.RANGE_ATTACK);
             expect(action?.cellToAttack()).toEqual({ x: 3, y: 6 });
         });
@@ -634,15 +594,7 @@ describe("RangeAttack", () => {
         it("Falls back to MOVE when no target is in range", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
             // Sniper-shot_distance of 1 with 1 shot: max range = 4 cells
-            const attacker = stubRangeUnit(
-                PBTypes.TeamVals.UPPER,
-                3,
-                { x: 1, y: 1 },
-                1,
-                1,
-                [],
-                true,
-            );
+            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 }, 1, 1, [], true);
             grid.occupyCell(
                 { x: 1, y: 1 },
                 attacker.getId(),
@@ -654,13 +606,7 @@ describe("RangeAttack", () => {
             // Enemy at distance > maxRangeCells (4)
             placeEnemy(grid, { x: 14, y: 14 });
 
-            const action = findTarget(
-                attacker,
-                grid,
-                grid.getMatrix(),
-                new UnitsHolder(grid),
-                pathHelper,
-            );
+            const action = findTarget(attacker, grid, grid.getMatrix(), new UnitsHolder(grid), pathHelper);
             // No range attack possible; with range attack the unit can't melee-attack,
             // so the AI either falls back to doFindTarget movement or returns undefined.
             expect(action === undefined || action.actionType() === AIActionType.MOVE).toBe(true);
@@ -669,6 +615,13 @@ describe("RangeAttack", () => {
 });
 
 describe("AI attack-cell helpers", () => {
+    it("exposes the active known paths carried by an action", () => {
+        const knownPaths = new Map([[33, []]]);
+        const action = new BasicAIAction(AIActionType.MOVE, { x: 1, y: 2 }, undefined, knownPaths);
+
+        expect(action.currentActiveKnownPaths()).toBe(knownPaths);
+    });
+
     it("returns adjacent free cells for a small attacker around a small target", () => {
         const attacker = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
         const matrix = Array.from({ length: 6 }, () => new Array(6).fill(0));

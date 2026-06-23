@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -64,6 +65,8 @@ describe("Unit", () => {
             expect(unit.getAttackRange()).toBe(1);
             expect(unit.getRangeShots()).toBe(2);
             expect(unit.getRangeShotDistance()).toBe(4);
+            unit.setRangeShotDistance(7);
+            expect(unit.getRangeShotDistance()).toBe(7);
             expect(unit.getMagicResist()).toBe(6);
             expect(unit.getCanCastSpells()).toBe(false);
             expect(unit.getMovementType()).toBe(PBTypes.MovementVals.FLY);
@@ -354,6 +357,29 @@ describe("Unit", () => {
     });
 
     describe("abilities and combat calculations", () => {
+        it("adds dynamic abilities and exposes cloned properties and loss estimates", () => {
+            const effectFactory = new EffectFactory();
+            const abilityFactory = new AbilityFactory(effectFactory);
+            const unit = createTestUnit({ amountAlive: 3, maxHp: 10 });
+
+            expect(unit.calculatePossibleLosses(4)).toBe(0);
+            expect(unit.calculatePossibleLosses(10)).toBe(1);
+            expect(unit.calculatePossibleLosses(35)).toBe(3);
+
+            const properties = unit.getAllProperties();
+            properties.name = "Mutated";
+
+            expect(unit.getName()).not.toBe("Mutated");
+
+            unit.addAbility(abilityFactory.makeAbility("Chain Lightning"));
+            unit.addAbility(abilityFactory.makeAbility("Paralysis"));
+            unit.addAbility(abilityFactory.makeAbility("Dodge"));
+
+            expect(unit.hasAbilityActive("Chain Lightning")).toBe(true);
+            expect(unit.hasAbilityActive("Paralysis")).toBe(true);
+            expect(unit.hasAbilityActive("Dodge")).toBe(true);
+        });
+
         it("calculates ability, aura, effect, and miss values", () => {
             const effectFactory = new EffectFactory();
             const attacker = createTestUnit({

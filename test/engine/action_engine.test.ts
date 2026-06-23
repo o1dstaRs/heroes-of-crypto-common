@@ -1247,6 +1247,97 @@ describe("GameActionEngine", () => {
         );
     });
 
+    it("exposes deterministic helper behavior for common event serialization and footprints", () => {
+        const setup = setupPlacementFight();
+        const engineAny = setup.engine as any;
+        const largeUnit = createTestUnit({ size: PBTypes.UnitSizeVals.LARGE });
+        const spell = new Spell({
+            spellProperties: getSpellConfig("Nature", "Summon Wolves"),
+            amount: 1,
+        });
+
+        const clonedDamage = engineAny.cloneVisibleDamage({
+            amount: 5,
+            render: true,
+            unitPosition: { x: 1, y: 2 },
+            unitIsSmall: true,
+            hits: [{ amount: 5, unitsDied: 1 }],
+        });
+        clonedDamage.hits[0].amount = 7;
+
+        expect(clonedDamage.unitPosition).toEqual({ x: 1, y: 2 });
+        expect(engineAny.resolveSummonCells(setup.unit, { x: 4, y: 4 })).toEqual([{ x: 4, y: 4 }]);
+        expect(engineAny.resolveSummonCells(largeUnit, { x: 4, y: 4 })).toEqual([
+            { x: 3, y: 4 },
+            { x: 4, y: 4 },
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+        ]);
+        expect(engineAny.isValidPlacementFootprint(setup.unit, [{ x: 1, y: 1 }])).toBe(true);
+        expect(
+            engineAny.isValidPlacementFootprint(largeUnit, [
+                { x: 1, y: 1 },
+                { x: 2, y: 1 },
+                { x: 1, y: 2 },
+                { x: 2, y: 2 },
+            ]),
+        ).toBe(true);
+        expect(engineAny.cellsMatchInOrder([{ x: 1, y: 1 }], [{ x: 1, y: 1 }])).toBe(true);
+        expect(
+            engineAny.cellsMatchAsSet(
+                [
+                    { x: 2, y: 1 },
+                    { x: 1, y: 1 },
+                ],
+                [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 1 },
+                ],
+            ),
+        ).toBe(true);
+
+        const route = [
+            { x: 3, y: 3 },
+            { x: 4, y: 4 },
+        ];
+        const actionSetup = setupActionFight({
+            currentActiveKnownPaths: new Map([[cellKey({ x: 4, y: 4 }), [weightedRoute(route)]]]),
+        });
+        const resolvedKnownPaths = (actionSetup.engine as any).resolveKnownPaths(
+            actionSetup.lower,
+            { x: 4, y: 4 },
+            route,
+        );
+
+        expect(resolvedKnownPaths.get(cellKey({ x: 4, y: 4 }))).toHaveLength(1);
+
+        const animationEvents = engineAny.serializeAnimations([
+            {
+                toPosition: { x: 10, y: 11 },
+                fromPosition: { x: 8, y: 9 },
+                affectedUnit: setup.unit,
+                bodyUnit: setup.unit,
+            },
+        ]);
+        const summonEvents = engineAny.createSummonEvents(setup.unit, spell, largeUnit, 3, [{ x: 4, y: 4 }], false);
+
+        expect(animationEvents).toEqual([
+            {
+                toPosition: { x: 10, y: 11 },
+                fromPosition: { x: 8, y: 9 },
+                affectedUnitId: setup.unit.getId(),
+                bodyUnitId: setup.unit.getId(),
+            },
+        ]);
+        expect(summonEvents[1]).toMatchObject({
+            type: "unit_summoned",
+            casterId: setup.unit.getId(),
+            unitId: largeUnit.getId(),
+            amount: 3,
+            merged: false,
+        });
+    });
+
     it("rejects unsupported actions without mutating game state", () => {
         const setup = setupActionFight();
 
