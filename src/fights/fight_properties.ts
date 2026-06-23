@@ -60,6 +60,8 @@ import {
 } from "../synergies/synergy_properties";
 import { ToFactionName, ToFactionType } from "../factions/faction_type";
 
+type RandomIntFn = (min: number, max: number) => number;
+
 export class FightProperties {
     private id: string;
     private currentLap: number;
@@ -192,6 +194,9 @@ export class FightProperties {
     public getCurrentTurnEnd(): number {
         return this.currentTurnEnd;
     }
+    public getCurrentLapTotalTime(teamType: TeamType): number {
+        return this.currentLapTotalTimePerTeam.get(teamType) ?? 0;
+    }
     public getObstacleHitsLeft(): number {
         return this.obstacleHitsLeft;
     }
@@ -286,7 +291,7 @@ export class FightProperties {
     public setHighestSpeedThisTurn(highestSpeedThisTurn: number): void {
         this.highestSpeedThisTurn = highestSpeedThisTurn;
     }
-    public startTurn(teamType: TeamType): void {
+    public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis()): void {
         let currentTotalTimePerTeam = this.currentLapTotalTimePerTeam.get(teamType);
         if (currentTotalTimePerTeam === undefined) {
             currentTotalTimePerTeam = 0;
@@ -320,7 +325,7 @@ export class FightProperties {
             );
         }
 
-        this.currentTurnStart = getTimeMillis();
+        this.currentTurnStart = nowMillis;
         this.currentTurnEnd = this.currentTurnStart + Math.min(timeRemaining, maxTimeToMakeTurn);
         // console.log(
         // `timeRemaining:${timeRemaining} currentTotalTimePerTeam:${currentTotalTimePerTeam} maxTimeToMakeTurn:${maxTimeToMakeTurn} alreadyMadeTurnTeamMembers:${alreadyMadeTurnTeamMembers}`,
@@ -865,7 +870,7 @@ export class FightProperties {
     public addRepliedAttack(unitId: string): void {
         this.alreadyRepliedAttack.add(unitId);
     }
-    public addAlreadyMadeTurn(teamType: TeamType, unitId: string): void {
+    public addAlreadyMadeTurn(teamType: TeamType, unitId: string, nowMillis: number = getTimeMillis()): void {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
@@ -882,7 +887,7 @@ export class FightProperties {
         if (currentTotalTimePerTeam === undefined) {
             currentTotalTimePerTeam = 0;
         }
-        currentTotalTimePerTeam += Math.floor(getTimeMillis() - this.currentTurnStart);
+        currentTotalTimePerTeam += Math.floor(nowMillis - this.currentTurnStart);
         this.currentLapTotalTimePerTeam.set(teamType, currentTotalTimePerTeam);
     }
     public enqueueHourglass(unitId: string) {
@@ -1119,7 +1124,12 @@ export class FightProperties {
 
         return fight.serializeBinary();
     }
-    public prefetchNextUnitsToTurn(allUnits: ReadonlyMap<string, Unit>, unitsUpper: Unit[], unitsLower: Unit[]): void {
+    public prefetchNextUnitsToTurn(
+        allUnits: ReadonlyMap<string, Unit>,
+        unitsUpper: Unit[],
+        unitsLower: Unit[],
+        randomInt: RandomIntFn = getRandomInt,
+    ): void {
         const upNextUnitsCount = unitsUpper.length + unitsLower.length;
 
         if (this.upNextQueue.length >= upNextUnitsCount) {
@@ -1127,7 +1137,7 @@ export class FightProperties {
         }
 
         while (this.upNextQueue.length < upNextUnitsCount) {
-            const nextUnitId = this.getNextTurnUnitId(allUnits, unitsUpper, unitsLower);
+            const nextUnitId = this.getNextTurnUnitId(allUnits, unitsUpper, unitsLower, randomInt);
 
             if (nextUnitId) {
                 const unit = allUnits.get(nextUnitId);
@@ -1239,6 +1249,7 @@ export class FightProperties {
         allUnits: ReadonlyMap<string, Unit>,
         unitsUpper: Unit[],
         unitsLower: Unit[],
+        randomInt: RandomIntFn,
     ): string | undefined {
         if (!unitsLower.length || !unitsUpper.length) {
             return undefined;
@@ -1294,7 +1305,7 @@ export class FightProperties {
                     firstBatch = unitsUpper;
                     secondBatch = unitsLower;
                 } else {
-                    const rnd = getRandomInt(0, 2);
+                    const rnd = randomInt(0, 2);
                     if (rnd) {
                         firstBatch = unitsUpper;
                         secondBatch = unitsLower;

@@ -1,0 +1,414 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import { getSpellConfig } from "../configuration/config_provider";
+import {
+    MAX_HOLE_LAYERS,
+    MORALE_CHANGE_FOR_SKIP,
+    NUMBER_OF_ARMAGEDDON_WAVES,
+    NUMBER_OF_LAPS_TILL_STOP_NARROWING,
+} from "../constants";
+import { FightProperties } from "../fights/fight_properties";
+import { PBTypes } from "../generated/protobuf/v1/types";
+import type { TeamType } from "../generated/protobuf/v1/types_gen";
+import { Grid } from "../grid/grid";
+import { UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
+import { MoveHandler, type ISystemMoveResult } from "../handlers/move_handler";
+import type { ISceneLog } from "../scene/scene_log_interface";
+import { Spell } from "../spells/spell";
+import { Unit } from "../units/unit";
+import { UnitsHolder } from "../units/units_holder";
+import type { GameEvent } from "./events";
+import { createDefaultGameRuntime, type IGameRuntime, shuffleWithRng } from "./runtime";
+
+export interface ITurnEngineContext {
+    fightProperties: FightProperties;
+    grid: Grid;
+    unitsHolder: UnitsHolder;
+    moveHandler: MoveHandler;
+    sceneLog: ISceneLog;
+    runtime?: IGameRuntime;
+}
+
+export interface IAdvanceTurnOptions {
+    centerAlreadyDried?: boolean;
+    damageDealtThisLap?: boolean;
+}
+
+export interface IAdvanceTurnResult {
+    events: GameEvent[];
+    nextUnit?: Unit;
+    fightFinished: boolean;
+}
+
+interface IOrderedTurnUnits {
+    allUnits: Unit[];
+    unitsUpper: Unit[];
+    unitsLower: Unit[];
+}
+
+export class TurnEngine {
+    private readonly fightProperties: FightProperties;
+    private readonly grid: Grid;
+    private readonly unitsHolder: UnitsHolder;
+    private readonly moveHandler: MoveHandler;
+    private readonly sceneLog: ISceneLog;
+    private readonly runtime: IGameRuntime;
+    public constructor(context: ITurnEngineContext) {
+        this.fightProperties = context.fightProperties;
+        this.grid = context.grid;
+        this.unitsHolder = context.unitsHolder;
+        this.moveHandler = context.moveHandler;
+        this.sceneLog = context.sceneLog;
+        this.runtime = context.runtime ?? createDefaultGameRuntime();
+    }
+    public completeTurn(unit: Unit, opts: { hourglass?: boolean } = {}): GameEvent[] {
+        const hourglass = opts.hourglass ?? false;
+
+        if (!hourglass) {
+            unit.minusLap();
+            this.fightProperties.addAlreadyMadeTurn(unit.getTeam(), unit.getId(), this.runtime.clock.nowMillis());
+            this.fightProperties.removeFromUpNext(unit.getId());
+            unit.setOnHourglass(false);
+        }
+
+        this.unitsHolder.refreshStackPowerForAllUnits();
+
+        return [
+            {
+                type: "turn_completed",
+                unitId: unit.getId(),
+                team: unit.getTeam(),
+                hourglass,
+            },
+        ];
+    }
+    public advanceAfterNoActiveUnit(opts: IAdvanceTurnOptions = {}): IAdvanceTurnResult {
+        const events: GameEvent[] = [];
+        let ordered = this.getOrderedTurnUnits();
+
+        const finishEvent = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
+        if (finishEvent) {
+            events.push(finishEvent);
+            return { events, fightFinished: true };
+        }
+
+        const initFirstLap =
+            this.fightProperties.getCurrentLap() === 1 &&
+            !this.fightProperties.getHourglassQueueSize() &&
+            !this.fightProperties.getUpNextQueueSize();
+        const allUnitsMadeTurn =
+            ordered.unitsUpper.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId())) &&
+            ordered.unitsLower.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId()));
+
+        if ((initFirstLap || allUnitsMadeTurn) && !this.fightProperties.hasFightFinished()) {
+            events.push(...this.handleLapTransition(ordered.unitsUpper, ordered.unitsLower, allUnitsMadeTurn, opts));
+            ordered = this.getOrderedTurnUnits();
+        }
+
+        if (this.fightProperties.hasFightFinished()) {
+            return { events, fightFinished: true };
+        }
+
+        const afterTransitionFinish = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
+        if (afterTransitionFinish) {
+            events.push(afterTransitionFinish);
+            return { events, fightFinished: true };
+        }
+
+        this.fightProperties.prefetchNextUnitsToTurn(
+            this.unitsHolder.getAllUnits(),
+            ordered.unitsUpper,
+            ordered.unitsLower,
+            (min, max) => this.runtime.rng.int(min, max),
+        );
+
+        const nextUnitId = this.fightProperties.dequeueNextUnitId();
+        const nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
+
+        if (nextUnit) {
+            const activationEvents = this.activateNextUnit(nextUnit);
+            events.push({ type: "next_unit_selected", unitId: nextUnit.getId(), team: nextUnit.getTeam() });
+            events.push(...activationEvents);
+            if (activationEvents.some((event) => event.type === "unit_skipped")) {
+                return { events, fightFinished: false };
+            }
+        }
+
+        return { events, nextUnit, fightFinished: false };
+    }
+    private handleLapTransition(
+        unitsUpper: Unit[],
+        unitsLower: Unit[],
+        allUnitsMadeTurn: boolean,
+        opts: IAdvanceTurnOptions,
+    ): GameEvent[] {
+        const events: GameEvent[] = [];
+        const allCurrentUnits = [...unitsUpper, ...unitsLower];
+
+        for (const unit of allCurrentUnits) {
+            unit.setResponded(false);
+            unit.setOnHourglass(false);
+        }
+
+        if (opts.damageDealtThisLap) {
+            this.fightProperties.encounterDamageDealFact();
+        }
+
+        if (this.fightProperties.getFirstTurnMade()) {
+            const previousLap = this.fightProperties.getCurrentLap();
+            this.fightProperties.flipLap();
+            events.push({
+                type: "lap_flipped",
+                previousLap,
+                currentLap: this.fightProperties.getCurrentLap(),
+            });
+
+            const gridType = this.fightProperties.getGridType();
+            const meltable = gridType === PBTypes.GridVals.LAVA_CENTER || gridType === PBTypes.GridVals.WATER_CENTER;
+            if (
+                meltable &&
+                !opts.centerAlreadyDried &&
+                this.fightProperties.getLapsNarrowed() >= this.fightProperties.getNumberOfLapsTillNarrowing()
+            ) {
+                this.grid.cleanupCenterObstacle();
+                events.push({ type: "center_dried", gridType });
+            }
+        } else {
+            events.push({ type: "lap_initialized", lap: this.fightProperties.getCurrentLap() });
+        }
+
+        events.push(...this.applyArmageddonIfNeeded([...unitsLower, ...unitsUpper]));
+        let refreshed = this.getOrderedTurnUnits();
+        const finishEvent = this.finishFightIfNeeded(refreshed.unitsLower, refreshed.unitsUpper);
+        if (finishEvent) {
+            events.push(finishEvent);
+            return events;
+        }
+
+        const distancesDecreased = this.unitsHolder.haveDistancesToClosestEnemiesDecreased();
+        if (allUnitsMadeTurn && (!distancesDecreased || this.fightProperties.isNarrowingLap())) {
+            let encounterCurrent = false;
+            if (
+                !distancesDecreased &&
+                !this.fightProperties.hasDamageDealFactPerLap(this.fightProperties.getCurrentLap() - 1) &&
+                !this.fightProperties.isNarrowingLap()
+            ) {
+                this.fightProperties.encounterAdditionalNarrowingLap();
+                encounterCurrent = true;
+            }
+            events.push(...this.applyNarrowing(encounterCurrent));
+            this.fightProperties.increaseStepsMoraleMultiplier();
+            this.unitsHolder.refreshStackPowerForAllUnits();
+            refreshed = this.getOrderedTurnUnits();
+        }
+
+        events.push(...this.applyMoraleRolls(refreshed.allUnits));
+
+        this.fightProperties.prefetchNextUnitsToTurn(
+            this.unitsHolder.getAllUnits(),
+            refreshed.unitsUpper,
+            refreshed.unitsLower,
+            (min, max) => this.runtime.rng.int(min, max),
+        );
+
+        return events;
+    }
+    private applyNarrowing(encounterCurrent: boolean): GameEvent[] {
+        const events: GameEvent[] = [];
+
+        if (this.fightProperties.getCurrentLap() > NUMBER_OF_LAPS_TILL_STOP_NARROWING) {
+            return events;
+        }
+
+        const calculatedLaps =
+            Math.floor(
+                (this.fightProperties.getCurrentLap() - (encounterCurrent ? 1 : 0)) /
+                    this.fightProperties.getNumberOfLapsTillNarrowing(),
+            ) + this.fightProperties.getAdditionalNarrowingLaps();
+
+        if (calculatedLaps < 1) {
+            return events;
+        }
+
+        const totalLaps = Math.min(calculatedLaps, MAX_HOLE_LAYERS);
+        const gridSettings = this.grid.getSettings();
+        const minCellX = gridSettings.getMinX() / gridSettings.getCellSize();
+        const maxCellX = gridSettings.getMaxX() / gridSettings.getCellSize();
+        const minCellY = gridSettings.getMinY() / gridSettings.getCellSize();
+        const maxCellY = gridSettings.getMaxY() / gridSettings.getCellSize();
+
+        events.push({
+            type: "narrowing_applied",
+            lap: this.fightProperties.getCurrentLap(),
+            layers: totalLaps,
+            encounterCurrent,
+        });
+
+        for (let layer = 1; layer <= totalLaps; layer++) {
+            const offset = layer - 1;
+
+            for (let i = minCellX + offset; i < maxCellX - offset; i++) {
+                const cell = { x: i + maxCellX, y: offset };
+                events.push(
+                    ...this.handleSystemMoveResult(this.moveHandler.moveUnitTowardsCenter(cell, UPDATE_UP, layer)),
+                );
+                this.grid.occupyByHole(cell);
+            }
+
+            for (let i = minCellX + offset; i < maxCellX - offset; i++) {
+                const cell = { x: i + maxCellX, y: maxCellY - layer };
+                events.push(
+                    ...this.handleSystemMoveResult(this.moveHandler.moveUnitTowardsCenter(cell, UPDATE_DOWN, layer)),
+                );
+                this.grid.occupyByHole(cell);
+            }
+
+            for (let i = minCellY + offset; i < maxCellY - offset; i++) {
+                const cell = { x: offset, y: i };
+                events.push(
+                    ...this.handleSystemMoveResult(this.moveHandler.moveUnitTowardsCenter(cell, UPDATE_RIGHT, layer)),
+                );
+                this.grid.occupyByHole(cell);
+            }
+
+            for (let i = minCellY + offset; i < maxCellY - offset; i++) {
+                const cell = { x: (maxCellX << 1) - layer, y: i };
+                events.push(
+                    ...this.handleSystemMoveResult(this.moveHandler.moveUnitTowardsCenter(cell, UPDATE_LEFT, layer)),
+                );
+                this.grid.occupyByHole(cell);
+            }
+        }
+
+        return events;
+    }
+    private handleSystemMoveResult(result: ISystemMoveResult): GameEvent[] {
+        const events: GameEvent[] = [];
+
+        if (result.log) {
+            for (const line of result.log.split("\n")) {
+                if (line) this.sceneLog.updateLog(line);
+            }
+        }
+
+        for (const [unitId, position] of result.unitIdToNewPosition.entries()) {
+            events.push({ type: "unit_moved_by_system", unitId, position, reason: "narrowing" });
+        }
+
+        for (const unitId of result.unitIdsDestroyed) {
+            if (this.unitsHolder.deleteUnitById(unitId)) {
+                events.push({ type: "unit_destroyed", unitId, reason: "narrowing" });
+            }
+        }
+
+        return events;
+    }
+    private applyArmageddonIfNeeded(units: Unit[]): GameEvent[] {
+        const events: GameEvent[] = [];
+        const wave = this.fightProperties.getArmageddonWave();
+
+        if (wave <= 0 || wave > NUMBER_OF_ARMAGEDDON_WAVES) {
+            return events;
+        }
+
+        for (const unit of units) {
+            unit.applyArmageddonDamage(wave, this.sceneLog);
+            events.push({ type: "armageddon_applied", unitId: unit.getId(), wave });
+            if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId(), wave === 1)) {
+                events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "armageddon" });
+            }
+        }
+
+        return events;
+    }
+    private applyMoraleRolls(units: Unit[]): GameEvent[] {
+        const events: GameEvent[] = [];
+        const lap = this.fightProperties.getCurrentLap();
+
+        for (const unit of units) {
+            if (!unit.getMorale()) continue;
+            const isPlusMorale = unit.getMorale() > 0;
+            const chance = this.runtime.rng.int(0, 100);
+            if (chance >= Math.abs(unit.getMorale()) || unit.hasMindAttackResistance()) {
+                continue;
+            }
+
+            if (isPlusMorale) {
+                const buff = new Spell({
+                    spellProperties: getSpellConfig("System", "Morale"),
+                    amount: 1,
+                });
+                unit.applyBuff(buff);
+                this.fightProperties.enqueueMoralePlus(unit.getId());
+                this.sceneLog.updateLog(`${unit.getName()} is on Morale this lap!`);
+                events.push({ type: "morale_applied", unitId: unit.getId(), kind: "plus", lap });
+            } else {
+                const debuff = new Spell({
+                    spellProperties: getSpellConfig("System", "Dismorale"),
+                    amount: 1,
+                });
+                unit.applyDebuff(debuff);
+                this.fightProperties.enqueueMoraleMinus(unit.getId());
+                this.sceneLog.updateLog(`${unit.getName()} is on Dismorale this lap!`);
+                events.push({ type: "morale_applied", unitId: unit.getId(), kind: "minus", lap });
+            }
+        }
+
+        return events;
+    }
+    private activateNextUnit(unit: Unit): GameEvent[] {
+        const events: GameEvent[] = [];
+        if (unit.isOnHourglass()) {
+            unit.setOnHourglass(false);
+        }
+        this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
+        unit.refreshPreTurnState(this.sceneLog);
+        this.fightProperties.markFirstTurn();
+
+        if (unit.isSkippingThisTurn()) {
+            unit.decreaseMorale(
+                MORALE_CHANGE_FOR_SKIP,
+                this.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
+            );
+            this.sceneLog.updateLog(`${unit.getName()} skip turn`);
+            events.push({ type: "unit_skipped", unitId: unit.getId(), team: unit.getTeam(), reason: "effect" });
+            events.push(...this.completeTurn(unit));
+        }
+
+        return events;
+    }
+    private finishFightIfNeeded(unitsLower: Unit[], unitsUpper: Unit[]): GameEvent | undefined {
+        if (unitsLower.length && unitsUpper.length) {
+            return undefined;
+        }
+
+        const winningTeam = unitsLower.length ? PBTypes.TeamVals.LOWER : PBTypes.TeamVals.UPPER;
+        this.fightProperties.finishFight();
+        return { type: "fight_finished", winningTeam };
+    }
+    private getOrderedTurnUnits(): IOrderedTurnUnits {
+        const unitsUpper = this.getAliveTeamUnits(PBTypes.TeamVals.UPPER);
+        const unitsLower = this.getAliveTeamUnits(PBTypes.TeamVals.LOWER);
+        const allUnits = shuffleWithRng([...unitsUpper, ...unitsLower], this.runtime.rng).sort(
+            (a, b) => b.getSpeed() - a.getSpeed(),
+        );
+
+        return {
+            allUnits,
+            unitsUpper: shuffleWithRng(unitsUpper, this.runtime.rng).sort((a, b) => b.getSpeed() - a.getSpeed()),
+            unitsLower: shuffleWithRng(unitsLower, this.runtime.rng).sort((a, b) => b.getSpeed() - a.getSpeed()),
+        };
+    }
+    private getAliveTeamUnits(team: TeamType): Unit[] {
+        return this.unitsHolder.getAllAllies(team).filter((unit) => !unit.isDead());
+    }
+}
