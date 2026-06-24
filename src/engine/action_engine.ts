@@ -82,12 +82,10 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
 export class GameActionEngine {
     private readonly context: IGameActionEngineContext;
     private readonly turnEngine: TurnEngine;
-
     public constructor(context: IGameActionEngineContext) {
         this.context = context;
         this.turnEngine = new TurnEngine(context);
     }
-
     public apply(action: GameAction): IGameActionResult {
         switch (action.type) {
             case "start_fight":
@@ -123,7 +121,6 @@ export class GameActionEngine {
                 );
         }
     }
-
     private startFight(): IGameActionResult {
         if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished()) {
             return this.reject("start_not_available");
@@ -152,7 +149,6 @@ export class GameActionEngine {
             events: [{ type: "fight_started", lowerUnitsAlive, upperUnitsAlive }],
         };
     }
-
     private endTurn(action: Extract<GameAction, { type: "end_turn" }>): IGameActionResult {
         const unit = this.validateTurnAction(action.unitId);
         if (unit instanceof Error) {
@@ -166,7 +162,6 @@ export class GameActionEngine {
         });
         return { completed: true, events };
     }
-
     private waitTurn(unitId: string): IGameActionResult {
         const unit = this.validateTurnAction(unitId);
         if (unit instanceof Error) {
@@ -188,7 +183,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(unit, { hourglass: true }));
         return { completed: true, events };
     }
-
     private defendTurn(unitId: string): IGameActionResult {
         const unit = this.validateTurnAction(unitId);
         if (unit instanceof Error) {
@@ -206,7 +200,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(unit));
         return { completed: true, events };
     }
-
     private selectAttackType(unitId: string, attackType: AttackType): IGameActionResult {
         const unit = this.validateActionUnit(unitId);
         if (unit instanceof Error) {
@@ -221,7 +214,6 @@ export class GameActionEngine {
             events: [{ type: "attack_type_selected", unitId: unit.getId(), team: unit.getTeam(), attackType }],
         };
     }
-
     private moveUnit(action: Extract<GameAction, { type: "move_unit" }>): IGameActionResult {
         const unit = this.validateTurnAction(action.unitId);
         if (unit instanceof Error) {
@@ -307,7 +299,6 @@ export class GameActionEngine {
             ],
         };
     }
-
     private meleeAttack(action: Extract<GameAction, { type: "melee_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -358,7 +349,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-
     private rangeAttack(action: Extract<GameAction, { type: "range_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -440,7 +430,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-
     private obstacleAttack(action: Extract<GameAction, { type: "obstacle_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -503,7 +492,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-
     private areaThrowAttack(action: Extract<GameAction, { type: "area_throw_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -573,7 +561,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-
     private castSpell(action: Extract<GameAction, { type: "cast_spell" }>): IGameActionResult {
         const caster = this.validateTurnAction(action.casterId);
         if (caster instanceof Error) {
@@ -633,7 +620,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
-
     private isMassSpell(spell: Spell): boolean {
         return (
             spell.getSpellTargetType() === SpellTargetType.ALL_FLYING ||
@@ -641,11 +627,9 @@ export class GameActionEngine {
             spell.getSpellTargetType() === SpellTargetType.ALL_ENEMIES
         );
     }
-
     private isSummonSpell(spell: Spell): boolean {
         return spell.isSummon() && spell.getSpellTargetType() === SpellTargetType.RANDOM_CLOSE_TO_CASTER;
     }
-
     private canUseSpell(caster: Unit, spell: Spell): boolean {
         return (
             spell.getLapsTotal() > 0 &&
@@ -653,7 +637,6 @@ export class GameActionEngine {
             spell.getMinimalCasterStackPower() <= caster.getStackPower()
         );
     }
-
     private massCastSpell(
         action: Extract<GameAction, { type: "cast_spell" }>,
         caster: Unit,
@@ -700,7 +683,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
-
     private summonSpell(
         action: Extract<GameAction, { type: "cast_spell" }>,
         caster: Unit,
@@ -775,7 +757,6 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
-
     private resolveSummonCells(unit: Unit, targetCell?: XY): XY[] {
         if (!targetCell) {
             return [];
@@ -791,7 +772,6 @@ export class GameActionEngine {
             { x: targetCell.x, y: targetCell.y - 1 },
         ];
     }
-
     private createSummonEvents(
         caster: Unit,
         spell: Spell,
@@ -822,7 +802,6 @@ export class GameActionEngine {
             },
         ];
     }
-
     private massCastOnFlyers(spell: Spell, caster: Unit, team: number): void {
         const applyTo = (units: Unit[]) => {
             for (const unit of units) {
@@ -837,7 +816,6 @@ export class GameActionEngine {
         applyTo(this.context.unitsHolder.getAllAllies(team));
         applyTo(this.context.unitsHolder.getAllEnemyUnits(team));
     }
-
     private massCastOnAllies(spell: Spell, caster: Unit, team: number): void {
         const isHeal = spell.getPowerType() === SpellPowerType.HEAL;
         if (!isHeal) {
@@ -879,7 +857,6 @@ export class GameActionEngine {
             }
         }
     }
-
     private massCastOnEnemies(spell: Spell, caster: Unit, team: number): void {
         this.context.sceneLog.updateLog(`${caster.getName()} cast ${spell.getName()} on enemies`);
         for (const enemy of this.context.unitsHolder.getAllEnemyUnits(team)) {
@@ -921,7 +898,6 @@ export class GameActionEngine {
             }
         }
     }
-
     private placeUnit(action: Extract<GameAction, { type: "place_unit" }>): IGameActionResult {
         if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished()) {
             return this.reject("placement_not_available");
@@ -980,7 +956,6 @@ export class GameActionEngine {
             ],
         };
     }
-
     private deleteUnit(action: Extract<GameAction, { type: "delete_unit" }>): IGameActionResult {
         if (this.context.fightProperties.hasFightStarted()) {
             return this.reject("delete_not_available");
@@ -1000,7 +975,6 @@ export class GameActionEngine {
             events: [{ type: "unit_deleted", unitId: action.unitId, team }],
         };
     }
-
     private validateTurnAction(unitId: string): Unit | Error {
         const unit = this.validateActionUnit(unitId);
         if (unit instanceof Error) {
@@ -1012,7 +986,6 @@ export class GameActionEngine {
 
         return unit;
     }
-
     private validateActionUnit(unitId: string): Unit | Error {
         if (!this.context.fightProperties.hasFightStarted()) {
             return new Error("fight_not_started");
@@ -1033,7 +1006,6 @@ export class GameActionEngine {
 
         return unit;
     }
-
     private canWaitOnHourglass(unit: Unit): boolean {
         const teamUnitsAlive = this.context.fightProperties.getTeamUnitsAlive(unit.getTeam());
         if (unit.getTeam() !== PBTypes.TeamVals.LOWER && unit.getTeam() !== PBTypes.TeamVals.UPPER) {
@@ -1047,7 +1019,6 @@ export class GameActionEngine {
             !this.context.fightProperties.hasAlreadyHourglass(unit.getId())
         );
     }
-
     private getTravelledMovePath(unit: Unit, path: XY[]): XY[] {
         const currentCell = unit.getBaseCell();
         const firstCell = path[0];
@@ -1057,7 +1028,6 @@ export class GameActionEngine {
 
         return path;
     }
-
     private resolveKnownMoveRoute(
         unit: Unit,
         path: XY[],
@@ -1088,7 +1058,6 @@ export class GameActionEngine {
         const matchingRoute = routes.find((route) => this.routeMatchesActionPath(unit, route.route, path));
         return matchingRoute ?? new Error("invalid_move");
     }
-
     private findKnownRouteForLargeFootprint(
         targetCells: XY[],
         knownPaths: ReadonlyMap<number, IWeightedRoute[]>,
@@ -1105,7 +1074,6 @@ export class GameActionEngine {
 
         return undefined;
     }
-
     private routeMatchesActionPath(unit: Unit, knownRoute: XY[], actionPath: XY[]): boolean {
         if (this.cellsMatchInOrder(knownRoute, actionPath)) {
             return true;
@@ -1116,7 +1084,6 @@ export class GameActionEngine {
             this.getTravelledMovePath(unit, actionPath),
         );
     }
-
     private isContinuousMovePath(unit: Unit, travelledPath: XY[]): boolean {
         let previous = unit.getBaseCell();
         for (const cell of travelledPath) {
@@ -1134,7 +1101,6 @@ export class GameActionEngine {
 
         return true;
     }
-
     private getLargeRouteFootprint(anchorCell: XY): XY[] {
         return [
             { x: anchorCell.x - 1, y: anchorCell.y - 1 },
@@ -1143,14 +1109,12 @@ export class GameActionEngine {
             { x: anchorCell.x, y: anchorCell.y },
         ];
     }
-
     private cellsMatchInOrder(left: XY[], right: XY[]): boolean {
         return (
             left.length === right.length &&
             left.every((cell, index) => cell.x === right[index]?.x && cell.y === right[index]?.y)
         );
     }
-
     private cellsMatchAsSet(left: XY[], right: XY[]): boolean {
         if (left.length !== right.length) {
             return false;
@@ -1159,15 +1123,12 @@ export class GameActionEngine {
         const rightCells = new Set(right.map((cell) => this.cellKey(cell)));
         return left.every((cell) => rightCells.has(this.cellKey(cell)));
     }
-
     private cellKey(cell: XY): number {
         return (cell.x << 4) | cell.y;
     }
-
     private sameCell(left: XY, right: XY): boolean {
         return left.x === right.x && left.y === right.y;
     }
-
     private resolveMoveTargetCells(unit: Unit, path: XY[], targetCells?: XY[]): XY[] {
         if (targetCells?.length) {
             return structuredClone(targetCells);
@@ -1187,7 +1148,6 @@ export class GameActionEngine {
             { x: destination.x + 1, y: destination.y + 1 },
         ];
     }
-
     private isValidPlacementFootprint(unit: Unit, cells: XY[]): boolean {
         if (unit.isSmallSize()) {
             return cells.length === 1;
@@ -1210,11 +1170,9 @@ export class GameActionEngine {
         const required = new Set([`${minX}:${minY}`, `${maxX}:${minY}`, `${minX}:${maxY}`, `${maxX}:${maxY}`]);
         return cells.every((cell) => required.has(`${cell.x}:${cell.y}`));
     }
-
     private getOccupiedCellsForUnit(unit: Unit): XY[] {
         return unit.getCells().filter((cell) => this.context.grid.getOccupantUnitId(cell) === unit.getId());
     }
-
     private rollbackPlacement(unit: Unit, previousCells: XY[], previousPosition: XY): void {
         if (!previousCells.length) {
             return;
@@ -1230,7 +1188,6 @@ export class GameActionEngine {
         );
         unit.setPosition(previousPosition.x, previousPosition.y);
     }
-
     private resolveKnownPaths(
         unit: Unit,
         targetCell: XY,
@@ -1263,7 +1220,6 @@ export class GameActionEngine {
         ]);
         return knownPaths;
     }
-
     private createVisibleDamage(): IVisibleDamage {
         return {
             amount: 0,
@@ -1273,7 +1229,6 @@ export class GameActionEngine {
             hits: [],
         };
     }
-
     private cloneVisibleDamage(damage: IVisibleDamage): IVisibleDamage {
         return {
             ...damage,
@@ -1281,7 +1236,6 @@ export class GameActionEngine {
             hits: damage.hits?.map((hit) => ({ ...hit })),
         };
     }
-
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {
         return animationData.map(
             (animation): IGameAnimationEvent => ({
@@ -1292,7 +1246,6 @@ export class GameActionEngine {
             }),
         );
     }
-
     private cleanupDeadUnits(unitIdsDied: string[]): GameEvent[] {
         const events: GameEvent[] = [];
         const processed = new Set<string>();
@@ -1331,7 +1284,6 @@ export class GameActionEngine {
 
         return events;
     }
-
     private reject(rejectionReason: GameActionRejectionReason, message?: string): IGameActionResult {
         return { completed: false, events: [], rejectionReason, message };
     }

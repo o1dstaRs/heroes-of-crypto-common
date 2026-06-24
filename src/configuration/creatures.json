@@ -20,9 +20,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Stun"
-            ]
+            "abilities": ["Stun"]
         },
         "Peasant": {
             "name": "Peasant",
@@ -43,10 +41,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Bitter Experience",
-                "Absorb Penalties Aura"
-            ]
+            "abilities": ["Bitter Experience", "Absorb Penalties Aura"]
         },
         "Arbalester": {
             "name": "Arbalester",
@@ -67,11 +62,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Sniper",
-                "Leather Armor",
-                "Limited Supply"
-            ]
+            "abilities": ["Sniper", "Leather Armor", "Limited Supply"]
         },
         "Pikeman": {
             "name": "Pikeman",
@@ -92,11 +83,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Aggr",
-                "Skewer Strike",
-                "Wardguard"
-            ]
+            "abilities": ["Aggr", "Skewer Strike", "Wardguard"]
         },
         "Valkyrie": {
             "name": "Valkyrie",
@@ -117,10 +104,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "War Anger Aura",
-                "Wind Flow"
-            ]
+            "abilities": ["War Anger Aura", "Wind Flow"]
         },
         "Healer": {
             "name": "Healer",
@@ -153,9 +137,7 @@
                 "Life:Mass Heal",
                 "Life:Mass Heal"
             ],
-            "abilities": [
-                "Book of Healing"
-            ]
+            "abilities": ["Book of Healing"]
         },
         "Crusader": {
             "name": "Crusader",
@@ -176,10 +158,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Double Punch",
-                "Sharpened Weapons Aura"
-            ]
+            "abilities": ["Double Punch", "Sharpened Weapons Aura"]
         },
         "Griffin": {
             "name": "Griffin",
@@ -200,11 +179,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Range Null Field Aura",
-                "Sky Runner",
-                "Deep Wounds Level 2"
-            ]
+            "abilities": ["Range Null Field Aura", "Sky Runner", "Deep Wounds Level 2"]
         },
         "Tsar Cannon": {
             "name": "Tsar Cannon",
@@ -225,11 +200,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Mechanism",
-                "No Melee",
-                "Through Shot"
-            ]
+            "abilities": ["Mechanism", "No Melee", "Through Shot"]
         },
         "Angel": {
             "name": "Angel",
@@ -250,10 +221,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Resurrection",
-                "Arrows Wingshield Aura"
-            ]
+            "abilities": ["Resurrection", "Arrows Wingshield Aura"]
         },
         "Champion": {
             "name": "Champion",
@@ -274,11 +242,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Tie up the Horses Aura",
-                "Crusade",
-                "Rapid Charge"
-            ]
+            "abilities": ["Tie up the Horses Aura", "Crusade", "Rapid Charge"]
         }
     },
     "Nature": {
@@ -301,10 +265,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Shadow Touch",
-                "Small Specie"
-            ]
+            "abilities": ["Shadow Touch", "Small Specie"]
         },
         "Wolf": {
             "name": "Wolf",
@@ -325,10 +286,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Double Punch",
-                "Deep Wounds Level 1"
-            ]
+            "abilities": ["Double Punch", "Deep Wounds Level 1"]
         },
         "Leprechaun": {
             "name": "Leprechaun",
@@ -349,10 +307,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Luck Aura",
-                "Lucky Strike"
-            ]
+            "abilities": ["Luck Aura", "Lucky Strike"]
         },
         "White Tiger": {
             "name": "White Tiger",
@@ -373,10 +328,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Disguise Aura",
-                "Deep Wounds Level 2"
-            ]
+            "abilities": ["Disguise Aura", "Deep Wounds Level 2"]
         },
         "Elf": {
             "name": "Elf",
@@ -397,9 +349,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Double Shot"
-            ]
+            "abilities": ["Double Shot"]
         },
         "Satyr": {
             "name": "Satyr",
@@ -427,9 +377,7 @@
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
-            "abilities": [
-                "Forest Spellbook"
-            ]
+            "abilities": ["Forest Spellbook"]
         },
         "Unicorn": {
             "name": "Unicorn",
@@ -450,10 +398,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "One in the Field",
-                "Blindness"
-            ]
+            "abilities": ["One in the Field", "Blindness"]
         },
         "Mantis": {
             "name": "Mantis",
@@ -474,9 +419,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Paralysis"
-            ]
+            "abilities": ["Paralysis"]
         },
         "Phoenix": {
             "name": "Phoenix",
@@ -539,10 +482,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Double Shot",
-                "Area Throw"
-            ]
+            "abilities": ["Double Shot", "Area Throw"]
         },
         "Pegasus": {
             "name": "Pegasus",
@@ -563,10 +503,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Pegasus Might Aura",
-                "Pegasus Light"
-            ]
+            "abilities": ["Pegasus Might Aura", "Pegasus Light"]
         },
         "Arachna Queen": {
             "name": "Arachna Queen",
@@ -610,10 +547,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Backstab",
-                "Dodge"
-            ]
+            "abilities": ["Backstab", "Dodge"]
         },
         "Orc": {
             "name": "Orc",
@@ -634,9 +568,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Stun"
-            ]
+            "abilities": ["Stun"]
         },
         "Troglodyte": {
             "name": "Troglodyte",
@@ -657,11 +589,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Madness",
-                "Blind Fury",
-                "Miner"
-            ]
+            "abilities": ["Madness", "Blind Fury", "Miner"]
         },
         "Medusa": {
             "name": "Medusa",
@@ -682,10 +610,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Endless Quiver",
-                "Petrifying Gaze"
-            ]
+            "abilities": ["Endless Quiver", "Petrifying Gaze"]
         },
         "Troll": {
             "name": "Troll",
@@ -706,9 +631,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Wild Regeneration"
-            ]
+            "abilities": ["Wild Regeneration"]
         },
         "Beholder": {
             "name": "Beholder",
@@ -729,9 +652,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Spit Ball"
-            ]
+            "abilities": ["Spit Ball"]
         },
         "Efreet": {
             "name": "Efreet",
@@ -752,11 +673,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Fire Element",
-                "Made of Fire",
-                "Fire Shield"
-            ]
+            "abilities": ["Fire Element", "Made of Fire", "Fire Shield"]
         },
         "Goblin Knight": {
             "name": "Goblin Knight",
@@ -777,10 +694,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Heavy Armor",
-                "Dulling Defense"
-            ]
+            "abilities": ["Heavy Armor", "Dulling Defense"]
         },
         "Black Dragon": {
             "name": "Black Dragon",
@@ -801,11 +715,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Fire Element",
-                "Enchanted Skin",
-                "Fire Breath"
-            ]
+            "abilities": ["Fire Element", "Enchanted Skin", "Fire Breath"]
         },
         "Hydra": {
             "name": "Hydra",
@@ -826,10 +736,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Lightning Spin",
-                "Devour Essence"
-            ]
+            "abilities": ["Lightning Spin", "Devour Essence"]
         },
         "Abomination": {
             "name": "Abomination",
@@ -850,9 +757,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Lightning Spin"
-            ]
+            "abilities": ["Lightning Spin"]
         }
     },
     "Death": {
@@ -875,9 +780,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Undead"
-            ]
+            "abilities": ["Undead"]
         },
         "Imp": {
             "name": "Imp",
@@ -898,9 +801,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Undead"
-            ]
+            "abilities": ["Undead"]
         },
         "Zombie": {
             "name": "Zombie",
@@ -921,9 +822,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Undead"
-            ]
+            "abilities": ["Undead"]
         },
         "Dark Champion": {
             "name": "Dark Champion",
@@ -944,9 +843,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Undead"
-            ]
+            "abilities": ["Undead"]
         }
     },
     "Might": {
@@ -969,10 +866,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "AI Driven",
-                "Double Punch"
-            ]
+            "abilities": ["AI Driven", "Double Punch"]
         },
         "Centaur": {
             "name": "Centaur",
@@ -993,11 +887,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Handyman",
-                "Piercing Spear",
-                "Boost Health"
-            ]
+            "abilities": ["Handyman", "Piercing Spear", "Boost Health"]
         },
         "Wolf Rider": {
             "name": "Wolf Rider",
@@ -1018,10 +908,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": [
-                "Wolf Trail Aura",
-                "Rapid Charge"
-            ]
+            "abilities": ["Wolf Trail Aura", "Rapid Charge"]
         },
         "Nomad": {
             "name": "Nomad",
@@ -1042,10 +929,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Shatter Armor",
-                "Rapid Charge"
-            ]
+            "abilities": ["Shatter Armor", "Rapid Charge"]
         },
         "Harpy": {
             "name": "Harpy",
@@ -1066,10 +950,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Shadow Touch",
-                "Castling"
-            ]
+            "abilities": ["Shadow Touch", "Castling"]
         },
         "Hyena": {
             "name": "Hyena",
@@ -1090,9 +971,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": [
-                "Penetrating Bite"
-            ]
+            "abilities": ["Penetrating Bite"]
         },
         "Ogre Mage": {
             "name": "Ogre Mage",
@@ -1120,9 +999,7 @@
                 "Chaos:Mass Riot",
                 "Chaos:Mass Magic Mirror"
             ],
-            "abilities": [
-                "Tome of Might"
-            ]
+            "abilities": ["Tome of Might"]
         },
         "Cyclops": {
             "name": "Cyclops",
@@ -1143,9 +1020,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": [
-                "Large Caliber"
-            ]
+            "abilities": ["Large Caliber"]
         },
         "Thunderbird": {
             "name": "Thunderbird",
@@ -1166,10 +1041,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Wind Element",
-                "Chain Lightning"
-            ]
+            "abilities": ["Wind Element", "Chain Lightning"]
         },
         "Behemoth": {
             "name": "Behemoth",
@@ -1190,11 +1062,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "Unyielding Power",
-                "Battle Roar",
-                "Deep Wounds Level 3"
-            ]
+            "abilities": ["Unyielding Power", "Battle Roar", "Deep Wounds Level 3"]
         },
         "Frenzied Boar": {
             "name": "Frenzied Boar",
@@ -1215,11 +1083,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": [
-                "AI Driven",
-                "Magic Shield",
-                "Boar Saliva"
-            ]
+            "abilities": ["AI Driven", "Magic Shield", "Boar Saliva"]
         }
     }
 }

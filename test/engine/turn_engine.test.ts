@@ -24,7 +24,14 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const queuedZeros = (count: number): number[] => Array.from({ length: count }, () => 0);
 
 function setupStartedFight(
-    opts: { lowerMorale?: number; upperMorale?: number; lowerSpeed?: number; upperSpeed?: number } = {},
+    opts: {
+        lowerAttackType?: PBTypes.AttackVals;
+        lowerMorale?: number;
+        lowerRangeShots?: number;
+        lowerSpeed?: number;
+        upperMorale?: number;
+        upperSpeed?: number;
+    } = {},
 ) {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -34,6 +41,8 @@ function setupStartedFight(
     const lower = createTestUnit({
         name: "Lower",
         team: PBTypes.TeamVals.LOWER,
+        attackType: opts.lowerAttackType,
+        rangeShots: opts.lowerRangeShots,
         speed: opts.lowerSpeed ?? 5,
         morale: opts.lowerMorale ?? 0,
     });
@@ -93,6 +102,32 @@ describe("TurnEngine", () => {
             unitId: setup.lower.getId(),
             team: PBTypes.TeamVals.LOWER,
         });
+    });
+
+    it("refreshes active unit attack options with injected range availability", () => {
+        const setup = setupStartedFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerRangeShots: 3,
+        });
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            canLandRangeAttack: (unit) => {
+                expect(unit.getId()).toBe(setup.lower.getId());
+                return false;
+            },
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000] }),
+        });
+
+        expect(setup.lower.getPossibleAttackTypes()).toEqual([]);
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result.nextUnit?.getId()).toBe(setup.lower.getId());
+        expect(setup.lower.getPossibleAttackTypes()).toEqual([PBTypes.AttackVals.MELEE]);
     });
 
     it("completes turns using injected time instead of global time", () => {

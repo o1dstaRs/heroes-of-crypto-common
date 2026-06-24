@@ -277,7 +277,6 @@ export class MoveHandler {
 
         return true;
     }
-
     private getTravelledRoute(route: XY[], unit: Unit): XY[] {
         const currentCell = unit.getBaseCell();
         const firstCell = route[0];
@@ -287,7 +286,6 @@ export class MoveHandler {
 
         return route;
     }
-
     public finishDirectedUnitMove(
         unit: Unit,
         targetCells: XY[],

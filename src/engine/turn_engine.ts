@@ -36,6 +36,7 @@ export interface ITurnEngineContext {
     moveHandler: MoveHandler;
     sceneLog: ISceneLog;
     getCurrentActiveUnitId?: () => string | undefined;
+    canLandRangeAttack?: (unit: Unit) => boolean;
     runtime?: IGameRuntime;
 }
 
@@ -64,6 +65,7 @@ export class TurnEngine {
     private readonly unitsHolder: UnitsHolder;
     private readonly moveHandler: MoveHandler;
     private readonly sceneLog: ISceneLog;
+    private readonly canLandRangeAttack?: (unit: Unit) => boolean;
     private readonly runtime: IGameRuntime;
     public constructor(context: ITurnEngineContext) {
         this.fightProperties = context.fightProperties;
@@ -71,6 +73,7 @@ export class TurnEngine {
         this.unitsHolder = context.unitsHolder;
         this.moveHandler = context.moveHandler;
         this.sceneLog = context.sceneLog;
+        this.canLandRangeAttack = context.canLandRangeAttack;
         this.runtime = context.runtime ?? createDefaultGameRuntime();
     }
     public completeTurn(
@@ -388,6 +391,7 @@ export class TurnEngine {
         }
         this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
         unit.refreshPreTurnState(this.sceneLog);
+        unit.refreshPossibleAttackTypes(this.canLandRangeAttack?.(unit) ?? true);
         this.fightProperties.markFirstTurn();
 
         if (unit.isSkippingThisTurn()) {
