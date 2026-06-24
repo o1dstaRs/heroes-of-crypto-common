@@ -239,6 +239,12 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
                 continue;
             }
 
+            // Skip targets whose line of sight is blocked by a mountain — the shot
+            // would hit the obstacle instead of the unit (wasted turn).
+            if (isLineBlockedByObstacle(unitCell, targetCell, matrix)) {
+                continue;
+            }
+
             let divisor = 1;
             if (!isSniper && shotDistance > 0) {
                 let d = distanceCells;
@@ -347,6 +353,40 @@ function countEnemiesBeyondInLine(
         curY += stepY;
     }
     return count;
+}
+
+/**
+ * Trace the line from `fromCell` to `toCell` and return true if any intermediate
+ * cell (excluding the endpoints) is a blocking obstacle (mountain). Uses the same
+ * line-stepping approach as countEnemiesBeyondInLine.
+ */
+function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY, matrix: number[][]): boolean {
+    const numRows = matrix.length;
+    const numCols = matrix[0].length;
+    const dx = toCell.x - fromCell.x;
+    const dy = toCell.y - fromCell.y;
+    const len = Math.max(Math.abs(dx), Math.abs(dy));
+    if (len <= 1) {
+        return false; // adjacent — nothing between them
+    }
+    const stepX = dx / len;
+    const stepY = dy / len;
+
+    let curX = fromCell.x + stepX;
+    let curY = fromCell.y + stepY;
+
+    for (let i = 1; i < len; i++) {
+        const cx = Math.round(curX);
+        const cy = Math.round(curY);
+        if (cx >= 0 && cy >= 0 && cx < numCols && cy < numRows) {
+            if (matrix[cy][cx] === ObstacleType.BLOCK) {
+                return true;
+            }
+        }
+        curX += stepX;
+        curY += stepY;
+    }
+    return false;
 }
 
 /**
