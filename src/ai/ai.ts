@@ -380,9 +380,14 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
             let score = 1 / divisor;
 
             if (isAOEAttacker) {
-                const adjacentEnemies = countAdjacentEnemies(targetCell, matrix, enemyTeam);
-                // Each additional enemy in splash range adds full-damage potential.
-                score *= 1 + adjacentEnemies;
+                // AOE (Large Caliber / Area Throw) hits all units adjacent to the target cell.
+                // Score by unique enemies in the splash zone, minus friendly fire penalty.
+                const splash = countAOESplashValue(targetCell, matrix, enemyTeam, unit.getTeam());
+                // Each enemy in splash adds full-damage potential. Allies in splash subtract.
+                score *= splash.enemyCount + 1; // +1 for the primary target
+                if (splash.allyCount > 0) {
+                    score *= Math.max(0.1, 1 - 0.3 * splash.allyCount);
+                }
             }
 
             if (isThroughShot) {
@@ -416,26 +421,136 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
     return new BasicAIAction(AIActionType.RANGE_ATTACK, undefined, bestTarget, new Map());
 }
 
-function countAdjacentEnemies(cell: HoCMath.XY, matrix: number[][], enemyTeam: number): number {
+/**
+ * Count unique enemy and ally units in the AOE splash zone around a target cell.
+ *
+ * The engine's `getCellsAroundCell` expands from the target's cell corners to find all
+ * adjacent cells — for a small unit this is the 8 cells around it; for a large (2x2)
+ * unit the zone is wider. We approximate this by:
+ * 1. Detecting if the target is a large unit (4 cells with the same team value).
+ * 2. Unioning all ±1 neighbors of all target cells.
+ * 3. Deduplicating large enemy units (they occupy 4 cells — count once, not 4x).
+ *
+ * Returns { enemyCount, allyCount } — unique enemy/ally units in the splash zone,
+ * NOT counting the primary target itself.
+ */
+function countAOESplashValue(
+    targetCell: HoCMath.XY,
+    matrix: number[][],
+    enemyTeam: number,
+    allyTeam: number,
+): { enemyCount: number; allyCount: number } {
     const numRows = matrix.length;
     const numCols = matrix[0].length;
-    let count = 0;
-    for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) {
-                continue;
-            }
-            const x = cell.x + dx;
-            const y = cell.y + dy;
-            if (x < 0 || y < 0 || x >= numCols || y >= numRows) {
-                continue;
-            }
-            if (matrix[y][x] === enemyTeam) {
-                count++;
+
+    // Build the set of cells to check for splash — the union of ±1 neighbors of all
+    // cells occupied by the target unit.
+    const cellsToCheck = new Set<number>();
+    const targetCells: HoCMath.XY[] = [{ x: targetCell.x, y: targetCell.y }];
+
+    // Detect large unit: check if the 2x2 block around the target cell has the same team.
+    const targetVal = matrix[targetCell.y]?.[targetCell.x];
+    if (targetVal !== undefined && targetVal !== 0) {
+        for (const [dx, dy] of [
+            [0, 0],
+            [-1, 0],
+            [0, -1],
+            [-1, -1],
+        ]) {
+            const nx = targetCell.x + dx;
+            const ny = targetCell.y + dy;
+            if (nx >= 0 && ny >= 0 && nx < numCols && ny < numRows && matrix[ny][nx] === targetVal) {
+                targetCells.push({ x: nx, y: ny });
             }
         }
     }
-    return count;
+
+    // Collect all cells in the splash zone (±1 around each target cell, excluding target cells).
+    const targetCellKeys = new Set(targetCells.map((c) => (c.x << 4) | c.y));
+    for (const tc of targetCells) {
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                const nx = tc.x + dx;
+                const ny = tc.y + dy;
+                if (nx < 0 || ny < 0 || nx >= numCols || ny >= numRows) continue;
+                const key = (nx << 4) | ny;
+                if (!targetCellKeys.has(key)) {
+                    cellsToCheck.add(key);
+                }
+            }
+        }
+    }
+
+    // Count unique enemy and ally cells in the splash zone.
+    // For large units (2x2), deduplicate by detecting adjacent same-team cells.
+    const enemyCells = new Set<number>();
+    let allyCount = 0;
+    const allyCellKeys = new Set<number>();
+
+    for (const key of cellsToCheck) {
+        const cx = (key >> 4) & 0xf;
+        const cy = key & 0xf;
+        const val = matrix[cy]?.[cx];
+        if (val === undefined || val === 0) continue;
+
+        if (val === enemyTeam) {
+            enemyCells.add(key);
+        } else if (val === allyTeam) {
+            allyCellKeys.add(key);
+        }
+    }
+
+    // Deduplicate large enemy units: if 4 adjacent cells have the same enemy team value,
+    // count them as 1 unit instead of 4.
+    const enemyCellList = [...enemyCells];
+    const countedEnemies = new Set<number>();
+    let enemyCount = 0;
+    for (const key of enemyCellList) {
+        if (countedEnemies.has(key)) continue;
+        enemyCount++;
+        countedEnemies.add(key);
+        // Check if this is part of a 2x2 block — mark the other 3 cells as counted.
+        const cx = (key >> 4) & 0xf;
+        const cy = key & 0xf;
+        for (const [dx, dy] of [
+            [-1, 0],
+            [0, -1],
+            [-1, -1],
+        ]) {
+            const nx = cx + dx;
+            const ny = cy + dy;
+            const nkey = (nx << 4) | ny;
+            if (enemyCells.has(nkey)) {
+                countedEnemies.add(nkey);
+            }
+        }
+    }
+
+    // Deduplicate allies the same way.
+    const allyCellList = [...allyCellKeys];
+    const countedAllies = new Set<number>();
+    for (const key of allyCellList) {
+        if (countedAllies.has(key)) continue;
+        allyCount++;
+        countedAllies.add(key);
+        const cx = (key >> 4) & 0xf;
+        const cy = key & 0xf;
+        for (const [dx, dy] of [
+            [-1, 0],
+            [0, -1],
+            [-1, -1],
+        ]) {
+            const nx = cx + dx;
+            const ny = cy + dy;
+            const nkey = (nx << 4) | ny;
+            if (allyCellKeys.has(nkey)) {
+                countedAllies.add(nkey);
+            }
+        }
+    }
+
+    return { enemyCount, allyCount };
 }
 
 function countEnemiesBeyondInLine(
