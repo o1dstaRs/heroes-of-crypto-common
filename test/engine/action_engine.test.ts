@@ -24,7 +24,7 @@ import { getPositionForCell } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
-import { SpellTargetType } from "../../src/spells/spell_properties";
+import { SpellProperties, SpellTargetType } from "../../src/spells/spell_properties";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 const setupActionFight = (
@@ -1021,9 +1021,25 @@ describe("GameActionEngine", () => {
 
     it("casts mass enemy debuffs through common mechanics", () => {
         const setup = setupActionFight();
-        const massWeaknessProperties = getSpellConfig("Death", "Weakness");
-        massWeaknessProperties.name = "Mass Weakness";
-        massWeaknessProperties.spell_target_type = SpellTargetType.ALL_ENEMIES;
+        const weaknessProperties = getSpellConfig("Death", "Weakness");
+        const massWeaknessProperties = new SpellProperties(
+            weaknessProperties.faction,
+            "Mass Weakness",
+            weaknessProperties.level,
+            [...weaknessProperties.desc],
+            SpellTargetType.ALL_ENEMIES,
+            weaknessProperties.power,
+            weaknessProperties.power_type,
+            weaknessProperties.multiplier_type,
+            weaknessProperties.laps,
+            weaknessProperties.is_buff,
+            weaknessProperties.self_cast_allowed,
+            weaknessProperties.self_debuff_applies,
+            weaknessProperties.minimal_caster_stack_power,
+            [...weaknessProperties.conflicts_with],
+            weaknessProperties.is_giftable,
+            weaknessProperties.maximum_gift_level,
+        );
         setup.lower.getSpells().push(new Spell({ spellProperties: massWeaknessProperties, amount: 1 }));
 
         const result = setup.engine.apply({

@@ -98,6 +98,10 @@ export class DamageStatisticHolder implements IStatisticHolder<IDamageStatistic>
     public has(lap: number): boolean {
         return this.values.some((value) => value.lap === lap);
     }
+
+    public clear(): void {
+        this.values.length = 0;
+    }
 }
 
 export function createCombatTestContext(gridType: GridType = PBTypes.GridVals.NORMAL): CombatTestContext {

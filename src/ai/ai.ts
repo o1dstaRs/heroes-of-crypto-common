@@ -109,6 +109,9 @@ export function findTarget(
 
     let action: BasicAIAction | undefined = undefined;
     let selectedEnemy: Unit | undefined = undefined;
+    const unitCell = unit.getBaseCell();
+    const unitTeam = unit.getTeam();
+    const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
     const enemiesAround = unitsHolder.allEnemiesAroundUnit(unit, false);
     const hasNoMelee = unit.hasAbilityActive("No Melee");
     for (const e of enemiesAround) {
@@ -160,30 +163,126 @@ export function findTarget(
         action = findRangeAttackAction(unit, grid, matrix);
     }
 
-    if (!action) {
-        if (!unit.canMove()) {
-            return undefined;
+    // --- Team strategy + movement ---
+    const engagement = analyzeEngagement(unit, matrix, unitsHolder);
+    const isRangedUnit = unit.getAttackType() === PBTypes.AttackVals.RANGE;
+    const isAlreadyEngaged = countMeleeThreatsToCell(unitCell, matrix, enemyTeam) > 0;
+
+    if (!action && !isRangedUnit && unit.canMove() && !isAlreadyEngaged) {
+        // Strategy 1: Ranged-heavy team → defensive posture. Melee units hold position
+        //              and let the enemy come to them. Only released when enemies are pressing.
+        if (
+            engagement.totalRangedAllies > engagement.totalMeleeAllies &&
+            engagement.totalRangedAllies >= 2 &&
+            !engagement.enemiesPressing
+        ) {
+            if (DEBUG_AI) {
+                console.log(
+                    `Melee holding (ranged-heavy defense): ${engagement.totalRangedAllies}R vs ${engagement.totalMeleeAllies}M, enemies not pressing`,
+                );
+            }
+            return undefined; // skip — let ranged units do their work
         }
 
+        // Strategy 2: Group coordination. If this melee unit is isolated (nearest melee
+        //              ally is > GROUP_REGROUP_DIST away) and no ally is engaged yet,
+        //              don't advance alone — move toward the ally group center instead
+        //              of rushing toward the nearest enemy.
+        if (
+            engagement.totalMeleeAllies > 0 &&
+            engagement.nearestMeleeAllyDist > GROUP_REGROUP_DIST &&
+            engagement.engagedMeleeAllies === 0 &&
+            !engagement.enemiesPressing
+        ) {
+            // Override the movement target: go toward allies, not toward enemies.
+            const center = engagement.allyMeleeCenter;
+            if (center) {
+                action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
+                // If doFindTarget returned a MOVE, redirect toward the ally center.
+                if (action && action.actionType() === AIActionType.MOVE && action.currentActiveKnownPaths()) {
+                    const centerKey = (center.x << 4) | center.y;
+                    const pathsToCenter = action.currentActiveKnownPaths()!.get(centerKey);
+                    if (pathsToCenter && pathsToCenter.length > 0) {
+                        const route = pathsToCenter[0];
+                        const lastCell = route.route[route.route.length - 1];
+                        if (lastCell) {
+                            if (DEBUG_AI) {
+                                console.log(
+                                    `Melee regrouping: nearest ally ${engagement.nearestMeleeAllyDist} cells away, moving toward group center ${cellToString(center)}`,
+                                );
+                            }
+                            action = new BasicAIAction(
+                                AIActionType.MOVE,
+                                lastCell,
+                                undefined,
+                                action.currentActiveKnownPaths(),
+                            );
+                        }
+                    }
+                }
+            } else {
+                action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
+            }
+        } else {
+            action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
+        }
+    } else if (!action && unit.canMove()) {
         action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
     }
 
-    // Movement safety: if the AI decided to MOVE (not attack), check that the
-    // destination cell isn't a suicide position for ranged units (adjacent to
-    // an enemy that can melee them). If it is, find a safer nearby cell.
+    // --- Post-decision movement safety ---
     if (action && action.actionType() === AIActionType.MOVE) {
-        const enemyTeamVal =
-            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
-        const isRangedUnit = unit.getAttackType() === PBTypes.AttackVals.RANGE;
-        const saferCell = findSaferMoveCell(
-            action.cellToMove(),
-            action.currentActiveKnownPaths(),
-            matrix,
-            enemyTeamVal,
-            isRangedUnit,
-        );
-        if (saferCell && saferCell !== action.cellToMove()) {
-            action = new BasicAIAction(AIActionType.MOVE, saferCell, undefined, action.currentActiveKnownPaths());
+        if (isRangedUnit) {
+            // Ranged units: avoid melee range entirely.
+            const saferCell = findSaferMoveCell(
+                action.cellToMove(),
+                action.currentActiveKnownPaths(),
+                matrix,
+                enemyTeam,
+                true,
+            );
+            if (saferCell && saferCell !== action.cellToMove()) {
+                action = new BasicAIAction(AIActionType.MOVE, saferCell, undefined, action.currentActiveKnownPaths());
+            }
+        } else {
+            // Melee units: don't rush past the frontline into 2+ enemy threats
+            // when allies are already tanking.
+            const destCell = action.cellToMove();
+            const destThreats = destCell ? countMeleeThreatsToCell(destCell, matrix, enemyTeam) : 0;
+
+            if (!isAlreadyEngaged && engagement.engagedMeleeAllies > 0 && destThreats >= 2) {
+                const saferCell = findSaferMoveCell(
+                    destCell,
+                    action.currentActiveKnownPaths(),
+                    matrix,
+                    enemyTeam,
+                    true,
+                );
+                if (saferCell && saferCell !== destCell) {
+                    action = new BasicAIAction(
+                        AIActionType.MOVE,
+                        saferCell,
+                        undefined,
+                        action.currentActiveKnownPaths(),
+                    );
+                }
+            }
+
+            // Ranged-heavy team + diving into 2+ enemies alone + no ally tanking → hold.
+            if (
+                !isAlreadyEngaged &&
+                engagement.totalRangedAllies >= 2 &&
+                engagement.totalRangedAllies > engagement.totalMeleeAllies &&
+                destThreats >= 2 &&
+                engagement.engagedMeleeAllies === 0
+            ) {
+                if (DEBUG_AI) {
+                    console.log(
+                        `Melee holding (surrounded dive): ${engagement.totalRangedAllies}R vs ${engagement.totalMeleeAllies}M, dest ${destThreats} threats`,
+                    );
+                }
+                return undefined;
+            }
         }
     }
 
@@ -431,9 +530,98 @@ function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], enemyTeam
 }
 
 /**
+ * Snapshot of the unit's team situation: how many allies are melee vs ranged,
+ * how many melee allies are already adjacent to an enemy ("engaged" / tanking),
+ * the centroid of melee allies (for grouping), the distance from this unit to
+ * its nearest melee ally, and whether any enemy is within `pressRange` cells of
+ * any ally (enemies "pressing" — if not, the team can hold position).
+ */
+interface ITeamEngagement {
+    totalAllies: number;
+    totalMeleeAllies: number;
+    totalRangedAllies: number;
+    engagedMeleeAllies: number;
+    allyMeleeCenter: HoCMath.XY | undefined;
+    nearestMeleeAllyDist: number;
+    enemiesPressing: boolean;
+}
+
+const ENEMY_PRESS_RADIUS = 3;
+const GROUP_REGROUP_DIST = 4;
+
+function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHolder: UnitsHolder): ITeamEngagement {
+    const team = unit.getTeam();
+    const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const allies = unitsHolder.getAllAllies(team);
+    const unitCell = unit.getBaseCell();
+    const numCols = matrix[0]?.length ?? 0;
+    const numRows = matrix.length;
+
+    let totalAllies = 0;
+    let totalMeleeAllies = 0;
+    let totalRangedAllies = 0;
+    let engagedMeleeAllies = 0;
+    let meleeSumX = 0;
+    let meleeSumY = 0;
+    let nearestMeleeAllyDist = Infinity;
+    let enemiesPressing = false;
+
+    for (const ally of allies) {
+        if (ally.getId() === unit.getId() || ally.isDead()) continue;
+        const allyCell = ally.getBaseCell();
+        if (!allyCell) continue;
+        totalAllies++;
+
+        const isRanged = ally.getAttackType() === PBTypes.AttackVals.RANGE;
+        if (isRanged) {
+            totalRangedAllies++;
+        } else {
+            totalMeleeAllies++;
+            meleeSumX += allyCell.x;
+            meleeSumY += allyCell.y;
+            if (unitCell) {
+                nearestMeleeAllyDist = Math.min(nearestMeleeAllyDist, HoCMath.getDistance(unitCell, allyCell));
+            }
+            if (countMeleeThreatsToCell(allyCell, matrix, enemyTeam) > 0) {
+                engagedMeleeAllies++;
+            }
+        }
+
+        // Check if any enemy is within ENEMY_PRESS_RADIUS of this ally.
+        if (!enemiesPressing) {
+            for (let dy = -ENEMY_PRESS_RADIUS; dy <= ENEMY_PRESS_RADIUS; dy++) {
+                for (let dx = -ENEMY_PRESS_RADIUS; dx <= ENEMY_PRESS_RADIUS; dx++) {
+                    const nx = allyCell.x + dx;
+                    const ny = allyCell.y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < numCols && ny < numRows && matrix[ny][nx] === enemyTeam) {
+                        enemiesPressing = true;
+                        break;
+                    }
+                }
+                if (enemiesPressing) break;
+            }
+        }
+    }
+
+    return {
+        totalAllies,
+        totalMeleeAllies,
+        totalRangedAllies,
+        engagedMeleeAllies,
+        allyMeleeCenter:
+            totalMeleeAllies > 0
+                ? { x: Math.round(meleeSumX / totalMeleeAllies), y: Math.round(meleeSumY / totalMeleeAllies) }
+                : undefined,
+        nearestMeleeAllyDist: nearestMeleeAllyDist === Infinity ? 0 : nearestMeleeAllyDist,
+        enemiesPressing,
+    };
+}
+
+/**
  * For ranged units: if the preferred destination is adjacent to an enemy (melee
  * threat), scan reachable cells for a safer spot NOT in melee range. Prefers cells
- * close to the preferred destination. For melee units: no override.
+ * close to the preferred destination. For melee units: overridden by team-aware logic
+ * in findTarget instead.
  */
 function findSaferMoveCell(
     preferredCell: HoCMath.XY | undefined,

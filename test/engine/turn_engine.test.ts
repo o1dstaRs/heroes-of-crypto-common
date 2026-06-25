@@ -14,6 +14,7 @@ import { describe, expect, it } from "bun:test";
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../src/constants";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
+import type { FightProperties } from "../../src/fights/fight_properties";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -68,10 +69,7 @@ function setupStartedFight(
     };
 }
 
-function advanceFightToLap(
-    fightProperties: ReturnType<typeof FightStateManager.getInstance>["getFightProperties"],
-    lap: number,
-) {
+function advanceFightToLap(fightProperties: FightProperties, lap: number) {
     while (fightProperties.getCurrentLap() < lap) {
         fightProperties.flipLap();
     }
@@ -378,7 +376,9 @@ describe("TurnEngine", () => {
 
         const firstLapResult = firstLapEngine.advanceAfterNoActiveUnit();
 
-        expect([firstLapSetup.lower.getId(), firstLapSetup.upper.getId()]).toContain(firstLapResult.nextUnit?.getId());
+        expect([firstLapSetup.lower.getId(), firstLapSetup.upper.getId()]).toContain(
+            firstLapResult.nextUnit?.getId() ?? "",
+        );
 
         const activeLapSetup = setupStartedFight({ lowerSpeed: 5, upperSpeed: 5 });
         activeLapSetup.fightProperties.markFirstTurn();
@@ -395,7 +395,7 @@ describe("TurnEngine", () => {
         const activeLapResult = activeLapEngine.advanceAfterNoActiveUnit();
 
         expect([activeLapSetup.lower.getId(), activeLapSetup.upper.getId()]).toContain(
-            activeLapResult.nextUnit?.getId(),
+            activeLapResult.nextUnit?.getId() ?? "",
         );
     });
 });

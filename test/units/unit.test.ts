@@ -367,9 +367,9 @@ describe("Unit", () => {
             expect(unit.calculatePossibleLosses(35)).toBe(3);
 
             const properties = unit.getAllProperties();
-            properties.name = "Mutated";
+            properties.hp = 999;
 
-            expect(unit.getName()).not.toBe("Mutated");
+            expect(unit.getHp()).not.toBe(999);
 
             unit.addAbility(abilityFactory.makeAbility("Chain Lightning"));
             unit.addAbility(abilityFactory.makeAbility("Paralysis"));

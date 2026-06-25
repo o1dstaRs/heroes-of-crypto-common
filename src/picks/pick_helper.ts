@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
+import { CreatureLevelMap, CreaturePoolByLevel, getCreaturesByLevel } from "../units/unit_properties";
 
 export const canBanCreatureLevel = (
     creatureLevel: number,
@@ -18,7 +18,7 @@ export const canBanCreatureLevel = (
     creaturesPickedPerTeam: number[],
 ): boolean => {
     let minimumCreaturesOfThisLevelRequired = 2;
-    let totalNumberOfCreaturesRemaining = CreatureLevelList[creatureLevel - 1].length ?? 0;
+    let totalNumberOfCreaturesRemaining = getCreaturesByLevel(creatureLevel).length;
 
     for (const cb of creaturesBanned) {
         if (creatureLevel === CreatureLevelMap[cb as keyof typeof CreatureLevelMap]) {
@@ -34,16 +34,16 @@ export const canBanCreatureLevel = (
 
     for (const kc of knownCreatures) {
         if (creatureLevel === CreatureLevelMap[kc as keyof typeof CreatureLevelMap]) {
-            if (pool[creatureLevel] < 1) {
+            if ((pool[creatureLevel - 1] ?? 0) < 1) {
                 minimumCreaturesOfThisLevelRequired -= 1;
             } else {
-                pool[creatureLevel] -= 1;
+                pool[creatureLevel - 1] -= 1;
             }
             totalNumberOfCreaturesRemaining -= 1;
         }
     }
 
-    const amount = pool[creatureLevel];
+    const amount = pool[creatureLevel - 1];
     if (amount > 0) {
         totalNumberOfCreaturesRemaining -= amount;
     }
