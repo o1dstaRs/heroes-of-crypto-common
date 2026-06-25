@@ -20,7 +20,6 @@ import {
     countMeleeThreatsToCell,
     analyzeEngagement,
     findSaferMoveCell,
-    type ITeamEngagement,
 } from "../../src/ai/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
@@ -776,9 +775,9 @@ describe("analyzeEngagement", () => {
         const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
         const melee1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 6, y: 5 });
         const ranged1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 }, 3, 6);
-        holder.addUnit(main);
-        holder.addUnit(melee1);
-        holder.addUnit(ranged1);
+        holder.addUnit(main as any);
+        holder.addUnit(melee1 as any);
+        holder.addUnit(ranged1 as any);
         const result = analyzeEngagement(main, grid.getMatrix(), holder);
         expect(result.totalMeleeAllies).toBe(1);
         expect(result.totalRangedAllies).toBe(1);
@@ -793,9 +792,9 @@ describe("analyzeEngagement", () => {
         grid.occupyCell({ x: 5, y: 5 }, main.getId(), main.getTeam(), 1, false, false);
         grid.occupyCell({ x: 7, y: 7 }, ally.getId(), ally.getTeam(), 1, false, false);
         grid.occupyCell({ x: 8, y: 7 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(main);
-        holder.addUnit(ally);
-        holder.addUnit(enemy);
+        holder.addUnit(main as any);
+        holder.addUnit(ally as any);
+        holder.addUnit(enemy as any);
         const result = analyzeEngagement(main, grid.getMatrix(), holder);
         expect(result.enemiesPressing).toBe(true);
     });
@@ -805,8 +804,8 @@ describe("analyzeEngagement", () => {
         const holder = new UnitsHolder(grid);
         const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
         const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
-        holder.addUnit(main);
-        holder.addUnit(enemy);
+        holder.addUnit(main as any);
+        holder.addUnit(enemy as any);
         const result = analyzeEngagement(main, grid.getMatrix(), holder);
         expect(result.enemiesPressing).toBe(false);
     });
@@ -817,9 +816,9 @@ describe("analyzeEngagement", () => {
         const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
         const ally1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 });
         const ally2 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 7 });
-        holder.addUnit(main);
-        holder.addUnit(ally1);
-        holder.addUnit(ally2);
+        holder.addUnit(main as any);
+        holder.addUnit(ally1 as any);
+        holder.addUnit(ally2 as any);
         const result = analyzeEngagement(main, grid.getMatrix(), holder);
         expect(result.allyMeleeCenter).toEqual({ x: 6, y: 6 });
     });
@@ -856,14 +855,6 @@ describe("findSaferMoveCell", () => {
     });
 
     it("finds a safer cell when the preferred one is adjacent to an enemy", () => {
-        const matrix = [
-            [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-            [0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-        ];
-        // Preferred cell is adjacent to an enemy; safer alternatives should be considered.
         const m2 = [
             [0, 0, 0, 0, 0],
             [0, 0, 1, 0, 0],
@@ -906,10 +897,10 @@ describe("AI Strategy: ranged-heavy defense", () => {
         grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 3, y: 7 }, r2.getId(), r2.getTeam(), 1, false, false);
         grid.occupyCell({ x: 14, y: 14 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(melee);
-        holder.addUnit(r1);
-        holder.addUnit(r2);
-        holder.addUnit(enemy);
+        holder.addUnit(melee as any);
+        holder.addUnit(r1 as any);
+        holder.addUnit(r2 as any);
+        holder.addUnit(enemy as any);
 
         const action = findTarget(melee, grid, grid.getMatrix(), holder, pathHelper);
         // Should return undefined (hold) because team is ranged-heavy and enemies are not pressing
@@ -925,9 +916,9 @@ describe("AI Strategy: ranged-heavy defense", () => {
         grid.occupyCell({ x: 5, y: 5 }, melee.getId(), melee.getTeam(), 1, false, false);
         grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 7, y: 5 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(melee);
-        holder.addUnit(r1);
-        holder.addUnit(enemy);
+        holder.addUnit(melee as any);
+        holder.addUnit(r1 as any);
+        holder.addUnit(enemy as any);
 
         const action = findTarget(melee, grid, grid.getMatrix(), holder, pathHelper);
         // Enemy is within 3 cells, so the melee unit should not hold.
@@ -943,8 +934,8 @@ describe("AI Strategy: ranged units avoid melee range", () => {
         const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 10, y: 10 });
         grid.occupyCell({ x: 1, y: 1 }, ranged.getId(), ranged.getTeam(), 1, false, false);
         grid.occupyCell({ x: 10, y: 10 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(ranged);
-        holder.addUnit(enemy);
+        holder.addUnit(ranged as any);
+        holder.addUnit(enemy as any);
 
         const action = findTarget(ranged, grid, grid.getMatrix(), holder, pathHelper);
         // Out of range, so falls to MOVE. Check that destination is NOT adjacent to enemy.
@@ -968,10 +959,10 @@ describe("AI Strategy: group coordination", () => {
         grid.occupyCell({ x: 10, y: 10 }, ally1.getId(), ally1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 12, y: 10 }, ally2.getId(), ally2.getTeam(), 1, false, false);
         grid.occupyCell({ x: 14, y: 14 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(lone);
-        holder.addUnit(ally1);
-        holder.addUnit(ally2);
-        holder.addUnit(enemy);
+        holder.addUnit(lone as any);
+        holder.addUnit(ally1 as any);
+        holder.addUnit(ally2 as any);
+        holder.addUnit(enemy as any);
 
         const action = findTarget(lone, grid, grid.getMatrix(), holder, pathHelper);
         expect(action).toBeDefined();
@@ -1002,8 +993,8 @@ describe("AI: AOE units ignore mountain LOS", () => {
         const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 11, y: 11 });
         grid.occupyCell({ x: 3, y: 3 }, cyclops.getId(), cyclops.getTeam(), 1, false, false);
         grid.occupyCell({ x: 11, y: 11 }, enemy.getId(), enemy.getTeam(), 1, false, false);
-        holder.addUnit(cyclops);
-        holder.addUnit(enemy);
+        holder.addUnit(cyclops as any);
+        holder.addUnit(enemy as any);
 
         const matrix = grid.getMatrix();
         const action = findTarget(cyclops, grid, matrix, holder, pathHelper);

@@ -48,4 +48,5 @@ export type GameAction =
     | { type: "area_throw_attack"; attackerId: string; targetCell: XY }
     | { type: "cast_spell"; casterId: string; spellName: string; targetId?: string; targetCell?: XY }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
+    | { type: "split_unit"; unitId: string; amount: number }
     | { type: "delete_unit"; unitId: string };

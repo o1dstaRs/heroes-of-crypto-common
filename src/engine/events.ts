@@ -40,6 +40,14 @@ export type GameEvent =
     | { type: "attack_type_selected"; unitId: string; team: TeamType; attackType: AttackType }
     | { type: "unit_moved"; unitId: string; from: XY; to: XY; path: XY[]; targetCells: XY[] }
     | { type: "unit_placed"; unitId: string; team: TeamType; position: XY; cells: XY[] }
+    | {
+          type: "unit_split";
+          sourceUnitId: string;
+          newUnitId: string;
+          team: TeamType;
+          sourceAmount: number;
+          splitAmount: number;
+      }
     | { type: "unit_deleted"; unitId: string; team: TeamType }
     | {
           type: "unit_summoned";

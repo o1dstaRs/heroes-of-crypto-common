@@ -48,6 +48,10 @@ export type GameActionRejectionReason =
     | "placement_not_available"
     | "invalid_placement"
     | "placement_blocked"
+    | "split_not_available"
+    | "invalid_split"
+    | "split_unit_factory_missing"
+    | "unit_limit_reached"
     | "delete_not_available"
     | "start_not_available"
     | "unsupported_action";
@@ -77,6 +81,12 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
         spell: Spell;
     }) => Unit | undefined;
     canPlaceUnit?: (unit: Unit, cells: XY[], action: Extract<GameAction, { type: "place_unit" }>) => boolean;
+    canSplitUnit?: (unit: Unit, action: Extract<GameAction, { type: "split_unit" }>) => boolean;
+    createSplitUnit?: (
+        unit: Unit,
+        amount: number,
+        action: Extract<GameAction, { type: "split_unit" }>,
+    ) => Unit | undefined;
 }
 
 export class GameActionEngine {
@@ -112,6 +122,8 @@ export class GameActionEngine {
                 return this.castSpell(action);
             case "place_unit":
                 return this.placeUnit(action);
+            case "split_unit":
+                return this.splitUnit(action);
             case "delete_unit":
                 return this.deleteUnit(action);
             default:
@@ -973,6 +985,51 @@ export class GameActionEngine {
         return {
             completed: true,
             events: [{ type: "unit_deleted", unitId: action.unitId, team }],
+        };
+    }
+    private splitUnit(action: Extract<GameAction, { type: "split_unit" }>): IGameActionResult {
+        if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished()) {
+            return this.reject("split_not_available");
+        }
+
+        const sourceUnit = this.context.unitsHolder.getAllUnits().get(action.unitId);
+        if (!sourceUnit) {
+            return this.reject("unit_not_found");
+        }
+
+        if (
+            !Number.isSafeInteger(action.amount) ||
+            action.amount <= 0 ||
+            action.amount >= sourceUnit.getAmountAlive()
+        ) {
+            return this.reject("invalid_split");
+        }
+
+        if (this.context.canSplitUnit && !this.context.canSplitUnit(sourceUnit, action)) {
+            return this.reject("unit_limit_reached");
+        }
+
+        const splitUnit = this.context.createSplitUnit?.(sourceUnit, action.amount, action);
+        if (!splitUnit) {
+            return this.reject("split_unit_factory_missing");
+        }
+
+        const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
+        sourceUnit.setAmountAlive(sourceAmount);
+        this.context.unitsHolder.addUnit(splitUnit);
+
+        return {
+            completed: true,
+            events: [
+                {
+                    type: "unit_split",
+                    sourceUnitId: sourceUnit.getId(),
+                    newUnitId: splitUnit.getId(),
+                    team: sourceUnit.getTeam(),
+                    sourceAmount,
+                    splitAmount: action.amount,
+                },
+            ],
         };
     }
     private validateTurnAction(unitId: string): Unit | Error {
