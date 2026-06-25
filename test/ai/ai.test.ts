@@ -11,7 +11,17 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { AIActionType, BasicAIAction, findTarget, getCellsForAttacker } from "../../src/ai/ai";
+import {
+    AIActionType,
+    BasicAIAction,
+    findTarget,
+    getCellsForAttacker,
+    isLineBlockedByObstacle,
+    countMeleeThreatsToCell,
+    analyzeEngagement,
+    findSaferMoveCell,
+    type ITeamEngagement,
+} from "../../src/ai/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
@@ -651,6 +661,358 @@ describe("AI attack-cell helpers", () => {
     });
 });
 
+// Unit tests for AI helper functions.
+
+describe("isLineBlockedByObstacle", () => {
+    const EMPTY = [
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ];
+
+    it("returns false for adjacent cells (nothing between them)", () => {
+        expect(isLineBlockedByObstacle({ x: 0, y: 0 }, { x: 1, y: 0 }, EMPTY)).toBe(false);
+        expect(isLineBlockedByObstacle({ x: 2, y: 2 }, { x: 3, y: 2 }, EMPTY)).toBe(false);
+    });
+
+    it("returns false for a clear line on an empty grid", () => {
+        expect(isLineBlockedByObstacle({ x: 0, y: 0 }, { x: 4, y: 0 }, EMPTY)).toBe(false);
+        expect(isLineBlockedByObstacle({ x: 0, y: 0 }, { x: 4, y: 4 }, EMPTY)).toBe(false);
+    });
+
+    it("returns true when a mountain (-1) is between the two cells", () => {
+        const matrix = [
+            [0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        expect(isLineBlockedByObstacle({ x: 0, y: 1 }, { x: 4, y: 1 }, matrix)).toBe(true);
+    });
+
+    it("returns false when the mountain is NOT on the line", () => {
+        const matrix = [
+            [0, 0, 0, 0, 0],
+            [0, 0, -1, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        expect(isLineBlockedByObstacle({ x: 0, y: 0 }, { x: 4, y: 0 }, matrix)).toBe(false);
+    });
+
+    it("does not count the endpoints as blocking", () => {
+        const matrix = [
+            [0, 0, 0, 0, 0],
+            [-1, 0, 0, 0, -1],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        // From cell at the mountain to a far cell; the starting cell's obstacle does not block.
+        expect(isLineBlockedByObstacle({ x: 0, y: 1 }, { x: 3, y: 1 }, matrix)).toBe(false);
+    });
+});
+
+describe("countMeleeThreatsToCell", () => {
+    it("returns 0 on an empty grid", () => {
+        const matrix = [
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 0],
+        ];
+        expect(countMeleeThreatsToCell({ x: 1, y: 1 }, matrix, 1)).toBe(0);
+    });
+
+    it("counts adjacent enemies (all 8 directions)", () => {
+        const matrix = [
+            [1, 1, 0],
+            [1, 0, 0],
+            [0, 0, 1],
+        ];
+        expect(countMeleeThreatsToCell({ x: 1, y: 1 }, matrix, 1)).toBe(4);
+    });
+
+    it("does not count the cell itself", () => {
+        const matrix = [
+            [0, 0, 0],
+            [0, 1, 0],
+            [0, 0, 0],
+        ];
+        expect(countMeleeThreatsToCell({ x: 1, y: 1 }, matrix, 1)).toBe(0);
+    });
+
+    it("only counts the specified team", () => {
+        const matrix = [
+            [2, 2, 0],
+            [1, 0, 0],
+            [0, 0, 0],
+        ];
+        expect(countMeleeThreatsToCell({ x: 1, y: 1 }, matrix, 1)).toBe(1);
+        expect(countMeleeThreatsToCell({ x: 1, y: 1 }, matrix, 2)).toBe(2);
+    });
+});
+
+describe("analyzeEngagement", () => {
+    it("returns zeros when no allies exist", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const unit = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
+        const holder = new UnitsHolder(grid);
+        const result = analyzeEngagement(unit, grid.getMatrix(), holder);
+        expect(result.totalAllies).toBe(0);
+        expect(result.totalMeleeAllies).toBe(0);
+        expect(result.totalRangedAllies).toBe(0);
+        expect(result.engagedMeleeAllies).toBe(0);
+        expect(result.enemiesPressing).toBe(false);
+        expect(result.allyMeleeCenter).toBeUndefined();
+    });
+
+    it("counts melee and ranged allies correctly", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
+        const melee1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 6, y: 5 });
+        const ranged1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 }, 3, 6);
+        holder.addUnit(main);
+        holder.addUnit(melee1);
+        holder.addUnit(ranged1);
+        const result = analyzeEngagement(main, grid.getMatrix(), holder);
+        expect(result.totalMeleeAllies).toBe(1);
+        expect(result.totalRangedAllies).toBe(1);
+    });
+
+    it("detects enemies pressing when an enemy is within 3 cells of an ally", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
+        const ally = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 7 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 8, y: 7 });
+        grid.occupyCell({ x: 5, y: 5 }, main.getId(), main.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 7, y: 7 }, ally.getId(), ally.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 8, y: 7 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(main);
+        holder.addUnit(ally);
+        holder.addUnit(enemy);
+        const result = analyzeEngagement(main, grid.getMatrix(), holder);
+        expect(result.enemiesPressing).toBe(true);
+    });
+
+    it("reports no pressing when enemies are far away", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        holder.addUnit(main);
+        holder.addUnit(enemy);
+        const result = analyzeEngagement(main, grid.getMatrix(), holder);
+        expect(result.enemiesPressing).toBe(false);
+    });
+
+    it("computes ally melee center", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
+        const ally1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 });
+        const ally2 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 7 });
+        holder.addUnit(main);
+        holder.addUnit(ally1);
+        holder.addUnit(ally2);
+        const result = analyzeEngagement(main, grid.getMatrix(), holder);
+        expect(result.allyMeleeCenter).toEqual({ x: 6, y: 6 });
+    });
+});
+
+describe("findSaferMoveCell", () => {
+    const ENEMY_TEAM = 1;
+
+    it("returns the preferred cell if it has no melee threats", () => {
+        const matrix = [
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        const knownPaths = new Map([
+            [0x23, []],
+            [0x34, []],
+        ]);
+        const result = findSaferMoveCell({ x: 3, y: 2 }, knownPaths, matrix, ENEMY_TEAM, true);
+        expect(result).toEqual({ x: 3, y: 2 });
+    });
+
+    it("returns the preferred cell when isRangedUnit is false", () => {
+        const matrix = [
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 1],
+        ];
+        const knownPaths = new Map([[0x11, []]]);
+        const result = findSaferMoveCell({ x: 1, y: 1 }, knownPaths, matrix, ENEMY_TEAM, false);
+        expect(result).toEqual({ x: 1, y: 1 });
+    });
+
+    it("finds a safer cell when the preferred one is adjacent to an enemy", () => {
+        const matrix = [
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        // Preferred cell is adjacent to an enemy; safer alternatives should be considered.
+        const m2 = [
+            [0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ];
+        const knownPaths = new Map([
+            [(0 << 4) | 0, []],
+            [(1 << 4) | 2, []], // safe cell (1,2)
+            [(2 << 4) | 1, []],
+        ]);
+        const preferred = { x: 1, y: 2 };
+        const result = findSaferMoveCell(preferred, knownPaths, m2, ENEMY_TEAM, true);
+        expect(result).toBeDefined();
+        // The safer cell should have 0 threats
+        if (result) {
+            expect(countMeleeThreatsToCell(result, m2, ENEMY_TEAM)).toBe(0);
+        }
+    });
+
+    it("returns undefined-safe (preferred) when knownPaths is empty", () => {
+        const result = findSaferMoveCell({ x: 1, y: 1 }, new Map(), [], 1, true);
+        expect(result).toEqual({ x: 1, y: 1 });
+    });
+});
+
+describe("AI Strategy: ranged-heavy defense", () => {
+    it("melee unit holds position when team is ranged-heavy and enemies are far", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        // One melee unit (the AI unit)
+        const melee = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 5, y: 5 });
+        // Two ranged allies
+        const r1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 3 }, 3, 8);
+        const r2 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 7 }, 3, 8);
+        // Enemy far away
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        grid.occupyCell({ x: 5, y: 5 }, melee.getId(), melee.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 3, y: 7 }, r2.getId(), r2.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 14, y: 14 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(melee);
+        holder.addUnit(r1);
+        holder.addUnit(r2);
+        holder.addUnit(enemy);
+
+        const action = findTarget(melee, grid, grid.getMatrix(), holder, pathHelper);
+        // Should return undefined (hold) because team is ranged-heavy and enemies are not pressing
+        expect(action).toBeUndefined();
+    });
+
+    it("melee unit advances when enemies are pressing even in ranged-heavy team", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const melee = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 5, y: 5 });
+        const r1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 3 }, 3, 8);
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 7, y: 5 });
+        grid.occupyCell({ x: 5, y: 5 }, melee.getId(), melee.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 7, y: 5 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(melee);
+        holder.addUnit(r1);
+        holder.addUnit(enemy);
+
+        const action = findTarget(melee, grid, grid.getMatrix(), holder, pathHelper);
+        // Enemy is within 3 cells, so the melee unit should not hold.
+        expect(action).toBeDefined();
+    });
+});
+
+describe("AI Strategy: ranged units avoid melee range", () => {
+    it("ranged unit does not move to a cell adjacent to an enemy", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const ranged = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 }, 1, 1, [], true);
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 10, y: 10 });
+        grid.occupyCell({ x: 1, y: 1 }, ranged.getId(), ranged.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 10, y: 10 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(ranged);
+        holder.addUnit(enemy);
+
+        const action = findTarget(ranged, grid, grid.getMatrix(), holder, pathHelper);
+        // Out of range, so falls to MOVE. Check that destination is NOT adjacent to enemy.
+        if (action && action.cellToMove()) {
+            const dest = action.cellToMove()!;
+            const threats = countMeleeThreatsToCell(dest, grid.getMatrix(), PBTypes.TeamVals.LOWER);
+            expect(threats).toBe(0);
+        }
+    });
+});
+
+describe("AI Strategy: group coordination", () => {
+    it("isolated melee unit moves toward ally group center when no enemies pressing", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const holder = new UnitsHolder(grid);
+        const lone = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 1, y: 1 });
+        const ally1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 10, y: 10 });
+        const ally2 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 12, y: 10 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        grid.occupyCell({ x: 1, y: 1 }, lone.getId(), lone.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 10, y: 10 }, ally1.getId(), ally1.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 12, y: 10 }, ally2.getId(), ally2.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 14, y: 14 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(lone);
+        holder.addUnit(ally1);
+        holder.addUnit(ally2);
+        holder.addUnit(enemy);
+
+        const action = findTarget(lone, grid, grid.getMatrix(), holder, pathHelper);
+        expect(action).toBeDefined();
+        // The unit should be moving toward allies (right/up), not just toward the enemy.
+        if (action?.cellToMove()) {
+            const dest = action.cellToMove()!;
+            // Should have moved closer to ally center (~11,10), i.e. x should increase from 1
+            expect(dest.x).toBeGreaterThan(1);
+        }
+    });
+});
+
+describe("AI: AOE units ignore mountain LOS", () => {
+    it("Cyclops with Large Caliber targets units behind a mountain", () => {
+        const grid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        const holder = new UnitsHolder(grid);
+        // Cyclops is a large unit with Large Caliber
+        const cyclops = stubRangeUnit(
+            PBTypes.TeamVals.UPPER,
+            3,
+            { x: 3, y: 3 },
+            3,
+            8,
+            ["Large Caliber"],
+            false, // big unit
+        );
+        // Enemy on the other side of the mountain (center)
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 11, y: 11 });
+        grid.occupyCell({ x: 3, y: 3 }, cyclops.getId(), cyclops.getTeam(), 1, false, false);
+        grid.occupyCell({ x: 11, y: 11 }, enemy.getId(), enemy.getTeam(), 1, false, false);
+        holder.addUnit(cyclops);
+        holder.addUnit(enemy);
+
+        const matrix = grid.getMatrix();
+        const action = findTarget(cyclops, grid, matrix, holder, pathHelper);
+        // Should fire RANGE_ATTACK despite the mountain being in the way (AOE ignores it)
+        expect(action).toBeDefined();
+        expect(action!.actionType()).toBe(AIActionType.RANGE_ATTACK);
+    });
+});
+
 function stubSmallUnit(teamType: TeamType, steps: number, baseCell: HoCMath.XY): UnitRepr {
     return new UnitRepr(
         crypto.randomUUID(),
@@ -811,5 +1173,9 @@ class UnitRepr implements IUnitAIRepr {
 
     public getRangeShotDistance(): number {
         return this.rangeShotDistance;
+    }
+
+    public isDead(): boolean {
+        return false;
     }
 }

@@ -479,7 +479,7 @@ function countEnemiesBeyondInLine(
  * cell (excluding the endpoints) is a blocking obstacle (mountain). Uses the same
  * line-stepping approach as countEnemiesBeyondInLine.
  */
-function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY, matrix: number[][]): boolean {
+export function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY, matrix: number[][]): boolean {
     const numRows = matrix.length;
     const numCols = matrix[0].length;
     const dx = toCell.x - fromCell.x;
@@ -513,7 +513,7 @@ function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY, matri
  * melee-attack a unit standing there next turn. Only melee proximity counts as
  * a "dangerous" threat for movement; ranged exchanges are normal gameplay.
  */
-function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], enemyTeam: number): number {
+export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], enemyTeam: number): number {
     const numCols = matrix[0].length;
     const numRows = matrix.length;
     let count = 0;
@@ -536,7 +536,7 @@ function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], enemyTeam
  * its nearest melee ally, and whether any enemy is within `pressRange` cells of
  * any ally (enemies "pressing" — if not, the team can hold position).
  */
-interface ITeamEngagement {
+export interface ITeamEngagement {
     totalAllies: number;
     totalMeleeAllies: number;
     totalRangedAllies: number;
@@ -549,7 +549,7 @@ interface ITeamEngagement {
 const ENEMY_PRESS_RADIUS = 3;
 const GROUP_REGROUP_DIST = 4;
 
-function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHolder: UnitsHolder): ITeamEngagement {
+export function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHolder: UnitsHolder): ITeamEngagement {
     const team = unit.getTeam();
     const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
     const allies = unitsHolder.getAllAllies(team);
@@ -623,7 +623,7 @@ function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHolder: U
  * close to the preferred destination. For melee units: overridden by team-aware logic
  * in findTarget instead.
  */
-function findSaferMoveCell(
+export function findSaferMoveCell(
     preferredCell: HoCMath.XY | undefined,
     knownPaths: Map<number, IWeightedRoute[]> | undefined,
     matrix: number[][],
