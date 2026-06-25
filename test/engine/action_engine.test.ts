@@ -122,7 +122,13 @@ const setupActionFight = (
     return { ...context, fightProperties, lower, lowerSupport, upper, activeUnit, sceneLog, moveHandler, engine };
 };
 
-const setupPlacementFight = () => {
+const setupPlacementFight = (
+    opts: {
+        amountAlive?: number;
+        canSplitUnit?: IGameActionEngineContext["canSplitUnit"];
+        createSplitUnit?: IGameActionEngineContext["createSplitUnit"];
+    } = {},
+) => {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
@@ -131,6 +137,7 @@ const setupPlacementFight = () => {
     const unit = createTestUnit({
         name: "Peasant",
         team: PBTypes.TeamVals.LOWER,
+        amountAlive: opts.amountAlive,
     });
     context.unitsHolder.addUnit(unit);
     const engine = new GameActionEngine({
@@ -140,6 +147,8 @@ const setupPlacementFight = () => {
         moveHandler,
         sceneLog,
         canPlaceUnit: (_unit, cells) => cells.every((cell) => cell.x <= 4 && cell.y <= 4),
+        canSplitUnit: opts.canSplitUnit,
+        createSplitUnit: opts.createSplitUnit,
     });
 
     return { ...context, fightProperties, unit, sceneLog, moveHandler, engine };
@@ -269,6 +278,21 @@ describe("GameActionEngine", () => {
                 attackType: PBTypes.AttackVals.MELEE,
             },
         ]);
+        expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+    });
+
+    it("accepts selecting the already selected attack type as an idempotent action", () => {
+        const setup = setupActionFight({ lowerAttackType: PBTypes.AttackVals.RANGE, lowerRangeShots: 3 });
+        setup.lower.refreshPossibleAttackTypes(false);
+        expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+
+        const result = setup.engine.apply({
+            type: "select_attack_type",
+            unitId: setup.lower.getId(),
+            attackType: PBTypes.AttackVals.MELEE,
+        });
+
+        expect(result).toEqual({ completed: true, events: [] });
         expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
     });
 
@@ -1243,6 +1267,60 @@ describe("GameActionEngine", () => {
         });
         expect(setup.unitsHolder.getAllUnits().has(setup.unit.getId())).toBe(false);
         expect(setup.grid.getOccupantUnitId({ x: 2, y: 2 })).toBe("");
+    });
+
+    it("splits an unstarted placement stack through common mechanics", () => {
+        const setup = setupPlacementFight({
+            amountAlive: 7,
+            canSplitUnit: () => true,
+            createSplitUnit: (sourceUnit, amount) =>
+                createTestUnit({ name: sourceUnit.getName(), team: sourceUnit.getTeam(), amountAlive: amount }),
+        });
+
+        const result = setup.engine.apply({ type: "split_unit", unitId: setup.unit.getId(), amount: 3 });
+        const splitEvent = result.events.find((event) => event.type === "unit_split");
+
+        expect(result.completed).toBe(true);
+        expect(splitEvent).toEqual({
+            type: "unit_split",
+            sourceUnitId: setup.unit.getId(),
+            newUnitId: splitEvent?.type === "unit_split" ? splitEvent.newUnitId : "",
+            team: setup.unit.getTeam(),
+            sourceAmount: 4,
+            splitAmount: 3,
+        });
+        expect(setup.unit.getAmountAlive()).toBe(4);
+        expect(setup.unitsHolder.getAllUnits().size).toBe(2);
+        expect(
+            setup.unitsHolder
+                .getAllUnits()
+                .get(splitEvent?.type === "unit_split" ? splitEvent.newUnitId : "")
+                ?.getAmountAlive(),
+        ).toBe(3);
+    });
+
+    it("rejects invalid or over-cap placement stack splits", () => {
+        const setup = setupPlacementFight({
+            amountAlive: 7,
+            canSplitUnit: () => false,
+            createSplitUnit: (sourceUnit, amount) =>
+                createTestUnit({ name: sourceUnit.getName(), team: sourceUnit.getTeam(), amountAlive: amount }),
+        });
+
+        expect(setup.engine.apply({ type: "split_unit", unitId: setup.unit.getId(), amount: 7 })).toEqual({
+            completed: false,
+            events: [],
+            rejectionReason: "invalid_split",
+            message: undefined,
+        });
+        expect(setup.engine.apply({ type: "split_unit", unitId: setup.unit.getId(), amount: 3 })).toEqual({
+            completed: false,
+            events: [],
+            rejectionReason: "unit_limit_reached",
+            message: undefined,
+        });
+        expect(setup.unit.getAmountAlive()).toBe(7);
+        expect(setup.unitsHolder.getAllUnits().size).toBe(1);
     });
 
     it("rejects placement and setup deletion after the fight starts", () => {

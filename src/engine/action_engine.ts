@@ -217,6 +217,9 @@ export class GameActionEngine {
         if (unit instanceof Error) {
             return this.reject(unit.message as GameActionRejectionReason);
         }
+        if (unit.getAttackTypeSelection() === attackType) {
+            return { completed: true, events: [] };
+        }
         if (!unit.selectAttackType(attackType)) {
             return this.reject("attack_type_not_available");
         }
