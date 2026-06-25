@@ -170,7 +170,7 @@ export class GameActionEngine {
         const skipReason = action.reason ?? "manual";
         const events = this.turnEngine.completeTurn(unit, {
             skipReason,
-            skipLogMessage: skipReason === "manual" ? `${unit.getName()} ends turn` : undefined,
+            skipLogMessage: skipReason === "manual" ? `${unit.getName()} skips turn` : undefined,
         });
         return { completed: true, events };
     }

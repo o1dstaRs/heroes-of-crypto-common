@@ -88,7 +88,7 @@ export class TurnEngine {
                 MORALE_CHANGE_FOR_SKIP,
                 this.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
             );
-            this.sceneLog.updateLog(opts.skipLogMessage ?? `${unit.getName()} skip turn`);
+            this.sceneLog.updateLog(opts.skipLogMessage ?? `${unit.getName()} skips turn`);
             events.push({ type: "unit_skipped", unitId: unit.getId(), team: unit.getTeam(), reason: opts.skipReason });
         }
 
