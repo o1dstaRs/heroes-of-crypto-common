@@ -168,6 +168,25 @@ export function findTarget(
         action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
     }
 
+    // Movement safety: if the AI decided to MOVE (not attack), check that the
+    // destination cell isn't a suicide position for ranged units (adjacent to
+    // an enemy that can melee them). If it is, find a safer nearby cell.
+    if (action && action.actionType() === AIActionType.MOVE) {
+        const enemyTeamVal =
+            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+        const isRangedUnit = unit.getAttackType() === PBTypes.AttackVals.RANGE;
+        const saferCell = findSaferMoveCell(
+            action.cellToMove(),
+            action.currentActiveKnownPaths(),
+            matrix,
+            enemyTeamVal,
+            isRangedUnit,
+        );
+        if (saferCell && saferCell !== action.cellToMove()) {
+            action = new BasicAIAction(AIActionType.MOVE, saferCell, undefined, action.currentActiveKnownPaths());
+        }
+    }
+
     if (DEBUG_AI) {
         logAction(action, DEBUG_AI);
         console.timeEnd("AI step");
@@ -241,7 +260,8 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
 
             // Skip targets whose line of sight is blocked by a mountain — the shot
             // would hit the obstacle instead of the unit (wasted turn).
-            if (isLineBlockedByObstacle(unitCell, targetCell, matrix)) {
+            // Units with Area Throw or Large Caliber ignore mountains (AOE shot passes through).
+            if (!isAOEAttacker && isLineBlockedByObstacle(unitCell, targetCell, matrix)) {
                 continue;
             }
 
@@ -387,6 +407,77 @@ function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY, matri
         curY += stepY;
     }
     return false;
+}
+
+/**
+ * Count enemy units adjacent (within 1 cell) to a given cell — those that can
+ * melee-attack a unit standing there next turn. Only melee proximity counts as
+ * a "dangerous" threat for movement; ranged exchanges are normal gameplay.
+ */
+function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], enemyTeam: number): number {
+    const numCols = matrix[0].length;
+    const numRows = matrix.length;
+    let count = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = cell.x + dx;
+            const ny = cell.y + dy;
+            if (nx < 0 || ny < 0 || nx >= numCols || ny >= numRows) continue;
+            if (matrix[ny][nx] === enemyTeam) count++;
+        }
+    }
+    return count;
+}
+
+/**
+ * For ranged units: if the preferred destination is adjacent to an enemy (melee
+ * threat), scan reachable cells for a safer spot NOT in melee range. Prefers cells
+ * close to the preferred destination. For melee units: no override.
+ */
+function findSaferMoveCell(
+    preferredCell: HoCMath.XY | undefined,
+    knownPaths: Map<number, IWeightedRoute[]> | undefined,
+    matrix: number[][],
+    enemyTeam: number,
+    isRangedUnit: boolean,
+): HoCMath.XY | undefined {
+    if (!preferredCell || !knownPaths || knownPaths.size === 0 || !isRangedUnit) {
+        return preferredCell;
+    }
+
+    const preferredThreats = countMeleeThreatsToCell(preferredCell, matrix, enemyTeam);
+    if (preferredThreats === 0) {
+        return preferredCell;
+    }
+
+    let safestCell = preferredCell;
+    let safestThreats = preferredThreats;
+    let safestDist = Infinity;
+
+    for (const [key] of knownPaths) {
+        const cx = (key >> 4) & 0xf;
+        const cy = key & 0xf;
+        const candidateCell = { x: cx, y: cy };
+
+        const val = HoCMath.matrixElementOrDefault(matrix, cx, cy, 0);
+        if (val === ObstacleType.BLOCK || val === ObstacleType.HOLE || val === ObstacleType.LAVA) {
+            continue;
+        }
+        if (val === enemyTeam) {
+            continue;
+        }
+
+        const threats = countMeleeThreatsToCell(candidateCell, matrix, enemyTeam);
+        const distToPreferred = HoCMath.getDistance(candidateCell, preferredCell);
+        if (threats < safestThreats || (threats === safestThreats && distToPreferred < safestDist)) {
+            safestThreats = threats;
+            safestDist = distToPreferred;
+            safestCell = candidateCell;
+        }
+    }
+
+    return safestCell;
 }
 
 /**
