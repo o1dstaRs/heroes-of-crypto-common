@@ -1959,6 +1959,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.randomizeLuckPerTurn();
             }
 
+            // Before the fight is initialized (unit placement in sandbox/ranked), units keep their
+            // default luck: the random per-turn spread (±LUCK_MAX_CHANGE_FOR_TURN) is only rolled
+            // once the fight starts and then re-rolled each lap. Gating the contribution here also
+            // stops a stale luckPerTurn (left over from a previous fight/rematch) from leaking into
+            // the placement view.
+            if (!hasFightStarted) {
+                this.luckPerTurn = 0;
+            }
             this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease;
             if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
                 this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;

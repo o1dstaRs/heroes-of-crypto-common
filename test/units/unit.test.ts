@@ -297,6 +297,30 @@ describe("Unit", () => {
         });
     });
 
+    describe("luck", () => {
+        it("drops the random per-turn spread before the fight starts (placement shows default luck)", () => {
+            const unit = createTestUnit({ luck: 4 });
+
+            // Simulate in-fight lap rolls until a non-zero spread is present, so the assertion below
+            // is meaningful (the roll range includes 0).
+            let guard = 0;
+            do {
+                unit.randomizeLuckPerTurn();
+                guard += 1;
+            } while (unit.getLuck() === 4 && guard < 50);
+            expect(unit.getLuck()).not.toBe(4);
+
+            // Placement / pre-fight refresh (hasFightStarted = false) must clear the random spread
+            // and show only the unit's default luck.
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getLuck()).toBe(4);
+
+            // Once the fight starts, the per-lap randomness applies again.
+            unit.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
+            expect(Math.abs(unit.getLuck() - 4)).toBeLessThanOrEqual(3);
+        });
+    });
+
     describe("calculateAttackDamage", () => {
         it("calculates deterministic range damage and consumes one shot", () => {
             const attacker = createTestUnit({
