@@ -340,8 +340,10 @@ export class TurnEngine {
         }
 
         for (const unit of units) {
+            const amountAliveBefore = unit.getAmountAlive();
             const damage = unit.applyArmageddonDamage(wave, this.sceneLog);
-            events.push({ type: "armageddon_applied", unitId: unit.getId(), wave, damage });
+            const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
+            events.push({ type: "armageddon_applied", unitId: unit.getId(), wave, damage, unitsDied });
             if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId(), wave === 1)) {
                 events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "armageddon" });
             }
@@ -405,7 +407,16 @@ export class TurnEngine {
             return undefined;
         }
 
-        const winningTeam = unitsLower.length ? PBTypes.TeamVals.LOWER : PBTypes.TeamVals.UPPER;
+        // Both sides can be wiped out on the same lap (e.g. armageddon kills everyone at once) — that's
+        // a draw, NOT an UPPER win. Only award a team the win when it's the sole side with units left.
+        let winningTeam: TeamType;
+        if (unitsLower.length) {
+            winningTeam = PBTypes.TeamVals.LOWER;
+        } else if (unitsUpper.length) {
+            winningTeam = PBTypes.TeamVals.UPPER;
+        } else {
+            winningTeam = PBTypes.TeamVals.NO_TEAM;
+        }
         this.fightProperties.finishFight();
         return { type: "fight_finished", winningTeam };
     }

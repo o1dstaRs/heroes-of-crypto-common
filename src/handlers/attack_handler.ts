@@ -125,8 +125,19 @@ export class AttackHandler {
         isSelection = false,
         isAOEShot = false,
     ): IRangeAttackEvaluation {
+        // Through Shot keeps travelling past the aimed target to the edge of the field, so it can
+        // hit every unit standing on that line - not just the ones up to the hovered target.
+        const lineEndPosition = isThroughShot
+            ? GridMath.projectLineToFieldEdge(
+                  this.gridSettings,
+                  fromPosition.x,
+                  fromPosition.y,
+                  toPosition.x,
+                  toPosition.y,
+              )
+            : toPosition;
         const intersectedCellsToPositions = this.getCellsToPositions(
-            this.getIntersectedPositions(fromPosition, toPosition),
+            this.getIntersectedPositions(fromPosition, lineEndPosition),
         );
 
         return this.getAffectedUnitsAndObstacles(

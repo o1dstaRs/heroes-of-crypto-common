@@ -307,6 +307,7 @@ describe("TurnEngine", () => {
             unitId: setup.lower.getId(),
             wave: 1,
             damage: 75,
+            unitsDied: 1,
         });
         expect(result.events).toContainEqual({
             type: "unit_destroyed",

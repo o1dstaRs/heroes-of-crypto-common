@@ -31,7 +31,7 @@ export type GameEvent =
     | { type: "unit_moved_by_system"; unitId: string; position: XY; reason: "narrowing" }
     | { type: "unit_destroyed"; unitId: string; reason: "narrowing" | "armageddon" | "dead_cleanup" }
     | { type: "unit_resurrected"; unitId: string; team: TeamType; amount: number; hp: number; position: XY }
-    | { type: "armageddon_applied"; unitId: string; wave: number; damage: number }
+    | { type: "armageddon_applied"; unitId: string; wave: number; damage: number; unitsDied: number }
     | { type: "morale_applied"; unitId: string; kind: "plus" | "minus"; lap: number }
     | { type: "next_unit_selected"; unitId: string; team: TeamType }
     | { type: "unit_skipped"; unitId: string; team: TeamType; reason: "effect" | "timeout" | "manual" }
