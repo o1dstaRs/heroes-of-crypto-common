@@ -356,6 +356,25 @@ describe("Unit", () => {
             unit.cleanupLuckPerTurn();
             expect(unit.getLuck()).toBe(4);
         });
+
+        it("makes a lucky defender take less damage and an unlucky one take more", () => {
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 100, amountAlive: 1 });
+            attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            const neutral = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 0 });
+            const lucky = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 10 });
+            const unlucky = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: -10 });
+
+            const base = attacker.calculateAttackDamageMax(1, neutral, false, 0);
+            const vsLucky = attacker.calculateAttackDamageMax(1, lucky, false, 0);
+            const vsUnlucky = attacker.calculateAttackDamageMax(1, unlucky, false, 0);
+
+            expect(vsLucky).toBeLessThan(base);
+            expect(vsUnlucky).toBeGreaterThan(base);
+            // +/-10 luck scales the damage term by (1 - luck/100) = 0.9 / 1.1.
+            expect(vsLucky / base).toBeCloseTo(0.9, 1);
+            expect(vsUnlucky / base).toBeCloseTo(1.1, 1);
+        });
     });
 
     describe("morale", () => {

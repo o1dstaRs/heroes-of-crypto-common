@@ -418,6 +418,44 @@ describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
     });
 });
 
+describe("UnitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam", () => {
+    const sync = (u: Unit): number => {
+        u.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        return u.getMorale();
+    };
+
+    it("drops morale only for living same-type allies of the fallen stack", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const knightA = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
+        const knightB = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
+        const archer = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Archer", morale: 10 });
+        const enemyKnight = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Knight", morale: 10 });
+        placeUnit(grid, unitsHolder, knightA, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, knightB, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, archer, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, enemyKnight, { x: 8, y: 8 });
+
+        // A LOWER Knight fell: same-name + same-team allies lose MORALE_CHANGE_FOR_KILL (4) each.
+        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LOWER}`]: 4 });
+
+        expect(sync(knightA)).toBe(6);
+        expect(sync(knightB)).toBe(6);
+        expect(sync(archer)).toBe(10); // different unit type — unaffected
+        expect(sync(enemyKnight)).toBe(10); // enemy team — unaffected
+    });
+
+    it("accumulates the penalty when multiple same-type stacks die at once", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const knight = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
+        placeUnit(grid, unitsHolder, knight, { x: 1, y: 1 });
+
+        // Two Knights died in the same attack -> 2 * 4 = 8.
+        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LOWER}`]: 8 });
+
+        expect(sync(knight)).toBe(2);
+    });
+});
+
 function flatUnitIds(teams: Unit[][]): string[] {
     return teams.flat().map((unit) => unit.getId());
 }
