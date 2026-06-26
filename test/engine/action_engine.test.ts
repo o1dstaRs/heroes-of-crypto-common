@@ -166,27 +166,68 @@ const weightedRoute = (route: { x: number; y: number }[]): IWeightedRoute => ({
 });
 
 describe("GameActionEngine", () => {
-    it("ends the active unit turn through common turn mechanics", () => {
+    it("ends the active unit turn through common turn mechanics (manual end is not a skip)", () => {
         const setup = setupActionFight();
+        const moraleBefore = setup.lower.getMorale();
 
         const result = setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() });
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
-        expect(result.events).toContainEqual({
-            type: "unit_skipped",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
-            reason: "manual",
-        });
+        // A manual end-of-turn is NOT a skip: no unit_skipped event and no morale penalty.
+        expect(result.events.some((event) => event.type === "unit_skipped")).toBe(false);
         expect(result.events).toContainEqual({
             type: "turn_completed",
             unitId: setup.lower.getId(),
             team: PBTypes.TeamVals.LOWER,
             hourglass: false,
         });
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.lower.getMorale()).toBe(moraleBefore);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
         expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LOWER)).toBe(400);
+    });
+
+    it("keeps the full +3 distance morale when a move also ends the unit's turn", () => {
+        const path = [
+            { x: 3, y: 3 },
+            { x: 3, y: 4 },
+            { x: 3, y: 5 },
+            { x: 3, y: 6 },
+        ];
+        const targetCell = path[path.length - 1];
+        const setup = setupActionFight({
+            currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
+        });
+        expect(setup.lower.getMorale()).toBe(4);
+
+        // Move toward the enemy (+3), then end the turn manually — the end must NOT apply the skip
+        // penalty, so the net stays +3 (regression: it used to net -1).
+        expect(setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() }).completed).toBe(true);
+
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.lower.getMorale()).toBe(7);
+    });
+
+    it("applies the full -3 distance morale when a move away also ends the turn", () => {
+        // Enemy is at (9,9); lower starts at (3,3) morale 4. This path walks away from it.
+        const path = [
+            { x: 3, y: 3 },
+            { x: 3, y: 2 },
+            { x: 3, y: 1 },
+        ];
+        const targetCell = path[path.length - 1];
+        const setup = setupActionFight({
+            currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
+        });
+        expect(setup.lower.getMorale()).toBe(4);
+
+        expect(setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() }).completed).toBe(true);
+
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.lower.getMorale()).toBe(1);
     });
 
     it("waits on hourglass without marking the unit as having completed the lap", () => {

@@ -455,6 +455,32 @@ export class UnitsHolder {
 
         return closestDistance;
     }
+    /**
+     * Distance from `position` to the CENTROID (average position) of all living enemy units.
+     * Used by the move-distance morale modifier so it reflects whether a unit advanced toward (or
+     * retreated from) the enemy army as a whole rather than a single closest enemy — a lone flanker
+     * behind the unit can no longer flip "charging into the enemy line" into a morale penalty.
+     * Returns Number.MAX_SAFE_INTEGER when there are no enemies (so the caller sees no change).
+     */
+    public getDistanceToEnemyCentroid(enemyTeam: TeamType, position: XY): number {
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        for (const u of this.getAllUnitsIterator()) {
+            if (u.getTeam() === enemyTeam) {
+                const enemyPosition = u.getPosition();
+                sumX += enemyPosition.x;
+                sumY += enemyPosition.y;
+                count += 1;
+            }
+        }
+
+        if (count === 0) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+
+        return getDistance(position, { x: sumX / count, y: sumY / count });
+    }
     public allEnemiesAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): Unit[] {
         const enemyList: Unit[] = [];
         const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();

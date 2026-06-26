@@ -25,6 +25,7 @@ import { SquarePlacement } from "../../src/grid/square_placement";
 import { LifeSynergy, SynergyLevel } from "../../src/synergies/synergy_properties";
 import type { Unit } from "../../src/units/unit";
 import type { UnitProperties } from "../../src/units/unit_properties";
+import { getDistance } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 describe("UnitsHolder", () => {
@@ -355,6 +356,65 @@ describe("UnitsHolder", () => {
         expect(meleeAlly.getBuff("Sharpened Weapons Aura")?.getPower()).toBe(18);
         expect(rangedEnemy.hasDebuffActive("Range Null Field Aura")).toBe(true);
         expect(meleeEnemy.hasDebuffActive("Range Null Field Aura")).toBe(false);
+    });
+});
+
+describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
+    it("returns MAX_SAFE_INTEGER when there are no enemies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const ally = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        placeUnit(grid, unitsHolder, ally, { x: 3, y: 3 });
+
+        // No UPPER units exist, so there is no enemy centroid.
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, positionForCell({ x: 3, y: 3 }))).toBe(
+            Number.MAX_SAFE_INTEGER,
+        );
+    });
+
+    it("equals the distance to the only enemy when there is exactly one", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
+
+        const from = positionForCell({ x: 2, y: 2 });
+        // With a single enemy the centroid coincides with the closest-enemy metric.
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+            getDistance(from, enemy.getPosition()),
+        );
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+            unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.UPPER, from),
+        );
+    });
+
+    it("measures distance to the average position of all enemies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const e1 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "E1" });
+        const e2 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "E2" });
+        placeUnit(grid, unitsHolder, e1, { x: 2, y: 8 });
+        placeUnit(grid, unitsHolder, e2, { x: 8, y: 8 });
+
+        const from = positionForCell({ x: 5, y: 2 });
+        const centroid = {
+            x: (e1.getPosition().x + e2.getPosition().x) / 2,
+            y: (e1.getPosition().y + e2.getPosition().y) / 2,
+        };
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+            getDistance(from, centroid),
+        );
+    });
+
+    it("ignores friendly units", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const ally = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
+        placeUnit(grid, unitsHolder, ally, { x: 1, y: 1 });
+
+        const from = positionForCell({ x: 4, y: 4 });
+        // Only the UPPER enemy counts; the LOWER ally must not move the centroid.
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+            getDistance(from, enemy.getPosition()),
+        );
     });
 });
 

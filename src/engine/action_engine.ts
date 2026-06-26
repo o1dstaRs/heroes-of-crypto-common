@@ -167,10 +167,16 @@ export class GameActionEngine {
             return this.reject(unit.message as GameActionRejectionReason);
         }
 
-        const skipReason = action.reason ?? "manual";
+        const reason = action.reason ?? "manual";
+        // A "manual" end-of-turn (the unit moved/attacked, or the player simply ended the turn) is
+        // NOT a skip and must not incur the MORALE_CHANGE_FOR_SKIP penalty or the "skips turn" log.
+        // This matches the legacy, which only penalized on turn timeout. Only forced skips
+        // (timeout / effect) count as a skip here. Without this, every move ended the turn through
+        // this path and silently lost morale (e.g. moving toward the enemy netted -1 instead of +3).
+        const isForcedSkip = reason === "timeout" || reason === "effect";
         const events = this.turnEngine.completeTurn(unit, {
-            skipReason,
-            skipLogMessage: skipReason === "manual" ? `${unit.getName()} skips turn` : undefined,
+            skipReason: isForcedSkip ? reason : undefined,
+            skipLogMessage: isForcedSkip ? `${unit.getName()} skips turn` : undefined,
         });
         return { completed: true, events };
     }
@@ -297,6 +303,16 @@ export class GameActionEngine {
                 knownMoveRoute?.hasLavaCell ?? action.hasLavaCell ?? false,
                 knownMoveRoute?.hasWaterCell ?? action.hasWaterCell ?? false,
                 from,
+            );
+        } else {
+            // Footprint-only large-unit move: there's no ordered step route to derive a travelled
+            // distance from, but morale-by-distance must still apply (previously these moves got no
+            // morale at all). Use the explicit pre/post-move centers — the same from/to as the move.
+            this.context.moveHandler.applyDistanceMoraleModifier(
+                unit,
+                from,
+                to,
+                this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
             );
         }
 

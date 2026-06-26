@@ -250,32 +250,53 @@ export class MoveHandler {
         hasLavaCell = false,
         hasWaterCell = false,
         fromPosition?: XY,
+        toPosition?: XY,
     ): boolean {
         const travelledRoute = this.getTravelledRoute(route, unit);
         if (!travelledRoute.length) {
             return false;
         }
 
-        const targetPos = getPositionForCell(
-            travelledRoute[travelledRoute.length - 1],
-            this.gridSettings.getMinX(),
-            this.gridSettings.getStep(),
-            this.gridSettings.getHalfStep(),
-        );
-        const distanceBefore = this.unitsHolder.getDistanceToClosestEnemy(
-            unit.getOppositeTeam(),
-            fromPosition ?? unit.getPosition(),
-        );
-        const distanceAfter = this.unitsHolder.getDistanceToClosestEnemy(unit.getOppositeTeam(), targetPos);
-        if (distanceAfter < distanceBefore) {
-            unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
-        } else if (distanceAfter > distanceBefore) {
-            unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
-        }
+        const targetPos =
+            toPosition ??
+            getPositionForCell(
+                travelledRoute[travelledRoute.length - 1],
+                this.gridSettings.getMinX(),
+                this.gridSettings.getStep(),
+                this.gridSettings.getHalfStep(),
+            );
+        this.applyDistanceMoraleModifier(unit, fromPosition ?? unit.getPosition(), targetPos, synergyMoraleIncrease);
         unit.applyTravelledDistanceModifier(travelledRoute.length, synergyAbilityPowerIncrease);
         unit.applyLavaWaterModifier(hasLavaCell, hasWaterCell);
 
         return true;
+    }
+    /**
+     * Distance-based morale: +MORALE_CHANGE_FOR_DISTANCE when a move brings the unit closer to the
+     * enemy army's centroid, -MORALE_CHANGE_FOR_DISTANCE when it retreats, and nothing on a purely
+     * lateral move (or when there are no enemies). Returns the classification for callers/tests.
+     *
+     * Exposed (and taking explicit pre/post-move centers) so the footprint-only large-unit move
+     * path — which has no ordered step route to derive a target cell from — can still apply morale.
+     */
+    public applyDistanceMoraleModifier(
+        unit: Unit,
+        fromPosition: XY,
+        toPosition: XY,
+        synergyMoraleIncrease: number,
+    ): "TOWARD" | "AWAY" | "SAME" {
+        const enemyTeam = unit.getOppositeTeam();
+        const distanceBefore = this.unitsHolder.getDistanceToEnemyCentroid(enemyTeam, fromPosition);
+        const distanceAfter = this.unitsHolder.getDistanceToEnemyCentroid(enemyTeam, toPosition);
+        if (distanceAfter < distanceBefore) {
+            unit.increaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
+            return "TOWARD";
+        }
+        if (distanceAfter > distanceBefore) {
+            unit.decreaseMorale(MORALE_CHANGE_FOR_DISTANCE, synergyMoraleIncrease);
+            return "AWAY";
+        }
+        return "SAME";
     }
     private getTravelledRoute(route: XY[], unit: Unit): XY[] {
         const currentCell = unit.getBaseCell();

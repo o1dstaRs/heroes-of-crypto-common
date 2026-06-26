@@ -1117,7 +1117,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.amount_alive = Math.floor(amountAlive);
         this.initialUnitProperties.amount_alive = Math.floor(amountAlive);
     }
-    public increaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
+    public increaseMorale(moraleAmount: number, _synergyMoraleIncrease: number): void {
         if (
             moraleAmount <= 0 ||
             this.hasAbilityActive("Madness") ||
@@ -1130,14 +1130,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return;
         }
 
-        let newMorale = this.unitProperties.morale + moraleAmount;
+        // Apply the change to the BASE (pre-synergy) morale; adjustBaseStats re-adds the synergy
+        // bonus on top. Reading the synergy-inflated unitProperties.morale here and subtracting
+        // synergyMoraleIncrease was fragile: when the synergy used at adjust time differed (e.g. 0),
+        // the net change came out as (amount - synergy) — so with a +morale synergy, moving toward
+        // the enemy showed +1 (or even -1) instead of +3.
+        let newMorale = this.initialUnitProperties.morale + moraleAmount;
         if (newMorale > MORALE_MAX_VALUE_TOTAL) {
             newMorale = MORALE_MAX_VALUE_TOTAL;
         }
         if (newMorale < -MORALE_MAX_VALUE_TOTAL) {
             newMorale = -MORALE_MAX_VALUE_TOTAL;
         }
-        this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
+        this.initialUnitProperties.morale = newMorale;
     }
     public decreaseBaseArmor(armorAmount: number): void {
         this.initialUnitProperties.base_armor = Math.max(
@@ -1160,7 +1165,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
         this.unitProperties.amount_alive = this.initialUnitProperties.amount_alive;
     }
-    public decreaseMorale(moraleAmount: number, synergyMoraleIncrease: number): void {
+    public decreaseMorale(moraleAmount: number, _synergyMoraleIncrease: number): void {
         if (
             moraleAmount <= 0 ||
             this.hasAbilityActive("Madness") ||
@@ -1173,14 +1178,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return;
         }
 
-        let newMorale = this.unitProperties.morale - moraleAmount;
+        // See increaseMorale: change the BASE morale directly; synergy is re-applied by adjustBaseStats.
+        let newMorale = this.initialUnitProperties.morale - moraleAmount;
         if (newMorale > MORALE_MAX_VALUE_TOTAL) {
             newMorale = MORALE_MAX_VALUE_TOTAL;
         }
         if (newMorale < -MORALE_MAX_VALUE_TOTAL) {
             newMorale = -MORALE_MAX_VALUE_TOTAL;
         }
-        this.initialUnitProperties.morale = newMorale - synergyMoraleIncrease;
+        this.initialUnitProperties.morale = newMorale;
     }
     public applyTravelledDistanceModifier(cellsTravelled: number, synergyAbilityPowerIncrease: number): void {
         const cruradeAbility = this.getAbility("Crusade");
@@ -2416,19 +2422,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             const baseCell = this.getBaseCell();
 
-            let checkCells: XY[];
-            if (this.isSmallSize()) {
-                // use either target move position on current
-                // depending on the action type (attack vs response)
-                checkCells = getCellsAroundCell(this.gridSettings, baseCell);
-            } else {
-                checkCells = [];
-                for (let i = -2; i <= 1; i++) {
-                    for (let j = -2; j <= 1; j++) {
-                        checkCells.push({ x: baseCell.x + i, y: baseCell.y + j });
-                    }
-                }
-            }
+            // Immobilized (this branch runs only when !canMove(), i.e. Paralysis): the unit cannot
+            // step anywhere, so the ONLY valid cell to strike from is where it currently stands. The
+            // valid attack-from anchors are therefore the unit's own current cells — not the ring of
+            // cells around it. (Previously small units used getCellsAroundCell + an unconditional
+            // addPos=true, which lit up every adjacent cell as a phantom attack position.)
+            const checkCells: XY[] = this.isSmallSize() ? [baseCell] : this.getCells();
             const surroundingCellHashes: number[] = [];
             for (const c of checkCells) {
                 surroundingCellHashes.push((c.x << 4) | c.y);
@@ -2483,7 +2482,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                         const posHash = (c.x << 4) | c.y;
                         let addPos = false;
                         if (this.isSmallSize()) {
-                            addPos = true;
+                            // Only the cell the paralyzed unit actually stands on is a valid attack
+                            // position (checkCells == [baseCell] here).
+                            addPos = surroundingCellHashes.includes(posHash);
                         } else if (surroundingCellHashes.includes((c.x << 4) | c.y)) {
                             const largeUnitAttackCells = getLargeUnitAttackCells(
                                 this.gridSettings,

@@ -278,6 +278,32 @@ describe("TurnEngine", () => {
         expect(setup.fightProperties.hasFightFinished()).toBe(true);
     });
 
+    it("declares a draw (NO_TEAM) when BOTH teams are wiped out on the same lap", () => {
+        const setup = setupStartedFight();
+        // Armageddon (and other simultaneous wipes) can empty both teams at once. That is a draw, not
+        // an automatic UPPER win. Regression guard for finishFightIfNeeded, whose ternary used to fall
+        // through to UPPER whenever the LOWER list was empty — including when UPPER was empty too.
+        setup.unitsHolder.deleteUnitById(setup.lower.getId(), true);
+        setup.unitsHolder.deleteUnitById(setup.upper.getId(), true);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result).toEqual({
+            events: [{ type: "fight_finished", winningTeam: PBTypes.TeamVals.NO_TEAM }],
+            fightFinished: true,
+        });
+        expect(setup.fightProperties.hasFightFinished()).toBe(true);
+    });
+
     it("applies armageddon damage and deletion through common lap mechanics", () => {
         const setup = setupStartedFight();
         setup.fightProperties.markFirstTurn();

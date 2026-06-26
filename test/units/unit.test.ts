@@ -319,6 +319,117 @@ describe("Unit", () => {
             unit.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
             expect(Math.abs(unit.getLuck() - 4)).toBeLessThanOrEqual(3);
         });
+
+        it("adds the luck synergy bonus to effective luck (pre-fight, no random spread)", () => {
+            const unit = createTestUnit({ luck: 0 });
+            // hasFightStarted=false zeroes the random spread, so only the synergy remains.
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 5);
+            expect(unit.getLuck()).toBe(5);
+        });
+
+        it("clamps effective luck to +10 when base + synergy would exceed it", () => {
+            const unit = createTestUnit({ luck: 8 });
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 9); // 8 + 9 = 17, capped at 10
+            expect(unit.getLuck()).toBe(10);
+        });
+
+        it("keeps effective luck within +/-10 across many in-fight rolls", () => {
+            const unit = createTestUnit({ luck: 9 });
+            for (let i = 0; i < 200; i += 1) {
+                unit.randomizeLuckPerTurn();
+                expect(unit.getLuck()).toBeGreaterThanOrEqual(-10);
+                expect(unit.getLuck()).toBeLessThanOrEqual(10);
+            }
+        });
+    });
+
+    describe("morale", () => {
+        it("applies the full morale change even when the synergy argument doesn't match adjustBaseStats", () => {
+            const unit = createTestUnit({ morale: 4 });
+
+            // Move toward the enemy: +3. A +morale synergy may be passed here, but adjustBaseStats
+            // re-derives synergy (0 in this fight). Previously the synergy was subtracted here and
+            // not added back, so the net came out as 3 - 2 = +1. It must be a full +3.
+            unit.increaseMorale(3, 2);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getMorale()).toBe(7);
+
+            // Move away: -3, back to 4.
+            unit.decreaseMorale(3, 2);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getMorale()).toBe(4);
+        });
+
+        it("forces effective morale to 0 for Madness units", () => {
+            const mad = createTestUnit({ morale: 12, abilities: ["Madness"] });
+            mad.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(mad.getMorale()).toBe(0);
+        });
+
+        it("locks morale to +20 under Courage and -20 under Sadness", () => {
+            const brave = createTestUnit({ morale: 0 });
+            brave.applyBuff(spell("Life", "Courage"));
+            brave.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(brave.getMorale()).toBe(20);
+
+            const sad = createTestUnit({ morale: 0 });
+            sad.applyDebuff(spell("Death", "Sadness"));
+            sad.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(sad.getMorale()).toBe(-20);
+        });
+
+        it("cancels to 0 morale when Courage and Sadness are both active", () => {
+            const conflicted = createTestUnit({ morale: 0 });
+            conflicted.applyBuff(spell("Life", "Courage"));
+            conflicted.applyDebuff(spell("Death", "Sadness"));
+            conflicted.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(conflicted.getMorale()).toBe(0);
+        });
+
+        it("blocks base morale changes while a morale-locking effect is active (exemption)", () => {
+            const unit = createTestUnit({ morale: 5 });
+            unit.applyBuff(spell("Life", "Courage"));
+            unit.increaseMorale(3, 0); // must be a no-op on base morale while Courage is active
+            unit.deleteBuff("Courage");
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            // If the +3 had leaked through, morale would read 8; the exemption keeps the base at 5.
+            expect(unit.getMorale()).toBe(5);
+        });
+
+        it("Morale buff grants +20 morale and a higher attack multiplier; Dismorale lowers it", () => {
+            const target = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 0 });
+
+            const baseline = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            baseline.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            const baseMax = baseline.calculateAttackDamageMax(1, target, false, 0);
+
+            const inspired = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            inspired.applyBuff(spell("System", "Morale"));
+            inspired.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(inspired.getMorale()).toBe(20);
+            expect(inspired.calculateAttackDamageMax(1, target, false, 0)).toBeGreaterThan(baseMax);
+
+            const demoralized = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            demoralized.applyDebuff(spell("System", "Dismorale"));
+            demoralized.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(demoralized.getMorale()).toBe(-20);
+            expect(demoralized.calculateAttackDamageMax(1, target, false, 0)).toBeLessThan(baseMax);
+        });
+
+        it("shifts movement steps by STEPS_MORALE_MULTIPLIER per morale point", () => {
+            // The 8th arg is the steps-morale multiplier the engine supplies at runtime
+            // (STEPS_MORALE_MULTIPLIER = 0.05); steps_mod = multiplier * morale.
+            const high = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            high.applyBuff(spell("Life", "Courage")); // -> +20 morale
+            high.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0.05);
+
+            const low = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            low.applyDebuff(spell("Death", "Sadness")); // -> -20 morale
+            low.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0.05);
+
+            // A 40-point morale gap is 0.05 * 40 = 2.0 extra steps.
+            expect(high.getSteps() - low.getSteps()).toBeCloseTo(2.0);
+        });
     });
 
     describe("calculateAttackDamage", () => {
@@ -495,12 +606,37 @@ describe("Unit", () => {
             expect(mobileTargets.unitIds.has(enemy.getId())).toBe(true);
             expect(mobileTargets.attackCells).toContainEqual({ x: 1, y: 1 });
 
+            // Paralysis immobilizes the attacker (canMove() === false): it can only strike from the
+            // cell it already stands on (1,1) — never from the ring of cells around the enemy.
+            // Regression guard for the bug where small immobilized units offered every adjacent cell
+            // as a phantom attack-from position.
             attacker.applyEffect(new EffectFactory().makeEffect("Paralysis")!);
+            expect(attacker.canMove()).toBe(false);
 
             const immobilizedTargets = attacker.attackMeleeAllowed([enemy], positions, [enemy]);
 
             expect(immobilizedTargets.unitIds.has(enemy.getId())).toBe(true);
-            expect(immobilizedTargets.attackCells.length).toBeGreaterThan(0);
+            expect(immobilizedTargets.attackCells).toEqual([{ x: 1, y: 1 }]);
+            // The far side of the enemy (3,1) is reachable only by moving — it must NOT be offered.
+            expect(immobilizedTargets.attackCells).not.toContainEqual({ x: 3, y: 1 });
+        });
+
+        it("consumes an ability-derived castable spell on use (faction-prefix regression)", () => {
+            // Castable abilities (Wind Flow, Battle Roar, Castling, …) are stored in the spell list
+            // with an EMPTY faction prefix (":Wind Flow"), while the parsed Spell reports faction
+            // "System". useSpell() used to rebuild the key as "System:Wind Flow", which never matched
+            // the stored ":Wind Flow", so the charge was never removed and the spell stayed castable
+            // forever (it kept showing as available in the book). It must be consumed on use.
+            const unit = createTestUnit({ abilities: ["Wind Flow"] });
+
+            expect(unit.getCanCastSpells()).toBe(true);
+            expect(unit.getSpellsCount()).toBe(1);
+            expect(unit.getSpells().some((s) => s.getName() === "Wind Flow")).toBe(true);
+
+            unit.useSpell("Wind Flow");
+
+            expect(unit.getSpellsCount()).toBe(0);
+            expect(unit.getAllProperties().spells.some((s) => s.endsWith(":Wind Flow"))).toBe(false);
         });
     });
 });
