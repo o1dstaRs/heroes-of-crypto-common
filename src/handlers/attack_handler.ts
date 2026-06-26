@@ -616,7 +616,10 @@ export class AttackHandler {
                 ),
                 this.sceneLog,
             );
-            this.sceneLog.updateLog(`${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})`);
+            this.sceneLog.updateLog(
+                `${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+            );
             attackDamageApplied = false;
         }
 
@@ -678,7 +681,8 @@ export class AttackHandler {
                 );
 
                 this.sceneLog.updateLog(
-                    `${targetUnit.getName()} resp ${rangeResponseUnit.getName()} (${damageFromResponse})`,
+                    `${targetUnit.getName()} resp ${rangeResponseUnit.getName()} (${damageFromResponse})` +
+                        HoCLib.killTag(rangeResponseUnit.calculatePossibleLosses(damageFromResponse)),
                 );
 
                 // response damage
@@ -1273,7 +1277,10 @@ export class AttackHandler {
         } else if (!hasLightningSpinAttackLanded) {
             // just log attack here,
             // to make sure that logs are in chronological order
-            this.sceneLog.updateLog(`${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})`);
+            this.sceneLog.updateLog(
+                `${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})` +
+                    HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
+            );
 
             const fireShieldReflectResult = AllAbilities.processFireShieldAbility(
                 targetUnit,
@@ -1413,7 +1420,8 @@ export class AttackHandler {
                         ) + AllAbilities.processPenetratingBiteAbility(targetUnit, attackerUnit);
 
                     this.sceneLog.updateLog(
-                        `${targetUnit.getName()} resp ${attackerUnit.getName()} (${damageFromResponse})`,
+                        `${targetUnit.getName()} resp ${attackerUnit.getName()} (${damageFromResponse})` +
+                            HoCLib.killTag(attackerUnit.calculatePossibleLosses(damageFromResponse)),
                     );
 
                     this.damageStatisticHolder.add({

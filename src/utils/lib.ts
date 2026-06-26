@@ -195,3 +195,6 @@ export class RefNumber {
 }
 
 export const getLapString = (laps: number): string => (laps === 1 ? "1 lap" : `${laps} laps`);
+
+/** Compact "💀N" suffix for a damage scene-log line; empty when no units of the stack died. */
+export const killTag = (unitsKilled: number): string => (unitsKilled > 0 ? ` 💀${unitsKilled}` : "");

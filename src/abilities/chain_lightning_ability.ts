@@ -11,6 +11,7 @@
 
 import * as EffectHelper from "../effects/effect_helper";
 import * as HoCConstants from "../constants";
+import * as HoCLib from "../utils/lib";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
@@ -104,6 +105,7 @@ function attackEnemiesAndGetLayerImpact(
         alreadyAffectedIds.push(e1.getId());
         let enemyMinusMorale = 0;
         if (targetEnemyLightningDamage && !e1.isDead()) {
+            const e1AmountBefore = e1.getAmountAlive();
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
                 damage: e1.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog),
@@ -111,7 +113,10 @@ function attackEnemiesAndGetLayerImpact(
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
             });
             magicDamageReflection += (SpellHelper.getMagicMirrorPower(e1) / 100) * targetEnemyLightningDamage;
-            sceneLog.updateLog(`${e1.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning`);
+            sceneLog.updateLog(
+                `${e1.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
+                    HoCLib.killTag(e1AmountBefore - e1.getAmountAlive()),
+            );
 
             if (e1.isDead() && !unitIdsDied.includes(e1.getId())) {
                 sceneLog.updateLog(`${e1.getName()} died`);
@@ -177,6 +182,7 @@ export function processChainLightningAbility(
     const targetEnemyLightningDamage =
         Math.floor(abilityMultiplier * attackDamage * (1 - targetMagicResist / 100)) * heavyArmorMultiplierTarget;
     if (targetEnemyLightningDamage && !targetUnit.isDead()) {
+        const targetAmountBefore = targetUnit.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: targetUnit.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog),
@@ -184,7 +190,10 @@ export function processChainLightningAbility(
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
         totalMagicDamageReflection += (SpellHelper.getMagicMirrorPower(targetUnit) / 100) * targetEnemyLightningDamage;
-        sceneLog.updateLog(`${targetUnit.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning`);
+        sceneLog.updateLog(
+            `${targetUnit.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
+                HoCLib.killTag(targetAmountBefore - targetUnit.getAmountAlive()),
+        );
     }
 
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
