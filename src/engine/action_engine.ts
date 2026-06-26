@@ -386,6 +386,16 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
+        // [RANGE-PROBE] how many units the trajectory line actually hit (and which).
+        // eslint-disable-next-line no-console
+        console.warn(
+            `[rangeDbg] engine.rangeAttack from=(${attacker.getPosition().x.toFixed(0)},${attacker
+                .getPosition()
+                .y.toFixed(0)}) to=(${target.getPosition().x.toFixed(0)},${target.getPosition().y.toFixed(0)}) ` +
+                `affectedUnits=${evalResult.affectedUnits.length} ` +
+                `[${evalResult.affectedUnits.map((u) => u.map((x) => x.getName()).join("+")).join(", ")}] ` +
+                `divisors=${evalResult.rangeAttackDivisors.length}`,
+        );
         let responseDivisor = 1;
         let responseUnits: Unit[] | undefined = undefined;
         if (

@@ -1845,9 +1845,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         for (const s of this.spells) {
             if (s.getName() === spellName) {
                 s.decreaseAmount();
-                const fullSpellName = `${s.getFaction()}:${s.getName()}`;
+                // Entries are stored as `${faction}:${name}`, but ability-derived castable spells (Wind
+                // Flow, Battle Roar, Castling, …) are stored with an EMPTY faction prefix (":name") while
+                // the parsed Spell reports faction "System". Reconstructing `${faction}:${name}` therefore
+                // never matched those, so the charge was never removed and the spell stayed enabled in the
+                // book. Match on the spell NAME (the segment after the last ":") so both forms are removed.
                 for (let i = this.unitProperties.spells.length - 1; i >= 0; i--) {
-                    if (this.unitProperties.spells[i] === fullSpellName) {
+                    const entry = this.unitProperties.spells[i];
+                    const entryName = entry.substring(entry.indexOf(":") + 1);
+                    if (entryName === spellName) {
                         this.unitProperties.spells.splice(i, 1);
                         break;
                     }

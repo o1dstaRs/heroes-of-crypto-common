@@ -342,6 +342,33 @@ describe("GameActionEngine", () => {
         expect(setup.lower.getBaseCell()).toEqual(targetCell);
     });
 
+    it("gives +3 morale end-to-end when a move_unit shortens the distance to the enemy", () => {
+        // Enemy (upper) is at (9,9); lower starts at (3,3) with morale 4. This path walks toward it.
+        const path = [
+            { x: 3, y: 3 },
+            { x: 3, y: 4 },
+            { x: 3, y: 5 },
+            { x: 3, y: 6 },
+        ];
+        const targetCell = path[path.length - 1];
+        const setup = setupActionFight({
+            currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
+        });
+        expect(setup.lower.getMorale()).toBe(4);
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path,
+        });
+        expect(result.completed).toBe(true);
+
+        // refreshStackPowerForAllUnits syncs the morale change (written to initialUnitProperties by
+        // increaseMorale) into unitProperties, exactly as the scene does after a move.
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.lower.getMorale()).toBe(7);
+    });
+
     it("rejects direct moves that are not present in current active known paths", () => {
         const currentCell = { x: 3, y: 3 };
         const allowedCell = { x: 3, y: 4 };

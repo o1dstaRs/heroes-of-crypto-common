@@ -96,6 +96,31 @@ describe("MoveHandler", () => {
         );
     });
 
+    it("gives +3 morale for moving closer to the enemy and -3 for moving away", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+
+        placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
+
+        // Morale changes are written to initialUnitProperties; adjustBaseStats syncs them into
+        // unitProperties (as refreshStackPowerForAllUnits does each refresh after a move).
+        const syncMorale = (): number => {
+            unit.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
+            return unit.getMorale();
+        };
+
+        // Closer: destination (5,5) is nearer the enemy (8,8) than the current cell (4,4).
+        expect(moveHandler.applyRouteMoveModifiers([{ x: 4, y: 4 }, { x: 5, y: 5 }], unit, 0, 0)).toBe(true);
+        expect(syncMorale()).toBe(3);
+
+        // Farther: destination (3,3) is farther from the enemy (8,8) than the current cell (4,4).
+        expect(moveHandler.applyRouteMoveModifiers([{ x: 4, y: 4 }, { x: 3, y: 3 }], unit, 0, 0)).toBe(true);
+        expect(syncMorale()).toBe(0);
+    });
+
     it("counts travelled cells without the starting cell for route modifiers", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
