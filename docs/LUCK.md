@@ -87,7 +87,7 @@ In short: high luck makes *your* abilities both stronger and more likely to fire
 
 - **Luck Aura** (buff): forces luck to the **maximum (+10)** for its duration — `adjustBaseStats` detects the sentinel and sets `luck = 10`, `luck_mod = 0` (`spells/spell_helper.ts`, `unit.ts`).
 - **Madness / Mechanism**: these abilities only affect **morale** (forced to 0). They do **not** change luck.
-- **Defend / Luck Shield**: `defendTurn` calls `cleanupLuckPerTurn()`, but in the current code that only resets the internal `luckPerTurn` tracking field — the `luck_mod = 0` line is commented out — so the turn's *effective* luck is **not** actually cleared. Flagged as a possible gap between the "Luck Shield" name and the implementation.
+- **Defend / Luck Shield**: defending costs **−2 morale** and runs `cleanupLuckPerTurn()`, which clears this turn's random luck spread (`luck_mod = 0`, `luckPerTurn = 0`). Effective luck falls back to **base luck** (plus any team luck synergy, which the next stat refresh re-applies); the random ±3 swing is gone for the rest of the lap. (`engine/action_engine.ts` `defendTurn` → `unit.ts` `cleanupLuckPerTurn`.)
 - **Determinism**: the per-turn spread uses a cryptographically-random integer (`utils/lib.ts` `getRandomInt`, not a seeded RNG). Luck rolls therefore cannot be reproduced from a replay unless the rolled values are recorded. (Morale's roll uses the runtime RNG and is comparatively reproducible.)
 
 ---

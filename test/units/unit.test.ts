@@ -341,6 +341,21 @@ describe("Unit", () => {
                 expect(unit.getLuck()).toBeLessThanOrEqual(10);
             }
         });
+
+        it("Luck Shield (cleanupLuckPerTurn) drops the random spread back to base luck", () => {
+            const unit = createTestUnit({ luck: 4 });
+
+            // Roll an in-fight spread until it actually differs from base (0 is a possible roll).
+            let guard = 0;
+            do {
+                unit.randomizeLuckPerTurn();
+                guard += 1;
+            } while (unit.getLuck() === 4 && guard < 50);
+            expect(unit.getLuck()).not.toBe(4);
+
+            unit.cleanupLuckPerTurn();
+            expect(unit.getLuck()).toBe(4);
+        });
     });
 
     describe("morale", () => {

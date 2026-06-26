@@ -1022,7 +1022,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.luckPerTurn = calculatedLuck;
     }
     public cleanupLuckPerTurn(): void {
-        // this.unitProperties.luck_mod = 0;
+        // Luck Shield / defend: drop this turn's random luck spread so effective luck falls back to
+        // base (+ any synergy, which the next adjustBaseStats refresh re-applies). Clearing luckPerTurn
+        // too keeps it gone for the rest of the lap (adjustBaseStats only re-rolls once per lap).
+        this.unitProperties.luck_mod = 0;
         this.luckPerTurn = 0;
     }
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): number {
