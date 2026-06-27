@@ -149,6 +149,41 @@ export class AttackHandler {
             isAOEShot,
         );
     }
+    /**
+     * Area Throw projection (e.g. Gargantuan): a thrown AOE shot is intercepted by the first enemy
+     * unit standing on the straight line between the attacker and the aimed cell. Returns that
+     * unit's base cell so the splash "projects to it" instead of the throw passing through to the
+     * empty cell behind. When the path is clear, the aimed cell is returned unchanged. Mirrors the
+     * legacy behaviour (scripts/legacy/test_heroes.ts Area Throw branch), where a unit on the
+     * trajectory intercepts the throw.
+     */
+    public projectAreaThrowTargetCell(
+        allUnits: ReadonlyMap<string, Unit>,
+        attackerUnit: Unit,
+        targetCell: HoCMath.XY,
+    ): HoCMath.XY {
+        const targetPosition = GridMath.getPositionForCell(
+            targetCell,
+            this.gridSettings.getMinX(),
+            this.gridSettings.getStep(),
+            this.gridSettings.getHalfStep(),
+        );
+        const evaluation = this.evaluateRangeAttack(
+            allUnits,
+            attackerUnit,
+            attackerUnit.getPosition(),
+            targetPosition,
+            false, // isThroughShot
+            false, // isSelection
+            true, // isAOEShot (Area Throw splash semantics)
+        );
+        const interceptingUnit = evaluation.affectedUnits?.[0]?.[0];
+        const interceptedCell = interceptingUnit?.getBaseCell();
+        if (interceptedCell) {
+            return { x: interceptedCell.x, y: interceptedCell.y };
+        }
+        return { x: targetCell.x, y: targetCell.y };
+    }
     public canLandRangeAttack(unit: Unit, aggrMatrix?: number[][]): boolean {
         return (
             unit.getAttackType() === PBTypes.AttackVals.RANGE &&
@@ -593,6 +628,16 @@ export class AttackHandler {
             );
             for (const uId of aoeRangeAttackResult.unitIdsDied) {
                 unitIdsDied.push(uId);
+            }
+            // Carry per-affected-unit damage so the client can draw a floating number on EVERY splashed
+            // unit at its own position. The AOE path (Large Caliber / Area Throw) never fills the single
+            // `unitPosition`/`hits` payload used for single-target hits, so without this the renderer has
+            // nowhere to place the secondary units' damage.
+            if (aoeRangeAttackResult.perUnitDamage.length) {
+                damageForAnimation.splash = aoeRangeAttackResult.perUnitDamage.map((entry) => ({
+                    ...entry,
+                    position: { ...entry.position },
+                }));
             }
         } else if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);

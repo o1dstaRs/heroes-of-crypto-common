@@ -26,4 +26,9 @@ export interface IVisibleDamage {
     unitIsSmall: boolean;
     unitId?: string;
     hits?: { amount: number; unitsDied: number }[];
+    // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw). Each entry carries the
+    // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
+    // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the
+    // primary target. Empty/undefined for single-target attacks.
+    splash?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
 }

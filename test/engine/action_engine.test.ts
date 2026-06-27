@@ -609,6 +609,47 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
+    it("carries per-affected-unit splash damage for a Large Caliber (AOE) range attack", () => {
+        // Cyclops' Large Caliber is a RANGE attack that splashes the 3x3 around the target. The hit
+        // unit's damage must travel in damage.splash with the unit id + impact position so the client
+        // can draw a floating number ON the affected unit, not at the primary-target spot only.
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Large Caliber"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 3,
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 7, y: 3 },
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+        const upperPosition = { ...setup.upper.getPosition() };
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        const attacked = result.events.find((event) => event.type === "unit_attacked");
+        expect(attacked?.type).toBe("unit_attacked");
+        if (attacked?.type !== "unit_attacked") {
+            throw new Error("expected unit_attacked event");
+        }
+        const splash = attacked.damage.splash;
+        expect(splash?.length).toBeGreaterThan(0);
+        const entry = splash?.find((s) => s.unitId === setup.upper.getId());
+        expect(entry).toBeDefined();
+        expect(entry?.amount).toBeGreaterThan(0);
+        // Position is captured at impact, so it matches where the unit stood when hit.
+        expect(entry?.position).toEqual(upperPosition);
+        // Sanity: the splashed amount reflects the HP actually lost.
+        expect(setup.upper.getCumulativeHp()).toBe(hpBefore - (entry?.amount ?? 0));
+    });
+
     it("rejects range attacks against hidden targets without consuming the turn", () => {
         const setup = setupActionFight({
             lowerAttackType: PBTypes.AttackVals.RANGE,
@@ -886,6 +927,54 @@ describe("GameActionEngine", () => {
         expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
         expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+
+        // The affected unit's damage rides along in damage.splash (with its impact position) so the
+        // client can place the floating number on the splashed unit rather than the throw's center.
+        const area = result.events.find((event) => event.type === "area_attacked");
+        if (area?.type !== "area_attacked") {
+            throw new Error("expected area_attacked event");
+        }
+        const entry = area.damage.splash?.find((s) => s.unitId === setup.upper.getId());
+        expect(entry).toBeDefined();
+        expect(entry?.amount).toBeGreaterThan(0);
+        expect(entry?.position).toEqual(setup.upper.getPosition());
+    });
+
+    it("projects an area throw onto the first enemy standing on the trajectory", () => {
+        // Attacker at {3,3}; an enemy sits at {5,3} directly between it and the empty aimed cell
+        // {7,3}. The throw must be intercepted by (project onto) that enemy instead of passing
+        // through to the empty cell behind it.
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Area Throw"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 2,
+            supportCell: { x: 2, y: 8 },
+            upperCell: { x: 5, y: 3 },
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.lower.getId(),
+            targetCell: { x: 7, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "area_attacked",
+                attackType: "area_throw",
+                attackerId: setup.lower.getId(),
+                // Projected from the aimed {7,3} onto the intercepting enemy at {5,3}.
+                targetCell: { x: 5, y: 3 },
+                affectedUnitIds: [setup.upper.getId()],
+            }),
+        );
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("rejects area throws without range selection or available shots", () => {

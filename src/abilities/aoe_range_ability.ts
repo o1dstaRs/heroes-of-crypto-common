@@ -30,6 +30,9 @@ export interface IAOERangeAttackResult {
     landed: boolean;
     maxDamage: number;
     unitIdsDied: string[];
+    // Per-affected-unit damage so the client can draw a floating number on every splashed unit at its
+    // own position (not just the primary target). Position is captured at impact time.
+    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[];
 }
 
 export function processRangeAOEAbility(
@@ -44,6 +47,7 @@ export function processRangeAOEAbility(
     isAttack = true,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
+    const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
     let aoeAbility = attackerUnit.getAbility("Area Throw");
     if (!aoeAbility) {
         aoeAbility = attackerUnit.getAbility("Large Caliber");
@@ -98,15 +102,25 @@ export function processRangeAOEAbility(
                     sceneLog,
                 );
 
+                // Snapshot position + stack BEFORE applying damage so the floating number lands where the
+                // unit stood when hit (it may die and be removed before the visuals play).
+                const unitPositionAtImpact = { ...unit.getPosition() };
+                const amountAliveBeforeDamage = unit.getAmountAlive();
+                const damageDealt = unit.applyDamage(
+                    damageFromAttack,
+                    FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
+                    sceneLog,
+                );
+                perUnitDamage.push({
+                    unitId: unit.getId(),
+                    position: unitPositionAtImpact,
+                    amount: damageDealt,
+                    unitsDied: Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive()),
+                });
+
                 damageStatisticHolder.add({
                     unitName: attackerUnit.getName(),
-                    damage: unit.applyDamage(
-                        damageFromAttack,
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getBreakChancePerTeam(attackerUnit.getTeam()),
-                        sceneLog,
-                    ),
+                    damage: damageDealt,
                     team: attackerUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });
@@ -153,6 +167,7 @@ export function processRangeAOEAbility(
             landed: true,
             maxDamage,
             unitIdsDied,
+            perUnitDamage,
         };
     }
 
@@ -160,6 +175,7 @@ export function processRangeAOEAbility(
         landed: false,
         maxDamage,
         unitIdsDied,
+        perUnitDamage,
     };
 }
 

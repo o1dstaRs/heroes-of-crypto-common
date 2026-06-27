@@ -554,16 +554,22 @@ export class GameActionEngine {
             return this.reject("attack_not_available");
         }
 
-        const targetPosition = getPositionForCell(
+        // Project the throw onto the first enemy standing on the trajectory between the attacker and
+        // the aimed (empty) cell. A unit on the line intercepts the throw instead of it passing
+        // through to the cell behind — matching legacy test_heroes.ts. With a clear path the aimed
+        // cell is used unchanged.
+        const targetCell = this.context.attackHandler.projectAreaThrowTargetCell(
+            this.context.unitsHolder.getAllUnits(),
+            attacker,
             action.targetCell,
+        );
+        const targetPosition = getPositionForCell(
+            targetCell,
             this.context.grid.getSettings().getMinX(),
             this.context.grid.getSettings().getStep(),
             this.context.grid.getSettings().getHalfStep(),
         );
-        const affectedCells = [
-            ...getCellsAroundCell(this.context.grid.getSettings(), action.targetCell),
-            action.targetCell,
-        ];
+        const affectedCells = [...getCellsAroundCell(this.context.grid.getSettings(), targetCell), targetCell];
         const affectedUnits = evaluateAffectedUnits(affectedCells, this.context.unitsHolder, this.context.grid);
         const divisor = this.context.attackHandler.getRangeAttackDivisor(attacker, targetPosition);
         const damage = this.createVisibleDamage();
@@ -590,7 +596,7 @@ export class GameActionEngine {
                 type: "area_attacked",
                 attackType: "area_throw",
                 attackerId: attacker.getId(),
-                targetCell: { ...action.targetCell },
+                targetCell: { ...targetCell },
                 targetPosition,
                 affectedUnitIds,
                 unitIdsDied,
@@ -1320,6 +1326,7 @@ export class GameActionEngine {
             ...damage,
             unitPosition: { ...damage.unitPosition },
             hits: damage.hits?.map((hit) => ({ ...hit })),
+            splash: damage.splash?.map((entry) => ({ ...entry, position: { ...entry.position } })),
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {
