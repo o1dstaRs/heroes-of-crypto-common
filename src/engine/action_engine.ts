@@ -270,16 +270,14 @@ export class GameActionEngine {
             return this.reject("invalid_move");
         }
 
-        if (
-            !(
-                this.context.grid.areAllCellsEmpty(targetCells, unit.getId()) ||
-                this.context.grid.canOccupyCells(
-                    targetCells,
-                    unit.hasAbilityActive("Made of Fire"),
-                    unit.hasAbilityActive("Made of Water"),
-                )
+        if (!(
+            this.context.grid.areAllCellsEmpty(targetCells, unit.getId()) ||
+            this.context.grid.canOccupyCells(
+                targetCells,
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
             )
-        ) {
+        )) {
             return this.reject("move_blocked");
         }
 
@@ -1320,14 +1318,12 @@ export class GameActionEngine {
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {
-        return animationData.map(
-            (animation): IGameAnimationEvent => ({
-                toPosition: { ...animation.toPosition },
-                fromPosition: animation.fromPosition ? { ...animation.fromPosition } : undefined,
-                affectedUnitId: animation.affectedUnit instanceof Unit ? animation.affectedUnit.getId() : undefined,
-                bodyUnitId: animation.bodyUnit?.getId(),
-            }),
-        );
+        return animationData.map((animation): IGameAnimationEvent => ({
+            toPosition: { ...animation.toPosition },
+            fromPosition: animation.fromPosition ? { ...animation.fromPosition } : undefined,
+            affectedUnitId: animation.affectedUnit instanceof Unit ? animation.affectedUnit.getId() : undefined,
+            bodyUnitId: animation.bodyUnit?.getId(),
+        }));
     }
     private cleanupDeadUnits(unitIdsDied: string[]): GameEvent[] {
         const events: GameEvent[] = [];

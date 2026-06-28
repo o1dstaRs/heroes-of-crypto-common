@@ -85,17 +85,15 @@ export class UnitsHolder {
                         this.gridSettings.getHalfStep(),
                     );
 
-                    if (
-                        !(
-                            (teamType === PBTypes.TeamVals.LOWER &&
-                                (lowerLeftPlacement.isAllowed(cellPosition) ||
-                                    (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                            (teamType === PBTypes.TeamVals.UPPER &&
-                                (upperRightPlacement.isAllowed(cellPosition) ||
-                                    (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
-                                isPositionWithinGrid(this.gridSettings, cellPosition))
-                        )
-                    ) {
+                    if (!(
+                        (teamType === PBTypes.TeamVals.LOWER &&
+                            (lowerLeftPlacement.isAllowed(cellPosition) ||
+                                (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
+                        (teamType === PBTypes.TeamVals.UPPER &&
+                            (upperRightPlacement.isAllowed(cellPosition) ||
+                                (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
+                            isPositionWithinGrid(this.gridSettings, cellPosition))
+                    )) {
                         allCellsAllowed = false;
                         break;
                     }
