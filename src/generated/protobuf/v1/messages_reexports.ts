@@ -66,3 +66,48 @@ export const UnitData = m_unit.PBTypes.UnitData;
 export type UnitData = InstanceType<typeof m_unit.PBTypes.UnitData>;
 export type UnitDataObject = ReturnType<InstanceType<typeof m_unit.PBTypes.UnitData>["toObject"]>;
 
+import * as m_lobby from "./lobby";
+export const LobbyStatus = m_lobby.PBTypes.LobbyStatus;
+export type LobbyStatus = m_lobby.PBTypes.LobbyStatus;
+export const LobbyPlayer = m_lobby.PBTypes.LobbyPlayer;
+export type LobbyPlayer = InstanceType<typeof m_lobby.PBTypes.LobbyPlayer>;
+export type LobbyPlayerObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.LobbyPlayer>["toObject"]>;
+export const Lobby = m_lobby.PBTypes.Lobby;
+export type Lobby = InstanceType<typeof m_lobby.PBTypes.Lobby>;
+export type LobbyObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.Lobby>["toObject"]>;
+export const LobbyList = m_lobby.PBTypes.LobbyList;
+export type LobbyList = InstanceType<typeof m_lobby.PBTypes.LobbyList>;
+export type LobbyListObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.LobbyList>["toObject"]>;
+export const CreateLobbyRequest = m_lobby.PBTypes.CreateLobbyRequest;
+export type CreateLobbyRequest = InstanceType<typeof m_lobby.PBTypes.CreateLobbyRequest>;
+export type CreateLobbyRequestObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.CreateLobbyRequest>["toObject"]>;
+export const JoinLobbyRequest = m_lobby.PBTypes.JoinLobbyRequest;
+export type JoinLobbyRequest = InstanceType<typeof m_lobby.PBTypes.JoinLobbyRequest>;
+export type JoinLobbyRequestObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.JoinLobbyRequest>["toObject"]>;
+export const ReadyRequest = m_lobby.PBTypes.ReadyRequest;
+export type ReadyRequest = InstanceType<typeof m_lobby.PBTypes.ReadyRequest>;
+export type ReadyRequestObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.ReadyRequest>["toObject"]>;
+
+import * as m_player_portal from "./player_portal";
+export const PortalMatch = m_player_portal.PBTypes.PortalMatch;
+export type PortalMatch = InstanceType<typeof m_player_portal.PBTypes.PortalMatch>;
+export type PortalMatchObject = ReturnType<InstanceType<typeof m_player_portal.PBTypes.PortalMatch>["toObject"]>;
+export const PortalComboStat = m_player_portal.PBTypes.PortalComboStat;
+export type PortalComboStat = InstanceType<typeof m_player_portal.PBTypes.PortalComboStat>;
+export type PortalComboStatObject = ReturnType<InstanceType<typeof m_player_portal.PBTypes.PortalComboStat>["toObject"]>;
+export const PortalCreatureStat = m_player_portal.PBTypes.PortalCreatureStat;
+export type PortalCreatureStat = InstanceType<typeof m_player_portal.PBTypes.PortalCreatureStat>;
+export type PortalCreatureStatObject = ReturnType<
+    InstanceType<typeof m_player_portal.PBTypes.PortalCreatureStat>["toObject"]
+>;
+export const PortalFactionStat = m_player_portal.PBTypes.PortalFactionStat;
+export type PortalFactionStat = InstanceType<typeof m_player_portal.PBTypes.PortalFactionStat>;
+export type PortalFactionStatObject = ReturnType<
+    InstanceType<typeof m_player_portal.PBTypes.PortalFactionStat>["toObject"]
+>;
+export const ResponsePlayerPortal = m_player_portal.PBTypes.ResponsePlayerPortal;
+export type ResponsePlayerPortal = InstanceType<typeof m_player_portal.PBTypes.ResponsePlayerPortal>;
+export type ResponsePlayerPortalObject = ReturnType<
+    InstanceType<typeof m_player_portal.PBTypes.ResponsePlayerPortal>["toObject"]
+>;
+

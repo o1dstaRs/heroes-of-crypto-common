@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package PBTypes;
+
+// Player-created custom-game lobbies. A lobby pairs a host with one guest, then
+// (once both are ready) starts a normal pick/ban game via the matchmaking server.
+
+enum LobbyStatus {
+    LOBBY_OPEN = 0;      // host waiting for a guest
+    LOBBY_FULL = 1;      // guest joined; readying up
+    LOBBY_STARTING = 2;  // both ready; countdown running (start_at_ms set)
+    LOBBY_STARTED = 3;   // game created; game_id set; both clients navigate in
+    LOBBY_CLOSED = 4;    // cancelled / abandoned
+}
+
+// One side of a lobby. avatar / rating / league are placeholders until those
+// systems exist (rating defaults to 0, league to "Unranked").
+message LobbyPlayer {
+    string player_id = 1;
+    string username = 2;
+    string avatar = 3;
+    int32 rating = 4;
+    string league = 5;
+    bool ready = 6;
+}
+
+// Full lobby state pushed to members over SSE / returned by the lobby endpoints.
+// Never carries the PIN (only its hash lives server-side).
+message Lobby {
+    string id = 1;
+    string name = 2;
+    bool is_private = 3;
+    LobbyStatus status = 4;
+    LobbyPlayer host = 5;
+    LobbyPlayer guest = 6;
+    int64 created_time = 7;
+    int64 start_at_ms = 8;
+    string game_id = 9;
+}
+
+message LobbyList {
+    repeated Lobby lobbies = 1;
+}
+
+message CreateLobbyRequest {
+    string name = 1;
+    bool is_private = 2;
+    string pin = 3; // 4 numeric chars; "" for public lobbies
+}
+
+message JoinLobbyRequest {
+    string pin = 1; // required for private lobbies
+}
+
+message ReadyRequest {
+    bool ready = 1;
+}

@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package PBTypes;
+
+// One finished match from the requesting player's perspective.
+message PortalMatch {
+    string game_id = 1;
+    bool won = 2;
+    bool abandoned = 3;
+    int64 finished_time = 4;
+    string opponent_username = 5;
+    // Viewer's team for this match: PBTypes.TeamVals (UPPER = 1, LOWER = 2).
+    int32 team = 6;
+    // Creature ids the viewer fielded, and the opponent's (when known).
+    repeated int32 creature_ids = 7 [packed = false];
+    repeated int32 opponent_creature_ids = 8 [packed = false];
+}
+
+// A creature combo (a sorted set of creature ids the viewer played together) with its record.
+message PortalComboStat {
+    repeated int32 creature_ids = 1 [packed = false];
+    int32 games = 2;
+    int32 wins = 3;
+}
+
+// Per-creature record across the viewer's finished matches.
+message PortalCreatureStat {
+    int32 creature_id = 1;
+    int32 games = 2;
+    int32 wins = 3;
+}
+
+// Per-faction record across the viewer's finished matches.
+message PortalFactionStat {
+    // PBTypes faction value.
+    int32 faction = 1;
+    int32 games = 2;
+    int32 wins = 3;
+}
+
+// Aggregated profile/portal payload for the requesting player.
+message ResponsePlayerPortal {
+    string username = 1;
+    int32 wins = 2;
+    int32 losses = 3;
+    int32 total_games_played = 4;
+    // Current streak: > 0 win streak, < 0 loss streak, 0 if no finished games.
+    int32 current_streak = 5;
+    int32 best_win_streak = 6;
+    int64 last_login = 7;
+    repeated PortalMatch recent_matches = 8;
+    repeated PortalComboStat combos = 9;
+    repeated PortalCreatureStat creature_stats = 10;
+    repeated PortalFactionStat faction_stats = 11;
+}
