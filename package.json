@@ -62,7 +62,7 @@
         "eslint": "^9.39.4",
         "google-protobuf": "^4.0.2",
         "lint-staged": "^17.0.8",
-        "prettier": "^3.8.4",
+        "prettier": "3.9.1",
         "protobufjs": "^7.6.4",
         "protoc-gen-ts": "^0.8.7",
         "rimraf": "^6.1.3",
