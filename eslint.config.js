@@ -4,7 +4,7 @@ import globals from "globals";
 
 export default [
     {
-        files: ["src/**/*.ts"],
+        files: ["src/**/*.ts", "test/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
         ignores: ["scripts/**/*.js", "src/generated/**/*.{ts,js}"],
         plugins: {
             "@typescript-eslint": typescriptPlugin,
@@ -59,13 +59,20 @@ export default [
         },
     },
 
-    // Test files (Jest globals only here)
+    // Test files: parsed + linted by the TypeScript block above. Add Jest globals and relax a few
+    // rules that are noisy (and not meaningful) in tests — mocks legitimately use `any`, test helper
+    // classes don't need member spacing, and assertion calls can read as unused expressions.
     {
         files: ["test/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
         languageOptions: {
             globals: {
                 ...globals.jest,
             },
+        },
+        rules: {
+            "@typescript-eslint/no-explicit-any": "off",
+            "@typescript-eslint/no-unused-expressions": "off",
+            "lines-between-class-members": "off",
         },
     },
 ];
