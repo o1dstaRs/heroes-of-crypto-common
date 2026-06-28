@@ -13,14 +13,7 @@ import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt, matrixElement, shuffle } from "../utils/lib";
-import {
-    getDistance,
-    intersect2D,
-    Intersect2DResult,
-    type IXYDistance,
-    matrixElementOrDefault,
-    type XY,
-} from "../utils/math";
+import { getDistance, intersect2D, Intersect2DResult, matrixElementOrDefault, type XY } from "../utils/math";
 import { GridSettings } from "./grid_settings";
 import type { IWeightedRoute } from "./path_definitions";
 
@@ -533,7 +526,117 @@ export function getDistanceToFurthestCorner(position: XY, gridSettings: GridSett
     );
 }
 
-export function getClosestSideCenter(
+/**
+ * Sides of a grid cell a ranged shot can be aimed at. The numeric values are part of the ranked
+ * wire protocol (range_attack carries the chosen side as an int) and are persisted in replays, so
+ * they MUST stay stable. Order matches the legacy push order in getClosestSideCenter.
+ */
+export enum RangeAttackCellSide {
+    LEFT = 0,
+    RIGHT = 1,
+    DOWN = 2,
+    UP = 3,
+}
+
+export const RANGE_ATTACK_CELL_SIDES: readonly RangeAttackCellSide[] = [
+    RangeAttackCellSide.LEFT,
+    RangeAttackCellSide.RIGHT,
+    RangeAttackCellSide.DOWN,
+    RangeAttackCellSide.UP,
+];
+
+/**
+ * Raw center of a cell's side (cell center shifted half a cell toward that side), before the
+ * attacker-relative pixel nudge. Pure geometry — no occlusion checks.
+ */
+function rangeAttackSideRawCenter(gridSettings: GridSettings, cellPosition: XY, side: RangeAttackCellSide): XY {
+    const half = gridSettings.getHalfStep();
+    switch (side) {
+        case RangeAttackCellSide.LEFT:
+            return { x: cellPosition.x - half, y: cellPosition.y };
+        case RangeAttackCellSide.RIGHT:
+            return { x: cellPosition.x + half, y: cellPosition.y };
+        case RangeAttackCellSide.DOWN:
+            return { x: cellPosition.x, y: cellPosition.y - half };
+        case RangeAttackCellSide.UP:
+        default:
+            return { x: cellPosition.x, y: cellPosition.y + half };
+    }
+}
+
+/**
+ * Deterministic world-space center of a cell's side that a ranged shot lands on. Uses the exact same
+ * math as getClosestSideCenter, so the server can reconstruct precisely what the client previewed
+ * from just (cell, side) — no floats are ever trusted from the client. Pure, no randomness.
+ */
+export function getRangeAttackSideCenter(
+    gridSettings: GridSettings,
+    cell: XY,
+    side: RangeAttackCellSide,
+    attackerPosition: XY,
+): XY {
+    const cellPosition = getPositionForCell(
+        cell,
+        gridSettings.getMinX(),
+        gridSettings.getStep(),
+        gridSettings.getHalfStep(),
+    );
+    return adjustClosestPointSideCenterPoint(
+        rangeAttackSideRawCenter(gridSettings, cellPosition, side),
+        attackerPosition,
+    );
+}
+
+/**
+ * Whether a ranged shot fired by `fromTeamType` can see (is not blocked at) a given cell side. A
+ * side is observable when the neighbouring cell is empty, holds a friendly unit, or is lava/water —
+ * i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
+ * This is the authoritative "visible edge" rule, shared by the client preview and the server engine.
+ */
+export function isRangeAttackSideObservable(
+    gridMatrix: number[][],
+    cell: XY,
+    side: RangeAttackCellSide,
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): boolean {
+    let neighbour: number;
+    switch (side) {
+        case RangeAttackCellSide.LEFT:
+            neighbour = matrixElement(gridMatrix, cell.x - 1, cell.y);
+            break;
+        case RangeAttackCellSide.RIGHT:
+            neighbour = matrixElement(gridMatrix, cell.x + 1, cell.y);
+            break;
+        case RangeAttackCellSide.DOWN:
+            neighbour = matrixElement(gridMatrix, cell.x, cell.y - 1);
+            break;
+        case RangeAttackCellSide.UP:
+        default:
+            neighbour = matrixElement(gridMatrix, cell.x, cell.y + 1);
+            break;
+    }
+    if (isThroughShot) {
+        return neighbour !== ObstacleType.BLOCK;
+    }
+    return (
+        !neighbour || neighbour === fromTeamType || neighbour === ObstacleType.LAVA || neighbour === ObstacleType.WATER
+    );
+}
+
+export interface IClosestSideCenter {
+    position: XY;
+    cell: XY;
+    side: RangeAttackCellSide;
+}
+
+/**
+ * Resolve which visible edge of an enemy unit a ranged shot is aimed at, given the mouse position.
+ * Deterministic (no shuffle): the player aims at a cell + the side of it nearest the cursor among the
+ * up-to-two sides closest to the attacker. Returns the cell and side so the same choice can be sent
+ * to the server as bounded ints and reconstructed there. Mirrors legacy test_heroes.ts targeting.
+ */
+export function getClosestSideCenterDetailed(
     gridMatrix: number[][],
     gridSettings: GridSettings,
     mousePosition: XY,
@@ -543,7 +646,7 @@ export function getClosestSideCenter(
     isSmallUnitTo: boolean,
     fromTeamType: TeamType,
     isThroughShot = false,
-): XY | undefined {
+): IClosestSideCenter | undefined {
     const cell = getCellForPosition(gridSettings, mousePosition);
     if (!cell) {
         return undefined;
@@ -555,82 +658,84 @@ export function getClosestSideCenter(
         gridSettings.getHalfStep(),
     );
 
-    const points: IXYDistance[] = [];
+    const points: Array<{ xy: XY; side: RangeAttackCellSide; distance: number }> = [];
+    const half = gridSettings.getHalfStep();
+    const step = gridSettings.getStep();
 
-    const me1 = matrixElement(gridMatrix, cell.x - 1, cell.y);
-    const me2 = matrixElement(gridMatrix, cell.x + 1, cell.y);
-    const me3 = matrixElement(gridMatrix, cell.x, cell.y + 1);
-    const me4 = matrixElement(gridMatrix, cell.x, cell.y - 1);
-    let observableLeft: boolean;
-    let observableRight: boolean;
-    let observableUp: boolean;
-    let observableDown: boolean;
-    if (isThroughShot) {
-        observableLeft = me1 !== ObstacleType.BLOCK;
-        observableRight = me2 !== ObstacleType.BLOCK;
-        observableUp = me3 !== ObstacleType.BLOCK;
-        observableDown = me4 !== ObstacleType.BLOCK;
-    } else {
-        observableLeft = !me1 || me1 === fromTeamType || me1 === ObstacleType.LAVA || me1 === ObstacleType.WATER;
-        observableRight = !me2 || me2 === fromTeamType || me2 === ObstacleType.LAVA || me2 === ObstacleType.WATER;
-        observableUp = !me3 || me3 === fromTeamType || me3 === ObstacleType.LAVA || me3 === ObstacleType.WATER;
-        observableDown = !me4 || me4 === fromTeamType || me4 === ObstacleType.LAVA || me4 === ObstacleType.WATER;
-    }
+    const observableLeft = isRangeAttackSideObservable(
+        gridMatrix,
+        cell,
+        RangeAttackCellSide.LEFT,
+        fromTeamType,
+        isThroughShot,
+    );
+    const observableRight = isRangeAttackSideObservable(
+        gridMatrix,
+        cell,
+        RangeAttackCellSide.RIGHT,
+        fromTeamType,
+        isThroughShot,
+    );
+    const observableUp = isRangeAttackSideObservable(
+        gridMatrix,
+        cell,
+        RangeAttackCellSide.UP,
+        fromTeamType,
+        isThroughShot,
+    );
+    const observableDown = isRangeAttackSideObservable(
+        gridMatrix,
+        cell,
+        RangeAttackCellSide.DOWN,
+        fromTeamType,
+        isThroughShot,
+    );
 
     if (
         observableLeft &&
-        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x - gridSettings.getHalfStep()) &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x - half) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.x < toPosition.x) ||
-            (isSmallUnitFrom &&
-                !isSmallUnitTo &&
-                fromPosition.x - gridSettings.getHalfStep() <
-                    toPosition.x - (isSmallUnitTo ? gridSettings.getHalfStep() : gridSettings.getStep())))
+            (isSmallUnitFrom && !isSmallUnitTo && fromPosition.x - half < toPosition.x - (isSmallUnitTo ? half : step)))
     ) {
         points.push({
-            xy: { x: cellPosition.x - gridSettings.getHalfStep(), y: cellPosition.y },
+            xy: { x: cellPosition.x - half, y: cellPosition.y },
+            side: RangeAttackCellSide.LEFT,
             distance: Number.MAX_VALUE,
         });
     }
     if (
         observableRight &&
-        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x + gridSettings.getHalfStep()) &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.x === toPosition.x + half) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.x > toPosition.x) ||
-            (isSmallUnitFrom &&
-                !isSmallUnitTo &&
-                fromPosition.x + gridSettings.getHalfStep() >
-                    toPosition.x + (isSmallUnitTo ? gridSettings.getHalfStep() : gridSettings.getStep())))
+            (isSmallUnitFrom && !isSmallUnitTo && fromPosition.x + half > toPosition.x + (isSmallUnitTo ? half : step)))
     ) {
         points.push({
-            xy: { x: cellPosition.x + gridSettings.getHalfStep(), y: cellPosition.y },
+            xy: { x: cellPosition.x + half, y: cellPosition.y },
+            side: RangeAttackCellSide.RIGHT,
             distance: Number.MAX_VALUE,
         });
     }
     if (
         observableDown &&
-        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y - gridSettings.getHalfStep()) &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y - half) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.y < toPosition.y) ||
-            (isSmallUnitFrom &&
-                !isSmallUnitTo &&
-                fromPosition.y - gridSettings.getHalfStep() <
-                    toPosition.y - (isSmallUnitTo ? gridSettings.getHalfStep() : gridSettings.getStep())))
+            (isSmallUnitFrom && !isSmallUnitTo && fromPosition.y - half < toPosition.y - (isSmallUnitTo ? half : step)))
     ) {
         points.push({
-            xy: { x: cellPosition.x, y: cellPosition.y - gridSettings.getHalfStep() },
+            xy: { x: cellPosition.x, y: cellPosition.y - half },
+            side: RangeAttackCellSide.DOWN,
             distance: Number.MAX_VALUE,
         });
     }
-
     if (
         observableUp &&
-        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y + gridSettings.getHalfStep()) &&
+        !(isSmallUnitTo && !isSmallUnitFrom && fromPosition.y === toPosition.y + half) &&
         (((isSmallUnitFrom === isSmallUnitTo || !isSmallUnitFrom) && fromPosition.y > toPosition.y) ||
-            (isSmallUnitFrom &&
-                !isSmallUnitTo &&
-                fromPosition.y + gridSettings.getHalfStep() >
-                    toPosition.y + (isSmallUnitTo ? gridSettings.getHalfStep() : gridSettings.getStep())))
+            (isSmallUnitFrom && !isSmallUnitTo && fromPosition.y + half > toPosition.y + (isSmallUnitTo ? half : step)))
     ) {
         points.push({
-            xy: { x: cellPosition.x, y: cellPosition.y + gridSettings.getHalfStep() },
+            xy: { x: cellPosition.x, y: cellPosition.y + half },
+            side: RangeAttackCellSide.UP,
             distance: Number.MAX_VALUE,
         });
     }
@@ -639,26 +744,51 @@ export function getClosestSideCenter(
         p.distance = getDistance(fromPosition, p.xy);
     }
 
-    points.sort((a: IXYDistance, b: IXYDistance) => {
-        if (a.distance < b.distance) return -1;
-        if (a.distance > b.distance) return 1;
-        return 0;
-    });
-
+    // Two sides closest to the attacker, deterministically ordered (distance, then side index) — the
+    // legacy shuffle is removed so the trajectory is reproducible on the server and in replays.
+    points.sort((a, b) => (a.distance !== b.distance ? a.distance - b.distance : a.side - b.side));
     const twoClosestPoints = points.slice(0, 2);
-    shuffle(twoClosestPoints);
     if (!twoClosestPoints.length) {
         return undefined;
     }
-    if (twoClosestPoints.length === 1 || !mousePosition) {
-        return adjustClosestPointSideCenterPoint(twoClosestPoints[0].xy, fromPosition);
+
+    let chosen = twoClosestPoints[0];
+    if (twoClosestPoints.length > 1 && mousePosition) {
+        const distanceA = getDistance(twoClosestPoints[0].xy, mousePosition);
+        const distanceB = getDistance(twoClosestPoints[1].xy, mousePosition);
+        // Cursor picks between the two; ties keep the lower side index (deterministic).
+        if (distanceB < distanceA) {
+            chosen = twoClosestPoints[1];
+        }
     }
 
-    const distanceA = getDistance(twoClosestPoints[0].xy, mousePosition);
-    const distanceB = getDistance(twoClosestPoints[1].xy, mousePosition);
-    if (distanceA === distanceB || distanceA < distanceB) {
-        return adjustClosestPointSideCenterPoint(twoClosestPoints[0].xy, fromPosition);
-    }
+    return {
+        position: adjustClosestPointSideCenterPoint(chosen.xy, fromPosition),
+        cell,
+        side: chosen.side,
+    };
+}
 
-    return adjustClosestPointSideCenterPoint(twoClosestPoints[1].xy, fromPosition);
+export function getClosestSideCenter(
+    gridMatrix: number[][],
+    gridSettings: GridSettings,
+    mousePosition: XY,
+    fromPosition: XY,
+    toPosition: XY,
+    isSmallUnitFrom: boolean,
+    isSmallUnitTo: boolean,
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): XY | undefined {
+    return getClosestSideCenterDetailed(
+        gridMatrix,
+        gridSettings,
+        mousePosition,
+        fromPosition,
+        toPosition,
+        isSmallUnitFrom,
+        isSmallUnitTo,
+        fromTeamType,
+        isThroughShot,
+    )?.position;
 }

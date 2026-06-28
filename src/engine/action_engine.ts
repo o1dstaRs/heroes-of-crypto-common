@@ -14,7 +14,17 @@ import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
-import { getCellsAroundCell, getPositionForCell, getPositionForCells, isCellWithinGrid } from "../grid/grid_math";
+import {
+    getCellsAroundCell,
+    getPositionForCell,
+    getPositionForCells,
+    getRangeAttackSideCenter,
+    isCellWithinGrid,
+    isRangeAttackSideObservable,
+    RANGE_ATTACK_CELL_SIDES,
+    RangeAttackCellSide,
+} from "../grid/grid_math";
+import { getDistance } from "../utils/math";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import type { AttackHandler } from "../handlers/attack_handler";
 import type { IAnimationData, IVisibleDamage } from "../scene/animations";
@@ -391,11 +401,17 @@ export class GameActionEngine {
             return this.reject("attack_handler_missing");
         }
 
+        // The shot travels from the attacker's center to the CENTER OF THE SELECTED VISIBLE EDGE of
+        // the target, never to the target's center. The edge is reconstructed authoritatively here
+        // from the client's bounded intent (aimCell + aimSide); malformed/occluded aim is clamped to
+        // a legal edge, so the server geometry can never be compromised.
+        const toPosition = this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide);
+
         const evalResult = this.context.attackHandler.evaluateRangeAttack(
             this.context.unitsHolder.getAllUnits(),
             attacker,
             attacker.getPosition(),
-            target.getPosition(),
+            toPosition,
             attacker.hasAbilityActive("Through Shot"),
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
@@ -435,7 +451,7 @@ export class GameActionEngine {
             attacker,
             evalResult.affectedUnits,
             responseUnits,
-            target.getPosition(),
+            toPosition,
             false,
             true,
         );
@@ -458,6 +474,86 @@ export class GameActionEngine {
         events.push(...this.cleanupDeadUnits(unitIdsDied));
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
+    }
+    /**
+     * Authoritative resolution of the ranged-shot trajectory endpoint. The client only ever sends
+     * bounded intent (aimCell + aimSide) — this never trusts a raw position, so a tampered client
+     * cannot bend the trajectory or inflate the distance-based damage divisor. The result is ALWAYS
+     * the center of a real visible edge of the target's own footprint; malformed/occluded intent is
+     * deterministically clamped (not honored), so the worst a compromised client can do is pick a
+     * legal edge a normal player could have aimed at:
+     *   - aimCell is used only when it is one of the target's own cells; otherwise the target cell
+     *     nearest the attacker is used.
+     *   - aimSide is honored only when it is a genuinely observable (non-occluded) side of that cell;
+     *     otherwise the observable side nearest the attacker is used.
+     * If the unit is fully hidden (no observable side) it falls back to the target center — the
+     * trajectory still hits whatever occluder stands in front first.
+     */
+    private resolveRangeTargetPosition(attacker: Unit, target: Unit, aimCell?: XY, aimSide?: number): XY {
+        const gridMatrix = this.context.grid.getMatrix();
+        const fromTeam = attacker.getTeam();
+        const isThroughShot = attacker.hasAbilityActive("Through Shot");
+        const attackerPosition = attacker.getPosition();
+        const targetCells = target.getCells();
+
+        const cell =
+            (aimCell && targetCells.find((c) => c.x === aimCell.x && c.y === aimCell.y)) ||
+            this.closestCellToPosition(targetCells, attackerPosition);
+        if (!cell) {
+            return target.getPosition();
+        }
+
+        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
+            isRangeAttackSideObservable(gridMatrix, cell, side, fromTeam, isThroughShot),
+        );
+        if (!observableSides.length) {
+            return target.getPosition();
+        }
+
+        const side =
+            aimSide !== undefined && observableSides.includes(aimSide as RangeAttackCellSide)
+                ? (aimSide as RangeAttackCellSide)
+                : this.closestObservableSide(cell, observableSides, attackerPosition);
+
+        return getRangeAttackSideCenter(this.context.grid.getSettings(), cell, side, attackerPosition);
+    }
+    private closestCellToPosition(cells: XY[], position: XY): XY | undefined {
+        const gridSettings = this.context.grid.getSettings();
+        let best: XY | undefined;
+        let bestDistance = Number.MAX_VALUE;
+        for (const cell of cells) {
+            const cellPosition = getPositionForCell(
+                cell,
+                gridSettings.getMinX(),
+                gridSettings.getStep(),
+                gridSettings.getHalfStep(),
+            );
+            const distance = getDistance(position, cellPosition);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = cell;
+            }
+        }
+        return best;
+    }
+    private closestObservableSide(
+        cell: XY,
+        sides: readonly RangeAttackCellSide[],
+        attackerPosition: XY,
+    ): RangeAttackCellSide {
+        const gridSettings = this.context.grid.getSettings();
+        let best = sides[0];
+        let bestDistance = Number.MAX_VALUE;
+        for (const side of sides) {
+            const point = getRangeAttackSideCenter(gridSettings, cell, side, attackerPosition);
+            const distance = getDistance(attackerPosition, point);
+            // Deterministic: strict less-than keeps the lower side index on ties.
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = side;
+            }
+        }
+        return best;
     }
     private obstacleAttack(action: Extract<GameAction, { type: "obstacle_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);

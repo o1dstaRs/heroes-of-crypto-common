@@ -35,7 +35,17 @@ export type GameAction =
           hasLavaCell?: boolean;
           hasWaterCell?: boolean;
       }
-    | { type: "range_attack"; attackerId: string; targetId: string }
+    | {
+          type: "range_attack";
+          attackerId: string;
+          targetId: string;
+          // The visible edge the player aimed at, as bounded intent only: which cell of the target
+          // (aimCell) and which of its 4 sides (aimSide, see RangeAttackCellSide). The server
+          // validates and reconstructs the exact trajectory from these — it never trusts a raw
+          // position. Omitted by the AI path, where the engine picks a deterministic default edge.
+          aimCell?: XY;
+          aimSide?: number;
+      }
     | {
           type: "obstacle_attack";
           attackerId: string;

@@ -20,7 +20,7 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { AttackType, GridType, MovementType, UnitSizeType } from "../../src/generated/protobuf/v1/types_gen";
 import type { IWeightedRoute } from "../../src/grid/path_definitions";
-import { getPositionForCell } from "../../src/grid/grid_math";
+import { getPositionForCell, RangeAttackCellSide } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
@@ -607,6 +607,46 @@ describe("GameActionEngine", () => {
         );
         expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it("honors a valid range aim (visible edge) and clamps a tampered aim cell to the target", () => {
+        const makeSetup = () => {
+            const setup = setupActionFight({
+                lowerAttackType: PBTypes.AttackVals.RANGE,
+                lowerRangeShots: 3,
+                supportCell: { x: 2, y: 3 },
+                upperCell: { x: 7, y: 3 },
+            });
+            setup.lower.refreshPossibleAttackTypes(true);
+            return setup;
+        };
+
+        // Valid aim: the target's own cell + its LEFT side (facing the attacker at x=3 < 7).
+        const aimed = makeSetup();
+        const aimedHpBefore = aimed.upper.getCumulativeHp();
+        const aimedResult = aimed.engine.apply({
+            type: "range_attack",
+            attackerId: aimed.lower.getId(),
+            targetId: aimed.upper.getId(),
+            aimCell: { x: 7, y: 3 },
+            aimSide: RangeAttackCellSide.LEFT,
+        });
+        expect(aimedResult.completed).toBe(true);
+        expect(aimed.upper.getCumulativeHp()).toBeLessThan(aimedHpBefore);
+
+        // Tampered aim: a cell that is NOT part of the target is clamped to the target's footprint —
+        // the action still lands on the intended target rather than being honored or silently lost.
+        const tampered = makeSetup();
+        const tamperedHpBefore = tampered.upper.getCumulativeHp();
+        const tamperedResult = tampered.engine.apply({
+            type: "range_attack",
+            attackerId: tampered.lower.getId(),
+            targetId: tampered.upper.getId(),
+            aimCell: { x: 14, y: 14 },
+            aimSide: RangeAttackCellSide.UP,
+        });
+        expect(tamperedResult.completed).toBe(true);
+        expect(tampered.upper.getCumulativeHp()).toBeLessThan(tamperedHpBefore);
     });
 
     it("carries per-affected-unit splash damage for a Large Caliber (AOE) range attack", () => {

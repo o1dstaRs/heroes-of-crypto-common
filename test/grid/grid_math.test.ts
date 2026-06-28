@@ -21,6 +21,10 @@ import {
     getCellsAroundPosition,
     getClosestCrossingPoint,
     getClosestSideCenter,
+    getClosestSideCenterDetailed,
+    getRangeAttackSideCenter,
+    isRangeAttackSideObservable,
+    RangeAttackCellSide,
     getClosestVH,
     getCrossingPoints,
     getDistanceToFurthestCorner,
@@ -357,6 +361,77 @@ describe("grid_math", () => {
                 true,
             ),
         ).toBeDefined();
+    });
+
+    it("aims ranged shots at the selected visible edge (center -> edge, not center -> center)", () => {
+        const half = testGridSettings.getHalfStep();
+        const targetCell = { x: 3, y: 1 };
+        const targetCenter = getPositionForCell(
+            targetCell,
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+        // Attacker sits to the LEFT of the target, on the same row.
+        const fromPosition = getPositionForCell(
+            { x: 1, y: 1 },
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+
+        // The reconstructed edge is the target cell's LEFT side center — half a cell toward the
+        // attacker — and is NEVER the target's center. This is the whole point of the fix.
+        const leftEdge = getRangeAttackSideCenter(testGridSettings, targetCell, RangeAttackCellSide.LEFT, fromPosition);
+        expect(leftEdge.x).toBe(targetCenter.x - half);
+        expect(leftEdge.y).toBe(targetCenter.y);
+        expect(leftEdge).not.toEqual(targetCenter);
+
+        const rightEdge = getRangeAttackSideCenter(
+            testGridSettings,
+            targetCell,
+            RangeAttackCellSide.RIGHT,
+            fromPosition,
+        );
+        expect(rightEdge.x).toBe(targetCenter.x + half);
+
+        // Visibility: an enemy unit hiding the LEFT neighbour (cell 2,1 -> matrix[1][2]) makes the
+        // LEFT edge unobservable; a friendly/empty neighbour keeps it observable. matrix[y][x].
+        const open = emptyMatrix();
+        expect(isRangeAttackSideObservable(open, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER)).toBe(
+            true,
+        );
+        const blocked = emptyMatrix();
+        blocked[1][2] = PBTypes.TeamVals.LOWER;
+        expect(isRangeAttackSideObservable(blocked, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER)).toBe(
+            false,
+        );
+
+        // Deterministic (no shuffle): same inputs -> same chosen side/position every call.
+        const a = getClosestSideCenterDetailed(
+            open,
+            testGridSettings,
+            targetCenter,
+            fromPosition,
+            targetCenter,
+            true,
+            true,
+            PBTypes.TeamVals.UPPER,
+        );
+        const b = getClosestSideCenterDetailed(
+            open,
+            testGridSettings,
+            targetCenter,
+            fromPosition,
+            targetCenter,
+            true,
+            true,
+            PBTypes.TeamVals.UPPER,
+        );
+        expect(a).toBeDefined();
+        // Attacker is to the left, so the chosen visible edge is the LEFT side facing it.
+        expect(a?.side).toBe(RangeAttackCellSide.LEFT);
+        expect(a).toEqual(b);
     });
 
     it("selects closest side centers across directions and blocked cells", () => {
