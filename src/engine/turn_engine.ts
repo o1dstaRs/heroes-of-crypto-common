@@ -150,8 +150,15 @@ export class TurnEngine {
             (min, max) => this.runtime.rng.int(min, max),
         );
 
-        const nextUnitId = this.fightProperties.dequeueNextUnitId();
-        const nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
+        let nextUnitId = this.fightProperties.dequeueNextUnitId();
+        let nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
+        // Skip stale queue entries: an id can outlive its unit in upNext, and a stale id at the front
+        // would otherwise return no next unit (and no events), stranding the turn order with valid
+        // units still queued behind it. Drain past any such entries to the next real unit.
+        while (nextUnitId && !nextUnit && this.fightProperties.getUpNextQueueSize() > 0) {
+            nextUnitId = this.fightProperties.dequeueNextUnitId();
+            nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
+        }
 
         if (nextUnit) {
             const activationEvents = this.activateNextUnit(nextUnit);
