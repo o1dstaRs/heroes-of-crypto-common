@@ -403,7 +403,6 @@ export class GameActionEngine {
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
         // [RANGE-PROBE] how many units the trajectory line actually hit (and which).
-        // eslint-disable-next-line no-console
         console.warn(
             `[rangeDbg] engine.rangeAttack from=(${attacker.getPosition().x.toFixed(0)},${attacker
                 .getPosition()
