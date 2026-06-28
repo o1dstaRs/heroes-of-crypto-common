@@ -615,6 +615,7 @@ export class AttackHandler {
             this.sceneLog,
             this.damageStatisticHolder,
             true,
+            (damageForAnimation.secondary ??= []),
         );
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
@@ -689,6 +690,7 @@ export class AttackHandler {
                 this.sceneLog,
                 this.damageStatisticHolder,
                 false,
+                (damageForAnimation.secondary ??= []),
             );
             if (aoeRangeResponseResult.landed) {
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
@@ -805,6 +807,7 @@ export class AttackHandler {
                     damageFromAttack,
                     this.sceneLog,
                     this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
                 );
                 AllAbilities.processSpitBallAbility(
                     attackerUnit,
@@ -854,6 +857,7 @@ export class AttackHandler {
                         damageFromResponse,
                         this.sceneLog,
                         this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
                     );
                     AllAbilities.processSpitBallAbility(
                         targetUnit,
@@ -979,6 +983,7 @@ export class AttackHandler {
                     secondShotResult.damage,
                     this.sceneLog,
                     this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
                 );
                 AllAbilities.processSpitBallAbility(
                     attackerUnit,
@@ -1276,6 +1281,7 @@ export class AttackHandler {
             this.damageStatisticHolder,
             attackFromCell,
             true,
+            (damageForAnimation.secondary ??= []),
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
@@ -1289,6 +1295,7 @@ export class AttackHandler {
             "attk",
             this.damageStatisticHolder,
             attackFromCell,
+            (damageForAnimation.secondary ??= []),
         );
         updateUnitsDied(fireBreathAttackResult.unitIdsDied);
         this.updateMoraleDecreaseForTheUnitTeam(
@@ -1313,6 +1320,15 @@ export class AttackHandler {
             skewerStrikeAttackResult.moraleDecreaseForTheUnitTeam,
         );
         attackerUnitPlusMorale += skewerStrikeAttackResult.increaseMorale;
+        for (const sd of skewerStrikeAttackResult.secondaryDamages) {
+            (damageForAnimation.secondary ??= []).push({
+                source: "skewer_strike",
+                unitId: sd.unitId,
+                position: sd.unitPosition,
+                amount: sd.damage,
+                unitsDied: sd.unitsDied,
+            });
+        }
 
         if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
@@ -1331,6 +1347,7 @@ export class AttackHandler {
                 damageFromAttack,
                 unitsHolder,
                 this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
             );
 
             updateUnitsDied(fireShieldReflectResult.unitIdsDied);
@@ -1373,6 +1390,7 @@ export class AttackHandler {
                     "resp",
                     this.damageStatisticHolder,
                     GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
+                    (damageForAnimation.secondary ??= []),
                 );
                 updateUnitsDied(fireBreathResponseResult.unitIdsDied);
                 this.updateMoraleDecreaseForTheUnitTeam(
@@ -1395,6 +1413,15 @@ export class AttackHandler {
                     moraleDecreaseForTheUnitTeam,
                     skewerStrikeResponseResult.moraleDecreaseForTheUnitTeam,
                 );
+                for (const sd of skewerStrikeResponseResult.secondaryDamages) {
+                    (damageForAnimation.secondary ??= []).push({
+                        source: "skewer_strike",
+                        unitId: sd.unitId,
+                        position: sd.unitPosition,
+                        amount: sd.damage,
+                        unitsDied: sd.unitsDied,
+                    });
+                }
 
                 const lightningSpinResponseResult = AllAbilities.processLightningSpinAbility(
                     targetUnit,
@@ -1404,6 +1431,7 @@ export class AttackHandler {
                     this.damageStatisticHolder,
                     attackFromCell,
                     false,
+                    (damageForAnimation.secondary ??= []),
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
@@ -1492,6 +1520,7 @@ export class AttackHandler {
                         damageFromResponse,
                         unitsHolder,
                         this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
                     );
                     updateUnitsDied(fireShieldFromAttackerResult.unitIdsDied);
                     this.updateMoraleDecreaseForTheUnitTeam(
@@ -1506,6 +1535,7 @@ export class AttackHandler {
                         damageFromResponse,
                         this.sceneLog,
                         this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
                     );
                     AllAbilities.processBoarSalivaAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processAggrAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
@@ -1522,6 +1552,7 @@ export class AttackHandler {
                             unitsHolder,
                             this.sceneLog,
                             this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
                         ),
                     );
                 }
@@ -1585,6 +1616,7 @@ export class AttackHandler {
                 damageFromAttack,
                 this.sceneLog,
                 this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
             );
             AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -1601,6 +1633,7 @@ export class AttackHandler {
                     unitsHolder,
                     this.sceneLog,
                     this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
                 ),
             );
             const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
@@ -1680,6 +1713,7 @@ export class AttackHandler {
                 secondPunchResult.damage,
                 unitsHolder,
                 this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
             );
             updateUnitsDied(secondFireShieldResult.unitIdsDied);
             this.updateMoraleDecreaseForTheUnitTeam(
@@ -1697,6 +1731,7 @@ export class AttackHandler {
                     secondPunchResult.damage,
                     this.sceneLog,
                     this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
                 );
                 AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);

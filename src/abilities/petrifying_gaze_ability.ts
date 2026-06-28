@@ -15,6 +15,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 export function processPetrifyingGazeAbility(
@@ -23,6 +24,7 @@ export function processPetrifyingGazeAbility(
     damageFromAttack: number,
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
 ): void {
     if (toUnit.isDead() || damageFromAttack <= 0) {
         return;
@@ -90,6 +92,8 @@ export function processPetrifyingGazeAbility(
         amountOfUnitsKilled += Math.floor(damageFromAbilityTmp / toUnit.getMaxHp());
 
         // apply the ability damage
+        const positionAtImpact = { ...toUnit.getPosition() };
+        const amountAliveBefore = toUnit.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: toUnit.applyDamage(
@@ -101,6 +105,13 @@ export function processPetrifyingGazeAbility(
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
 
+        secondaryDamage?.push({
+            source: "petrifying_gaze",
+            unitId: toUnit.getId(),
+            position: positionAtImpact,
+            amount: damageFromAbility,
+            unitsDied: Math.max(0, amountAliveBefore - toUnit.getAmountAlive()),
+        });
         sceneLog.updateLog(`${amountOfUnitsKilled} ${toUnit.getName()} killed by ${petrifyingGazeAbility.getName()}`);
     }
 }

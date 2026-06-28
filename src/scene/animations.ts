@@ -19,6 +19,33 @@ export interface IAnimationData {
     bodyUnit?: Unit;
 }
 
+/** Source of a secondary (non-primary-hit) damage instance applied during an attack exchange. */
+export type SecondaryDamageSource =
+    | "fire_shield"
+    | "chain_lightning"
+    | "petrifying_gaze"
+    | "magic_mirror"
+    // Melee AOE: extra units struck by a sweeping/breath attack (Black Dragon Fire Breath,
+    // Pikeman Lightning Spin, Hydra Skewer Strike) beyond the primary target.
+    | "fire_breath"
+    | "lightning_spin"
+    | "skewer_strike";
+
+/**
+ * A damage instance dealt by an ability that triggers DURING an attack but isn't the primary hit:
+ * Fire Shield reflect, Chain Lightning bounces, Petrifying Gaze kills, Magic Mirror reflection. The
+ * authoritative engine fills these on the attack's IVisibleDamage so the client can show a floating
+ * number on the affected unit (at its impact-time position) and write a scene-log line — the engine's
+ * own sceneLog only reaches the local sandbox, not ranked (which rebuilds purely from events).
+ */
+export interface ISecondaryDamage {
+    source: SecondaryDamageSource;
+    unitId: string;
+    position: XY;
+    amount: number;
+    unitsDied: number;
+}
+
 export interface IVisibleDamage {
     amount: number;
     render: boolean;
@@ -31,4 +58,8 @@ export interface IVisibleDamage {
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the
     // primary target. Empty/undefined for single-target attacks.
     splash?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+    // Secondary damage applied during this exchange (Fire Shield reflect, Chain Lightning bounces,
+    // Petrifying Gaze kills, Magic Mirror reflection) — each rendered as its own floating number and
+    // scene-log line. Empty/undefined when no such ability triggered.
+    secondary?: ISecondaryDamage[];
 }

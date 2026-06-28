@@ -19,6 +19,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
@@ -45,6 +46,7 @@ export function processRangeAOEAbility(
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     isAttack = true,
+    secondaryDamage?: ISecondaryDamage[],
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
@@ -134,7 +136,14 @@ export function processRangeAOEAbility(
                 maxDamage = Math.max(maxDamage, damageFromAttack);
 
                 if (!unit.isDead()) {
-                    processPetrifyingGazeAbility(attackerUnit, unit, damageFromAttack, sceneLog, damageStatisticHolder);
+                    processPetrifyingGazeAbility(
+                        attackerUnit,
+                        unit,
+                        damageFromAttack,
+                        sceneLog,
+                        damageStatisticHolder,
+                        secondaryDamage,
+                    );
                 }
             }
         }

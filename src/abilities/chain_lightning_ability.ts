@@ -21,6 +21,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 import * as SpellHelper from "../spells/spell_helper";
 
 interface ILayerImpact {
@@ -73,6 +74,7 @@ function attackEnemiesAndGetLayerImpact(
     sceneLog: ISceneLog,
     unitIdsDied: string[],
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
 ): ILayerImpact[] {
     const fullLayerImpact: ILayerImpact[] = [];
     let magicDamageReflection = 0;
@@ -106,6 +108,7 @@ function attackEnemiesAndGetLayerImpact(
         let enemyMinusMorale = 0;
         if (targetEnemyLightningDamage && !e1.isDead()) {
             const e1AmountBefore = e1.getAmountAlive();
+            const positionAtImpact = { ...e1.getPosition() };
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
                 damage: e1.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog),
@@ -113,6 +116,13 @@ function attackEnemiesAndGetLayerImpact(
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
             });
             magicDamageReflection += (SpellHelper.getMagicMirrorPower(e1) / 100) * targetEnemyLightningDamage;
+            secondaryDamage?.push({
+                source: "chain_lightning",
+                unitId: e1.getId(),
+                position: positionAtImpact,
+                amount: targetEnemyLightningDamage,
+                unitsDied: Math.max(0, e1AmountBefore - e1.getAmountAlive()),
+            });
             sceneLog.updateLog(
                 `${e1.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
                     HoCLib.killTag(e1AmountBefore - e1.getAmountAlive()),
@@ -147,6 +157,7 @@ export function processChainLightningAbility(
     unitsHolder: UnitsHolder,
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
 ): string[] {
     const unitIdsDied: string[] = [];
     const chainLightningAbility = fromUnit.getAbility("Chain Lightning");
@@ -183,6 +194,7 @@ export function processChainLightningAbility(
         Math.floor(abilityMultiplier * attackDamage * (1 - targetMagicResist / 100)) * heavyArmorMultiplierTarget;
     if (targetEnemyLightningDamage && !targetUnit.isDead()) {
         const targetAmountBefore = targetUnit.getAmountAlive();
+        const targetPositionAtImpact = { ...targetUnit.getPosition() };
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: targetUnit.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog),
@@ -190,6 +202,13 @@ export function processChainLightningAbility(
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
         totalMagicDamageReflection += (SpellHelper.getMagicMirrorPower(targetUnit) / 100) * targetEnemyLightningDamage;
+        secondaryDamage?.push({
+            source: "chain_lightning",
+            unitId: targetUnit.getId(),
+            position: targetPositionAtImpact,
+            amount: targetEnemyLightningDamage,
+            unitsDied: Math.max(0, targetAmountBefore - targetUnit.getAmountAlive()),
+        });
         sceneLog.updateLog(
             `${targetUnit.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
                 HoCLib.killTag(targetAmountBefore - targetUnit.getAmountAlive()),
@@ -231,6 +250,7 @@ export function processChainLightningAbility(
         sceneLog,
         unitIdsDied,
         damageStatisticHolder,
+        secondaryDamage,
     );
 
     for (const impact of layer1Impact) {
@@ -264,6 +284,7 @@ export function processChainLightningAbility(
             sceneLog,
             unitIdsDied,
             damageStatisticHolder,
+            secondaryDamage,
         );
 
         for (const impact2 of layer2Impact) {
@@ -296,6 +317,7 @@ export function processChainLightningAbility(
                 sceneLog,
                 unitIdsDied,
                 damageStatisticHolder,
+                secondaryDamage,
             );
 
             for (const impact3 of layer3Impact) {
@@ -309,7 +331,16 @@ export function processChainLightningAbility(
     }
 
     if (totalMagicDamageReflection && !fromUnit.hasAbilityActive("Wind Element")) {
+        const reflectPositionAtImpact = { ...fromUnit.getPosition() };
+        const reflectAmountBefore = fromUnit.getAmountAlive();
         fromUnit.applyDamage(totalMagicDamageReflection, 0 /* magic attack */, sceneLog);
+        secondaryDamage?.push({
+            source: "magic_mirror",
+            unitId: fromUnit.getId(),
+            position: reflectPositionAtImpact,
+            amount: Math.floor(totalMagicDamageReflection),
+            unitsDied: Math.max(0, reflectAmountBefore - fromUnit.getAmountAlive()),
+        });
         sceneLog.updateLog(`${fromUnit.getName()} got hit ${totalMagicDamageReflection} by Magic Mirror reflection`);
         if (fromUnit.isDead()) {
             sceneLog.updateLog(`${fromUnit.getName()} died`);

@@ -19,6 +19,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";
@@ -50,6 +51,7 @@ export function processLightningSpinAbility(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     attackFromCell?: HoCMath.XY,
     isAttack = true,
+    secondaryDamage?: ISecondaryDamage[],
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -125,6 +127,8 @@ export function processLightningSpinAbility(
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
 
+            const positionAtImpact = { ...enemy.getPosition() };
+            const amountAliveBefore = enemy.getAmountAlive();
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
                 damage: enemy.applyDamage(
@@ -134,6 +138,13 @@ export function processLightningSpinAbility(
                 ),
                 team: fromUnit.getTeam(),
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+            });
+            secondaryDamage?.push({
+                source: "lightning_spin",
+                unitId: enemy.getId(),
+                position: positionAtImpact,
+                amount: damageFromAttack,
+                unitsDied: Math.max(0, amountAliveBefore - enemy.getAmountAlive()),
             });
             enemyIdDamageFromAttack.set(enemy.getId(), damageFromAttack);
             const pegasusLightEffect = enemy.getEffect("Pegasus Light");
@@ -151,7 +162,14 @@ export function processLightningSpinAbility(
                 processMinerAbility(fromUnit, enemy, sceneLog);
                 processStunAbility(fromUnit, enemy, fromUnit, sceneLog);
                 processDullingDefenseAblity(enemy, fromUnit, sceneLog);
-                processPetrifyingGazeAbility(fromUnit, enemy, damageFromAttack, sceneLog, damageStatisticHolder);
+                processPetrifyingGazeAbility(
+                    fromUnit,
+                    enemy,
+                    damageFromAttack,
+                    sceneLog,
+                    damageStatisticHolder,
+                    secondaryDamage,
+                );
                 processBoarSalivaAbility(fromUnit, enemy, fromUnit, sceneLog);
                 processAggrAbility(fromUnit, enemy, fromUnit, sceneLog);
                 processDeepWoundsAbility(fromUnit, enemy, fromUnit, sceneLog);

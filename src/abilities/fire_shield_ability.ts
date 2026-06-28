@@ -16,6 +16,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 
 export interface IFireShieldResult {
     increaseMorale: number;
@@ -30,6 +31,7 @@ export function processFireShieldAbility(
     damageFromAttack: number,
     unitsHolder: UnitsHolder,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
 ): IFireShieldResult {
     const unitIdsDied: string[] = [];
     let increaseMorale = 0;
@@ -66,11 +68,20 @@ export function processFireShieldAbility(
                 (1 - toUnit.getMagicResist() / 100) *
                 multiplier,
         );
+        const positionAtImpact = { ...toUnit.getPosition() };
+        const amountAliveBefore = toUnit.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+        });
+        secondaryDamage?.push({
+            source: "fire_shield",
+            unitId: toUnit.getId(),
+            position: positionAtImpact,
+            amount: fireShieldDmg,
+            unitsDied: Math.max(0, amountAliveBefore - toUnit.getAmountAlive()),
         });
         sceneLog.updateLog(`${toUnit.getName()} received (${fireShieldDmg}) from Fire Shield`);
 

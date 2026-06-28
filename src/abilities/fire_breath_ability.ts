@@ -20,6 +20,7 @@ import { UnitsHolder } from "../units/units_holder";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 
 export interface IFireBreathResult {
     increaseMorale: number;
@@ -36,6 +37,7 @@ export function processFireBreathAbility(
     attackTypeString: string,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     targetMovePosition?: HoCMath.XY,
+    secondaryDamage?: ISecondaryDamage[],
 ): IFireBreathResult {
     const unitIdsDied: string[] = [];
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
@@ -96,11 +98,20 @@ export function processFireBreathAbility(
                 multiplier,
         );
 
+        const positionAtImpact = { ...nextStandingTarget.getPosition() };
+        const amountAliveBefore = nextStandingTarget.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: nextStandingTarget.applyDamage(fireBreathAttackDamage, 0 /* magic attack */, sceneLog),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+        });
+        secondaryDamage?.push({
+            source: "fire_breath",
+            unitId: nextStandingTarget.getId(),
+            position: positionAtImpact,
+            amount: fireBreathAttackDamage,
+            unitsDied: Math.max(0, amountAliveBefore - nextStandingTarget.getAmountAlive()),
         });
 
         sceneLog.updateLog(
