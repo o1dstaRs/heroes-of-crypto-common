@@ -32,7 +32,17 @@
         "lint:style": "bun run lint:style:base -- --check",
         "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\"",
         "lint:style:fix": "bun run lint:style:base -- --write",
+        "prepare": "git config core.hooksPath .githooks || true",
         "test": "bun test"
+    },
+    "lint-staged": {
+        "*.{ts,tsx}": [
+            "bunx eslint --fix",
+            "bunx prettier --write"
+        ],
+        "*.{js,json}": [
+            "bunx prettier --write"
+        ]
     },
     "browserslist": [
         "> 5%"
@@ -51,6 +61,7 @@
         "cpy-cli": "^7.0.0",
         "eslint": "^9.39.4",
         "google-protobuf": "^4.0.2",
+        "lint-staged": "^17.0.8",
         "prettier": "^3.8.4",
         "protobufjs": "^7.6.4",
         "protoc-gen-ts": "^0.8.7",

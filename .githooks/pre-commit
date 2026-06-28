@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Auto-format/lint staged files before commit so CI's check-only lint never sees dirty code.
+bunx lint-staged
