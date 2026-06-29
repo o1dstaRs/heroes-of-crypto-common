@@ -28,6 +28,13 @@ export interface ITournamentOptions {
     maxLaps?: number;
     composition?: readonly IRosterComposition[];
     amountByLevel?: Readonly<Record<number, number>>;
+    /**
+     * Off by default → both teams field the SAME roster (mirror match; isolates AI skill from luck).
+     * On → each team gets its OWN randomly-picked roster (same composition/stack sizes, likely different
+     * creatures), so matchups vary. Side/roster bias is still cancelled: each pair of games keeps the
+     * two rosters fixed to their sides and swaps which version drives which side.
+     */
+    randomizePicks?: boolean;
 }
 
 export interface IGameRecord {
@@ -79,13 +86,19 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
 
     const pairIndex = Math.floor(game / 2);
     const seed = (options.baseSeed + pairIndex * 0x9e3779b1) >>> 0;
+    // Green roster from `seed`. When randomizing, red gets its own roster from a decorrelated seed;
+    // both games in the pair reuse the same two rosters (fixed to their sides) so swapping versions
+    // cancels side AND roster luck. Mirrored (default) → red roster === green roster.
     const roster = buildRoster(makeRng(seed), composition, amountByLevel);
+    const redRoster = options.randomizePicks
+        ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
+        : undefined;
 
     const aIsGreen = game % 2 === 0;
     const greenVersion = aIsGreen ? options.versionA : options.versionB;
     const redVersion = aIsGreen ? options.versionB : options.versionA;
 
-    const result = runMatch({ greenVersion, redVersion, roster, seed, maxLaps: options.maxLaps });
+    const result = runMatch({ greenVersion, redVersion, roster, redRoster, seed, maxLaps: options.maxLaps });
 
     const winnerSide: Side | "draw" = result.winner;
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;

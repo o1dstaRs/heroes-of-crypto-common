@@ -46,8 +46,10 @@ const sideForTeam = (team: TeamType): Side => (team === GREEN_TEAM ? "green" : "
 export interface IMatchConfig {
     greenVersion: string;
     redVersion: string;
-    /** Identical roster handed to BOTH teams (mirrored match). */
+    /** Roster for the GREEN team. In a mirrored match the red team gets the same list. */
     roster: IArmyUnitSpec[];
+    /** Optional distinct roster for the RED team (randomized-picks match). Defaults to `roster`. */
+    redRoster?: IArmyUnitSpec[];
     /** Recorded for reproducibility (drives roster selection upstream; stored here as provenance). */
     seed: number;
     /** Hard cap on laps before the match is called a draw-on-points. Default 60. */
@@ -109,7 +111,10 @@ export interface IMatchResult {
     endReason: "elimination" | "turn_cap" | "stuck";
     laps: number;
     totalActions: number;
+    /** Green-team roster. Equals the red roster in a mirrored match. */
     roster: IArmyUnitSpec[];
+    /** Red-team roster — only present (and distinct) in a randomized-picks match. */
+    redRoster?: IArmyUnitSpec[];
     placements: { green: IPlacementRecord[]; red: IPlacementRecord[] };
     actions: IRecordedAction[];
     outcome: { green: ISideOutcome; red: ISideOutcome };
@@ -297,11 +302,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const greenStrategy = getAIStrategy(config.greenVersion);
     const redStrategy = getAIStrategy(config.redVersion);
 
-    // --- build armies (identical rosters for both teams) ---
-    const greenUnits = config.roster.map((spec) =>
+    // --- build armies (per-team rosters; identical lists in a mirrored match) ---
+    const greenRoster = config.roster;
+    const redRoster = config.redRoster ?? config.roster;
+    const greenUnits = greenRoster.map((spec) =>
         createUnitFromSpec(spec, GREEN_TEAM, gridSettings, abilityFactory, effectFactory),
     );
-    const redUnits = config.roster.map((spec) =>
+    const redUnits = redRoster.map((spec) =>
         createUnitFromSpec(spec, RED_TEAM, gridSettings, abilityFactory, effectFactory),
     );
     for (const unit of [...greenUnits, ...redUnits]) {
@@ -314,13 +321,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             GREEN_TEAM,
             greenZone,
             greenStrategy,
-            config.roster,
+            greenRoster,
             engine,
             grid,
             unitsHolder,
             pathHelper,
         ),
-        red: placeArmy(redUnits, RED_TEAM, redZone, redStrategy, config.roster, engine, grid, unitsHolder, pathHelper),
+        red: placeArmy(redUnits, RED_TEAM, redZone, redStrategy, redRoster, engine, grid, unitsHolder, pathHelper),
     };
 
     // --- run the fight ---
@@ -666,6 +673,7 @@ function buildResult(
         laps: fightProperties.getCurrentLap(),
         totalActions: actions.length,
         roster: config.roster,
+        redRoster: config.redRoster,
         placements,
         actions,
         outcome: { green, red },

@@ -35,9 +35,15 @@ import { runTournamentConcurrent } from "./concurrent_tournament";
  * to an LLM to mine concrete improvements for the next version.
  */
 async function main(): Promise<void> {
-    const [, , versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = process.argv;
+    // Flags (e.g. --random) may appear anywhere; strip them so positional args keep their order.
+    const argv = process.argv.slice(2);
+    const flags = argv.filter((a) => a.startsWith("--"));
+    const [versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
+    const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
     if (!versionA || !versionB) {
-        console.error("usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency]");
+        console.error(
+            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random]",
+        );
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
     }
@@ -68,18 +74,23 @@ async function main(): Promise<void> {
     };
 
     console.log(
-        `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}) -> ${jsonlPath}`,
+        `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}, ` +
+            `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}) -> ${jsonlPath}`,
     );
-    const summary = await runTournamentConcurrent({ versionA, versionB, games, baseSeed }, concurrency, (record) => {
-        buffer.push(`${JSON.stringify(record)}\n`);
-        if (buffer.length >= 50) {
-            flush();
-        }
-        logged += 1;
-        if (logged % 100 === 0) {
-            console.log(`  ${logged}/${games} games...`);
-        }
-    });
+    const summary = await runTournamentConcurrent(
+        { versionA, versionB, games, baseSeed, randomizePicks },
+        concurrency,
+        (record) => {
+            buffer.push(`${JSON.stringify(record)}\n`);
+            if (buffer.length >= 50) {
+                flush();
+            }
+            logged += 1;
+            if (logged % 100 === 0) {
+                console.log(`  ${logged}/${games} games...`);
+            }
+        },
+    );
     flush();
 
     writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
