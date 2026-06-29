@@ -15,13 +15,15 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
+import { GRID_SIZE } from "../../grid/grid_constants";
 import { getDistance, type XY } from "../../utils/math";
-import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_2 } from "./v0_2";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const placeCellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 // How much more a point of damage on an enemy RANGE unit is worth than the same damage on a melee
 // unit. Winning the ranged-attrition race flips firepower superiority our way; from there we hold a
@@ -244,6 +246,63 @@ class StrategyV0_3 extends StrategyV0_2 {
         const allies = context.unitsHolder.getAllAllies(unit.getTeam()).filter((a) => !a.isDead());
         const reach = enemy.getSteps() + 1; // move into contact + strike
         return allies.some((a) => getDistance(enemy.getBaseCell(), a.getBaseCell()) <= reach);
+    }
+    /**
+     * Placement variant: v0.2 sits non-sniper shooters back-CENTRE behind the wall; v0.3 tucks EVERY
+     * range unit into the safest, most-cornered deep cells (like snipers). Our focus-fire firepower is
+     * what wins, so protecting all of it from the clash pays. Melee still forms the centred front wall;
+     * casters/support sit back-centre behind it.
+     */
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        const placements = new Map<string, XY>();
+        const occupied = new Set<number>();
+        const legal = context.placement.possibleCellHashes();
+        const baseCells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
+        if (!baseCells.length) {
+            return placements;
+        }
+        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : GRID_SIZE - 1 - cc.y);
+        const xs = baseCells.map((cc) => cc.x);
+        const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const edgeness = (cc: XY): number => Math.abs(cc.x - centreX);
+        const footprintFor = (u: Unit, base: XY): XY[] =>
+            u.isSmallSize()
+                ? [base]
+                : [
+                      { x: base.x, y: base.y },
+                      { x: base.x - 1, y: base.y },
+                      { x: base.x, y: base.y - 1 },
+                      { x: base.x - 1, y: base.y - 1 },
+                  ];
+        const placeBy = (u: Unit, compare: (a: XY, b: XY) => number): void => {
+            for (const base of [...baseCells].sort(compare)) {
+                const footprint = footprintFor(u, base);
+                if (footprint.some((cc) => !legal.has(placeCellKey(cc)) || occupied.has(placeCellKey(cc)))) {
+                    continue;
+                }
+                for (const cc of footprint) {
+                    occupied.add(placeCellKey(cc));
+                }
+                placements.set(u.getId(), { x: base.x, y: base.y });
+                return;
+            }
+        };
+        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
+        const isRange = (u: Unit): boolean => u.getAttackType() === RANGE;
+        const isMeleeU = (u: Unit): boolean => u.getAttackType() === MELEE;
+        const ranged = units.filter(isRange).sort(bySizeLargeFirst);
+        const melee = units.filter(isMeleeU).sort(bySizeLargeFirst);
+        const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(bySizeLargeFirst);
+        for (const u of ranged) {
+            placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a)); // deep + cornered
+        }
+        for (const u of melee) {
+            placeBy(u, (a, b) => frontness(b) - frontness(a) || edgeness(a) - edgeness(b)); // front wall, centred
+        }
+        for (const u of support) {
+            placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(a) - edgeness(b)); // back, centred
+        }
+        return placements;
     }
 }
 
