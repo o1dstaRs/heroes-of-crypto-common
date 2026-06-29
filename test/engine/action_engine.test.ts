@@ -188,6 +188,20 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LOWER)).toBe(400);
     });
 
+    it("drops morale and emits unit_skipped when the turn is skipped (Next/skip)", () => {
+        const setup = setupActionFight();
+        const moraleBefore = setup.lower.getMorale();
+
+        const result = setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId(), reason: "skip" });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({ type: "unit_skipped", unitId: setup.lower.getId(), reason: "skip" }),
+        );
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.lower.getMorale()).toBeLessThan(moraleBefore);
+    });
+
     it("keeps the full +3 distance morale when a move also ends the unit's turn", () => {
         const path = [
             { x: 3, y: 3 },

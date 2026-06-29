@@ -34,7 +34,7 @@ export type GameEvent =
     | { type: "armageddon_applied"; unitId: string; wave: number; damage: number; unitsDied: number }
     | { type: "morale_applied"; unitId: string; kind: "plus" | "minus"; lap: number }
     | { type: "next_unit_selected"; unitId: string; team: TeamType }
-    | { type: "unit_skipped"; unitId: string; team: TeamType; reason: "effect" | "timeout" | "manual" }
+    | { type: "unit_skipped"; unitId: string; team: TeamType; reason: "effect" | "timeout" | "manual" | "skip" }
     | { type: "unit_waited"; unitId: string; team: TeamType }
     | { type: "unit_defended"; unitId: string; team: TeamType }
     | { type: "attack_type_selected"; unitId: string; team: TeamType; attackType: AttackType }

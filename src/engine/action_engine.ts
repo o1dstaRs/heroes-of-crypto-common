@@ -178,12 +178,12 @@ export class GameActionEngine {
         }
 
         const reason = action.reason ?? "manual";
-        // A "manual" end-of-turn (the unit moved/attacked, or the player simply ended the turn) is
-        // NOT a skip and must not incur the MORALE_CHANGE_FOR_SKIP penalty or the "skips turn" log.
-        // This matches the legacy, which only penalized on turn timeout. Only forced skips
-        // (timeout / effect) count as a skip here. Without this, every move ended the turn through
-        // this path and silently lost morale (e.g. moving toward the enemy netted -1 instead of +3).
-        const isForcedSkip = reason === "timeout" || reason === "effect";
+        // A "manual" end-of-turn (the unit moved/attacked, then its turn was finished for it) is NOT a
+        // skip and must not incur the MORALE_CHANGE_FOR_SKIP penalty — otherwise a move that ends the
+        // turn through this path silently loses morale (moving toward the enemy netted -1 instead of
+        // +3). A genuine skip — the player pressing Next without acting ("skip"), a forced effect, or a
+        // turn timeout — DOES drop morale, mirroring the legacy (test_heroes.ts) skip penalty.
+        const isForcedSkip = reason === "timeout" || reason === "effect" || reason === "skip";
         const events = this.turnEngine.completeTurn(unit, {
             skipReason: isForcedSkip ? reason : undefined,
             skipLogMessage: isForcedSkip ? `${unit.getName()} skips turn` : undefined,

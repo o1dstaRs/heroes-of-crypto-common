@@ -20,6 +20,7 @@ import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Grid } from "../grid/grid";
 import { GRID_SIZE, MAX_X, MAX_Y, MIN_X, MIN_Y, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../grid/grid_constants";
 import { GridSettings } from "../grid/grid_settings";
+import type { IWeightedRoute } from "../grid/path_definitions";
 import { PathHelper } from "../grid/path_helper";
 import { PlacementPositionType } from "../grid/placement_properties";
 import { RectanglePlacement } from "../grid/rectangle_placement";
@@ -145,6 +146,68 @@ const footprintCells = (unit: Unit, base: XY): XY[] =>
               { x: base.x, y: base.y - 1 },
               { x: base.x - 1, y: base.y - 1 },
           ];
+
+/**
+ * A guaranteed-legal "advance toward the nearest enemy" move (closest reachable cell to any enemy),
+ * used to recover a turn whose attack the engine declined — so the unit closes distance instead of
+ * stalling. Returns undefined if the unit can't move or no enemy/route exists (caller then defends).
+ */
+function advanceTowardEnemyAction(
+    unit: Unit,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+    pathHelper: PathHelper,
+): GameAction | undefined {
+    if (!unit.canMove()) {
+        return undefined;
+    }
+    const enemyTeam = unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+    const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
+    if (!enemies.length) {
+        return undefined;
+    }
+    const movePath = pathHelper.getMovePath(
+        unit.getBaseCell(),
+        grid.getMatrix(),
+        unit.getSteps(),
+        grid.getAggrMatrixByTeam(enemyTeam),
+        unit.canFly(),
+        unit.isSmallSize(),
+        unit.hasAbilityActive("Made of Fire"),
+    );
+    if (!movePath.knownPaths.size) {
+        return undefined;
+    }
+    const base = unit.getBaseCell();
+    let best: IWeightedRoute | undefined;
+    let bestScore = Infinity;
+    for (const routeList of movePath.knownPaths.values()) {
+        const route = routeList[0];
+        if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
+            continue;
+        }
+        const score = Math.min(
+            ...enemies.map(
+                (e) => Math.abs(route.cell.x - e.getBaseCell().x) + Math.abs(route.cell.y - e.getBaseCell().y),
+            ),
+        );
+        if (score < bestScore) {
+            bestScore = score;
+            best = route;
+        }
+    }
+    if (!best?.route.length) {
+        return undefined;
+    }
+    return {
+        type: "move_unit",
+        unitId: unit.getId(),
+        path: best.route.map((c) => ({ x: c.x, y: c.y })),
+        targetCells: footprintCells(unit, best.cell),
+        hasLavaCell: best.hasLavaCell,
+        hasWaterCell: best.hasWaterCell,
+    };
+}
 
 /**
  * Run one headless AI-vs-AI battle to completion and return a fully recorded match (placements, every
@@ -361,9 +424,13 @@ export function runMatch(config: IMatchConfig): IMatchResult {
             fightProperties,
         });
 
+        let didSomething = false;
         for (const action of decided) {
             const fromCell = { ...unit.getBaseCell() };
             const result = engine.apply(action);
+            if (result.completed && action.type !== "select_attack_type") {
+                didSomething = true; // a real action landed (a move or an attack)
+            }
             recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
             applyEvents(result.events);
             if (finished) {
@@ -371,29 +438,39 @@ export function runMatch(config: IMatchConfig): IMatchResult {
             }
         }
 
-        // Safety net: a unit must always yield its turn. If its chosen actions didn't complete it (e.g.
-        // an attack the engine rejected), DON'T waste the turn — DEFEND (a valid, useful action: a
-        // defense bonus) so the fight always flows smoothly. end_turn is the last-resort guarantee.
-        if (!finished && currentActiveUnitId === actingUnitId) {
-            const defendAction: GameAction = { type: "defend_turn", unitId: actingUnitId };
-            const defendResult = engine.apply(defendAction);
-            recordAction(
-                actions,
-                defendAction,
-                unit,
-                { ...unit.getBaseCell() },
-                defendResult,
-                unitsHolder,
-                fightProperties.getCurrentLap(),
-            );
-            applyEvents(defendResult.events);
-            if (!finished && currentActiveUnitId === actingUnitId) {
-                const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
-                applyEvents(endResult.events);
-                if (!endResult.completed) {
-                    // Could not even end the turn — bail rather than loop forever.
-                    currentActiveUnitId = "";
+        // A move_unit leaves the unit ACTIVE (it may attack after moving), so a turn can be incomplete
+        // even though the unit acted. Only RECOVER when nothing landed — i.e. the engine declined every
+        // proposal (a doomed attack) — so the turn isn't wasted: advance toward the enemy, else defend.
+        // Then close out the turn. Only completed actions are recorded, so a declined proposal never
+        // shows up as a "rejected" turn.
+        if (!finished && currentActiveUnitId === actingUnitId && !didSomething) {
+            const recover = (action: GameAction): boolean => {
+                if (finished || currentActiveUnitId !== actingUnitId) {
+                    return false;
                 }
+                const r = engine.apply(action);
+                recordAction(
+                    actions,
+                    action,
+                    unit,
+                    { ...unit.getBaseCell() },
+                    r,
+                    unitsHolder,
+                    fightProperties.getCurrentLap(),
+                );
+                applyEvents(r.events);
+                return r.completed;
+            };
+            const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
+            if (!advance || !recover(advance)) {
+                recover({ type: "defend_turn", unitId: actingUnitId });
+            }
+        }
+        if (!finished && currentActiveUnitId === actingUnitId) {
+            const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
+            applyEvents(endResult.events);
+            if (!endResult.completed) {
+                currentActiveUnitId = ""; // could not even end the turn — bail rather than loop forever
             }
         }
     }
@@ -492,6 +569,9 @@ function recordAction(
 ): void {
     if (action.type === "select_attack_type") {
         return; // bookkeeping action, not a turn move
+    }
+    if (!result.completed) {
+        return; // the engine declined this proposal — it isn't an action the unit took, so don't log it
     }
     const attackEvent = result.events.find((e) => e.type === "unit_attacked");
     let targetId: string | undefined;

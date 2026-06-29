@@ -14,7 +14,7 @@ import type { XY } from "../utils/math";
 
 export type GameAction =
     | { type: "start_fight" }
-    | { type: "end_turn"; unitId: string; reason?: "effect" | "timeout" | "manual" }
+    | { type: "end_turn"; unitId: string; reason?: "effect" | "timeout" | "manual" | "skip" }
     | { type: "wait_turn"; unitId: string }
     | { type: "defend_turn"; unitId: string }
     | { type: "select_attack_type"; unitId: string; attackType: AttackType }

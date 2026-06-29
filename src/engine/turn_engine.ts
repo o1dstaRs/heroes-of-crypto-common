@@ -51,7 +51,7 @@ export interface IAdvanceTurnResult {
     fightFinished: boolean;
 }
 
-export type TurnSkipReason = "effect" | "timeout" | "manual";
+export type TurnSkipReason = "effect" | "timeout" | "manual" | "skip";
 
 interface IOrderedTurnUnits {
     allUnits: Unit[];
