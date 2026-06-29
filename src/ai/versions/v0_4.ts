@@ -24,6 +24,7 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const boxHoldOn = process.env.V04_BOXHOLD === "on"; // NEUTRAL: +0.06pp overall, +0.05pp range-heavy (v0.3 already handles boxed shooters)
 const frontlineOn = process.env.V04_FRONTLINE === "on";
 const frontMoveOn = process.env.V04_FRONTMOVE !== "off"; // range-heavy bait/lead: +0.99pp on forced range-heavy (gated to >=3 ranged so no dilution) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
 const FRONT_TANKS = new Set(["Unicorn", "Scavenger"]);
@@ -115,6 +116,13 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 return healerPlay;
             }
         }
+        // (EXP) Boxed shooter: an enemy adjacent blocks our shot. Hourglass FIRST — an ally may clear the
+        // blocker this lap (saving us a wasted retreat); only after we've waited does v0.3 melee-kill it or
+        // retreat to safety.
+        if (boxHoldOn && unit.getAttackType() === RANGE && unit.getRangeShots() > 0 && unit.canMove()) {
+            const boxed = this.holdBoxedShooter(unit, context);
+            if (boxed) return boxed;
+        }
         const base = super.decideTurn(unit, context);
         const healed = this.retargetHeal(unit, context, base);
         const goblin = this.preferLowLevelMelee(unit, context, healed);
@@ -148,6 +156,19 @@ export class StrategyV0_4 extends StrategyV0_3 {
      *  - else Unicorn/Scavenger LEAD the advance (toward the nearest enemy) to consume the first hits while
      *    the rest of the melee follows normally.
      */
+    private holdBoxedShooter(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        if (unit.hasAbilityActive("No Melee") || unit.hasAbilityActive("Handyman")) return undefined;
+        if (this.canLandRange(unit, context)) return undefined; // it can actually shoot -> not boxed
+        const myCells = unit.getCells();
+        const boxed = context.unitsHolder
+            .getAllAllies(otherTeam(unit.getTeam()))
+            .some((e) => !e.isDead() && e.getCells().some((ec) => myCells.some((uc) => isAdjacentCell(ec, uc))));
+        if (!boxed) return undefined;
+        // Hourglass on the first slot to give an ally a chance to clear the blocker. Once we've already
+        // hourglassed (canHourglass false), fall through to v0.3 (melee the blocker if it pays, else retreat).
+        if (this.canHourglass(unit, context)) return [{ type: "wait_turn", unitId: unit.getId() }];
+        return undefined;
+    }
     private frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!frontMoveOn || unit.getAttackType() !== MELEE || !unit.canMove()) return decision;
         const myRanged = context.unitsHolder
