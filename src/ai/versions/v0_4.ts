@@ -117,7 +117,136 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const hunted = this.flyerPatientHunt(unit, context, fhTuned);
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
-        return this.enforceMeleeLegality(unit, context, tuned);
+        const legal = this.enforceMeleeLegality(unit, context, tuned);
+        return this.doublePunchInitiate(unit, context, legal);
+    }
+    /**
+     * (12) Double Punch units (Wolf / Crusader / Berserker) hit TWICE only when they ATTACK — a unit that
+     * gets attacked first merely responds (single hit, and from a stack already thinned by the blow). So
+     * v0.4 keeps them from frontlining: when one would just advance (no strike this turn) and the enemy is
+     * about to reach it, it HOURGLASSES first (wait, let the line form, strike on our turn); otherwise it
+     * advances but stops JUST SHORT of any enemy — never ending adjacent — so it initiates next turn rather
+     * than being struck first. Never overrides an actual attack (initiating is exactly what we want).
+     */
+    private doublePunchInitiate(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        // DISABLED by default (set V04_DPUNCH=on to re-test). Clean A/B on forced Wolf+Crusader rosters
+        // showed this LOSES ~3.4pp (v0.4 49.5% on vs 52.9% off): keeping Double Punch units out of exposed
+        // cells / hourglassing makes them too passive — the lost offense outweighs the attack-first bonus,
+        // and the base AI already gets the double punch by simply attacking on its turn.
+        if (process.env.V04_DPUNCH !== "on" || !unit.hasAbilityActive("Double Punch") || unit.getTarget()) {
+            return decision;
+        }
+        if (
+            decision.some(
+                (a) =>
+                    a.type === "melee_attack" ||
+                    a.type === "range_attack" ||
+                    a.type === "cast_spell" ||
+                    a.type === "wait_turn",
+            )
+        ) {
+            return decision; // already attacking/holding — initiating is the goal, keep it
+        }
+        if (!decision.some((a) => a.type === "move_unit")) {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return decision;
+        }
+        // PRECISE exposure: enumerate every cell an enemy MELEE unit could stand on this turn (its current
+        // footprint + everywhere it can move), then a cell is EXPOSED if an enemy could stand next to our
+        // footprint there and strike us first. No distance guesswork — we check the actual reach.
+        const enemyStands = this.enemyMeleeStandCells(unit, context);
+        const exposedAt = (cell: XY): boolean => {
+            const fp = this.footprintForCell(unit, cell, context);
+            return enemyStands.some((sc) => fp.some((fc) => isAdjacentCell(sc, fc)));
+        };
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        // Advance to the SAFE cell (no enemy can reach to hit us there) closest to the enemy, so we get to
+        // strike first next turn instead of being struck first.
+        let bestSafe: { cell: XY; route: IWeightedRoute; dist: number } | undefined;
+        for (const routes of movePath.knownPaths.values()) {
+            const route = routes[0];
+            if (!route?.route.length || exposedAt(route.cell)) {
+                continue;
+            }
+            const d = Math.min(...enemies.map((e) => getDistance(route.cell, e.getBaseCell())));
+            if (!bestSafe || d < bestSafe.dist) {
+                bestSafe = { cell: route.cell, route, dist: d };
+            }
+        }
+        if (bestSafe) {
+            return [
+                {
+                    type: "move_unit",
+                    unitId: unit.getId(),
+                    path: bestSafe.route.route.map((c) => ({ x: c.x, y: c.y })),
+                    targetCells: this.footprintForCell(unit, bestSafe.cell, context),
+                    hasLavaCell: bestSafe.route.hasLavaCell,
+                    hasWaterCell: bestSafe.route.hasWaterCell,
+                },
+            ];
+        }
+        // No safe cell to advance to (every reachable cell is exposed). Hourglass first — let the line form
+        // / allies engage — so we can still strike on our terms; if we can't wait, proceed with the move.
+        if (this.canHourglass(unit, context)) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        return decision;
+    }
+    /** Every cell an enemy MELEE unit could occupy this turn (current footprint + reachable) — its strike origins. */
+    private enemyMeleeStandCells(unit: Unit, context: IDecisionContext): XY[] {
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const ourAggr = grid.getAggrMatrixByTeam(unit.getTeam());
+        const stands: XY[] = [];
+        const pushFootprint = (e: Unit, base: XY): void => {
+            if (e.isSmallSize()) {
+                stands.push(base);
+            } else {
+                stands.push(
+                    base,
+                    { x: base.x - 1, y: base.y },
+                    { x: base.x, y: base.y - 1 },
+                    { x: base.x - 1, y: base.y - 1 },
+                );
+            }
+        };
+        for (const e of unitsHolder.getAllAllies(enemyTeam)) {
+            if (e.isDead() || e.getAttackType() !== MELEE) {
+                continue; // only melee units threaten a melee strike
+            }
+            for (const c of e.getCells()) {
+                stands.push(c);
+            }
+            const mp = pathHelper.getMovePath(
+                e.getBaseCell(),
+                matrix,
+                e.getSteps(),
+                ourAggr,
+                e.canFly(),
+                e.isSmallSize(),
+                e.hasAbilityActive("Made of Fire"),
+            );
+            for (const routes of mp.knownPaths.values()) {
+                const r = routes[0];
+                if (r?.route.length) {
+                    pushFootprint(e, r.cell);
+                }
+            }
+        }
+        return stands;
     }
     /**
      * (11) Final melee-legality guard. The engine forbids two melees the base heuristic sometimes
