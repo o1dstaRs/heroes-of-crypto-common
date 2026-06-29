@@ -48,13 +48,15 @@ function ctxFor(c: CombatTestContext): IDecisionContext {
 const moveAction = (a: GameAction[]): Extract<GameAction, { type: "move_unit" }> | undefined =>
     a.find((x) => x.type === "move_unit") as Extract<GameAction, { type: "move_unit" }> | undefined;
 
-describe("AI version registry — v0.3 promoted to default, v0.4 is the new target", () => {
-    it("registers v0.3 and v0.4, ships v0.3 as the default, and exposes a latest version", () => {
+describe("AI version registry — v0.4 is the shipped default, v0.5 is the RL target", () => {
+    it("registers v0.3/v0.4/v0.5, ships v0.4 as the default, and exposes a latest version", () => {
         expect(AI_VERSIONS).toContain("v0.3");
         expect(AI_VERSIONS).toContain("v0.4");
-        expect(DEFAULT_AI_VERSION).toBe("v0.3");
-        // v0.4 is registered after v0.3 (don't pin "latest" — newer in-dev versions may be added).
+        expect(AI_VERSIONS).toContain("v0.5");
+        expect(DEFAULT_AI_VERSION).toBe("v0.4");
+        // v0.5 (in-dev, reinforcement-learned) is registered after v0.4 but NOT shipped as default.
         expect(AI_VERSIONS.indexOf("v0.4")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.3"));
+        expect(AI_VERSIONS.indexOf("v0.5")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.4"));
         expect(LATEST_AI_VERSION).toBe(AI_VERSIONS[AI_VERSIONS.length - 1]);
     });
 
