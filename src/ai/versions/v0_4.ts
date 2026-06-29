@@ -25,7 +25,7 @@ import { StrategyV0_3 } from "./v0_3";
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
 const buffWaitOn = process.env.V04_BUFFWAIT !== "off";
-const beheSelfOn = process.env.V04_BEHESELF !== "off";
+const beheSelfOn = process.env.V04_BEHESELF === "on"; // DISABLED by default: measured -2.66pp on 20k forced-Behemoth games
 const mvGuardOn = process.env.V04_MVGUARD !== "off";
 const MAGIC_FH = PBTypes.AttackVals.MAGIC;
 const enabledFH = (name: string): boolean => process.env[`V04_${name}`] !== "off";
@@ -191,20 +191,27 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (this.armiesInContact(unit, context)) {
             return decision;
         }
+        // HOURGLASS FIRST: a Double Punch unit with no strike available defers its turn rather than walking
+        // into the open — so it acts LATER (after the enemy commits) and lands the FIRST blow at full stack.
+        if (this.canHourglass(unit, context)) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        // Already waited this lap and must act: don't end where an enemy could strike us first. If the base
+        // move would leave us exposed and a SAFE cell is reachable, take that closest-to-the-enemy one.
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
-        if (!enemies.length) {
-            return decision;
-        }
-        // Pre-contact: advance to the cell CLOSEST to the enemy that no enemy can reach to hit us — stopping
-        // just out of reach, so the enemy must close the last step and WE strike first (full-stack double
-        // punch). No safe advance -> hourglass to wait them out; can't wait -> proceed.
+        const moveAction = decision.find((a) => a.type === "move_unit");
+        const path = moveAction?.type === "move_unit" ? moveAction.path : undefined;
+        const dest = path && path.length ? path[path.length - 1] : undefined;
         const enemyStands = this.enemyMeleeStandCells(unit, context);
         const exposedAt = (cell: XY): boolean => {
             const fp = this.footprintForCell(unit, cell, context);
             return enemyStands.some((sc) => fp.some((fc) => isAdjacentCell(sc, fc)));
         };
+        if (!dest || !enemies.length || !exposedAt(dest)) {
+            return decision; // the base move is already safe (or nothing to avoid) — take it
+        }
         const movePath = pathHelper.getMovePath(
             unit.getBaseCell(),
             matrix,
@@ -225,22 +232,19 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 bestSafe = { cell: route.cell, route, dist: d };
             }
         }
-        if (bestSafe) {
-            return [
-                {
-                    type: "move_unit",
-                    unitId: unit.getId(),
-                    path: bestSafe.route.route.map((c) => ({ x: c.x, y: c.y })),
-                    targetCells: this.footprintForCell(unit, bestSafe.cell, context),
-                    hasLavaCell: bestSafe.route.hasLavaCell,
-                    hasWaterCell: bestSafe.route.hasWaterCell,
-                },
-            ];
+        if (!bestSafe) {
+            return decision;
         }
-        if (this.canHourglass(unit, context)) {
-            return [{ type: "wait_turn", unitId: unit.getId() }];
-        }
-        return decision;
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: bestSafe.route.route.map((c) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, bestSafe.cell, context),
+                hasLavaCell: bestSafe.route.hasLavaCell,
+                hasWaterCell: bestSafe.route.hasWaterCell,
+            },
+        ];
     }
     /** Have the armies made first contact — any living ally adjacent to any living enemy? */
     private armiesInContact(unit: Unit, context: IDecisionContext): boolean {
