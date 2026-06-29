@@ -62,8 +62,8 @@ function makeReal(team: number, faction: string, name: string): Unit {
 }
 const typeOf = (a: GameAction[], t: string): GameAction | undefined => a.find((x) => x.type === t);
 
-describe("v0.4 (3) flyers mute an enemy siege unit (Gargantuan / Tsar Cannon)", () => {
-    it("a flyer rushes/strikes the enemy Tsar Cannon instead of the nearer front-line unit", () => {
+describe("v0.4 (3) flyer-mute-siege is DISABLED (it over-extended the flyer and lost games)", () => {
+    it("does NOT dive a distant siege unit past a nearer enemy — engages normally instead", () => {
         const c = createCombatTestContext();
         const flyer = createTestUnit({ team: LOWER, name: "Flyer", attackType: MELEE, movementType: FLY, speed: 8 });
         const tsar = makeReal(UPPER, "Life", "Tsar Cannon");
@@ -73,15 +73,13 @@ describe("v0.4 (3) flyers mute an enemy siege unit (Gargantuan / Tsar Cannon)", 
         placeUnit(c.grid, c.unitsHolder, tsar, { x: 7, y: 12 });
 
         const actions = v04.decideTurn(flyer, ctxFor(c));
-        // It commits toward the siege: either a strike on the Tsar Cannon, or a move that closes on it.
-        const strike = typeOf(actions, "melee_attack");
-        const move = typeOf(actions, "move_unit");
-        if (strike && strike.type === "melee_attack") {
-            expect(strike.targetId).toBe(tsar.getId());
-        } else {
-            expect(move).toBeDefined();
-        }
         expect(actions.length).toBeGreaterThan(0);
+        // With the mute tactic off the flyer plays normally — it must NOT throw itself at the distant
+        // Tsar Cannon past the adjacent front-line unit (that over-extension is exactly what lost games).
+        const strike = typeOf(actions, "melee_attack");
+        if (strike && strike.type === "melee_attack") {
+            expect(strike.targetId).not.toBe(tsar.getId());
+        }
     });
 
     it("ignores the siege rule when there is no siege unit (behaves as a normal flyer)", () => {
