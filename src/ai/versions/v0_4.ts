@@ -23,8 +23,6 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
-const MAGIC = PBTypes.AttackVals.MAGIC;
-const enabled = (name: string): boolean => process.env[`V04_${name}`] !== "off";
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 
@@ -111,8 +109,105 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const healed = this.retargetHeal(unit, context, base);
         const goblin = this.preferLowLevelMelee(unit, context, healed);
         const positioned = this.auraRepositionMelee(unit, context, goblin);
-        const tuned = this.rapidChargeReposition(unit, context, positioned);
-        return this.flyerHuntRanges(unit, context, tuned);
+        const meleeTuned = this.rapidChargeReposition(unit, context, positioned);
+        return this.aoeMeleeReposition(unit, context, meleeTuned);
+    }
+    /**
+     * (8) Melee AoE targeting for Black Dragon (Fire Breath, line depth = unit size) and Pikeman (Skewer
+     * Strike, hits the stack behind the target). Both splash in a LINE from the attacker THROUGH the
+     * target, so v0.4 picks the stand cell + target whose line catches the MOST enemy stacks — turning a
+     * single hit into a 2+-stack blow. Only swaps when it strictly increases the stacks hit.
+     */
+    private aoeMeleeReposition(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const fireBreath = unit.hasAbilityActive("Fire Breath");
+        const skewer = unit.hasAbilityActive("Skewer Strike");
+        if ((!fireBreath && !skewer) || unit.getTarget() || !unit.canMove()) {
+            return decision;
+        }
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (enemies.length < 2) {
+            return decision; // need at least two enemies for a multi-stack hit
+        }
+        const depth = fireBreath ? (unit.isSmallSize() ? 1 : 2) : 1;
+        const occupantEnemy = (cell: XY): Unit | undefined => {
+            if (cell.x < 0 || cell.y < 0) {
+                return undefined;
+            }
+            const id = grid.getOccupantUnitId(cell);
+            const u = id ? unitsHolder.getAllUnits().get(id) : undefined;
+            return u && !u.isDead() && u.getTeam() === enemyTeam ? u : undefined;
+        };
+        // Enemy stacks caught by the line from `cell` through `target` and `depth` cells beyond it.
+        const lineHits = (cell: XY, target: Unit): number => {
+            const tc = target.getBaseCell();
+            const dx = Math.sign(tc.x - cell.x);
+            const dy = Math.sign(tc.y - cell.y);
+            const hit = new Set<string>([target.getId()]);
+            for (let k = 1; k <= depth; k += 1) {
+                const occ = occupantEnemy({ x: tc.x + dx * k, y: tc.y + dy * k });
+                if (occ) {
+                    hit.add(occ.getId());
+                }
+            }
+            return hit.size;
+        };
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
+        const baseHits = baseTarget ? lineHits(strike.attackFrom ?? unit.getBaseCell(), baseTarget) : 1;
+
+        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        for (const routes of movePath.knownPaths.values()) {
+            const r = routes[0];
+            if (r?.route.length) {
+                cands.push({ cell: r.cell, route: r });
+            }
+        }
+        let best: { cell: XY; target: Unit; route?: IWeightedRoute; hits: number } | undefined;
+        for (const cand of cands) {
+            const footprint = this.footprintForCell(unit, cand.cell, context);
+            for (const e of enemies) {
+                if (!e.getCells().some((ec) => footprint.some((fc) => isAdjacentCell(ec, fc)))) {
+                    continue;
+                }
+                const hits = lineHits(cand.cell, e);
+                const len = cand.route?.route.length ?? 0;
+                if (!best || hits > best.hits || (hits === best.hits && len < (best.route?.route.length ?? 0))) {
+                    best = { cell: cand.cell, target: e, route: cand.route, hits };
+                }
+            }
+        }
+        if (!best || best.hits < 2 || best.hits <= baseHits) {
+            return decision; // no strictly-better multi-stack line available
+        }
+        const actions: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            actions.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        actions.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: best.target.getId(),
+            attackFrom: { x: best.cell.x, y: best.cell.y },
+            path: best.route?.route.map((c) => ({ x: c.x, y: c.y })),
+            hasLavaCell: best.route?.hasLavaCell,
+            hasWaterCell: best.route?.hasWaterCell,
+        });
+        return actions;
     }
     /**
      * (7) Healer spell policy (requested): a single-target HEAL is only worth it on a LEVEL 3-4 stack that
@@ -267,64 +362,6 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return undefined;
         }
         return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Riot", targetId: unit.getId() }];
-    }
-    /**
-     * (EXP) Flyers hunt the enemy back line. A flyer attacks whatever it can reach (en route), but when it
-     * has nothing to strike this turn (a pure move), it advances toward the nearest enemy RANGE/MAGE instead
-     * of the default target — ultimate goal: get into position to mute their shooters/casters. Toggle V04_FHUNT.
-     */
-    private flyerHuntRanges(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        if (!enabled("FHUNT") || !unit.canFly() || unit.getAttackType() !== MELEE || !unit.canMove()) {
-            return decision;
-        }
-        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
-            return decision; // we always attack en route — only redirect an idle move
-        }
-        const enemyTeam = otherTeam(unit.getTeam());
-        const targets = context.unitsHolder
-            .getAllAllies(enemyTeam)
-            .filter((e) => !e.isDead() && (e.getAttackType() === RANGE || e.getAttackType() === MAGIC));
-        if (!targets.length) {
-            return decision;
-        }
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
-            unit.getBaseCell(),
-            matrix,
-            unit.getSteps(),
-            grid.getAggrMatrixByTeam(enemyTeam),
-            unit.canFly(),
-            unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
-        );
-        const nearest = (cell: XY): number => Math.min(...targets.map((t) => getDistance(cell, t.getBaseCell())));
-        let best: { cell: XY; route: IWeightedRoute } | undefined;
-        let bestDist = nearest(unit.getBaseCell());
-        for (const [key, routes] of movePath.knownPaths) {
-            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
-            const route = routes?.[0];
-            if (!route?.route.length) {
-                continue;
-            }
-            const d = nearest(cell);
-            if (d < bestDist) {
-                bestDist = d;
-                best = { cell, route };
-            }
-        }
-        if (!best) {
-            return decision;
-        }
-        return [
-            {
-                type: "move_unit",
-                unitId: unit.getId(),
-                path: best.route.route.map((c) => ({ x: c.x, y: c.y })),
-                targetCells: this.footprintForCell(unit, best.cell, context),
-                hasLavaCell: best.route.hasLavaCell,
-                hasWaterCell: best.route.hasWaterCell,
-            },
-        ];
     }
     /**
      * (8) Rapid Charge rewards distance: the longer the run-up, the more bonus damage. When a Rapid Charge
