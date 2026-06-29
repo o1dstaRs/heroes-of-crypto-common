@@ -90,7 +90,7 @@ function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
  *     melee (their range units are screened), it hourglasses (waits) to fire once the formation opens —
  *     never more than the engine's once-per-lap, so it can't stall.
  */
-class StrategyV0_2 extends StrategyV0_1 {
+export class StrategyV0_2 extends StrategyV0_1 {
     public override readonly version: string = "v0.2";
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         const placements = new Map<string, XY>();

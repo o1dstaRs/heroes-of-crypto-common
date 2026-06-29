@@ -59,7 +59,7 @@ export * from "./factions/faction_type";
 export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
-export { getAIStrategy, AI_VERSIONS, LATEST_AI_VERSION } from "./ai";
+export { getAIStrategy, AI_VERSIONS, LATEST_AI_VERSION, DEFAULT_AI_VERSION } from "./ai";
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";
