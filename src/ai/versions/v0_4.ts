@@ -127,7 +127,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
     // Behemoth/Ogre rosters), but the CASTER should fire the buff IMMEDIATELY. Delaying the caster only
     // shortens how long the buff is live: Behemoth self-delay = -2.66pp on 20k forced-Behemoth games
-    // (FORCE_CREATURES=4:Behemoth). Ogre-Mage self-delay measured the same way; both kept off by default.
+    // (FORCE_CREATURES=4:Behemoth). Ogre-Mage self-delay (Mass Riot) measured -0.17pp on 20k forced-Ogre rosters (neutral). Caster always casts now; both self-delays kept off by default.
     /**
      * (EXP) Act with the mass buff ON (V04_BUFFWAIT). On lap 1, a non-caster unit hourglasses while our
      * Behemoth's Battle Roar / Ogre Mage's Mass Riot is still pending, so when it finally acts the army-wide
