@@ -29,6 +29,9 @@ const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.a
 // unit. Winning the ranged-attrition race flips firepower superiority our way; from there we hold a
 // grouped position and out-shoot, while the now ranged-inferior enemy must walk onto our shots.
 const ENEMY_RANGE_DAMAGE_WEIGHT = 2.0;
+// How far a melee unit must drift from its allies' centroid before we treat it as a detached straggler
+// and redirect it to rejoin the pack rather than charge the enemy alone (avoids piecemeal engagement).
+const STRAGGLER_DIST = 3.0;
 
 // Beholder's "Spit Ball" debuffs. A ranged hit stacks every one the target does NOT already have
 // (Rangebane only lands on range targets), so a target lacking more of these is a richer opportunity.
@@ -78,7 +81,85 @@ class StrategyV0_3 extends StrategyV0_2 {
                 return retreat;
             }
         }
-        return super.decideTurn(unit, context);
+        const decision = super.decideTurn(unit, context);
+        // Army cohesion: a melee straggler that would otherwise plod toward the enemy alone is redirected to
+        // rejoin the pack, so we engage as a block instead of feeding the brawl one stack at a time.
+        if (unit.getAttackType() === MELEE && unit.canMove()) {
+            const rejoin = this.cohesionAdvance(unit, context, decision);
+            if (rejoin) {
+                return rejoin;
+            }
+        }
+        return decision;
+    }
+    /**
+     * If v0.2's decision for this melee unit is a PURE move (no attack/cast available this turn) and the unit
+     * is a detached straggler - meaningfully far from the centroid of its living allies - steer it toward the
+     * pack instead of toward the enemy. Arriving together lets us focus-fire and trade well; arriving piecemeal
+     * is how brawls are lost. Conservative: stragglers only, only when no strike was on offer, valid moves only
+     * (drawn from getMovePath, so the engine never rejects). Undefined -> keep v0.2's move.
+     */
+    private cohesionAdvance(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] | undefined {
+        if (!decision.length || decision.some((a) => a.type !== "move_unit")) {
+            return undefined; // a strike/cast was available - don't touch it
+        }
+        const move = decision.find((a) => a.type === "move_unit");
+        if (!move || move.type !== "move_unit") {
+            return undefined;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const allies = unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId());
+        if (allies.length < 2) {
+            return undefined; // nothing to rally to
+        }
+        const centroid = {
+            x: allies.reduce((sum, a) => sum + a.getBaseCell().x, 0) / allies.length,
+            y: allies.reduce((sum, a) => sum + a.getBaseCell().y, 0) / allies.length,
+        };
+        const base = unit.getBaseCell();
+        if (getDistance(base, centroid) < STRAGGLER_DIST) {
+            return undefined; // already with the pack
+        }
+        const enemyTeam = otherTeam(unit.getTeam());
+        const movePath = pathHelper.getMovePath(
+            base,
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        let bestCell = base;
+        let bestRoute: IWeightedRoute | undefined;
+        let bestDist = getDistance(base, centroid);
+        for (const routes of movePath.knownPaths.values()) {
+            const route = routes[0];
+            if (!route?.route.length) {
+                continue;
+            }
+            const dist = getDistance(route.cell, centroid);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestCell = route.cell;
+                bestRoute = route;
+            }
+        }
+        if (bestRoute && (bestCell.x !== base.x || bestCell.y !== base.y)) {
+            return [
+                {
+                    type: "move_unit",
+                    unitId: unit.getId(),
+                    path: bestRoute.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                    targetCells: this.footprintForCell(unit, bestCell, context),
+                    hasLavaCell: bestRoute.hasLavaCell,
+                    hasWaterCell: bestRoute.hasWaterCell,
+                },
+            ];
+        }
+        return undefined;
     }
     /** Melee for a boxed-in shooter only pays when it's free or decisive: a safe-to-hit or lethal target. */
     private meleeIsClearlyRight(unit: Unit, context: IDecisionContext): boolean {
