@@ -34,7 +34,8 @@ import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
-import { createCombatFactories, createUnitFromSpec, type IArmyUnitSpec } from "./army";
+import { setDeterministicRandomSource } from "../utils/lib";
+import { createCombatFactories, createUnitFromSpec, makeRng, type IArmyUnitSpec } from "./army";
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
@@ -215,6 +216,21 @@ function advanceTowardEnemyAction(
  * receive the SAME roster, so the only variable is the AI version driving each.
  */
 export function runMatch(config: IMatchConfig): IMatchResult {
+    // Seed combat randomness deterministically so a (versions, seed) pair reproduces EXACTLY — this turns
+    // AI-vs-AI measurement into a paired, noise-free comparison. Simulation-only: production code never sets
+    // a deterministic source, so live matches keep crypto-secure randomness. Cleared in `finally` so a
+    // thrown match can't leak the seeded source into the next game on this worker (which would desync it).
+    if (config.seed !== undefined) {
+        setDeterministicRandomSource(makeRng((config.seed ^ 0x6d2b79f5) >>> 0));
+    }
+    try {
+        return runMatchInner(config);
+    } finally {
+        setDeterministicRandomSource(undefined);
+    }
+}
+
+function runMatchInner(config: IMatchConfig): IMatchResult {
     const maxLaps = config.maxLaps ?? 60;
     const gridSettings = simulationGridSettings();
 

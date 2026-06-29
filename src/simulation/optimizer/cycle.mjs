@@ -31,8 +31,14 @@ const LOG = join(STATE_DIR, "log.md");
 const TOURN_OUT = join(REPO, "sim-out");
 
 const summary = process.argv[2] ?? "(unspecified change)";
-const games = Number(process.argv[3] ?? 10000);
-const gainPP = Number(process.argv[4] ?? 1.0); // required improvement in PERCENTAGE POINTS
+// Combat randomness is now SEEDED in simulation (battle_engine installs a deterministic source per match),
+// so a (versions, seed) run reproduces EXACTLY — there is no run-to-run measurement noise at a fixed
+// concurrency. That lets the gate be both faster (fewer games) and far more sensitive (tighter pp gate)
+// than the old noisy 30k/0.6 regime. 12k games at a fixed baseSeed samples rosters well; +0.2pp on the
+// SAME fixed scenario set is a real, repeatable gain. (Re-validate a kept change on a 2nd baseSeed
+// occasionally to guard against overfitting one seed set — see PROTOCOL.md.)
+const games = Number(process.argv[3] ?? 12000);
+const gainPP = Number(process.argv[4] ?? 0.2); // required improvement in PERCENTAGE POINTS (noise-free now)
 
 const sh = (cmd, opts = {}) => execSync(cmd, { cwd: REPO, encoding: "utf8", stdio: "pipe", ...opts });
 const revert = () => sh(`git checkout -- ${V03}`);

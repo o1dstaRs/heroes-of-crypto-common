@@ -261,4 +261,27 @@ describe("tournament", () => {
         // Every game index 0..games-1 ran exactly once (completion order may differ).
         expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     }, 30000);
+
+    it("runs single-threaded when concurrency <= 1 (delegates to runTournament)", async () => {
+        const options = { versionA: "v0.1", versionB: "v0.2", games: 4, baseSeed: 7, maxLaps: 60 };
+        const seen: number[] = [];
+        const summary = await runTournamentConcurrent(options, 1, (r) => seen.push(r.game));
+        expect(summary.games).toBe(4);
+        expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
+    });
+});
+
+describe("battle engine determinism (seeded for reproducible measurement)", () => {
+    it("reproduces a match exactly from the same seed, and a different seed can diverge", () => {
+        const roster = buildRoster(makeRng(123));
+        const cfg = (seed: number) => ({ greenVersion: "v0.2", redVersion: "v0.3", roster, seed, maxLaps: 60 });
+        const a = runMatch(cfg(4242));
+        const b = runMatch(cfg(4242));
+        // Same (versions, roster, seed) -> identical winner and identical number of actions taken.
+        expect(b.winner).toBe(a.winner);
+        expect(b.actions.length).toBe(a.actions.length);
+        // The seeded source is cleared after each match, so a later default match is unaffected (no throw).
+        const c = runMatch(cfg(99));
+        expect(["green", "red", "draw"]).toContain(c.winner);
+    });
 });

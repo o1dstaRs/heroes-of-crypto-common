@@ -34,11 +34,53 @@ export function getSecureRandomValues<T extends ArrayBufferView>(array: T): T {
     return c.getRandomValues(array);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                       Deterministic source (test/sim ONLY)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A pluggable source of raw randomness consumed by {@link getRandomInt}. It returns a uniform float in
+ * [0, 1). The DEFAULT is crypto-secure (`crypto.getRandomValues`) and is the ONLY path real games ever
+ * take — production code never installs an override, so live, real-money matches always use unpredictable
+ * crypto randomness that fails closed.
+ *
+ * The simulation/optimizer harness (and unit tests) may install a SEEDED override via
+ * {@link setDeterministicRandomSource} so a run reproduces exactly from one seed. This makes AI-vs-AI
+ * measurements a paired, zero-variance comparison (same scenarios for both versions) — never use it in a
+ * code path that decides a real match outcome.
+ */
+export type RandomSource = () => number;
+let deterministicSource: RandomSource | undefined;
+
+/** Install (or clear, with `undefined`) a seeded randomness source. Simulation/tests only — see above. */
+export function setDeterministicRandomSource(source: RandomSource | undefined): void {
+    deterministicSource = source;
+}
+
+/** Whether a seeded source is currently installed (true only inside a simulation/test scope). */
+export function isDeterministicRandomActive(): boolean {
+    return deterministicSource !== undefined;
+}
+
+/** One raw 53-bit value: from the seeded source if installed, else crypto-secure (the production path). */
+function nextRaw53(): bigint {
+    if (deterministicSource) {
+        const r = deterministicSource();
+        const clamped = r < 0 ? 0 : r >= 1 ? 0.9999999999999999 : r;
+        return BigInt(Math.floor(clamped * 9007199254740992)); // r * 2^53 -> [0, 2^53)
+    }
+    const u32 = new Uint32Array(2);
+    getSecureRandomValues(u32);
+    const hi = BigInt(u32[0] & 0x001fffff); // 21 bits
+    const lo = BigInt(u32[1]); // 32 bits
+    return (hi << 32n) | lo; // 53-bit integer in [0, 2^53)
+}
+
 /**
  * Secure uniform integer in [min, max).
  * - Exclusive of max (matches Node's crypto.randomInt).
  * - Uses rejection sampling (no modulo bias).
- * - Fails closed if crypto-secure randomness is unavailable.
+ * - Fails closed if crypto-secure randomness is unavailable (unless a seeded test source is installed).
  * - Supports safe JS integer ranges up to 2^53 possible values.
  */
 export function getRandomInt(min: number, max: number): number {
@@ -52,14 +94,11 @@ export function getRandomInt(min: number, max: number): number {
     if (spanBig > TWO53) throw new Error("range must contain at most 2^53 possible values");
     if (spanBig === 1n) return min;
 
-    // Rejection sample 53-bit values to avoid bias.
+    // Rejection sample 53-bit values to avoid bias. The raw source is crypto-secure in production and a
+    // seeded PRNG only when a simulation/test has installed one (see setDeterministicRandomSource).
     const limit = (TWO53 / spanBig) * spanBig; // largest multiple of span below 2^53
     for (;;) {
-        const u32 = new Uint32Array(2);
-        getSecureRandomValues(u32);
-        const hi = BigInt(u32[0] & 0x001fffff); // 21 bits
-        const lo = BigInt(u32[1]); // 32 bits
-        const rnd53 = (hi << 32n) | lo; // 53-bit integer in [0, 2^53)
+        const rnd53 = nextRaw53();
         if (rnd53 < limit) {
             return Number(rnd53 % spanBig) + min;
         }

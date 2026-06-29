@@ -101,12 +101,26 @@ for (const line of lines) {
         optLosses++;
         lossEndReasons[r.endReason ?? "?"] = (lossEndReasons[r.endReason ?? "?"] ?? 0) + 1;
     }
+    // Action mix for the optimized side: what fraction of its committed actions were pure MOVES vs strikes.
+    // A high move-share in LOSSES but not WINS is the fingerprint of poor engagement / piecemeal fighting —
+    // the exact signal that led to the +9.7pp "army cohesion" win. Surfacing it makes the next loop look at
+    // MOVEMENT COORDINATION (the top lever) instead of grinding targeting weights.
+    let moves = 0;
+    let strikes = 0;
+    for (const a of r.actions ?? []) {
+        if (a.side !== side) continue;
+        if (a.actionType === "move_unit") moves += 1;
+        else if (a.actionType === "melee_attack" || a.actionType === "range_attack" || a.actionType === "cast_spell")
+            strikes += 1;
+    }
+    const acted = moves + strikes;
     games.push({
         side,
         optWon,
         laps: r.laps ?? 0,
         armageddon: r.endReason === "armageddon" || (r.outcome && r.outcome.armageddon) || false,
         feat: rosterFeatures(r.roster ?? []),
+        moveShare: acted ? moves / acted : 0,
     });
 }
 
@@ -136,6 +150,22 @@ out.push(`|---|---:|---:|---:|`);
 for (const b of worst) {
     out.push(`| ${b.label} | ${b.n} | ${pct(b.winRate)} | ${b.delta >= 0 ? "+" : ""}${pct(b.delta)} |`);
 }
+// Movement-coordination signal: average move-share in wins vs losses. A losses >> wins gap means the
+// optimized side shuffles instead of engaging when it is losing — point the next change at MOVEMENT.
+const avg = (arr) => (arr.length ? arr.reduce((s, g) => s + g.moveShare, 0) / arr.length : 0);
+const winMoveShare = avg(games.filter((g) => g.optWon));
+const lossMoveShare = avg(games.filter((g) => !g.optWon));
+out.push(``);
+out.push(`## Engagement (move-share of the optimized side's actions)`);
+out.push(`- in WINS:   ${pct(winMoveShare)} pure moves`);
+out.push(`- in LOSSES: ${pct(lossMoveShare)} pure moves`);
+out.push(
+    `- gap (losses - wins): ${(100 * (lossMoveShare - winMoveShare)).toFixed(1)}pp` +
+        (lossMoveShare - winMoveShare > 0.03
+            ? `  <-- shuffles when losing; try MOVEMENT-COORDINATION changes (cohesion / converge / advance-as-block)`
+            : ``),
+);
+
 const report = out.join("\n");
 console.log(report);
 

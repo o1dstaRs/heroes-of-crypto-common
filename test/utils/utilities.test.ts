@@ -32,9 +32,11 @@ import {
     getRandomInt,
     interval,
     isBrowser,
+    isDeterministicRandomActive,
     matrixElement,
     RefNumber,
     removeItemOnce,
+    setDeterministicRandomSource,
     shuffle,
     stringToBoolean,
     uuidFromBytes,
@@ -227,6 +229,50 @@ describe("utility functions", () => {
                 expect(() => getRandomInt(5, 4)).toThrow("max must be >= min");
             },
         );
+    });
+
+    it("uses an installed deterministic source (simulation/tests) and clears back to crypto", () => {
+        expect(isDeterministicRandomActive()).toBe(false);
+        try {
+            // A constant 0 source always lands on the low end of [min, max).
+            setDeterministicRandomSource(() => 0);
+            expect(isDeterministicRandomActive()).toBe(true);
+            expect(getRandomInt(10, 20)).toBe(10);
+            expect(getRandomInt(7, 7)).toBe(7); // max === min short-circuits
+            expect(getRandomInt(7, 8)).toBe(7); // span === 1 short-circuits
+
+            // Out-of-range inputs are clamped into [0, 1) and never overflow max (the result stays < max).
+            setDeterministicRandomSource(() => 1.5); // clamped to just below 1
+            const high = getRandomInt(0, 4);
+            expect(high).toBeGreaterThanOrEqual(0);
+            expect(high).toBeLessThan(4);
+            setDeterministicRandomSource(() => -2); // out-of-range low is clamped to 0 -> the minimum
+            expect(getRandomInt(0, 4)).toBe(0);
+
+            // Same seed reproduces the same sequence (the property the optimizer relies on).
+            const seeded = (): (() => number) => {
+                let s = 12345 >>> 0;
+                return () => {
+                    s = (s + 0x6d2b79f5) >>> 0;
+                    let t = s;
+                    t = Math.imul(t ^ (t >>> 15), t | 1);
+                    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+                };
+            };
+            setDeterministicRandomSource(seeded());
+            const first = Array.from({ length: 8 }, () => getRandomInt(0, 1000));
+            setDeterministicRandomSource(seeded());
+            const second = Array.from({ length: 8 }, () => getRandomInt(0, 1000));
+            expect(second).toEqual(first);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+        expect(isDeterministicRandomActive()).toBe(false);
+        // With the source cleared, the secure path is back in force (fails closed without crypto).
+        withCryptoMock(undefined, () => {
+            expect(() => getRandomInt(0, 2)).toThrow("Crypto-secure random values are unavailable in this runtime");
+        });
     });
 
     it("creates secure v4 UUIDs from random bytes when native randomUUID is absent", () => {
