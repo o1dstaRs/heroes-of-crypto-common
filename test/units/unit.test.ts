@@ -141,6 +141,22 @@ describe("Unit", () => {
             expect(unit.getEffects()).toEqual([]);
         });
 
+        it("keeps Morale/Dismorale across the unit's turn (lap-scoped, not consumed by minusLap)", () => {
+            const moraledUnit = createTestUnit();
+            moraledUnit.applyBuff(spell("System", "Morale"));
+            expect(moraledUnit.hasBuffActive("Morale")).toBe(true);
+            moraledUnit.minusLap();
+            // The morale buff lasts the whole lap (so its multiplier covers a morale extra turn); it is
+            // cleared at the lap flip, NOT on the unit's own turn.
+            expect(moraledUnit.hasBuffActive("Morale")).toBe(true);
+
+            const dismoraledUnit = createTestUnit();
+            dismoraledUnit.applyDebuff(spell("System", "Dismorale"));
+            expect(dismoraledUnit.hasDebuffActive("Dismorale")).toBe(true);
+            dismoraledUnit.minusLap();
+            expect(dismoraledUnit.hasDebuffActive("Dismorale")).toBe(true);
+        });
+
         it("applies and clears buffs, debuffs, and aura effects", () => {
             const unit = createTestUnit();
             const blessing = spell("Life", "Blessing");

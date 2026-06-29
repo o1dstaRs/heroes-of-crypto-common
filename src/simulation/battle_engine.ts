@@ -123,6 +123,11 @@ export interface IMatchResult {
     actions: IRecordedAction[];
     outcome: { green: ISideOutcome; red: ISideOutcome };
     attrition: IAttritionInfo;
+    /** Engine-rejected STRATEGY actions per side — must be 0 (a healthy AI never proposes a declined command). */
+    rejectedGreen?: number;
+    rejectedRed?: number;
+    /** Per-rejection diagnostics (action type + engine reason) for driving the count to 0. */
+    rejectedDetails?: { type: string; reason?: string; version: string }[];
 }
 
 class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
@@ -336,6 +341,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     // --- run the fight ---
     const actions: IRecordedAction[] = [];
+    let rejectedGreen = 0;
+    let rejectedRed = 0;
+    const rejectedDetails: { type: string; reason?: string; version: string }[] = [];
     let finished = false;
     const attrition: IAttritionInfo = {
         reachedArmageddon: false,
@@ -458,6 +466,19 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             if (result.completed && action.type !== "select_attack_type") {
                 didSomething = true; // a real action landed (a move or an attack)
             }
+            if (!result.completed && action.type !== "select_attack_type") {
+                // The strategy proposed a command the engine declined — a smooth AI should never do this.
+                if (unit.getTeam() === GREEN_TEAM) {
+                    rejectedGreen += 1;
+                } else {
+                    rejectedRed += 1;
+                }
+                rejectedDetails.push({
+                    type: action.type,
+                    reason: result.rejectionReason,
+                    version: (unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy).version,
+                });
+            }
             recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
             applyEvents(result.events);
             if (finished) {
@@ -506,7 +527,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // i.e. the result leaned on environmental attrition rather than a clean combat kill.
     attrition.decidedByArmageddon = attrition.reachedArmageddon && attrition.unitsKilledByArmageddon > 0;
 
-    return buildResult(
+    const matchResult = buildResult(
         config,
         endReason,
         actions,
@@ -517,6 +538,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         redStrategy.version,
         attrition,
     );
+    matchResult.rejectedGreen = rejectedGreen;
+    matchResult.rejectedRed = rejectedRed;
+    return matchResult;
 }
 
 function placeArmy(

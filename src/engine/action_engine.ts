@@ -166,6 +166,15 @@ export class GameActionEngine {
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, upperUnitsAlive);
         this.context.unitsHolder.refreshStackPowerForAllUnits();
 
+        // Record each unit's starting cell so the fight log preserves the initial deployment.
+        for (const unit of this.context.unitsHolder.getAllUnits().values()) {
+            if (unit.isDead()) {
+                continue;
+            }
+            const cell = unit.getBaseCell();
+            this.context.sceneLog.updateLog(`${unit.getName()} spawned at (${cell.x}, ${cell.y})`);
+        }
+
         return {
             completed: true,
             events: [{ type: "fight_started", lowerUnitsAlive, upperUnitsAlive }],
@@ -889,6 +898,8 @@ export class GameActionEngine {
         summoned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(summoned);
         this.context.sceneLog.updateLog(`${caster.getName()} summoned ${amount} x ${unitName}`);
+        const summonCell = summoned.getBaseCell();
+        this.context.sceneLog.updateLog(`${unitName} spawned at (${summonCell.x}, ${summonCell.y})`);
         caster.useSpell(spell.getName());
 
         const events = this.createSummonEvents(caster, spell, summoned, amount, cells, false);
