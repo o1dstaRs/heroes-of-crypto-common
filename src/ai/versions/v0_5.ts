@@ -9,14 +9,20 @@
  * -----------------------------------------------------------------------------
  */
 
+import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
-import type { IAIStrategy } from "../ai_strategy";
+import { getDistance, type XY } from "../../utils/math";
+import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
+import { otherTeam } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+/** Action types that mean the unit is striking/casting this turn (so a move is a combat reposition, not a free one). */
+const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "obstacle_attack", "area_throw_attack"]);
 /** Rough single-stack firepower proxy (shots * max hit), matching v0.4's firepowerOf. */
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
 
@@ -42,6 +48,110 @@ export class StrategyV0_5 extends StrategyV0_4 {
     public constructor(weights?: number[]) {
         super();
         this.w = weights ?? loadV05Weights();
+    }
+    public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
+        // v0.4's full decision (which already used v0.5's learned scoreShot via inheritance), then the
+        // learned reposition policy re-ranks a STANDALONE move's destination. Default weights keep v0.4's
+        // own destination (posIncumbent anchor), so this is a strict, validity-preserving extension.
+        return this.repositionByPolicy(unit, context, super.decideTurn(unit, context));
+    }
+    /**
+     * Stage-2 learned positioning. When this turn is a pure reposition (a single move_unit, no strike or
+     * cast), re-pick the destination among the engine's reachable cells by a learned linear score over
+     * cell features (advance toward the enemy, cohesion with allies, lava/water hazard, and an incumbency
+     * bias toward v0.4's own pick). Candidates come straight from pathHelper.getMovePath — exactly the set
+     * v0.3 moves within — so every emitted move is valid by construction (no new engine rejections). With
+     * the default weights v0.4's destination always wins, so untrained v0.5 == v0.4.
+     */
+    private repositionByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const move = decision.find((a) => a.type === "move_unit");
+        if (!move || move.type !== "move_unit") {
+            return decision; // not a move turn
+        }
+        if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+            return decision; // move is part of a strike/cast — leave the (target-constrained) stand cell alone
+        }
+        const [, , , , , , wAdvance, wCohesion, wHazard, wIncumbent] = this.w;
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return decision;
+        }
+        const base = unit.getBaseCell();
+        const dest = move.path.length ? move.path[move.path.length - 1] : base; // v0.4's chosen anchor cell
+        const allies = unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId());
+        const centroid = allies.length
+            ? {
+                  x: allies.reduce((s, a) => s + a.getBaseCell().x, 0) / allies.length,
+                  y: allies.reduce((s, a) => s + a.getBaseCell().y, 0) / allies.length,
+              }
+            : base;
+        const steps = Math.max(1, unit.getSteps());
+        const minEnemyDist = (c: XY): number => Math.min(...enemies.map((e) => getDistance(c, e.getBaseCell())));
+        const baseEnemyDist = minEnemyDist(base);
+        const baseCentroidDist = getDistance(base, centroid);
+        const score = (cell: XY, route: IWeightedRoute): number => {
+            const advance = (baseEnemyDist - minEnemyDist(cell)) / steps; // + => closer to the enemy
+            const cohesion = (baseCentroidDist - getDistance(cell, centroid)) / steps; // + => toward allies
+            const hazard = route.hasLavaCell || route.hasWaterCell ? 1 : 0;
+            const incumbent = cell.x === dest.x && cell.y === dest.y ? 1 : 0;
+            return wAdvance * advance + wCohesion * cohesion + wHazard * hazard + wIncumbent * incumbent;
+        };
+
+        const movePath = pathHelper.getMovePath(
+            base,
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        // A candidate's full footprint must be occupiable — getMovePath keys on the anchor, but a large
+        // unit's footprint can still clip an occupied cell. Mirror v0.4's moveIsBlocked guard exactly so we
+        // never emit a move the engine would reject (validity by construction == 0 added rejections).
+        const footprintOk = (cell: XY): boolean => {
+            const fp = this.footprintForCell(unit, cell, context);
+            return (
+                fp.length > 0 &&
+                (grid.areAllCellsEmpty(fp, unit.getId()) ||
+                    grid.canOccupyCells(
+                        fp,
+                        unit.hasAbilityActive("Made of Fire"),
+                        unit.hasAbilityActive("Made of Water"),
+                    ))
+            );
+        };
+        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let bestScore = -Infinity;
+        for (const routes of movePath.knownPaths.values()) {
+            const route = routes[0];
+            if (!route?.route.length) {
+                continue;
+            }
+            const s = score(route.cell, route);
+            if (s > bestScore && footprintOk(route.cell)) {
+                bestScore = s;
+                best = { cell: route.cell, route };
+            }
+        }
+        // No better-or-equal alternative, or the policy agrees with v0.4's pick -> keep v0.4's decision verbatim.
+        if (!best || (best.cell.x === dest.x && best.cell.y === dest.y)) {
+            return decision;
+        }
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            },
+        ];
     }
     /**
      * Learned shot scorer. Sums a weighted feature vector over every unit a candidate shot hits — enemies

@@ -31,7 +31,17 @@
  * is the shipped behaviour.
  */
 
-/** Human-readable order of the weight vector — keep in sync with scoreShot in v0_5.ts and CEM_DIM. */
+/**
+ * Human-readable order of the weight vector — keep in sync with v0_5.ts and CEM_DIM.
+ *
+ * Two learned seams:
+ *   [0..5] scoreShot   — which enemy a shooter aims at (stage 1; a narrow lever, ~+1pp ceiling).
+ *   [6..9] reposition  — where a unit moves on a STANDALONE reposition turn (stage 2; the real
+ *                        positioning/timing headroom). The policy re-ranks the engine's reachable cells
+ *                        by w·features; "posIncumbent" biases toward v0.4's own chosen destination, so at
+ *                        the default below (all feature weights 0, incumbent > 0) v0.5 keeps v0.4's move
+ *                        EXACTLY — the untrained-v0.5 == v0.4 safety identity holds across both seams.
+ */
 export const V05_WEIGHT_KEYS = [
     "shotDamage", // * expected effective damage on an enemy hit (proven dominant term)
     "shotKill", // * cumulative HP of a stack THIS shot finishes (focus-kill bonus)
@@ -39,10 +49,18 @@ export const V05_WEIGHT_KEYS = [
     "shotFirepower", // * target firepower / 1000 (prefer silencing high-DPS shooters)
     "shotLevel", // * target level (prefer hitting higher-tier stacks)
     "shotFriendlyFire", // * effective AOE-splash damage onto our own units (a cost; subtracted)
+    "posAdvance", // * (toward nearest enemy, per step) — sign learns advance(+) vs retreat(-)
+    "posCohesion", // * (toward ally centroid, per step) — stay with the pack vs peel off
+    "posHazard", // * candidate route crosses lava/water (1/0) — usually penalised
+    "posIncumbent", // * candidate == v0.4's own destination (1/0) — anchor; keeps the default == v0.4
 ] as const;
 
-/** Default == exact v0.4 shot scoring (see header). Length MUST equal V05_WEIGHT_KEYS.length. */
-export const DEFAULT_V05_W: readonly number[] = [1.0, 0.0, 1.0, 0.0, 0.0, 1.0];
+/**
+ * Default == exact v0.4 behaviour on BOTH seams: shot scoring reproduces v0.4 (shotDamage=1, shotRange=1
+ * => 2x on enemy range, others 0/1), and the reposition policy is a no-op (all feature weights 0, only
+ * posIncumbent=1.5 > 0, so v0.4's destination always wins). Length MUST equal V05_WEIGHT_KEYS.length.
+ */
+export const DEFAULT_V05_W: readonly number[] = [1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.5];
 
 /**
  * Resolve the active weight vector. Honours process.env.V05_WEIGHTS (JSON number[]) for CEM training /

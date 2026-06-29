@@ -27,12 +27,13 @@ describe("v0.5 — reinforcement-learned strategy", () => {
     it("default weight vector reproduces v0.4 shot scoring exactly", () => {
         // shotDamage=1, shotRange=1 (=> 2x on enemy range, matching v0.3/v0.4's ENEMY_RANGE_DAMAGE_WEIGHT),
         // shotKill/shotFirepower/shotLevel=0 (new biases off), shotFriendlyFire=1. An untrained v0.5 == v0.4.
-        expect(DEFAULT_V05_W).toEqual([1.0, 0.0, 1.0, 0.0, 0.0, 1.0]);
+        // 6 shot weights (== v0.4 scoring) + 4 reposition weights (no-op: features 0, only incumbent 1.5).
+        expect(DEFAULT_V05_W).toEqual([1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.5]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {
-        const trained = [1.2, 0.5, 0.8, 0.1, 0.05, 1.0];
+        const trained = [1.2, 0.5, 0.8, 0.1, 0.05, 1.0, 0.4, -0.2, -0.6, 1.0];
         process.env.V05_WEIGHTS = JSON.stringify(trained);
         expect(loadV05Weights()).toEqual(trained);
     });
