@@ -1110,6 +1110,52 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
+    it("casts Castling (POSITION_CHANGE) and swaps the caster with the in-range small enemy", () => {
+        const enemyCell = { x: 5, y: 3 };
+        const setup = setupActionFight({
+            lowerSpells: ["System:Castling"],
+            lowerStackPower: 4, // Castling needs minimal_caster_stack_power 4
+            upperCell: enemyCell,
+            currentEnemiesCellsWithinMovementRange: [enemyCell],
+        });
+        const casterStart = { ...setup.lower.getBaseCell() };
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Castling",
+            targetId: setup.upper.getId(),
+            targetCell: setup.upper.getBaseCell(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getBaseCell()).toEqual(enemyCell);
+        expect(setup.upper.getBaseCell()).toEqual(casterStart);
+    });
+
+    it("rejects Castling when the in-range enemy list is absent (the ranked server-context bug)", () => {
+        const enemyCell = { x: 5, y: 3 };
+        const setup = setupActionFight({
+            lowerSpells: ["System:Castling"],
+            lowerStackPower: 4,
+            upperCell: enemyCell,
+            // currentEnemiesCellsWithinMovementRange intentionally omitted — exactly what the server used
+            // to do, which made every Castling cast reject. Providing it (server fix) is what makes the
+            // positive test above pass.
+        });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Castling",
+            targetId: setup.upper.getId(),
+            targetCell: setup.upper.getBaseCell(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("spell_not_available");
+    });
+
     it("rejects single-target spells with stale target-cell data", () => {
         const setup = setupActionFight({ lowerSpells: ["Death:Weakness"] });
 
