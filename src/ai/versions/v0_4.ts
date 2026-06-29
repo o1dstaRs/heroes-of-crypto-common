@@ -23,6 +23,8 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const MAGIC_FH = PBTypes.AttackVals.MAGIC;
+const enabledFH = (name: string): boolean => process.env[`V04_${name}`] !== "off";
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 
@@ -110,7 +112,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const goblin = this.preferLowLevelMelee(unit, context, healed);
         const positioned = this.auraRepositionMelee(unit, context, goblin);
         const meleeTuned = this.rapidChargeReposition(unit, context, positioned);
-        return this.aoeMeleeReposition(unit, context, meleeTuned);
+        const fhTuned = this.aoeMeleeReposition(unit, context, meleeTuned);
+        return this.flyerPatientHunt(unit, context, fhTuned);
     }
     /**
      * (8) Melee AoE targeting for Black Dragon (Fire Breath, line depth = unit size) and Pikeman (Skewer
@@ -118,6 +121,60 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * target, so v0.4 picks the stand cell + target whose line catches the MOST enemy stacks — turning a
      * single hit into a 2+-stack blow. Only swaps when it strictly increases the stacks hit.
      */
+    private flyerPatientHunt(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!enabledFH("FHUNT2") || !unit.canFly() || unit.getAttackType() !== MELEE || !unit.canMove())
+            return decision;
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell"))
+            return decision;
+        const uh = context.unitsHolder;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = uh.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        const ranges = enemies.filter((e) => e.getAttackType() === RANGE || e.getAttackType() === MAGIC_FH);
+        if (!ranges.length) return decision;
+        const clash = uh
+            .getAllAllies(unit.getTeam())
+            .some(
+                (a) =>
+                    !a.isDead() &&
+                    a.getId() !== unit.getId() &&
+                    enemies.some((e) => e.getCells().some((ec) => a.getCells().some((ac) => isAdjacentCell(ec, ac)))),
+            );
+        if (!clash) return this.canHourglass(unit, context) ? [{ type: "wait_turn", unitId: unit.getId() }] : decision;
+        const { grid, matrix, pathHelper } = context;
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const nearest = (cell: XY): number => Math.min(...ranges.map((t) => getDistance(cell, t.getBaseCell())));
+        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let bestDist = nearest(unit.getBaseCell());
+        for (const [key, routes] of movePath.knownPaths) {
+            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
+            const route = routes?.[0];
+            if (!route?.route.length) continue;
+            const d = nearest(cell);
+            if (d < bestDist) {
+                bestDist = d;
+                best = { cell, route };
+            }
+        }
+        if (!best) return decision;
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            },
+        ];
+    }
     private aoeMeleeReposition(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         const fireBreath = unit.hasAbilityActive("Fire Breath");
         const skewer = unit.hasAbilityActive("Skewer Strike");
