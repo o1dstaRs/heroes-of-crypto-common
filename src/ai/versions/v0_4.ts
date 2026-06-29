@@ -158,8 +158,14 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell"))
             return decision;
         const allies = context.unitsHolder.getAllAllies(unit.getTeam()).filter((a) => !a.isDead());
+        // Battle Roar (+steps, melee-flavored) is NOT worth a shooter losing a volley, so skip the wait when
+        // we're range-heavy. Mass Riot (+25% dmg) compounds over shots, so the Ogre wait is kept regardless.
+        // Measured on 20k forced-roster runs: Behemoth range-heavy army-wait -2.57pp, Ogre range-heavy +2.38pp.
+        const rangeHeavy = allies.filter((a) => a.getAttackType() === RANGE).length >= 3;
         const roarPending =
-            allies.some((a) => a.getName() === "Behemoth") && !allies.some((a) => a.hasBuffActive("Battle Roar"));
+            !rangeHeavy &&
+            allies.some((a) => a.getName() === "Behemoth") &&
+            !allies.some((a) => a.hasBuffActive("Battle Roar"));
         const riotPending =
             allies.some((a) => a.getName() === "Ogre Mage") &&
             !allies.some((a) => a.hasBuffActive("Mass Riot") || a.hasBuffActive("Riot"));
