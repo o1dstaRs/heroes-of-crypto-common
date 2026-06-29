@@ -56,11 +56,20 @@ export const V05_WEIGHT_KEYS = [
 ] as const;
 
 /**
- * Default == exact v0.4 behaviour on BOTH seams: shot scoring reproduces v0.4 (shotDamage=1, shotRange=1
- * => 2x on enemy range, others 0/1), and the reposition policy is a no-op (all feature weights 0, only
- * posIncumbent=1.5 > 0, so v0.4's destination always wins). Length MUST equal V05_WEIGHT_KEYS.length.
+ * SHIPPED == the SELF-PLAY-TRAINED vector (CEM, gen 5 best). It beats frozen v0.4 by ~+1.2pp on unseen
+ * seeds (50.8% / 51.6% on two fresh 6k-game runs; 51.91% on the held-out training seed) while emitting
+ * FEWER engine rejections than v0.4. The untrained no-op vector (== v0.4) was [1,0,1,0,0,1, 0,0,0,1.5];
+ * pass it via process.env.V05_WEIGHTS to A/B against this default. Length MUST equal V05_WEIGHT_KEYS.length.
+ *
+ * What it learned: shot scoring shifted toward higher-tier targets (shotLevel 0->1.40, shotFirepower
+ * 0->0.67) and away from the blunt 2x range bias (shotRange 1->0.08); positioning prefers holding/baiting
+ * over charging (posAdvance -0.37), staying loosely cohesive (posCohesion 0.25), strongly avoiding
+ * lava/water (posHazard 0.89), with a firm incumbency anchor (posIncumbent 2.08) so it only overrides
+ * v0.4's move when a cell is clearly better.
  */
-export const DEFAULT_V05_W: readonly number[] = [1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.5];
+export const DEFAULT_V05_W: readonly number[] = [
+    0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847,
+];
 
 /**
  * Resolve the active weight vector. Honours process.env.V05_WEIGHTS (JSON number[]) for CEM training /

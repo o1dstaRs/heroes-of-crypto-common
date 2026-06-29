@@ -24,12 +24,12 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("default weight vector reproduces v0.4 shot scoring exactly", () => {
-        // shotDamage=1, shotRange=1 (=> 2x on enemy range, matching v0.3/v0.4's ENEMY_RANGE_DAMAGE_WEIGHT),
-        // shotKill/shotFirepower/shotLevel=0 (new biases off), shotFriendlyFire=1. An untrained v0.5 == v0.4.
-        // 6 shot weights (== v0.4 scoring) + 4 reposition weights (no-op: features 0, only incumbent 1.5).
-        expect(DEFAULT_V05_W).toEqual([1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.5]);
+    it("ships the self-play-trained weight vector (10 dims, not the v0.4-identity no-op)", () => {
+        // Default is the CEM-trained vector (beats v0.4 ~+1.2pp on unseen seeds), NOT the identity
+        // [1,0,1,0,0,1, 0,0,0,1.5]. Both seams are live: shot scoring re-weighted + reposition active.
+        expect(DEFAULT_V05_W).toEqual([0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
+        expect(DEFAULT_V05_W).not.toEqual([1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.5]);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {
