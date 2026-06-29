@@ -56,6 +56,9 @@ export enum AIActionType {
     MAGIC_ATTACK,
     MOVE,
     MOVE_AND_MELEE_ATTACK,
+    // Break the destructible center mountain (BLOCK_CENTER map). cellToAttack = the struck center
+    // cell, cellToMove = the (reachable) cell to strike from. The driver issues an obstacle_attack.
+    OBSTACLE_ATTACK,
 }
 
 export interface IAIAction {
@@ -172,62 +175,71 @@ export function findTarget(
     const isAlreadyEngaged = countMeleeThreatsToCell(unitCell, matrix, enemyTeam) > 0;
 
     if (!action && !isRangedUnit && unit.canMove() && !isAlreadyEngaged) {
-        // Strategy 1: Ranged-heavy team → defensive posture. Melee units hold position
-        //              and let the enemy come to them. Only released when enemies are pressing.
-        if (
-            engagement.totalRangedAllies > engagement.totalMeleeAllies &&
-            engagement.totalRangedAllies >= 2 &&
-            !engagement.enemiesPressing
-        ) {
-            if (DEBUG_AI) {
-                console.log(
-                    `Melee holding (ranged-heavy defense): ${engagement.totalRangedAllies}R vs ${engagement.totalMeleeAllies}M, enemies not pressing`,
-                );
+        // Mountain strategy (BLOCK_CENTER maps): an otherwise-idle melee unit may break the center
+        // mountain to open the melee lane (see evaluateMountainStrategy). Takes priority over the
+        // hold/regroup strategies below — in the "we out-range them" case mining is exactly what idle
+        // melee should do instead of holding.
+        const mountainAction = evaluateMountainStrategy(unit, grid, matrix, unitsHolder, pathHelper, engagement);
+        if (mountainAction) {
+            action = mountainAction;
+        } else {
+            // Strategy 1: Ranged-heavy team → defensive posture. Melee units hold position
+            //              and let the enemy come to them. Only released when enemies are pressing.
+            if (
+                engagement.totalRangedAllies > engagement.totalMeleeAllies &&
+                engagement.totalRangedAllies >= 2 &&
+                !engagement.enemiesPressing
+            ) {
+                if (DEBUG_AI) {
+                    console.log(
+                        `Melee holding (ranged-heavy defense): ${engagement.totalRangedAllies}R vs ${engagement.totalMeleeAllies}M, enemies not pressing`,
+                    );
+                }
+                return undefined; // skip — let ranged units do their work
             }
-            return undefined; // skip — let ranged units do their work
-        }
 
-        // Strategy 2: Group coordination. If this melee unit is isolated (nearest melee
-        //              ally is > GROUP_REGROUP_DIST away) and no ally is engaged yet,
-        //              don't advance alone — move toward the ally group center instead
-        //              of rushing toward the nearest enemy.
-        if (
-            engagement.totalMeleeAllies > 0 &&
-            engagement.nearestMeleeAllyDist > GROUP_REGROUP_DIST &&
-            engagement.engagedMeleeAllies === 0 &&
-            !engagement.enemiesPressing
-        ) {
-            // Override the movement target: go toward allies, not toward enemies.
-            const center = engagement.allyMeleeCenter;
-            if (center) {
-                action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
-                // If doFindTarget returned a MOVE, redirect toward the ally center.
-                if (action && action.actionType() === AIActionType.MOVE && action.currentActiveKnownPaths()) {
-                    const centerKey = (center.x << 4) | center.y;
-                    const pathsToCenter = action.currentActiveKnownPaths()!.get(centerKey);
-                    if (pathsToCenter && pathsToCenter.length > 0) {
-                        const route = pathsToCenter[0];
-                        const lastCell = route.route[route.route.length - 1];
-                        if (lastCell) {
-                            if (DEBUG_AI) {
-                                console.log(
-                                    `Melee regrouping: nearest ally ${engagement.nearestMeleeAllyDist} cells away, moving toward group center ${cellToString(center)}`,
+            // Strategy 2: Group coordination. If this melee unit is isolated (nearest melee
+            //              ally is > GROUP_REGROUP_DIST away) and no ally is engaged yet,
+            //              don't advance alone — move toward the ally group center instead
+            //              of rushing toward the nearest enemy.
+            if (
+                engagement.totalMeleeAllies > 0 &&
+                engagement.nearestMeleeAllyDist > GROUP_REGROUP_DIST &&
+                engagement.engagedMeleeAllies === 0 &&
+                !engagement.enemiesPressing
+            ) {
+                // Override the movement target: go toward allies, not toward enemies.
+                const center = engagement.allyMeleeCenter;
+                if (center) {
+                    action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
+                    // If doFindTarget returned a MOVE, redirect toward the ally center.
+                    if (action && action.actionType() === AIActionType.MOVE && action.currentActiveKnownPaths()) {
+                        const centerKey = (center.x << 4) | center.y;
+                        const pathsToCenter = action.currentActiveKnownPaths()!.get(centerKey);
+                        if (pathsToCenter && pathsToCenter.length > 0) {
+                            const route = pathsToCenter[0];
+                            const lastCell = route.route[route.route.length - 1];
+                            if (lastCell) {
+                                if (DEBUG_AI) {
+                                    console.log(
+                                        `Melee regrouping: nearest ally ${engagement.nearestMeleeAllyDist} cells away, moving toward group center ${cellToString(center)}`,
+                                    );
+                                }
+                                action = new BasicAIAction(
+                                    AIActionType.MOVE,
+                                    lastCell,
+                                    undefined,
+                                    action.currentActiveKnownPaths(),
                                 );
                             }
-                            action = new BasicAIAction(
-                                AIActionType.MOVE,
-                                lastCell,
-                                undefined,
-                                action.currentActiveKnownPaths(),
-                            );
                         }
                     }
+                } else {
+                    action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
                 }
             } else {
                 action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
             }
-        } else {
-            action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
         }
     } else if (!action && unit.canMove()) {
         action = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
@@ -733,6 +745,168 @@ export function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHo
         nearestMeleeAllyDist: nearestMeleeAllyDist === Infinity ? 0 : nearestMeleeAllyDist,
         enemiesPressing,
     };
+}
+
+// ──────────────────────────── Mountain (BLOCK_CENTER) strategy ────────────────────────────
+// On a BLOCK_CENTER map a destructible 4x4 mountain sits in the middle of the board, splitting it
+// and lengthening every melee route to the enemy. Clearing it opens a direct lane. The AI weighs
+// breaking it against advancing, driven by which side has the stronger RANGED army:
+//   • We out-range them  → our ranged army wins the long game, so keep idle melee productive by
+//                          mining the mountain (ranged units hold/shoot as usual).
+//   • They out-range us  → only mine when we can finish it FAST — units grouped and enough melee to
+//                          clear it in a single lap — so it actually accelerates our rush instead of
+//                          wasting turns chipping rock while we're shot at. Otherwise just advance.
+// Either way we only mine before contact (enemies not pressing) and never trade away a real attack.
+
+/** Total potential ranged firepower of a team: Σ remaining shots × max per-shot damage. */
+function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
+    let firepower = 0;
+    for (const u of unitsHolder.getAllAllies(team)) {
+        if (u.isDead() || u.getAttackType() !== PBTypes.AttackVals.RANGE) {
+            continue;
+        }
+        const shots = u.getRangeShots();
+        if (shots <= 0) {
+            continue;
+        }
+        firepower += shots * Math.max(1, u.getAttackDamageMax());
+    }
+    return firepower;
+}
+
+/** Remaining hits on the center mountain, or 0 when the map has none / it's already cleared. */
+function mountainHitsLeft(grid: Grid): number {
+    if (grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER) {
+        return 0;
+    }
+    return FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft();
+}
+
+/**
+ * How many melee allies could reach the mountain THIS lap (stand adjacent to its outer ring within
+ * their movement). Used to gate "can we clear it in a single lap?" — each contributes ~1 hit/lap.
+ */
+function countMeleeAlliesAbleToReachMountain(team: number, unitsHolder: UnitsHolder, grid: Grid): number {
+    const outerCells = grid.getCenterCells(true);
+    if (!outerCells.length) {
+        return 0;
+    }
+    let count = 0;
+    for (const u of unitsHolder.getAllAllies(team)) {
+        if (u.isDead() || u.getAttackType() === PBTypes.AttackVals.RANGE) {
+            continue;
+        }
+        const cell = u.getBaseCell();
+        if (!cell) {
+            continue;
+        }
+        let nearest = Infinity;
+        for (const oc of outerCells) {
+            nearest = Math.min(nearest, HoCMath.getDistance(cell, oc));
+        }
+        // +1: a unit only needs to reach a cell ADJACENT to the ring, not the ring itself.
+        if (nearest <= u.getSteps() + 1) {
+            count++;
+        }
+    }
+    return count;
+}
+
+/**
+ * For a melee unit, find a reachable cell to strike the mountain from this turn: the cheapest-to-reach
+ * cell (or its current cell) that is adjacent to the mountain's outer ring. Returns the strike cell,
+ * the struck center cell, and the unit's reachable paths — or undefined if it can't reach the mountain.
+ */
+function findMountainMeleeStrike(
+    unit: IUnitAIRepr,
+    grid: Grid,
+    matrix: number[][],
+    pathHelper: PathHelper,
+): { attackFrom: HoCMath.XY; targetCell: HoCMath.XY; knownPaths: Map<number, IWeightedRoute[]> } | undefined {
+    const outerCells = grid.getCenterCells(true);
+    if (!outerCells.length) {
+        return undefined;
+    }
+    const unitCell = unit.getBaseCell();
+    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const movePath = pathHelper.getMovePath(
+        unitCell,
+        matrix,
+        unit.getSteps(),
+        grid.getAggrMatrixByTeam(enemyTeam),
+        unit.canFly(),
+        unit.isSmallSize(),
+        unit.hasAbilityActive("Made of Fire"),
+    );
+    const knownPaths = movePath.knownPaths;
+
+    let best: { attackFrom: HoCMath.XY; targetCell: HoCMath.XY; weight: number } | undefined;
+    const consider = (standCell: HoCMath.XY, weight: number): void => {
+        for (const oc of outerCells) {
+            if (Math.abs(standCell.x - oc.x) <= 1 && Math.abs(standCell.y - oc.y) <= 1) {
+                if (!best || weight < best.weight) {
+                    best = { attackFrom: standCell, targetCell: oc, weight };
+                }
+                break;
+            }
+        }
+    };
+
+    // Striking in place (already adjacent) is cheapest — no move needed.
+    consider(unitCell, 0);
+    for (const [key, routes] of knownPaths) {
+        const standCell = { x: (key >> 4) & 0xf, y: key & 0xf };
+        consider(standCell, routes?.[0]?.weight ?? Infinity);
+    }
+
+    if (!best) {
+        return undefined;
+    }
+    return { attackFrom: best.attackFrom, targetCell: best.targetCell, knownPaths };
+}
+
+/**
+ * Decide whether this (melee) unit should break the center mountain this turn. Returns an
+ * OBSTACLE_ATTACK action when it should and can reach the mountain, otherwise undefined (caller
+ * falls back to normal movement). See the strategy comment above for the two firepower cases.
+ */
+function evaluateMountainStrategy(
+    unit: IUnitAIRepr,
+    grid: Grid,
+    matrix: number[][],
+    unitsHolder: UnitsHolder,
+    pathHelper: PathHelper,
+    engagement: ITeamEngagement,
+): BasicAIAction | undefined {
+    if (mountainHitsLeft(grid) <= 0) {
+        return undefined;
+    }
+    // Only melee units mine; ranged units stay on shooting/holding duty. Never mine with enemies
+    // pressing — deal with the incoming fight (or reach safety) first.
+    if (unit.getAttackType() === PBTypes.AttackVals.RANGE || !unit.canMove() || engagement.enemiesPressing) {
+        return undefined;
+    }
+
+    const strike = findMountainMeleeStrike(unit, grid, matrix, pathHelper);
+    if (!strike) {
+        return undefined; // can't reach the mountain this turn — advance normally instead
+    }
+
+    const team = unit.getTeam();
+    const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const weOutRange = teamRangedFirepower(team, unitsHolder) > teamRangedFirepower(enemyTeam, unitsHolder);
+
+    if (!weOutRange) {
+        // They out-range us: only break it when we can clear it in a single lap (grouped + enough
+        // melee in reach), so the lane opens fast enough to be worth the turns under fire.
+        const grouped = engagement.nearestMeleeAllyDist <= GROUP_REGROUP_DIST;
+        const canSingleLap = countMeleeAlliesAbleToReachMountain(team, unitsHolder, grid) >= mountainHitsLeft(grid);
+        if (!grouped || !canSingleLap) {
+            return undefined;
+        }
+    }
+
+    return new BasicAIAction(AIActionType.OBSTACLE_ATTACK, strike.attackFrom, strike.targetCell, strike.knownPaths);
 }
 
 /**
