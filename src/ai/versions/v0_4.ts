@@ -24,7 +24,6 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
-const angelResOn = process.env.V04_ANGELRES === "on"; // DISABLED: -28pp blunt, -3.65pp even strictly gated (Angel's melee beats resurrecting in sim)
 const boxHoldOn = process.env.V04_BOXHOLD === "on"; // NEUTRAL: +0.06pp overall, +0.05pp range-heavy (v0.3 already handles boxed shooters)
 const frontlineOn = process.env.V04_FRONTLINE === "on";
 const frontMoveOn = process.env.V04_FRONTMOVE !== "off"; // range-heavy bait/lead: +0.99pp on forced range-heavy (gated to >=3 ranged so no dilution) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
@@ -143,11 +142,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
         const legal = this.enforceMeleeLegality(unit, context, tuned);
-        return this.angelResurrect(
-            unit,
-            context,
-            this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal)),
-        );
+        return this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal));
     }
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
     // Behemoth/Ogre rosters), but the CASTER should fire the buff IMMEDIATELY. Delaying the caster only
@@ -170,44 +165,10 @@ export class StrategyV0_4 extends StrategyV0_3 {
      *  - else Unicorn/Scavenger LEAD the advance (toward the nearest enemy) to consume the first hits while
      *    the rest of the melee follows normally.
      */
-    private angelResurrect(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        if (!angelResOn || !unit.hasAbilityActive("Resurrection")) return decision;
-        // Only in a range-heavy/defensive army: the Angel screens shooters (not leading melee), so spending
-        // a standing turn to resurrect fallen DPS can pay. In a melee army it should fight (measured -3.65pp).
-        const myRangedAR = context.unitsHolder
-            .getAllAllies(unit.getTeam())
-            .filter((a) => !a.isDead() && a.getAttackType() === RANGE).length;
-        if (myRangedAR < 3) return decision;
-        const spell = unit.getSpells().find((sp) => sp.getPowerType() === SpellPowerType.RESURRECT);
-        if (!spell) return decision;
-        // The Angel is a strong fighter: only resurrect when it has NO attack on offer this turn.
-        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
-            return decision;
-        }
-        const target = context.unitsHolder
-            .getAllAllies(unit.getTeam())
-            .filter(
-                (a) =>
-                    !a.isDead() && a.getId() !== unit.getId() && a.getAmountDied() >= Math.max(3, a.getAmountAlive()),
-            )
-            .sort((a, b) => b.getAmountDied() * b.getMaxHp() - a.getAmountDied() * a.getMaxHp())[0];
-        if (!target) return decision;
-        const ok = canCastSpell(
-            false,
-            context.grid.getSettings(),
-            context.matrix,
-            unit,
-            target,
-            spell,
-            target.getBaseCell(),
-            target.getMagicResist(),
-            target.hasMindAttackResistance(),
-            target.canBeHealed(),
-            undefined,
-        );
-        if (!ok) return decision;
-        return [{ type: "cast_spell", casterId: unit.getId(), spellName: spell.getName(), targetId: target.getId() }];
-    }
+    // REMOVED (refuted in every context): Angel resurrect. Measured -28pp blunt, -3.65pp strictly gated
+    // (no-attack + heavily-dead target), and -14.16pp even gated to a range-heavy defensive army on 20k
+    // forced Angel+ranged rosters. The Angel is too valuable a fighter to ever stand and resurrect — a
+    // restored stack re-dies and we cede its combat contribution (in a mirror the enemy Angel keeps fighting).
     private holdBoxedShooter(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
         if (unit.hasAbilityActive("No Melee") || unit.hasAbilityActive("Handyman")) return undefined;
         if (this.canLandRange(unit, context)) return undefined; // it can actually shoot -> not boxed
