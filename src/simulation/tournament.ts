@@ -59,6 +59,10 @@ export interface ITournamentSummary {
     avgLaps: number;
     endReasons: Record<string, number>;
     better: string | "tie";
+    /** Games whose result leaned on armageddon attrition rather than a clean combat kill. */
+    armageddonDecided: number;
+    /** Fraction of games NOT decided by armageddon — higher is better (AI wins cleanly). */
+    cleanWinRate: number;
 }
 
 const emptyStats = (version: string): IVersionStats => ({ version, wins: 0, winsAsGreen: 0, winsAsRed: 0 });
@@ -95,6 +99,7 @@ export interface ITournamentTally {
     draws: number;
     totalLaps: number;
     endReasons: Record<string, number>;
+    armageddonDecided: number;
     counted: number;
 }
 
@@ -105,6 +110,7 @@ export function createTally(options: ITournamentOptions): ITournamentTally {
         draws: 0,
         totalLaps: 0,
         endReasons: {},
+        armageddonDecided: 0,
         counted: 0,
     };
 }
@@ -123,6 +129,9 @@ export function tallyGame(tally: ITournamentTally, record: IGameRecord, options:
     }
     tally.totalLaps += record.result.laps;
     tally.endReasons[record.result.endReason] = (tally.endReasons[record.result.endReason] ?? 0) + 1;
+    if (record.result.attrition.decidedByArmageddon) {
+        tally.armageddonDecided += 1;
+    }
     tally.counted += 1;
 }
 
@@ -141,6 +150,8 @@ export function finalizeTally(tally: ITournamentTally, options: ITournamentOptio
         endReasons: tally.endReasons,
         better:
             tally.a.wins === tally.b.wins ? "tie" : tally.a.wins > tally.b.wins ? options.versionA : options.versionB,
+        armageddonDecided: tally.armageddonDecided,
+        cleanWinRate: tally.counted ? 1 - tally.armageddonDecided / tally.counted : 1,
     };
 }
 

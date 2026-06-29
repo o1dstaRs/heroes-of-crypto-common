@@ -146,6 +146,7 @@ export function createUnitFromSpec(
     gridSettings: GridSettings,
     abilityFactory: AbilityFactory,
     effectFactory: EffectFactory,
+    summoned = false,
 ): Unit {
     const textureName = `${spec.creatureName.toLowerCase().replace(/ /g, "_")}_128`;
     const properties = getCreatureConfig(team, spec.faction, spec.creatureName, textureName, spec.amount);
@@ -156,7 +157,7 @@ export function createUnitFromSpec(
         PBTypes.UnitVals.CREATURE,
         abilityFactory,
         effectFactory,
-        false,
+        summoned,
     );
 }
 

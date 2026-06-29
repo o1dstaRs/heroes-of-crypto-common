@@ -32,6 +32,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
+import { ToFactionName } from "../factions/faction_type";
 import { createCombatFactories, createUnitFromSpec, type IArmyUnitSpec } from "./army";
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
@@ -72,6 +73,8 @@ export interface IRecordedAction {
     targetCreature?: string;
     toCell?: XY;
     completed: boolean;
+    /** Engine rejection reason when completed === false (for diagnosing non-smooth turns). */
+    rejectionReason?: string;
     damage?: number;
     unitIdsDied?: string[];
 }
@@ -81,6 +84,21 @@ export interface ISideOutcome {
     unitsAlive: number;
     creaturesAlive: number;
     hpRemaining: number;
+}
+
+/**
+ * Attrition mechanics that end a fight by environment rather than clean combat: the board NARROWING
+ * (from lap 3) and ARMAGEDDON (escalating damage to everyone from lap 12, 4 waves). A clean AI win
+ * kills the enemy outright before these matter; `decidedByArmageddon` flags games where armageddon
+ * deaths actually contributed to the result (what we want to minimise).
+ */
+export interface IAttritionInfo {
+    reachedArmageddon: boolean;
+    armageddonWaves: number;
+    unitsKilledByArmageddon: number;
+    unitsKilledByNarrowing: number;
+    /** Armageddon killed units AND the game ended in/after the armageddon phase. */
+    decidedByArmageddon: boolean;
 }
 
 export interface IMatchResult {
@@ -93,6 +111,7 @@ export interface IMatchResult {
     placements: { green: IPlacementRecord[]; red: IPlacementRecord[] };
     actions: IRecordedAction[];
     outcome: { green: ISideOutcome; red: ISideOutcome };
+    attrition: IAttritionInfo;
 }
 
 class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
@@ -170,6 +189,26 @@ export function runMatch(config: IMatchConfig): IMatchResult {
         // No known-paths provider: the engine trusts the legal path the AI computed (mirrors the live
         // server, which also omits it). canPlaceUnit restricts placement to each team's zone.
         canPlaceUnit: (unit: Unit, cells: XY[]) => cells.every((c) => zoneHashesFor(unit.getTeam()).has(cellKey(c))),
+        // Spell summons (e.g. Satyr's Summon Wolves) build a real creature stack of the summoned type.
+        // The engine passes the numeric FactionType; getCreatureConfig keys by faction NAME, so map it.
+        createSummonedUnit: (opts: { team: TeamType; faction: number; unitName: string; amount: number }) => {
+            const factionName = ToFactionName[opts.faction];
+            if (!factionName) {
+                return undefined;
+            }
+            try {
+                return createUnitFromSpec(
+                    { faction: factionName, creatureName: opts.unitName, level: 0, size: 0, amount: opts.amount },
+                    opts.team,
+                    gridSettings,
+                    abilityFactory,
+                    effectFactory,
+                    true,
+                );
+            } catch {
+                return undefined; // unknown summon creature -> engine rejects the cast cleanly
+            }
+        },
         runtime,
     };
 
@@ -208,6 +247,13 @@ export function runMatch(config: IMatchConfig): IMatchResult {
     // --- run the fight ---
     const actions: IRecordedAction[] = [];
     let finished = false;
+    const attrition: IAttritionInfo = {
+        reachedArmageddon: false,
+        armageddonWaves: 0,
+        unitsKilledByArmageddon: 0,
+        unitsKilledByNarrowing: 0,
+        decidedByArmageddon: false,
+    };
     const applyEvents = (events: GameEvent[]): void => {
         for (const event of events) {
             if (event.type === "turn_completed") {
@@ -219,6 +265,15 @@ export function runMatch(config: IMatchConfig): IMatchResult {
             } else if (event.type === "fight_finished") {
                 currentActiveUnitId = "";
                 finished = true;
+            } else if (event.type === "armageddon_applied") {
+                attrition.reachedArmageddon = true;
+                attrition.armageddonWaves = Math.max(attrition.armageddonWaves, event.wave);
+            } else if (event.type === "unit_destroyed") {
+                if (event.reason === "armageddon") {
+                    attrition.unitsKilledByArmageddon += 1;
+                } else if (event.reason === "narrowing") {
+                    attrition.unitsKilledByNarrowing += 1;
+                }
             }
         }
     };
@@ -264,9 +319,27 @@ export function runMatch(config: IMatchConfig): IMatchResult {
                 break;
             }
             if (!currentActiveUnitId) {
-                // Turn engine produced no next unit and the fight is not over — wedged.
-                endReason = "stuck";
-                break;
+                // The turn engine wedged with no next unit while the fight is live (a queue can stall
+                // after deaths/hourglass). Mirror the server's recovery: force a lap transition by
+                // marking every living unit as having taken its turn, then advance again. This reuses
+                // the normal lap-flip (re-seeds the queue) instead of stranding the match.
+                let forced = false;
+                for (const u of unitsHolder.getAllUnits().values()) {
+                    if (!u.isDead()) {
+                        fightProperties.addAlreadyMadeTurn(u.getTeam(), u.getId());
+                        forced = true;
+                    }
+                }
+                if (forced) {
+                    advance();
+                }
+                if (finished) {
+                    break;
+                }
+                if (!currentActiveUnitId) {
+                    endReason = "stuck";
+                    break;
+                }
             }
             continue;
         }
@@ -310,6 +383,10 @@ export function runMatch(config: IMatchConfig): IMatchResult {
         }
     }
 
+    // Armageddon "decided" the game when it both reached that phase and actually destroyed units —
+    // i.e. the result leaned on environmental attrition rather than a clean combat kill.
+    attrition.decidedByArmageddon = attrition.reachedArmageddon && attrition.unitsKilledByArmageddon > 0;
+
     return buildResult(
         config,
         endReason,
@@ -319,6 +396,7 @@ export function runMatch(config: IMatchConfig): IMatchResult {
         fightProperties,
         greenStrategy.version,
         redStrategy.version,
+        attrition,
     );
 }
 
@@ -393,7 +471,7 @@ function recordAction(
     action: GameAction,
     unit: Unit,
     fromCell: XY,
-    result: { completed: boolean; events: GameEvent[] },
+    result: { completed: boolean; events: GameEvent[]; rejectionReason?: string },
     unitsHolder: UnitsHolder,
     lap: number,
 ): void {
@@ -425,6 +503,7 @@ function recordAction(
         targetCreature: targetUnit?.getName(),
         toCell,
         completed: result.completed,
+        rejectionReason: result.completed ? undefined : result.rejectionReason,
         damage: attackEvent?.type === "unit_attacked" ? attackEvent.damage.amount : undefined,
         unitIdsDied:
             attackEvent?.type === "unit_attacked" && attackEvent.unitIdsDied.length
@@ -452,6 +531,7 @@ function buildResult(
     fightProperties: ReturnType<FightStateManager["getFightProperties"]>,
     greenVersion: string,
     redVersion: string,
+    attrition: IAttritionInfo,
 ): IMatchResult {
     const green = sideOutcome(GREEN_TEAM, greenVersion, unitsHolder);
     const red = sideOutcome(RED_TEAM, redVersion, unitsHolder);
@@ -478,5 +558,6 @@ function buildResult(
         placements,
         actions,
         outcome: { green, red },
+        attrition,
     };
 }

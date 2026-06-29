@@ -16,6 +16,8 @@ import type { IDecisionContext } from "../../src/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { AttackHandler } from "../../src/handlers/attack_handler";
 import { PathHelper } from "../../src/grid/path_helper";
+import { PlacementPositionType } from "../../src/grid/placement_properties";
+import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { buildRoster, creaturesByLevel, DEFAULT_ROSTER_COMPOSITION, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
 import { runTournamentConcurrent } from "../../src/simulation/concurrent_tournament";
@@ -147,6 +149,42 @@ describe("AI v0.2 out-of-ammo handling", () => {
         if (actions.some((a) => a.type === "melee_attack")) {
             expect(actions.some((a) => a.type === "select_attack_type")).toBe(true);
         }
+    });
+
+    it("deploys melee in front, range/casters behind, and the Sniper Arbalester in a back corner", () => {
+        const mk = (name: string, type: number, abilities: string[] = []) =>
+            createTestUnit({ name, team: PBTypes.TeamVals.LOWER, attackType: type, abilities });
+        const arbalester = mk("Arbalester", PBTypes.AttackVals.RANGE, ["Sniper"]);
+        const beholder = mk("Beholder", PBTypes.AttackVals.RANGE);
+        const crusader = mk("Crusader", PBTypes.AttackVals.MELEE);
+        const pikeman = mk("Pikeman", PBTypes.AttackVals.MELEE);
+        const healer = mk("Healer", PBTypes.AttackVals.MAGIC);
+        const satyr = mk("Satyr", PBTypes.AttackVals.MAGIC);
+        const units = [arbalester, beholder, crusader, pikeman, healer, satyr];
+
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const placed = getAIStrategy("v0.2").placeArmy(units, {
+            team: PBTypes.TeamVals.LOWER,
+            grid: undefined as never,
+            unitsHolder: undefined as never,
+            pathHelper: undefined as never,
+            placement: zone,
+        });
+
+        // LOWER team: frontness == y (higher = closer to the enemy).
+        const cellOf = (u: typeof arbalester) => placed.get(u.getId())!;
+        const front = (u: typeof arbalester) => cellOf(u).y;
+        for (const u of units) {
+            expect(placed.has(u.getId())).toBe(true);
+        }
+        // Melee sit ahead of every backline unit (the wall screens them).
+        const meleeFront = Math.min(front(crusader), front(pikeman));
+        const backFront = Math.max(front(beholder), front(healer), front(satyr), front(arbalester));
+        expect(meleeFront).toBeGreaterThan(backFront);
+        // Arbalester is on the back row AND tucked to an edge (a corner), not in the central cluster.
+        expect(front(arbalester)).toBeLessThanOrEqual(backFront);
+        const centreX = 7.5; // zone spans x≈1..14 for size-3
+        expect(Math.abs(cellOf(arbalester).x - centreX)).toBeGreaterThan(Math.abs(cellOf(healer).x - centreX));
     });
 
     it("when it CAN shoot, v0.2 fires the best visible edge with an explicit aim (v0.1 sends none)", () => {

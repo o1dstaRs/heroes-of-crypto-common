@@ -99,6 +99,9 @@ async function main(): Promise<void> {
     console.log(
         `better: ${summary.better} | avg laps: ${summary.avgLaps.toFixed(1)} | end reasons: ${JSON.stringify(summary.endReasons)}`,
     );
+    console.log(
+        `clean wins (not armageddon): ${(summary.cleanWinRate * 100).toFixed(1)}% | armageddon-decided: ${summary.armageddonDecided}/${summary.games}`,
+    );
 }
 
 // Bun/Node entry-point guard.
