@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { MORALE_CHANGE_FOR_SHIELD_OR_CLOCK } from "../constants";
+import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_SHIELD_OR_CLOCK } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -36,7 +36,7 @@ import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
 import type { GameEvent, IGameAnimationEvent } from "./events";
-import { TurnEngine, type ITurnEngineContext } from "./turn_engine";
+import { TurnEngine, type ITurnEngineContext, type TurnSkipReason } from "./turn_engine";
 
 export type GameActionRejectionReason =
     | "fight_not_started"
@@ -187,15 +187,22 @@ export class GameActionEngine {
         }
 
         const reason = action.reason ?? "manual";
-        // A "manual" end-of-turn (the unit moved/attacked, then its turn was finished for it) is NOT a
-        // skip and must not incur the MORALE_CHANGE_FOR_SKIP penalty — otherwise a move that ends the
-        // turn through this path silently loses morale (moving toward the enemy netted -1 instead of
-        // +3). A genuine skip — the player pressing Next without acting ("skip"), a forced effect, or a
-        // turn timeout — DOES drop morale, mirroring the legacy (test_heroes.ts) skip penalty.
+        // A "manual" end-of-turn after the unit MOVED is NOT a skip and must not incur the
+        // MORALE_CHANGE_FOR_SKIP penalty — otherwise a move that ends the turn through this path silently
+        // loses morale (moving toward the enemy netted -1 instead of +3). A genuine skip — the player
+        // pressing Next without acting ("skip"), a forced effect, or a turn timeout — DOES drop morale,
+        // mirroring the legacy (test_heroes.ts) skip penalty.
         const isForcedSkip = reason === "timeout" || reason === "effect" || reason === "skip";
+        // Reaching end_turn means the unit didn't attack/cast (those complete the turn directly), so if it
+        // also didn't move it did nothing this turn — treat that as a skip even for a "manual" end, e.g.
+        // an AI-driven unit that ended without acting. So it reads as "<unit> skips turn" and is scored
+        // like any other skip.
+        const didNothing = !unit.hasMovedThisTurn();
+        const isSkip = isForcedSkip || didNothing;
+        const skipReason: TurnSkipReason | undefined = isForcedSkip ? reason : didNothing ? "skip" : undefined;
         const events = this.turnEngine.completeTurn(unit, {
-            skipReason: isForcedSkip ? reason : undefined,
-            skipLogMessage: isForcedSkip ? `${unit.getName()} skips turn` : undefined,
+            skipReason,
+            skipLogMessage: isSkip ? `${unit.getName()} skips turn` : undefined,
         });
         return { completed: true, events };
     }
@@ -226,12 +233,14 @@ export class GameActionEngine {
             return this.reject(unit.message as GameActionRejectionReason);
         }
 
-        unit.cleanupLuckPerTurn();
+        unit.applyLuckShield();
         unit.decreaseMorale(
             MORALE_CHANGE_FOR_SHIELD_OR_CLOCK,
             this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
         );
-        this.context.sceneLog.updateLog(`${unit.getName()} uses Luck Shield`);
+        this.context.sceneLog.updateLog(
+            `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD_OR_CLOCK})`,
+        );
 
         const events: GameEvent[] = [{ type: "unit_defended", unitId: unit.getId(), team: unit.getTeam() }];
         events.push(...this.turnEngine.completeTurn(unit));
@@ -332,6 +341,10 @@ export class GameActionEngine {
                 this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
             );
         }
+
+        // Mark that the unit moved this turn so a later end_turn reads as a real "manual" finish (it
+        // acted) rather than a do-nothing skip.
+        unit.setMovedThisTurn(true);
 
         return {
             completed: true,

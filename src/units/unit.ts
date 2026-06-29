@@ -15,6 +15,7 @@ import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
+    LUCK_CHANGE_FOR_SHIELD,
     LUCK_MAX_CHANGE_FOR_TURN,
     LUCK_MAX_VALUE_TOTAL,
     MAX_UNIT_STACK_POWER,
@@ -210,6 +211,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     protected maxRangeShots = 0;
     protected responded = false;
     protected onHourglass = false;
+    // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
+    // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
+    // AI unit that ended without moving/attacking/casting), which should read + score as a skip.
+    protected movedThisTurn = false;
     protected currentAttackModIncrease = 0;
     protected adjustedBaseStatsLaps: number[] = [];
     protected luckPerTurn: number = 0;
@@ -1024,12 +1029,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.luck_mod = calculatedLuck;
         this.luckPerTurn = calculatedLuck;
     }
-    public cleanupLuckPerTurn(): void {
-        // Luck Shield / defend: drop this turn's random luck spread so effective luck falls back to
-        // base (+ any synergy, which the next adjustBaseStats refresh re-applies). Clearing luckPerTurn
-        // too keeps it gone for the rest of the lap (adjustBaseStats only re-rolls once per lap).
-        this.unitProperties.luck_mod = 0;
-        this.luckPerTurn = 0;
+    public applyLuckShield(): void {
+        // Luck Shield: replace this turn's random luck spread with a fixed positive bonus (so a bad roll
+        // like -3 becomes +LUCK_CHANGE_FOR_SHIELD). Persisting it via luckPerTurn keeps it for the rest
+        // of the lap — adjustBaseStats re-derives luck_mod from luckPerTurn and only re-rolls once per
+        // lap, so it won't be overwritten. Clamped so base + bonus never exceeds the luck cap.
+        let luckMod = LUCK_CHANGE_FOR_SHIELD;
+        if (luckMod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
+            luckMod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
+        }
+        this.unitProperties.luck_mod = luckMod;
+        this.luckPerTurn = luckMod;
     }
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): number {
         const aw = Math.floor(armageddonWave);
@@ -1627,6 +1637,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public isOnHourglass(): boolean {
         return this.onHourglass;
     }
+    public setMovedThisTurn(moved: boolean) {
+        this.movedThisTurn = moved;
+    }
+    public hasMovedThisTurn(): boolean {
+        return this.movedThisTurn;
+    }
     public refreshPossibleAttackTypes(canLandRangeAttack: boolean): boolean {
         const currentSelectedAttackType = this.selectedAttackType;
         this.possibleAttackTypes = [];
@@ -1964,32 +1980,36 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.hp = this.unitProperties.max_hp;
         }
 
-        // LUCK
-        if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
-            this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
-            this.unitProperties.luck_mod = 0;
-        } else {
-            this.unitProperties.luck = synergyLuckIncrease;
-            if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
-                this.unitProperties.luck = this.initialUnitProperties.luck;
-            }
-            if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
-                this.randomizeLuckPerTurn();
-            }
+        // LUCK — recomputed locally unless the value was supplied authoritatively (ranked snapshots
+        // carry the server's already-rolled luck incl. auras; recomputing here would roll a divergent
+        // per-turn spread on top of it). See UnitProperties.luck_authoritative.
+        if (!this.unitProperties.luck_authoritative) {
+            if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
+                this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
+                this.unitProperties.luck_mod = 0;
+            } else {
+                this.unitProperties.luck = synergyLuckIncrease;
+                if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
+                    this.unitProperties.luck = this.initialUnitProperties.luck;
+                }
+                if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+                    this.randomizeLuckPerTurn();
+                }
 
-            // Before the fight is initialized (unit placement in sandbox/ranked), units keep their
-            // default luck: the random per-turn spread (±LUCK_MAX_CHANGE_FOR_TURN) is only rolled
-            // once the fight starts and then re-rolled each lap. Gating the contribution here also
-            // stops a stale luckPerTurn (left over from a previous fight/rematch) from leaking into
-            // the placement view.
-            if (!hasFightStarted) {
-                this.luckPerTurn = 0;
-            }
-            this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease;
-            if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
-                this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
-            } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
-                this.unitProperties.luck_mod = -LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
+                // Before the fight is initialized (unit placement in sandbox/ranked), units keep their
+                // default luck: the random per-turn spread (±LUCK_MAX_CHANGE_FOR_TURN) is only rolled
+                // once the fight starts and then re-rolled each lap. Gating the contribution here also
+                // stops a stale luckPerTurn (left over from a previous fight/rematch) from leaking into
+                // the placement view.
+                if (!hasFightStarted) {
+                    this.luckPerTurn = 0;
+                }
+                this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease;
+                if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
+                    this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
+                } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
+                    this.unitProperties.luck_mod = -LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
+                }
             }
         }
 

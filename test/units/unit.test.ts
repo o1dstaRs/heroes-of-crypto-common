@@ -358,19 +358,24 @@ describe("Unit", () => {
             }
         });
 
-        it("Luck Shield (cleanupLuckPerTurn) drops the random spread back to base luck", () => {
-            const unit = createTestUnit({ luck: 4 });
+        it("Luck Shield (applyLuckShield) replaces this turn's spread with base + 3", () => {
+            const unit = createTestUnit({ luck: 0 });
 
-            // Roll an in-fight spread until it actually differs from base (0 is a possible roll).
+            // Roll an in-fight spread until it actually differs from the shielded result.
             let guard = 0;
             do {
                 unit.randomizeLuckPerTurn();
                 guard += 1;
-            } while (unit.getLuck() === 4 && guard < 50);
-            expect(unit.getLuck()).not.toBe(4);
+            } while (unit.getLuck() === 3 && guard < 50);
 
-            unit.cleanupLuckPerTurn();
-            expect(unit.getLuck()).toBe(4);
+            unit.applyLuckShield();
+            expect(unit.getLuck()).toBe(3); // base 0 + LUCK_CHANGE_FOR_SHIELD
+        });
+
+        it("Luck Shield clamps base + 3 to the +10 luck cap", () => {
+            const unit = createTestUnit({ luck: 9 });
+            unit.applyLuckShield();
+            expect(unit.getLuck()).toBe(10); // 9 + 3 capped at 10
         });
 
         it("makes a lucky defender take less damage and an unlucky one take more", () => {

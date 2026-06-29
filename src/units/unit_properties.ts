@@ -106,6 +106,11 @@ export class UnitProperties {
     public large_texture_name: string;
     public stack_power: number;
     public target: string;
+    // When set, luck is supplied authoritatively (e.g. the ranked server's per-turn roll + auras) and
+    // adjustBaseStats must NOT recompute/re-randomize it — the client would otherwise roll its own
+    // luck spread that diverges from the server. Left undefined for locally-simulated units (sandbox),
+    // which compute luck themselves.
+    public luck_authoritative?: boolean;
     public constructor(
         faction: FactionType,
         name: string,

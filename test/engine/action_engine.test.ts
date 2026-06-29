@@ -166,16 +166,20 @@ const weightedRoute = (route: { x: number; y: number }[]): IWeightedRoute => ({
 });
 
 describe("GameActionEngine", () => {
-    it("ends the active unit turn through common turn mechanics (manual end is not a skip)", () => {
+    it("treats a manual end with no action taken as a skip (do-nothing turn, e.g. an AI unit)", () => {
         const setup = setupActionFight();
         const moraleBefore = setup.lower.getMorale();
 
+        // The unit ends its turn without moving/attacking/casting. Reaching end_turn at all means it
+        // didn't attack/cast (those complete the turn directly), and it didn't move either, so it did
+        // nothing — that must read + score as a skip even though the end carried no explicit reason.
         const result = setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() });
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
-        // A manual end-of-turn is NOT a skip: no unit_skipped event and no morale penalty.
-        expect(result.events.some((event) => event.type === "unit_skipped")).toBe(false);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({ type: "unit_skipped", unitId: setup.lower.getId(), reason: "skip" }),
+        );
         expect(result.events).toContainEqual({
             type: "turn_completed",
             unitId: setup.lower.getId(),
@@ -183,7 +187,7 @@ describe("GameActionEngine", () => {
             hourglass: false,
         });
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBe(moraleBefore);
+        expect(setup.lower.getMorale()).toBeLessThan(moraleBefore);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
         expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LOWER)).toBe(400);
     });

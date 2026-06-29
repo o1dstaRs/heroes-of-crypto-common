@@ -689,6 +689,12 @@ function recordAction(
     unitsHolder: UnitsHolder,
     lap: number,
 ): void {
+    // Large/long runs (e.g. 1M-game per-unit win-rate sweeps) don't need the per-action log; skipping it
+    // keeps each match record tiny so the worker->main serialisation stays cheap. Winner/attrition/outcome
+    // are computed from unit state, not from this array, so they're unaffected.
+    if (process.env.SIM_NO_ACTIONS) {
+        return;
+    }
     if (action.type === "select_attack_type") {
         return; // bookkeeping action, not a turn move
     }

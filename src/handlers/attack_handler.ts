@@ -639,6 +639,12 @@ export class AttackHandler {
             }
         } else if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
+            // Dodged ranged shot (Dodge / Small Specie / Boar Saliva): flag it so the client pops "MISS"
+            // over the target. render stays false — no damage number.
+            damageForAnimation.missed = true;
+            damageForAnimation.unitId = targetUnit.getId();
+            damageForAnimation.unitPosition = targetUnit.getPosition();
+            damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
         } else {
             let abilityMultiplier = 1;
             const paralysisAttackerEffect = attackerUnit.getEffect("Paralysis");
@@ -1332,6 +1338,12 @@ export class AttackHandler {
 
         if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
+            // Tell the client the blow was dodged (Dodge / Small Specie / Boar Saliva) so it can pop a
+            // "MISS" over the target. render stays false — there is no damage number to draw.
+            damageForAnimation.missed = true;
+            damageForAnimation.unitId = targetUnit.getId();
+            damageForAnimation.unitPosition = targetUnit.getPosition();
+            damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
         } else if (!hasLightningSpinAttackLanded) {
             // just log attack here,
             // to make sure that logs are in chronological order

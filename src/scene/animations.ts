@@ -52,6 +52,10 @@ export interface IVisibleDamage {
     unitPosition: XY;
     unitIsSmall: boolean;
     unitId?: string;
+    // The attack (or range response) fully MISSED the target — Dodge, Small Specie (large→small dodge),
+    // or Boar Saliva. No damage was dealt; the client shows a "MISS" pop over `unitPosition` instead of
+    // a damage number. `render` stays false on a miss (there is no damage to draw).
+    missed?: boolean;
     hits?: { amount: number; unitsDied: number }[];
     // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw). Each entry carries the
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its

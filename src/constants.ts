@@ -38,6 +38,9 @@ export const MORALE_CHANGE_FOR_SKIP = 1;
 export const MORALE_CHANGE_FOR_KILL = 4;
 export const MORALE_MAX_VALUE_TOTAL = 20;
 export const LUCK_MAX_CHANGE_FOR_TURN = 3;
+// Luck Shield replaces this turn's random luck spread with this fixed positive value (and the unit
+// skips its turn for MORALE_CHANGE_FOR_SHIELD_OR_CLOCK morale).
+export const LUCK_CHANGE_FOR_SHIELD = 3;
 export const LUCK_MAX_VALUE_TOTAL = 10;
 export const STEPS_MORALE_MULTIPLIER = 0.05;
 

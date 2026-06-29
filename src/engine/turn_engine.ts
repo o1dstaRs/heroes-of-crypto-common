@@ -100,6 +100,9 @@ export class TurnEngine {
         }
 
         this.unitsHolder.refreshStackPowerForAllUnits();
+        // The turn is over (or parked on the hourglass) — clear the per-turn moved flag so the unit's
+        // next turn starts fresh and a do-nothing turn is detected as a skip in end_turn.
+        unit.setMovedThisTurn(false);
 
         events.push({
             type: "turn_completed",

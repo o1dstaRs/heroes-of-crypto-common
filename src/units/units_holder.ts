@@ -523,6 +523,12 @@ export class UnitsHolder {
         FightStateManager.getInstance()
             .getFightProperties()
             .setUnitsCalculatedStacksPower(this.gridSettings, this.allUnits);
+        // Refresh position-dependent auras (e.g. Leprechaun's Luck Aura, Disguise/War Anger) before
+        // recomputing per-unit stats so adjustBaseStats below sees the current aura buffs. The engine
+        // (used authoritatively by the ranked server) only ever called the stack-power refresh, so
+        // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
+        // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
+        this.refreshAuraEffectsForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
