@@ -32,8 +32,12 @@ const OPT = process.env.OPT_VERSION ?? "v0.4";
 const BASE = process.env.BASE_VERSION ?? "v0.3";
 const OPT_FILE = `src/ai/versions/${OPT.replace(".", "_")}.ts`;
 const STATE_DIR = join(REPO, "sim-out", "optimizer");
-const STATE = join(STATE_DIR, "state.json");
-const LOG = join(STATE_DIR, "log.md");
+// State + log are namespaced by the OPT version so each generation's loop starts from its OWN baseline
+// (~50% when OPT is a fresh copy of BASE). Sharing one state.json would make a fresh v0.4 inherit v0.3's
+// 66.5% baseline and revert every change forever. (Legacy un-namespaced files from the v0.3 run remain as
+// state.json / log.md for history.)
+const STATE = join(STATE_DIR, `state.${OPT}.json`);
+const LOG = join(STATE_DIR, `log.${OPT}.md`);
 const TOURN_OUT = join(REPO, "sim-out");
 
 const summary = process.argv[2] ?? "(unspecified change)";
