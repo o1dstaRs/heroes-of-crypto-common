@@ -740,14 +740,44 @@ export function getClosestSideCenterDetailed(
         });
     }
 
-    for (const p of points) {
+    // A non-Through-Shot projectile can't fly through a unit, so an edge whose straight line from the
+    // attacker is blocked by ANOTHER unit (or a solid obstacle) before reaching the target is hidden
+    // and must not be selectable. isRangeAttackSideObservable above only checks the cell immediately
+    // adjacent to the edge, which misses an occluder further along the trajectory — raycast the rest.
+    let visiblePoints = points;
+    if (!isThroughShot && points.length) {
+        const aimedCellKey = (cell.x << 4) | cell.y;
+        const occludes = (value: number): boolean =>
+            value !== 0 && value !== fromTeamType && value !== ObstacleType.LAVA && value !== ObstacleType.WATER;
+        const hasClearLine = (sideCenter: XY): boolean => {
+            const distance = getDistance(fromPosition, sideCenter);
+            const samples = Math.max(2, Math.ceil(distance / (gridSettings.getCellSize() * 0.4)));
+            for (let i = 1; i < samples; i++) {
+                const t = i / samples;
+                const sampleCell = getCellForPosition(gridSettings, {
+                    x: fromPosition.x + (sideCenter.x - fromPosition.x) * t,
+                    y: fromPosition.y + (sideCenter.y - fromPosition.y) * t,
+                });
+                if (!sampleCell || ((sampleCell.x << 4) | sampleCell.y) === aimedCellKey) {
+                    continue;
+                }
+                if (occludes(matrixElement(gridMatrix, sampleCell.x, sampleCell.y))) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        visiblePoints = points.filter((p) => hasClearLine(p.xy));
+    }
+
+    for (const p of visiblePoints) {
         p.distance = getDistance(fromPosition, p.xy);
     }
 
     // Two sides closest to the attacker, deterministically ordered (distance, then side index) — the
     // legacy shuffle is removed so the trajectory is reproducible on the server and in replays.
-    points.sort((a, b) => (a.distance !== b.distance ? a.distance - b.distance : a.side - b.side));
-    const twoClosestPoints = points.slice(0, 2);
+    visiblePoints.sort((a, b) => (a.distance !== b.distance ? a.distance - b.distance : a.side - b.side));
+    const twoClosestPoints = visiblePoints.slice(0, 2);
     if (!twoClosestPoints.length) {
         return undefined;
     }
