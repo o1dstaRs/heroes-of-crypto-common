@@ -400,7 +400,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         return decision;
     }
     /** Whether the engine will accept a hourglass (wait) for this unit this lap. */
-    private canHourglass(unit: Unit, context: IDecisionContext): boolean {
+    protected canHourglass(unit: Unit, context: IDecisionContext): boolean {
         const fp = context.fightProperties;
         return (
             !!fp &&
@@ -545,12 +545,15 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     if (scored.value <= 0) {
                         continue;
                     }
-                    if (!best || scored.value > best.score) {
+                    // Damage stays dominant; subclasses may add a per-target bias (e.g. Beholder
+                    // spreading fresh debuffs onto the most valuable yet-to-act enemy).
+                    const value = scored.value + this.shotTargetBonus(unit, enemy, scored.value, context);
+                    if (!best || value > best.score) {
                         best = {
                             aimCell: { x: cell.x, y: cell.y },
                             aimSide: side,
                             targetId: enemy.getId(),
-                            score: scored.value,
+                            score: value,
                             hitsEnemyRange: scored.hitsEnemyRange,
                         };
                     }
@@ -558,6 +561,14 @@ export class StrategyV0_2 extends StrategyV0_1 {
             }
         }
         return best;
+    }
+    /**
+     * Per-shot bias on the chosen TARGET (the aimed enemy), added on top of raw effective damage.
+     * v0.2 has none (returns 0). `baseValue` is the shot's effective damage so a subclass can scale its
+     * bias relative to it and keep damage dominant. Used by v0.3 for Beholder's debuff spreading.
+     */
+    protected shotTargetBonus(_unit: Unit, _enemy: Unit, _baseValue: number, _context: IDecisionContext): number {
+        return 0;
     }
     /** Sum expected effective damage over everyone a shot hits; enemies add, friendly-fire subtracts. */
     protected scoreShot(

@@ -9,17 +9,33 @@
  * -----------------------------------------------------------------------------
  */
 
+import type { GameAction } from "../../engine/actions";
+import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
-import type { IAIStrategy } from "../ai_strategy";
+import { getDistance, type XY } from "../../utils/math";
+import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import { otherTeam } from "./v0_1";
 import { StrategyV0_2 } from "./v0_2";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+const MELEE = PBTypes.AttackVals.MELEE;
+const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 // How much more a point of damage on an enemy RANGE unit is worth than the same damage on a melee
 // unit. Winning the ranged-attrition race flips firepower superiority our way; from there we hold a
 // grouped position and out-shoot, while the now ranged-inferior enemy must walk onto our shots.
 const ENEMY_RANGE_DAMAGE_WEIGHT = 2.0;
+
+// Beholder's "Spit Ball" debuffs. A ranged hit stacks every one the target does NOT already have
+// (Rangebane only lands on range targets), so a target lacking more of these is a richer opportunity.
+const SPIT_BALL_DEBUFFS = ["Sadness", "Quagmire", "Weakening Beam", "Weakness", "Cowardice"] as const;
+const SPIT_BALL_RANGE_ONLY_DEBUFF = "Rangebane";
+// Debuff bias expressed as a fraction of the shot's damage, so raw damage stays the primary driver.
+const BEHOLDER_FRESH_WEIGHT = 0.35; // up to +35% of damage for an all-fresh target
+const BEHOLDER_YET_TO_ACT_MULT = 1.8; // the debuff will degrade a turn the target hasn't taken yet
+const BEHOLDER_THREAT_MULT = 1.3; // ...and that turn would actually hit us
 
 /**
  * v0.3 — continues from v0.2 (inherits placement, best-shot, out-of-ammo, aura, spell-casting).
@@ -36,6 +52,118 @@ const ENEMY_RANGE_DAMAGE_WEIGHT = 2.0;
  */
 class StrategyV0_3 extends StrategyV0_2 {
     public override readonly version: string = "v0.3";
+    /**
+     * Change #2 — don't waste a shooter in melee. v0.2 sends any ranged unit that can't land a shot
+     * into melee. But a shooter that still has AMMO and is merely boxed in is better off RETREATING
+     * behind its own melee line (whose aggro screens it) and trying to shoot next turn — keeping the
+     * far more valuable ranged attack alive. Melee is only right when it can't be helped or clearly
+     * pays: a "Handyman" unit (no melee penalty), a target that already used its retaliation this lap
+     * (no counter), or a lethal blow. Out-of-ammo units still melee (v0.2 behaviour) — they have no
+     * shot to wait for. Everything else defers to v0.2.
+     */
+    public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
+        if (
+            unit.getAttackType() === RANGE &&
+            unit.getRangeShots() > 0 && // still has a shot worth preserving for next turn
+            unit.canMove() &&
+            !unit.hasAbilityActive("No Melee") &&
+            !unit.hasAbilityActive("Handyman") && // Handyman shooters melee without penalty
+            !this.canLandRange(unit, context) && // ...but it can't shoot right now (boxed in)
+            !this.meleeIsClearlyRight(unit, context)
+        ) {
+            const retreat = this.rangedRetreat(unit, context);
+            if (retreat) {
+                return retreat;
+            }
+        }
+        return super.decideTurn(unit, context);
+    }
+    /** Melee for a boxed-in shooter only pays when it's free or decisive: a safe-to-hit or lethal target. */
+    private meleeIsClearlyRight(unit: Unit, context: IDecisionContext): boolean {
+        const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((e) => !e.isDead());
+        const myCells = unit.getCells();
+        const fp = FightStateManager.getInstance().getFightProperties();
+        for (const e of enemies) {
+            if (!e.getCells().some((ec) => myCells.some((uc) => isAdjacent(ec, uc)))) {
+                continue; // only in-place strikes — we won't chase with a shooter
+            }
+            // Lethal: a guaranteed wipe of the stack is always worth taking.
+            if (unit.calculateAttackDamageMin(unit.getAttack(), e, false, 0, 1) >= e.getCumulativeHp()) {
+                return true;
+            }
+            // Free: the target already used its retaliation this lap, so we take no counter.
+            if (fp.hasAlreadyRepliedAttack(e.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * Pull a boxed-in shooter back behind the melee line: move to the reachable cell that maximises
+     * distance from enemies while staying close to our melee (screened by their aggro). If no move
+     * improves safety, hold — hourglass if allowed so allies can shuffle and free a shot this lap,
+     * else end the turn — rather than throwing the shooter into melee. Undefined ⇒ let v0.2 decide.
+     */
+    private rangedRetreat(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return undefined;
+        }
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const meleeAllies = unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId() && a.getAttackType() === MELEE);
+        const minEnemyDist = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
+        const nearestAllyDist = (cell: XY): number =>
+            meleeAllies.length ? Math.min(...meleeAllies.map((a) => getDistance(cell, a.getBaseCell()))) : 0;
+        // Safer = further from every enemy, but not abandoning the melee screen (so subtract ally distance).
+        const safety = (cell: XY): number => minEnemyDist(cell) * 2 - nearestAllyDist(cell);
+
+        const base = unit.getBaseCell();
+        let bestCell = base;
+        let bestRoute: IWeightedRoute | undefined;
+        let bestScore = safety(base);
+        for (const routes of movePath.knownPaths.values()) {
+            const route = routes[0];
+            if (!route?.route.length) {
+                continue;
+            }
+            const score = safety(route.cell);
+            if (score > bestScore) {
+                bestScore = score;
+                bestCell = route.cell;
+                bestRoute = route;
+            }
+        }
+
+        if (bestRoute && (bestCell.x !== base.x || bestCell.y !== base.y)) {
+            return [
+                {
+                    type: "move_unit",
+                    unitId: unit.getId(),
+                    path: bestRoute.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                    targetCells: this.footprintForCell(unit, bestCell, context),
+                    hasLavaCell: bestRoute.hasLavaCell,
+                    hasWaterCell: bestRoute.hasWaterCell,
+                },
+            ];
+        }
+        // Already as safe as we can get: wait (so allies move and may open a shot this lap), else hold.
+        if (this.canHourglass(unit, context)) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        return [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+    }
     /**
      * Same effective-damage scoring as v0.2, but damage on enemy RANGE units is weighted up so the
      * best-shot search prefers angles that hit the enemy's shooters (even slightly lower raw damage),
@@ -74,6 +202,48 @@ class StrategyV0_3 extends StrategyV0_2 {
             }
         }
         return { value, hitsEnemyRange };
+    }
+    /**
+     * Beholder ("Spit Ball") target bias: a ranged hit stacks every listed debuff the target DOESN'T
+     * already have, so v0.3 spreads debuffs onto the richest victim instead of re-hitting one that is
+     * already debuffed. Most valuable when the target (a) still lacks several debuffs, (b) hasn't acted
+     * this lap — the debuff cripples its imminent turn — and (c) can actually threaten this turn (a
+     * melee in reach, or a range unit with shots). Scaled by the shot's damage so damage stays dominant.
+     * Returns 0 for non-Beholder shooters and for targets that are already fully debuffed.
+     */
+    protected override shotTargetBonus(unit: Unit, enemy: Unit, baseValue: number, context: IDecisionContext): number {
+        if (unit.getName() !== "Beholder" && !unit.hasAbilityActive("Spit Ball")) {
+            return 0;
+        }
+        const targetsRange = enemy.getAttackType() === RANGE;
+        const possible = SPIT_BALL_DEBUFFS.length + (targetsRange ? 1 : 0);
+        let fresh = SPIT_BALL_DEBUFFS.reduce((n, d) => n + (enemy.hasDebuffActive(d) ? 0 : 1), 0);
+        if (targetsRange && !enemy.hasDebuffActive(SPIT_BALL_RANGE_ONLY_DEBUFF)) {
+            fresh += 1;
+        }
+        if (fresh === 0) {
+            return 0; // already fully debuffed — nothing more to stack (we still shoot it for damage)
+        }
+        let bonus = baseValue * BEHOLDER_FRESH_WEIGHT * (fresh / possible);
+        if (!this.hasActedThisLap(enemy, context)) {
+            bonus *= BEHOLDER_YET_TO_ACT_MULT;
+        }
+        if (this.canThreatenThisTurn(enemy, unit, context)) {
+            bonus *= BEHOLDER_THREAT_MULT;
+        }
+        return bonus;
+    }
+    private hasActedThisLap(enemy: Unit, context: IDecisionContext): boolean {
+        return context.fightProperties?.hasAlreadyMadeTurn(enemy.getId()) ?? false;
+    }
+    /** Will this enemy hurt us on its turn — a melee in reach of our line, or a range unit with shots left? */
+    private canThreatenThisTurn(enemy: Unit, unit: Unit, context: IDecisionContext): boolean {
+        if (enemy.getAttackType() === RANGE) {
+            return enemy.getRangeShots() > 0; // it can fire (full line-of-sight check left as a refinement)
+        }
+        const allies = context.unitsHolder.getAllAllies(unit.getTeam()).filter((a) => !a.isDead());
+        const reach = enemy.getSteps() + 1; // move into contact + strike
+        return allies.some((a) => getDistance(enemy.getBaseCell(), a.getBaseCell()) <= reach);
     }
 }
 
