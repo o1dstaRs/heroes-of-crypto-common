@@ -114,7 +114,102 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const meleeTuned = this.rapidChargeReposition(unit, context, positioned);
         const fhTuned = this.aoeMeleeReposition(unit, context, meleeTuned);
         const hunted = this.flyerPatientHunt(unit, context, fhTuned);
-        return this.hydraSpinReposition(unit, context, hunted);
+        const spun = this.hydraSpinReposition(unit, context, hunted);
+        return this.chainLightningTarget(unit, context, spun);
+    }
+    /**
+     * (10) Thunderbird "Chain Lightning": the strike arcs from the primary target to ADJACENT enemies,
+     * then to THEIR neighbours (up to 4 layers, damage falling off; Wind-immune stacks break the chain).
+     * So v0.4 attacks the reachable enemy embedded in the LARGEST connected enemy cluster, maximising the
+     * arc. Only swaps when it strictly increases the stacks the chain reaches.
+     */
+    private chainLightningTarget(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!unit.hasAbilityActive("Chain Lightning") || unit.getTarget() || !unit.canMove()) {
+            return decision;
+        }
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (enemies.length < 2) {
+            return decision;
+        }
+        // Wind-immune / fully magic-resistant stacks neither take the arc nor pass it on.
+        const chainable = enemies.filter((e) => !e.hasAbilityActive("Wind Element") && e.getMagicResist() < 100);
+        // BFS the chain out from `target` through adjacent enemy clusters (≤4 layers); count stacks reached.
+        const chainReach = (target: Unit): number => {
+            const affected = new Set<string>([target.getId()]);
+            let frontier: Unit[] = [target];
+            for (let layer = 0; layer < 4 && frontier.length; layer += 1) {
+                const next: Unit[] = [];
+                for (const u of frontier) {
+                    for (const e of chainable) {
+                        if (affected.has(e.getId())) {
+                            continue;
+                        }
+                        if (e.getCells().some((ec) => u.getCells().some((uc) => isAdjacentCell(ec, uc)))) {
+                            affected.add(e.getId());
+                            next.push(e);
+                        }
+                    }
+                }
+                frontier = next;
+            }
+            return affected.size;
+        };
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
+        const baseReach = baseTarget ? chainReach(baseTarget) : 1;
+        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        for (const routes of movePath.knownPaths.values()) {
+            const r = routes[0];
+            if (r?.route.length) {
+                cands.push({ cell: r.cell, route: r });
+            }
+        }
+        let best: { cell: XY; target: Unit; route?: IWeightedRoute; reach: number } | undefined;
+        for (const cand of cands) {
+            const fp = this.footprintForCell(unit, cand.cell, context);
+            for (const e of enemies) {
+                if (!e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc)))) {
+                    continue;
+                }
+                const reach = chainReach(e);
+                const len = cand.route?.route.length ?? 0;
+                if (!best || reach > best.reach || (reach === best.reach && len < (best.route?.route.length ?? 0))) {
+                    best = { cell: cand.cell, target: e, route: cand.route, reach };
+                }
+            }
+        }
+        if (!best || best.reach < 2 || best.reach <= baseReach) {
+            return decision;
+        }
+        const actions: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            actions.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        actions.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: best.target.getId(),
+            attackFrom: { x: best.cell.x, y: best.cell.y },
+            path: best.route?.route.map((c) => ({ x: c.x, y: c.y })),
+            hasLavaCell: best.route?.hasLavaCell,
+            hasWaterCell: best.route?.hasWaterCell,
+        });
+        return actions;
     }
     /**
      * (9) Hydra "Lightning Spin": her melee hits EVERY enemy around her footprint and provokes NO counter,
