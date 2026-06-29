@@ -523,6 +523,21 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     } else {
                         cause = "other";
                     }
+                } else if (action.type === "range_attack") {
+                    const tgt = unitsHolder.getAllUnits().get(action.targetId);
+                    if (!tgt || tgt.isDead()) {
+                        cause = "target_gone";
+                    } else if (unit.hasDebuffActive("Range Null Field Aura")) {
+                        cause = "null_field";
+                    } else if (unit.hasDebuffActive("Rangebane")) {
+                        cause = "rangebane";
+                    } else if (unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE) {
+                        cause = "not_range_selected";
+                    } else if (unit.getRangeShots() <= 0) {
+                        cause = "no_ammo";
+                    } else {
+                        cause = action.aimCell ? "shot_no_hit_aimed" : "shot_no_hit_noaim";
+                    }
                 }
                 rejectedDetails.push({
                     type: action.type,
