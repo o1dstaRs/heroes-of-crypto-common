@@ -11,6 +11,7 @@
 
 import type { GameAction } from "../../engine/actions";
 import type { IWeightedRoute } from "../../grid/path_definitions";
+import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
@@ -23,6 +24,7 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const buffWaitOn = process.env.V04_BUFFWAIT !== "off";
 const mvGuardOn = process.env.V04_MVGUARD !== "off";
 const MAGIC_FH = PBTypes.AttackVals.MAGIC;
 const enabledFH = (name: string): boolean => process.env[`V04_${name}`] !== "off";
@@ -118,7 +120,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
         const legal = this.enforceMeleeLegality(unit, context, tuned);
-        return this.doublePunchInitiate(unit, context, legal);
+        return this.waitForMassBuff(unit, context, this.doublePunchInitiate(unit, context, legal));
     }
     /**
      * (12) Double Punch units (Wolf / Crusader / Berserker) hit TWICE only when they ATTACK — a unit that
@@ -128,6 +130,26 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * advances but stops JUST SHORT of any enemy — never ending adjacent — so it initiates next turn rather
      * than being struck first. Never overrides an actual attack (initiating is exactly what we want).
      */
+    /**
+     * (EXP) Act with the mass buff ON (V04_BUFFWAIT). On lap 1, a non-caster unit hourglasses while our
+     * Behemoth's Battle Roar / Ogre Mage's Mass Riot is still pending, so when it finally acts the army-wide
+     * buff is already live. Only redirects an idle/move turn (never a strike); lap 1 only.
+     */
+    private waitForMassBuff(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!buffWaitOn) return decision;
+        if (FightStateManager.getInstance().getFightProperties().getCurrentLap() > 1) return decision;
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell"))
+            return decision;
+        const allies = context.unitsHolder.getAllAllies(unit.getTeam()).filter((a) => !a.isDead());
+        const roarPending =
+            allies.some((a) => a.getName() === "Behemoth") && !allies.some((a) => a.hasBuffActive("Battle Roar"));
+        const riotPending =
+            allies.some((a) => a.getName() === "Ogre Mage") &&
+            !allies.some((a) => a.hasBuffActive("Mass Riot") || a.hasBuffActive("Riot"));
+        const wait = (roarPending && unit.getName() !== "Behemoth") || (riotPending && unit.getName() !== "Ogre Mage");
+        if (wait && this.canHourglass(unit, context)) return [{ type: "wait_turn", unitId: unit.getId() }];
+        return decision;
+    }
     private doublePunchInitiate(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         // DISABLED by default (set V04_DPUNCH=on to re-test). Clean A/B on forced Wolf+Crusader rosters
         // showed this LOSES ~3.4pp (v0.4 49.5% on vs 52.9% off): keeping Double Punch units out of exposed
@@ -150,56 +172,24 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!decision.some((a) => a.type === "move_unit")) {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
-        const enemyTeam = otherTeam(unit.getTeam());
-        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
-        if (!enemies.length) {
+        // Keep advancing with the army — only delay at the THRESHOLD of contact. Take the destination of
+        // the base move; if it keeps us out of enemy reach, take it (stay in the fight). If it would step
+        // into reach (we'd be hit first, losing the double punch), delay just ONE turn — hourglass so the
+        // enemy closes the last step and WE strike first next turn. If we can't wait, engage anyway.
+        const moveAction = decision.find((a) => a.type === "move_unit");
+        const path = moveAction?.type === "move_unit" ? moveAction.path : undefined;
+        const dest = path && path.length ? path[path.length - 1] : undefined;
+        if (!dest) {
             return decision;
         }
-        // PRECISE exposure: enumerate every cell an enemy MELEE unit could stand on this turn (its current
-        // footprint + everywhere it can move), then a cell is EXPOSED if an enemy could stand next to our
-        // footprint there and strike us first. No distance guesswork — we check the actual reach.
+        // PRECISE exposure: any enemy MELEE unit that could reach a stand cell adjacent to our footprint at
+        // `dest` could strike us first there.
         const enemyStands = this.enemyMeleeStandCells(unit, context);
-        const exposedAt = (cell: XY): boolean => {
-            const fp = this.footprintForCell(unit, cell, context);
-            return enemyStands.some((sc) => fp.some((fc) => isAdjacentCell(sc, fc)));
-        };
-        const movePath = pathHelper.getMovePath(
-            unit.getBaseCell(),
-            matrix,
-            unit.getSteps(),
-            grid.getAggrMatrixByTeam(enemyTeam),
-            unit.canFly(),
-            unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
-        );
-        // Advance to the SAFE cell (no enemy can reach to hit us there) closest to the enemy, so we get to
-        // strike first next turn instead of being struck first.
-        let bestSafe: { cell: XY; route: IWeightedRoute; dist: number } | undefined;
-        for (const routes of movePath.knownPaths.values()) {
-            const route = routes[0];
-            if (!route?.route.length || exposedAt(route.cell)) {
-                continue;
-            }
-            const d = Math.min(...enemies.map((e) => getDistance(route.cell, e.getBaseCell())));
-            if (!bestSafe || d < bestSafe.dist) {
-                bestSafe = { cell: route.cell, route, dist: d };
-            }
+        const footprint = this.footprintForCell(unit, dest, context);
+        const exposed = enemyStands.some((sc) => footprint.some((fc) => isAdjacentCell(sc, fc)));
+        if (!exposed) {
+            return decision; // safe advance — keep moving in
         }
-        if (bestSafe) {
-            return [
-                {
-                    type: "move_unit",
-                    unitId: unit.getId(),
-                    path: bestSafe.route.route.map((c) => ({ x: c.x, y: c.y })),
-                    targetCells: this.footprintForCell(unit, bestSafe.cell, context),
-                    hasLavaCell: bestSafe.route.hasLavaCell,
-                    hasWaterCell: bestSafe.route.hasWaterCell,
-                },
-            ];
-        }
-        // No safe cell to advance to (every reachable cell is exposed). Hourglass first — let the line form
-        // / allies engage — so we can still strike on our terms; if we can't wait, proceed with the move.
         if (this.canHourglass(unit, context)) {
             return [{ type: "wait_turn", unitId: unit.getId() }];
         }
