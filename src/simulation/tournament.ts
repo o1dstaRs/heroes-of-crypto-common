@@ -35,6 +35,13 @@ export interface ITournamentOptions {
      * two rosters fixed to their sides and swaps which version drives which side.
      */
     randomizePicks?: boolean;
+    /**
+     * Board layouts to sample from (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER).
+     * Empty/undefined → every game is NORMAL (the historical default; keeps old baselines comparable). When
+     * set, each PAIR draws one layout deterministically from the list (both games in the pair share it, so
+     * map luck cancels alongside side/roster luck), letting map-specific tactics be measured.
+     */
+    mapTypes?: readonly number[];
 }
 
 export interface IGameRecord {
@@ -94,11 +101,17 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
         : undefined;
 
+    // The board layout is drawn once per PAIR (decorrelated from the roster seed) so both games in the pair
+    // share it — keeping the comparison apples-to-apples while still varying maps across pairs.
+    const gridType = options.mapTypes?.length
+        ? options.mapTypes[Math.floor(makeRng((seed ^ 0xc2b2ae35) >>> 0)() * options.mapTypes.length)]
+        : undefined;
+
     const aIsGreen = game % 2 === 0;
     const greenVersion = aIsGreen ? options.versionA : options.versionB;
     const redVersion = aIsGreen ? options.versionB : options.versionA;
 
-    const result = runMatch({ greenVersion, redVersion, roster, redRoster, seed, maxLaps: options.maxLaps });
+    const result = runMatch({ greenVersion, redVersion, roster, redRoster, seed, gridType, maxLaps: options.maxLaps });
 
     const winnerSide: Side | "draw" = result.winner;
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;

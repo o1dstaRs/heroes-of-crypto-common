@@ -40,9 +40,17 @@ async function main(): Promise<void> {
     const flags = argv.filter((a) => a.startsWith("--"));
     const [versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
     const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
+    // --maps                -> sample all four layouts; --maps=lava,water,normal -> just those.
+    const MAP_BY_NAME: Record<string, number> = { normal: 1, water: 2, lava: 3, block: 4 };
+    const mapsFlag = flags.find((f) => f === "--maps" || f.startsWith("--maps="));
+    const mapTypes = mapsFlag
+        ? (mapsFlag.includes("=") ? mapsFlag.split("=")[1].split(",") : ["normal", "water", "lava", "block"])
+              .map((n) => MAP_BY_NAME[n.trim().toLowerCase()])
+              .filter((v): v is number => typeof v === "number")
+        : undefined;
     if (!versionA || !versionB) {
         console.error(
-            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random]",
+            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]]",
         );
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
@@ -75,10 +83,10 @@ async function main(): Promise<void> {
 
     console.log(
         `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}, ` +
-            `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}) -> ${jsonlPath}`,
+            `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}, maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}) -> ${jsonlPath}`,
     );
     const summary = await runTournamentConcurrent(
-        { versionA, versionB, games, baseSeed, randomizePicks },
+        { versionA, versionB, games, baseSeed, randomizePicks, mapTypes },
         concurrency,
         (record) => {
             buffer.push(`${JSON.stringify(record)}\n`);

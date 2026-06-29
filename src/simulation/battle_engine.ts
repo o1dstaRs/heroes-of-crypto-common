@@ -54,6 +54,8 @@ export interface IMatchConfig {
     seed: number;
     /** Hard cap on laps before the match is called a draw-on-points. Default 60. */
     maxLaps?: number;
+    /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
+    gridType?: number;
 }
 
 export interface IPlacementRecord {
@@ -107,6 +109,8 @@ export interface IAttritionInfo {
 
 export interface IMatchResult {
     seed: number;
+    /** Board layout the match was played on (GridVals). */
+    gridType: number;
     winner: Side | "draw";
     endReason: "elimination" | "turn_cap" | "stuck";
     laps: number;
@@ -240,7 +244,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const gridSettings = simulationGridSettings();
 
     FightStateManager.getInstance().reset();
-    const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+    const grid = new Grid(gridSettings, config.gridType ?? PBTypes.GridVals.NORMAL);
     const unitsHolder = new UnitsHolder(grid);
     const sceneLog = new SceneLogMock();
     const damageStatisticHolder = new DamageStatHolder();
@@ -668,6 +672,7 @@ function buildResult(
 
     return {
         seed: config.seed,
+        gridType: config.gridType ?? PBTypes.GridVals.NORMAL,
         winner,
         endReason,
         laps: fightProperties.getCurrentLap(),
