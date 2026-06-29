@@ -434,6 +434,75 @@ describe("grid_math", () => {
         expect(a).toEqual(b);
     });
 
+    it("hides an edge occluded by a unit further along the trajectory (not just the adjacent cell)", () => {
+        // Attacker (UPPER) at the far left, target at x=4 on the same row. An enemy (LOWER) sits at
+        // (2,1) — between them, but NOT the target's immediate LEFT neighbour (3,1), which stays empty.
+        const targetCell = { x: 4, y: 1 };
+        const targetCenter = getPositionForCell(
+            targetCell,
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+        const fromPosition = getPositionForCell(
+            { x: 0, y: 1 },
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+
+        const occluded = emptyMatrix();
+        occluded[1][2] = PBTypes.TeamVals.LOWER; // matrix[y][x]: a unit two cells in front of the target
+
+        // The adjacent-cell check still considers the LEFT side observable (its neighbour 3,1 is empty)...
+        expect(
+            isRangeAttackSideObservable(occluded, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER),
+        ).toBe(true);
+        // ...but a non-Through-Shot projectile can't fly through the unit at (2,1), so the only edge
+        // facing the attacker is hidden and no aim is offered.
+        expect(
+            getClosestSideCenterDetailed(
+                occluded,
+                testGridSettings,
+                targetCenter,
+                fromPosition,
+                targetCenter,
+                true,
+                true,
+                PBTypes.TeamVals.UPPER,
+            ),
+        ).toBeUndefined();
+
+        // Through Shot pierces units, so the same edge stays selectable.
+        expect(
+            getClosestSideCenterDetailed(
+                occluded,
+                testGridSettings,
+                targetCenter,
+                fromPosition,
+                targetCenter,
+                true,
+                true,
+                PBTypes.TeamVals.UPPER,
+                true,
+            )?.side,
+        ).toBe(RangeAttackCellSide.LEFT);
+
+        // With the occluder removed the edge is selectable for a normal shot too (control).
+        expect(
+            getClosestSideCenterDetailed(
+                emptyMatrix(),
+                testGridSettings,
+                targetCenter,
+                fromPosition,
+                targetCenter,
+                true,
+                true,
+                PBTypes.TeamVals.UPPER,
+            )?.side,
+        ).toBe(RangeAttackCellSide.LEFT);
+    });
+
     it("selects closest side centers across directions and blocked cells", () => {
         const matrix = emptyMatrix();
         const toPosition = getPositionForCell(
