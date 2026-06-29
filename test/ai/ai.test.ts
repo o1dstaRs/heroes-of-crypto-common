@@ -20,7 +20,11 @@ import {
     countMeleeThreatsToCell,
     analyzeEngagement,
     findSaferMoveCell,
+    auraCoverageScore,
+    planAuraMove,
 } from "../../src/ai/ai";
+import type { IWeightedRoute } from "../../src/grid/path_definitions";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { AttackType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
@@ -1170,3 +1174,80 @@ class UnitRepr implements IUnitAIRepr {
         return false;
     }
 }
+
+describe("aura-aware AI positioning", () => {
+    const TeamVals = PBTypes.TeamVals;
+    const cellKey = (c: HoCMath.XY): number => (c.x << 4) | c.y;
+    const routeTo = (from: HoCMath.XY, cell: HoCMath.XY): IWeightedRoute => ({
+        cell,
+        route: [from, cell],
+        weight: HoCMath.getDistance(from, cell),
+        firstAggrMet: false,
+        hasLavaCell: false,
+        hasWaterCell: false,
+    });
+
+    it("auraCoverageScore counts only allies inside a buff aura, ignoring far allies and enemies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const auraUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Sharpened Weapons"] }); // range 2 buff
+        const nearAlly = createTestUnit({ team: TeamVals.UPPER, name: "near-ally" });
+        const farAlly = createTestUnit({ team: TeamVals.UPPER, name: "far-ally" });
+        const enemy = createTestUnit({ team: TeamVals.LOWER, name: "enemy" });
+        placeUnit(grid, unitsHolder, auraUnit, { x: 6, y: 6 });
+        placeUnit(grid, unitsHolder, nearAlly, { x: 6, y: 8 }); // distance 2 -> covered
+        placeUnit(grid, unitsHolder, farAlly, { x: 6, y: 13 }); // far -> not covered
+        placeUnit(grid, unitsHolder, enemy, { x: 7, y: 6 }); // enemy ignored by a buff aura
+
+        expect(auraUnit.getAuraEffects().length).toBe(1);
+        expect(auraCoverageScore(auraUnit, { x: 6, y: 6 }, testGridSettings, unitsHolder)).toBe(1);
+        // Standing next to the far ally covers it instead of the near one.
+        expect(auraCoverageScore(auraUnit, { x: 6, y: 12 }, testGridSettings, unitsHolder)).toBe(1);
+    });
+
+    it("planAuraMove picks the reachable cell that covers the most allies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const auraUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Sharpened Weapons"] });
+        const allyA = createTestUnit({ team: TeamVals.UPPER, name: "ally-a" });
+        const allyB = createTestUnit({ team: TeamVals.UPPER, name: "ally-b" });
+        const start = { x: 6, y: 6 };
+        placeUnit(grid, unitsHolder, auraUnit, start);
+        placeUnit(grid, unitsHolder, allyA, { x: 6, y: 9 });
+        placeUnit(grid, unitsHolder, allyB, { x: 6, y: 11 });
+
+        // Reachable: stay put, or move to (6,10) which sits between the two allies (distance 1 each).
+        const between = { x: 6, y: 10 };
+        const knownPaths = new Map<number, IWeightedRoute[]>([
+            [cellKey(start), [routeTo(start, start)]],
+            [cellKey(between), [routeTo(start, between)]],
+        ]);
+
+        const plan = planAuraMove(auraUnit, knownPaths, testGridSettings, grid.getMatrix(), unitsHolder);
+        expect(plan).toBeDefined();
+        expect(plan!.currentScore).toBe(0); // both allies out of range from the start cell
+        expect(plan!.bestScore).toBe(2); // (6,10) covers both
+        expect(plan!.bestCell).toEqual(between);
+        expect(plan!.coverableTargets).toBe(2); // one buff aura x two allies
+    });
+
+    it("planAuraMove on a debuff aura maximizes enemies covered; returns undefined without auras", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const debuffUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Range Null Field"] }); // range 2 debuff
+        const start = { x: 6, y: 6 };
+        placeUnit(grid, unitsHolder, debuffUnit, start);
+        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LOWER, name: "enemy-a" }), { x: 6, y: 9 });
+        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LOWER, name: "enemy-b" }), { x: 6, y: 11 });
+        const between = { x: 6, y: 10 };
+        const knownPaths = new Map<number, IWeightedRoute[]>([
+            [cellKey(start), [routeTo(start, start)]],
+            [cellKey(between), [routeTo(start, between)]],
+        ]);
+
+        const plan = planAuraMove(debuffUnit, knownPaths, testGridSettings, grid.getMatrix(), unitsHolder);
+        expect(plan!.bestCell).toEqual(between);
+        expect(plan!.bestScore).toBe(2);
+
+        const noAura = createTestUnit({ team: TeamVals.UPPER, name: "plain" });
+        placeUnit(grid, unitsHolder, noAura, { x: 1, y: 1 });
+        expect(planAuraMove(noAura, knownPaths, testGridSettings, grid.getMatrix(), unitsHolder)).toBeUndefined();
+    });
+});

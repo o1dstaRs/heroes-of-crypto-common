@@ -20,6 +20,9 @@ import { Unit } from "../units/unit";
 import type { IUnitAIRepr } from "./../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import * as HoCLib from "../utils/lib";
+import * as EffectHelper from "../effects/effect_helper";
+import { FightStateManager } from "../fights/fight_state_manager";
+import type { GridSettings } from "../grid/grid_settings";
 
 const DEBUG_AI = false;
 
@@ -781,6 +784,129 @@ export function findSaferMoveCell(
     }
 
     return safestCell;
+}
+
+/**
+ * How many relevant targets — allies for buff auras, enemies for debuff auras — a unit would cover with
+ * its emitted auras if it stood at `fromCell`. Each aura counts its own targets, so a unit with two
+ * buff auras that both reach an ally scores that ally twice; that's fine for relative comparison between
+ * candidate cells. Large units are approximated as emitting from their base cell.
+ */
+export function auraCoverageScore(
+    unit: Unit,
+    fromCell: HoCMath.XY,
+    gridSettings: GridSettings,
+    unitsHolder: UnitsHolder,
+): number {
+    const auras = unit.getAuraEffects();
+    if (!auras.length) {
+        return 0;
+    }
+    const allies = unitsHolder.getAllAllies(unit.getTeam()).filter((u) => !u.isDead() && u.getId() !== unit.getId());
+    const enemies = unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((u) => !u.isDead());
+    const teamAuraBonus = FightStateManager.getInstance()
+        .getFightProperties()
+        .getAdditionalAuraRangePerTeam(unit.getTeam());
+
+    let score = 0;
+    for (const aura of auras) {
+        const range = aura.getRange() + teamAuraBonus;
+        if (range < 0) {
+            continue;
+        }
+        const cellKeys = new Set<number>();
+        for (const c of EffectHelper.getAuraCells(gridSettings, fromCell, range)) {
+            cellKeys.add((c.x << 4) | c.y);
+        }
+        const targets = aura.getProperties().is_buff ? allies : enemies;
+        for (const t of targets) {
+            const bc = t.getBaseCell();
+            if (cellKeys.has((bc.x << 4) | bc.y)) {
+                score += 1;
+            }
+        }
+    }
+    return score;
+}
+
+export interface IAuraMovePlan {
+    // Reachable cell that maximizes aura coverage (may equal the unit's current cell).
+    bestCell: HoCMath.XY;
+    // Coverage from bestCell, and from where the unit currently stands.
+    bestScore: number;
+    currentScore: number;
+    // Theoretical max coverage (every relevant target inside every relevant aura) — lets callers tell
+    // "everyone reachable is already covered" from "some targets are still out of range".
+    coverableTargets: number;
+    // Melee threats adjacent to the current cell (so a caller won't sit still / hourglass into danger).
+    currentThreats: number;
+}
+
+/**
+ * Plan an aura-bearer's positioning: among the cells it can reach, the one that keeps the most allies
+ * (buff auras) / enemies (debuff auras) inside its auras. Returns undefined when the unit emits no
+ * auras. Callers use it to (a) move onto bestCell when it beats the current spot, or (b) hourglass to
+ * reposition later in the round when no move helps yet but targets remain out of reach.
+ */
+export function planAuraMove(
+    unit: Unit,
+    knownPaths: Map<number, IWeightedRoute[]> | undefined,
+    gridSettings: GridSettings,
+    matrix: number[][],
+    unitsHolder: UnitsHolder,
+): IAuraMovePlan | undefined {
+    const auras = unit.getAuraEffects();
+    if (!auras.length) {
+        return undefined;
+    }
+    const enemyTeam = unit.getOppositeTeam();
+    const baseCell = unit.getBaseCell();
+    const currentScore = auraCoverageScore(unit, baseCell, gridSettings, unitsHolder);
+
+    const aliveAllies = unitsHolder
+        .getAllAllies(unit.getTeam())
+        .filter((u) => !u.isDead() && u.getId() !== unit.getId()).length;
+    const aliveEnemies = unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((u) => !u.isDead()).length;
+    let coverableTargets = 0;
+    for (const aura of auras) {
+        coverableTargets += aura.getProperties().is_buff ? aliveAllies : aliveEnemies;
+    }
+
+    let bestCell = baseCell;
+    let bestScore = currentScore;
+    if (knownPaths) {
+        for (const [key] of knownPaths) {
+            const cx = (key >> 4) & 0xf;
+            const cy = key & 0xf;
+            const val = HoCMath.matrixElementOrDefault(matrix, cx, cy, 0);
+            if (
+                val === ObstacleType.BLOCK ||
+                val === ObstacleType.HOLE ||
+                val === ObstacleType.LAVA ||
+                val === enemyTeam
+            ) {
+                continue;
+            }
+            const cell = { x: cx, y: cy };
+            const score = auraCoverageScore(unit, cell, gridSettings, unitsHolder);
+            // Higher coverage wins; on a tie prefer staying closer to the current cell (less exposure).
+            if (
+                score > bestScore ||
+                (score === bestScore && HoCMath.getDistance(cell, baseCell) < HoCMath.getDistance(bestCell, baseCell))
+            ) {
+                bestScore = score;
+                bestCell = cell;
+            }
+        }
+    }
+
+    return {
+        bestCell,
+        bestScore,
+        currentScore,
+        coverableTargets,
+        currentThreats: countMeleeThreatsToCell(baseCell, matrix, enemyTeam),
+    };
 }
 
 /**
