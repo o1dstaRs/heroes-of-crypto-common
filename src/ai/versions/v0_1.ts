@@ -103,6 +103,13 @@ export class StrategyV0_1 implements IAIStrategy {
         const type = aiAction.actionType();
 
         if (type === AIActionType.RANGE_ATTACK) {
+            // Mirror the live server's ensureAiAttackType(RANGE) guard (dropped in the original port):
+            // the engine is the source of truth for what a unit can do, and it removes RANGE from the
+            // possible attack types when the unit is out of ammo or boxed in by melee. Proposing a range
+            // shot anyway just gets rejected and wastes the turn — fall back instead.
+            if (!unit.getPossibleAttackTypes().includes(PBTypes.AttackVals.RANGE)) {
+                return this.fallbackTurn(unit, context);
+            }
             const targetCell = aiAction.cellToAttack();
             const targetId = targetCell ? grid.getOccupantUnitId(targetCell) : undefined;
             if (!targetId) {

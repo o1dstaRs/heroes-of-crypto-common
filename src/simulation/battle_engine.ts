@@ -371,14 +371,29 @@ export function runMatch(config: IMatchConfig): IMatchResult {
             }
         }
 
-        // Safety net: a unit must always yield its turn. If its actions didn't complete the turn
-        // (e.g. all were rejected), force an end_turn so the loop can never spin on one unit.
+        // Safety net: a unit must always yield its turn. If its chosen actions didn't complete it (e.g.
+        // an attack the engine rejected), DON'T waste the turn — DEFEND (a valid, useful action: a
+        // defense bonus) so the fight always flows smoothly. end_turn is the last-resort guarantee.
         if (!finished && currentActiveUnitId === actingUnitId) {
-            const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
-            applyEvents(endResult.events);
-            if (!endResult.completed) {
-                // Could not even end the turn — bail rather than loop forever.
-                currentActiveUnitId = "";
+            const defendAction: GameAction = { type: "defend_turn", unitId: actingUnitId };
+            const defendResult = engine.apply(defendAction);
+            recordAction(
+                actions,
+                defendAction,
+                unit,
+                { ...unit.getBaseCell() },
+                defendResult,
+                unitsHolder,
+                fightProperties.getCurrentLap(),
+            );
+            applyEvents(defendResult.events);
+            if (!finished && currentActiveUnitId === actingUnitId) {
+                const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
+                applyEvents(endResult.events);
+                if (!endResult.completed) {
+                    // Could not even end the turn — bail rather than loop forever.
+                    currentActiveUnitId = "";
+                }
             }
         }
     }
