@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import type { IWeightedRoute } from "../../grid/path_definitions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { canCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
@@ -99,7 +100,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const base = super.decideTurn(unit, context);
         const healed = this.retargetHeal(unit, context, base);
         const goblin = this.preferLowLevelMelee(unit, context, healed);
-        return this.auraRepositionMelee(unit, context, goblin);
+        const positioned = this.auraRepositionMelee(unit, context, goblin);
+        return this.rapidChargeReposition(unit, context, positioned);
     }
     /**
      * (5b) Don't clump into AoE: when the enemy fields an AoE / multi-hit unit, suppress v0.3's melee
@@ -152,6 +154,61 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return undefined;
         }
         return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Riot", targetId: unit.getId() }];
+    }
+    /**
+     * (8) Rapid Charge rewards distance: the longer the run-up, the more bonus damage. When a Rapid Charge
+     * unit does a move-and-strike, relocate the stand cell to the reachable cell adjacent to the same target
+     * with the LONGEST approach path (without giving up the strike). Reuses validated move-path cells -> 0 rej.
+     */
+    private rapidChargeReposition(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!unit.hasAbilityActive("Rapid Charge") || unit.getTarget() || !unit.canMove()) {
+            return decision;
+        }
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const target = context.unitsHolder.getAllUnits().get(strike.targetId);
+        if (!target) {
+            return decision;
+        }
+        const { grid, matrix, pathHelper } = context;
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
+        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let bestLen = strike.path && strike.path.length > 0 ? strike.path.length : 0;
+        for (const [key, routes] of movePath.knownPaths) {
+            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
+            const route = routes?.[0];
+            if (!route?.route.length || !adjToTarget(cell)) {
+                continue;
+            }
+            if (route.route.length > bestLen) {
+                bestLen = route.route.length;
+                best = { cell, route };
+            }
+        }
+        if (!best) {
+            return decision;
+        }
+        const swapped = [...decision];
+        swapped[idx] = {
+            ...strike,
+            attackFrom: { x: best.cell.x, y: best.cell.y },
+            path: best.route.route.map((c) => ({ x: c.x, y: c.y })),
+            hasLavaCell: best.route.hasLavaCell,
+            hasWaterCell: best.route.hasWaterCell,
+        };
+        return swapped;
     }
     /**
      * (7) Goblin Knight prefers low-level victims. Its strike deducts attack from the target, so spending
