@@ -81,6 +81,8 @@ export interface IRecordedAction {
     completed: boolean;
     /** Engine rejection reason when completed === false (for diagnosing non-smooth turns). */
     rejectionReason?: string;
+    /** Extra enemy stacks hit beyond the primary target (AoE splash + line/secondary damage). */
+    secondaryHits?: number;
     damage?: number;
     unitIdsDied?: string[];
 }
@@ -665,6 +667,10 @@ function recordAction(
         unitIdsDied:
             attackEvent?.type === "unit_attacked" && attackEvent.unitIdsDied.length
                 ? [...attackEvent.unitIdsDied]
+                : undefined,
+        secondaryHits:
+            attackEvent?.type === "unit_attacked"
+                ? (attackEvent.damage.secondary?.length ?? 0) + (attackEvent.damage.splash?.length ?? 0)
                 : undefined,
     });
 }

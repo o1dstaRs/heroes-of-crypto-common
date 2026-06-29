@@ -114,19 +114,46 @@ export function creaturesByLevel(level: number): ICatalogEntry[] {
  * Build one roster (list of stacks) from the composition. Both teams in a match receive an identical
  * copy of this list, so the only difference between the sides is the AI driving them.
  */
+/**
+ * Diagnostic-only: force specific creatures into a level's first slot via FORCE_CREATURES, e.g.
+ * `FORCE_CREATURES="2:Pikeman,4:Black Dragon"`. Lets an A/B target a specific matchup without changing
+ * the random rng sequence (the pick is still rolled, then overridden), so runs stay reproducible.
+ */
+function forcedByLevel(): Record<number, string> {
+    const raw = process.env.FORCE_CREATURES;
+    if (!raw) {
+        return {};
+    }
+    const out: Record<number, string> = {};
+    for (const part of raw.split(",")) {
+        const [lvl, name] = part.split(":");
+        if (lvl && name) {
+            out[Number(lvl)] = name.trim();
+        }
+    }
+    return out;
+}
+
 export function buildRoster(
     rng: () => number,
     composition: readonly IRosterComposition[] = DEFAULT_ROSTER_COMPOSITION,
     amountByLevel: Readonly<Record<number, number>> = DEFAULT_AMOUNT_BY_LEVEL,
 ): IArmyUnitSpec[] {
     const roster: IArmyUnitSpec[] = [];
+    const forced = forcedByLevel();
     for (const { level, count } of composition) {
         const pool = creaturesByLevel(level);
         if (!pool.length) {
             throw new Error(`No creatures found for level ${level}`);
         }
         for (let i = 0; i < count; i += 1) {
-            const pick = pool[Math.floor(rng() * pool.length)];
+            let pick = pool[Math.floor(rng() * pool.length)];
+            if (i === 0 && forced[level]) {
+                const forcedPick = pool.find((p) => p.creatureName === forced[level]);
+                if (forcedPick) {
+                    pick = forcedPick;
+                }
+            }
             roster.push({
                 faction: pick.faction,
                 creatureName: pick.creatureName,
