@@ -163,6 +163,37 @@ export class StrategyV0_1 implements IAIStrategy {
             return actions;
         }
 
+        if (type === AIActionType.OBSTACLE_ATTACK) {
+            // Break the destructible centre mountain (BLOCK_CENTER map): cellToAttack = the struck centre
+            // cell, cellToMove = the (reachable) cell to strike from. The engine wants the obstacle's pixel
+            // POSITION, so convert the cell. (This mapping was previously missing in the headless path, so
+            // the AI's mountain decision silently fell through to a plain advance.)
+            const struckCell = aiAction.cellToAttack();
+            const attackFrom = aiAction.cellToMove();
+            if (!struckCell || !attackFrom) {
+                return this.fallbackTurn(unit, context);
+            }
+            const gs = context.grid.getSettings();
+            const targetPosition = getPositionForCell(struckCell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
+            const base = unit.getBaseCell();
+            const movesToStrike = attackFrom.x !== base.x || attackFrom.y !== base.y;
+            const route = movesToStrike ? this.routeForCell(aiAction, attackFrom) : undefined;
+            if (movesToStrike && !route?.route.length) {
+                return this.fallbackTurn(unit, context); // can't actually reach the strike cell
+            }
+            return [
+                {
+                    type: "obstacle_attack",
+                    attackerId: unit.getId(),
+                    targetPosition,
+                    attackFrom: { x: attackFrom.x, y: attackFrom.y },
+                    path: route?.route.map((c) => ({ x: c.x, y: c.y })),
+                    hasLavaCell: route?.hasLavaCell,
+                    hasWaterCell: route?.hasWaterCell,
+                },
+            ];
+        }
+
         if (type === AIActionType.MOVE) {
             const targetCell = aiAction.cellToMove();
             if (!targetCell || !unit.canMove()) {
