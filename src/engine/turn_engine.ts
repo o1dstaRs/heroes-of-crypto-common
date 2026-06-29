@@ -237,6 +237,17 @@ export class TurnEngine {
             refreshed = this.getOrderedTurnUnits();
         }
 
+        // A new lap: drop the previous lap's Morale/Dismorale (they're lap-scoped and intentionally
+        // NOT consumed by per-turn minusLap) before rolling fresh ones, so each lasts exactly one lap.
+        for (const unit of refreshed.allUnits) {
+            if (unit.getBuff("Morale")) {
+                unit.deleteBuff("Morale");
+            }
+            if (unit.getDebuff("Dismorale")) {
+                unit.deleteDebuff("Dismorale");
+            }
+        }
+
         events.push(...this.applyMoraleRolls(refreshed.allUnits));
 
         this.fightProperties.prefetchNextUnitsToTurn(

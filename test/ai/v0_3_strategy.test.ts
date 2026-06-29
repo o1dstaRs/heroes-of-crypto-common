@@ -56,11 +56,11 @@ describe("AI version registry — v0.3 promoted to default, v0.4 is the new targ
         expect(DEFAULT_AI_VERSION).toBe("v0.3");
     });
 
-    it("v0.4 starts as an exact copy of v0.3 — same placement, same decisions", () => {
+    it("v0.4 defers to v0.3 when none of its extra tactics apply (no Wolf Rider, no siege, …)", () => {
         const v04 = getAIStrategy("v0.4");
         expect(v04.version).toBe("v0.4");
 
-        // placeArmy delegates to v0.3 -> identical deployment for the same roster.
+        // placeArmy delegates to v0.3 for a non-Wolf-Rider roster -> identical deployment.
         const mkUnits = () => [
             createTestUnit({ name: "R", team: LOWER, attackType: RANGE, rangeShots: 5 }),
             createTestUnit({ name: "M1", team: LOWER, attackType: MELEE }),

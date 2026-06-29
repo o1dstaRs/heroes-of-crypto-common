@@ -622,10 +622,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
+        // The Morale buff is lap-scoped: it lasts the WHOLE lap (so its 1.25 attack multiplier covers
+        // every turn the unit takes this lap, including a morale extra turn) and is cleared at the next
+        // lap flip — NOT consumed here on the unit's turn. While it's active the unit's other buffs are
+        // held (not ticked down), matching the legacy.
         const moraleBuff = this.getBuff("Morale");
-        if (moraleBuff) {
-            this.deleteBuff("Morale");
-        } else {
+        if (!moraleBuff) {
             for (const b of this.buffs) {
                 if (b.getLaps() > 0 && b) {
                     b.minusLap();
@@ -649,9 +651,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        if (dismoraleDebuff) {
-            this.deleteDebuff("Dismorale");
-        } else {
+        // Dismorale is lap-scoped too: kept for the whole lap (0.8 multiplier) and cleared at the lap
+        // flip, not consumed on the unit's turn. While active, the unit's other debuffs are held.
+        if (!dismoraleDebuff) {
             for (const d of this.debuffs) {
                 if (d.getLaps() > 0) {
                     d.minusLap();
