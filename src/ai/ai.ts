@@ -301,6 +301,11 @@ export function findTarget(
         }
     }
 
+    // Backstab units (Scavenger) prefer striking from the target's far side for the damage bonus.
+    if (action) {
+        action = preferBackstabAttackCell(unit, action, grid, matrix, pathHelper, unitsHolder);
+    }
+
     if (DEBUG_AI) {
         logAction(action, DEBUG_AI);
         console.timeEnd("AI step");
@@ -907,6 +912,113 @@ function evaluateMountainStrategy(
     }
 
     return new BasicAIAction(AIActionType.OBSTACLE_ATTACK, strike.attackFrom, strike.targetCell, strike.knownPaths);
+}
+
+// ──────────────────────────────── Backstab positioning ────────────────────────────────
+// Backstab (Scavenger) deals bonus damage only when the attacker strikes from the target's far side.
+// Mirror the engine's trigger (getAbilitiesWithPosisionCoefficient): a LOWER-team attacker must stand
+// at a HIGHER y than the target, an UPPER-team attacker at a LOWER y. (Small targets only here, so no
+// large-unit margin.)
+function isBackstabCell(team: number, fromCell: HoCMath.XY, targetCell: HoCMath.XY): boolean {
+    if (team === PBTypes.TeamVals.LOWER) {
+        return fromCell.y > targetCell.y;
+    }
+    return fromCell.y < targetCell.y;
+}
+
+/**
+ * When a Backstab unit has decided to melee a (small) enemy, try to route to a reachable cell on the
+ * target's backstab side instead of the nearest one — so the Scavenger always lands the bonus when it
+ * can. Falls back to the original action when no backstab-side cell is reachable this turn (we never
+ * give up the attack just to chase the bonus). Only re-targets the stand cell; the victim is unchanged.
+ */
+function preferBackstabAttackCell(
+    unit: IUnitAIRepr,
+    action: BasicAIAction,
+    grid: Grid,
+    matrix: number[][],
+    pathHelper: PathHelper,
+    unitsHolder: UnitsHolder,
+): BasicAIAction {
+    const type = action.actionType();
+    if (type !== AIActionType.MELEE_ATTACK && type !== AIActionType.MOVE_AND_MELEE_ATTACK) {
+        return action;
+    }
+    if (!unit.isSmallSize() || !unit.hasAbilityActive("Backstab")) {
+        return action;
+    }
+
+    const targetCell = action.cellToAttack();
+    const currentFromCell = action.cellToMove();
+    if (!targetCell || !currentFromCell) {
+        return action;
+    }
+
+    // Restrict to small targets: keeps the y-condition exact and the 8-neighbour adjacency valid.
+    const targetUnitId = grid.getOccupantUnitId(targetCell);
+    const targetUnit = targetUnitId ? unitsHolder.getAllUnits().get(targetUnitId) : undefined;
+    if (!targetUnit || !targetUnit.isSmallSize()) {
+        return action;
+    }
+
+    const team = unit.getTeam();
+    if (isBackstabCell(team, currentFromCell, targetCell)) {
+        return action; // already striking from the backstab side
+    }
+
+    const unitCell = unit.getBaseCell();
+    // A backstab stand cell is adjacent to the target — and therefore adjacent to the enemy, so the
+    // team aggression weighting prices it out of the normal path even when the unit can physically step
+    // there this turn. Recompute reachability with a zero aggression matrix to get true raw-movement
+    // reach (the Scavenger accepts the slightly riskier step in exchange for the damage bonus).
+    const zeroAggr = matrix.map((row) => row.map(() => 0));
+    const knownPaths = pathHelper.getMovePath(
+        unitCell,
+        matrix,
+        unit.getSteps(),
+        zeroAggr,
+        unit.canFly(),
+        unit.isSmallSize(),
+        unit.hasAbilityActive("Made of Fire"),
+    ).knownPaths;
+
+    // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
+    let bestCell: HoCMath.XY | undefined;
+    let bestWeight = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) {
+                continue;
+            }
+            const cell = { x: targetCell.x + dx, y: targetCell.y + dy };
+            if (!isBackstabCell(team, cell, targetCell)) {
+                continue;
+            }
+            let weight: number;
+            if (cell.x === unitCell.x && cell.y === unitCell.y) {
+                weight = 0; // already standing on a backstab-side cell adjacent to the target
+            } else {
+                const routes = knownPaths.get(cellKey(cell));
+                if (!routes?.length) {
+                    continue; // unreachable this turn / not a valid standing cell
+                }
+                weight = routes[0].weight;
+            }
+            if (weight < bestWeight) {
+                bestWeight = weight;
+                bestCell = cell;
+            }
+        }
+    }
+
+    if (!bestCell) {
+        return action;
+    }
+    const newType =
+        bestCell.x === unitCell.x && bestCell.y === unitCell.y
+            ? AIActionType.MELEE_ATTACK
+            : AIActionType.MOVE_AND_MELEE_ATTACK;
+    return new BasicAIAction(newType, bestCell, targetCell, knownPaths);
 }
 
 /**

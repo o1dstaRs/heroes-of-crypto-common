@@ -105,11 +105,12 @@ describe("grid_math geometry helpers", () => {
         const a = GridMath.getPositionForCell({ x: 4, y: 4 }, gs.getMinX(), gs.getStep(), gs.getHalfStep());
         const b = GridMath.getPositionForCell({ x: 5, y: 4 }, gs.getMinX(), gs.getStep(), gs.getHalfStep());
         expect(typeof GridMath.arePointsConnected(gs, a, b)).toBe("boolean");
-        const crossings = GridMath.getCrossingPoints(gs, a, b);
+        const vh = GridMath.getClosestVH(gs, a, b);
+        expect(Array.isArray(vh)).toBe(true);
+        const crossings = GridMath.getCrossingPoints(a, b, vh);
         expect(Array.isArray(crossings)).toBe(true);
         // Closest of a non-empty candidate list is the nearest point; an empty list yields undefined.
         expect(GridMath.getClosestCrossingPoint(a, [a, b])).toEqual(a);
         expect(GridMath.getClosestCrossingPoint(a, [])).toBeUndefined();
-        expect(GridMath.getClosestVH(gs, a, b)).toBeDefined();
     });
 });
