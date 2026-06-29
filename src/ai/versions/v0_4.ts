@@ -23,6 +23,8 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const MAGIC = PBTypes.AttackVals.MAGIC;
+const enabled = (name: string): boolean => process.env[`V04_${name}`] !== "off";
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 
@@ -109,7 +111,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const healed = this.retargetHeal(unit, context, base);
         const goblin = this.preferLowLevelMelee(unit, context, healed);
         const positioned = this.auraRepositionMelee(unit, context, goblin);
-        return this.rapidChargeReposition(unit, context, positioned);
+        const tuned = this.rapidChargeReposition(unit, context, positioned);
+        return this.flyerHuntRanges(unit, context, tuned);
     }
     /**
      * (7) Healer spell policy (requested): a single-target HEAL is only worth it on a LEVEL 3-4 stack that
@@ -264,6 +267,64 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return undefined;
         }
         return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Riot", targetId: unit.getId() }];
+    }
+    /**
+     * (EXP) Flyers hunt the enemy back line. A flyer attacks whatever it can reach (en route), but when it
+     * has nothing to strike this turn (a pure move), it advances toward the nearest enemy RANGE/MAGE instead
+     * of the default target — ultimate goal: get into position to mute their shooters/casters. Toggle V04_FHUNT.
+     */
+    private flyerHuntRanges(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!enabled("FHUNT") || !unit.canFly() || unit.getAttackType() !== MELEE || !unit.canMove()) {
+            return decision;
+        }
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
+            return decision; // we always attack en route — only redirect an idle move
+        }
+        const enemyTeam = otherTeam(unit.getTeam());
+        const targets = context.unitsHolder
+            .getAllAllies(enemyTeam)
+            .filter((e) => !e.isDead() && (e.getAttackType() === RANGE || e.getAttackType() === MAGIC));
+        if (!targets.length) {
+            return decision;
+        }
+        const { grid, matrix, pathHelper } = context;
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const nearest = (cell: XY): number => Math.min(...targets.map((t) => getDistance(cell, t.getBaseCell())));
+        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let bestDist = nearest(unit.getBaseCell());
+        for (const [key, routes] of movePath.knownPaths) {
+            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
+            const route = routes?.[0];
+            if (!route?.route.length) {
+                continue;
+            }
+            const d = nearest(cell);
+            if (d < bestDist) {
+                bestDist = d;
+                best = { cell, route };
+            }
+        }
+        if (!best) {
+            return decision;
+        }
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            },
+        ];
     }
     /**
      * (8) Rapid Charge rewards distance: the longer the run-up, the more bonus damage. When a Rapid Charge
