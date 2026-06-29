@@ -43,6 +43,8 @@ const HOURGLASS_ENABLED = false;
 const NEGLIGIBLE_COUNTER_STACK_POWER = 1;
 // Rough melee threat of a stack, used to pick the most valuable no-counter victim.
 const meleeThreat = (u: Unit): number => Math.max(1, u.getAttackDamageMax()) * Math.max(1, u.getAmountAlive());
+// Griffin's aura ability: silences enemy range attacks within its range.
+const NULL_FIELD_AURA_ABILITY = "Range Null Field Aura";
 
 interface IShotPlan {
     aimCell: XY;
@@ -181,6 +183,12 @@ class StrategyV0_2 extends StrategyV0_1 {
         const opener = this.decideCreatureOpener(unit, context);
         if (opener) {
             return opener;
+        }
+        // Griffin: dive the enemy range line, blanket their shooters with the Null Field aura, and
+        // melee a ranged unit in the same move (with flying support; see decideGriffinDive).
+        const griffin = this.decideGriffinDive(unit, context);
+        if (griffin) {
+            return griffin;
         }
         const melee = this.preferNoCounterMeleeTarget(unit, context, super.decideTurn(unit, context));
         return this.withAura(unit, context, melee);
@@ -733,6 +741,127 @@ class StrategyV0_2 extends StrategyV0_1 {
             return undefined;
         }
         return [{ type: "cast_spell", casterId: unit.getId(), spellName }];
+    }
+    /** The range of this unit's Null Field (range-silencing) debuff aura, or 0 if it has none. */
+    private nullFieldRange(unit: Unit): number {
+        let range = 0;
+        for (const aura of unit.getAuraEffects()) {
+            if (!aura.getProperties().is_buff) {
+                range = Math.max(range, aura.getRange());
+            }
+        }
+        return range;
+    }
+    /** Living enemy RANGE units — the ones the Null Field silences. */
+    private livingEnemyRanged(unit: Unit, context: IDecisionContext): Unit[] {
+        return context.unitsHolder
+            .getAllAllies(otherTeam(unit.getTeam()))
+            .filter((e) => !e.isDead() && e.getAttackType() === RANGE);
+    }
+    /**
+     * Don't dive the backline alone: only commit when another living flying ally is close enough to the
+     * enemy range line to come in too (so the Griffin isn't focused down on its own).
+     */
+    private hasFlyingSupport(unit: Unit, context: IDecisionContext, enemyRanged: Unit[]): boolean {
+        const auraR = this.nullFieldRange(unit);
+        const nearestBackline = (a: Unit): number =>
+            Math.min(...enemyRanged.map((r) => getDistance(a.getBaseCell(), r.getBaseCell())));
+        return context.unitsHolder
+            .getAllAllies(unit.getTeam())
+            .some(
+                (a) =>
+                    a.getId() !== unit.getId() &&
+                    !a.isDead() &&
+                    a.canFly() &&
+                    nearestBackline(a) <= a.getSteps() + auraR + 2,
+            );
+    }
+    /**
+     * Griffin (Range Null Field aura): fly to the enemy's range line, land where the MOST enemy RANGE
+     * units fall inside the aura (silencing their shots) and melee one of them in the same move. Only
+     * with flying support and only when the enemy actually fields ranged units; otherwise returns
+     * undefined to behave like a normal melee unit. If it can't reach a strike cell yet, it advances
+     * toward the coverage instead.
+     */
+    private decideGriffinDive(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        if (!unit.hasAbilityActive(NULL_FIELD_AURA_ABILITY) || !unit.canMove()) {
+            return undefined;
+        }
+        const enemyRanged = this.livingEnemyRanged(unit, context);
+        if (!enemyRanged.length) {
+            return undefined; // no shooters to silence -> behave as a regular melee unit
+        }
+        if (!this.hasFlyingSupport(unit, context, enemyRanged)) {
+            return undefined; // never dive the backline solo
+        }
+        const { grid, matrix, pathHelper } = context;
+        const auraR = this.nullFieldRange(unit);
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const coverage = (cell: XY): number =>
+            enemyRanged.filter((r) => getDistance(cell, r.getBaseCell()) <= auraR).length;
+
+        let strike: { cell: XY; targetId: string; cover: number; weight: number } | undefined;
+        let advance: { cell: XY; cover: number; weight: number } | undefined;
+        for (const [key, routes] of movePath.knownPaths) {
+            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
+            const cover = coverage(cell);
+            if (cover <= 0) {
+                continue;
+            }
+            const weight = routes?.[0]?.weight ?? Infinity;
+            if (!advance || cover > advance.cover || (cover === advance.cover && weight < advance.weight)) {
+                advance = { cell, cover, weight };
+            }
+            const adj = enemyRanged.find((r) =>
+                r.getCells().some((rc) => Math.abs(rc.x - cell.x) <= 1 && Math.abs(rc.y - cell.y) <= 1),
+            );
+            if (adj && (!strike || cover > strike.cover || (cover === strike.cover && weight < strike.weight))) {
+                strike = { cell, targetId: adj.getId(), cover, weight };
+            }
+        }
+
+        if (strike) {
+            const route = movePath.knownPaths.get(cellKey(strike.cell))?.[0];
+            const actions: GameAction[] = [];
+            if (unit.getAttackTypeSelection() !== MELEE) {
+                actions.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+            }
+            actions.push({
+                type: "melee_attack",
+                attackerId: unit.getId(),
+                targetId: strike.targetId,
+                attackFrom: { x: strike.cell.x, y: strike.cell.y },
+                path: route?.route.map((c) => ({ x: c.x, y: c.y })),
+                hasLavaCell: route?.hasLavaCell,
+                hasWaterCell: route?.hasWaterCell,
+            });
+            return actions;
+        }
+        const base = unit.getBaseCell();
+        if (advance && (advance.cell.x !== base.x || advance.cell.y !== base.y)) {
+            const route = movePath.knownPaths.get(cellKey(advance.cell))?.[0];
+            if (route?.route.length) {
+                return [
+                    {
+                        type: "move_unit",
+                        unitId: unit.getId(),
+                        path: route.route.map((c) => ({ x: c.x, y: c.y })),
+                        targetCells: this.footprintForCell(unit, advance.cell, context),
+                        hasLavaCell: route.hasLavaCell,
+                        hasWaterCell: route.hasWaterCell,
+                    },
+                ];
+            }
+        }
+        return undefined;
     }
     private adjacentEnemy(unit: Unit, context: IDecisionContext): string | undefined {
         const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((u) => !u.isDead());
