@@ -660,7 +660,7 @@ export class AttackHandler {
                 this.sceneLog,
             );
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})` +
+                `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})` +
                     HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
             );
             attackDamageApplied = false;
@@ -1336,7 +1336,7 @@ export class AttackHandler {
             // just log attack here,
             // to make sure that logs are in chronological order
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})` +
+                `${attackerUnit.getName()} ⚔️ ${targetUnit.getName()} (${damageFromAttack})` +
                     HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
             );
 
