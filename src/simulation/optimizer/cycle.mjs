@@ -106,35 +106,54 @@ const decisive = sum.a.wins + sum.b.wins; // a = OPT, b = BASE
 const pct = decisive ? (100 * sum.a.wins) / decisive : 0;
 const jsonl = summaryPath.replace(/\.summary\.json$/, ".jsonl");
 
-// HARD GATE: the AI must never issue an action the engine rejects (completed === false).
-// Even a single rejection means the change destabilised behaviour — revert no matter the win rate.
+// HARD GATE: a change must never make the AI propose MORE engine-rejected actions. Rejections are recorded
+// in result.rejectedDetails ({type, reason, version}) — NOT in result.actions (which only holds completed
+// commands), so they must be read from there. We count rejections attributed to the OPT version (the side
+// we're changing); the BASE version's count is its own inherited floor. There is a non-zero inherited floor
+// today (the core findTarget->GameAction mapping in v0.1/v0.2 sometimes proposes attack_not_available), so
+// the gate is "no increase vs the recorded baseline" rather than "exactly zero".
 let rejected = 0;
+const rejByFlavor = {};
 for (const l of readFileSync(jsonl, "utf8").split("\n")) {
     if (!l) continue;
     try {
-        for (const a of JSON.parse(l).result.actions ?? []) {
-            if (a.completed === false || a.rejectionReason) rejected++;
+        for (const d of JSON.parse(l).result.rejectedDetails ?? []) {
+            if (d.version !== OPT) continue;
+            rejected += 1;
+            const k = `${d.type} :: ${d.reason ?? "?"}`;
+            rejByFlavor[k] = (rejByFlavor[k] ?? 0) + 1;
         }
     } catch {
         /* skip */
     }
 }
+const flavorStr = Object.entries(rejByFlavor)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${n} ${k}`)
+    .join(", ");
+// First measured cycle seeds the rejection baseline; later cycles must not exceed it.
+if (state.baselineRejected == null) {
+    state.baselineRejected = rejected;
+}
+const rejectionsOk = rejected <= state.baselineRejected;
+console.log(`${OPT} rejected actions: ${rejected} (baseline ${state.baselineRejected})${flavorStr ? " — " + flavorStr : ""}`);
 
-// 3) Decide. Win rate must clear baseline + gainPP AND there must be zero rejected actions.
-const improved = pct >= state.baselinePct + gainPP && rejected === 0;
-if (rejected > 0 && pct >= state.baselinePct + gainPP) {
+// 3) Decide. Win rate must clear baseline + gainPP AND rejections must not increase over the floor.
+const improved = pct >= state.baselinePct + gainPP && rejectionsOk;
+if (!rejectionsOk && pct >= state.baselinePct + gainPP) {
     revert();
-    record("REVERT(rejections)", pct, `${rejected} rejected actions`);
-    console.log(`REVERT: ${rejected} rejected actions — change destabilised the AI, reverted despite ${pct.toFixed(2)}%.`);
+    record("REVERT(rejections)", pct, `${rejected} rejected > floor ${state.baselineRejected} (${flavorStr})`);
+    console.log(`REVERT: rejections rose to ${rejected} (floor ${state.baselineRejected}) — reverted despite ${pct.toFixed(2)}%.`);
     process.exit(0);
 }
 if (improved) {
     sh(`git add ${OPT_FILE}`);
     sh(`git commit -q -m "${OPT} optimizer: ${summary.replace(/"/g, "'")} (${pct.toFixed(2)}% vs ${state.baselinePct.toFixed(2)}%)"`);
     state.baselinePct = pct;
+    state.baselineRejected = Math.min(state.baselineRejected, rejected); // ratchet the floor down, never up
     state.accepted = (state.accepted ?? 0) + 1;
-    record("ACCEPT", pct, `(+${(pct - (state.baselinePct - (pct - state.baselinePct))).toFixed(2)}pp)`);
-    console.log(`ACCEPT: ${OPT} ${pct.toFixed(2)}% — committed. New baseline ${pct.toFixed(2)}%.`);
+    record("ACCEPT", pct, `(+${(pct - (state.baselinePct - (pct - state.baselinePct))).toFixed(2)}pp, rej ${rejected})`);
+    console.log(`ACCEPT: ${OPT} ${pct.toFixed(2)}% — committed. New baseline ${pct.toFixed(2)}%, rejection floor ${state.baselineRejected}.`);
 } else {
     revert();
     record("REVERT", pct, `(<${gainPP}pp gain)`);

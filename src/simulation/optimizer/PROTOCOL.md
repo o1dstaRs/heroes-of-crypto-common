@@ -71,3 +71,6 @@ v0.3 reached **66.5%** vs v0.2 (+16.5pp) in 36 cycles via 3 wins. The leverage r
 - Re-baseline once (`cycle.mjs "init" 12000 0`) to record v0.4==v0.3 ≈ 50% before the first real change.
 - New strategy code MUST have unit tests (see `test/ai/v0_3_strategy.test.ts` for the pattern) — keep the
   common package at its coverage bar.
+
+## Rejection-aware gate (important)
+Engine-rejected actions are recorded in `result.rejectedDetails` ({type, reason, version}), NOT in `result.actions`. `cycle.mjs` counts rejections attributed to the OPT version and gates on **no increase vs a tracked floor** (`state.baselineRejected`), because there is a non-zero INHERITED floor today: the core `findTarget`->GameAction mapping (v0.1/v0.2) sometimes proposes `melee/range_attack :: attack_not_available` (~700/version/10k). A change that raises the OPT rejection count is reverted even if it wins. Reducing rejections ratchets the floor down.
