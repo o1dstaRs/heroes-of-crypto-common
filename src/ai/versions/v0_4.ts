@@ -246,9 +246,27 @@ export class StrategyV0_4 extends StrategyV0_3 {
             const cap = fullCap(a);
             return cap > 0 ? 1 - a.getCumulativeHp() / cap : 0;
         };
+        // Only retarget to a unit the engine will actually ACCEPT the heal on — mirrors the engine's gate
+        // (range / resist / can-be-healed). Without this the swap can pick a valid-looking but un-castable
+        // target and the engine rejects it ("spell_not_available").
+        const gridSettings = context.grid.getSettings();
+        const canHeal = (a: Unit): boolean =>
+            !!canCastSpell(
+                false,
+                gridSettings,
+                context.matrix,
+                unit,
+                a,
+                spell,
+                a.getBaseCell(),
+                a.getMagicResist(),
+                a.hasMindAttackResistance(),
+                a.canBeHealed(),
+                undefined,
+            );
         const eligible = context.unitsHolder
             .getAllAllies(unit.getTeam())
-            .filter((a) => !a.isDead() && a.canBeHealed() && woundFrac(a) > HEAL_WOUND_THRESHOLD)
+            .filter((a) => !a.isDead() && a.canBeHealed() && woundFrac(a) > HEAL_WOUND_THRESHOLD && canHeal(a))
             .sort((p, q) => fullCap(q) - fullCap(p)); // biggest-HP stack first
         if (!eligible.length || eligible[0].getId() === only.targetId) {
             return decision; // nobody hurt enough (keep v0.2's valid heal), or already optimal

@@ -127,7 +127,14 @@ export interface IMatchResult {
     rejectedGreen?: number;
     rejectedRed?: number;
     /** Per-rejection diagnostics (action type + engine reason) for driving the count to 0. */
-    rejectedDetails?: { type: string; reason?: string; version: string }[];
+    rejectedDetails?: {
+        type: string;
+        reason?: string;
+        version: string;
+        creature?: string;
+        ammo?: number;
+        possible?: string;
+    }[];
 }
 
 class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
@@ -343,7 +350,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const actions: IRecordedAction[] = [];
     let rejectedGreen = 0;
     let rejectedRed = 0;
-    const rejectedDetails: { type: string; reason?: string; version: string }[] = [];
+    const rejectedDetails: NonNullable<IMatchResult["rejectedDetails"]> = [];
     let finished = false;
     const attrition: IAttritionInfo = {
         reachedArmageddon: false,
@@ -477,6 +484,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     type: action.type,
                     reason: result.rejectionReason,
                     version: (unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy).version,
+                    creature: unit.getName(),
+                    ammo: unit.getRangeShots(),
+                    possible: unit.getPossibleAttackTypes().join("|"),
                 });
             }
             recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
@@ -540,6 +550,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     );
     matchResult.rejectedGreen = rejectedGreen;
     matchResult.rejectedRed = rejectedRed;
+    matchResult.rejectedDetails = rejectedDetails;
     return matchResult;
 }
 
