@@ -18,6 +18,8 @@ import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
+import { PlacementPositionType } from "../../src/grid/placement_properties";
+import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
 import {
@@ -126,6 +128,47 @@ describe("v0.4 (2) ranged-superiority patience", () => {
         const actions = v04.decideTurn(shooter, ctxFor(c));
         // With a clear shot it should fire, not hold.
         expect(typeOf(actions, "range_attack")).toBeDefined();
+    });
+});
+
+describe("v0.4 (5) anti-AoE: spread deployment when an AoE unit is present", () => {
+    const v03 = getAIStrategy("v0.3");
+    const minPairwise = (placed: Map<string, { x: number; y: number }>): number => {
+        const cells = [...placed.values()];
+        let m = Infinity;
+        for (let i = 0; i < cells.length; i++)
+            for (let j = i + 1; j < cells.length; j++)
+                m = Math.min(m, Math.hypot(cells[i].x - cells[j].x, cells[i].y - cells[j].y));
+        return m;
+    };
+    const place = (strat: ReturnType<typeof getAIStrategy>, units: Unit[]) => {
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        return strat.placeArmy(units, {
+            team: LOWER,
+            grid: undefined as never,
+            unitsHolder: undefined as never,
+            pathHelper: undefined as never,
+            placement: zone,
+        });
+    };
+    it("spreads stacks farther apart than v0.3 clusters them when the roster has an AoE unit", () => {
+        const roster = () => [
+            makeReal(LOWER, "Nature", "Gargantuan"), // AoE (Area Throw) -> triggers spread
+            createTestUnit({ team: LOWER, name: "M1", attackType: MELEE }),
+            createTestUnit({ team: LOWER, name: "M2", attackType: MELEE }),
+            createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5 }),
+        ];
+        const spread = minPairwise(place(v04, roster()));
+        const clustered = minPairwise(place(v03, roster()));
+        expect(spread).toBeGreaterThan(clustered); // v0.4 keeps stacks farther apart
+    });
+    it("defers to v0.3 deployment when no AoE unit is present", () => {
+        const noAoe = () => [
+            createTestUnit({ team: LOWER, name: "M1", attackType: MELEE }),
+            createTestUnit({ team: LOWER, name: "M2", attackType: MELEE }),
+            createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5 }),
+        ];
+        expect([...place(v04, noAoe()).values()]).toEqual([...place(v03, noAoe()).values()]);
     });
 });
 

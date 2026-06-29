@@ -14,7 +14,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
-import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { teamRangedFirepower } from "./v0_2";
 import { StrategyV0_3 } from "./v0_3";
@@ -29,6 +29,13 @@ const SIEGE_UNITS = new Set(["Gargantuan", "Tsar Cannon"]);
 // Only spend a single-target heal on a stack that is down more than this fraction of its full HP.
 const HEAL_WOUND_THRESHOLD = 0.25;
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
+
+// AoE / multi-hit threats: against these, clustered or cornered stacks get caught by one blow, so we spread
+// out at deployment. Detected by signature ability (robust to renames) or by unit name.
+const AOE_ABILITIES = ["Area Throw", "Fire Breath", "Through Shot", "Skewer Strike", "Large Caliber"];
+const AOE_NAMES = new Set(["Black Dragon", "Pikeman", "Gargantuan", "Cyclops", "Tsar Cannon"]);
+const isAoEUnit = (u: Unit): boolean =>
+    AOE_NAMES.has(u.getName()) || AOE_ABILITIES.some((ab) => u.hasAbilityActive(ab));
 
 /**
  * v0.4 — extends the v0.3 champion with four requested human-tactics overrides. Each is a guarded branch
@@ -72,6 +79,14 @@ export class StrategyV0_4 extends StrategyV0_3 {
         // aura (so the attacker fights buffed).
         const base = super.decideTurn(unit, context);
         return this.auraRepositionMelee(unit, context, this.retargetHeal(unit, context, base));
+    }
+    /**
+     * (5b) Don't clump into AoE: when the enemy fields an AoE / multi-hit unit, suppress v0.3's melee
+     * cohesion so the army stays spread (paired with the spread deployment) and no single blow catches the
+     * pack. With no enemy AoE, cohesion stays on (v0.3's +9.7pp behaviour).
+     */
+    protected override shouldCohere(unit: Unit, context: IDecisionContext): boolean {
+        return !context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).some((e) => !e.isDead() && isAoEUnit(e));
     }
     /** How many friendly BUFF auras cover a cell (receiver-side: is the unit standing inside an ally's aura). */
     private friendlyAuraCover(cell: XY, unit: Unit, context: IDecisionContext): number {
@@ -278,6 +293,66 @@ export class StrategyV0_4 extends StrategyV0_3 {
             }
         }
         return undefined; // can't make progress toward the siege this turn -> normal behaviour
+    }
+    /**
+     * (5) Anti-AoE deployment. v0.3 corners its shooters and clusters the army — strong in general, but a
+     * gift to AoE / multi-hit attackers (Black Dragon, Pikeman, Gargantuan, Cyclops, Tsar Cannon), where one
+     * blow catches a whole pile. When such a unit is on the board, deploy SPREAD instead: greedily place each
+     * stack on the legal cell farthest from the stacks already placed, so no single AoE hit lands on two of
+     * ours. (Mirror tournaments field the same roster on both sides, so "our roster has AoE" stands in for
+     * "the enemy has AoE".) No AoE present → defer to v0.3's clustered deployment. Measured on NORMAL maps.
+     */
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        if (!units.some(isAoEUnit)) {
+            return super.placeArmy(units, context);
+        }
+        const placements = new Map<string, XY>();
+        const occupied = new Set<number>();
+        const legal = context.placement.possibleCellHashes();
+        const baseCells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
+        if (!baseCells.length) {
+            return placements;
+        }
+        // Deeper = safer first-pick (farther from the enemy); used only to break ties (and to seed unit 1).
+        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
+        const footprintFor = (u: Unit, base: XY): XY[] =>
+            u.isSmallSize()
+                ? [base]
+                : [
+                      { x: base.x, y: base.y },
+                      { x: base.x - 1, y: base.y },
+                      { x: base.x, y: base.y - 1 },
+                      { x: base.x - 1, y: base.y - 1 },
+                  ];
+        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
+        const placed: XY[] = [];
+        for (const u of [...units].sort(bySizeLargeFirst)) {
+            let bestBase: XY | undefined;
+            let bestSpacing = -Infinity;
+            let bestFront = -Infinity;
+            for (const base of baseCells) {
+                const footprint = footprintFor(u, base);
+                if (footprint.some((cc) => !legal.has(cellKey(cc)) || occupied.has(cellKey(cc)))) {
+                    continue;
+                }
+                const spacing = placed.length ? Math.min(...placed.map((p) => getDistance(base, p))) : 0;
+                const front = frontness(base);
+                if (spacing > bestSpacing || (spacing === bestSpacing && front > bestFront)) {
+                    bestSpacing = spacing;
+                    bestFront = front;
+                    bestBase = base;
+                }
+            }
+            if (!bestBase) {
+                continue;
+            }
+            for (const cc of footprintFor(u, bestBase)) {
+                occupied.add(cellKey(cc));
+            }
+            placements.set(u.getId(), bestBase);
+            placed.push(bestBase);
+        }
+        return placements;
     }
 }
 

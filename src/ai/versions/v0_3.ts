@@ -84,13 +84,17 @@ export class StrategyV0_3 extends StrategyV0_2 {
         const decision = super.decideTurn(unit, context);
         // Army cohesion: a melee straggler that would otherwise plod toward the enemy alone is redirected to
         // rejoin the pack, so we engage as a block instead of feeding the brawl one stack at a time.
-        if (unit.getAttackType() === MELEE && unit.canMove()) {
+        if (unit.getAttackType() === MELEE && unit.canMove() && this.shouldCohere(unit, context)) {
             const rejoin = this.cohesionAdvance(unit, context, decision);
             if (rejoin) {
                 return rejoin;
             }
         }
         return decision;
+    }
+    /** Whether melee cohesion (rejoin-the-pack) applies this turn. Always on for v0.3; subclasses may suppress it. */
+    protected shouldCohere(_unit: Unit, _context: IDecisionContext): boolean {
+        return true;
     }
     /**
      * If v0.2's decision for this melee unit is a PURE move (no attack/cast available this turn) and the unit
