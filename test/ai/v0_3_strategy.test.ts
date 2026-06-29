@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getAIStrategy, type IDecisionContext } from "../../src/ai";
+import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION, type IDecisionContext } from "../../src/ai";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
@@ -47,6 +47,52 @@ function ctxFor(c: CombatTestContext): IDecisionContext {
 }
 const moveAction = (a: GameAction[]): Extract<GameAction, { type: "move_unit" }> | undefined =>
     a.find((x) => x.type === "move_unit") as Extract<GameAction, { type: "move_unit" }> | undefined;
+
+describe("AI version registry — v0.3 promoted to default, v0.4 is the new target", () => {
+    it("registers v0.4 as the latest version and ships v0.3 as the default", () => {
+        expect(AI_VERSIONS).toContain("v0.3");
+        expect(AI_VERSIONS).toContain("v0.4");
+        expect(LATEST_AI_VERSION).toBe("v0.4");
+        expect(DEFAULT_AI_VERSION).toBe("v0.3");
+    });
+
+    it("v0.4 starts as an exact copy of v0.3 — same placement, same decisions", () => {
+        const v04 = getAIStrategy("v0.4");
+        expect(v04.version).toBe("v0.4");
+
+        // placeArmy delegates to v0.3 -> identical deployment for the same roster.
+        const mkUnits = () => [
+            createTestUnit({ name: "R", team: LOWER, attackType: RANGE, rangeShots: 5 }),
+            createTestUnit({ name: "M1", team: LOWER, attackType: MELEE }),
+            createTestUnit({ name: "M2", team: LOWER, attackType: MELEE }),
+        ];
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const placeCtx = {
+            team: LOWER,
+            grid: undefined as never,
+            unitsHolder: undefined as never,
+            pathHelper: undefined as never,
+            placement: zone,
+        };
+        const u3 = mkUnits();
+        const u4 = mkUnits();
+        const p3 = v03.placeArmy(u3, placeCtx);
+        const p4 = v04.placeArmy(u4, placeCtx);
+        const cellsOf = (units: Unit[], placed: Map<string, { x: number; y: number }>) =>
+            units.map((u) => placed.get(u.getId())!).map((c) => `${c.x}:${c.y}`);
+        expect(cellsOf(u4, p4)).toEqual(cellsOf(u3, p3));
+
+        // decideTurn delegates too: a boxed-in shooter produces the same kind of action under both.
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5, speed: 3 });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 5 });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
+        const actions = v04.decideTurn(shooter, ctxFor(c));
+        expect(Array.isArray(actions)).toBe(true);
+        expect(actions.length).toBeGreaterThan(0);
+    });
+});
 
 describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
     it("routes ranged to deep corners, ground melee to the centred front wall, flyers to a forward flank", () => {

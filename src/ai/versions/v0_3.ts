@@ -55,7 +55,7 @@ const BEHOLDER_THREAT_MULT = 1.3; // ...and that turn would actually hit us
  * Tried and dropped (no measurable gain over v0.2): late-game "anti-kite" forced-melee (the late-game
  * shufflers genuinely can't reach an enemy to strike, so forcing aggression is a no-op).
  */
-class StrategyV0_3 extends StrategyV0_2 {
+export class StrategyV0_3 extends StrategyV0_2 {
     public override readonly version: string = "v0.3";
     /**
      * Change #2 — don't waste a shooter in melee. v0.2 sends any ranged unit that can't land a shot
