@@ -10,7 +10,9 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { GRID_SIZE } from "../../grid/grid_constants";
 import {
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
@@ -22,11 +24,21 @@ import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
 import type { XY } from "../../utils/math";
-import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import { auraCoverageScore, planAuraMove } from "../ai";
+import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam, StrategyV0_1 } from "./v0_1";
 
 const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const RANGE = PBTypes.AttackVals.RANGE;
+const MELEE = PBTypes.AttackVals.MELEE;
+// Hourglass costs the unit morale; A/B showed whether the patience is worth that cost.
+const HOURGLASS_ENABLED = false;
+// A target at or below this stack power (1..5 scale) retaliates for so little that dodging its
+// counter-attack isn't worth re-targeting for.
+const NEGLIGIBLE_COUNTER_STACK_POWER = 1;
+// Rough melee threat of a stack, used to pick the most valuable no-counter victim.
+const meleeThreat = (u: Unit): number => Math.max(1, u.getAttackDamageMax()) * Math.max(1, u.getAmountAlive());
 
 interface IShotPlan {
     aimCell: XY;
@@ -51,9 +63,16 @@ function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
 }
 
 /**
- * v0.2 — smarter ranged play over the v0.1 baseline. Three changes, all confined to RANGE units; melee
- * units and placement are untouched v0.1, so a v0.1-vs-v0.2 tournament isolates the ranged AI.
+ * v0.2 — smarter ranged play AND a role-aware deployment over the v0.1 baseline.
  *
+ * Placement (placeArmy):
+ *  - Melee form a centred FRONT wall (highest "frontness", toward the enemy).
+ *  - Range + squishy MAGIC support (Healer, Satyr, …) sit on the BACK rows, behind the wall, so the
+ *    melee body screens them.
+ *  - A "Sniper" range unit (Arbalester — no distance penalty) is tucked into a far BACK CORNER, away
+ *    from the main army: it can hit anywhere on the board at full damage, so safety beats proximity.
+ *
+ * Per-turn ranged AI (decideTurn), all confined to RANGE units:
  *  1. Out of options: a ranged unit that can't LAND a shot (out of ammo, or boxed in) doesn't waste the
  *     turn on a doomed range attack. "No Melee" units advance/hold; others switch to melee.
  *  2. Best shot: when it CAN shoot, it iterates every VISIBLE EDGE of every enemy, scores each shot by
@@ -67,6 +86,69 @@ function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
  */
 class StrategyV0_2 extends StrategyV0_1 {
     public override readonly version: string = "v0.2";
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        const placements = new Map<string, XY>();
+        const occupied = new Set<number>();
+        const legal = context.placement.possibleCellHashes();
+        const baseCells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
+        if (!baseCells.length) {
+            return placements;
+        }
+
+        // "Frontness" grows toward the enemy (LOWER faces up, UPPER faces down). "Edgeness" is distance
+        // from the zone's horizontal centre, so a high edgeness = toward a corner.
+        const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
+        const xs = baseCells.map((c) => c.x);
+        const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const edgeness = (c: XY): number => Math.abs(c.x - centreX);
+
+        const footprintFor = (unit: Unit, base: XY): XY[] =>
+            unit.isSmallSize()
+                ? [base]
+                : [
+                      { x: base.x, y: base.y },
+                      { x: base.x - 1, y: base.y },
+                      { x: base.x, y: base.y - 1 },
+                      { x: base.x - 1, y: base.y - 1 },
+                  ];
+
+        const placeBy = (unit: Unit, compare: (a: XY, b: XY) => number): void => {
+            for (const base of [...baseCells].sort(compare)) {
+                const footprint = footprintFor(unit, base);
+                if (footprint.some((c) => !legal.has(cellKey(c)) || occupied.has(cellKey(c)))) {
+                    continue;
+                }
+                for (const c of footprint) {
+                    occupied.add(cellKey(c));
+                }
+                placements.set(unit.getId(), { x: base.x, y: base.y });
+                return;
+            }
+        };
+
+        const isSniperRange = (u: Unit): boolean => u.getAttackType() === RANGE && u.hasAbilityActive("Sniper");
+        const isMelee = (u: Unit): boolean => u.getAttackType() === MELEE;
+        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1); // large units are harder to fit, place them first
+
+        const snipers = units.filter(isSniperRange).sort(bySizeLargeFirst);
+        const melee = units.filter(isMelee).sort(bySizeLargeFirst);
+        const backline = units.filter((u) => !isSniperRange(u) && !isMelee(u)).sort(bySizeLargeFirst); // range + magic/support
+
+        // 1. Snipers (Arbalester) -> deepest, most-cornered cell, away from the clash.
+        for (const u of snipers) {
+            placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a));
+        }
+        // 2. Melee -> front rows, centred: a wall that screens the backline.
+        for (const u of melee) {
+            placeBy(u, (a, b) => frontness(b) - frontness(a) || edgeness(a) - edgeness(b));
+        }
+        // 3. Backline (range + squishy casters/healers) -> back rows, centred, behind the wall.
+        for (const u of backline) {
+            placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(a) - edgeness(b));
+        }
+
+        return placements;
+    }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const isRanged = unit.getAttackType() === RANGE;
         if (isRanged && !this.canLandRange(unit, context)) {
@@ -79,7 +161,162 @@ class StrategyV0_2 extends StrategyV0_1 {
         if (isRanged && context.attackHandler) {
             return this.decideRangedTurn(unit, context, context.attackHandler);
         }
-        return super.decideTurn(unit, context);
+        // Melee defers to v0.1's findTarget for positioning (a custom melee scorer regressed the win
+        // rate by throwing away its movement/backstab/engagement work), but refines the VICTIM of an
+        // in-place strike: when several enemies are adjacent, prefer one that won't counter-attack.
+        const melee = this.preferNoCounterMeleeTarget(unit, context, super.decideTurn(unit, context));
+        return this.withAura(unit, context, melee);
+    }
+    /**
+     * Aura emitters earn their keep by keeping the buff/debuff on as many allies as possible. When the
+     * unit would otherwise just move (no attack worth taking), reposition for the best coverage; if no
+     * move helps yet but more allies will come into range, HOURGLASS first to hold the aura up and
+     * re-cover after the army shuffles (the user's "keep giving the aura for longer"); and never let the
+     * default advance drag the aura OFF its current targets. Non-aura units pass straight through.
+     */
+    private withAura(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        // Attacking (or casting) is the better turn — don't trade it for positioning.
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const gridSettings = grid.getSettings();
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
+        if (!plan) {
+            return decision; // not an aura emitter
+        }
+
+        const base = unit.getBaseCell();
+        const movesElsewhere = plan.bestCell.x !== base.x || plan.bestCell.y !== base.y;
+
+        // 1) A reachable cell covers more allies — move there.
+        if (plan.bestScore > plan.currentScore && movesElsewhere && unit.canMove()) {
+            const route = movePath.knownPaths.get(cellKey(plan.bestCell))?.[0];
+            if (route?.route.length) {
+                return [
+                    {
+                        type: "move_unit",
+                        unitId: unit.getId(),
+                        path: route.route.map((c) => ({ x: c.x, y: c.y })),
+                        targetCells: this.footprintForCell(unit, plan.bestCell, context),
+                        hasLavaCell: route.hasLavaCell,
+                        hasWaterCell: route.hasWaterCell,
+                    },
+                ];
+            }
+        }
+        // 2) Hourglass first: nothing better to cover yet, but targets remain out of range and we're not
+        //    under melee pressure — wait so allies move into the aura and we re-cover, keeping it up.
+        if (
+            plan.bestScore <= plan.currentScore &&
+            plan.bestScore < plan.coverableTargets &&
+            plan.currentThreats === 0 &&
+            this.canHourglass(unit, context)
+        ) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        // 3) The default advance would drag the aura OFF allies — hold position instead.
+        const defaultMove = decision.find((a) => a.type === "move_unit");
+        if (defaultMove?.type === "move_unit" && defaultMove.path?.length) {
+            const dest = defaultMove.path[defaultMove.path.length - 1];
+            if (auraCoverageScore(unit, dest, gridSettings, unitsHolder) < plan.currentScore) {
+                return [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+            }
+        }
+        return decision;
+    }
+    /** Whether the engine will accept a hourglass (wait) for this unit this lap. */
+    private canHourglass(unit: Unit, context: IDecisionContext): boolean {
+        const fp = context.fightProperties;
+        return (
+            !!fp &&
+            fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
+            !unit.isOnHourglass() &&
+            !fp.hourglassIncludes(unit.getId()) &&
+            !fp.hasAlreadyHourglass(unit.getId()) &&
+            !fp.hasAlreadyMadeTurn(unit.getId())
+        );
+    }
+    /**
+     * Would attacking `target` in melee provoke a counter-attack worth dodging? No if it already used
+     * its response this lap (engine bars a second), can't respond (stun/blind/no-melee), or its stack
+     * is so small the retaliation is negligible.
+     */
+    private counterMatters(target: Unit): boolean {
+        if (target.getStackPower() <= NEGLIGIBLE_COUNTER_STACK_POWER) {
+            return false;
+        }
+        if (FightStateManager.getInstance().getFightProperties().hasAlreadyRepliedAttack(target.getId())) {
+            return false;
+        }
+        return target.canRespond(MELEE);
+    }
+    /**
+     * Refine the victim of an IN-PLACE melee strike to avoid a meaningful counter: if the chosen target
+     * would retaliate but another equally-adjacent enemy wouldn't (already responded / can't respond /
+     * tiny stack), hit that one instead — same position, no counter taken, so a free advantage. Picks
+     * the most threatening such enemy. Never overrides a forced target, and never touches a
+     * move-and-strike (whose stand cell was positioned for, e.g. a backstab).
+     */
+    private preferNoCounterMeleeTarget(unit: Unit, context: IDecisionContext, actions: GameAction[]): GameAction[] {
+        if (unit.getTarget()) {
+            return actions; // forced to attack a specific unit — respect it
+        }
+        const idx = actions.findIndex((a) => a.type === "melee_attack");
+        if (idx < 0) {
+            return actions;
+        }
+        const strike = actions[idx];
+        if (strike.type !== "melee_attack") {
+            return actions;
+        }
+        // In-place only: a move-and-strike carries a path and a non-current attackFrom.
+        const unitCell = unit.getBaseCell();
+        if (
+            (strike.path && strike.path.length > 0) ||
+            !strike.attackFrom ||
+            strike.attackFrom.x !== unitCell.x ||
+            strike.attackFrom.y !== unitCell.y
+        ) {
+            return actions;
+        }
+
+        const current = context.unitsHolder.getAllUnits().get(strike.targetId);
+        if (!current || !this.counterMatters(current)) {
+            return actions; // already a no-counter (or tiny) victim — nothing to gain
+        }
+
+        const myCells = unit.getCells();
+        const alternatives = context.unitsHolder
+            .getAllAllies(otherTeam(unit.getTeam()))
+            .filter(
+                (e) =>
+                    e.getId() !== current.getId() &&
+                    !e.isDead() &&
+                    !e.hasBuffActive("Hidden") &&
+                    // A meaningful stack (not a trivial one we'd waste the hit on) that still won't
+                    // counter — i.e. it already responded or can't respond.
+                    e.getStackPower() > NEGLIGIBLE_COUNTER_STACK_POWER &&
+                    !this.counterMatters(e) &&
+                    e.getCells().some((ec) => myCells.some((uc) => isAdjacent(ec, uc))),
+            )
+            .sort((p, q) => meleeThreat(q) - meleeThreat(p));
+
+        if (!alternatives.length) {
+            return actions;
+        }
+        const swapped = [...actions];
+        swapped[idx] = { ...strike, targetId: alternatives[0].getId() };
+        return swapped;
     }
     /** A ranged unit that CAN shoot: pick the best visible-edge shot, or hourglass to wait for a better one. */
     private decideRangedTurn(unit: Unit, context: IDecisionContext, attackHandler: AttackHandler): GameAction[] {
@@ -88,7 +325,7 @@ class StrategyV0_2 extends StrategyV0_1 {
             // No worthwhile shot found — let v0.1 decide (it may move/engage).
             return super.decideTurn(unit, context);
         }
-        if (this.shouldHourglass(unit, context, best)) {
+        if (HOURGLASS_ENABLED && this.shouldHourglass(unit, context, best)) {
             return [{ type: "wait_turn", unitId: unit.getId() }];
         }
         const actions: GameAction[] = [];
@@ -176,8 +413,11 @@ class StrategyV0_2 extends StrategyV0_1 {
                 counted.add(target.getId());
                 const min = unit.calculateAttackDamageMin(unit.getAttack(), target, true, 0, divisor);
                 const max = unit.calculateAttackDamageMax(unit.getAttack(), target, true, 0, divisor);
-                const effective = Math.min((min + max) / 2, target.getCumulativeHp());
+                const targetHp = target.getCumulativeHp();
+                const effective = Math.min((min + max) / 2, targetHp);
                 if (target.getTeam() === enemyTeam) {
+                    // Pure expected effective damage — A/B showed threat/finish weightings only hurt the
+                    // win rate. AOE still wins naturally by summing every unit the splash hits.
                     value += effective;
                     if (target.getAttackType() === RANGE) {
                         hitsEnemyRange = true;
