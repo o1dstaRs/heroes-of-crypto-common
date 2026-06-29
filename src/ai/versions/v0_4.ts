@@ -116,7 +116,68 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const fhTuned = this.aoeMeleeReposition(unit, context, meleeTuned);
         const hunted = this.flyerPatientHunt(unit, context, fhTuned);
         const spun = this.hydraSpinReposition(unit, context, hunted);
-        return this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
+        const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
+        return this.enforceMeleeLegality(unit, context, tuned);
+    }
+    /**
+     * (11) Final melee-legality guard. The engine forbids two melees the base heuristic sometimes
+     * proposes: attacking while "Cowardice"-debuffed a target STRONGER than us, and attacking anything
+     * other than a FORCED target (Aggr/taunt). v0.4 honours both — it retargets in place to the forced
+     * unit (or, under Cowardice, a weaker adjacent enemy) when one is reachable, else falls back to a safe
+     * advance — so the engine never rejects the strike.
+     */
+    private enforceMeleeLegality(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const uh = context.unitsHolder;
+        const target = uh.getAllUnits().get(strike.targetId);
+        if (!target || target.isDead()) {
+            return this.fallbackTurn(unit, context);
+        }
+        const myCells = unit.getCells();
+        const adjacentInPlace = (e: Unit): boolean =>
+            e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(ec, mc)));
+        const cowardlyVs = (e: Unit): boolean =>
+            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+        const inPlaceStrike = (targetId: string): GameAction[] => {
+            const acts: GameAction[] = [];
+            if (unit.getAttackTypeSelection() !== MELEE) {
+                acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+            }
+            acts.push({
+                type: "melee_attack",
+                attackerId: unit.getId(),
+                targetId,
+                attackFrom: { ...unit.getBaseCell() },
+            });
+            return acts;
+        };
+
+        // Forced target (Aggr/taunt): only that unit may be struck.
+        const forcedId = unit.getTarget();
+        if (forcedId && forcedId !== strike.targetId) {
+            const forced = uh.getAllUnits().get(forcedId);
+            if (forced && !forced.isDead()) {
+                if (adjacentInPlace(forced) && !cowardlyVs(forced)) {
+                    return inPlaceStrike(forcedId);
+                }
+                return this.fallbackTurn(unit, context); // can't legally strike the forced target this turn
+            }
+        }
+        // Cowardice: cannot attack a stronger stack.
+        if (cowardlyVs(target)) {
+            if (forcedId === strike.targetId) {
+                return this.fallbackTurn(unit, context); // forced onto a stronger target — can't, so advance
+            }
+            const weaker = uh
+                .getAllAllies(otherTeam(unit.getTeam()))
+                .find((e) => !e.isDead() && e.getId() !== target.getId() && !cowardlyVs(e) && adjacentInPlace(e));
+            return weaker ? inPlaceStrike(weaker.getId()) : this.fallbackTurn(unit, context);
+        }
+        return decision;
     }
     /**
      * (10) Thunderbird "Chain Lightning": the strike arcs from the primary target to ADJACENT enemies,

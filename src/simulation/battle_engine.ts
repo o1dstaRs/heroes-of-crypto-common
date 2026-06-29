@@ -136,6 +136,7 @@ export interface IMatchResult {
         creature?: string;
         ammo?: number;
         possible?: string;
+        cause?: string;
     }[];
 }
 
@@ -482,6 +483,47 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 } else {
                     rejectedRed += 1;
                 }
+                let cause: string | undefined;
+                if (action.type === "melee_attack") {
+                    const tgt = unitsHolder.getAllUnits().get(action.targetId);
+                    const af = action.attackFrom ?? unit.getBaseCell();
+                    const afCells = unit.isSmallSize()
+                        ? [af]
+                        : [af, { x: af.x, y: af.y - 1 }, { x: af.x - 1, y: af.y }, { x: af.x - 1, y: af.y - 1 }];
+                    const bc = unit.getBaseCell();
+                    const stationary = af.x === bc.x && af.y === bc.y;
+                    const sel = unit.getAttackTypeSelection();
+                    const forced = unit.getTarget();
+                    if (!tgt || tgt.isDead()) {
+                        cause = "target_gone";
+                    } else if (tgt.hasBuffActive("Hidden")) {
+                        cause = "hidden";
+                    } else if (sel !== PBTypes.AttackVals.MELEE && sel !== PBTypes.AttackVals.MELEE_MAGIC) {
+                        cause = "not_melee_selected";
+                    } else if (forced && forced !== tgt.getId()) {
+                        cause = "forced_target_mismatch";
+                    } else if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < tgt.getCumulativeHp()) {
+                        cause = "cowardice";
+                    } else if (!grid.areCellsAdjacent(afCells, tgt.getCells())) {
+                        cause = "not_adjacent";
+                    } else if (!stationary && !unit.canMove()) {
+                        cause = "cannot_move";
+                    } else if (!stationary && (!action.path || !action.path.length)) {
+                        cause = "no_path";
+                    } else if (
+                        !stationary &&
+                        !grid.areAllCellsEmpty(afCells, unit.getId()) &&
+                        !grid.canOccupyCells(
+                            afCells,
+                            unit.hasAbilityActive("Made of Fire"),
+                            unit.hasAbilityActive("Made of Water"),
+                        )
+                    ) {
+                        cause = "cell_occupied";
+                    } else {
+                        cause = "other";
+                    }
+                }
                 rejectedDetails.push({
                     type: action.type,
                     reason: result.rejectionReason,
@@ -489,6 +531,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     creature: unit.getName(),
                     ammo: unit.getRangeShots(),
                     possible: unit.getPossibleAttackTypes().join("|"),
+                    cause,
                 });
             }
             recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
