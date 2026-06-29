@@ -113,7 +113,84 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const positioned = this.auraRepositionMelee(unit, context, goblin);
         const meleeTuned = this.rapidChargeReposition(unit, context, positioned);
         const fhTuned = this.aoeMeleeReposition(unit, context, meleeTuned);
-        return this.flyerPatientHunt(unit, context, fhTuned);
+        const hunted = this.flyerPatientHunt(unit, context, fhTuned);
+        return this.hydraSpinReposition(unit, context, hunted);
+    }
+    /**
+     * (9) Hydra "Lightning Spin": her melee hits EVERY enemy around her footprint and provokes NO counter,
+     * so position matters more than which target she nominally strikes. v0.4 moves her into the reachable
+     * cell adjacent to the MOST enemy stacks and strikes from there — turning a single hit into an
+     * all-around blow. Only swaps when it strictly increases the enemies caught.
+     */
+    private hydraSpinReposition(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!unit.hasAbilityActive("Lightning Spin") || unit.getTarget() || !unit.canMove()) {
+            return decision;
+        }
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (enemies.length < 2) {
+            return decision; // nothing to cleave around
+        }
+        // Enemy stacks adjacent to the Hydra's footprint at `cell` — exactly the engine's spin zone.
+        const adjEnemies = (cell: XY): Unit[] => {
+            const fp = this.footprintForCell(unit, cell, context);
+            return enemies.filter((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
+        };
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const baseCount = adjEnemies(strike.attackFrom ?? unit.getBaseCell()).length;
+        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        for (const routes of movePath.knownPaths.values()) {
+            const r = routes[0];
+            if (r?.route.length) {
+                cands.push({ cell: r.cell, route: r });
+            }
+        }
+        let best: { cell: XY; target: Unit; route?: IWeightedRoute; count: number } | undefined;
+        for (const cand of cands) {
+            const adj = adjEnemies(cand.cell);
+            if (!adj.length) {
+                continue;
+            }
+            const len = cand.route?.route.length ?? 0;
+            if (
+                !best ||
+                adj.length > best.count ||
+                (adj.length === best.count && len < (best.route?.route.length ?? 0))
+            ) {
+                best = { cell: cand.cell, target: adj[0], route: cand.route, count: adj.length };
+            }
+        }
+        if (!best || best.count < 2 || best.count <= baseCount) {
+            return decision; // no strictly-better cluster within reach
+        }
+        const actions: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            actions.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        actions.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: best.target.getId(),
+            attackFrom: { x: best.cell.x, y: best.cell.y },
+            path: best.route?.route.map((c) => ({ x: c.x, y: c.y })),
+            hasLavaCell: best.route?.hasLavaCell,
+            hasWaterCell: best.route?.hasWaterCell,
+        });
+        return actions;
     }
     /**
      * (8) Melee AoE targeting for Black Dragon (Fire Breath, line depth = unit size) and Pikeman (Skewer
