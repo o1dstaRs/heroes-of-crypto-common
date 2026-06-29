@@ -123,4 +123,23 @@ describe("v0.2 aura emitter (Pegasus, withAura)", () => {
         expect(actions.length).toBeGreaterThan(0);
         expect(actions.some((a) => a.type === "melee_attack" || a.type === "range_attack")).toBe(false);
     });
+
+    it("hourglasses (waits) when an ally is out of aura range and unreachable, to re-cover later", () => {
+        const c = createCombatTestContext();
+        const pegasus = makeCreature("Pegasus", "Nature", UPPER);
+        const covered = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE });
+        // A second ally far across the board: out of aura range and unreachable this turn, so no move
+        // improves coverage — the Pegasus should wait for the army to close up rather than advance.
+        const faraway = createTestUnit({ team: UPPER, name: "Faraway", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, pegasus, { x: 8, y: 12 });
+        placeUnit(c.grid, c.unitsHolder, covered, { x: 8, y: 11 });
+        placeUnit(c.grid, c.unitsHolder, faraway, { x: 8, y: 1 });
+
+        const ctx = ctxFor(c);
+        // The engine only accepts a hourglass when the team has more than one unit alive.
+        ctx.fightProperties!.setTeamUnitsAlive(UPPER, 3);
+
+        const actions = getAIStrategy("v0.2").decideTurn(pegasus, ctx);
+        expect(actions.some((a) => a.type === "wait_turn")).toBe(true);
+    });
 });
