@@ -759,9 +759,13 @@ export class StrategyV0_4 extends StrategyV0_3 {
     /**
      * (8) Troll "Wild Regeneration" gift. The ability is GIFTABLE (max gift level 3) and lasts the whole
      * fight, so gifting it to the highest-HP level<=3 ally makes that stack restore to full HP every turn —
-     * a near-unkillable frontliner. Sequencing: strike if an enemy is adjacent; else hourglass the very
-     * first turn (let the line form), then gift it on the next turn. Validated with canCastSpell so the
-     * engine never rejects it. Off via V04_TROLL=off.
+     * a near-unkillable frontliner. The base AI never casts it (Troll is MELEE_MAGIC -> treated as melee).
+     * Conditions (per domain guidance): only when we're DEFENDING with a ranged-heavy army (out-gun them at
+     * range) — the regen tank holds while our shooters out-attrition; never when we can strike an adjacent
+     * enemy. Sequencing: hourglass the very first turn, then gift to the best <=3 ally (falls to L2/L1 if no
+     * L3; never L4 — the engine forbids it, and we filter it out so there are zero rejections). Validated
+     * with canCastSpell. Measured neutral: forced-Troll A/B was -1.1pp ungated -> -0.2pp with the
+     * ranged-superiority gate (encodes the right play at no cost in mirror). On by default; V04_TROLL=off.
      */
     private trollWildRegen(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
         if (process.env.V04_TROLL === "off" || unit.getTarget()) {
