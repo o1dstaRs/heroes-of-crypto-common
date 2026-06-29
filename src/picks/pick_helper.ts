@@ -17,6 +17,22 @@ export const canBanCreatureLevel = (
     knownCreatures: number[],
     creaturesPickedPerTeam: number[],
 ): boolean => {
+    // Hard floor: a level must always keep enough creatures for the full set of picks BOTH teams are
+    // entitled to make there (2 x CreaturePoolByLevel). Banning past that strands the picker with no
+    // legal creature to take — the case the heuristic below used to under-count on the small (8-pool)
+    // L3/L4 levels. This invariant needs only the ban count, so it stays correct for every caller.
+    const poolSizeOfThisLevel = getCreaturesByLevel(creatureLevel).length;
+    let bansOfThisLevel = 0;
+    for (const cb of creaturesBanned) {
+        if (creatureLevel === CreatureLevelMap[cb as keyof typeof CreatureLevelMap]) {
+            bansOfThisLevel += 1;
+        }
+    }
+    const totalPicksReservedForBothTeams = 2 * (CreaturePoolByLevel[creatureLevel - 1] ?? 0);
+    if (poolSizeOfThisLevel - bansOfThisLevel - 1 < totalPicksReservedForBothTeams) {
+        return false;
+    }
+
     let minimumCreaturesOfThisLevelRequired = 2;
     let totalNumberOfCreaturesRemaining = getCreaturesByLevel(creatureLevel).length;
 

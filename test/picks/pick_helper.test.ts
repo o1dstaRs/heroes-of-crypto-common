@@ -33,7 +33,11 @@ describe("pick_helper", () => {
         const levelOne = creatureIdsForLevel(1);
         const levelFour = creatureIdsForLevel(4);
 
-        expect(canBanCreatureLevel(1, levelOne.slice(0, 8), [], [])).toBe(true);
+        // L1 has a 12-creature pool and both teams may pick 2 each (4 reserved): the 8th ban is the
+        // last legal one, so with 8 already banned a 9th is refused (it would strand a pick). A
+        // sentinel-inflated bucket would wrongly allow it, so this still pins the bucket size.
+        expect(canBanCreatureLevel(1, levelOne.slice(0, 7), [], [])).toBe(true);
+        expect(canBanCreatureLevel(1, levelOne.slice(0, 8), [], [])).toBe(false);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 10), [], [])).toBe(false);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 4), [], [])).toBe(true);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(false);
