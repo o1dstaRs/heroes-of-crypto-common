@@ -1006,6 +1006,38 @@ describe("GameActionEngine", () => {
         expect(entry?.position).toEqual(setup.upper.getPosition());
     });
 
+    it("carries a separate splash entry per shot for a Double-Shot area throw", () => {
+        // Gargantuan's Area Throw + Double Shot hits the splash twice. Each shot must contribute its
+        // OWN per-unit splash entry so the client draws two distinct floating numbers per affected unit,
+        // not a single merged total (the second shot's damage used to be applied but never recorded).
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Area Throw", "Double Shot"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 3,
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 7, y: 7 },
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.lower.getId(),
+            targetCell: { x: 7, y: 6 },
+        });
+
+        expect(result.completed).toBe(true);
+        const area = result.events.find((event) => event.type === "area_attacked");
+        if (area?.type !== "area_attacked") {
+            throw new Error("expected area_attacked event");
+        }
+        const entries = (area.damage.splash ?? []).filter((s) => s.unitId === setup.upper.getId());
+        expect(entries.length).toBe(2); // one floating number per shot, not a merged total
+        expect(entries.every((e) => e.amount > 0)).toBe(true);
+    });
+
     it("projects an area throw onto the first enemy standing on the trajectory", () => {
         // Attacker at {3,3}; an enemy sits at {5,3} directly between it and the empty aimed cell
         // {7,3}. The throw must be intercepted by (project onto) that enemy instead of passing

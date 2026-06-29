@@ -113,6 +113,15 @@ export function processDoubleShotAbility(
                 unitIdsDied.push(uId);
             }
         }
+        // Record THIS (second) shot's per-unit damage as its OWN splash entries. The first shot already
+        // filled damageForAnimation.splash; appending here means a Double-Shot AOE (Gargantuan's Area
+        // Throw) carries two entries per affected unit, so the client draws a separate floating number
+        // for each shot instead of one merged total.
+        if (aoeRangeAttackResult.perUnitDamage.length) {
+            (damageForAnimation.splash ??= []).push(
+                ...aoeRangeAttackResult.perUnitDamage.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            );
+        }
     } else {
         let abilityMultiplier = fromUnit.calculateAbilityMultiplier(
             doubleShotAbility,
