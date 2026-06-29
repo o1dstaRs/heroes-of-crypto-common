@@ -24,7 +24,8 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
-const frontlineOn = process.env.V04_FRONTLINE === "on"; // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
+const frontlineOn = process.env.V04_FRONTLINE === "on";
+const frontMoveOn = process.env.V04_FRONTMOVE === "on"; // NEUTRAL: +0.02pp overall, +0.47pp range-heavy (within noise) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
 const FRONT_TANKS = new Set(["Unicorn", "Scavenger"]);
 const buffWaitOn = process.env.V04_BUFFWAIT !== "off";
 const beheSelfOn = process.env.V04_BEHESELF === "on";
@@ -124,7 +125,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
         const legal = this.enforceMeleeLegality(unit, context, tuned);
-        return this.waitForMassBuff(unit, context, legal);
+        return this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal));
     }
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
     // Behemoth/Ogre rosters), but the CASTER should fire the buff IMMEDIATELY. Delaying the caster only
@@ -141,6 +142,60 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * that v0.3 placed deeper, so the tanks meet the enemy first and the rest follow. Same-size swap keeps
      * footprints valid. No tank / no swap partner -> unchanged.
      */
+    /**
+     * (EXP) Frontline lead + range bait (V04_FRONTMOVE). On a pure-move (no strike) for a melee unit:
+     *  - if our ranged firepower out-guns theirs, HOLD (bait) and let them walk onto our shots;
+     *  - else Unicorn/Scavenger LEAD the advance (toward the nearest enemy) to consume the first hits while
+     *    the rest of the melee follows normally.
+     */
+    private frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!frontMoveOn || unit.getAttackType() !== MELEE || !unit.canMove()) return decision;
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell"))
+            return decision;
+        const uh = context.unitsHolder;
+        const team = unit.getTeam();
+        const enemyTeam = otherTeam(team);
+        const enemies = uh.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) return decision;
+        if (teamRangedFirepower(team, uh) > teamRangedFirepower(enemyTeam, uh)) {
+            return this.canHourglass(unit, context) ? [{ type: "wait_turn", unitId: unit.getId() }] : decision;
+        }
+        if (!FRONT_TANKS.has(unit.getName())) return decision;
+        const { grid, matrix, pathHelper } = context;
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const nearest = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
+        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let bestDist = nearest(unit.getBaseCell());
+        for (const [key, routes] of movePath.knownPaths) {
+            const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
+            const route = routes?.[0];
+            if (!route?.route.length) continue;
+            const d = nearest(cell);
+            if (d < bestDist) {
+                bestDist = d;
+                best = { cell, route };
+            }
+        }
+        if (!best) return decision;
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            },
+        ];
+    }
     private frontlineTanks(units: Unit[], context: IPlacementContext, placed: Map<string, XY>): Map<string, XY> {
         if (!frontlineOn) return placed;
         const tanks = units.filter((u) => FRONT_TANKS.has(u.getName()));
