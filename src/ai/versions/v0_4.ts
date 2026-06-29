@@ -163,12 +163,12 @@ export class StrategyV0_4 extends StrategyV0_3 {
     }
     private doublePunchInitiate(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         // DISABLED by default (set V04_DPUNCH=on to re-test). Double Punch fires only when ATTACKING, so
-        // landing the first blow ~doubles a unit's damage. We tried positioning Wolf/Crusader/Berserker for
-        // that initiative. Forced Wolf+Crusader A/B (v0.3 vs v0.4): always avoiding exposure measured -3.4pp;
-        // gating it to PRE-CONTACT only (this version: hold just out of reach until the armies clash, then
-        // fight) recovered most of it but still -1.1pp (52.0% on vs 53.1% off). The pre-positioning's tempo/
-        // cohesion cost outweighs the initiative gain in mirror play — the base AI already attacks on its
-        // turn. Kept gated + measurable for asymmetric re-testing.
+        // landing the first blow ~doubles a unit's damage. Three variants tried (forced Wolf+Crusader A/B vs
+        // v0.3): always-avoid-exposure -3.4pp; pre-contact-only -1.1pp; hourglass-first (this version) -1.2pp.
+        // WHY it can't win in mirror (diagnostic): these units ALREADY attack at near-full power — avg ~262
+        // dmg/hit with the tactic ON and OFF, same as v0.3 — because the base AI initiates on its turn. The
+        // tactic lifts per-attack damage only ~1.5% while the deferring costs tempo. It's a weak PREMISE in
+        // self-play (both sides already strike first on their turns), not a weak implementation. Kept gated.
         if (process.env.V04_DPUNCH !== "on" || !unit.hasAbilityActive("Double Punch") || unit.getTarget()) {
             return decision;
         }
