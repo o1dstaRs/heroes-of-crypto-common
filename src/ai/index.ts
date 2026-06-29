@@ -11,15 +11,16 @@
 
 import type { IAIStrategy } from "./ai_strategy";
 import { STRATEGY_V0_1 } from "./versions/v0_1";
+import { STRATEGY_V0_2 } from "./versions/v0_2";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
 /**
- * Registry of every in-game AI version. Add the next generation here (e.g. STRATEGY_V0_2) — the
- * battle engine and tournament runner discover versions through this map, so a new version is
- * comparable against the baseline the moment it is registered. The latest entry is the default.
+ * Registry of every in-game AI version. Add the next generation here — the battle engine and
+ * tournament runner discover versions through this map, so a new version is comparable against the
+ * baseline the moment it is registered. The latest entry is the default.
  */
-const STRATEGIES: readonly IAIStrategy[] = [STRATEGY_V0_1];
+const STRATEGIES: readonly IAIStrategy[] = [STRATEGY_V0_1, STRATEGY_V0_2];
 
 const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));
 

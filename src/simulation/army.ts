@@ -66,6 +66,19 @@ interface ICatalogEntry {
 
 let catalogCache: ICatalogEntry[] | undefined;
 
+const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
+
+/**
+ * Only creatures that have a CreatureVals enum id are actually ENABLED in the game — creatures.json
+ * also carries disabled/unreleased entries (e.g. Faerie Dragon, which has no enum id). This mirrors
+ * the server's creature_lookup (it keys names to the enum), so rosters never field a disabled unit.
+ */
+function isCreatureEnabled(creatureName: string): boolean {
+    const enumKey = creatureName.toUpperCase().replace(/ /g, "_");
+    const id = creatureEnum[enumKey];
+    return typeof id === "number" && id > 0;
+}
+
 function getCatalog(): ICatalogEntry[] {
     if (catalogCache) {
         return catalogCache;
@@ -79,7 +92,12 @@ function getCatalog(): ICatalogEntry[] {
         }
         for (const creatureName of Object.keys(factionCreatures)) {
             const cfg = factionCreatures[creatureName];
-            if (cfg && typeof cfg.level === "number" && typeof cfg.size === "number") {
+            if (
+                cfg &&
+                typeof cfg.level === "number" &&
+                typeof cfg.size === "number" &&
+                isCreatureEnabled(creatureName)
+            ) {
                 entries.push({ faction, creatureName, level: cfg.level, size: cfg.size });
             }
         }

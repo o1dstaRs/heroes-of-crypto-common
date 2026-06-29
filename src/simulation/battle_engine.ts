@@ -162,6 +162,11 @@ export function runMatch(config: IMatchConfig): IMatchResult {
         sceneLog,
         attackHandler,
         getCurrentActiveUnitId: () => currentActiveUnitId || undefined,
+        // Mirror the live server: a unit's selectable attack types are refreshed on activation using
+        // whether it can actually land a ranged shot (boxed-in shooters lose RANGE), so the AI/engine
+        // agree on what's legal. Without this the turn engine defaults to "can always range".
+        canLandRangeAttack: (unit: Unit) =>
+            attackHandler.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(unit.getId())),
         // No known-paths provider: the engine trusts the legal path the AI computed (mirrors the live
         // server, which also omits it). canPlaceUnit restricts placement to each team's zone.
         canPlaceUnit: (unit: Unit, cells: XY[]) => cells.every((c) => zoneHashesFor(unit.getTeam()).has(cellKey(c))),
@@ -274,7 +279,14 @@ export function runMatch(config: IMatchConfig): IMatchResult {
         const actingUnitId = currentActiveUnitId;
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
-        const decided = strategy.decideTurn(unit, { grid, matrix, unitsHolder, pathHelper });
+        const decided = strategy.decideTurn(unit, {
+            grid,
+            matrix,
+            unitsHolder,
+            pathHelper,
+            attackHandler,
+            fightProperties,
+        });
 
         for (const action of decided) {
             const fromCell = { ...unit.getBaseCell() };

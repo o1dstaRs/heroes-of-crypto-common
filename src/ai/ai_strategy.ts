@@ -10,10 +10,12 @@
  */
 
 import type { GameAction } from "../engine/actions";
+import type { FightProperties } from "../fights/fight_properties";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Grid } from "../grid/grid";
 import type { PathHelper } from "../grid/path_helper";
 import type { IPlacement } from "../grid/placement_properties";
+import type { AttackHandler } from "../handlers/attack_handler";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
@@ -42,6 +44,15 @@ export interface IDecisionContext {
     matrix: number[][];
     unitsHolder: UnitsHolder;
     pathHelper: PathHelper;
+    /**
+     * Optional: lets a strategy ask whether a unit can actually LAND a ranged shot right now (not just
+     * whether it has ammo) — i.e. it isn't boxed in by melee and isn't range-suppressed — and to
+     * evaluate candidate shots (which units a trajectory hits, with what divisors). v0.1 ignores it;
+     * v0.2+ uses it to pick the best shot and to stop wasting turns on doomed ones.
+     */
+    attackHandler?: AttackHandler;
+    /** Optional: turn/hourglass state, so a strategy can decide whether a unit may wait (hourglass). */
+    fightProperties?: FightProperties;
 }
 
 export interface IAIStrategy {

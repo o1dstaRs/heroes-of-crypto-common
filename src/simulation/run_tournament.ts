@@ -10,35 +10,45 @@
  */
 
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { AI_VERSIONS } from "../ai";
-import { runTournament } from "./tournament";
+import { runTournamentConcurrent } from "./concurrent_tournament";
 
 /**
  * CLI: run an AI-vs-AI tournament and write LLM-feedable logs.
  *
- *   bun src/simulation/run_tournament.ts <versionA> <versionB> [games] [baseSeed] [outDir]
+ *   bun src/simulation/run_tournament.ts <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency]
  *
- * Example: bun src/simulation/run_tournament.ts v0.1 v0.2 1000
+ * Examples:
+ *   bun src/simulation/run_tournament.ts v0.1 v0.2 1000           # auto concurrency (= CPU cores)
+ *   bun src/simulation/run_tournament.ts v0.1 v0.2 1000 1 sim-out 10   # exactly 10 games in parallel
+ *   bun src/simulation/run_tournament.ts v0.1 v0.2 1000 1 sim-out 1    # force single-threaded
  *
- * Produces, under outDir:
- *   <A>_vs_<B>_<stamp>.jsonl     — one JSON line per game: placements + every action + outcome
+ * Concurrency runs games across worker threads (each its own isolate, so the engine's singleton is
+ * safe). Produces, under outDir:
+ *   <A>_vs_<B>_<stamp>.jsonl        — one JSON line per game: placements + every action + outcome
  *   <A>_vs_<B>_<stamp>.summary.json — aggregate win rates, end reasons, which version is better
  *
  * Feed the .jsonl (and especially the placement + early-action lines of games the new version LOST)
  * to an LLM to mine concrete improvements for the next version.
  */
-function main(): void {
-    const [, , versionA, versionB, gamesArg, seedArg, outDirArg] = process.argv;
+async function main(): Promise<void> {
+    const [, , versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = process.argv;
     if (!versionA || !versionB) {
-        console.error("usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir]");
+        console.error("usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency]");
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
     }
     const games = gamesArg ? Number(gamesArg) : 1000;
     const baseSeed = seedArg ? Number(seedArg) : 1;
     const outDir = outDirArg ?? join(process.cwd(), "sim-out");
+    const defaultConcurrency = Math.max(1, availableParallelism());
+    const concurrency = Math.min(
+        concurrencyArg ? Math.max(1, Number(concurrencyArg)) : defaultConcurrency,
+        Math.max(1, games),
+    );
     mkdirSync(outDir, { recursive: true });
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -49,6 +59,7 @@ function main(): void {
 
     const startedAt = Date.now();
     let buffer: string[] = [];
+    let logged = 0;
     const flush = (): void => {
         if (buffer.length) {
             appendFileSync(jsonlPath, buffer.join(""));
@@ -56,14 +67,17 @@ function main(): void {
         }
     };
 
-    console.log(`Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}) -> ${jsonlPath}`);
-    const summary = runTournament({ versionA, versionB, games, baseSeed }, (record) => {
+    console.log(
+        `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}) -> ${jsonlPath}`,
+    );
+    const summary = await runTournamentConcurrent({ versionA, versionB, games, baseSeed }, concurrency, (record) => {
         buffer.push(`${JSON.stringify(record)}\n`);
         if (buffer.length >= 50) {
             flush();
         }
-        if ((record.game + 1) % 100 === 0) {
-            console.log(`  ${record.game + 1}/${games} games...`);
+        logged += 1;
+        if (logged % 100 === 0) {
+            console.log(`  ${logged}/${games} games...`);
         }
     });
     flush();
@@ -89,7 +103,10 @@ function main(): void {
 
 // Bun/Node entry-point guard.
 if ((import.meta as unknown as { main?: boolean }).main) {
-    main();
+    main().catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });
 }
 
 export { main };

@@ -12,9 +12,15 @@
 import { describe, expect, it } from "bun:test";
 
 import { AI_VERSIONS, getAIStrategy, LATEST_AI_VERSION } from "../../src/ai";
+import type { IDecisionContext } from "../../src/ai";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { AttackHandler } from "../../src/handlers/attack_handler";
+import { PathHelper } from "../../src/grid/path_helper";
 import { buildRoster, creaturesByLevel, DEFAULT_ROSTER_COMPOSITION, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
-import { runTournament } from "../../src/simulation/tournament";
+import { runTournamentConcurrent } from "../../src/simulation/concurrent_tournament";
+import { playGame, runTournament } from "../../src/simulation/tournament";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 describe("AI strategy registry", () => {
     it("exposes v0.1 as a registered version and rejects unknown ones", () => {
@@ -29,6 +35,18 @@ describe("army / roster builder", () => {
     it("has creatures at every level used by the default composition", () => {
         for (const { level } of DEFAULT_ROSTER_COMPOSITION) {
             expect(creaturesByLevel(level).length).toBeGreaterThan(0);
+        }
+    });
+
+    it("only fields creatures enabled in the game (excludes disabled ones like Faerie Dragon)", () => {
+        const enabled = new Set([1, 2, 3, 4].flatMap((l) => creaturesByLevel(l).map((c) => c.creatureName)));
+        // Faerie Dragon exists in creatures.json but has no CreatureVals enum id -> must be excluded.
+        expect(enabled.has("Faerie Dragon")).toBe(false);
+        // Sanity: rosters across many seeds never contain a disabled creature.
+        for (let seed = 0; seed < 200; seed += 1) {
+            for (const spec of buildRoster(makeRng(seed))) {
+                expect(enabled.has(spec.creatureName)).toBe(true);
+            }
         }
     });
 
@@ -75,6 +93,101 @@ describe("battle engine", () => {
     });
 });
 
+describe("AI v0.2 out-of-ammo handling", () => {
+    // Force the "cannot land a ranged shot" branch deterministically, independent of fight RNG.
+    const cantLandRange = (ctx: ReturnType<typeof createCombatTestContext>): IDecisionContext => ({
+        grid: ctx.grid,
+        matrix: ctx.grid.getMatrix(),
+        unitsHolder: ctx.unitsHolder,
+        pathHelper: new PathHelper(testGridSettings),
+        attackHandler: { canLandRangeAttack: () => false } as unknown as AttackHandler,
+    });
+
+    const setup = (shooterAbilities: string[]) => {
+        const ctx = createCombatTestContext();
+        const shooter = createTestUnit({
+            name: "Shooter",
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 3,
+            speed: 5,
+            abilities: shooterAbilities,
+        });
+        const enemy = createTestUnit({
+            name: "Enemy",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+            maxHp: 100,
+            amountAlive: 1,
+        });
+        placeUnit(ctx.grid, ctx.unitsHolder, shooter, { x: 5, y: 5 });
+        placeUnit(ctx.grid, ctx.unitsHolder, enemy, { x: 8, y: 5 });
+        return { ctx, shooter };
+    };
+
+    it("never proposes a doomed range attack when the unit cannot land one", () => {
+        for (const abilities of [["No Melee"], []]) {
+            const { ctx, shooter } = setup(abilities);
+            const actions = getAIStrategy("v0.2").decideTurn(shooter, cantLandRange(ctx));
+            expect(actions.some((a) => a.type === "range_attack")).toBe(false);
+        }
+    });
+
+    it("a No-Melee shooter that can't shoot only advances or holds (no melee, no range)", () => {
+        const { ctx, shooter } = setup(["No Melee"]);
+        const actions = getAIStrategy("v0.2").decideTurn(shooter, cantLandRange(ctx));
+        expect(actions.every((a) => a.type === "move_unit" || a.type === "end_turn")).toBe(true);
+    });
+
+    it("a melee-capable shooter that can't shoot switches to melee (or advances), never wastes the turn", () => {
+        const { ctx, shooter } = setup([]);
+        const actions = getAIStrategy("v0.2").decideTurn(shooter, cantLandRange(ctx));
+        // Switches to melee (select + strike / move-and-strike) or at least advances toward the enemy.
+        expect(actions.some((a) => a.type === "melee_attack" || a.type === "move_unit")).toBe(true);
+        if (actions.some((a) => a.type === "melee_attack")) {
+            expect(actions.some((a) => a.type === "select_attack_type")).toBe(true);
+        }
+    });
+
+    it("when it CAN shoot, v0.2 fires the best visible edge with an explicit aim (v0.1 sends none)", () => {
+        const ctx = createCombatTestContext();
+        const shooter = createTestUnit({
+            name: "Shooter",
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            shotDistance: 16,
+            attack: 20,
+            damageMin: 10,
+            damageMax: 12,
+        });
+        // A killable chip target vs a juicier high-HP stack, both in the open and in range.
+        const chip = createTestUnit({ name: "Chip", team: PBTypes.TeamVals.UPPER, maxHp: 5, amountAlive: 1 });
+        const juicy = createTestUnit({ name: "Juicy", team: PBTypes.TeamVals.UPPER, maxHp: 100, amountAlive: 30 });
+        placeUnit(ctx.grid, ctx.unitsHolder, shooter, { x: 5, y: 8 });
+        placeUnit(ctx.grid, ctx.unitsHolder, chip, { x: 9, y: 8 });
+        placeUnit(ctx.grid, ctx.unitsHolder, juicy, { x: 5, y: 12 });
+
+        const decision: IDecisionContext = {
+            grid: ctx.grid,
+            matrix: ctx.grid.getMatrix(),
+            unitsHolder: ctx.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: ctx.attackHandler,
+        };
+        const actions = getAIStrategy("v0.2").decideTurn(shooter, decision);
+        const shot = actions.find((a) => a.type === "range_attack");
+        expect(shot).toBeDefined();
+        if (shot?.type === "range_attack") {
+            // Best-shot always sends the chosen edge (aimCell + aimSide); v0.1 leaves these undefined.
+            expect(shot.aimCell).toBeDefined();
+            expect(typeof shot.aimSide).toBe("number");
+            // The high-HP stack yields far more effective damage than the 5-hp chip, so it's preferred.
+            expect(shot.targetId).toBe(juicy.getId());
+        }
+    });
+});
+
 describe("tournament", () => {
     it("tallies every game and invokes the per-game callback", () => {
         const games = 6;
@@ -91,4 +204,23 @@ describe("tournament", () => {
         // Sides swap each game, so across the run each version plays green and red.
         expect(Object.values(summary.endReasons).reduce((a, b) => a + b, 0)).toBe(games);
     });
+
+    it("derives each game's side assignment from its index alone (parallel-safe)", () => {
+        const options = { versionA: "v0.1", versionB: "v0.2", games: 4, baseSeed: 9, maxLaps: 60 };
+        // Even games: A is green; odd games: A is red. Mirrored pairs share a roster.
+        expect(playGame(options, 0).greenVersion).toBe("v0.1");
+        expect(playGame(options, 1).greenVersion).toBe("v0.2");
+        expect(playGame(options, 0).result.roster).toEqual(playGame(options, 1).result.roster);
+    });
+
+    it("runs concurrently across worker threads with the same coverage as sequential", async () => {
+        const games = 8;
+        const options = { versionA: "v0.1", versionB: "v0.2", games, baseSeed: 3, maxLaps: 60 };
+        const seen: number[] = [];
+        const summary = await runTournamentConcurrent(options, 4, (r) => seen.push(r.game));
+        expect(summary.games).toBe(games);
+        expect(summary.a.wins + summary.b.wins + summary.draws).toBe(games);
+        // Every game index 0..games-1 ran exactly once (completion order may differ).
+        expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    }, 30000);
 });

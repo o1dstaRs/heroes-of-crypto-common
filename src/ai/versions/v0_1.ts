@@ -19,9 +19,9 @@ import type { XY } from "../../utils/math";
 import { findTarget, AIActionType, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 
-const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 
-const otherTeam = (team: number): number =>
+export const otherTeam = (team: number): number =>
     team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
 
 /**
@@ -32,8 +32,8 @@ const otherTeam = (team: number): number =>
  * before, so this is the baseline placement to beat. Magic/aura play is intentionally NOT included in
  * v0.1; a caster simply advances/holds, leaving headroom for v0.2 to add spellcasting.
  */
-class StrategyV0_1 implements IAIStrategy {
-    public readonly version = "v0.1";
+export class StrategyV0_1 implements IAIStrategy {
+    public readonly version: string = "v0.1";
     public placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         const placements = new Map<string, XY>();
         const occupied = new Set<number>();
@@ -122,6 +122,12 @@ class StrategyV0_1 implements IAIStrategy {
         }
 
         if (type === AIActionType.MELEE_ATTACK || type === AIActionType.MOVE_AND_MELEE_ATTACK) {
+            // Mirror the live server's ensureAiAttackType guard: findTarget can hand back a melee even
+            // for a unit that cannot melee (e.g. a "No Melee" shooter like Tsar Cannon, boxed in and
+            // unable to shoot). Proposing it just gets rejected and wastes the turn — reposition instead.
+            if (unit.hasAbilityActive("No Melee")) {
+                return this.fallbackTurn(unit, context);
+            }
             const targetCell = aiAction.cellToAttack();
             const attackFrom = aiAction.cellToMove() ?? unit.getBaseCell();
             const targetId = targetCell ? grid.getOccupantUnitId(targetCell) : undefined;
@@ -174,10 +180,10 @@ class StrategyV0_1 implements IAIStrategy {
         // MAGIC_ATTACK (and anything else): v0.1 doesn't cast — just advance toward the enemy / hold.
         return this.fallbackTurn(unit, context);
     }
-    private routeForCell(aiAction: IAIAction, cell: XY): IWeightedRoute | undefined {
+    protected routeForCell(aiAction: IAIAction, cell: XY): IWeightedRoute | undefined {
         return aiAction.currentActiveKnownPaths().get(cellKey(cell))?.[0];
     }
-    private footprintForCell(unit: Unit, cell: XY, context: IDecisionContext): XY[] {
+    protected footprintForCell(unit: Unit, cell: XY, context: IDecisionContext): XY[] {
         if (unit.isSmallSize()) {
             return [{ x: cell.x, y: cell.y }];
         }
@@ -192,7 +198,7 @@ class StrategyV0_1 implements IAIStrategy {
      * No reachable enemy/target: advance toward the nearest enemy along the best known route, mirroring
      * the live server's fallback. If the unit can't move, pass the turn.
      */
-    private fallbackTurn(unit: Unit, context: IDecisionContext): GameAction[] {
+    protected fallbackTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const endTurn: GameAction = { type: "end_turn", unitId: unit.getId(), reason: "manual" };
         if (!unit.canMove()) {
