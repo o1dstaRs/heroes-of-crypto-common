@@ -78,9 +78,30 @@ const summaryPath = jsonls[jsonls.length - 1];
 const sum = JSON.parse(readFileSync(summaryPath, "utf8"));
 const decisive = sum.a.wins + sum.b.wins; // a = v0.3, b = v0.2
 const pct = decisive ? (100 * sum.a.wins) / decisive : 0;
+const jsonl = summaryPath.replace(/\.summary\.json$/, ".jsonl");
 
-// 3) Decide.
-const improved = pct >= state.baselinePct + gainPP;
+// HARD GATE: the AI must never issue an action the engine rejects (completed === false).
+// Even a single rejection means the change destabilised behaviour — revert no matter the win rate.
+let rejected = 0;
+for (const l of readFileSync(jsonl, "utf8").split("\n")) {
+    if (!l) continue;
+    try {
+        for (const a of JSON.parse(l).result.actions ?? []) {
+            if (a.completed === false || a.rejectionReason) rejected++;
+        }
+    } catch {
+        /* skip */
+    }
+}
+
+// 3) Decide. Win rate must clear baseline + gainPP AND there must be zero rejected actions.
+const improved = pct >= state.baselinePct + gainPP && rejected === 0;
+if (rejected > 0 && pct >= state.baselinePct + gainPP) {
+    revert();
+    record("REVERT(rejections)", pct, `${rejected} rejected actions`);
+    console.log(`REVERT: ${rejected} rejected actions — change destabilised the AI, reverted despite ${pct.toFixed(2)}%.`);
+    process.exit(0);
+}
 if (improved) {
     sh(`git add ${V03}`);
     sh(`git commit -q -m "v0.3 optimizer: ${summary.replace(/"/g, "'")} (${pct.toFixed(2)}% vs ${state.baselinePct.toFixed(2)}%)"`);
@@ -95,7 +116,6 @@ if (improved) {
 }
 
 // 4) Refresh the loss analysis for the next cycle to target.
-const jsonl = summaryPath.replace(/\.summary\.json$/, ".jsonl");
 try {
     const report = sh(`node src/simulation/optimizer/analyze.mjs ${JSON.stringify(jsonl)} v0.3 v0.2`);
     console.log("\n" + report);
