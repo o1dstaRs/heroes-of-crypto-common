@@ -7,3 +7,6 @@ lerna-debug.log
 src/.DS_Store
 .idea
 tsconfig.build.tsbuildinfo
+
+# AI battle-engine tournament outputs
+sim-out/

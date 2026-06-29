@@ -1,0 +1,132 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import {
+    buildRoster,
+    makeRng,
+    DEFAULT_ROSTER_COMPOSITION,
+    DEFAULT_AMOUNT_BY_LEVEL,
+    type IRosterComposition,
+} from "./army";
+import { runMatch, type IMatchResult, type Side } from "./battle_engine";
+
+export interface ITournamentOptions {
+    versionA: string;
+    versionB: string;
+    /** Total games to play. Played as mirrored pairs (each roster is fought twice with sides swapped). */
+    games: number;
+    /** Base seed; game i uses a seed derived from it, so a whole run reproduces from one number. */
+    baseSeed: number;
+    maxLaps?: number;
+    composition?: readonly IRosterComposition[];
+    amountByLevel?: Readonly<Record<number, number>>;
+}
+
+export interface IGameRecord {
+    game: number;
+    /** Which version played which side this game (sides swap every other game). */
+    greenVersion: string;
+    redVersion: string;
+    winnerVersion: string | "draw";
+    result: IMatchResult;
+}
+
+export interface IVersionStats {
+    version: string;
+    wins: number;
+    winsAsGreen: number;
+    winsAsRed: number;
+}
+
+export interface ITournamentSummary {
+    versionA: string;
+    versionB: string;
+    games: number;
+    baseSeed: number;
+    a: IVersionStats;
+    b: IVersionStats;
+    draws: number;
+    /** Share of decisive games won by A (draws excluded). 0.5 = no improvement. */
+    winRateA: number;
+    avgLaps: number;
+    endReasons: Record<string, number>;
+    better: string | "tie";
+}
+
+const emptyStats = (version: string): IVersionStats => ({ version, wins: 0, winsAsGreen: 0, winsAsRed: 0 });
+
+/**
+ * Play `games` AI-vs-AI battles between two versions and tally who wins. Sides swap every other game
+ * on an identical roster (a mirrored pair), so green/red bias and first-move advantage cancel out and
+ * the win rate reflects only the AI. `onGame` is invoked with the full per-game record (placements +
+ * every action) so a caller can stream them to a JSONL log for later LLM analysis.
+ */
+export function runTournament(options: ITournamentOptions, onGame?: (record: IGameRecord) => void): ITournamentSummary {
+    const composition = options.composition ?? DEFAULT_ROSTER_COMPOSITION;
+    const amountByLevel = options.amountByLevel ?? DEFAULT_AMOUNT_BY_LEVEL;
+
+    const a = emptyStats(options.versionA);
+    const b = emptyStats(options.versionB);
+    let draws = 0;
+    let totalLaps = 0;
+    const endReasons: Record<string, number> = {};
+
+    for (let game = 0; game < options.games; game += 1) {
+        // Each mirrored pair (games 2k, 2k+1) shares a roster+seed; sides swap between them.
+        const pairIndex = Math.floor(game / 2);
+        const seed = (options.baseSeed + pairIndex * 0x9e3779b1) >>> 0;
+        const roster = buildRoster(makeRng(seed), composition, amountByLevel);
+
+        const aIsGreen = game % 2 === 0;
+        const greenVersion = aIsGreen ? options.versionA : options.versionB;
+        const redVersion = aIsGreen ? options.versionB : options.versionA;
+
+        const result = runMatch({ greenVersion, redVersion, roster, seed, maxLaps: options.maxLaps });
+
+        const winnerSide: Side | "draw" = result.winner;
+        const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;
+
+        if (winnerVersion === "draw") {
+            draws += 1;
+        } else {
+            const stats = winnerVersion === options.versionA ? a : b;
+            stats.wins += 1;
+            if (winnerSide === "green") {
+                stats.winsAsGreen += 1;
+            } else {
+                stats.winsAsRed += 1;
+            }
+        }
+
+        totalLaps += result.laps;
+        endReasons[result.endReason] = (endReasons[result.endReason] ?? 0) + 1;
+
+        onGame?.({ game, greenVersion, redVersion, winnerVersion, result });
+    }
+
+    const decisive = a.wins + b.wins;
+    const winRateA = decisive > 0 ? a.wins / decisive : 0.5;
+    const better = a.wins === b.wins ? "tie" : a.wins > b.wins ? options.versionA : options.versionB;
+
+    return {
+        versionA: options.versionA,
+        versionB: options.versionB,
+        games: options.games,
+        baseSeed: options.baseSeed,
+        a,
+        b,
+        draws,
+        winRateA,
+        avgLaps: options.games ? totalLaps / options.games : 0,
+        endReasons,
+        better,
+    };
+}
