@@ -57,7 +57,7 @@ interface IShotPlan {
 }
 
 /** Σ remaining shots × max per-shot damage for a team's living range units (mirrors ai.ts firepower). */
-function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
+export function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
     let firepower = 0;
     for (const u of unitsHolder.getAllAllies(team)) {
         if (u.isDead() || u.getAttackType() !== RANGE || u.getRangeShots() <= 0) {
@@ -484,7 +484,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         return swapped;
     }
     /** A ranged unit that CAN shoot: pick the best visible-edge shot, or hourglass to wait for a better one. */
-    private decideRangedTurn(unit: Unit, context: IDecisionContext, attackHandler: AttackHandler): GameAction[] {
+    protected decideRangedTurn(unit: Unit, context: IDecisionContext, attackHandler: AttackHandler): GameAction[] {
         const best = this.findBestShot(unit, context, attackHandler);
         if (!best) {
             // No worthwhile shot found — let v0.1 decide (it may move/engage).
@@ -560,7 +560,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         return best;
     }
     /** Sum expected effective damage over everyone a shot hits; enemies add, friendly-fire subtracts. */
-    private scoreShot(
+    protected scoreShot(
         unit: Unit,
         evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
         fromTeam: number,
