@@ -24,6 +24,8 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const frontlineOn = process.env.V04_FRONTLINE === "on"; // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
+const FRONT_TANKS = new Set(["Unicorn", "Scavenger"]);
 const buffWaitOn = process.env.V04_BUFFWAIT !== "off";
 const beheSelfOn = process.env.V04_BEHESELF === "on";
 const ogreSelfOn = process.env.V04_OGRESELF === "on"; // measured below // DISABLED by default: measured -2.66pp on 20k forced-Behemoth games
@@ -133,6 +135,39 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * Behemoth's Battle Roar / Ogre Mage's Mass Riot is still pending, so when it finally acts the army-wide
      * buff is already live. Only redirects an idle/move turn (never a strike); lap 1 only.
      */
+    /**
+     * (EXP) Frontline soak (V04_FRONTLINE). Unicorn (Blindness) and Scavenger (Dodge/Backstab) are good at
+     * trading the FIRST hits, so put them on the front line: swap each forward with a same-size regular melee
+     * that v0.3 placed deeper, so the tanks meet the enemy first and the rest follow. Same-size swap keeps
+     * footprints valid. No tank / no swap partner -> unchanged.
+     */
+    private frontlineTanks(units: Unit[], context: IPlacementContext, placed: Map<string, XY>): Map<string, XY> {
+        if (!frontlineOn) return placed;
+        const tanks = units.filter((u) => FRONT_TANKS.has(u.getName()));
+        if (!tanks.length) return placed;
+        const front = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
+        for (const t of tanks) {
+            const tc = placed.get(t.getId());
+            if (!tc) continue;
+            let best: Unit | undefined;
+            let bestFront = front(tc);
+            for (const u of units) {
+                if (u.getId() === t.getId() || u.getAttackType() !== MELEE || FRONT_TANKS.has(u.getName())) continue;
+                if (u.isSmallSize() !== t.isSmallSize()) continue;
+                const uc = placed.get(u.getId());
+                if (uc && front(uc) > bestFront) {
+                    bestFront = front(uc);
+                    best = u;
+                }
+            }
+            if (best) {
+                const bc = placed.get(best.getId())!;
+                placed.set(t.getId(), bc);
+                placed.set(best.getId(), tc);
+            }
+        }
+        return placed;
+    }
     private waitForMassBuff(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!buffWaitOn) return decision;
         if (FightStateManager.getInstance().getFightProperties().getCurrentLap() > 1) return decision;
@@ -1084,7 +1119,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
      */
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         if (!units.some(isAoEUnit)) {
-            return super.placeArmy(units, context);
+            return this.frontlineTanks(units, context, super.placeArmy(units, context));
         }
         const placements = new Map<string, XY>();
         const occupied = new Set<number>();
@@ -1132,7 +1167,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             placements.set(u.getId(), bestBase);
             placed.push(bestBase);
         }
-        return placements;
+        return this.frontlineTanks(units, context, placements);
     }
 }
 
