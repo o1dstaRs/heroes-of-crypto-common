@@ -75,7 +75,8 @@ describe("v0.2 Griffin null-field dive", () => {
         placeUnit(c.grid, c.unitsHolder, r3, { x: 5, y: 2 });
 
         const target = meleeTargetId(getAIStrategy("v0.2").decideTurn(griffin, ctxFor(c)));
-        expect([r1.getId(), r2.getId(), r3.getId()]).toContain(target);
+        expect(target).toBeDefined();
+        expect([r1.getId(), r2.getId(), r3.getId()]).toContain(target as string);
     });
 
     it("does not dive alone — without flying support it engages normally", () => {
