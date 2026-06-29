@@ -199,6 +199,14 @@ export class FightProperties {
     public getObstacleHitsLeft(): number {
         return this.obstacleHitsLeft;
     }
+    /**
+     * Authoritatively set the remaining mountain hit points. Used by the client replay to reflect the
+     * recorded `obstacle_attacked` event's `hitsAfter` without re-running the attack through the engine
+     * (which is unreliable mid-replay once the actor's turn has handed over). Clamped to [0, MAX].
+     */
+    public setObstacleHitsLeft(hits: number): void {
+        this.obstacleHitsLeft = Math.max(0, Math.min(MAX_HITS_MOUNTAIN, Math.floor(hits)));
+    }
     public hasDamageDealFactPerLap(lap: number): boolean {
         return this.damageDealFactPerLap.get(lap) ?? false;
     }
