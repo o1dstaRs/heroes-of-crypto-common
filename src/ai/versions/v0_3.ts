@@ -296,8 +296,20 @@ class StrategyV0_3 extends StrategyV0_2 {
         for (const u of ranged) {
             placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a)); // deep + cornered
         }
-        for (const u of melee) {
+        // Ground melee form the centred front wall (the body the enemy must grind through). Flyers, by
+        // contrast, ignore terrain and screens, so spreading them across that wall wastes their reach.
+        // We instead STAGE all flyers together, forward and packed onto one flank, so they sweep the
+        // enemy back line as a coordinated wing in a single move (and support each other's dives) rather
+        // than peeling off solo. Flying-heavy mirrors are v0.3's weakest bucket; a grouped flank wing is
+        // the textbook answer to "coordinate flyers, don't dive alone".
+        const isFlyer = (u: Unit): boolean => u.canFly();
+        const groundMelee = melee.filter((u) => !isFlyer(u));
+        const flyers = melee.filter(isFlyer);
+        for (const u of groundMelee) {
             placeBy(u, (a, b) => frontness(b) - frontness(a) || edgeness(a) - edgeness(b)); // front wall, centred
+        }
+        for (const u of flyers) {
+            placeBy(u, (a, b) => frontness(b) - frontness(a) || a.x - b.x); // forward, packed onto one flank
         }
         for (const u of support) {
             placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(a) - edgeness(b)); // back, centred
