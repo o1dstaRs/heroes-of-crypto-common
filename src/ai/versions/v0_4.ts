@@ -23,6 +23,7 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const mvGuardOn = process.env.V04_MVGUARD !== "off";
 const MAGIC_FH = PBTypes.AttackVals.MAGIC;
 const enabledFH = (name: string): boolean => process.env[`V04_${name}`] !== "off";
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
@@ -115,7 +116,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const fhTuned = this.aoeMeleeReposition(unit, context, meleeTuned);
         const hunted = this.flyerPatientHunt(unit, context, fhTuned);
         const spun = this.hydraSpinReposition(unit, context, hunted);
-        return this.chainLightningTarget(unit, context, spun);
+        return this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
     }
     /**
      * (10) Thunderbird "Chain Lightning": the strike arcs from the primary target to ADJACENT enemies,
@@ -123,6 +124,47 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * So v0.4 attacks the reachable enemy embedded in the LARGEST connected enemy cluster, maximising the
      * arc. Only swaps when it strictly increases the stacks the chain reaches.
      */
+    /**
+     * Footprint guard (V04_MVGUARD): the move-emitting tactics use getMovePath, whose reachability model is
+     * slightly looser than the engine's execution-time check, so a few proposed moves land on an occupied
+     * footprint and get rejected `move_blocked` (wasting the turn). If the tuned decision's move would be
+     * blocked, fall back to the validated core decision; if that is also blocked, hold instead of emitting a
+     * rejected move. Mirrors the engine's own areAllCellsEmpty / canOccupyCells gate.
+     */
+    private preferValidMove(
+        unit: Unit,
+        context: IDecisionContext,
+        decision: GameAction[],
+        fallback: GameAction[],
+    ): GameAction[] {
+        if (!mvGuardOn || !this.moveIsBlocked(unit, context, decision)) {
+            return decision;
+        }
+        if (!this.moveIsBlocked(unit, context, fallback)) {
+            return fallback;
+        }
+        return this.canHourglass(unit, context)
+            ? [{ type: "wait_turn", unitId: unit.getId() }]
+            : [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+    }
+    private moveIsBlocked(unit: Unit, context: IDecisionContext, decision: GameAction[]): boolean {
+        const mv = decision.find((a) => a.type === "move_unit");
+        if (!mv || mv.type !== "move_unit") {
+            return false;
+        }
+        const fp = mv.targetCells ?? [];
+        if (!fp.length) {
+            return false;
+        }
+        return !(
+            context.grid.areAllCellsEmpty(fp, unit.getId()) ||
+            context.grid.canOccupyCells(
+                fp,
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            )
+        );
+    }
     private chainLightningTarget(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!unit.hasAbilityActive("Chain Lightning") || unit.getTarget() || !unit.canMove()) {
             return decision;
