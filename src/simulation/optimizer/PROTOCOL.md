@@ -74,3 +74,16 @@ v0.3 reached **66.5%** vs v0.2 (+16.5pp) in 36 cycles via 3 wins. The leverage r
 
 ## Rejection-aware gate (important)
 Engine-rejected actions are recorded in `result.rejectedDetails` ({type, reason, version}), NOT in `result.actions`. `cycle.mjs` counts rejections attributed to the OPT version and gates on **no increase vs a tracked floor** (`state.baselineRejected`), because there is a non-zero INHERITED floor today: the core `findTarget`->GameAction mapping (v0.1/v0.2) sometimes proposes `melee/range_attack :: attack_not_available` (~700/version/10k). A change that raises the OPT rejection count is reverted even if it wins. Reducing rejections ratchets the floor down.
+
+## Self-steering signals (read the analysis, pick ONE change, trust ONE measurement)
+Each cycle's `analyze.mjs` report now hands the next change to you directly — no extra exploration needed:
+- **Win rate by board layout** (NORMAL/WATER/LAVA/BLOCK): attack the weakest map. `cycle.mjs` samples all
+  layouts by default (`MAPS=off` to disable), so mountain/lava/water tactics are measured in the SAME run.
+- **Composition buckets** (ranged/flying/caster-heavy) + **engagement move-share** (high in losses ⇒ try
+  MOVEMENT coordination, the lever that gave +9.7pp).
+- **Engine-rejected actions** by side + flavor (`move_blocked`, `attack_not_available`): a change must NOT
+  raise the OPT count (the gate enforces this). Reducing them is itself a valid win.
+Because measurement is deterministic, ONE 12k run is the verdict — do not re-run the same change. Make ONE
+selective change per cycle aimed at the worst bucket/map, and prefer NOVEL structural levers over re-encoding
+known intuitions (those already measure neutral against the strong base). `RANDOM=on` adds asymmetric rosters
+when you want creature-specific tactics (Goblin Knight, Hydra, AoE) to actually appear.

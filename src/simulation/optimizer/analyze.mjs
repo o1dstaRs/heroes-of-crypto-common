@@ -74,6 +74,10 @@ const BUCKETS = [
 ];
 
 const games = [];
+const MAP_NAMES = { 1: 'NORMAL', 2: 'WATER', 3: 'LAVA', 4: 'BLOCK' };
+const rejFlavors = {};
+let optRejected = 0;
+let baseRejected = 0;
 let optWins = 0;
 let optLosses = 0;
 let draws = 0;
@@ -89,6 +93,12 @@ for (const line of lines) {
     const r = o.result ?? {};
     const side = o.greenVersion === optimized ? "green" : o.redVersion === optimized ? "red" : undefined;
     if (!side) continue; // not a game involving the optimized version
+    for (const d of r.rejectedDetails ?? []) {
+        if (d.version === optimized) optRejected += 1;
+        else if (d.version === baseline) baseRejected += 1;
+        const k = `${d.version}  ${d.type} :: ${d.reason ?? '?'}`;
+        rejFlavors[k] = (rejFlavors[k] ?? 0) + 1;
+    }
     const winnerSide = r.winner; // "green" | "red" | undefined (draw)
     const optWon = winnerSide === side;
     const draw = winnerSide !== "green" && winnerSide !== "red";
@@ -121,6 +131,7 @@ for (const line of lines) {
         armageddon: r.endReason === "armageddon" || (r.outcome && r.outcome.armageddon) || false,
         feat: rosterFeatures(r.roster ?? []),
         moveShare: acted ? moves / acted : 0,
+        gridType: r.gridType ?? 1,
     });
 }
 
@@ -150,6 +161,29 @@ out.push(`|---|---:|---:|---:|`);
 for (const b of worst) {
     out.push(`| ${b.label} | ${b.n} | ${pct(b.winRate)} | ${b.delta >= 0 ? "+" : ""}${pct(b.delta)} |`);
 }
+// Per-map-type win rate — surfaces map-specific tactics (mountain / lava / water) the loop should target.
+const mapStats = {};
+for (const g of games) {
+    const m = MAP_NAMES[g.gridType] ?? String(g.gridType);
+    (mapStats[m] ??= { n: 0, w: 0 });
+    mapStats[m].n += 1;
+    if (g.optWon) mapStats[m].w += 1;
+}
+if (Object.keys(mapStats).length > 1) {
+    out.push(``);
+    out.push(`## Win rate by board layout (target the weakest map)`);
+    for (const [m, v] of Object.entries(mapStats).sort((a, b) => a[1].w / a[1].n - b[1].w / b[1].n)) {
+        out.push(`- ${m}: ${pct(v.w / v.n)}  (${v.n} games)`);
+    }
+}
+
+// Engine-rejected actions — a stable AI must not raise these. Shown by side + flavor so the loop sees them.
+out.push(``);
+out.push(`## Engine-rejected actions (must not increase)`);
+out.push(`- ${optimized}: ${optRejected}   |   ${baseline}: ${baseRejected}`);
+const topFlavors = Object.entries(rejFlavors).sort((a, b) => b[1] - a[1]).slice(0, 6);
+for (const [k, n] of topFlavors) out.push(`  - ${n}  ${k}`);
+
 // Movement-coordination signal: average move-share in wins vs losses. A losses >> wins gap means the
 // optimized side shuffles instead of engaging when it is losing — point the next change at MOVEMENT.
 const avg = (arr) => (arr.length ? arr.reduce((s, g) => s + g.moveShare, 0) / arr.length : 0);

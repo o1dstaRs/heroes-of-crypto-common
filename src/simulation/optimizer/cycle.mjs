@@ -49,6 +49,12 @@ const summary = process.argv[2] ?? "(unspecified change)";
 // occasionally to guard against overfitting one seed set — see PROTOCOL.md.)
 const games = Number(process.argv[3] ?? 12000);
 const gainPP = Number(process.argv[4] ?? 0.2); // required improvement in PERCENTAGE POINTS (noise-free now)
+// Sample ALL board layouts by default (MAPS=off to disable) so map-specific tactics (mountain/lava/water)
+// are measured in the SAME run — no separate map runs needed. Rosters stay MIRRORED by default for a clean
+// skill signal (RANDOM=on enables the other agent's asymmetric-roster matchups when you want realism).
+const MAPS = process.env.MAPS !== "off";
+const RANDOM = process.env.RANDOM === "on";
+const tournFlags = `${MAPS ? " --maps" : ""}${RANDOM ? " --random" : ""}`;
 
 const sh = (cmd, opts = {}) => execSync(cmd, { cwd: REPO, encoding: "utf8", stdio: "pipe", ...opts });
 const revert = () => sh(`git checkout -- ${OPT_FILE}`);
@@ -89,7 +95,9 @@ let summaryPath;
 let sum;
 try {
     const before = new Set(readdirSync(TOURN_OUT).filter((f) => f.endsWith(".summary.json")));
-    sh(`bun src/simulation/run_tournament.ts ${OPT} ${BASE} ${games} 1 ${JSON.stringify(TOURN_OUT)}`, { stdio: "ignore" });
+    sh(`bun src/simulation/run_tournament.ts ${OPT} ${BASE} ${games} 1 ${JSON.stringify(TOURN_OUT)}${tournFlags}`, {
+        stdio: "ignore",
+    });
     const after = readdirSync(TOURN_OUT)
         .filter((f) => f.startsWith(`${OPT}_vs_${BASE}_`) && f.endsWith(".summary.json") && !before.has(f))
         .map((f) => join(TOURN_OUT, f))
