@@ -609,6 +609,32 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
+    it("rejects a range attack from a unit standing in a Range Null Field", () => {
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerRangeShots: 3,
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 7, y: 3 },
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+        // Stand the shooter inside an enemy's Range Null Field (modelled as a debuff aura) — firing must
+        // be impossible, not merely discouraged.
+        setup.lower.applyAuraEffect("Range Null Field Aura", "", false, 0, "");
+        expect(setup.lower.hasDebuffActive("Range Null Field Aura")).toBe(true);
+        const shotsBefore = setup.lower.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("attack_not_available");
+        expect(setup.lower.getRangeShots()).toBe(shotsBefore); // no shot consumed
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+    });
+
     it("honors a valid range aim (visible edge) and clamps a tampered aim cell to the target", () => {
         const makeSetup = () => {
             const setup = setupActionFight({

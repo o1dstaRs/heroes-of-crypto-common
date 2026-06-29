@@ -341,6 +341,11 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
     if (unit.getRangeShots() <= 0) {
         return undefined;
     }
+    // A unit inside an enemy's Range Null Field (or carrying Rangebane) can't fire — don't propose a
+    // range attack the engine will reject (and never animate a shot that can't happen).
+    if (unit.hasDebuffActive("Range Null Field Aura") || unit.hasDebuffActive("Rangebane")) {
+        return undefined;
+    }
 
     const unitCell = unit.getBaseCell();
     const unitTeam = unit.getTeam();

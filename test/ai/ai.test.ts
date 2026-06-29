@@ -1102,6 +1102,7 @@ class UnitRepr implements IUnitAIRepr {
         public rangeShots: number,
         public rangeShotDistance: number,
         public abilities: Set<string>,
+        public debuffs: Set<string> = new Set<string>(),
     ) {
         // public movePath?: IMovePath, // the IMovePath that is returned from PathHelper.getMovePath if provided
     }
@@ -1160,6 +1161,10 @@ class UnitRepr implements IUnitAIRepr {
 
     public hasAbilityActive(abilityName: string): boolean {
         return this.abilities.has(abilityName);
+    }
+
+    public hasDebuffActive(debuffName: string): boolean {
+        return this.debuffs.has(debuffName);
     }
 
     public getRangeShots(): number {

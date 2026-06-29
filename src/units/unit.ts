@@ -137,6 +137,7 @@ export interface IUnitAIRepr {
     getCells(): XY[];
     getAttackType(): AttackType;
     hasAbilityActive(abilityName: string): boolean;
+    hasDebuffActive(debuffName: string): boolean;
     getRangeShots(): number;
     getRangeShotDistance(): number;
 }

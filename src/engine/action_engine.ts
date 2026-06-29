@@ -400,6 +400,13 @@ export class GameActionEngine {
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
         }
+        // A unit standing in an enemy's Range Null Field (or carrying Rangebane) cannot fire — the
+        // ability/aura exists precisely to forbid this. The handler otherwise never re-checks the
+        // attacker's range eligibility, so without this an AI (or a tampered client) can shoot through
+        // the field and the shot animation plays. canLandRangeAttack enforces the same names.
+        if (attacker.hasDebuffActive("Range Null Field Aura") || attacker.hasDebuffActive("Rangebane")) {
+            return this.reject("attack_not_available");
+        }
 
         // The shot travels from the attacker's center to the CENTER OF THE SELECTED VISIBLE EDGE of
         // the target, never to the target's center. The edge is reconstructed authoritatively here
