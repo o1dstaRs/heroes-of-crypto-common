@@ -12,7 +12,7 @@
 import type { GameAction } from "../../engine/actions";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import { canCastSpell } from "../../spells/spell_helper";
+import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
@@ -97,11 +97,121 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 return riot;
             }
         }
+        // (7) Healer policy: only heal a LEVEL 3-4 stack that has lost >30% HP (Mass Heal if several),
+        // otherwise armor is the better play. Preempts the generic heal/buff logic for the Healer.
+        if (unit.getName() === "Healer") {
+            const healerPlay = this.decideHealerSpell(unit, context);
+            if (healerPlay) {
+                return healerPlay;
+            }
+        }
         const base = super.decideTurn(unit, context);
         const healed = this.retargetHeal(unit, context, base);
         const goblin = this.preferLowLevelMelee(unit, context, healed);
         const positioned = this.auraRepositionMelee(unit, context, goblin);
         return this.rapidChargeReposition(unit, context, positioned);
+    }
+    /**
+     * (7) Healer spell policy (requested): a single-target HEAL is only worth it on a LEVEL 3-4 stack that
+     * has lost >30% of its HP — cheap low-level stacks aren't worth a heal. If SEVERAL such stacks are hurt,
+     * Mass Heal instead. Otherwise the stronger play is armor: Spiritual Armor on the most valuable
+     * uncovered ally. Every branch is validated (canCastSpell / canMassCastSpell) so the engine never
+     * rejects it; returns undefined when nothing is worth casting (fall through to normal play).
+     */
+    private decideHealerSpell(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        if (unit.getStackPower() < 1) {
+            return undefined;
+        }
+        const { grid, matrix, unitsHolder } = context;
+        const gridSettings = grid.getSettings();
+        const team = unit.getTeam();
+        const allies = unitsHolder.getAllAllies(team).filter((a) => !a.isDead());
+        if (!allies.length) {
+            return undefined;
+        }
+        const usable = (name: string) =>
+            unit
+                .getSpells()
+                .find(
+                    (s) =>
+                        s.getName() === name &&
+                        s.getLapsTotal() > 0 &&
+                        s.isRemaining() &&
+                        s.getMinimalCasterStackPower() <= unit.getStackPower(),
+                );
+        const fullCap = (a: Unit): number => a.getMaxHp() * Math.max(1, a.getAmountAlive() + a.getAmountDied());
+        const lostFrac = (a: Unit): number => {
+            const cap = fullCap(a);
+            return cap > 0 ? 1 - a.getCumulativeHp() / cap : 0;
+        };
+        const canCast = (spell: ReturnType<typeof usable>, target: Unit): boolean =>
+            !!spell &&
+            !!canCastSpell(
+                false,
+                gridSettings,
+                matrix,
+                unit,
+                target,
+                spell,
+                target.getBaseCell(),
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+                undefined,
+            );
+
+        // Only LEVEL 3-4 stacks that have lost more than 30% of their HP are worth a heal.
+        const critical = allies
+            .filter((a) => a.canBeHealed() && a.getLevel() >= 3 && lostFrac(a) > 0.3)
+            .sort((p, q) => lostFrac(q) - lostFrac(p));
+
+        // 1) Several such stacks -> Mass Heal.
+        if (critical.length >= 2) {
+            const mass = usable("Mass Heal");
+            if (
+                mass &&
+                canMassCastSpell(
+                    mass,
+                    unitsHolder.getAllTeamUnitsBuffs(team),
+                    unitsHolder.getAllEnemyUnitsBuffs(team),
+                    unitsHolder.getAllEnemyUnitsDebuffs(team),
+                    unitsHolder.getAllTeamUnitsMagicResist(team),
+                    unitsHolder.getAllEnemyUnitsMagicResist(team),
+                    unitsHolder.getAllTeamUnitsHp(team),
+                    unitsHolder.getAllTeamUnitsMaxHp(team),
+                    unitsHolder.getAllTeamUnitsCanFly(team),
+                    unitsHolder.getAllEnemyUnitsCanFly(team),
+                )
+            ) {
+                return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Mass Heal" }];
+            }
+        }
+        // 2) One such stack -> single Heal on the most-hurt of them.
+        const heal = usable("Heal");
+        if (critical.length >= 1 && canCast(heal, critical[0])) {
+            return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Heal", targetId: critical[0].getId() }];
+        }
+        // 3) Otherwise armor is the better play -> Spiritual Armor on the most valuable uncovered ally.
+        const armor = usable("Spiritual Armor");
+        if (armor) {
+            const target = allies
+                .filter((a) => a.getId() !== unit.getId() && !a.hasBuffActive("Spiritual Armor"))
+                .sort(
+                    (p, q) => q.getAttackDamageMax() * q.getAmountAlive() - p.getAttackDamageMax() * p.getAmountAlive(),
+                )
+                .find((a) => canCast(armor, a));
+            if (target) {
+                return [
+                    {
+                        type: "cast_spell",
+                        casterId: unit.getId(),
+                        spellName: "Spiritual Armor",
+                        targetId: target.getId(),
+                    },
+                ];
+            }
+        }
+        return undefined;
     }
     /**
      * (5b) Don't clump into AoE: when the enemy fields an AoE / multi-hit unit, suppress v0.3's melee
