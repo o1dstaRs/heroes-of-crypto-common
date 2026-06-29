@@ -24,6 +24,7 @@ import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const angelResOn = process.env.V04_ANGELRES === "on"; // DISABLED: -28pp blunt, -3.65pp even strictly gated (Angel's melee beats resurrecting in sim)
 const boxHoldOn = process.env.V04_BOXHOLD === "on"; // NEUTRAL: +0.06pp overall, +0.05pp range-heavy (v0.3 already handles boxed shooters)
 const frontlineOn = process.env.V04_FRONTLINE === "on";
 const frontMoveOn = process.env.V04_FRONTMOVE !== "off"; // range-heavy bait/lead: +0.99pp on forced range-heavy (gated to >=3 ranged so no dilution) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
@@ -116,6 +117,15 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 return healerPlay;
             }
         }
+        // (8) Troll "Wild Regeneration" gift: a MELEE_MAGIC unit the base AI never casts. Gift the
+        // full-heal-each-turn buff to the highest-HP level<=3 ally (max effect; lasts the whole fight),
+        // hourglassing the very first turn — unless the Troll can strike an enemy right now.
+        if (unit.getName() === "Troll") {
+            const regen = this.trollWildRegen(unit, context);
+            if (regen) {
+                return regen;
+            }
+        }
         // (EXP) Boxed shooter: an enemy adjacent blocks our shot. Hourglass FIRST — an ally may clear the
         // blocker this lap (saving us a wasted retreat); only after we've waited does v0.3 melee-kill it or
         // retreat to safety.
@@ -133,7 +143,11 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
         const legal = this.enforceMeleeLegality(unit, context, tuned);
-        return this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal));
+        return this.angelResurrect(
+            unit,
+            context,
+            this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal)),
+        );
     }
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
     // Behemoth/Ogre rosters), but the CASTER should fire the buff IMMEDIATELY. Delaying the caster only
@@ -156,6 +170,38 @@ export class StrategyV0_4 extends StrategyV0_3 {
      *  - else Unicorn/Scavenger LEAD the advance (toward the nearest enemy) to consume the first hits while
      *    the rest of the melee follows normally.
      */
+    private angelResurrect(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!angelResOn || !unit.hasAbilityActive("Resurrection")) return decision;
+        const spell = unit.getSpells().find((sp) => sp.getPowerType() === SpellPowerType.RESURRECT);
+        if (!spell) return decision;
+        // The Angel is a strong fighter: only resurrect when it has NO attack on offer this turn.
+        if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
+            return decision;
+        }
+        const target = context.unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter(
+                (a) =>
+                    !a.isDead() && a.getId() !== unit.getId() && a.getAmountDied() >= Math.max(3, a.getAmountAlive()),
+            )
+            .sort((a, b) => b.getAmountDied() * b.getMaxHp() - a.getAmountDied() * a.getMaxHp())[0];
+        if (!target) return decision;
+        const ok = canCastSpell(
+            false,
+            context.grid.getSettings(),
+            context.matrix,
+            unit,
+            target,
+            spell,
+            target.getBaseCell(),
+            target.getMagicResist(),
+            target.hasMindAttackResistance(),
+            target.canBeHealed(),
+            undefined,
+        );
+        if (!ok) return decision;
+        return [{ type: "cast_spell", casterId: unit.getId(), spellName: spell.getName(), targetId: target.getId() }];
+    }
     private holdBoxedShooter(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
         if (unit.hasAbilityActive("No Melee") || unit.hasAbilityActive("Handyman")) return undefined;
         if (this.canLandRange(unit, context)) return undefined; // it can actually shoot -> not boxed
@@ -709,6 +755,78 @@ export class StrategyV0_4 extends StrategyV0_3 {
             hasWaterCell: best.route?.hasWaterCell,
         });
         return actions;
+    }
+    /**
+     * (8) Troll "Wild Regeneration" gift. The ability is GIFTABLE (max gift level 3) and lasts the whole
+     * fight, so gifting it to the highest-HP level<=3 ally makes that stack restore to full HP every turn —
+     * a near-unkillable frontliner. Sequencing: strike if an enemy is adjacent; else hourglass the very
+     * first turn (let the line form), then gift it on the next turn. Validated with canCastSpell so the
+     * engine never rejects it. Off via V04_TROLL=off.
+     */
+    private trollWildRegen(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        if (process.env.V04_TROLL === "off" || unit.getTarget()) {
+            return undefined;
+        }
+        const regen = unit.getSpells().find((s) => s.getName() === "Wild Regeneration");
+        if (!regen) {
+            return undefined;
+        }
+        const { unitsHolder } = context;
+        const enemies = unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((e) => !e.isDead());
+        const myCells = unit.getCells();
+        // If we can strike an adjacent enemy, do that — don't waste the Troll's turn on the gift.
+        if (enemies.some((e) => e.getCells().some((ec) => myCells.some((uc) => isAdjacentCell(ec, uc))))) {
+            return undefined;
+        }
+        // Only worth the gift when we're DEFENDING with a ranged-heavy army (we out-gun them at range): the
+        // regen tank holds the line while our shooters out-attrition them. Otherwise the Troll just fights.
+        if (
+            teamRangedFirepower(unit.getTeam(), unitsHolder) <=
+            teamRangedFirepower(otherTeam(unit.getTeam()), unitsHolder)
+        ) {
+            return undefined;
+        }
+        const allies = unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId());
+        // Already gifted to a living ally -> nothing to do; fall through to normal play.
+        if (allies.some((a) => a.hasBuffActive("Wild Regeneration"))) {
+            return undefined;
+        }
+        // Hourglass the very first turn (let the fight develop), then gift on the next Troll turn.
+        if (
+            FightStateManager.getInstance().getFightProperties().getCurrentLap() <= 1 &&
+            this.canHourglass(unit, context)
+        ) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        // Gift to the highest-HP ally within the max gift level (<=3) for maximum effect.
+        const gridSettings = context.grid.getSettings();
+        const maxGift = regen.getMaximumGiftLevel();
+        const canCast = (target: Unit): boolean =>
+            !!canCastSpell(
+                false,
+                gridSettings,
+                context.matrix,
+                unit,
+                target,
+                regen,
+                target.getBaseCell(),
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+                undefined,
+            );
+        const target = allies
+            .filter((a) => a.getLevel() <= maxGift && !a.hasBuffActive("Wild Regeneration"))
+            .sort((p, q) => q.getMaxHp() * q.getAmountAlive() - p.getMaxHp() * p.getAmountAlive())
+            .find((a) => canCast(a));
+        if (!target) {
+            return undefined;
+        }
+        return [
+            { type: "cast_spell", casterId: unit.getId(), spellName: "Wild Regeneration", targetId: target.getId() },
+        ];
     }
     /**
      * (7) Healer spell policy (requested): a single-target HEAL is only worth it on a LEVEL 3-4 stack that
