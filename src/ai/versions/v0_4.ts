@@ -25,7 +25,7 @@ import { StrategyV0_3 } from "./v0_3";
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
 const frontlineOn = process.env.V04_FRONTLINE === "on";
-const frontMoveOn = process.env.V04_FRONTMOVE === "on"; // NEUTRAL: +0.02pp overall, +0.47pp range-heavy (within noise) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
+const frontMoveOn = process.env.V04_FRONTMOVE !== "off"; // range-heavy bait/lead: +0.99pp on forced range-heavy (gated to >=3 ranged so no dilution) // measured NEUTRAL (+0.27pp on forced Unicorn+Scavenger); placement-only doesn't move it
 const FRONT_TANKS = new Set(["Unicorn", "Scavenger"]);
 const buffWaitOn = process.env.V04_BUFFWAIT !== "off";
 const beheSelfOn = process.env.V04_BEHESELF === "on";
@@ -150,6 +150,10 @@ export class StrategyV0_4 extends StrategyV0_3 {
      */
     private frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!frontMoveOn || unit.getAttackType() !== MELEE || !unit.canMove()) return decision;
+        const myRanged = context.unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getAttackType() === RANGE).length;
+        if (myRanged < 3) return decision; // only a range-heavy army baits + leads with tanks
         if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell"))
             return decision;
         const uh = context.unitsHolder;
