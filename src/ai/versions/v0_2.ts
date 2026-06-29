@@ -14,6 +14,7 @@ import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import {
+    getRandomGridCellAroundPosition,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
@@ -21,9 +22,12 @@ import {
 } from "../../grid/grid_math";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
+import { canCastSpell, canCastSummon, canMassCastSpell } from "../../spells/spell_helper";
+import type { Spell } from "../../spells/spell";
+import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
-import type { XY } from "../../utils/math";
+import { getDistance, type XY } from "../../utils/math";
 import { auraCoverageScore, planAuraMove } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam, StrategyV0_1 } from "./v0_1";
@@ -161,11 +165,164 @@ class StrategyV0_2 extends StrategyV0_1 {
         if (isRanged && context.attackHandler) {
             return this.decideRangedTurn(unit, context, context.attackHandler);
         }
+        // MAGIC units (Healer, Satyr) cast a beneficial spell when it's the best turn — heal the most
+        // hurt ally, buff/summon, etc. (v0.1 never casts). Falls through to melee when no good cast.
+        if (unit.getAttackType() === PBTypes.AttackVals.MAGIC) {
+            const spell = this.decideSpellTurn(unit, context);
+            if (spell) {
+                return spell;
+            }
+        }
         // Melee defers to v0.1's findTarget for positioning (a custom melee scorer regressed the win
         // rate by throwing away its movement/backstab/engagement work), but refines the VICTIM of an
         // in-place strike: when several enemies are adjacent, prefer one that won't counter-attack.
+        // Creature-specific openers: Ogre Mage / Behemoth cast their signature army-wide buff early.
+        // They are MELEE_MAGIC, so they fall past the ranged/MAGIC branches above to here.
+        const opener = this.decideCreatureOpener(unit, context);
+        if (opener) {
+            return opener;
+        }
         const melee = this.preferNoCounterMeleeTarget(unit, context, super.decideTurn(unit, context));
         return this.withAura(unit, context, melee);
+    }
+    /**
+     * MAGIC unit casting (Healer, Satyr), restoring the live server's runAiBuffOrHeal that the port
+     * dropped. Picks the highest-value beneficial cast and emits it; undefined when nothing is worth
+     * casting (caller falls back to melee). Requested heuristics:
+     *  - Satyr "Helping Hand" (HP + armor) → the most numerous LEVEL-1 ally (Fairy/Peasant/…); a big
+     *    cheap stack benefits most. Only when a fight is imminent (timed buff won't expire unused).
+     *  - Satyr "Summon Wolves" → preferred instead when our ranged army out-guns theirs: spawn bodies
+     *    and let the enemy come onto our shots.
+     *  - Healer → heal the most-wounded ally (Mass Heal when several are hurt).
+     */
+    private decideSpellTurn(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        const spells = unit.getSpells();
+        if (!spells.length || unit.getStackPower() < 1) {
+            return undefined;
+        }
+        const { grid, matrix, unitsHolder } = context;
+        const gridSettings = grid.getSettings();
+        const team = unit.getTeam();
+        const allies = unitsHolder.getAllAllies(team).filter((u) => !u.isDead());
+        if (!allies.length) {
+            return undefined;
+        }
+        const enemies = unitsHolder.getAllEnemyUnits(team).filter((u) => !u.isDead() && !u.hasBuffActive("Hidden"));
+        const rangedSuperior =
+            teamRangedFirepower(team, unitsHolder) > teamRangedFirepower(otherTeam(team), unitsHolder);
+        // "Fighting soon": an enemy is within ~half the board, so a timed buff won't expire unused.
+        const nearestEnemyDist = enemies.length
+            ? Math.min(...enemies.map((e) => getDistance(unit.getBaseCell(), e.getBaseCell())))
+            : Infinity;
+        const fightingSoon = nearestEnemyDist <= GRID_SIZE / 2;
+
+        const canCast = (spell: Spell, target?: Unit): boolean =>
+            !!canCastSpell(
+                false,
+                gridSettings,
+                matrix,
+                unit,
+                target,
+                spell,
+                target?.getBaseCell(),
+                target?.getMagicResist(),
+                target?.hasMindAttackResistance(),
+                target?.canBeHealed(),
+                undefined,
+            );
+
+        let bestSpell: Spell | undefined;
+        let bestTargetId: string | undefined;
+        let bestTargetCell: XY | undefined;
+        let bestValue = 0;
+        const consider = (value: number, spell: Spell, targetId?: string, targetCell?: XY): void => {
+            if (value > bestValue) {
+                bestValue = value;
+                bestSpell = spell;
+                bestTargetId = targetId;
+                bestTargetCell = targetCell;
+            }
+        };
+
+        for (const spell of spells) {
+            if (spell.getLapsTotal() <= 0 || !spell.isRemaining()) {
+                continue;
+            }
+            if (spell.getMinimalCasterStackPower() > unit.getStackPower()) {
+                continue;
+            }
+            const targetType = spell.getSpellTargetType();
+            const isHeal = spell.getPowerType() === SpellPowerType.HEAL;
+            const candidates = spell.isSelfCastAllowed() ? allies : allies.filter((a) => a.getId() !== unit.getId());
+
+            // Summon Wolves: strongly preferred when our ranged army is stronger (stand and shoot), else low.
+            if (spell.isSummon() && targetType === SpellTargetType.RANDOM_CLOSE_TO_CASTER) {
+                const amount = Math.floor(unit.getAmountAlive() * spell.getPower());
+                const cell = getRandomGridCellAroundPosition(gridSettings, matrix, team, unit.getPosition());
+                if (amount > 0 && cell && canCastSummon(spell, matrix, cell)) {
+                    consider(amount * (rangedSuperior ? 60 : 3), spell, undefined, cell);
+                }
+                continue;
+            }
+
+            if (!spell.isBuff() && !isHeal) {
+                continue; // v0.2 casts only beneficial spells (heal/buff/summon)
+            }
+            if (targetType === SpellTargetType.ALL_ALLIES || targetType === SpellTargetType.ALL_FLYING) {
+                const pool =
+                    targetType === SpellTargetType.ALL_FLYING ? candidates.filter((a) => a.canFly()) : candidates;
+                const beneficiaries = pool.filter((a) =>
+                    isHeal ? a.getHp() < a.getMaxHp() : !a.hasBuffActive(spell.getName()),
+                );
+                if (beneficiaries.length && (isHeal || fightingSoon)) {
+                    consider(beneficiaries.length * 200, spell);
+                }
+            } else if (targetType === SpellTargetType.ANY_ALLY) {
+                let target: Unit | undefined;
+                let value = 0;
+                if (isHeal) {
+                    for (const a of candidates) {
+                        const missing = a.getMaxHp() - a.getHp();
+                        if (missing > value) {
+                            value = missing;
+                            target = a;
+                        }
+                    }
+                } else if (fightingSoon) {
+                    // Buff (Helping Hand / Blessing / …): the most numerous LEVEL-1 stack benefits most.
+                    const helpingHand = spell.getName() === "Helping Hand";
+                    for (const a of candidates) {
+                        if (a.hasBuffActive(spell.getName())) {
+                            continue;
+                        }
+                        if (helpingHand && a.getLevel() !== PBTypes.UnitLevelVals.FIRST) {
+                            continue;
+                        }
+                        const c = helpingHand ? a.getAmountAlive() * 10 : meleeThreat(a);
+                        if (c > value) {
+                            value = c;
+                            target = a;
+                        }
+                    }
+                }
+                if (target && canCast(spell, target)) {
+                    consider(value, spell, target.getId());
+                }
+            }
+        }
+
+        if (!bestSpell) {
+            return undefined;
+        }
+        return [
+            {
+                type: "cast_spell",
+                casterId: unit.getId(),
+                spellName: bestSpell.getName(),
+                targetId: bestTargetId,
+                targetCell: bestTargetCell,
+            },
+        ];
     }
     /**
      * Aura emitters earn their keep by keeping the buff/debuff on as many allies as possible. When the
@@ -519,6 +676,64 @@ class StrategyV0_2 extends StrategyV0_1 {
         return withSelect(advance);
     }
     /** The id of a living enemy whose footprint touches the unit's footprint, if any. */
+    /** The army-wide opening buff a specific creature should cast at the start of the fight, if any. */
+    private creatureOpenerSpell(unit: Unit): string | undefined {
+        if (!unit.getCanCastSpells()) {
+            return undefined;
+        }
+        const name = unit.getName();
+        if (name === "Ogre Mage") {
+            return "Mass Riot"; // almost always worth casting first (+25% damage to the whole army)
+        }
+        if (name === "Behemoth") {
+            return "Battle Roar"; // first-turn army buff: +steps and guaranteed max damage
+        }
+        return undefined;
+    }
+    /**
+     * Cast a creature's signature opener (Ogre Mage -> Mass Riot, Behemoth -> Battle Roar) when it's
+     * still worth it. Ogre Mage prefers to melee an adjacent enemy instead (a guaranteed hit beats the
+     * buff that turn). Returns undefined to fall through to normal melee logic.
+     */
+    private decideCreatureOpener(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        const spellName = this.creatureOpenerSpell(unit);
+        if (!spellName) {
+            return undefined;
+        }
+        // Ogre Mage: if it can strike an adjacent enemy this turn, do that rather than cast.
+        if (unit.getName() === "Ogre Mage" && this.adjacentEnemy(unit, context)) {
+            return undefined;
+        }
+        const spell = unit.getSpells().find((s) => s.getName() === spellName);
+        if (
+            !spell ||
+            spell.getLapsTotal() <= 0 ||
+            !spell.isRemaining() ||
+            spell.getMinimalCasterStackPower() > unit.getStackPower()
+        ) {
+            return undefined;
+        }
+        // These are ALL_ALLIES mass buffs: only cast while the team isn't already covered (this is also
+        // the engine's own gate, so a redundant cast is never proposed and the turn is never wasted).
+        const team = unit.getTeam();
+        const uh = context.unitsHolder;
+        const castable = canMassCastSpell(
+            spell,
+            uh.getAllTeamUnitsBuffs(team),
+            uh.getAllEnemyUnitsBuffs(team),
+            uh.getAllEnemyUnitsDebuffs(team),
+            uh.getAllTeamUnitsMagicResist(team),
+            uh.getAllEnemyUnitsMagicResist(team),
+            uh.getAllTeamUnitsHp(team),
+            uh.getAllTeamUnitsMaxHp(team),
+            uh.getAllTeamUnitsCanFly(team),
+            uh.getAllEnemyUnitsCanFly(team),
+        );
+        if (!castable) {
+            return undefined;
+        }
+        return [{ type: "cast_spell", casterId: unit.getId(), spellName }];
+    }
     private adjacentEnemy(unit: Unit, context: IDecisionContext): string | undefined {
         const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((u) => !u.isDead());
         const myCells = unit.getCells();
