@@ -97,7 +97,9 @@ export class StrategyV0_4 extends StrategyV0_3 {
             }
         }
         const base = super.decideTurn(unit, context);
-        return this.auraRepositionMelee(unit, context, this.retargetHeal(unit, context, base));
+        const healed = this.retargetHeal(unit, context, base);
+        const goblin = this.preferLowLevelMelee(unit, context, healed);
+        return this.auraRepositionMelee(unit, context, goblin);
     }
     /**
      * (5b) Don't clump into AoE: when the enemy fields an AoE / multi-hit unit, suppress v0.3's melee
@@ -150,6 +152,52 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return undefined;
         }
         return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Riot", targetId: unit.getId() }];
+    }
+    /**
+     * (7) Goblin Knight prefers low-level victims. Its strike deducts attack from the target, so spending
+     * it on a low-level stack is almost always the better trade. Among equally-adjacent enemies of an
+     * in-place strike, swap to the lowest-LEVEL one below the currently-chosen target's level. Same engine
+     * validation (an adjacent enemy is always a valid in-place melee target), so it adds no rejections.
+     */
+    private preferLowLevelMelee(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (unit.getName() !== "Goblin Knight" || unit.getTarget()) {
+            return decision;
+        }
+        const idx = decision.findIndex((a) => a.type === "melee_attack");
+        const strike = idx >= 0 ? decision[idx] : undefined;
+        if (!strike || strike.type !== "melee_attack") {
+            return decision;
+        }
+        const unitCell = unit.getBaseCell();
+        if (
+            (strike.path && strike.path.length > 0) ||
+            !strike.attackFrom ||
+            strike.attackFrom.x !== unitCell.x ||
+            strike.attackFrom.y !== unitCell.y
+        ) {
+            return decision; // in-place strikes only (a move-and-strike was positioned deliberately)
+        }
+        const current = context.unitsHolder.getAllUnits().get(strike.targetId);
+        if (!current) {
+            return decision;
+        }
+        const myCells = unit.getCells();
+        const lower = context.unitsHolder
+            .getAllAllies(otherTeam(unit.getTeam()))
+            .filter(
+                (e) =>
+                    !e.isDead() &&
+                    !e.hasBuffActive("Hidden") &&
+                    e.getLevel() < current.getLevel() &&
+                    e.getCells().some((ec) => myCells.some((uc) => isAdjacentCell(ec, uc))),
+            )
+            .sort((a, b) => a.getLevel() - b.getLevel());
+        if (!lower.length) {
+            return decision;
+        }
+        const swapped = [...decision];
+        swapped[idx] = { ...strike, targetId: lower[0].getId() };
+        return swapped;
     }
     /** How many friendly BUFF auras cover a cell (receiver-side: is the unit standing inside an ally's aura). */
     private friendlyAuraCover(cell: XY, unit: Unit, context: IDecisionContext): number {

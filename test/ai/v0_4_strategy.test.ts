@@ -129,6 +129,23 @@ describe("v0.4 (2) ranged-superiority patience", () => {
     });
 });
 
+describe("v0.4 (7) Goblin Knight prefers low-level targets", () => {
+    it("swaps an in-place strike onto the lower-level adjacent enemy", () => {
+        const c = createCombatTestContext();
+        const gk = makeReal(LOWER, "Chaos", "Goblin Knight");
+        const hi = createTestUnit({ team: UPPER, name: "Hi", attackType: MELEE, level: 3, amountAlive: 5 });
+        const lo = createTestUnit({ team: UPPER, name: "Lo", attackType: MELEE, level: 1, amountAlive: 5 });
+        // Place GK adjacent to both so an in-place strike can hit either.
+        placeUnit(c.grid, c.unitsHolder, gk, { x: 6, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, hi, { x: 6, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, lo, { x: 7, y: 6 });
+        const cast = typeOf(v04.decideTurn(gk, ctxFor(c)), "melee_attack");
+        if (cast && cast.type === "melee_attack") {
+            expect(cast.targetId).toBe(lo.getId()); // the lower-level victim
+        }
+    });
+});
+
 describe("v0.4 (6) Ogre Mage single-Riot opener (small army, can't melee)", () => {
     it("a lone Ogre Mage that can't reach an enemy self-casts single Riot (not Mass Riot)", () => {
         const c = createCombatTestContext();
