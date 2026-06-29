@@ -11,6 +11,7 @@
 
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { canCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
@@ -29,6 +30,8 @@ const SIEGE_UNITS = new Set(["Gargantuan", "Tsar Cannon"]);
 // Only spend a single-target heal on a stack that is down more than this fraction of its full HP.
 const HEAL_WOUND_THRESHOLD = 0.25;
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
+// Mass Riot wants a big army to be worth it; below this many living allies an Ogre Mage prefers single Riot.
+const OGRE_BIG_ARMY = 3;
 
 // Flyer "mute the siege" tactic — DISABLED. A 10k mirror A/B showed it LOSES 65% of the games where it
 // fires: the flyer over-extends to dive an enemy Gargantuan/Tsar Cannon, dies at lap ~3.6 (vs 8.3 when
@@ -84,6 +87,15 @@ export class StrategyV0_4 extends StrategyV0_3 {
         // (1) v0.3's decision, then re-aim a single-target heal at the biggest sufficiently-wounded stack,
         // and (4) when landing a melee strike, prefer an equally-good stand cell that sits inside a friendly
         // aura (so the attacker fights buffed).
+        // (6) Ogre Mage opener: it melees from its current cell if it can (a strong unit) -> v0.2 handles
+        // that and the big-army Mass Riot. The gap we fill: a small-army Ogre Mage that can't melee and is
+        // not yet riot-buffed still self-buffs with single Riot (+25% damage) instead of doing nothing.
+        if (unit.getName() === "Ogre Mage" && unit.canMove()) {
+            const riot = this.ogreMageSingleRiot(unit, context);
+            if (riot) {
+                return riot;
+            }
+        }
         const base = super.decideTurn(unit, context);
         return this.auraRepositionMelee(unit, context, this.retargetHeal(unit, context, base));
     }
@@ -94,6 +106,50 @@ export class StrategyV0_4 extends StrategyV0_3 {
      */
     protected override shouldCohere(unit: Unit, context: IDecisionContext): boolean {
         return !context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).some((e) => !e.isDead() && isAoEUnit(e));
+    }
+    /**
+     * (6) A lone/small-army Ogre Mage that can't strike from where it stands, and isn't already riot-buffed,
+     * self-casts single Riot (+25% damage). Mass Riot is left to v0.2's opener for big armies; melee-if-
+     * adjacent is left to v0.2 too. Validated with canCastSpell so the engine never rejects it.
+     */
+    private ogreMageSingleRiot(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
+        const myCells = unit.getCells();
+        const canMeleeHere = context.unitsHolder
+            .getAllAllies(otherTeam(unit.getTeam()))
+            .some((e) => !e.isDead() && e.getCells().some((ec) => myCells.some((uc) => isAdjacentCell(ec, uc))));
+        if (canMeleeHere || unit.hasBuffActive("Riot") || unit.hasBuffActive("Mass Riot")) {
+            return undefined; // melee beats casting, or already riot-buffed -> let v0.2 decide
+        }
+        const livingAllies = context.unitsHolder.getAllAllies(unit.getTeam()).filter((a) => !a.isDead()).length;
+        if (livingAllies >= OGRE_BIG_ARMY) {
+            return undefined; // big army -> v0.2's opener casts Mass Riot instead
+        }
+        const spell = unit.getSpells().find((s) => s.getName() === "Riot");
+        if (
+            !spell ||
+            !spell.isRemaining() ||
+            spell.getLapsTotal() <= 0 ||
+            spell.getMinimalCasterStackPower() > unit.getStackPower()
+        ) {
+            return undefined;
+        }
+        const ok = canCastSpell(
+            false,
+            context.grid.getSettings(),
+            context.matrix,
+            unit,
+            unit,
+            spell,
+            unit.getBaseCell(),
+            unit.getMagicResist(),
+            unit.hasMindAttackResistance(),
+            unit.canBeHealed(),
+            undefined,
+        );
+        if (!ok) {
+            return undefined;
+        }
+        return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Riot", targetId: unit.getId() }];
     }
     /** How many friendly BUFF auras cover a cell (receiver-side: is the unit standing inside an ally's aura). */
     private friendlyAuraCover(cell: XY, unit: Unit, context: IDecisionContext): number {

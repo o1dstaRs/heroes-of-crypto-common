@@ -129,6 +129,34 @@ describe("v0.4 (2) ranged-superiority patience", () => {
     });
 });
 
+describe("v0.4 (6) Ogre Mage single-Riot opener (small army, can't melee)", () => {
+    it("a lone Ogre Mage that can't reach an enemy self-casts single Riot (not Mass Riot)", () => {
+        const c = createCombatTestContext();
+        const ogre = makeReal(LOWER, "Might", "Ogre Mage");
+        const tiger = makeReal(UPPER, "Nature", "White Tiger");
+        placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, tiger, { x: 5, y: 12 });
+        const cast = typeOf(v04.decideTurn(ogre, ctxFor(c)), "cast_spell");
+        expect(cast && cast.type === "cast_spell" ? cast.spellName : undefined).toBe("Riot");
+    });
+    it("with a big army it defers to v0.2 (Mass Riot), not single Riot", () => {
+        const c = createCombatTestContext();
+        const ogre = makeReal(LOWER, "Might", "Ogre Mage");
+        const a1 = createTestUnit({ team: LOWER, name: "A1", attackType: MELEE });
+        const a2 = createTestUnit({ team: LOWER, name: "A2", attackType: MELEE });
+        const a3 = createTestUnit({ team: LOWER, name: "A3", attackType: MELEE });
+        const tiger = makeReal(UPPER, "Nature", "White Tiger");
+        placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, a1, { x: 6, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, a2, { x: 7, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, a3, { x: 8, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, tiger, { x: 5, y: 12 });
+        const cast = typeOf(v04.decideTurn(ogre, ctxFor(c)), "cast_spell");
+        const name = cast && cast.type === "cast_spell" ? cast.spellName : undefined;
+        expect(name).not.toBe("Riot"); // Mass Riot (or another action), never the single-army fallback
+    });
+});
+
 describe("v0.4 (5) anti-AoE: spread deployment when an AoE unit is present", () => {
     const v03 = getAIStrategy("v0.3");
     const minPairwise = (placed: Map<string, { x: number; y: number }>): number => {
