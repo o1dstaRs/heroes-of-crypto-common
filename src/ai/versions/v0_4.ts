@@ -30,6 +30,12 @@ const SIEGE_UNITS = new Set(["Gargantuan", "Tsar Cannon"]);
 const HEAL_WOUND_THRESHOLD = 0.25;
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
 
+// Flyer "mute the siege" tactic — DISABLED. A 10k mirror A/B showed it LOSES 65% of the games where it
+// fires: the flyer over-extends to dive an enemy Gargantuan/Tsar Cannon, dies at lap ~3.6 (vs 8.3 when
+// off) to enemy focus-fire, and ends up landing FEWER siege strikes than just playing normally. Net
+// ~-3.6pp vs v0.3. Flag kept so the behaviour can be re-tested behind a survival/support gate later.
+const MUTE_SIEGE_ENABLED = false;
+
 // AoE / multi-hit threats: against these, clustered or cornered stacks get caught by one blow, so we spread
 // out at deployment. Detected by signature ability (robust to renames) or by unit name.
 const AOE_ABILITIES = ["Area Throw", "Fire Breath", "Through Shot", "Skewer Strike", "Large Caliber"];
@@ -60,8 +66,9 @@ const isAoEUnit = (u: Unit): boolean =>
 export class StrategyV0_4 extends StrategyV0_3 {
     public override readonly version: string = "v0.4";
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        // (3) Flyers rush an enemy siege unit (Gargantuan / Tsar Cannon) to mute it right away.
-        if (unit.canFly() && unit.getAttackType() === MELEE && unit.canMove()) {
+        // (3) Flyers rush an enemy siege unit (Gargantuan / Tsar Cannon) to mute it. DISABLED via flag:
+        // it over-extends the flyer and loses (see MUTE_SIEGE_ENABLED). Kept gated for future re-testing.
+        if (MUTE_SIEGE_ENABLED && unit.canFly() && unit.getAttackType() === MELEE && unit.canMove()) {
             const mute = this.flyerMuteSiege(unit, context);
             if (mute) {
                 return mute;
