@@ -172,6 +172,12 @@ export class StrategyV0_4 extends StrategyV0_3 {
      */
     private angelResurrect(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!angelResOn || !unit.hasAbilityActive("Resurrection")) return decision;
+        // Only in a range-heavy/defensive army: the Angel screens shooters (not leading melee), so spending
+        // a standing turn to resurrect fallen DPS can pay. In a melee army it should fight (measured -3.65pp).
+        const myRangedAR = context.unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getAttackType() === RANGE).length;
+        if (myRangedAR < 3) return decision;
         const spell = unit.getSpells().find((sp) => sp.getPowerType() === SpellPowerType.RESURRECT);
         if (!spell) return decision;
         // The Angel is a strong fighter: only resurrect when it has NO attack on offer this turn.
