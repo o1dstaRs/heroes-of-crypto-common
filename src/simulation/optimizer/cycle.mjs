@@ -68,14 +68,24 @@ try {
     process.exit(0);
 }
 
-// 2) Measure — v0.3 vs v0.2 tournament.
-sh(`bun src/simulation/run_tournament.ts v0.3 v0.2 ${games} 1 ${JSON.stringify(TOURN_OUT)}`, { stdio: "ignore" });
-const jsonls = readdirSync(TOURN_OUT)
-    .filter((f) => f.startsWith("v0.3_vs_v0.2_") && f.endsWith(".summary.json"))
-    .map((f) => join(TOURN_OUT, f))
-    .sort();
-const summaryPath = jsonls[jsonls.length - 1];
-const sum = JSON.parse(readFileSync(summaryPath, "utf8"));
+// 2) Measure — v0.3 vs v0.2 tournament. A crash here must not strand a half-applied change.
+let summaryPath;
+let sum;
+try {
+    const before = new Set(readdirSync(TOURN_OUT).filter((f) => f.endsWith(".summary.json")));
+    sh(`bun src/simulation/run_tournament.ts v0.3 v0.2 ${games} 1 ${JSON.stringify(TOURN_OUT)}`, { stdio: "ignore" });
+    const after = readdirSync(TOURN_OUT)
+        .filter((f) => f.startsWith("v0.3_vs_v0.2_") && f.endsWith(".summary.json") && !before.has(f))
+        .map((f) => join(TOURN_OUT, f))
+        .sort();
+    summaryPath = after[after.length - 1];
+    sum = JSON.parse(readFileSync(summaryPath, "utf8"));
+} catch (e) {
+    revert();
+    record("REVERT(measure)", null, "tournament crashed");
+    console.log("REVERT: tournament/measure crashed — change reverted. " + String(e).slice(0, 200));
+    process.exit(0);
+}
 const decisive = sum.a.wins + sum.b.wins; // a = v0.3, b = v0.2
 const pct = decisive ? (100 * sum.a.wins) / decisive : 0;
 const jsonl = summaryPath.replace(/\.summary\.json$/, ".jsonl");
