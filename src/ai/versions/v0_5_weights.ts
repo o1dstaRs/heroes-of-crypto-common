@@ -76,11 +76,11 @@ export const V05_WEIGHT_KEYS = [
  * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CEM (12h, panel-validated, pass 1). ~55.3% vs v0.4 on three FRESH seeds outside the training
-    // panel (56.0/54.3/55.5); panel score 54.48%. All 22 dims trained — the melee seam (incl. favorable-trade
-    // [20] -1.11 and focus-fire [21]) plus a strong shotLevel ([4] 3.28). Re-baked as the run improves.
-    1.4784, -0.5372, -0.0465, 0.5077, 3.2829, 2.5787, 0.345, 0.4073, 0.1361, 2.1908, 0.2573, 0.7238, 0.1559, 0.5607,
-    0.2632, 1.3877, 1.9179, 0.6414, -0.4613, 0.7084, -1.1098, 0.0419,
+    // Long-run CEM (12h, panel-validated, pass 2). ~55.9% vs v0.4 on four FRESH seeds outside the training
+    // panel (55.3/56.2/56.2/56.0); panel score 55.31%. Favorable-trade [20] deepened to -2.02 and focus-fire
+    // [21] rose to 0.62 (gang-up helps), with strong shotLevel ([4] 3.21). Re-baked as the run improves.
+    0.878, -0.322, -0.1112, 0.1731, 3.2121, 2.866, 1.0165, 0.4742, 0.2352, 2.4026, 0.3742, 0.9864, 0.5068, 0.8132,
+    0.0245, 1.0611, 1.9781, 0.61, -0.651, 0.9425, -2.0235, 0.6172,
 ];
 
 /**

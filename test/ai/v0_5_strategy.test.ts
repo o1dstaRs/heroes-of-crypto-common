@@ -24,11 +24,11 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the long-run-trained vector (22 dims, ~55.3% vs v0.4 on fresh seeds)", () => {
+    it("ships the long-run-trained vector (22 dims, ~55.9% vs v0.4 on fresh seeds)", () => {
         // Panel-validated best from the 12h CEM run (re-baked as it improves). All 22 dims trained.
         expect(DEFAULT_V05_W).toEqual([
-            1.4784, -0.5372, -0.0465, 0.5077, 3.2829, 2.5787, 0.345, 0.4073, 0.1361, 2.1908, 0.2573, 0.7238, 0.1559,
-            0.5607, 0.2632, 1.3877, 1.9179, 0.6414, -0.4613, 0.7084, -1.1098, 0.0419,
+            0.878, -0.322, -0.1112, 0.1731, 3.2121, 2.866, 1.0165, 0.4742, 0.2352, 2.4026, 0.3742, 0.9864, 0.5068,
+            0.8132, 0.0245, 1.0611, 1.9781, 0.61, -0.651, 0.9425, -2.0235, 0.6172,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(22);
