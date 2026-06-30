@@ -18,12 +18,11 @@
  * possible — verified), which makes black-box POLICY SEARCH over a parameterised scorer the right RL
  * family here; reward is simply the self-play decisive win rate.
  *
- * The DEFAULT vector below reproduces v0.4's shot scoring EXACTLY (so an untrained v0.5 == v0.4):
- *   - enemy hit: value += shotDamage * effective   (v0.4: += effective, i.e. 1.0)
- *   - enemy RANGE hit additionally: += shotRange * effective  (v0.4: total 2.0x, so default shotRange=1.0)
- *   - friendly-fire splash: value -= shotFriendlyFire * effective  (v0.4: -= effective, i.e. 1.0)
- *   - shotKill / shotFirepower / shotLevel: NEW biases, default 0 (off) so the default is a no-op delta.
- * CEM searches around this and writes the winning vector back here.
+ * The DEFAULT vector below is the SHIPPED, fully-trained policy (~53.3% vs v0.4 on unseen seeds). The
+ * untrained no-op vector that reproduces v0.4 EXACTLY is [1,0,1,0,0,1, 0,0,0,1.5, 0,0,0,0, 0,0,0,0,0,2.0]
+ * (shot scoring == v0.4's 2x-range pure-damage; every reposition/melee feature off with its incumbency
+ * anchor dominating) — pass it via process.env.V05_WEIGHTS to A/B against the trained default. CEM searches
+ * around such anchors and writes the winning vector back here.
  *
  * Runtime injection: the strategy reads `process.env.V05_WEIGHTS` (a JSON number[]) when present — this
  * is how the CEM harness evaluates a candidate vector inside the tournament workers. It is NEVER read
@@ -34,13 +33,11 @@
 /**
  * Human-readable order of the weight vector — keep in sync with v0_5.ts and CEM_DIM.
  *
- * Two learned seams:
- *   [0..5] scoreShot   — which enemy a shooter aims at (stage 1; a narrow lever, ~+1pp ceiling).
- *   [6..9] reposition  — where a unit moves on a STANDALONE reposition turn (stage 2; the real
- *                        positioning/timing headroom). The policy re-ranks the engine's reachable cells
- *                        by w·features; "posIncumbent" biases toward v0.4's own chosen destination, so at
- *                        the default below (all feature weights 0, incumbent > 0) v0.5 keeps v0.4's move
- *                        EXACTLY — the untrained-v0.5 == v0.4 safety identity holds across both seams.
+ * Four learned seams (each anchored so weights==no-op reproduce v0.4 exactly):
+ *   [0..5]   scoreShot   — which enemy a shooter aims at (stage 1; narrow, ~+1pp).
+ *   [6..9]   reposition  — destination of a STANDALONE move (stage 2; ~+0.2pp).
+ *   [10..13] reposition+ — richer move features: threat/aggro-zone/shoot-ready/aura (stage 3; ~flat).
+ *   [14..19] melee       — which enemy to strike and FROM WHICH cell (stage 4; the breakthrough, +2.4pp).
  */
 export const V05_WEIGHT_KEYS = [
     "shotDamage", // * expected effective damage on an enemy hit (proven dominant term)
@@ -66,16 +63,15 @@ export const V05_WEIGHT_KEYS = [
 ] as const;
 
 /**
- * SHIPPED == the SELF-PLAY-TRAINED vector (CEM, gen 5 best). It beats frozen v0.4 by ~+1.2pp on unseen
- * seeds (50.8% / 51.6% on two fresh 6k-game runs; 51.91% on the held-out training seed) while emitting
- * FEWER engine rejections than v0.4. The untrained no-op vector (== v0.4) was [1,0,1,0,0,1, 0,0,0,1.5];
- * pass it via process.env.V05_WEIGHTS to A/B against this default. Length MUST equal V05_WEIGHT_KEYS.length.
+ * SHIPPED == the SELF-PLAY-TRAINED vector (CEM stage-4, melee-centred). Beats frozen v0.4 by ~+3.3pp on
+ * FOUR unseen seeds (53.4 / 53.6 / 53.5 / 52.8, 5-6k games each) while emitting far FEWER engine rejections
+ * (89 vs 264 on 6k games) — the learned melee re-pick turns v0.4's invalid strikes into valid hits.
+ * Length MUST equal V05_WEIGHT_KEYS.length.
  *
- * What it learned: shot scoring shifted toward higher-tier targets (shotLevel 0->1.40, shotFirepower
- * 0->0.67) and away from the blunt 2x range bias (shotRange 1->0.08); positioning prefers holding/baiting
- * over charging (posAdvance -0.37), staying loosely cohesive (posCohesion 0.25), strongly avoiding
- * lava/water (posHazard 0.89), with a firm incumbency anchor (posIncumbent 2.08) so it only overrides
- * v0.4's move when a cell is clearly better.
+ * What it learned: shots favour higher-tier / high-firepower stacks over the blunt 2x range bias; movement
+ * holds/baits rather than charges and avoids lava/water; and — the big one — MELEE strongly weights
+ * finishing a stack (meleeKill 1.72) and damage (meleeDamage 1.17), picking the target/stand-cell that v0.4
+ * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
     // [0..9] shot + reposition (stage 1/2), [10..13] richer reposition (stage 3), [14..19] melee (stage 4).
