@@ -15,7 +15,7 @@ import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
-import { auraCoverageScore, countMeleeThreatsToCell } from "../ai";
+import { auraCoverageScore, countMeleeThreatsToCell, planAuraMove } from "../ai";
 import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
@@ -31,6 +31,10 @@ const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Ma
 /** A "Hidden" stack (via Disguise Aura) is UNTARGETABLE — the engine rejects any attack on it
  * (attack_not_available). Check both buff and ability forms so we never select it for a strike. */
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
+const cellKey = (c: XY): number => (c.x << 4) | c.y;
+// A fragile aura-emitting FLYER (e.g. Pegasus) is worth more keeping its aura on the army than diving in to
+// melee for a marginal hit — measured: Pegasus attacked 81% of turns, supporting only ~3%. ON by default.
+const auraFlyOn = process.env.V05_AURAFLY !== "off";
 
 /**
  * v0.5 — the first REINFORCEMENT-LEARNED AI version.
@@ -64,7 +68,80 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const melee = this.meleeByPolicy(unit, context, base);
         const repos = this.repositionByPolicy(unit, context, melee);
         // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
-        return this.excludeHiddenAttack(unit, context, repos);
+        const safe = this.excludeHiddenAttack(unit, context, repos);
+        // A fragile aura-flyer keeps its aura on the army instead of diving for a marginal melee hit.
+        return this.auraFlyerSupport(unit, context, safe);
+    }
+    /**
+     * Keep a fragile aura-emitting FLYER (Pegasus etc.) in its support role. The base AI prefers any
+     * available attack over aura positioning — fine for ground bruisers, wrong for a glass-cannon flyer that
+     * can reach an enemy almost every turn and so dives in instead of buffing the army (measured 81% attacks,
+     * 3% support). When such a flyer's turn is a MARGINAL melee strike (not a guaranteed kill, not a free /
+     * retaliation-spent hit) and its aura currently covers allies, reposition for the best coverage instead
+     * (planAuraMove), else hold the aura up (hourglass / stay). Kills and free hits are still taken.
+     */
+    private auraFlyerSupport(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!auraFlyOn || !unit.canFly() || !unit.getAuraEffects().length) {
+            return decision;
+        }
+        const strike = decision.find((a) => a.type === "melee_attack");
+        if (!strike || strike.type !== "melee_attack") {
+            return decision; // only converts a diving MELEE strike (a flyer shooting from range is fine)
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const target = unitsHolder.getAllUnits().get(strike.targetId);
+        if (!target) {
+            return decision;
+        }
+        // A guaranteed kill or a retaliation-free hit is always worth taking, even diving.
+        const kill = unit.calculateAttackDamageMin(unit.getAttack(), target, false, 0, 1) >= target.getCumulativeHp();
+        const retalFree = context.fightProperties?.hasAlreadyRepliedAttack(target.getId()) ?? false;
+        if (kill || retalFree) {
+            return decision;
+        }
+        const gridSettings = grid.getSettings();
+        const base = unit.getBaseCell();
+        // Nothing to protect right now -> just attack as before.
+        if (auraCoverageScore(unit, base, gridSettings, unitsHolder) < 1) {
+            return decision;
+        }
+        const enemyTeam = otherTeam(unit.getTeam());
+        const movePath = pathHelper.getMovePath(
+            base,
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
+        // 1) A reachable cell covers more allies -> reposition there (stay in support).
+        if (
+            plan &&
+            plan.bestScore > plan.currentScore &&
+            unit.canMove() &&
+            (plan.bestCell.x !== base.x || plan.bestCell.y !== base.y)
+        ) {
+            const route = movePath.knownPaths.get(cellKey(plan.bestCell))?.[0];
+            if (route?.route.length) {
+                return [
+                    {
+                        type: "move_unit",
+                        unitId: unit.getId(),
+                        path: route.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                        targetCells: this.footprintForCell(unit, plan.bestCell, context),
+                        hasLavaCell: route.hasLavaCell,
+                        hasWaterCell: route.hasWaterCell,
+                    },
+                ];
+            }
+        }
+        // 2) Already at the best coverage: hold the aura up rather than dive (hourglass if allowed, else stay).
+        if (this.canHourglass(unit, context)) {
+            return [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        return [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
     }
     /**
      * Guarantee v0.5 never selects a Hidden (Disguise Aura) stack for a strike — the engine refuses such
