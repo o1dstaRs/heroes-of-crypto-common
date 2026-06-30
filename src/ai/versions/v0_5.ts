@@ -19,7 +19,6 @@ import { canCastSpell } from "../../spells/spell_helper";
 import { auraCoverageScore, countMeleeThreatsToCell, planAuraMove } from "../ai";
 import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
-import { teamRangedFirepower } from "./v0_2";
 import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
 
@@ -37,9 +36,11 @@ const cellKey = (c: XY): number => (c.x << 4) | c.y;
 // A fragile aura-emitting FLYER (e.g. Pegasus) is worth more keeping its aura on the army than diving in to
 // melee for a marginal hit — measured: Pegasus attacked 81% of turns, supporting only ~3%. ON by default.
 const auraFlyOn = process.env.V05_AURAFLY !== "off";
-// Healer Blessing (max-damage buff, 3 laps): worth most on the highest attack-SPREAD attacker about to
-// engage — especially a ranged unit (lands max on every shot, and on defence it fires a lot). ON by default.
-const healBlessOn = process.env.V05_HEALBLESS !== "off";
+// Healer spell-choice policy. A 2-seed battery (forced-Healer, vs v0.4) ranked the plays:
+//   healL4 56.7/57.0% > base 56.2/56.4% > armor 55.8% > bless 54.6% >> heal-anyone 50.3% (over-healing is bad).
+// Default "healL4" — eagerly heal a hurt level-4 stack first (its damage/aura/threat is worth most), else the
+// inherited play (heal hurt L3-4 >30%, else Spiritual Armor). Other modes kept for A/B via V05_HEALPOLICY.
+const healPolicy = process.env.V05_HEALPOLICY ?? "healL4";
 
 /**
  * v0.5 — the first REINFORCEMENT-LEARNED AI version.
@@ -69,7 +70,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // post-processes: re-rank a melee strike's (target, stand cell), then re-rank a standalone move's
         // destination. They're mutually exclusive (a turn is either a strike or a pure move), and both anchor
         // to v0.4's own pick, so with the default weights v0.5 == v0.4 (a strict, validity-preserving extension).
-        const base = this.healerBlessing(unit, context, super.decideTurn(unit, context));
+        const base = this.healerPolicy(unit, context, super.decideTurn(unit, context));
         const melee = this.meleeByPolicy(unit, context, base);
         const repos = this.repositionByPolicy(unit, context, melee);
         // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
@@ -78,84 +79,99 @@ export class StrategyV0_5 extends StrategyV0_4 {
         return this.auraFlyerSupport(unit, context, safe);
     }
     /**
-     * Healer Blessing. "Blessing" makes an ally always inflict MAX damage for 3 laps, so its value scales
-     * with the target's attack SPREAD (max-min), stack size, and — for a shooter — its shots (every shot
-     * lands max). The base Healer never casts it (only Heal/Mass-Heal/Spiritual Armor). Here: when the Healer
-     * isn't healing a wounded stack, bless the highest-spread ally that will ENGAGE now — a ranged unit with
-     * shots (fires immediately; especially strong on defence) or a melee already adjacent to an enemy —
-     * instead of armouring. Skips already-blessed units; falls back to the inherited armour play if none fit.
+     * Experimental Healer spell-choice policy (V05_HEALPOLICY). The base Healer heals a hurt L3-4 stack
+     * (>30% lost) else casts Spiritual Armor, and never uses Blessing. This forces a single play so each can
+     * be measured head-to-head: "armor" (always armour the top attacker), "heal" (heal anyone hurt), "bless"
+     * (max-damage buff the highest-spread attacker), "healL4" (eagerly heal a hurt level-4 stack first, else
+     * fall back to the inherited play). "base" (default) leaves v0.4's decision untouched.
      */
-    private healerBlessing(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        if (!healBlessOn || unit.getName() !== "Healer" || unit.getStackPower() < 1) {
-            return decision;
-        }
-        // Never override a heal — wounded stacks come first.
-        const cast = decision.find((a) => a.type === "cast_spell");
-        if (cast?.type === "cast_spell" && (cast.spellName === "Heal" || cast.spellName === "Mass Heal")) {
-            return decision;
-        }
-        const bless = unit
-            .getSpells()
-            .find(
-                (s) =>
-                    s.getName() === "Blessing" &&
-                    s.getLapsTotal() > 0 &&
-                    s.isRemaining() &&
-                    s.getMinimalCasterStackPower() <= unit.getStackPower(),
-            );
-        if (!bless) {
+    private healerPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (healPolicy === "base" || unit.getName() !== "Healer" || unit.getStackPower() < 1) {
             return decision;
         }
         const { grid, matrix, unitsHolder } = context;
         const gridSettings = grid.getSettings();
         const team = unit.getTeam();
-        const enemyTeam = otherTeam(team);
-        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
-        if (!enemies.length) {
-            return decision;
-        }
-        // Blessing pays off most when we're the ranged-superior DEFENDER: our shooters fire a lot and land
-        // max every time, while armour matters less if the enemy must come to us. Only then prefer it over
-        // armour. (In a mirrored match firepower is equal so this never fires — by design: zero benchmark
-        // risk; the edge shows up in real asymmetric games where the AI out-ranges its opponent.)
-        if (teamRangedFirepower(team, unitsHolder) <= teamRangedFirepower(enemyTeam, unitsHolder)) {
-            return decision;
-        }
-        const isRanged = (a: Unit): boolean => a.getAttackType() === RANGE && a.getRangeShots() > 0;
-        const willEngage = (a: Unit): boolean =>
-            isRanged(a) ||
-            (a.getAttackType() === MELEE &&
-                enemies.some((e) => a.getCells().some((ac) => e.getCells().some((ec) => isAdjacentCell(ac, ec)))));
-        // Damage saved by removing the roll ~ (max-min) per hit; scale by stack size and (for shooters) shots.
-        const blessGain = (a: Unit): number => {
-            const spread =
-                Math.max(0, a.getAttackDamageMax() - a.getAttackDamageMin()) * Math.max(1, a.getAmountAlive());
-            return spread * (isRanged(a) ? Math.max(1, a.getRangeShots()) : 1);
-        };
-        const canBless = (a: Unit): boolean =>
+        const allies = unitsHolder.getAllAllies(team).filter((a) => !a.isDead());
+        const usable = (name: string) =>
+            unit
+                .getSpells()
+                .find(
+                    (s) =>
+                        s.getName() === name &&
+                        s.getLapsTotal() > 0 &&
+                        s.isRemaining() &&
+                        s.getMinimalCasterStackPower() <= unit.getStackPower(),
+                );
+        const canCastOn = (spell: ReturnType<typeof usable>, t: Unit): boolean =>
+            !!spell &&
             !!canCastSpell(
                 false,
                 gridSettings,
                 matrix,
                 unit,
-                a,
-                bless,
-                a.getBaseCell(),
-                a.getMagicResist(),
-                a.hasMindAttackResistance(),
-                a.canBeHealed(),
+                t,
+                spell,
+                t.getBaseCell(),
+                t.getMagicResist(),
+                t.hasMindAttackResistance(),
+                t.canBeHealed(),
                 undefined,
             );
-        const target = unitsHolder
-            .getAllAllies(team)
-            .filter((a) => !a.isDead() && a.getId() !== unit.getId() && !a.hasBuffActive("Blessing") && willEngage(a))
-            .filter((a) => blessGain(a) > 0)
-            .sort((p, q) => blessGain(q) - blessGain(p))
-            .find(canBless);
-        if (!target) {
-            return decision; // nobody worth blessing -> keep the inherited armour play
+        const lostFrac = (a: Unit): number => {
+            const cap = a.getMaxHp() * Math.max(1, a.getAmountAlive() + a.getAmountDied());
+            return cap > 0 ? 1 - a.getCumulativeHp() / cap : 0;
+        };
+        const healEligible = (a: Unit): boolean =>
+            a.canBeHealed() && a.getMagicResist() !== 100 && a.getHp() < a.getMaxHp();
+        const castHeal = (minLost: number, minLevel: number): GameAction[] | undefined => {
+            const heal = usable("Heal");
+            const t = allies
+                .filter((a) => healEligible(a) && a.getLevel() >= minLevel && lostFrac(a) > minLost)
+                .sort((p, q) => lostFrac(q) - lostFrac(p))
+                .find((a) => canCastOn(heal, a));
+            return t
+                ? [{ type: "cast_spell", casterId: unit.getId(), spellName: "Heal", targetId: t.getId() }]
+                : undefined;
+        };
+        const castArmor = (): GameAction[] | undefined => {
+            const armor = usable("Spiritual Armor");
+            const t = allies
+                .filter((a) => a.getId() !== unit.getId() && !a.hasBuffActive("Spiritual Armor"))
+                .sort(
+                    (p, q) => q.getAttackDamageMax() * q.getAmountAlive() - p.getAttackDamageMax() * p.getAmountAlive(),
+                )
+                .find((a) => canCastOn(armor, a));
+            return t
+                ? [{ type: "cast_spell", casterId: unit.getId(), spellName: "Spiritual Armor", targetId: t.getId() }]
+                : undefined;
+        };
+        const castBless = (): GameAction[] | undefined => {
+            const bless = usable("Blessing");
+            const gain = (a: Unit): number =>
+                Math.max(0, a.getAttackDamageMax() - a.getAttackDamageMin()) *
+                Math.max(1, a.getAmountAlive()) *
+                (a.getAttackType() === RANGE && a.getRangeShots() > 0 ? Math.max(1, a.getRangeShots()) : 1);
+            const t = allies
+                .filter((a) => a.getId() !== unit.getId() && !a.hasBuffActive("Blessing") && gain(a) > 0)
+                .sort((p, q) => gain(q) - gain(p))
+                .find((a) => canCastOn(bless, a));
+            return t
+                ? [{ type: "cast_spell", casterId: unit.getId(), spellName: "Blessing", targetId: t.getId() }]
+                : undefined;
+        };
+        switch (healPolicy) {
+            case "armor":
+                return castArmor() ?? decision;
+            case "heal":
+                return castHeal(0.05, 1) ?? decision;
+            case "bless":
+                return castBless() ?? decision;
+            case "healL4":
+                return castHeal(0.2, 4) ?? decision; // eagerly heal a hurt L4, else inherited play
+            default:
+                return decision;
         }
-        return [{ type: "cast_spell", casterId: unit.getId(), spellName: "Blessing", targetId: target.getId() }];
     }
     /**
      * Keep a fragile aura-emitting FLYER (Pegasus etc.) in its support role. The base AI prefers any
