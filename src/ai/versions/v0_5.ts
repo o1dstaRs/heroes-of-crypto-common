@@ -28,6 +28,9 @@ const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "o
 /** Rough single-stack firepower proxy (shots * max hit), matching v0.4's firepowerOf. */
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+/** A "Hidden" stack (via Disguise Aura) is UNTARGETABLE — the engine rejects any attack on it
+ * (attack_not_available). Check both buff and ability forms so we never select it for a strike. */
+const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 
 /**
  * v0.5 — the first REINFORCEMENT-LEARNED AI version.
@@ -58,7 +61,63 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // destination. They're mutually exclusive (a turn is either a strike or a pure move), and both anchor
         // to v0.4's own pick, so with the default weights v0.5 == v0.4 (a strict, validity-preserving extension).
         const base = super.decideTurn(unit, context);
-        return this.repositionByPolicy(unit, context, this.meleeByPolicy(unit, context, base));
+        const melee = this.meleeByPolicy(unit, context, base);
+        const repos = this.repositionByPolicy(unit, context, melee);
+        // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
+        return this.excludeHiddenAttack(unit, context, repos);
+    }
+    /**
+     * Guarantee v0.5 never selects a Hidden (Disguise Aura) stack for a strike — the engine refuses such
+     * attacks (attack_not_available), wasting the turn. If the chosen melee/range target is Hidden, retarget
+     * a melee strike to a legal adjacent non-Hidden enemy; otherwise drop the strike (keep any move, else
+     * hold). The base AI already filters Hidden in most paths, so this is a belt-and-suspenders catch-all.
+     */
+    private excludeHiddenAttack(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const idx = decision.findIndex((a) => a.type === "melee_attack" || a.type === "range_attack");
+        if (idx < 0) {
+            return decision;
+        }
+        const atk = decision[idx];
+        if (atk.type !== "melee_attack" && atk.type !== "range_attack") {
+            return decision;
+        }
+        const target = context.unitsHolder.getAllUnits().get(atk.targetId);
+        if (!target || !isHidden(target)) {
+            return decision; // targeting a normal stack — fine
+        }
+        // Melee: retarget to a legal in-place non-Hidden enemy if one is adjacent now.
+        if (atk.type === "melee_attack") {
+            const enemyTeam = otherTeam(unit.getTeam());
+            const myCells = unit.getCells();
+            const alt = context.unitsHolder
+                .getAllAllies(enemyTeam)
+                .find(
+                    (e) =>
+                        !e.isDead() &&
+                        !isHidden(e) &&
+                        !(unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp()) &&
+                        e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(mc, ec))),
+                );
+            if (alt) {
+                const acts: GameAction[] = [];
+                if (unit.getAttackTypeSelection() !== MELEE) {
+                    acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+                }
+                acts.push({
+                    type: "melee_attack",
+                    attackerId: unit.getId(),
+                    targetId: alt.getId(),
+                    attackFrom: { ...unit.getBaseCell() },
+                });
+                return acts;
+            }
+        }
+        // No legal retarget (or a Hidden ranged shot): drop the strike, keep any non-attack action, else hold.
+        const rest = decision.filter((a, i) => i !== idx && a.type !== "select_attack_type");
+        if (rest.some((a) => a.type === "move_unit")) {
+            return rest;
+        }
+        return [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
     }
     /**
      * Stage-4 learned melee. When this turn lands a melee strike, re-pick WHICH enemy to hit and FROM WHICH
@@ -89,7 +148,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         const enemies = unitsHolder
             .getAllAllies(enemyTeam)
-            .filter((e) => !e.isDead() && !e.hasBuffActive("Hidden") && !cowardlyVs(e));
+            .filter((e) => !e.isDead() && !isHidden(e) && !cowardlyVs(e));
         if (!enemies.length) {
             return decision;
         }
@@ -115,7 +174,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // ANCHOR: v0.4's own (target, stand cell) is always a candidate, so the meleeIncumbent weight can
         // make it win (default behaviour). Without this, a tie at 0 could deviate from v0.4 even at default.
         const v4targetUnit = unitsHolder.getAllUnits().get(v4target);
-        if (v4targetUnit && !v4targetUnit.isDead()) {
+        if (v4targetUnit && !v4targetUnit.isDead() && !isHidden(v4targetUnit)) {
             cands.push({ target: v4targetUnit, cell: v4from });
         }
         // In-place strikes: any enemy already adjacent to the unit's current footprint.
