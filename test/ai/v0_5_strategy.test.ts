@@ -24,12 +24,12 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the self-play-trained weight vector (20 dims, not the v0.4-identity no-op)", () => {
-        // Stage-1/2 trained (first 10) + stage-3 reposition features (neutral 0) + stage-4 melee features
-        // (neutral 0, meleeIncumbent=2.0). The neutral stage-3/4 dims keep the shipped default == ~51.2%.
+    it("ships the stage-4 self-play-trained vector (20 dims, ~53.5% vs v0.4)", () => {
+        // Fully trained across all four seams (the melee seam at [14..19] drove the jump from ~51% to ~53.5%
+        // on three unseen seeds). NOT the v0.4-identity no-op.
         expect(DEFAULT_V05_W).toEqual([
-            0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 2.0,
+            1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549,
+            0.5654, 1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(20);

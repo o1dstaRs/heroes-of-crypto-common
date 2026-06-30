@@ -78,12 +78,11 @@ export const V05_WEIGHT_KEYS = [
  * v0.4's move when a cell is clearly better.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847,
-    // stage-3 features start neutral (0) so this default ships identical to the validated ~51.2% vector.
-    0.0, 0.0, 0.0, 0.0,
-    // stage-4 melee features: neutral (0) with meleeIncumbent=2.0 dominating, so v0.4's melee pick always
-    // wins until a CEM run retrains them — keeps the shipped default == the validated ~51.2% behaviour.
-    0.0, 0.0, 0.0, 0.0, 0.0, 2.0,
+    // [0..9] shot + reposition (stage 1/2), [10..13] richer reposition (stage 3), [14..19] melee (stage 4).
+    // Stage-4 CEM (centred on the melee region) lifted v0.5 from the ~51% plateau to ~53.5% vs v0.4 on three
+    // unseen seeds (53.4/53.6/53.5) — a +2.4pp jump driven by the learned melee target/position scorer.
+    1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549, 0.5654,
+    1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564,
 ];
 
 /**
