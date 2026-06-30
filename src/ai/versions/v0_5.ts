@@ -36,11 +36,14 @@ const cellKey = (c: XY): number => (c.x << 4) | c.y;
 // A fragile aura-emitting FLYER (e.g. Pegasus) is worth more keeping its aura on the army than diving in to
 // melee for a marginal hit — measured: Pegasus attacked 81% of turns, supporting only ~3%. ON by default.
 const auraFlyOn = process.env.V05_AURAFLY !== "off";
-// Healer spell-choice policy. A 2-seed battery (forced-Healer, vs v0.4) ranked the plays:
+// Healer spell-choice policy. Battery (forced-Healer vs v0.4) ranked single plays:
 //   healL4 56.7/57.0% > base 56.2/56.4% > armor 55.8% > bless 54.6% >> heal-anyone 50.3% (over-healing is bad).
-// Default "healL4" — eagerly heal a hurt level-4 stack first (its damage/aura/threat is worth most), else the
-// inherited play (heal hurt L3-4 >30%, else Spiritual Armor). Other modes kept for A/B via V05_HEALPOLICY.
-const healPolicy = process.env.V05_HEALPOLICY ?? "healL4";
+// Default "smart": heal a hurt L4 first; keep any heal of a wounded stack; otherwise BALANCE armour vs
+// Blessing — bless a ranged unit whose attack spread is large %-wise (gains most from a forced-max hit),
+// else armour the most valuable ally. Modes "armor"|"heal"|"bless"|"healL4"|"base" kept for A/B.
+const healPolicy = process.env.V05_HEALPOLICY ?? "smart";
+// Minimum RELATIVE attack spread ((max-min)/max) for a ranged unit to be worth Blessing over armour.
+const blessRelThresh = Number(process.env.V05_BLESS_REL ?? 0.33);
 
 /**
  * v0.5 — the first REINFORCEMENT-LEARNED AI version.
@@ -160,6 +163,37 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 ? [{ type: "cast_spell", casterId: unit.getId(), spellName: "Blessing", targetId: t.getId() }]
                 : undefined;
         };
+        // Bless a RANGED unit whose attack spread is large RELATIVE to its max ((max-min)/max) — those gain
+        // the most % from a forced-max hit (e.g. Orc 80%, Arbalester 50% vs Cyclops 23%). Among qualifiers,
+        // pick the one whose total damage gain (abs spread x stack x shots) is biggest.
+        const castBlessRanged = (relThresh: number): GameAction[] | undefined => {
+            const bless = usable("Blessing");
+            if (!bless) {
+                return undefined;
+            }
+            const relSpread = (a: Unit): number => {
+                const mx = a.getAttackDamageMax();
+                return mx > 0 ? (mx - a.getAttackDamageMin()) / mx : 0;
+            };
+            const absGain = (a: Unit): number =>
+                (a.getAttackDamageMax() - a.getAttackDamageMin()) *
+                Math.max(1, a.getAmountAlive()) *
+                Math.max(1, a.getRangeShots());
+            const t = allies
+                .filter(
+                    (a) =>
+                        a.getId() !== unit.getId() &&
+                        a.getAttackType() === RANGE &&
+                        a.getRangeShots() > 0 &&
+                        !a.hasBuffActive("Blessing") &&
+                        relSpread(a) >= relThresh,
+                )
+                .sort((p, q) => absGain(q) - absGain(p))
+                .find((a) => canCastOn(bless, a));
+            return t
+                ? [{ type: "cast_spell", casterId: unit.getId(), spellName: "Blessing", targetId: t.getId() }]
+                : undefined;
+        };
         switch (healPolicy) {
             case "armor":
                 return castArmor() ?? decision;
@@ -169,6 +203,19 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 return castBless() ?? decision;
             case "healL4":
                 return castHeal(0.2, 4) ?? decision; // eagerly heal a hurt L4, else inherited play
+            case "smart": {
+                // 1) heal a hurt L4 first; 2) keep any inherited heal (wounded stacks); 3) otherwise bless a
+                // high-%-spread ranged unit, else armour the most valuable ally.
+                const l4 = castHeal(0.2, 4);
+                if (l4) {
+                    return l4;
+                }
+                const inh = decision.find((a) => a.type === "cast_spell");
+                if (inh?.type === "cast_spell" && (inh.spellName === "Heal" || inh.spellName === "Mass Heal")) {
+                    return decision;
+                }
+                return castBlessRanged(blessRelThresh) ?? castArmor() ?? decision;
+            }
             default:
                 return decision;
         }
