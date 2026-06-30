@@ -13,6 +13,13 @@ import type { GameAction } from "../../engine/actions";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import {
+    getPositionForCell,
+    getRangeAttackSideCenter,
+    isRangeAttackSideObservable,
+    RANGE_ATTACK_CELL_SIDES,
+    type RangeAttackCellSide,
+} from "../../grid/grid_math";
 import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
@@ -142,7 +149,120 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const spun = this.hydraSpinReposition(unit, context, hunted);
         const tuned = this.preferValidMove(unit, context, this.chainLightningTarget(unit, context, spun), base);
         const legal = this.enforceMeleeLegality(unit, context, tuned);
-        return this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal));
+        const finalDecision = this.frontMove(unit, context, this.waitForMassBuff(unit, context, legal));
+        return this.enforceRangeLegality(unit, context, finalDecision);
+    }
+    /**
+     * Final range-legality guard. The engine declines a range_attack whose resolved shot hits NOTHING (an
+     * occluded / off-target aim) or whose target is "Hidden". v0.4 re-resolves the shot with the engine's
+     * exact aim logic (resolveRangeTargetPosition + evaluateRangeAttack) and, if it wouldn't land, drops it
+     * for a safe advance — so the engine never rejects what we emit.
+     */
+    private enforceRangeLegality(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const shot = decision.find((a) => a.type === "range_attack");
+        if (!shot || shot.type !== "range_attack" || this.rangeShotLands(unit, context, shot)) {
+            return decision;
+        }
+        return this.fallbackTurn(unit, context);
+    }
+    /** Mirrors the engine: does this exact range shot land on something (and not on a Hidden/None target)? */
+    private rangeShotLands(
+        unit: Unit,
+        context: IDecisionContext,
+        action: Extract<GameAction, { type: "range_attack" }>,
+    ): boolean {
+        const ah = context.attackHandler;
+        if (!ah) {
+            return true; // can't validate without the handler — trust the proposal
+        }
+        const uh = context.unitsHolder;
+        const grid = context.grid;
+        const target = uh.getAllUnits().get(action.targetId);
+        if (!target || target.isDead() || target.hasBuffActive("Hidden")) {
+            return false;
+        }
+        // Pinned in melee, out of shots, or range-suppressed → the engine won't land the shot (line 465).
+        if (!ah.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(unit.getId()))) {
+            return false;
+        }
+        const gs = grid.getSettings();
+        const matrix = grid.getMatrix();
+        const from = unit.getPosition();
+        const fromTeam = unit.getTeam();
+        const through = unit.hasAbilityActive("Through Shot");
+        const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
+        // Replicate resolveRangeTargetPosition EXACTLY so our verdict matches the engine's handler.
+        const closestCell = (cells: XY[]): XY | undefined => {
+            let best: XY | undefined;
+            let bestD = Number.MAX_VALUE;
+            for (const c of cells) {
+                const d = getDistance(from, getPositionForCell(c, gs.getMinX(), gs.getStep(), gs.getHalfStep()));
+                if (d < bestD) {
+                    bestD = d;
+                    best = c;
+                }
+            }
+            return best;
+        };
+        const closestSide = (cell: XY, sides: RangeAttackCellSide[]): RangeAttackCellSide => {
+            let best = sides[0];
+            let bestD = Number.MAX_VALUE;
+            for (const s of sides) {
+                const d = getDistance(from, getRangeAttackSideCenter(gs, cell, s, from));
+                if (d < bestD) {
+                    bestD = d;
+                    best = s;
+                }
+            }
+            return best;
+        };
+        const cells = target.getCells();
+        const cell =
+            (action.aimCell && cells.find((c) => c.x === action.aimCell?.x && c.y === action.aimCell?.y)) ??
+            closestCell(cells);
+        if (!cell) {
+            return false;
+        }
+        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((s) =>
+            isRangeAttackSideObservable(matrix, cell, s, fromTeam, through),
+        );
+        const to = !observableSides.length
+            ? target.getPosition()
+            : getRangeAttackSideCenter(
+                  gs,
+                  cell,
+                  action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
+                      ? (action.aimSide as RangeAttackCellSide)
+                      : closestSide(cell, observableSides),
+                  from,
+              );
+        const evaluation = ah.evaluateRangeAttack(uh.getAllUnits(), unit, from, to, through, false, isAOE);
+        const groups = evaluation.affectedUnits;
+        // The engine keys off the FIRST group (targetUnits[0]); a later non-empty group can't save an empty
+        // first one (line 483). The divisor count must also match the group count (lines 462/477).
+        const firstGroup = groups[0];
+        if (!firstGroup?.length || evaluation.rangeAttackDivisors.length !== groups.length) {
+            return false;
+        }
+        // handleRangeAttack always runs with isAOE=false (action_engine.ts line 484) — the splash flag is only
+        // fed to evaluateRangeAttack, never to the handler — so EVEN Large Caliber / Area Throw shots must pass
+        // the non-AOE gate: the FIRST unit struck must be a live ENEMY it's allowed to hit (not a friendly it's
+        // blocked behind, not Cowardice-barred, and the forced Aggr target if one exists).
+        const firstHit = firstGroup[0];
+        if (firstHit.isDead() || firstHit.getTeam() === unit.getTeam()) {
+            return false;
+        }
+        if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < firstHit.getCumulativeHp()) {
+            return false;
+        }
+        const forced = unit.getTarget();
+        if (forced && firstHit.getId() !== forced) {
+            const forcedUnit = uh.getAllUnits().get(forced);
+            if (forcedUnit && !forcedUnit.isDead()) {
+                return false;
+            }
+        }
+        return true;
     }
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
     // Behemoth/Ogre rosters), but the CASTER should fire the buff IMMEDIATELY. Delaying the caster only
