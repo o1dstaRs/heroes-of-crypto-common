@@ -1665,3 +1665,4 @@ export declare namespace google.protobuf {
         }
     }
 }
+//# sourceMappingURL=descriptor.d.ts.map

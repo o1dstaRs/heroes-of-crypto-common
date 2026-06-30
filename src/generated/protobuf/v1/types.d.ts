@@ -147,3 +147,4 @@ export declare namespace PBTypes {
         static deserializeBinary(bytes: Uint8Array): StringList;
     }
 }
+//# sourceMappingURL=types.d.ts.map

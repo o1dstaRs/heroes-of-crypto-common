@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_SHIELD_OR_CLOCK } from "../constants";
+import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -216,7 +216,7 @@ export class GameActionEngine {
         }
 
         unit.decreaseMorale(
-            MORALE_CHANGE_FOR_SHIELD_OR_CLOCK,
+            MORALE_CHANGE_FOR_CLOCK,
             this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
         );
         unit.setOnHourglass(true);
@@ -235,11 +235,11 @@ export class GameActionEngine {
 
         unit.applyLuckShield();
         unit.decreaseMorale(
-            MORALE_CHANGE_FOR_SHIELD_OR_CLOCK,
+            MORALE_CHANGE_FOR_SHIELD,
             this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
         );
         this.context.sceneLog.updateLog(
-            `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD_OR_CLOCK})`,
+            `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD})`,
         );
 
         const events: GameEvent[] = [{ type: "unit_defended", unitId: unit.getId(), team: unit.getTeam() }];

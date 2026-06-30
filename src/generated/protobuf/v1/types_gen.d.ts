@@ -13,3 +13,4 @@ export type TeamType = PBTypes.TeamVals;
 export type UnitLevelType = PBTypes.UnitLevelVals;
 export type UnitSizeType = PBTypes.UnitSizeVals;
 export type UnitType = PBTypes.UnitVals;
+//# sourceMappingURL=types_gen.d.ts.map

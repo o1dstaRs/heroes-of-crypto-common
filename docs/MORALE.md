@@ -23,9 +23,9 @@ Morale changes are applied to a unit's **base** morale and clamped to ±20. (See
 | Lateral move (distance unchanged) | 0 | — | same |
 | **Kill** an enemy stack (attacker) | **+4** | `MORALE_CHANGE_FOR_KILL` | `handlers/attack_handler.ts`, kill-dealing abilities |
 | An allied stack of the **same unit type** dies | **−4** each | `MORALE_CHANGE_FOR_KILL` | `units_holder.ts` `decreaseMoraleForTheSameUnitsOfTheTeam` |
-| **Wait** (hourglass) | **−2** | `MORALE_CHANGE_FOR_SHIELD_OR_CLOCK` | `engine/action_engine.ts` |
-| **Defend** (Luck Shield) | **−2** | `MORALE_CHANGE_FOR_SHIELD_OR_CLOCK` | `engine/action_engine.ts` |
-| **Forced skip** (timeout / effect) | **−1** | `MORALE_CHANGE_FOR_SKIP` | `engine/turn_engine.ts` `completeTurn` |
+| **Wait** (hourglass) | **−3** | `MORALE_CHANGE_FOR_CLOCK` | `engine/action_engine.ts` |
+| **Defend** (Luck Shield, also sets this turn's luck to +3) | **−2** | `MORALE_CHANGE_FOR_SHIELD` | `engine/action_engine.ts` |
+| **Skip** (Next with no action) / **forced skip** (timeout / effect) | **−1** | `MORALE_CHANGE_FOR_SKIP` | `engine/turn_engine.ts` `completeTurn` |
 
 ### The distance rule (in detail)
 
