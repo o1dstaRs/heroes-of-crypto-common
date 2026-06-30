@@ -74,26 +74,38 @@ const fmt = (a) => "[" + a.map((x) => x.toFixed(3)).join(", ") + "]";
 
 const sh = (cmd, opts = {}) => execSync(cmd, { cwd: REPO, encoding: "utf8", stdio: "pipe", ...opts });
 
-/** Run one self-play tournament of OPT(weights) vs BASE at a fixed seed; return decisive win rate of OPT. */
+/**
+ * Run one self-play tournament of OPT(weights) vs BASE at a fixed seed; return decisive win rate of OPT.
+ * Resilient to a flaky subprocess: retries a failed tournament up to 2 times (a transient worker/OOM
+ * failure must not abort a multi-hour search). Returns null only if every attempt fails — the caller
+ * ranks a null candidate last rather than crashing the whole run.
+ */
 function evalWeights(weights, seed, games) {
-    const before = new Set(readdirSync(OUT).filter((f) => f.endsWith(".summary.json")));
     const env = { ...process.env, V05_WEIGHTS: JSON.stringify(weights) };
-    // outDir is the last positional -> concurrency defaults to all cores. --maps samples every layout.
-    sh(`bun src/simulation/run_tournament.ts ${OPT} ${BASE} ${games} ${seed} ${JSON.stringify(OUT)} --maps`, {
-        stdio: "ignore",
-        env,
-    });
-    const summaryPath = readdirSync(OUT)
-        .filter((f) => f.startsWith(`${OPT}_vs_${BASE}_`) && f.endsWith(".summary.json") && !before.has(f))
-        .map((f) => join(OUT, f))
-        .sort()
-        .pop();
-    if (!summaryPath) {
-        throw new Error("no summary produced");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+            const before = new Set(readdirSync(OUT).filter((f) => f.endsWith(".summary.json")));
+            // outDir is the last positional -> concurrency defaults to all cores. --maps samples every layout.
+            sh(`bun src/simulation/run_tournament.ts ${OPT} ${BASE} ${games} ${seed} ${JSON.stringify(OUT)} --maps`, {
+                stdio: "ignore",
+                env,
+            });
+            const summaryPath = readdirSync(OUT)
+                .filter((f) => f.startsWith(`${OPT}_vs_${BASE}_`) && f.endsWith(".summary.json") && !before.has(f))
+                .map((f) => join(OUT, f))
+                .sort()
+                .pop();
+            if (!summaryPath) {
+                throw new Error("no summary produced");
+            }
+            const sum = JSON.parse(readFileSync(summaryPath, "utf8"));
+            const decisive = sum.a.wins + sum.b.wins;
+            return decisive ? sum.a.wins / decisive : 0;
+        } catch (e) {
+            console.log(`[cem] tournament failed (seed ${seed}, attempt ${attempt + 1}/3): ${String(e).slice(0, 120)}`);
+        }
     }
-    const sum = JSON.parse(readFileSync(summaryPath, "utf8"));
-    const decisive = sum.a.wins + sum.b.wins;
-    return decisive ? sum.a.wins / decisive : 0;
+    return null; // all retries exhausted
 }
 
 if (!existsSync(LOG)) {
@@ -111,7 +123,7 @@ let bestEver = { winRate: -1, weights: mean.slice(), gen: -1 };
 
 // Baseline: the default vector (== v0.4) on the validation seed. v0.5 vs v0.4 with identical weights is
 // the mirror self-play floor (~50%); anything the search finds above this is a real learned edge.
-const baseVal = evalWeights(DEFAULT_MEAN, VAL_SEED, VAL_GAMES);
+const baseVal = evalWeights(DEFAULT_MEAN, VAL_SEED, VAL_GAMES) ?? -1;
 console.log(`[cem] baseline (default==${BASE}) on val seed: ${(baseVal * 100).toFixed(2)}%`);
 
 for (let gen = 1; gen <= GENS; gen += 1) {
@@ -121,7 +133,8 @@ for (let gen = 1; gen <= GENS; gen += 1) {
     for (let k = 1; k < POP; k += 1) {
         pop.push(mean.map((m, d) => clip(m + sigma[d] * gauss())));
     }
-    const scored = pop.map((w) => ({ w, fit: evalWeights(w, seed, GAMES) }));
+    // null fit (a candidate whose tournament failed all retries) ranks last so it can't enter the elite.
+    const scored = pop.map((w) => ({ w, fit: evalWeights(w, seed, GAMES) ?? -1 }));
     scored.sort((a, b) => b.fit - a.fit);
     const elite = scored.slice(0, ELITE);
 
@@ -139,7 +152,7 @@ for (let gen = 1; gen <= GENS; gen += 1) {
     sigma = newSigma.map((v) => Math.max(SIGMA_FLOOR, Math.sqrt(v) * SIGMA_DECAY));
 
     // Honest trajectory: re-evaluate the refit MEAN on the fixed held-out validation seed.
-    const valWin = evalWeights(mean, VAL_SEED, VAL_GAMES);
+    const valWin = evalWeights(mean, VAL_SEED, VAL_GAMES) ?? -1;
     if (valWin > bestEver.winRate) {
         bestEver = { winRate: valWin, weights: mean.slice(), gen };
         writeFileSync(BEST, JSON.stringify({ ...bestEver, base: BASE, opt: OPT, valGames: VAL_GAMES }, null, 2));
