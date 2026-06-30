@@ -402,7 +402,11 @@ function findRangeAttackAction(
             // is a friendly, the shot is wasted — you can't damage your own unit — and the engine rejects
             // it as attack_not_available. An enemy blocker is fine (the shot just strikes that nearer
             // enemy), and Through Shot pierces, so only guard plain shots against a friendly screen.
-            if (!isAOEAttacker && !isThroughShot && isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)) {
+            if (
+                !isAOEAttacker &&
+                !isThroughShot &&
+                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)
+            ) {
                 continue;
             }
 
@@ -697,8 +701,7 @@ export function isLineBlockedByFriendlyUnit(
     if (len <= 1) {
         return false;
     }
-    const enemyTeam =
-        friendlyTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = friendlyTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
     const stepX = dx / len;
     const stepY = dy / len;
     let curX = fromCell.x + stepX;
