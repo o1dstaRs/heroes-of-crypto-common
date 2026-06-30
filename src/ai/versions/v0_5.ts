@@ -94,7 +94,39 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // A fragile aura-flyer keeps its aura on the army instead of diving for a marginal melee hit.
         const flyer = this.auraFlyerSupport(unit, context, safe);
         // A melee-buff aura emitter (Crusader/Wolf Rider) covers the FRONT melee line, not the backline.
-        return this.meleeAuraSupport(unit, context, flyer);
+        const auraM = this.meleeAuraSupport(unit, context, flyer);
+        // Final catch-all: never emit a move whose footprint is occupied (the engine rejects move_blocked).
+        return this.dropBlockedMove(unit, context, auraM);
+    }
+    /**
+     * Catch-all validity guard for moves. Some aura-repositioning paths (the inherited withAura, and large
+     * flyers like Angel/Pegasus/Griffin) build a move from a reachable ANCHOR whose full footprint can still
+     * clip an occupied cell — the engine then rejects it as move_blocked and the turn is wasted. If the final
+     * decision carries such a move, drop it and hold instead (hourglass if allowed, else end turn). Measured:
+     * eliminates the ~0.013/game move_blocked seen with asymmetric armies (mostly size-2 units).
+     */
+    private dropBlockedMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const mv = decision.find((a) => a.type === "move_unit");
+        if (!mv || mv.type !== "move_unit") {
+            return decision;
+        }
+        const fp = mv.targetCells ?? [];
+        if (!fp.length) {
+            return decision;
+        }
+        const valid =
+            context.grid.areAllCellsEmpty(fp, unit.getId()) ||
+            context.grid.canOccupyCells(
+                fp,
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
+        if (valid) {
+            return decision;
+        }
+        return this.canHourglass(unit, context)
+            ? [{ type: "wait_turn", unitId: unit.getId() }]
+            : [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
     }
     /**
      * Melee-line aura support. Crusader (Sharpened Weapons, +melee damage) and Wolf Rider (Wolf Trail, +move)
