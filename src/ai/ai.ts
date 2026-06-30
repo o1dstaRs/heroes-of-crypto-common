@@ -389,6 +389,14 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
                 continue;
             }
 
+            // A normal (non-AOE, non-Through-Shot) shot stops at the FIRST unit on its line. If that unit
+            // is a friendly, the shot is wasted — you can't damage your own unit — and the engine rejects
+            // it as attack_not_available. An enemy blocker is fine (the shot just strikes that nearer
+            // enemy), and Through Shot pierces, so only guard plain shots against a friendly screen.
+            if (!isAOEAttacker && !isThroughShot && isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)) {
+                continue;
+            }
+
             let divisor = 1;
             if (!isSniper && shotDistance > 0) {
                 let d = distanceCells;
@@ -640,6 +648,51 @@ export function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY
         if (cx >= 0 && cy >= 0 && cx < numCols && cy < numRows) {
             if (matrix[cy][cx] === ObstacleType.BLOCK) {
                 return true;
+            }
+        }
+        curX += stepX;
+        curY += stepY;
+    }
+    return false;
+}
+
+/**
+ * Whether the FIRST unit a straight shot from `fromCell` toward `toCell` meets is a friendly. A normal
+ * (non-Through-Shot) projectile stops at the first body it hits; if that body is on the shooter's own
+ * team the shot deals no damage and the engine rejects it. An enemy first means the shot still strikes
+ * an enemy (just a nearer one), so that is not "blocked". Terrain/obstacles are flown over here — the
+ * mountain block is handled separately by isLineBlockedByObstacle.
+ */
+export function isLineBlockedByFriendlyUnit(
+    fromCell: HoCMath.XY,
+    toCell: HoCMath.XY,
+    matrix: number[][],
+    friendlyTeam: number,
+): boolean {
+    const numRows = matrix.length;
+    const numCols = matrix[0].length;
+    const dx = toCell.x - fromCell.x;
+    const dy = toCell.y - fromCell.y;
+    const len = Math.max(Math.abs(dx), Math.abs(dy));
+    if (len <= 1) {
+        return false;
+    }
+    const enemyTeam =
+        friendlyTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const stepX = dx / len;
+    const stepY = dy / len;
+    let curX = fromCell.x + stepX;
+    let curY = fromCell.y + stepY;
+    for (let i = 1; i < len; i++) {
+        const cx = Math.round(curX);
+        const cy = Math.round(curY);
+        if (cx >= 0 && cy >= 0 && cx < numCols && cy < numRows) {
+            const v = matrix[cy][cx];
+            if (v === friendlyTeam) {
+                return true;
+            }
+            if (v === enemyTeam) {
+                return false;
             }
         }
         curX += stepX;
