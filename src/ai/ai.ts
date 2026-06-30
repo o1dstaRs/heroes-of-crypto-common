@@ -1716,6 +1716,21 @@ function doFindTarget(
         actionDetermined = pickTargetByActualPath();
         usedInfinitPath = false;
         if (actionDetermined) {
+            if (
+                unit.hasAbilityActive("No Melee") &&
+                (actionDetermined.actionType() === AIActionType.MELEE_ATTACK ||
+                    actionDetermined.actionType() === AIActionType.MOVE_AND_MELEE_ATTACK)
+            ) {
+                // No-Melee ranged units (e.g. Tsar Cannon) cannot perform the melee strike this
+                // actual-path target would queue. Reposition toward it instead of returning an
+                // impossible melee (mirrors the closest-target No-Melee guard below).
+                return new BasicAIAction(
+                    AIActionType.MOVE,
+                    actionDetermined.cellToMove(),
+                    undefined,
+                    actionDetermined.currentActiveKnownPaths(),
+                );
+            }
             return actionDetermined;
         }
     }
