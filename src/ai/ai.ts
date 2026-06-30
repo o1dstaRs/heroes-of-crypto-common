@@ -166,7 +166,7 @@ export function findTarget(
     }
 
     if (!action && unit.getAttackType() === PBTypes.AttackVals.RANGE && unit.getRangeShots() > 0) {
-        action = findRangeAttackAction(unit, grid, matrix);
+        action = findRangeAttackAction(unit, grid, matrix, unitsHolder);
     }
 
     // --- Team strategy + movement ---
@@ -337,7 +337,12 @@ function logAction(action: BasicAIAction | undefined, debug: boolean) {
  *
  * Returns undefined when no enemy is in range; callers fall back to movement.
  */
-function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]): BasicAIAction | undefined {
+function findRangeAttackAction(
+    unit: IUnitAIRepr,
+    grid: Grid,
+    matrix: number[][],
+    unitsHolder: UnitsHolder,
+): BasicAIAction | undefined {
     if (unit.getRangeShots() <= 0) {
         return undefined;
     }
@@ -395,6 +400,17 @@ function findRangeAttackAction(unit: IUnitAIRepr, grid: Grid, matrix: number[][]
             // enemy), and Through Shot pierces, so only guard plain shots against a friendly screen.
             if (!isAOEAttacker && !isThroughShot && isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)) {
                 continue;
+            }
+
+            // Skip untargetable enemies: a unit hidden by Disguise Aura (no enemy within its aura range)
+            // carries the "Hidden" buff and the engine rejects any plain shot at it (attack_not_available).
+            // It is still present in the occupancy matrix, so guard on the buff explicitly. AOE/Through
+            // Shot resolve differently (splash / pierce), so leave those paths untouched.
+            if (!isAOEAttacker && !isThroughShot) {
+                const occupantId = grid.getOccupantUnitId(targetCell);
+                if (occupantId && unitsHolder.getAllUnits().get(occupantId)?.hasBuffActive("Hidden")) {
+                    continue;
+                }
             }
 
             let divisor = 1;
