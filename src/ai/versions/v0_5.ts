@@ -22,10 +22,12 @@ import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+const MELEE = PBTypes.AttackVals.MELEE;
 /** Action types that mean the unit is striking/casting this turn (so a move is a combat reposition, not a free one). */
 const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "obstacle_attack", "area_throw_attack"]);
 /** Rough single-stack firepower proxy (shots * max hit), matching v0.4's firepowerOf. */
 const firepowerOf = (u: Unit): number => Math.max(1, u.getRangeShots()) * Math.max(1, u.getAttackDamageMax());
+const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 
 /**
  * v0.5 — the first REINFORCEMENT-LEARNED AI version.
@@ -51,10 +53,153 @@ export class StrategyV0_5 extends StrategyV0_4 {
         this.w = weights ?? loadV05Weights();
     }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        // v0.4's full decision (which already used v0.5's learned scoreShot via inheritance), then the
-        // learned reposition policy re-ranks a STANDALONE move's destination. Default weights keep v0.4's
-        // own destination (posIncumbent anchor), so this is a strict, validity-preserving extension.
-        return this.repositionByPolicy(unit, context, super.decideTurn(unit, context));
+        // v0.4's full decision (which already used v0.5's learned scoreShot via inheritance), then two learned
+        // post-processes: re-rank a melee strike's (target, stand cell), then re-rank a standalone move's
+        // destination. They're mutually exclusive (a turn is either a strike or a pure move), and both anchor
+        // to v0.4's own pick, so with the default weights v0.5 == v0.4 (a strict, validity-preserving extension).
+        const base = super.decideTurn(unit, context);
+        return this.repositionByPolicy(unit, context, this.meleeByPolicy(unit, context, base));
+    }
+    /**
+     * Stage-4 learned melee. When this turn lands a melee strike, re-pick WHICH enemy to hit and FROM WHICH
+     * cell among the legal options — in-place-adjacent enemies and reachable cells adjacent to an enemy — by
+     * a learned score (damage / focus-kill / free-hit-if-retaliation-spent / target firepower / don't-
+     * overextend) anchored to v0.4's own pick. Candidates are footprint-guarded and adjacency-checked, so
+     * every emitted strike (and any move into it) is valid by construction. Forced targets (Aggr/taunt) and
+     * the default weights both keep v0.4's exact strike.
+     */
+    private meleeByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const strike = decision.find((a) => a.type === "melee_attack");
+        if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
+            return decision; // not a melee strike, or a forced target we may not retarget
+        }
+        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent] = this.w;
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const base = unit.getBaseCell();
+        const myCells = unit.getCells();
+        const fp = context.fightProperties;
+        const v4target = strike.targetId;
+        const v4from = strike.attackFrom ?? base;
+        const cowardlyVs = (e: Unit): boolean =>
+            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+        const enemies = unitsHolder
+            .getAllAllies(enemyTeam)
+            .filter((e) => !e.isDead() && !e.hasBuffActive("Hidden") && !cowardlyVs(e));
+        if (!enemies.length) {
+            return decision;
+        }
+        const footprintOk = (cell: XY): boolean => {
+            const f = this.footprintForCell(unit, cell, context);
+            return (
+                f.length > 0 &&
+                (grid.areAllCellsEmpty(f, unit.getId()) ||
+                    grid.canOccupyCells(
+                        f,
+                        unit.hasAbilityActive("Made of Fire"),
+                        unit.hasAbilityActive("Made of Water"),
+                    ))
+            );
+        };
+        const adjacentFrom = (cell: XY, e: Unit): boolean => {
+            const f = this.footprintForCell(unit, cell, context);
+            return f.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)));
+        };
+
+        type Cand = { target: Unit; cell: XY; route?: IWeightedRoute };
+        const cands: Cand[] = [];
+        // ANCHOR: v0.4's own (target, stand cell) is always a candidate, so the meleeIncumbent weight can
+        // make it win (default behaviour). Without this, a tie at 0 could deviate from v0.4 even at default.
+        const v4targetUnit = unitsHolder.getAllUnits().get(v4target);
+        if (v4targetUnit && !v4targetUnit.isDead()) {
+            cands.push({ target: v4targetUnit, cell: v4from });
+        }
+        // In-place strikes: any enemy already adjacent to the unit's current footprint.
+        for (const e of enemies) {
+            if (e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(mc, ec)))) {
+                cands.push({ target: e, cell: base });
+            }
+        }
+        // Move-and-strike: reachable cells whose footprint sits adjacent to an enemy (skip if can't move).
+        if (unit.canMove()) {
+            const movePath = pathHelper.getMovePath(
+                base,
+                matrix,
+                unit.getSteps(),
+                grid.getAggrMatrixByTeam(enemyTeam),
+                unit.canFly(),
+                unit.isSmallSize(),
+                unit.hasAbilityActive("Made of Fire"),
+            );
+            for (const routes of movePath.knownPaths.values()) {
+                const route = routes[0];
+                if (!route?.route.length || !footprintOk(route.cell)) {
+                    continue;
+                }
+                for (const e of enemies) {
+                    if (adjacentFrom(route.cell, e)) {
+                        cands.push({ target: e, cell: route.cell, route });
+                    }
+                }
+            }
+        }
+        if (!cands.length) {
+            return decision;
+        }
+        const score = (c: Cand): number => {
+            const min = unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
+            const max = unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
+            const hp = c.target.getCumulativeHp();
+            const effective = Math.min((min + max) / 2, hp);
+            const dmg = effective / Math.max(1, c.target.getMaxHp());
+            const kill = effective >= hp ? 1 : 0;
+            const retalFree = fp?.hasAlreadyRepliedAttack(c.target.getId()) ? 1 : 0;
+            const threat = firepowerOf(c.target) / 1000;
+            const standThreat = countMeleeThreatsToCell(c.cell, matrix, enemyTeam) / 3;
+            const incumbent = c.target.getId() === v4target && c.cell.x === v4from.x && c.cell.y === v4from.y ? 1 : 0;
+            return (
+                wDmg * dmg +
+                wKill * kill +
+                wRetal * retalFree +
+                wThreat * threat +
+                wStand * standThreat +
+                wIncumbent * incumbent
+            );
+        };
+        let best: Cand | undefined;
+        let bestScore = -Infinity;
+        for (const c of cands) {
+            const s = score(c);
+            if (s > bestScore) {
+                bestScore = s;
+                best = c;
+            }
+        }
+        // Policy agrees with v0.4 (or nothing better) -> keep v0.4's exact strike (incl. any move it built).
+        if (!best || (best.target.getId() === v4target && best.cell.x === v4from.x && best.cell.y === v4from.y)) {
+            return decision;
+        }
+        const acts: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        if (best.route && (best.cell.x !== base.x || best.cell.y !== base.y)) {
+            acts.push({
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            });
+        }
+        acts.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: best.target.getId(),
+            attackFrom: { ...best.cell },
+        });
+        return acts;
     }
     /**
      * Stage-2 learned positioning. When this turn is a pure reposition (a single move_unit, no strike or

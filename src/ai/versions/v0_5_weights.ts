@@ -57,6 +57,12 @@ export const V05_WEIGHT_KEYS = [
     "posAggrZone", // * route steps into the enemy threat zone (1/0)
     "posShoot", // * shooter-with-ammo lands on a cell within shot distance but not boxed (1/0)
     "posAura", // * aura emitter covers more allies from the cell / 4
+    "meleeDamage", // * expected damage / target maxHp — which adjacent/reachable enemy to strike
+    "meleeKill", // * this strike wipes the target stack (1/0) — focus-kill
+    "meleeRetalFree", // * target already used its retaliation this lap (1/0) — a free hit
+    "meleeThreat", // * target firepower / 1000 — trade into their most dangerous stack
+    "meleeStandThreat", // * enemy melee that can reach our STAND cell / 3 — don't overextend
+    "meleeIncumbent", // * (target, stand cell) == v0.4's own melee pick (1/0) — anchor; keeps default == v0.4
 ] as const;
 
 /**
@@ -73,9 +79,11 @@ export const V05_WEIGHT_KEYS = [
  */
 export const DEFAULT_V05_W: readonly number[] = [
     0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847,
-    // stage-3 features start neutral (0) so this default ships identical to the validated ~51.2% vector
-    // until a richer-feature CEM run retrains and re-bakes them.
+    // stage-3 features start neutral (0) so this default ships identical to the validated ~51.2% vector.
     0.0, 0.0, 0.0, 0.0,
+    // stage-4 melee features: neutral (0) with meleeIncumbent=2.0 dominating, so v0.4's melee pick always
+    // wins until a CEM run retrains them — keeps the shipped default == the validated ~51.2% behaviour.
+    0.0, 0.0, 0.0, 0.0, 0.0, 2.0,
 ];
 
 /**

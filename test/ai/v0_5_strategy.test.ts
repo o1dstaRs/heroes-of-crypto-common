@@ -24,18 +24,21 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the self-play-trained weight vector (14 dims, not the v0.4-identity no-op)", () => {
-        // Default is the CEM-trained vector (beats v0.4 ~+1.2pp on unseen seeds), NOT the identity. The 4
-        // stage-3 features start neutral (0) so the shipped default == the validated ~51.2% behaviour.
+    it("ships the self-play-trained weight vector (20 dims, not the v0.4-identity no-op)", () => {
+        // Stage-1/2 trained (first 10) + stage-3 reposition features (neutral 0) + stage-4 melee features
+        // (neutral 0, meleeIncumbent=2.0). The neutral stage-3/4 dims keep the shipped default == ~51.2%.
         expect(DEFAULT_V05_W).toEqual([
-            0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847, 0.0, 0.0, 0.0, 0.0,
+            0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 2.0,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
-        expect(DEFAULT_V05_W.length).toBe(14);
+        expect(DEFAULT_V05_W.length).toBe(20);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {
-        const trained = [1.2, 0.5, 0.8, 0.1, 0.05, 1.0, 0.4, -0.2, -0.6, 1.0, 0.3, -0.5, 0.7, 0.2];
+        const trained = [
+            1.2, 0.5, 0.8, 0.1, 0.05, 1.0, 0.4, -0.2, -0.6, 1.0, 0.3, -0.5, 0.7, 0.2, 0.9, 0.6, 0.3, 0.1, -0.4, 1.5,
+        ];
         process.env.V05_WEIGHTS = JSON.stringify(trained);
         expect(loadV05Weights()).toEqual(trained);
     });
