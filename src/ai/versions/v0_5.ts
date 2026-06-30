@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { AbilityPowerType } from "../../abilities/ability_properties";
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { IWeightedRoute } from "../../grid/path_definitions";
@@ -36,6 +37,18 @@ const cellKey = (c: XY): number => (c.x << 4) | c.y;
 // A fragile aura-emitting FLYER (e.g. Pegasus) is worth more keeping its aura on the army than diving in to
 // melee for a marginal hit — measured: Pegasus attacked 81% of turns, supporting only ~3%. ON by default.
 const auraFlyOn = process.env.V05_AURAFLY !== "off";
+// Auras that mainly help the MELEE line: Sharpened Weapons (+melee damage, Crusader) and Wolf Trail / walk
+// steps (+movement, Wolf Rider). (Pegasus Might is +attack&armor for ALL incl. ranged -> flyer balance play.)
+const MELEE_AURA_TYPES = new Set<number>([
+    AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE,
+    AbilityPowerType.ADDITIONAL_STEPS,
+    AbilityPowerType.ADDITIONAL_STEPS_WALK,
+]);
+// REFUTED, default OFF: explicitly repositioning these emitters to cover the melee line measured WORSE
+// (50.9/51.0% vs 51.4/52.1% on two seeds). They're melee ATTACKERS that already advance with the army, so
+// overriding their advance/attack to chase aura coverage costs more than the extra coverage is worth. Kept
+// behind V05_AURASUPPORT=on for future refinement (e.g. only when truly sitting behind the line).
+const auraSupportOn = process.env.V05_AURASUPPORT === "on";
 // Healer spell-choice policy. Battery (forced-Healer vs v0.4) ranked single plays:
 //   healL4 56.7/57.0% > base 56.2/56.4% > armor 55.8% > bless 54.6% >> heal-anyone 50.3% (over-healing is bad).
 // Default "smart": heal a hurt L4 first; keep any heal of a wounded stack; otherwise BALANCE armour vs
@@ -79,7 +92,93 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
         const safe = this.excludeHiddenAttack(unit, context, repos);
         // A fragile aura-flyer keeps its aura on the army instead of diving for a marginal melee hit.
-        return this.auraFlyerSupport(unit, context, safe);
+        const flyer = this.auraFlyerSupport(unit, context, safe);
+        // A melee-buff aura emitter (Crusader/Wolf Rider) covers the FRONT melee line, not the backline.
+        return this.meleeAuraSupport(unit, context, flyer);
+    }
+    /**
+     * Melee-line aura support. Crusader (Sharpened Weapons, +melee damage) and Wolf Rider (Wolf Trail, +move)
+     * carry auras that only help MELEE allies, so the base "max total coverage" positioning wastes them on
+     * the backline. On a pure move (not a strike), reposition this ground emitter to the reachable cell that
+     * covers the most MELEE allies, tie-breaking toward the melee centroid — so it advances WITH the front
+     * line instead of sitting back with the ranged units. Pegasus (flyer, all-ally aura) is excluded.
+     */
+    private meleeAuraSupport(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!auraSupportOn || unit.canFly()) {
+            return decision;
+        }
+        const meleeAuras = unit.getAuraEffects().filter((a) => MELEE_AURA_TYPES.has(a.getPowerType()));
+        if (!meleeAuras.length || decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+            return decision; // not a melee-aura emitter, or it's striking/casting this turn
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const team = unit.getTeam();
+        const enemyTeam = otherTeam(team);
+        const meleeAllies = unitsHolder
+            .getAllAllies(team)
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId() && a.getAttackType() === MELEE);
+        if (!meleeAllies.length) {
+            return decision; // no melee line to support
+        }
+        const auraRange = Math.max(...meleeAuras.map((a) => a.getRange()));
+        const centroid = {
+            x: meleeAllies.reduce((s, a) => s + a.getBaseCell().x, 0) / meleeAllies.length,
+            y: meleeAllies.reduce((s, a) => s + a.getBaseCell().y, 0) / meleeAllies.length,
+        };
+        const cover = (cell: XY): number =>
+            meleeAllies.filter((a) => getDistance(cell, a.getBaseCell()) <= auraRange).length;
+        const footprintOk = (cell: XY): boolean => {
+            const f = this.footprintForCell(unit, cell, context);
+            return (
+                f.length > 0 &&
+                (grid.areAllCellsEmpty(f, unit.getId()) ||
+                    grid.canOccupyCells(
+                        f,
+                        unit.hasAbilityActive("Made of Fire"),
+                        unit.hasAbilityActive("Made of Water"),
+                    ))
+            );
+        };
+        const base = unit.getBaseCell();
+        let best: { cell: XY; route?: IWeightedRoute; cover: number; dist: number } = {
+            cell: base,
+            cover: cover(base),
+            dist: getDistance(base, centroid),
+        };
+        const movePath = pathHelper.getMovePath(
+            base,
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        for (const routes of movePath.knownPaths.values()) {
+            const route = routes[0];
+            if (!route?.route.length || !footprintOk(route.cell)) {
+                continue;
+            }
+            const c = cover(route.cell);
+            const d = getDistance(route.cell, centroid);
+            // Prefer covering more melee allies; tie-break toward the melee centroid (advance with the line).
+            if (c > best.cover || (c === best.cover && d < best.dist)) {
+                best = { cell: route.cell, route, cover: c, dist: d };
+            }
+        }
+        if (!best.route || (best.cell.x === base.x && best.cell.y === base.y)) {
+            return decision; // already best-positioned for the melee line
+        }
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.route.hasLavaCell,
+                hasWaterCell: best.route.hasWaterCell,
+            },
+        ];
     }
     /**
      * Experimental Healer spell-choice policy (V05_HEALPOLICY). The base Healer heals a hurt L3-4 stack
