@@ -65,9 +65,16 @@ export function isDeterministicRandomActive(): boolean {
 /** One raw 53-bit value: from the seeded source if installed, else crypto-secure (the production path). */
 function nextRaw53(): bigint {
     if (deterministicSource) {
-        const r = deterministicSource();
-        const clamped = r < 0 ? 0 : r >= 1 ? 0.9999999999999999 : r;
-        return BigInt(Math.floor(clamped * 9007199254740992)); // r * 2^53 -> [0, 2^53)
+        // The seeded source (mulberry32) yields only 32 bits of precision, so `floor(r * 2^53)` would push
+        // those bits into the HIGH end and leave the LOW 21 bits always zero. That biases small-range
+        // getRandomInt — e.g. randomInt(0, 2) returned the low bit, hence ALWAYS 0, which made the
+        // morale-tie turn-order coin flip never random (LOWER/green always went first in sims -> a spurious
+        // ~57/43 side bias that does NOT exist in production). Combine TWO draws for a full 53-bit value with
+        // random LOW bits, matching the crypto branch's distribution. Production (crypto) is unaffected.
+        const clamp = (r: number): number => (r < 0 ? 0 : r >= 1 ? 0.9999999999999999 : r);
+        const hi = BigInt(Math.floor(clamp(deterministicSource()) * 0x200000)); // 21 high bits (2^21)
+        const lo = BigInt(Math.floor(clamp(deterministicSource()) * 0x100000000)); // 32 low bits (2^32)
+        return (hi << 32n) | lo; // 53-bit integer in [0, 2^53) with proper low-bit entropy
     }
     const u32 = new Uint32Array(2);
     getSecureRandomValues(u32);

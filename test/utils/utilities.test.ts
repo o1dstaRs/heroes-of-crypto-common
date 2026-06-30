@@ -275,6 +275,38 @@ describe("utility functions", () => {
         });
     });
 
+    it("seeded getRandomInt has full low-bit entropy (small ranges are not stuck)", () => {
+        // Regression: the seeded mulberry32 source yields 32-bit floats; nextRaw53 must spread those into a
+        // full 53-bit value with random LOW bits. A prior `floor(r * 2^53)` left the low 21 bits always 0, so
+        // getRandomInt(0, 2) returned the low bit -> ALWAYS 0. That silently rigged every coin flip in the
+        // sim (e.g. the turn-order morale-tie, making LOWER/green always move first -> a spurious ~57/43 side
+        // bias). Production (crypto path) was never affected. Guard small-range uniformity here.
+        try {
+            let s = 0xc0ffee >>> 0;
+            const seeded = () => {
+                s = (s + 0x6d2b79f5) >>> 0;
+                let t = s;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+            setDeterministicRandomSource(seeded);
+            let zeros = 0;
+            let ones = 0;
+            for (let i = 0; i < 2000; i += 1) {
+                const v = getRandomInt(0, 2);
+                expect(v === 0 || v === 1).toBe(true);
+                if (v === 0) zeros += 1;
+                else ones += 1;
+            }
+            // Both outcomes must appear and be roughly balanced (would be 2000/0 with the old bug).
+            expect(zeros).toBeGreaterThan(700);
+            expect(ones).toBeGreaterThan(700);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
     it("creates secure v4 UUIDs from random bytes when native randomUUID is absent", () => {
         withCryptoMock(
             {
