@@ -73,7 +73,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
             return decision; // not a melee strike, or a forced target we may not retarget
         }
-        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent] = this.w;
+        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent, wRetalCost] = this.w;
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const base = unit.getBaseCell();
@@ -146,6 +146,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!cands.length) {
             return decision;
         }
+        const myHp = Math.max(1, unit.getCumulativeHp());
         const score = (c: Cand): number => {
             const min = unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
             const max = unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
@@ -153,17 +154,31 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const effective = Math.min((min + max) / 2, hp);
             const dmg = effective / Math.max(1, c.target.getMaxHp());
             const kill = effective >= hp ? 1 : 0;
-            const retalFree = fp?.hasAlreadyRepliedAttack(c.target.getId()) ? 1 : 0;
+            const replied = fp?.hasAlreadyRepliedAttack(c.target.getId()) ?? false;
+            const retalFree = replied ? 1 : 0;
             const threat = firepowerOf(c.target) / 1000;
             const standThreat = countMeleeThreatsToCell(c.cell, matrix, enemyTeam) / 3;
             const incumbent = c.target.getId() === v4target && c.cell.x === v4from.x && c.cell.y === v4from.y ? 1 : 0;
+            // Expected retaliation damage taken (as a fraction of our HP) — 0 if this strike kills the stack
+            // or the target already retaliated this lap. The core favorable-trade signal: avoid striking a
+            // hard-hitting survivor. Weight is learned (expected negative).
+            const counter =
+                kill || replied
+                    ? 0
+                    : Math.min(
+                          (c.target.calculateAttackDamageMin(c.target.getAttack(), unit, false, 0, 1) +
+                              c.target.calculateAttackDamageMax(c.target.getAttack(), unit, false, 0, 1)) /
+                              2,
+                          myHp,
+                      ) / myHp;
             return (
                 wDmg * dmg +
                 wKill * kill +
                 wRetal * retalFree +
                 wThreat * threat +
                 wStand * standThreat +
-                wIncumbent * incumbent
+                wIncumbent * incumbent +
+                wRetalCost * counter
             );
         };
         let best: Cand | undefined;

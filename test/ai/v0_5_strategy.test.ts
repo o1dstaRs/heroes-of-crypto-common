@@ -24,20 +24,21 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the stage-4 self-play-trained vector (20 dims, ~53.5% vs v0.4)", () => {
-        // Fully trained across all four seams (the melee seam at [14..19] drove the jump from ~51% to ~53.5%
-        // on three unseen seeds). NOT the v0.4-identity no-op.
+    it("ships the trained vector (21 dims, ~53.3% vs v0.4; stage-5 retal-cost feature neutral)", () => {
+        // Trained across all melee seams (the melee scorer drove the jump from ~51% to ~53.3% on unseen
+        // seeds). The [20] meleeRetalCost feature starts neutral (0). NOT the v0.4-identity no-op.
         expect(DEFAULT_V05_W).toEqual([
             1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549,
-            0.5654, 1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564,
+            0.5654, 1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564, 0.0,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
-        expect(DEFAULT_V05_W.length).toBe(20);
+        expect(DEFAULT_V05_W.length).toBe(21);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {
         const trained = [
             1.2, 0.5, 0.8, 0.1, 0.05, 1.0, 0.4, -0.2, -0.6, 1.0, 0.3, -0.5, 0.7, 0.2, 0.9, 0.6, 0.3, 0.1, -0.4, 1.5,
+            -0.7,
         ];
         process.env.V05_WEIGHTS = JSON.stringify(trained);
         expect(loadV05Weights()).toEqual(trained);
