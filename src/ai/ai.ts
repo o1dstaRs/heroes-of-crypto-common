@@ -118,7 +118,11 @@ export function findTarget(
     const unitCell = unit.getBaseCell();
     const unitTeam = unit.getTeam();
     const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
-    const enemiesAround = unitsHolder.allEnemiesAroundUnit(unit, false);
+    // Exclude dead and UNTARGETABLE (Disguise Aura -> "Hidden") enemies up front: the random fallback
+    // pick below otherwise selects them, and the engine rejects the resulting attack (attack_not_available).
+    const enemiesAround = unitsHolder
+        .allEnemiesAroundUnit(unit, false)
+        .filter((e) => !e.isDead() && !e.hasBuffActive("Hidden"));
     const hasNoMelee = unit.hasAbilityActive("No Melee");
     for (const e of enemiesAround) {
         if (e.isDead() || e.hasBuffActive("Hidden")) {
