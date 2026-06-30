@@ -61,6 +61,7 @@ export const V05_WEIGHT_KEYS = [
     "meleeStandThreat", // * enemy melee that can reach our STAND cell / 3 — don't overextend
     "meleeIncumbent", // * (target, stand cell) == v0.4's own melee pick (1/0) — anchor; keeps default == v0.4
     "meleeRetalCost", // * expected retaliation damage taken / our HP (0 if we kill / they already retaliated)
+    "meleeFocusFire", // * # of our OTHER stacks already adjacent to the target / 2 — gang up to finish a stack
 ] as const;
 
 /**
@@ -80,9 +81,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     // unseen seeds (53.4/53.6/53.5) — a +2.4pp jump driven by the learned melee target/position scorer.
     1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549, 0.5654,
     1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564,
-    // [20] meleeRetalCost — stage-5 favorable-trade feature, starts neutral (0) so this default == the
-    // validated ~53.3% stage-4 vector until a CEM run trains it.
-    0.0,
+    // [20] meleeRetalCost (favorable-trade) and [21] meleeFocusFire (gang-up) — start neutral (0) so this
+    // default == the validated ~53.3% stage-4 vector until the long CEM run trains them.
+    0.0, 0.0,
 ];
 
 /**

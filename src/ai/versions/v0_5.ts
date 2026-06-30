@@ -73,11 +73,15 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
             return decision; // not a melee strike, or a forced target we may not retarget
         }
-        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent, wRetalCost] = this.w;
+        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent, wRetalCost, wFocus] =
+            this.w;
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const base = unit.getBaseCell();
         const myCells = unit.getCells();
+        const myAllies = unitsHolder
+            .getAllAllies(unit.getTeam())
+            .filter((a) => !a.isDead() && a.getId() !== unit.getId());
         const fp = context.fightProperties;
         const v4target = strike.targetId;
         const v4from = strike.attackFrom ?? base;
@@ -159,6 +163,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const threat = firepowerOf(c.target) / 1000;
             const standThreat = countMeleeThreatsToCell(c.cell, matrix, enemyTeam) / 3;
             const incumbent = c.target.getId() === v4target && c.cell.x === v4from.x && c.cell.y === v4from.y ? 1 : 0;
+            // Focus-fire: how many of OUR other stacks are already adjacent to this target (so the army can
+            // wipe it together). Concentrating melee on an already-engaged stack finishes it faster.
+            const focusFire =
+                myAllies.filter((a) =>
+                    a.getCells().some((ac) => c.target.getCells().some((tc) => isAdjacentCell(ac, tc))),
+                ).length / 2;
             // Expected retaliation damage taken (as a fraction of our HP) — 0 if this strike kills the stack
             // or the target already retaliated this lap. The core favorable-trade signal: avoid striking a
             // hard-hitting survivor. Weight is learned (expected negative).
@@ -178,7 +188,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wThreat * threat +
                 wStand * standThreat +
                 wIncumbent * incumbent +
-                wRetalCost * counter
+                wRetalCost * counter +
+                wFocus * focusFire
             );
         };
         let best: Cand | undefined;
