@@ -76,14 +76,11 @@ export const V05_WEIGHT_KEYS = [
  * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // [0..9] shot + reposition (stage 1/2), [10..13] richer reposition (stage 3), [14..19] melee (stage 4).
-    // Stage-4 CEM (centred on the melee region) lifted v0.5 from the ~51% plateau to ~53.5% vs v0.4 on three
-    // unseen seeds (53.4/53.6/53.5) — a +2.4pp jump driven by the learned melee target/position scorer.
-    1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549, 0.5654,
-    1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564,
-    // [20] meleeRetalCost (favorable-trade) and [21] meleeFocusFire (gang-up) — start neutral (0) so this
-    // default == the validated ~53.3% stage-4 vector until the long CEM run trains them.
-    0.0, 0.0,
+    // Long-run CEM (12h, panel-validated, pass 1). ~55.3% vs v0.4 on three FRESH seeds outside the training
+    // panel (56.0/54.3/55.5); panel score 54.48%. All 22 dims trained — the melee seam (incl. favorable-trade
+    // [20] -1.11 and focus-fire [21]) plus a strong shotLevel ([4] 3.28). Re-baked as the run improves.
+    1.4784, -0.5372, -0.0465, 0.5077, 3.2829, 2.5787, 0.345, 0.4073, 0.1361, 2.1908, 0.2573, 0.7238, 0.1559, 0.5607,
+    0.2632, 1.3877, 1.9179, 0.6414, -0.4613, 0.7084, -1.1098, 0.0419,
 ];
 
 /**

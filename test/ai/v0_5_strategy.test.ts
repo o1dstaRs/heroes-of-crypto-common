@@ -24,12 +24,11 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the trained vector (22 dims, ~53.3% vs v0.4; stage-5 retal-cost + focus-fire neutral)", () => {
-        // Trained melee seam (~51% -> ~53.3% on unseen seeds). [20] meleeRetalCost + [21] meleeFocusFire
-        // start neutral (0), trained by the long CEM run. NOT the v0.4-identity no-op.
+    it("ships the long-run-trained vector (22 dims, ~55.3% vs v0.4 on fresh seeds)", () => {
+        // Panel-validated best from the 12h CEM run (re-baked as it improves). All 22 dims trained.
         expect(DEFAULT_V05_W).toEqual([
-            1.4567, -0.5161, 0.3337, 0.6168, 1.5012, 2.0219, -0.404, 0.3361, 0.8333, 2.8348, -0.0731, 0.2008, 0.0549,
-            0.5654, 1.1652, 1.7223, 0.6822, 0.3598, 0.3706, 1.0564, 0.0, 0.0,
+            1.4784, -0.5372, -0.0465, 0.5077, 3.2829, 2.5787, 0.345, 0.4073, 0.1361, 2.1908, 0.2573, 0.7238, 0.1559,
+            0.5607, 0.2632, 1.3877, 1.9179, 0.6414, -0.4613, 0.7084, -1.1098, 0.0419,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(22);
