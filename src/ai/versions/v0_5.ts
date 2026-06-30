@@ -15,6 +15,7 @@ import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
+import { auraCoverageScore, countMeleeThreatsToCell } from "../ai";
 import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
@@ -71,7 +72,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
             return decision; // move is part of a strike/cast — leave the (target-constrained) stand cell alone
         }
-        const [, , , , , , wAdvance, wCohesion, wHazard, wIncumbent] = this.w;
+        const [, , , , , , wAdvance, wCohesion, wHazard, wIncumbent, wThreat, wAggrZone, wShoot, wAura] = this.w;
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
@@ -93,12 +94,32 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const minEnemyDist = (c: XY): number => Math.min(...enemies.map((e) => getDistance(c, e.getBaseCell())));
         const baseEnemyDist = minEnemyDist(base);
         const baseCentroidDist = getDistance(base, centroid);
+        // Per-unit constants for the shoot-readiness feature: a shooter with ammo wants a cell within its
+        // shot distance of an enemy but NOT boxed in melee (dist >= 2).
+        const isShooter = unit.getAttackType() === RANGE && unit.getRangeShots() > 0;
+        const shotDist = unit.getRangeShotDistance();
+        const gridSettings = grid.getSettings();
         const score = (cell: XY, route: IWeightedRoute): number => {
             const advance = (baseEnemyDist - minEnemyDist(cell)) / steps; // + => closer to the enemy
             const cohesion = (baseCentroidDist - getDistance(cell, centroid)) / steps; // + => toward allies
             const hazard = route.hasLavaCell || route.hasWaterCell ? 1 : 0;
             const incumbent = cell.x === dest.x && cell.y === dest.y ? 1 : 0;
-            return wAdvance * advance + wCohesion * cohesion + wHazard * hazard + wIncumbent * incumbent;
+            // Richer (stage-3) features — what v0.4's hand-tuned positioning can't express directly.
+            const threat = countMeleeThreatsToCell(cell, matrix, enemyTeam) / 3; // enemy melee that can reach this cell
+            const aggrZone = route.firstAggrMet ? 1 : 0; // route steps into the enemy threat zone
+            const ed = minEnemyDist(cell);
+            const shootReady = isShooter && ed >= 2 && ed <= shotDist ? 1 : 0; // can likely fire from here
+            const aura = auraCoverageScore(unit, cell, gridSettings, unitsHolder) / 4; // aura emitters cover more allies
+            return (
+                wAdvance * advance +
+                wCohesion * cohesion +
+                wHazard * hazard +
+                wIncumbent * incumbent +
+                wThreat * threat +
+                wAggrZone * aggrZone +
+                wShoot * shootReady +
+                wAura * aura
+            );
         };
 
         const movePath = pathHelper.getMovePath(

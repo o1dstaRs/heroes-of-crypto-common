@@ -53,6 +53,10 @@ export const V05_WEIGHT_KEYS = [
     "posCohesion", // * (toward ally centroid, per step) — stay with the pack vs peel off
     "posHazard", // * candidate route crosses lava/water (1/0) — usually penalised
     "posIncumbent", // * candidate == v0.4's own destination (1/0) — anchor; keeps the default == v0.4
+    "posThreat", // * enemy melee that can reach the cell / 3 — exposure the heuristic can't see
+    "posAggrZone", // * route steps into the enemy threat zone (1/0)
+    "posShoot", // * shooter-with-ammo lands on a cell within shot distance but not boxed (1/0)
+    "posAura", // * aura emitter covers more allies from the cell / 4
 ] as const;
 
 /**
@@ -69,6 +73,9 @@ export const V05_WEIGHT_KEYS = [
  */
 export const DEFAULT_V05_W: readonly number[] = [
     0.8001, -0.3517, 0.0828, 0.6675, 1.4, 2.035, -0.3694, 0.2538, 0.892, 2.0847,
+    // stage-3 features start neutral (0) so this default ships identical to the validated ~51.2% vector
+    // until a richer-feature CEM run retrains and re-bakes them.
+    0.0, 0.0, 0.0, 0.0,
 ];
 
 /**
