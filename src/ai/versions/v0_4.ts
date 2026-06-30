@@ -976,9 +976,15 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 undefined,
             );
 
+        // The engine only heals a unit whose FRONT creature is actually damaged and that isn't magic-immune
+        // (canMassCastSpell/handleMagicAttack require getHp() < getMaxHp() && magicResist !== 100). canBeHealed()
+        // alone lets a magic-immune stack (e.g. a hurt Black Dragon, mr=100) through, so the cast is then
+        // declined as "spell_not_available". Gate on the exact engine predicate to never propose a dead heal.
+        const healEligible = (a: Unit): boolean =>
+            a.canBeHealed() && a.getMagicResist() !== 100 && a.getHp() < a.getMaxHp();
         // Only LEVEL 3-4 stacks that have lost more than 30% of their HP are worth a heal.
         const critical = allies
-            .filter((a) => a.canBeHealed() && a.getLevel() >= 3 && lostFrac(a) > 0.3)
+            .filter((a) => healEligible(a) && a.getLevel() >= 3 && lostFrac(a) > 0.3)
             .sort((p, q) => lostFrac(q) - lostFrac(p));
 
         // 1) Several such stacks -> Mass Heal.

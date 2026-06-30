@@ -540,6 +540,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     } else {
                         cause = action.aimCell ? "shot_no_hit_aimed" : "shot_no_hit_noaim";
                     }
+                } else if (action.type === "cast_spell") {
+                    cause = `spell:${action.spellName}${action.targetId ? "" : ":self/mass"}`;
                 }
                 rejectedDetails.push({
                     type: action.type,

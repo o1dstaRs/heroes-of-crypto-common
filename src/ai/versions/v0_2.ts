@@ -280,7 +280,11 @@ export class StrategyV0_2 extends StrategyV0_1 {
                 const pool =
                     targetType === SpellTargetType.ALL_FLYING ? candidates.filter((a) => a.canFly()) : candidates;
                 const beneficiaries = pool.filter((a) =>
-                    isHeal ? a.getHp() < a.getMaxHp() : !a.hasBuffActive(spell.getName()),
+                    isHeal
+                        ? // canMassCastSpell only heals a unit whose front creature is damaged AND that isn't
+                          // magic-immune; counting a hurt mr=100 stack (e.g. Black Dragon) gets the cast declined.
+                          a.getHp() < a.getMaxHp() && a.getMagicResist() !== 100
+                        : !a.hasBuffActive(spell.getName()),
                 );
                 if (beneficiaries.length && (isHeal || fightingSoon)) {
                     consider(beneficiaries.length * 200, spell);
