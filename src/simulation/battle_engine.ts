@@ -527,6 +527,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     const tgt = unitsHolder.getAllUnits().get(action.targetId);
                     if (!tgt || tgt.isDead()) {
                         cause = "target_gone";
+                    } else if (tgt.hasBuffActive("Hidden")) {
+                        cause = "hidden";
                     } else if (unit.hasDebuffActive("Range Null Field Aura")) {
                         cause = "null_field";
                     } else if (unit.hasDebuffActive("Rangebane")) {

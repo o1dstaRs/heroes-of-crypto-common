@@ -315,49 +315,57 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return decision;
         }
         const uh = context.unitsHolder;
-        const target = uh.getAllUnits().get(strike.targetId);
-        if (!target || target.isDead()) {
-            return this.fallbackTurn(unit, context);
-        }
+        const base = unit.getBaseCell();
         const myCells = unit.getCells();
         const adjacentInPlace = (e: Unit): boolean =>
             e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(ec, mc)));
         const cowardlyVs = (e: Unit): boolean =>
             unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+        // A target we can legally strike RIGHT HERE this turn — the exact set of conditions the engine's
+        // melee handler enforces: alive, not "Hidden" (engine refuses), not a Cowardice-blocked stronger
+        // stack, and adjacent now (so no move is needed, valid even if the unit can't move).
+        const strikableInPlace = (e: Unit | undefined): e is Unit =>
+            !!e && !e.isDead() && !e.hasBuffActive("Hidden") && !cowardlyVs(e) && adjacentInPlace(e);
         const inPlaceStrike = (targetId: string): GameAction[] => {
             const acts: GameAction[] = [];
             if (unit.getAttackTypeSelection() !== MELEE) {
                 acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
             }
-            acts.push({
-                type: "melee_attack",
-                attackerId: unit.getId(),
-                targetId,
-                attackFrom: { ...unit.getBaseCell() },
-            });
+            acts.push({ type: "melee_attack", attackerId: unit.getId(), targetId, attackFrom: { ...base } });
             return acts;
         };
-
-        // Forced target (Aggr/taunt): only that unit may be struck.
         const forcedId = unit.getTarget();
+        // When forced (Aggr/taunt) we may strike ONLY that unit — so we can't retarget elsewhere; advance.
+        const retargetOrFallback = (): GameAction[] => {
+            if (forcedId) {
+                return this.fallbackTurn(unit, context);
+            }
+            const alt = uh.getAllAllies(otherTeam(unit.getTeam())).find((e) => strikableInPlace(e));
+            return alt ? inPlaceStrike(alt.getId()) : this.fallbackTurn(unit, context);
+        };
+
+        const target = uh.getAllUnits().get(strike.targetId);
+        const attackFrom = strike.attackFrom ?? base;
+        const movesToStrike = attackFrom.x !== base.x || attackFrom.y !== base.y;
+
+        // Forced target (Aggr/taunt): only that unit may be struck — hit it in place if we legally can.
         if (forcedId && forcedId !== strike.targetId) {
             const forced = uh.getAllUnits().get(forcedId);
             if (forced && !forced.isDead()) {
-                if (adjacentInPlace(forced) && !cowardlyVs(forced)) {
-                    return inPlaceStrike(forcedId);
-                }
-                return this.fallbackTurn(unit, context); // can't legally strike the forced target this turn
+                return strikableInPlace(forced) ? inPlaceStrike(forcedId) : this.fallbackTurn(unit, context);
             }
         }
-        // Cowardice: cannot attack a stronger stack.
-        if (cowardlyVs(target)) {
-            if (forcedId === strike.targetId) {
-                return this.fallbackTurn(unit, context); // forced onto a stronger target — can't, so advance
-            }
-            const weaker = uh
-                .getAllAllies(otherTeam(unit.getTeam()))
-                .find((e) => !e.isDead() && e.getId() !== target.getId() && !cowardlyVs(e) && adjacentInPlace(e));
-            return weaker ? inPlaceStrike(weaker.getId()) : this.fallbackTurn(unit, context);
+        // The engine would reject this strike if: the target is gone / "Hidden", Cowardice bars it (stronger
+        // stack), or it needs a move the unit can't make. In any of those, hit a legal adjacent enemy
+        // instead, else advance — so the engine never declines what we emit.
+        if (
+            !target ||
+            target.isDead() ||
+            target.hasBuffActive("Hidden") ||
+            cowardlyVs(target) ||
+            (movesToStrike && !unit.canMove())
+        ) {
+            return retargetOrFallback();
         }
         return decision;
     }

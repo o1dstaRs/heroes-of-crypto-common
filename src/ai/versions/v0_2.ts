@@ -519,7 +519,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         const allUnits = unitsHolder.getAllUnits();
         const fromTeam = unit.getTeam();
         const enemyTeam = otherTeam(fromTeam);
-        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead() && !u.hasBuffActive("Hidden"));
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
         const isThroughShot = unit.hasAbilityActive("Through Shot");
         const from = unit.getPosition();
@@ -896,7 +896,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         }
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
-        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead() && !u.hasBuffActive("Hidden"));
         if (!enemies.length) {
             return undefined;
         }
