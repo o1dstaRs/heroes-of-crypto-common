@@ -129,6 +129,30 @@ export class StrategyV0_5 extends StrategyV0_4 {
             : [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
     }
     /**
+     * First-mover exposure: fraction of LIVING enemies that haven't acted yet this lap. 1 = we commit before
+     * any of them react (the disadvantaged "first-mover" seat); 0 = they've all acted and we're reacting.
+     * Measured: moving first wins ~41% vs ~59% second — a structural seat edge. The fmExposure-scaled
+     * interaction weights let CEM learn to play more conservatively (advance less, avoid reactable trades)
+     * exactly when this is high, to claw back some of the first-mover losses. Default weights = no change.
+     */
+    private fmExposure(unit: Unit, context: IDecisionContext): number {
+        const fp = context.fightProperties;
+        if (!fp) {
+            return 0;
+        }
+        const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return 0;
+        }
+        let yetToAct = 0;
+        for (const e of enemies) {
+            if (!fp.hasAlreadyMadeTurn(e.getId())) {
+                yetToAct += 1;
+            }
+        }
+        return yetToAct / enemies.length;
+    }
+    /**
      * Melee-line aura support. Crusader (Sharpened Weapons, +melee damage) and Wolf Rider (Wolf Trail, +move)
      * carry auras that only help MELEE allies, so the base "max total coverage" positioning wastes them on
      * the backline. On a pure move (not a strike), reposition this ground emitter to the reachable cell that
@@ -590,6 +614,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         const myHp = Math.max(1, unit.getCumulativeHp());
+        // First-mover mitigation: when most enemies haven't acted yet (we commit before they react), avoid
+        // reactable trades more strongly. wRetalCostFM scales the retaliation cost by that exposure.
+        const fm = this.fmExposure(unit, context);
+        const wRetalCostFM = this.w[25] ?? 0;
         const score = (c: Cand): number => {
             const min = unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
             const max = unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
@@ -640,7 +668,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wRetalCost * counter +
                 wFocus * focusFire +
                 wStandSupport * standSupport +
-                wTargetWounded * targetWounded
+                wTargetWounded * targetWounded +
+                wRetalCostFM * counter * fm
             );
         };
         let best: Cand | undefined;
@@ -721,6 +750,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const isShooter = unit.getAttackType() === RANGE && unit.getRangeShots() > 0;
         const shotDist = unit.getRangeShotDistance();
         const gridSettings = grid.getSettings();
+        // First-mover mitigation: when committing before the enemy reacts (high fmExposure), let CEM dial back
+        // the advance (don't over-extend into a reactable position). wAdvanceFM modulates advance by exposure.
+        const fm = this.fmExposure(unit, context);
+        const wAdvanceFM = this.w[24] ?? 0;
         const score = (cell: XY, route: IWeightedRoute): number => {
             const advance = (baseEnemyDist - minEnemyDist(cell)) / steps; // + => closer to the enemy
             const cohesion = (baseCentroidDist - getDistance(cell, centroid)) / steps; // + => toward allies
@@ -740,7 +773,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wThreat * threat +
                 wAggrZone * aggrZone +
                 wShoot * shootReady +
-                wAura * aura
+                wAura * aura +
+                wAdvanceFM * advance * fm
             );
         };
 
