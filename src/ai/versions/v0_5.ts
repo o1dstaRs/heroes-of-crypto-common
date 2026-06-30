@@ -132,8 +132,32 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
             return decision; // not a melee strike, or a forced target we may not retarget
         }
-        const [, , , , , , , , , , , , , , wDmg, wKill, wRetal, wThreat, wStand, wIncumbent, wRetalCost, wFocus] =
-            this.w;
+        const [
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            wDmg,
+            wKill,
+            wRetal,
+            wThreat,
+            wStand,
+            wIncumbent,
+            wRetalCost,
+            wFocus,
+            wStandSupport,
+            wTargetWounded,
+        ] = this.w;
         const { grid, matrix, unitsHolder, pathHelper } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const base = unit.getBaseCell();
@@ -240,6 +264,16 @@ export class StrategyV0_5 extends StrategyV0_4 {
                               2,
                           myHp,
                       ) / myHp;
+            // Stand-support: how many of OUR stacks sit adjacent to the stand cell (screen/protect us there).
+            const fpCells = this.footprintForCell(unit, c.cell, context);
+            const standSupport =
+                myAllies.filter((a) => a.getCells().some((ac) => fpCells.some((fc) => isAdjacentCell(ac, fc)))).length /
+                2;
+            // Target-wounded: fraction of the target stack already dead — finishing a nearly-dead stack removes
+            // a whole unit from the board (worth more than chip damage on a fresh one).
+            const tDead = c.target.getAmountDied();
+            const tAlive = c.target.getAmountAlive();
+            const targetWounded = tDead + tAlive > 0 ? tDead / (tDead + tAlive) : 0;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -248,7 +282,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wStand * standThreat +
                 wIncumbent * incumbent +
                 wRetalCost * counter +
-                wFocus * focusFire
+                wFocus * focusFire +
+                wStandSupport * standSupport +
+                wTargetWounded * targetWounded
             );
         };
         let best: Cand | undefined;
