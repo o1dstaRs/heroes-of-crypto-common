@@ -845,7 +845,7 @@ export function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHo
 // Either way we only mine before contact (enemies not pressing) and never trade away a real attack.
 
 /** Total potential ranged firepower of a team: Σ remaining shots × max per-shot damage. */
-function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
+export function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
     let firepower = 0;
     for (const u of unitsHolder.getAllAllies(team)) {
         if (u.isDead() || u.getAttackType() !== PBTypes.AttackVals.RANGE) {
@@ -861,7 +861,7 @@ function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
 }
 
 /** Remaining hits on the center mountain, or 0 when the map has none / it's already cleared. */
-function mountainHitsLeft(grid: Grid): number {
+export function mountainHitsLeft(grid: Grid): number {
     if (grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER) {
         return 0;
     }
@@ -873,7 +873,7 @@ function mountainHitsLeft(grid: Grid): number {
  * cell (or its current cell) that is adjacent to the mountain's outer ring. Returns the strike cell,
  * the struck center cell, and the unit's reachable paths — or undefined if it can't reach the mountain.
  */
-function findMountainMeleeStrike(
+export function findMountainMeleeStrike(
     unit: IUnitAIRepr,
     grid: Grid,
     matrix: number[][],

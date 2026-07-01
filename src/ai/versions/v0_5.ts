@@ -17,7 +17,18 @@ import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { canCastSpell } from "../../spells/spell_helper";
-import { auraCoverageScore, countMeleeThreatsToCell, planAuraMove } from "../ai";
+import { getPositionForCell } from "../../grid/grid_math";
+import { MAX_HITS_MOUNTAIN } from "../../constants";
+import {
+    analyzeEngagement,
+    auraCoverageScore,
+    countMeleeThreatsToCell,
+    findMountainMeleeStrike,
+    isLineBlockedByObstacle,
+    mountainHitsLeft,
+    planAuraMove,
+    teamRangedFirepower,
+} from "../ai";
 import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
@@ -87,7 +98,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // destination. They're mutually exclusive (a turn is either a strike or a pure move), and both anchor
         // to v0.4's own pick, so with the default weights v0.5 == v0.4 (a strict, validity-preserving extension).
         const base = this.healerPolicy(unit, context, super.decideTurn(unit, context));
-        const melee = this.meleeByPolicy(unit, context, base);
+        // Learned mountain mining: on a BLOCK_CENTER map, let CEM decide whether an otherwise-advancing melee
+        // unit should instead move+strike the center block to open the lane (weights [26..32], default 0 = v0.4).
+        const mined = this.mineByPolicy(unit, context, base);
+        const melee = this.meleeByPolicy(unit, context, mined);
         const repos = this.repositionByPolicy(unit, context, melee);
         // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
         const safe = this.excludeHiddenAttack(unit, context, repos);
@@ -97,6 +111,99 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const auraM = this.meleeAuraSupport(unit, context, flyer);
         // Final catch-all: never emit a move whose footprint is occupied (the engine rejects move_blocked).
         return this.dropBlockedMove(unit, context, auraM);
+    }
+    /**
+     * Learned center-mountain mining (BLOCK_CENTER maps). v0.4 already breaks the block via a fixed
+     * heuristic; this ADDS a learned option: when a melee unit would otherwise just ADVANCE, CEM can
+     * decide (from map features) that moving to strike the block is the better turn — opening the lane
+     * to the enemy over a few laps instead of detouring the army around it. Weights [26..32] default to 0,
+     * so untrained v0.5 leaves v0.4's mining untouched; a trained vector converts some advances to strikes.
+     * Only PURE advances are candidates (never overrides an attack / existing strike / cast).
+     */
+    private mineByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        const wBias = this.w[26] ?? 0;
+        const wInPlace = this.w[27] ?? 0;
+        const wClose = this.w[28] ?? 0;
+        const wGroup = this.w[29] ?? 0;
+        const wOutRange = this.w[30] ?? 0;
+        const wLaneBlocked = this.w[31] ?? 0;
+        const wProgress = this.w[32] ?? 0;
+        if (!wBias && !wInPlace && !wClose && !wGroup && !wOutRange && !wLaneBlocked && !wProgress) {
+            return decision; // untrained: exact v0.4 mountain behaviour (its own heuristic still runs in super)
+        }
+        if (unit.getAttackType() === RANGE || !unit.canMove()) {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const hits = mountainHitsLeft(grid);
+        if (hits <= 0) {
+            return decision; // not a block map / already cleared
+        }
+        // Only upgrade a PURE advance — leave real attacks, an existing strike, or a cast alone.
+        if (!decision.some((a) => a.type === "move_unit") || decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+            return decision;
+        }
+        const strike = findMountainMeleeStrike(unit, grid, matrix, pathHelper);
+        if (!strike) {
+            return decision; // can't reach the block this turn
+        }
+        const base = unit.getBaseCell();
+        const inPlace = strike.attackFrom.x === base.x && strike.attackFrom.y === base.y;
+        const route = strike.knownPaths.get(cellKey(strike.attackFrom))?.[0];
+        const moveCost = inPlace ? 0 : (route?.weight ?? unit.getSteps());
+        // Features (normalized). fClose: 1=free in-place, →0=full-move away. fGroup: 1=tightly grouped.
+        // fOutRange: +1 we out-range them / -1 they out-range us. fProgress: 0=fresh block →~1 nearly cleared.
+        // fLaneBlocked: the block sits on the straight line to the nearest enemy (breaking it truly opens the lane).
+        const fClose = Math.max(0, 1 - moveCost / Math.max(1, unit.getSteps()));
+        const eng = analyzeEngagement(unit, matrix, unitsHolder);
+        const fGroup = Math.max(0, 1 - eng.nearestMeleeAllyDist / 10);
+        const enemyTeam = otherTeam(unit.getTeam());
+        const fOutRange = Math.sign(
+            teamRangedFirepower(unit.getTeam(), unitsHolder) - teamRangedFirepower(enemyTeam, unitsHolder),
+        );
+        const fProgress = (MAX_HITS_MOUNTAIN - hits) / MAX_HITS_MOUNTAIN;
+        let nearestEnemy: XY | undefined;
+        let nearestD = Infinity;
+        for (const e of unitsHolder.getAllAllies(enemyTeam)) {
+            if (e.isDead()) {
+                continue;
+            }
+            const c = e.getBaseCell();
+            const d = getDistance(base, c);
+            if (d < nearestD) {
+                nearestD = d;
+                nearestEnemy = c;
+            }
+        }
+        const fLaneBlocked = nearestEnemy && isLineBlockedByObstacle(base, nearestEnemy, matrix) ? 1 : 0;
+        const score =
+            wBias +
+            wInPlace * (inPlace ? 1 : 0) +
+            wClose * fClose +
+            wGroup * fGroup +
+            wOutRange * fOutRange +
+            wLaneBlocked * fLaneBlocked +
+            wProgress * fProgress;
+        if (score <= 0) {
+            return decision; // learned: advancing beats mining here
+        }
+        const gs = grid.getSettings();
+        const targetPosition = getPositionForCell(strike.targetCell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
+        const path = inPlace ? undefined : route?.route.map((c) => ({ x: c.x, y: c.y }));
+        if (!inPlace && !path?.length) {
+            return decision; // no usable route to the strike cell
+        }
+        return [
+            {
+                type: "obstacle_attack",
+                attackerId: unit.getId(),
+                targetPosition,
+                attackFrom: { x: strike.attackFrom.x, y: strike.attackFrom.y },
+                path,
+                hasLavaCell: route?.hasLavaCell,
+                hasWaterCell: route?.hasWaterCell,
+            },
+        ];
     }
     /**
      * Catch-all validity guard for moves. Some aura-repositioning paths (the inherited withAura, and large

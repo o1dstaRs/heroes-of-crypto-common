@@ -66,6 +66,15 @@ export const V05_WEIGHT_KEYS = [
     "meleeTargetWounded", // * fraction of the target stack already dead — finish nearly-dead stacks (remove a unit)
     "posAdvanceFM", // * advance x first-mover-exposure — dial back committing-advance when the enemy will react
     "meleeRetalCostFM", // * retaliation-taken x first-mover-exposure — avoid reactable trades when committing first
+    // [26..32] LEARNED CENTER-MOUNTAIN MINING (BLOCK_CENTER maps). Converts an otherwise-advancing melee unit
+    // into a move+strike on the block when the weighted score > 0. All-zero (default) = v0.4's fixed heuristic.
+    "mineBias", // + constant — overall willingness to break the block instead of advancing
+    "mineInPlace", // * already adjacent to the block (1/0) — a free chip, no move
+    "mineClose", // * 1 - moveCost/steps — cheaper-to-reach strike cells preferred
+    "mineGroup", // * 1 - nearestMeleeAllyDist/10 — mine when the melee is grouped, not alone
+    "mineOutRange", // * sign(our ranged firepower - theirs): +1 we out-range, -1 they do
+    "mineLaneBlocked", // * the block sits on the straight line to the nearest enemy (1/0) — truly opens the lane
+    "mineProgress", // * (MAX_HITS - hitsLeft)/MAX_HITS — lean into finishing a nearly-cleared block
 ] as const;
 
 /**
@@ -80,22 +89,25 @@ export const V05_WEIGHT_KEYS = [
  * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 7). ~58.6% vs v0.4 on four truly-FRESH
-    // held-out seeds outside BOTH the training seeds and the selection panel (59.4/58.9/57.6/58.6, 5k games
-    // each; avg 58.61%); panel score 58.68% — the panel→fresh gap has essentially vanished, so the policy is
-    // robust rather than overfit. A further +1.9pp over the prior pass-6 bake (56.74% fresh). Shots stay heavy
-    // on high-firepower/high-tier stacks (shotLevel [4] 3.92, shotRange [5] 4.75); melee now flips meleeKill
-    // ([15] -1.23) NEGATIVE — don't chase the wipe — while leaning hard on a free hit (meleeRetalFree [16] 3.45)
-    // and meleeThreat ([17] 1.51), i.e. trade into their most dangerous stack from a screened cell.
-    0.7805, -0.2351, 0.2918, 0.3259, 3.9152, 4.7528, 0.6614, 0.2203, -0.7477, 2.2378, 0.1866, 0.9765, 0.6135, 1.5349,
-    -0.0091, -1.2281, 3.4529, 1.5101, -0.7689, 1.0507, -1.7521, 0.8412,
-    // [22] meleeStandSupport, [23] meleeTargetWounded — strike from a screened stand cell (-0.67) and strongly
-    // de-prioritise piling onto already-wounded stacks ([23] -2.80), letting focus-fire spend hits on fresh kills.
-    -0.6676, -2.8021,
+    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 8). ~59.1% vs v0.4 on four truly-FRESH
+    // held-out seeds outside BOTH the training seeds and the selection panel (59.7/59.7/58.1/58.9, 5k games
+    // each; avg 59.12%); panel score 59.44% — panel≈fresh, so robust not overfit. A further +0.5pp over the
+    // pass-7 bake (58.61% fresh), +3.4pp over the original shipped ~55.7%. Shots lean even harder on
+    // high-firepower/high-tier stacks (shotFirepower [3] 0.75, shotLevel [4] 4.12, shotRange [5] 5.31); melee
+    // keeps meleeKill ([15] -0.50) negative — don't chase the wipe — while taking the free hit (meleeRetalFree
+    // [16] 2.92) into the most dangerous stack (meleeThreat [17] 2.53) from a screened cell.
+    1.0301, -0.2669, 0.2212, 0.7464, 4.1193, 5.3065, 0.4172, 0.536, -0.4642, 2.4397, -0.1963, 0.9927, 0.8947, 1.7654,
+    -0.0329, -0.5002, 2.9235, 2.5296, -0.4112, 1.0424, -1.5771, 0.9101,
+    // [22] meleeStandSupport, [23] meleeTargetWounded — strike from a screened stand cell (-0.78) and strongly
+    // de-prioritise piling onto already-wounded stacks ([23] -2.78), letting focus-fire spend hits on fresh kills.
+    -0.7753, -2.7806,
     // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions, learned non-zero: dial
-    // back committing-advance when the enemy will react (posAdvanceFM -1.32) while accepting reactable trades
-    // slightly (meleeRetalCostFM +0.19). Part of the pass-7 win.
-    -1.3218, 0.1874,
+    // back committing-advance when the enemy will react (posAdvanceFM -1.54) while accepting reactable trades
+    // slightly (meleeRetalCostFM +0.26). Part of the pass-8 win.
+    -1.5444, 0.2624,
+    // [26..32] center-mountain mining — UNTRAINED (all 0): v0.5 leaves v0.4's fixed block-breaking heuristic
+    // untouched. A CEM retrain that samples BLOCK_CENTER maps searches these to add learned move+strike mining.
+    0, 0, 0, 0, 0, 0, 0,
 ];
 
 /**
