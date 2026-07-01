@@ -102,7 +102,11 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // unit should instead move+strike the center block to open the lane (weights [26..32], default 0 = v0.4).
         const mined = this.mineByPolicy(unit, context, base);
         const melee = this.meleeByPolicy(unit, context, mined);
-        const repos = this.repositionByPolicy(unit, context, melee);
+        // Learned AOE-melee positioning: pick a multi-hit unit's stand cell by a weighted sum over the WHOLE
+        // hit-set (coverage vs total value vs exposure), not just v0.4's max-enemy-count (weights [33..40],
+        // default 0 = v0.4's coverage-max — the current behaviour, kept by meleeByPolicy skipping these units).
+        const aoe = this.aoeMeleeByPolicy(unit, context, melee);
+        const repos = this.repositionByPolicy(unit, context, aoe);
         // Final safety net: never emit an attack on a Hidden (untargetable) stack — the engine rejects it.
         const safe = this.excludeHiddenAttack(unit, context, repos);
         // A fragile aura-flyer keeps its aura on the army instead of diving for a marginal melee hit.
@@ -204,6 +208,128 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 hasWaterCell: route?.hasWaterCell,
             },
         ];
+    }
+    /**
+     * Learned AOE-melee positioning (weights [33..40], default 0 = dormant). v0.4 positions a multi-hit
+     * melee unit by MAX enemy-count; this lets CEM instead score each reachable stand cell by a weighted sum
+     * over the WHOLE hit-set — coverage, total damage value, kills, enemy firepower caught, self-exposure,
+     * move cost — with an incumbency anchor on v0.4's cell. Currently the all-around SPIN (Hydra Lightning
+     * Spin); the line-AOE units (Black Dragon Fire Breath, Pikeman Skewer) are a follow-up on the same frame.
+     * Dormant (all weights 0) => v0.4's coverage-max stands (meleeByPolicy already skips these units).
+     */
+    private aoeMeleeByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (!unit.hasAbilityActive("Lightning Spin")) {
+            return decision; // all-around spin only (for now)
+        }
+        const wCov = this.w[33] ?? 0;
+        const wVal = this.w[34] ?? 0;
+        const wKill = this.w[35] ?? 0;
+        const wThreat = this.w[36] ?? 0;
+        const wExpo = this.w[37] ?? 0;
+        const wCost = this.w[38] ?? 0;
+        const wWound = this.w[39] ?? 0;
+        const wInc = this.w[40] ?? 0;
+        if (!wCov && !wVal && !wKill && !wThreat && !wExpo && !wCost && !wWound && !wInc) {
+            return decision; // dormant: keep v0.4's coverage-max stand cell
+        }
+        const strike = decision.find((a) => a.type === "melee_attack");
+        if (!strike || strike.type !== "melee_attack" || unit.getTarget() || !unit.canMove()) {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return decision;
+        }
+        const adjEnemies = (cell: XY): Unit[] => {
+            const fp = this.footprintForCell(unit, cell, context);
+            return enemies.filter((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
+        };
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.hasAbilityActive("Made of Fire"),
+        );
+        const v4Cell = strike.attackFrom ?? unit.getBaseCell();
+        const bc = unit.getBaseCell();
+        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: bc }];
+        for (const routes of movePath.knownPaths.values()) {
+            const r = routes[0];
+            if (r?.route.length) {
+                cands.push({ cell: r.cell, route: r });
+            }
+        }
+        const dmgMax = Math.max(1, unit.getAttackDamageMax());
+        const steps = Math.max(1, unit.getSteps());
+        const scoreCell = (cell: XY, route?: IWeightedRoute): number => {
+            const hitSet = adjEnemies(cell);
+            if (!hitSet.length) {
+                return -Infinity;
+            }
+            let val = 0;
+            let kills = 0;
+            let threat = 0;
+            let wound = 0;
+            for (const e of hitSet) {
+                const hp = e.getCumulativeHp();
+                val += Math.min(dmgMax, hp) / Math.max(1, e.getMaxHp());
+                if (dmgMax >= hp) {
+                    kills += 1;
+                }
+                threat += firepowerOf(e) / 1000;
+                const total = Math.max(1, e.getAmountAlive() + e.getAmountDied());
+                wound += 1 - e.getAmountAlive() / total;
+            }
+            const expo = countMeleeThreatsToCell(cell, matrix, enemyTeam) / 3;
+            const cost = route ? Math.max(0, 1 - route.route.length / steps) : 1;
+            const inc = cell.x === v4Cell.x && cell.y === v4Cell.y ? 1 : 0;
+            return (
+                wCov * hitSet.length +
+                wVal * val +
+                wKill * kills +
+                wThreat * threat +
+                wExpo * expo +
+                wCost * cost +
+                wWound * wound +
+                wInc * inc
+            );
+        };
+        let best: { cell: XY; route?: IWeightedRoute } | undefined;
+        let bestScore = -Infinity;
+        for (const c of cands) {
+            const s = scoreCell(c.cell, c.route);
+            if (s > bestScore) {
+                bestScore = s;
+                best = c;
+            }
+        }
+        if (!best || (best.cell.x === v4Cell.x && best.cell.y === v4Cell.y)) {
+            return decision; // v0.4's cell wins (or nothing better) — keep the original strike + its path
+        }
+        const hitSet = adjEnemies(best.cell);
+        if (!hitSet.length) {
+            return decision;
+        }
+        const inPlace = best.cell.x === bc.x && best.cell.y === bc.y;
+        const actions: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            actions.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        actions.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: hitSet[0].getId(),
+            attackFrom: { x: best.cell.x, y: best.cell.y },
+            path: inPlace ? undefined : best.route?.route.map((c) => ({ x: c.x, y: c.y })),
+            hasLavaCell: best.route?.hasLavaCell,
+            hasWaterCell: best.route?.hasWaterCell,
+        });
+        return actions;
     }
     /**
      * Catch-all validity guard for moves. Some aura-repositioning paths (the inherited withAura, and large
