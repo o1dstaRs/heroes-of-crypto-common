@@ -24,16 +24,16 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the long-run-trained vector (41 dims, all learned incl. mining + AOE; ~61.2% vs v0.4 fresh)", () => {
-        // Concurrent CEM over all 41 dims (10h, RNG-fixed sim, pass 17): panel 61.56%, fresh held-out avg
-        // ~61.2% (61.8/61.1/60.7, 4k games each) — panel≈fresh, robust not overfit; +2.4pp over the pass-8
-        // bake (58.8% same fresh seeds). This pass co-trained the mountain-mining [26..32] and AOE-melee
-        // positioning [33..40] blocks, both now non-zero (e.g. aoeExposure [37] +3.21 — a Hydra surrounds).
+    it("ships the long-run-trained vector (49 dims, all learned incl. mining + spin/directional AOE; ~61.6% fresh)", () => {
+        // Concurrent CEM over all 49 dims (7h, RNG-fixed sim, pass 12): panel 61.74%, fresh held-out avg
+        // ~61.6% (61.5/61.6/61.7, 4k games each) — panel≈fresh, robust not overfit; +0.6pp over the pass-17
+        // bake (61.0% same fresh seeds). Trains the directional-AOE block [41..48] (Fire Breath / Skewer /
+        // Chain Lightning), which anchors to v0.4's coverage-max (dirIncumbent [48] +0.71 — already near-optimal).
         expect(DEFAULT_V05_W).toEqual([
-            1.5071, -0.2441, 0.3461, 0.8641, 3.5716, 4.5685, 0.9699, 0.1516, -0.5075, 1.2347, -0.2059, 1.9369, 1.3947,
-            2.5332, -0.0088, 0.1119, 3.9592, 3.232, -0.4417, 0.29, -0.7771, 0.5521, -1.7815, -2.3662, -0.655, 0.6914,
-            1.0091, -0.5941, -1.4454, -0.3316, 0.681, 0.2878, 0.1747, 2.6464, -0.3006, 1.3421, -0.9998, 3.2068, -0.0927,
-            -0.9579, 0.734, 0, 0, 0, 0, 0, 0, 0, 0,
+            1.6989, -0.5351, 0.1209, -0.0394, 3.1819, 4.4191, 0.8675, 0.5428, -0.3078, 0.8065, -0.737, 1.5808, 1.7297,
+            2.8292, -0.0376, 1.0486, 3.4951, 2.9443, -0.666, -0.0077, -2.0195, 0.6111, -1.8996, -2.5474, -0.9852,
+            1.7509, 1.4942, -0.4027, -0.501, -0.7806, 0.5115, 0.1852, -0.1876, 2.5639, -0.758, 0.9309, -0.6723, 3.1302,
+            -0.5766, -0.9204, 1.6919, 0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(49);

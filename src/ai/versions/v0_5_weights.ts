@@ -99,43 +99,37 @@ export const V05_WEIGHT_KEYS = [
 ] as const;
 
 /**
- * SHIPPED == the SELF-PLAY-TRAINED vector. Beats frozen v0.4 by ~+6pp: ~61.2% decisive on three truly-FRESH
- * held-out seeds (61.8 / 61.1 / 60.7, 4k games each), panel 61.56% — panel≈fresh, so robust not overfit.
+ * SHIPPED == the SELF-PLAY-TRAINED vector. Beats frozen v0.4 by ~+6.5pp: ~61.6% decisive on three truly-FRESH
+ * held-out seeds (61.5 / 61.6 / 61.7, 4k games each), panel 61.74% — panel≈fresh, so robust not overfit.
  * Length MUST equal V05_WEIGHT_KEYS.length.
  *
- * What it learned (41-dim full CEM, pass 17): shots favour higher-tier / high-firepower stacks over the blunt
- * 2x range bias; melee leans on a free hit into the most dangerous stack from a screened cell; and the two
- * newest blocks — center-mountain mining [26..32] and AOE-melee positioning [33..40] — are now trained too,
- * the latter learning that a Hydra WANTS to be surrounded (aoeExposure +3.2, aoeCoverage +2.6).
+ * What it learned (49-dim full CEM, pass 12): shots favour higher-tier / high-firepower stacks; melee leans on
+ * a free hit into the most dangerous stack from a screened cell; center-mountain mining [26..32] and AOE
+ * positioning are trained — the Hydra spin [33..40] learning it WANTS to be surrounded (aoeExposure +3.1,
+ * aoeCoverage +2.6), while the directional-AOE block [41..48] (Fire Breath / Skewer / Chain Lightning) mostly
+ * ANCHORS to v0.4's coverage-max (dirIncumbent +0.71) — those lines/arcs were already near-optimal.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CONCURRENT CEM over ALL 41 dims (10h, RNG-fixed sim, panel-validated, pass 17). ~61.2% vs v0.4
-    // on three truly-FRESH held-out seeds outside BOTH the training seeds and the 5-seed selection panel
-    // (61.8/61.1/60.7, 4k games each; avg 61.2%); panel score 61.56% — panel≈fresh, so robust not overfit.
-    // +2.4pp over the pass-8 bake (58.8% on the same fresh seeds), and this pass ALSO co-trained the two new
-    // feature blocks below. Shots still lean on high-tier/high-firepower stacks (shotLevel [4] 3.57, shotRange
-    // [5] 4.57); melee flips meleeKill ([15] +0.11) back slightly positive while leaning on the free hit
-    // (meleeRetalFree [16] 3.96) into the most dangerous stack (meleeThreat [17] 3.23).
-    1.5071, -0.2441, 0.3461, 0.8641, 3.5716, 4.5685, 0.9699, 0.1516, -0.5075, 1.2347, -0.2059, 1.9369, 1.3947, 2.5332,
-    -0.0088, 0.1119, 3.9592, 3.232, -0.4417, 0.29, -0.7771, 0.5521,
-    // [22] meleeStandSupport (-1.78), [23] meleeTargetWounded (-2.37) — strike from a screened stand cell and
-    // strongly de-prioritise piling onto already-wounded stacks, letting focus-fire spend hits on fresh kills.
-    -1.7815, -2.3662,
-    // [24] posAdvanceFM (-0.66), [25] meleeRetalCostFM (+0.69) — first-mover-mitigation interactions.
-    -0.655, 0.6914,
-    // [26..32] center-mountain mining — LEARNED: mineBias 1.01 (willing to break the block), mineOutRange 0.68
-    // (more so when we out-range them), mineLaneBlocked 0.29 (block on the line to the enemy) — net a modest
-    // learned lean toward mining a reachable block instead of detouring. Values: bias, inPlace, close, group,
-    // outRange, laneBlocked, progress.
-    1.0091, -0.5941, -1.4454, -0.3316, 0.681, 0.2878, 0.1747,
-    // [33..40] AOE-melee positioning — LEARNED: aoeCoverage 2.65 (catch more enemies), aoeExposure +3.21 (a
-    // Hydra WANTS to be surrounded — Lightning Spin hits all-around and draws no counter), aoeKill 1.34
-    // (finish stacks), aoeIncumbent 0.73 (keep v0.4's cell absent a clear win). Values: coverage, value, kill,
-    // threat, exposure, moveCost, wounded, incumbent.
-    2.6464, -0.3006, 1.3421, -0.9998, 3.2068, -0.0927, -0.9579, 0.734,
-    // [41..48] DIRECTIONAL-AOE positioning (Fire Breath / Skewer line, Chain Lightning arc) — UNTRAINED (all 0):
-    // v0.5 keeps v0.4's coverage-max line/arc pick until the next CEM pass searches these dims.
-    0, 0, 0, 0, 0, 0, 0, 0,
+    // Long-run CONCURRENT CEM over ALL 49 dims (7h, RNG-fixed sim, panel-validated, pass 12). ~61.6% vs v0.4 on
+    // three truly-FRESH held-out seeds outside BOTH the training seeds and the 5-seed panel (61.5/61.6/61.7, 4k
+    // games each; avg 61.6%); panel 61.74% — panel≈fresh, robust not overfit. +0.6pp over the pass-17 bake
+    // (61.0% on the same fresh seeds) from refining the whole vector + training the directional-AOE block.
+    1.6989, -0.5351, 0.1209, -0.0394, 3.1819, 4.4191, 0.8675, 0.5428, -0.3078, 0.8065, -0.737, 1.5808, 1.7297, 2.8292,
+    -0.0376, 1.0486, 3.4951, 2.9443, -0.666, -0.0077, -2.0195, 0.6111,
+    // [22] meleeStandSupport (-1.90), [23] meleeTargetWounded (-2.55) — strike from a screened stand cell and
+    // strongly de-prioritise piling onto already-wounded stacks.
+    -1.8996, -2.5474,
+    // [24] posAdvanceFM (-0.99), [25] meleeRetalCostFM (+1.75) — first-mover-mitigation interactions.
+    -0.9852, 1.7509,
+    // [26..32] center-mountain mining — LEARNED (bias, inPlace, close, group, outRange, laneBlocked, progress).
+    1.4942, -0.4027, -0.501, -0.7806, 0.5115, 0.1852, -0.1876,
+    // [33..40] Hydra spin AOE — LEARNED: aoeCoverage 2.56 + aoeExposure +3.13 (a Hydra WANTS to be surrounded),
+    // aoeIncumbent 1.69. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
+    2.5639, -0.758, 0.9309, -0.6723, 3.1302, -0.5766, -0.9204, 1.6919,
+    // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — LEARNED but ANCHOR-heavy
+    // (dirIncumbent 0.71, others small): v0.4's coverage-max line/arc was already near-optimal, so it mostly
+    // keeps it. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
+    0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142,
 ];
 
 /**
