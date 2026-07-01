@@ -22,8 +22,9 @@
  *                 CEM_SIGMA, CEM_MEAN (JSON), CEM_DIM, CEM_LO, CEM_HI, CEM_HOURS, OPT_VERSION, BASE_VERSION.
  * -----------------------------------------------------------------------------
  */
-import { execSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync, rmSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,48 +78,67 @@ const gauss = () => {
 };
 const clip = (x) => Math.min(HI, Math.max(LO, x));
 const fmt = (a) => "[" + a.map((x) => x.toFixed(3)).join(", ") + "]";
-const sh = (cmd, opts = {}) => execSync(cmd, { cwd: REPO, encoding: "utf8", stdio: "pipe", ...opts });
+
+// Concurrency: the machine has CORES logical CPUs. Running candidates ONE at a time leaves cores idle
+// (a single tournament doesn't saturate them, and each pays bun-startup serially). Instead run CEM_BATCH
+// candidates at once, each tournament given CORES/BATCH worker concurrency, so the cores stay pinned and the
+// startups overlap. Each concurrent eval writes to a UNIQUE temp dir to avoid summary-file races.
+const CORES = Math.max(1, availableParallelism());
+const BATCH = Math.max(1, Number(process.env.CEM_BATCH ?? 3));
+const PER_CONC = Math.max(1, Math.floor(CORES / BATCH));
+let evalUid = 0;
+
+/** Run N items through fn in concurrent batches of BATCH; preserves order. */
+async function mapBatched(items, fn) {
+    const out = new Array(items.length);
+    for (let i = 0; i < items.length; i += BATCH) {
+        const slice = items.slice(i, i + BATCH);
+        const res = await Promise.all(slice.map((it) => fn(it)));
+        for (let j = 0; j < res.length; j += 1) out[i + j] = res[j];
+    }
+    return out;
+}
 
 /**
  * One self-play tournament of OPT(weights) vs BASE at a fixed seed -> decisive win rate of OPT.
  * Retries a flaky subprocess up to 3x; returns null on total failure. Deletes the tournament's output
  * files after scoring (disk hygiene for long runs).
  */
-function evalWeights(weights, seed, games) {
+async function evalWeights(weights, seed, games) {
     const env = { ...process.env, V05_WEIGHTS: JSON.stringify(weights) };
     for (let attempt = 0; attempt < 3; attempt += 1) {
+        const dir = join(STATE_DIR, `eval_${process.pid}_${evalUid++}`);
         try {
-            const before = new Set(readdirSync(OUT).filter((f) => f.endsWith(".summary.json")));
-            sh(`bun src/simulation/run_tournament.ts ${OPT} ${BASE} ${games} ${seed} ${JSON.stringify(OUT)} --maps`, {
-                stdio: "ignore",
-                env,
+            mkdirSync(dir, { recursive: true });
+            // outDir = unique temp dir, concurrency = PER_CONC (6th positional). --maps samples every layout.
+            await new Promise((resolve, reject) => {
+                const p = spawn(
+                    "bun",
+                    ["src/simulation/run_tournament.ts", OPT, BASE, String(games), String(seed), dir, String(PER_CONC), "--maps"],
+                    { cwd: REPO, env, stdio: "ignore" },
+                );
+                p.on("close", (code) => (code === 0 ? resolve() : reject(new Error("exit " + code))));
+                p.on("error", reject);
             });
-            const fresh = readdirSync(OUT).filter(
-                (f) => f.startsWith(`${OPT}_vs_${BASE}_`) && f.endsWith(".summary.json") && !before.has(f),
-            );
-            // NB: copy before sort/pop — mutating `fresh` here would skip files in the cleanup loop below.
-            const summaryFile = [...fresh].sort().at(-1);
-            if (!summaryFile) {
+            const f = readdirSync(dir).find((x) => x.endsWith(".summary.json"));
+            if (!f) {
                 throw new Error("no summary produced");
             }
-            const sum = JSON.parse(readFileSync(join(OUT, summaryFile), "utf8"));
-            // Disk hygiene: drop this run's summary + jsonl now that we've read the score.
-            for (const f of fresh) {
-                rmSync(join(OUT, f), { force: true });
-                rmSync(join(OUT, f.replace(/\.summary\.json$/, ".jsonl")), { force: true });
-            }
+            const sum = JSON.parse(readFileSync(join(dir, f), "utf8"));
+            rmSync(dir, { recursive: true, force: true });
             const decisive = sum.a.wins + sum.b.wins;
             return decisive ? sum.a.wins / decisive : 0;
         } catch (e) {
+            rmSync(dir, { recursive: true, force: true });
             console.log(`[cem] tournament failed (seed ${seed}, attempt ${attempt + 1}/3): ${String(e).slice(0, 120)}`);
         }
     }
     return null;
 }
 
-/** Honest selection metric: average win rate over the held-out seed PANEL (anti-overfit). */
-function panelVal(weights) {
-    const scores = VAL_SEEDS.map((s) => evalWeights(weights, s, VAL_GAMES)).filter((x) => x != null);
+/** Honest selection metric: average win rate over the held-out seed PANEL (anti-overfit), panel runs concurrent. */
+async function panelVal(weights) {
+    const scores = (await mapBatched(VAL_SEEDS, (s) => evalWeights(weights, s, VAL_GAMES))).filter((x) => x != null);
     if (!scores.length) {
         return -1;
     }
@@ -137,7 +157,7 @@ if (!existsSync(LOG)) {
 
 let globalMean = DEFAULT_MEAN.slice();
 let globalBest = { panel: -1, weights: globalMean.slice(), pass: 0 };
-const basePanel = panelVal(DEFAULT_MEAN);
+const basePanel = await panelVal(DEFAULT_MEAN);
 globalBest = { panel: basePanel, weights: DEFAULT_MEAN.slice(), pass: 0 };
 writeFileSync(
     BEST,
@@ -156,7 +176,8 @@ do {
         for (let k = 1; k < POP; k += 1) {
             popW.push(mean.map((m, d) => clip(m + sigma[d] * gauss())));
         }
-        const scored = popW.map((w) => ({ w, fit: evalWeights(w, seed, GAMES) ?? -1 }));
+        const fits = await mapBatched(popW, (w) => evalWeights(w, seed, GAMES));
+        const scored = popW.map((w, i) => ({ w, fit: fits[i] ?? -1 }));
         scored.sort((a, b) => b.fit - a.fit);
         const elite = scored.slice(0, ELITE);
         const newMean = new Array(DIM).fill(0);
@@ -167,7 +188,7 @@ do {
         sigma = newSigma.map((v) => Math.max(SIGMA_FLOOR, Math.sqrt(v) * SIGMA_DECAY));
         // Cheap per-gen trajectory on one rotating panel seed (full panel is too costly every gen).
         const trajSeed = VAL_SEEDS[gen % VAL_SEEDS.length];
-        const traj = evalWeights(mean, trajSeed, VAL_GAMES) ?? -1;
+        const traj = (await evalWeights(mean, trajSeed, VAL_GAMES)) ?? -1;
         appendFileSync(
             LOG,
             `| ${pass} | ${gen} | ${(traj * 100).toFixed(2)}% | ${(elite[0].fit * 100).toFixed(2)}% | ${(globalBest.panel * 100).toFixed(2)}% | ${fmt(mean)} |\n`,
@@ -179,7 +200,7 @@ do {
         writeFileSync(STATE, JSON.stringify({ pass, gen, mean, sigma, globalBest, base: BASE, opt: OPT }, null, 2));
     }
     // End of pass: rigorously validate this pass's mean on the full held-out panel.
-    const passPanel = panelVal(mean);
+    const passPanel = await panelVal(mean);
     if (passPanel > globalBest.panel) {
         globalBest = { panel: passPanel, weights: mean.slice(), pass };
         writeFileSync(
