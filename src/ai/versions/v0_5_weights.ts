@@ -80,18 +80,21 @@ export const V05_WEIGHT_KEYS = [
  * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CEM (12h, panel-validated, pass 2). ~55.9% vs v0.4 on four FRESH seeds outside the training
-    // panel (55.3/56.2/56.2/56.0); panel score 55.31%. Favorable-trade [20] deepened to -2.02 and focus-fire
-    // [21] rose to 0.62 (gang-up helps), with strong shotLevel ([4] 3.21). Re-baked as the run improves.
-    0.878, -0.322, -0.1112, 0.1731, 3.2121, 2.866, 1.0165, 0.4742, 0.2352, 2.4026, 0.3742, 0.9864, 0.5068, 0.8132,
-    0.0245, 1.0611, 1.9781, 0.61, -0.651, 0.9425, -2.0235, 0.6172,
-    // [22] meleeStandSupport, [23] meleeTargetWounded — stage-6 levers (neutral).
-    0.0, 0.0,
-    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions. NEUTRAL (0): a hand
-    // sweep (-0.5..-2) of "play safer when committing first" measured 55.3-55.6% vs the 55.8% baseline — no
-    // gain. The second-mover edge (41/59) is structural: the AI can't position out of having to commit first.
-    // Feature/weights kept for future search; default 0 keeps the shipped ~55.7% behaviour.
-    0.0, 0.0,
+    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 6). ~56.7% vs v0.4 on four truly-FRESH
+    // held-out seeds outside BOTH the training seeds and the selection panel (56.4/57.5/56.1/57.0, 5k games
+    // each; avg 56.74%); panel score 57.31%. A clear +1.0pp over the prior shipped ~55.7% vector, robust across
+    // every fresh seed. Shots lean even harder on high-firepower/high-tier stacks (shotFirepower [3] 0.32,
+    // shotLevel [4] 3.62, shotRange [5] 4.69); melee sharpens finish/damage (meleeKill [15] 0.49 traded for a
+    // strong meleeRetalFree [16] 3.56 and meleeThreat [17] 1.70), favorable-trade [20] holds at -1.93.
+    0.9096, -0.3032, 0.1114, 0.3173, 3.6201, 4.6948, 1.0045, 0.1257, -0.5688, 2.3661, -0.0032, 1.4, 0.5115, 1.1915,
+    -0.0109, 0.4945, 3.5584, 1.6964, -0.4485, 1.7589, -1.9332, 0.9368,
+    // [22] meleeStandSupport, [23] meleeTargetWounded — the search now uses them: strike from screened cells
+    // (-0.77) and de-prioritise piling onto already-wounded stacks (-1.87), letting focus-fire pick fresh kills.
+    -0.7713, -1.8652,
+    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions, now LEARNED non-zero:
+    // dial back committing-advance when the enemy will react (posAdvanceFM -1.53) while accepting reactable
+    // trades a touch more (meleeRetalCostFM +0.34). Part of the pass-6 win; no longer the neutral 0 anchors.
+    -1.5258, 0.3406,
 ];
 
 /**

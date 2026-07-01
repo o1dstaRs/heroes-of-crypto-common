@@ -24,12 +24,14 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the long-run-trained vector (26 dims, ~55.7% vs v0.4; FM-mitigation weights neutral)", () => {
-        // Pass-2 best (~55.7%) + neutral stage-6 ([22] support, [23] wounded) + neutral first-mover
-        // interactions ([24] posAdvanceFM, [25] meleeRetalCostFM). Neutral dims keep the shipped default.
+    it("ships the long-run-trained vector (26 dims, ~56.7% vs v0.4 on fresh seeds; all dims learned)", () => {
+        // Concurrent CEM pass-6 best (8h, RNG-fixed sim): panel 57.31%, fresh held-out avg 56.74%
+        // (56.4/57.5/56.1/57.0) — a robust +1.0pp over the prior ~55.7% vector. The former neutral anchors
+        // ([22] support, [23] wounded, [24] posAdvanceFM, [25] meleeRetalCostFM) are now learned non-zero.
         expect(DEFAULT_V05_W).toEqual([
-            0.878, -0.322, -0.1112, 0.1731, 3.2121, 2.866, 1.0165, 0.4742, 0.2352, 2.4026, 0.3742, 0.9864, 0.5068,
-            0.8132, 0.0245, 1.0611, 1.9781, 0.61, -0.651, 0.9425, -2.0235, 0.6172, 0.0, 0.0, 0.0, 0.0,
+            0.9096, -0.3032, 0.1114, 0.3173, 3.6201, 4.6948, 1.0045, 0.1257, -0.5688, 2.3661, -0.0032, 1.4, 0.5115,
+            1.1915, -0.0109, 0.4945, 3.5584, 1.6964, -0.4485, 1.7589, -1.9332, 0.9368, -0.7713, -1.8652, -1.5258,
+            0.3406,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(26);
