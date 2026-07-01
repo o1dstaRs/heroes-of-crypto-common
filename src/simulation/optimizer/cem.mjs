@@ -59,6 +59,10 @@ const LO = Number(process.env.CEM_LO ?? -3);
 const HI = Number(process.env.CEM_HI ?? 6);
 const HOURS = Number(process.env.CEM_HOURS ?? 0); // >0 => keep restarting until this many hours elapse
 const DEADLINE = HOURS > 0 ? Date.now() + HOURS * 3600 * 1000 : 0;
+// Freeze the leading dims [0, FREEZE_BELOW) at the mean (sigma 0) — search only the trailing dims. Used to
+// bolt a NEW feature block onto a proven vector without disturbing it (e.g. mountain mining dims 26..32).
+const FREEZE_BELOW = Number(process.env.CEM_FREEZE_BELOW ?? 0);
+const maskFrozen = (s) => s.map((v, d) => (d < FREEZE_BELOW ? 0 : v));
 
 // Seeded PRNG (mulberry32) + Box-Muller.
 function mulberry32(a) {
@@ -110,11 +114,13 @@ async function evalWeights(weights, seed, games) {
         const dir = join(STATE_DIR, `eval_${process.pid}_${evalUid++}`);
         try {
             mkdirSync(dir, { recursive: true });
-            // outDir = unique temp dir, concurrency = PER_CONC (6th positional). --maps samples every layout.
+            // outDir = unique temp dir, concurrency = PER_CONC (6th positional). CEM_MAPS controls the layout
+            // sample: default "--maps" = every layout; e.g. "--maps=block" to train a block-only feature.
+            const mapsFlag = process.env.CEM_MAPS ?? "--maps";
             await new Promise((resolve, reject) => {
                 const p = spawn(
                     "bun",
-                    ["src/simulation/run_tournament.ts", OPT, BASE, String(games), String(seed), dir, String(PER_CONC), "--maps"],
+                    ["src/simulation/run_tournament.ts", OPT, BASE, String(games), String(seed), dir, String(PER_CONC), mapsFlag],
                     { cwd: REPO, env, stdio: "ignore" },
                 );
                 p.on("close", (code) => (code === 0 ? resolve() : reject(new Error("exit " + code))));
@@ -169,7 +175,7 @@ let pass = 0;
 do {
     pass += 1;
     let mean = globalBest.weights.slice(); // each pass restarts from the best-so-far
-    let sigma = new Array(DIM).fill(SIGMA0); // re-inflated so the search keeps exploring
+    let sigma = maskFrozen(new Array(DIM).fill(SIGMA0)); // re-inflated so the search keeps exploring (frozen dims: 0)
     for (let gen = 1; gen <= GENS; gen += 1) {
         const seed = SEED0 + pass * 1_000_003 + gen * 7919; // distinct from the held-out panel seeds
         const popW = [mean.slice()];
@@ -185,7 +191,7 @@ do {
         const newSigma = new Array(DIM).fill(0);
         for (const e of elite) for (let d = 0; d < DIM; d += 1) newSigma[d] += (e.w[d] - newMean[d]) ** 2 / ELITE;
         mean = newMean;
-        sigma = newSigma.map((v) => Math.max(SIGMA_FLOOR, Math.sqrt(v) * SIGMA_DECAY));
+        sigma = maskFrozen(newSigma.map((v) => Math.max(SIGMA_FLOOR, Math.sqrt(v) * SIGMA_DECAY)));
         // Cheap per-gen trajectory on one rotating panel seed (full panel is too costly every gen).
         const trajSeed = VAL_SEEDS[gen % VAL_SEEDS.length];
         const traj = (await evalWeights(mean, trajSeed, VAL_GAMES)) ?? -1;
