@@ -1386,6 +1386,14 @@ function doFindTarget(
                         continue;
                     }
 
+                    // A Disguise-Aura unit with the "Hidden" buff is UNTARGETABLE — the engine rejects any
+                    // melee/move+melee strike against it (attack_not_available). The candidate-pool filter
+                    // above only guards the random fallback; this matrix scan picks enemy cells straight off
+                    // the grid, so skip Hidden occupants here too or the AI keeps proposing doomed melees.
+                    if (unitsHolder.getAllUnits().get(occupantUnitId)?.hasBuffActive?.("Hidden")) {
+                        continue;
+                    }
+
                     if (debug) {
                         console.log("Checking unit at cell: " + cellToString({ x: x, y: y }));
                     }
@@ -1535,6 +1543,13 @@ function doFindTarget(
 
                     const occupantUnitId = grid.getOccupantUnitId({ x: x, y: y });
                     if (!occupantUnitId) {
+                        continue;
+                    }
+
+                    // Hidden (Disguise Aura) units are untargetable — skip so the AI never proposes a melee
+                    // the engine rejects as attack_not_available (this scan reads enemy cells off the grid,
+                    // bypassing the candidate-pool Hidden filter).
+                    if (unitsHolder.getAllUnits().get(occupantUnitId)?.hasBuffActive?.("Hidden")) {
                         continue;
                     }
 
