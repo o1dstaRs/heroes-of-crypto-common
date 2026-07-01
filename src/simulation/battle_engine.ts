@@ -377,6 +377,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 attrition.reachedArmageddon = true;
                 attrition.armageddonWaves = Math.max(attrition.armageddonWaves, event.wave);
             } else if (event.type === "unit_destroyed") {
+                // If the ACTIVE unit is destroyed environmentally (narrowing/armageddon) its turn ends with
+                // it — clear the active id like turn_completed does, so we never run decideTurn on a corpse
+                // (which then proposes an attack the engine rejects as "attacker dead").
+                if (currentActiveUnitId === event.unitId) {
+                    currentActiveUnitId = "";
+                }
                 if (event.reason === "armageddon") {
                     attrition.unitsKilledByArmageddon += 1;
                 } else if (event.reason === "narrowing") {
@@ -453,7 +459,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
 
         const unit = unitsHolder.getAllUnits().get(currentActiveUnitId);
-        if (!unit) {
+        if (!unit || unit.isDead()) {
+            // Never decide a turn for a missing or dead unit — abandon its turn and let the queue advance.
             currentActiveUnitId = "";
             continue;
         }
