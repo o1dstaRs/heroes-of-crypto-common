@@ -210,27 +210,36 @@ export class StrategyV0_5 extends StrategyV0_4 {
         ];
     }
     /**
-     * Learned AOE-melee positioning (weights [33..40], default 0 = dormant). v0.4 positions a multi-hit
-     * melee unit by MAX enemy-count; this lets CEM instead score each reachable stand cell by a weighted sum
-     * over the WHOLE hit-set — coverage, total damage value, kills, enemy firepower caught, self-exposure,
-     * move cost — with an incumbency anchor on v0.4's cell. Currently the all-around SPIN (Hydra Lightning
-     * Spin); the line-AOE units (Black Dragon Fire Breath, Pikeman Skewer) are a follow-up on the same frame.
-     * Dormant (all weights 0) => v0.4's coverage-max stands (meleeByPolicy already skips these units).
+     * Learned AOE-melee positioning. v0.4 positions a multi-hit melee unit by MAX enemy-count; this lets CEM
+     * instead score each reachable stand cell (and, for directional AOE, the target it aims through) by a
+     * weighted sum over the WHOLE hit-set — coverage, total damage value, kills, enemy firepower caught,
+     * self-exposure, move cost, wounded — with an incumbency anchor on v0.4's pick. Two weight blocks so the
+     * lessons don't cross-contaminate (a Hydra WANTS to be surrounded; a fragile Dragon/Thunderbird does not):
+     *   • SPIN [33..40] — all-around, target-independent: Hydra Lightning Spin.
+     *   • DIRECTIONAL [41..48] — target/direction-dependent: Black Dragon Fire Breath & Pikeman Skewer (a LINE
+     *     through the target) and Thunderbird Chain Lightning (a BFS arc from the target).
+     * Dormant (block all-zero) => v0.4's coverage-max stands (meleeByPolicy skips these units).
      */
     private aoeMeleeByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        if (!unit.hasAbilityActive("Lightning Spin")) {
-            return decision; // all-around spin only (for now)
+        const spin = unit.hasAbilityActive("Lightning Spin");
+        const fireBreath = unit.hasAbilityActive("Fire Breath");
+        const skewer = unit.hasAbilityActive("Skewer Strike");
+        const chain = unit.hasAbilityActive("Chain Lightning");
+        const directional = fireBreath || skewer || chain;
+        if (!spin && !directional) {
+            return decision;
         }
-        const wCov = this.w[33] ?? 0;
-        const wVal = this.w[34] ?? 0;
-        const wKill = this.w[35] ?? 0;
-        const wThreat = this.w[36] ?? 0;
-        const wExpo = this.w[37] ?? 0;
-        const wCost = this.w[38] ?? 0;
-        const wWound = this.w[39] ?? 0;
-        const wInc = this.w[40] ?? 0;
+        const off = spin ? 33 : 41;
+        const wCov = this.w[off] ?? 0;
+        const wVal = this.w[off + 1] ?? 0;
+        const wKill = this.w[off + 2] ?? 0;
+        const wThreat = this.w[off + 3] ?? 0;
+        const wExpo = this.w[off + 4] ?? 0;
+        const wCost = this.w[off + 5] ?? 0;
+        const wWound = this.w[off + 6] ?? 0;
+        const wInc = this.w[off + 7] ?? 0;
         if (!wCov && !wVal && !wKill && !wThreat && !wExpo && !wCost && !wWound && !wInc) {
-            return decision; // dormant: keep v0.4's coverage-max stand cell
+            return decision; // dormant: keep v0.4's coverage-max positioning
         }
         const strike = decision.find((a) => a.type === "melee_attack");
         if (!strike || strike.type !== "melee_attack" || unit.getTarget() || !unit.canMove()) {
@@ -242,9 +251,56 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!enemies.length) {
             return decision;
         }
+        const footprintAt = (cell: XY): XY[] => this.footprintForCell(unit, cell, context);
         const adjEnemies = (cell: XY): Unit[] => {
-            const fp = this.footprintForCell(unit, cell, context);
+            const fp = footprintAt(cell);
             return enemies.filter((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
+        };
+        // Directional hit-sets — mirror v0.4's aoeMeleeReposition (line) and chainLightningTarget (arc).
+        const depth = fireBreath ? (unit.isSmallSize() ? 1 : 2) : 1;
+        const occupantEnemy = (cell: XY): Unit | undefined => {
+            if (cell.x < 0 || cell.y < 0) {
+                return undefined;
+            }
+            const id = grid.getOccupantUnitId(cell);
+            const u = id ? unitsHolder.getAllUnits().get(id) : undefined;
+            return u && !u.isDead() && u.getTeam() === enemyTeam ? u : undefined;
+        };
+        const lineHits = (cell: XY, target: Unit): Unit[] => {
+            const tc = target.getBaseCell();
+            const dx = Math.sign(tc.x - cell.x);
+            const dy = Math.sign(tc.y - cell.y);
+            const hit = [target];
+            const seen = new Set<string>([target.getId()]);
+            for (let k = 1; k <= depth; k += 1) {
+                const occ = occupantEnemy({ x: tc.x + dx * k, y: tc.y + dy * k });
+                if (occ && !seen.has(occ.getId())) {
+                    seen.add(occ.getId());
+                    hit.push(occ);
+                }
+            }
+            return hit;
+        };
+        const chainable = enemies.filter((e) => !e.hasAbilityActive("Wind Element") && e.getMagicResist() < 100);
+        const chainHits = (target: Unit): Unit[] => {
+            const affected = new Map<string, Unit>([[target.getId(), target]]);
+            let frontier: Unit[] = [target];
+            for (let layer = 0; layer < 4 && frontier.length; layer += 1) {
+                const next: Unit[] = [];
+                for (const u of frontier) {
+                    for (const e of chainable) {
+                        if (affected.has(e.getId())) {
+                            continue;
+                        }
+                        if (e.getCells().some((ec) => u.getCells().some((uc) => isAdjacentCell(ec, uc)))) {
+                            affected.set(e.getId(), e);
+                            next.push(e);
+                        }
+                    }
+                }
+                frontier = next;
+            }
+            return [...affected.values()];
         };
         const movePath = pathHelper.getMovePath(
             unit.getBaseCell(),
@@ -255,27 +311,52 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.hasAbilityActive("Made of Fire"),
         );
-        const v4Cell = strike.attackFrom ?? unit.getBaseCell();
         const bc = unit.getBaseCell();
-        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: bc }];
+        const v4from = strike.attackFrom ?? bc;
+        const v4target = strike.targetId;
+        const stands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: bc }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
             if (r?.route.length) {
-                cands.push({ cell: r.cell, route: r });
+                stands.push({ cell: r.cell, route: r });
             }
+        }
+        // Enumerate candidates: spin is target-independent (one per cell); directional pairs each stand cell
+        // with every enemy adjacent to its footprint (the aim through which the line/arc resolves).
+        type Cand = { cell: XY; route?: IWeightedRoute; target: Unit; hitSet: Unit[] };
+        const cands: Cand[] = [];
+        for (const s of stands) {
+            if (spin) {
+                const hitSet = adjEnemies(s.cell);
+                if (hitSet.length) {
+                    cands.push({ cell: s.cell, route: s.route, target: hitSet[0], hitSet });
+                }
+                continue;
+            }
+            const fp = footprintAt(s.cell);
+            for (const e of enemies) {
+                if (!e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc)))) {
+                    continue;
+                }
+                cands.push({
+                    cell: s.cell,
+                    route: s.route,
+                    target: e,
+                    hitSet: chain ? chainHits(e) : lineHits(s.cell, e),
+                });
+            }
+        }
+        if (!cands.length) {
+            return decision;
         }
         const dmgMax = Math.max(1, unit.getAttackDamageMax());
         const steps = Math.max(1, unit.getSteps());
-        const scoreCell = (cell: XY, route?: IWeightedRoute): number => {
-            const hitSet = adjEnemies(cell);
-            if (!hitSet.length) {
-                return -Infinity;
-            }
+        const score = (c: Cand): number => {
             let val = 0;
             let kills = 0;
             let threat = 0;
             let wound = 0;
-            for (const e of hitSet) {
+            for (const e of c.hitSet) {
                 const hp = e.getCumulativeHp();
                 val += Math.min(dmgMax, hp) / Math.max(1, e.getMaxHp());
                 if (dmgMax >= hp) {
@@ -285,11 +366,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 const total = Math.max(1, e.getAmountAlive() + e.getAmountDied());
                 wound += 1 - e.getAmountAlive() / total;
             }
-            const expo = countMeleeThreatsToCell(cell, matrix, enemyTeam) / 3;
-            const cost = route ? Math.max(0, 1 - route.route.length / steps) : 1;
-            const inc = cell.x === v4Cell.x && cell.y === v4Cell.y ? 1 : 0;
+            const expo = countMeleeThreatsToCell(c.cell, matrix, enemyTeam) / 3;
+            const cost = c.route ? Math.max(0, 1 - c.route.route.length / steps) : 1;
+            const inc =
+                c.cell.x === v4from.x && c.cell.y === v4from.y && (spin || c.target.getId() === v4target) ? 1 : 0;
             return (
-                wCov * hitSet.length +
+                wCov * c.hitSet.length +
                 wVal * val +
                 wKill * kills +
                 wThreat * threat +
@@ -299,20 +381,20 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wInc * inc
             );
         };
-        let best: { cell: XY; route?: IWeightedRoute } | undefined;
+        let best: Cand | undefined;
         let bestScore = -Infinity;
         for (const c of cands) {
-            const s = scoreCell(c.cell, c.route);
+            const s = score(c);
             if (s > bestScore) {
                 bestScore = s;
                 best = c;
             }
         }
-        if (!best || (best.cell.x === v4Cell.x && best.cell.y === v4Cell.y)) {
-            return decision; // v0.4's cell wins (or nothing better) — keep the original strike + its path
-        }
-        const hitSet = adjEnemies(best.cell);
-        if (!hitSet.length) {
+        // v0.4's pick wins (or nothing better) — keep the original strike (incl. its path).
+        if (
+            !best ||
+            (best.cell.x === v4from.x && best.cell.y === v4from.y && (spin || best.target.getId() === v4target))
+        ) {
             return decision;
         }
         const inPlace = best.cell.x === bc.x && best.cell.y === bc.y;
@@ -323,7 +405,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         actions.push({
             type: "melee_attack",
             attackerId: unit.getId(),
-            targetId: hitSet[0].getId(),
+            targetId: best.target.getId(),
             attackFrom: { x: best.cell.x, y: best.cell.y },
             path: inPlace ? undefined : best.route?.route.map((c) => ({ x: c.x, y: c.y })),
             hasLavaCell: best.route?.hasLavaCell,
@@ -745,15 +827,16 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
             return decision; // not a melee strike, or a forced target we may not retarget
         }
-        // Multi-hit melee — Hydra (Lightning Spin, all-around), Black Dragon (Fire Breath) and Pikeman
-        // (Skewer Strike, line) — is positioned by v0.4 for COVERAGE (most enemies caught in one blow). The
-        // single-target re-rank below optimises raw damage on ONE victim and would trade that coverage away,
-        // so leave their stand cell where v0.4 put it. (Measured: keeps Hydra's avg enemies/spin at v0.4's ~2.34
-        // instead of v0.5 drifting to ~2.26.)
+        // Multi-hit melee — Hydra (Lightning Spin), Black Dragon (Fire Breath), Pikeman (Skewer Strike) and
+        // Thunderbird (Chain Lightning) — is positioned for COVERAGE (most enemies caught in one blow), by v0.4
+        // when the AOE block is dormant or by aoeMeleeByPolicy when trained. The single-target re-rank below
+        // optimises raw damage on ONE victim and would trade that coverage away, so leave these units to the
+        // AOE positioner. (Measured: keeps Hydra's avg enemies/spin at ~2.34 instead of drifting to ~2.26.)
         if (
             unit.hasAbilityActive("Lightning Spin") ||
             unit.hasAbilityActive("Fire Breath") ||
-            unit.hasAbilityActive("Skewer Strike")
+            unit.hasAbilityActive("Skewer Strike") ||
+            unit.hasAbilityActive("Chain Lightning")
         ) {
             return decision;
         }

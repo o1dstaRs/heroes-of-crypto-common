@@ -33,10 +33,10 @@ describe("v0.5 — reinforcement-learned strategy", () => {
             1.5071, -0.2441, 0.3461, 0.8641, 3.5716, 4.5685, 0.9699, 0.1516, -0.5075, 1.2347, -0.2059, 1.9369, 1.3947,
             2.5332, -0.0088, 0.1119, 3.9592, 3.232, -0.4417, 0.29, -0.7771, 0.5521, -1.7815, -2.3662, -0.655, 0.6914,
             1.0091, -0.5941, -1.4454, -0.3316, 0.681, 0.2878, 0.1747, 2.6464, -0.3006, 1.3421, -0.9998, 3.2068, -0.0927,
-            -0.9579, 0.734,
+            -0.9579, 0.734, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
-        expect(DEFAULT_V05_W.length).toBe(41);
+        expect(DEFAULT_V05_W.length).toBe(49);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {

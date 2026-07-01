@@ -85,6 +85,17 @@ export const V05_WEIGHT_KEYS = [
     "aoeMoveCost", // * 1 - moveCost/steps — prefer cheaper-to-reach spin cells
     "aoeWounded", // * Σ wounded fraction over the hit-set — finish nearly-dead stacks
     "aoeIncumbent", // * cell == v0.4's coverage-max pick (1/0) — anchor; keeps default == v0.4
+    // [41..48] LEARNED DIRECTIONAL-AOE positioning — Black Dragon Fire Breath & Pikeman Skewer (a LINE through
+    // the aimed target) and Thunderbird Chain Lightning (a BFS arc). Separate block from the Hydra spin so the
+    // "wants to be surrounded" lesson doesn't leak onto fragile line/chain units. All-zero (default) = v0.4.
+    "dirCoverage", // * number of enemy stacks the line/arc catches (raw coverage)
+    "dirValue", // * Σ min(our max melee dmg, enemy cumHP)/enemy maxHp over the hit-set
+    "dirKill", // * # of hit stacks this blow would wipe
+    "dirThreat", // * Σ enemy firepower/1000 over the hit-set — catch their dangerous stacks
+    "dirExposure", // * enemy melee that can reach the stand cell / 3 — fragile AOE units avoid over-extending
+    "dirMoveCost", // * 1 - moveCost/steps — prefer cheaper-to-reach cells
+    "dirWounded", // * Σ wounded fraction over the hit-set — finish nearly-dead stacks
+    "dirIncumbent", // * (cell, target) == v0.4's coverage-max pick (1/0) — anchor; keeps default == v0.4
 ] as const;
 
 /**
@@ -122,6 +133,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     // (finish stacks), aoeIncumbent 0.73 (keep v0.4's cell absent a clear win). Values: coverage, value, kill,
     // threat, exposure, moveCost, wounded, incumbent.
     2.6464, -0.3006, 1.3421, -0.9998, 3.2068, -0.0927, -0.9579, 0.734,
+    // [41..48] DIRECTIONAL-AOE positioning (Fire Breath / Skewer line, Chain Lightning arc) — UNTRAINED (all 0):
+    // v0.5 keeps v0.4's coverage-max line/arc pick until the next CEM pass searches these dims.
+    0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
 /**
