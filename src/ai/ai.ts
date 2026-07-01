@@ -869,36 +869,6 @@ function mountainHitsLeft(grid: Grid): number {
 }
 
 /**
- * How many melee allies could reach the mountain THIS lap (stand adjacent to its outer ring within
- * their movement). Used to gate "can we clear it in a single lap?" — each contributes ~1 hit/lap.
- */
-function countMeleeAlliesAbleToReachMountain(team: number, unitsHolder: UnitsHolder, grid: Grid): number {
-    const outerCells = grid.getCenterCells(true);
-    if (!outerCells.length) {
-        return 0;
-    }
-    let count = 0;
-    for (const u of unitsHolder.getAllAllies(team)) {
-        if (u.isDead() || u.getAttackType() === PBTypes.AttackVals.RANGE) {
-            continue;
-        }
-        const cell = u.getBaseCell();
-        if (!cell) {
-            continue;
-        }
-        let nearest = Infinity;
-        for (const oc of outerCells) {
-            nearest = Math.min(nearest, HoCMath.getDistance(cell, oc));
-        }
-        // +1: a unit only needs to reach a cell ADJACENT to the ring, not the ring itself.
-        if (nearest <= u.getSteps() + 1) {
-            count++;
-        }
-    }
-    return count;
-}
-
-/**
  * For a melee unit, find a reachable cell to strike the mountain from this turn: the cheapest-to-reach
  * cell (or its current cell) that is adjacent to the mountain's outer ring. Returns the strike cell,
  * the struck center cell, and the unit's reachable paths — or undefined if it can't reach the mountain.
@@ -982,12 +952,18 @@ function evaluateMountainStrategy(
     const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
     const weOutRange = teamRangedFirepower(team, unitsHolder) > teamRangedFirepower(enemyTeam, unitsHolder);
 
-    if (!weOutRange) {
-        // They out-range us: only break it when we can clear it in a single lap (grouped + enough
-        // melee in reach), so the lane opens fast enough to be worth the turns under fire.
+    // Striking the mountain IN PLACE (already adjacent — no move, no change in exposure) is free progress
+    // toward opening the lane, so an otherwise-idle melee unit should always take it, regardless of the
+    // firepower balance. Only a MOVE to reach the mountain is weighed against advancing.
+    const unitCell = unit.getBaseCell();
+    const inPlace = !!unitCell && strike.attackFrom.x === unitCell.x && strike.attackFrom.y === unitCell.y;
+    if (!weOutRange && !inPlace) {
+        // They out-range us and reaching the block costs a move: only commit when the melee is GROUPED, so
+        // the army opens the lane together instead of a lone unit chipping rock in the open. (Previously
+        // this also demanded a full single-lap clear — 5 units in reach at once — which a melee-heavy army
+        // rushing ranged shooters essentially never met, so it detoured the whole way round instead.)
         const grouped = engagement.nearestMeleeAllyDist <= GROUP_REGROUP_DIST;
-        const canSingleLap = countMeleeAlliesAbleToReachMountain(team, unitsHolder, grid) >= mountainHitsLeft(grid);
-        if (!grouped || !canSingleLap) {
+        if (!grouped) {
             return undefined;
         }
     }
