@@ -411,14 +411,13 @@ function findRangeAttackAction(
             }
 
             // Skip untargetable enemies: a unit hidden by Disguise Aura (no enemy within its aura range)
-            // carries the "Hidden" buff and the engine rejects any plain shot at it (attack_not_available).
-            // It is still present in the occupancy matrix, so guard on the buff explicitly. AOE/Through
-            // Shot resolve differently (splash / pierce), so leave those paths untouched.
-            if (!isAOEAttacker && !isThroughShot) {
-                const occupantId = grid.getOccupantUnitId(targetCell);
-                if (occupantId && unitsHolder.getAllUnits().get(occupantId)?.hasBuffActive("Hidden")) {
-                    continue;
-                }
+            // carries the "Hidden" buff and the engine rejects ANY shot at it (attack_not_available) —
+            // AOE (Large Caliber) and Through Shot included, since a Hidden unit can never be the primary
+            // target. Unlike the friendly-block occlusion above (which pierce/splash legitimately ignore),
+            // this applies to every attack kind. Defensive optional-call for method-less test mocks.
+            const rangeOccupantId = grid.getOccupantUnitId(targetCell);
+            if (rangeOccupantId && unitsHolder.getAllUnits().get(rangeOccupantId)?.hasBuffActive?.("Hidden")) {
+                continue;
             }
 
             let divisor = 1;
