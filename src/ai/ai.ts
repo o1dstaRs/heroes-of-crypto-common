@@ -943,6 +943,19 @@ function evaluateMountainStrategy(
         return undefined;
     }
 
+    // If the melee army is spread out — a melee ally is too far to reach the fight and nobody is
+    // engaged yet — regrouping beats chipping the mountain alone (even in place). Defer to the
+    // group-coordination movement (Strategy 2 in findTarget) so the army opens the lane together
+    // instead of one unit picking at rock while stragglers are stuck across the map.
+    if (
+        engagement.totalMeleeAllies > 0 &&
+        engagement.nearestMeleeAllyDist > GROUP_REGROUP_DIST &&
+        engagement.engagedMeleeAllies === 0 &&
+        !engagement.enemiesPressing
+    ) {
+        return undefined;
+    }
+
     const strike = findMountainMeleeStrike(unit, grid, matrix, pathHelper);
     if (!strike) {
         return undefined; // can't reach the mountain this turn — advance normally instead
