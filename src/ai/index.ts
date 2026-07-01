@@ -36,9 +36,9 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * Promoted to v0.4 — now the shipped default for in-game AI (was v0.3).
+ * Promoted to v0.5 — now the shipped default for in-game AI (was v0.4).
  */
-export const DEFAULT_AI_VERSION = "v0.4";
+export const DEFAULT_AI_VERSION = "v0.5";
 
 export function getAIStrategy(version: string): IAIStrategy {
     const strategy = STRATEGY_BY_VERSION.get(version);
