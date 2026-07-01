@@ -80,21 +80,22 @@ export const V05_WEIGHT_KEYS = [
  * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 6). ~56.7% vs v0.4 on four truly-FRESH
-    // held-out seeds outside BOTH the training seeds and the selection panel (56.4/57.5/56.1/57.0, 5k games
-    // each; avg 56.74%); panel score 57.31%. A clear +1.0pp over the prior shipped ~55.7% vector, robust across
-    // every fresh seed. Shots lean even harder on high-firepower/high-tier stacks (shotFirepower [3] 0.32,
-    // shotLevel [4] 3.62, shotRange [5] 4.69); melee sharpens finish/damage (meleeKill [15] 0.49 traded for a
-    // strong meleeRetalFree [16] 3.56 and meleeThreat [17] 1.70), favorable-trade [20] holds at -1.93.
-    0.9096, -0.3032, 0.1114, 0.3173, 3.6201, 4.6948, 1.0045, 0.1257, -0.5688, 2.3661, -0.0032, 1.4, 0.5115, 1.1915,
-    -0.0109, 0.4945, 3.5584, 1.6964, -0.4485, 1.7589, -1.9332, 0.9368,
-    // [22] meleeStandSupport, [23] meleeTargetWounded — the search now uses them: strike from screened cells
-    // (-0.77) and de-prioritise piling onto already-wounded stacks (-1.87), letting focus-fire pick fresh kills.
-    -0.7713, -1.8652,
-    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions, now LEARNED non-zero:
-    // dial back committing-advance when the enemy will react (posAdvanceFM -1.53) while accepting reactable
-    // trades a touch more (meleeRetalCostFM +0.34). Part of the pass-6 win; no longer the neutral 0 anchors.
-    -1.5258, 0.3406,
+    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 7). ~58.6% vs v0.4 on four truly-FRESH
+    // held-out seeds outside BOTH the training seeds and the selection panel (59.4/58.9/57.6/58.6, 5k games
+    // each; avg 58.61%); panel score 58.68% — the panel→fresh gap has essentially vanished, so the policy is
+    // robust rather than overfit. A further +1.9pp over the prior pass-6 bake (56.74% fresh). Shots stay heavy
+    // on high-firepower/high-tier stacks (shotLevel [4] 3.92, shotRange [5] 4.75); melee now flips meleeKill
+    // ([15] -1.23) NEGATIVE — don't chase the wipe — while leaning hard on a free hit (meleeRetalFree [16] 3.45)
+    // and meleeThreat ([17] 1.51), i.e. trade into their most dangerous stack from a screened cell.
+    0.7805, -0.2351, 0.2918, 0.3259, 3.9152, 4.7528, 0.6614, 0.2203, -0.7477, 2.2378, 0.1866, 0.9765, 0.6135, 1.5349,
+    -0.0091, -1.2281, 3.4529, 1.5101, -0.7689, 1.0507, -1.7521, 0.8412,
+    // [22] meleeStandSupport, [23] meleeTargetWounded — strike from a screened stand cell (-0.67) and strongly
+    // de-prioritise piling onto already-wounded stacks ([23] -2.80), letting focus-fire spend hits on fresh kills.
+    -0.6676, -2.8021,
+    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions, learned non-zero: dial
+    // back committing-advance when the enemy will react (posAdvanceFM -1.32) while accepting reactable trades
+    // slightly (meleeRetalCostFM +0.19). Part of the pass-7 win.
+    -1.3218, 0.1874,
 ];
 
 /**

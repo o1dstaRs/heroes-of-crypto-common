@@ -24,14 +24,14 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the long-run-trained vector (26 dims, ~56.7% vs v0.4 on fresh seeds; all dims learned)", () => {
-        // Concurrent CEM pass-6 best (8h, RNG-fixed sim): panel 57.31%, fresh held-out avg 56.74%
-        // (56.4/57.5/56.1/57.0) — a robust +1.0pp over the prior ~55.7% vector. The former neutral anchors
-        // ([22] support, [23] wounded, [24] posAdvanceFM, [25] meleeRetalCostFM) are now learned non-zero.
+    it("ships the long-run-trained vector (26 dims, ~58.6% vs v0.4 on fresh seeds; all dims learned)", () => {
+        // Concurrent CEM pass-7 best (8h, RNG-fixed sim): panel 58.68%, fresh held-out avg 58.61%
+        // (59.4/58.9/57.6/58.6) — panel≈fresh, so robust not overfit; a further +1.9pp over the pass-6 bake
+        // (56.74%). Note meleeKill [15] is now NEGATIVE (-1.23): the policy stopped chasing the wipe.
         expect(DEFAULT_V05_W).toEqual([
-            0.9096, -0.3032, 0.1114, 0.3173, 3.6201, 4.6948, 1.0045, 0.1257, -0.5688, 2.3661, -0.0032, 1.4, 0.5115,
-            1.1915, -0.0109, 0.4945, 3.5584, 1.6964, -0.4485, 1.7589, -1.9332, 0.9368, -0.7713, -1.8652, -1.5258,
-            0.3406,
+            0.7805, -0.2351, 0.2918, 0.3259, 3.9152, 4.7528, 0.6614, 0.2203, -0.7477, 2.2378, 0.1866, 0.9765, 0.6135,
+            1.5349, -0.0091, -1.2281, 3.4529, 1.5101, -0.7689, 1.0507, -1.7521, 0.8412, -0.6676, -2.8021, -1.3218,
+            0.1874,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(26);
