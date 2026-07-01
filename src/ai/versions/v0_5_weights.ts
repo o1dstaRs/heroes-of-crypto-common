@@ -75,6 +75,16 @@ export const V05_WEIGHT_KEYS = [
     "mineOutRange", // * sign(our ranged firepower - theirs): +1 we out-range, -1 they do
     "mineLaneBlocked", // * the block sits on the straight line to the nearest enemy (1/0) — truly opens the lane
     "mineProgress", // * (MAX_HITS - hitsLeft)/MAX_HITS — lean into finishing a nearly-cleared block
+    // [33..40] LEARNED AOE-MELEE POSITIONING (multi-hit melee, currently Hydra Lightning Spin). Scores each
+    // reachable stand cell by a weighted sum over the WHOLE hit-set. All-zero (default) = v0.4's coverage-max.
+    "aoeCoverage", // * number of enemies the spin catches from the cell (the raw coverage term)
+    "aoeValue", // * Σ min(our max melee dmg, enemy cumHP)/enemy maxHp over the hit-set (total damage value)
+    "aoeKill", // * # of hit stacks this blow would wipe (focus-finish)
+    "aoeThreat", // * Σ enemy firepower/1000 over the hit-set — catch their dangerous stacks
+    "aoeExposure", // * enemy melee that can reach the stand cell / 3 — don't over-extend for coverage
+    "aoeMoveCost", // * 1 - moveCost/steps — prefer cheaper-to-reach spin cells
+    "aoeWounded", // * Σ wounded fraction over the hit-set — finish nearly-dead stacks
+    "aoeIncumbent", // * cell == v0.4's coverage-max pick (1/0) — anchor; keeps default == v0.4
 ] as const;
 
 /**
@@ -108,6 +118,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     // [26..32] center-mountain mining — UNTRAINED (all 0): v0.5 leaves v0.4's fixed block-breaking heuristic
     // untouched. A CEM retrain that samples BLOCK_CENTER maps searches these to add learned move+strike mining.
     0, 0, 0, 0, 0, 0, 0,
+    // [33..40] AOE-melee positioning — UNTRAINED (all 0): v0.5 keeps v0.4's coverage-max spin cell. Searched by
+    // the same frozen-CEM pass (freeze 0..25, explore 26..40) alongside the mountain dims.
+    0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
 /**
