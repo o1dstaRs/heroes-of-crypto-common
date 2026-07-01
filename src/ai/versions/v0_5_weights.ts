@@ -88,39 +88,40 @@ export const V05_WEIGHT_KEYS = [
 ] as const;
 
 /**
- * SHIPPED == the SELF-PLAY-TRAINED vector (CEM stage-4, melee-centred). Beats frozen v0.4 by ~+3.3pp on
- * FOUR unseen seeds (53.4 / 53.6 / 53.5 / 52.8, 5-6k games each) while emitting far FEWER engine rejections
- * (89 vs 264 on 6k games) — the learned melee re-pick turns v0.4's invalid strikes into valid hits.
+ * SHIPPED == the SELF-PLAY-TRAINED vector. Beats frozen v0.4 by ~+6pp: ~61.2% decisive on three truly-FRESH
+ * held-out seeds (61.8 / 61.1 / 60.7, 4k games each), panel 61.56% — panel≈fresh, so robust not overfit.
  * Length MUST equal V05_WEIGHT_KEYS.length.
  *
- * What it learned: shots favour higher-tier / high-firepower stacks over the blunt 2x range bias; movement
- * holds/baits rather than charges and avoids lava/water; and — the big one — MELEE strongly weights
- * finishing a stack (meleeKill 1.72) and damage (meleeDamage 1.17), picking the target/stand-cell that v0.4
- * misses, with the meleeIncumbent anchor (1.06) keeping v0.4's pick when nothing clearly beats it.
+ * What it learned (41-dim full CEM, pass 17): shots favour higher-tier / high-firepower stacks over the blunt
+ * 2x range bias; melee leans on a free hit into the most dangerous stack from a screened cell; and the two
+ * newest blocks — center-mountain mining [26..32] and AOE-melee positioning [33..40] — are now trained too,
+ * the latter learning that a Hydra WANTS to be surrounded (aoeExposure +3.2, aoeCoverage +2.6).
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CONCURRENT CEM (8h, RNG-fixed sim, panel-validated, pass 8). ~59.1% vs v0.4 on four truly-FRESH
-    // held-out seeds outside BOTH the training seeds and the selection panel (59.7/59.7/58.1/58.9, 5k games
-    // each; avg 59.12%); panel score 59.44% — panel≈fresh, so robust not overfit. A further +0.5pp over the
-    // pass-7 bake (58.61% fresh), +3.4pp over the original shipped ~55.7%. Shots lean even harder on
-    // high-firepower/high-tier stacks (shotFirepower [3] 0.75, shotLevel [4] 4.12, shotRange [5] 5.31); melee
-    // keeps meleeKill ([15] -0.50) negative — don't chase the wipe — while taking the free hit (meleeRetalFree
-    // [16] 2.92) into the most dangerous stack (meleeThreat [17] 2.53) from a screened cell.
-    1.0301, -0.2669, 0.2212, 0.7464, 4.1193, 5.3065, 0.4172, 0.536, -0.4642, 2.4397, -0.1963, 0.9927, 0.8947, 1.7654,
-    -0.0329, -0.5002, 2.9235, 2.5296, -0.4112, 1.0424, -1.5771, 0.9101,
-    // [22] meleeStandSupport, [23] meleeTargetWounded — strike from a screened stand cell (-0.78) and strongly
-    // de-prioritise piling onto already-wounded stacks ([23] -2.78), letting focus-fire spend hits on fresh kills.
-    -0.7753, -2.7806,
-    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions, learned non-zero: dial
-    // back committing-advance when the enemy will react (posAdvanceFM -1.54) while accepting reactable trades
-    // slightly (meleeRetalCostFM +0.26). Part of the pass-8 win.
-    -1.5444, 0.2624,
-    // [26..32] center-mountain mining — UNTRAINED (all 0): v0.5 leaves v0.4's fixed block-breaking heuristic
-    // untouched. A CEM retrain that samples BLOCK_CENTER maps searches these to add learned move+strike mining.
-    0, 0, 0, 0, 0, 0, 0,
-    // [33..40] AOE-melee positioning — UNTRAINED (all 0): v0.5 keeps v0.4's coverage-max spin cell. Searched by
-    // the same frozen-CEM pass (freeze 0..25, explore 26..40) alongside the mountain dims.
-    0, 0, 0, 0, 0, 0, 0, 0,
+    // Long-run CONCURRENT CEM over ALL 41 dims (10h, RNG-fixed sim, panel-validated, pass 17). ~61.2% vs v0.4
+    // on three truly-FRESH held-out seeds outside BOTH the training seeds and the 5-seed selection panel
+    // (61.8/61.1/60.7, 4k games each; avg 61.2%); panel score 61.56% — panel≈fresh, so robust not overfit.
+    // +2.4pp over the pass-8 bake (58.8% on the same fresh seeds), and this pass ALSO co-trained the two new
+    // feature blocks below. Shots still lean on high-tier/high-firepower stacks (shotLevel [4] 3.57, shotRange
+    // [5] 4.57); melee flips meleeKill ([15] +0.11) back slightly positive while leaning on the free hit
+    // (meleeRetalFree [16] 3.96) into the most dangerous stack (meleeThreat [17] 3.23).
+    1.5071, -0.2441, 0.3461, 0.8641, 3.5716, 4.5685, 0.9699, 0.1516, -0.5075, 1.2347, -0.2059, 1.9369, 1.3947, 2.5332,
+    -0.0088, 0.1119, 3.9592, 3.232, -0.4417, 0.29, -0.7771, 0.5521,
+    // [22] meleeStandSupport (-1.78), [23] meleeTargetWounded (-2.37) — strike from a screened stand cell and
+    // strongly de-prioritise piling onto already-wounded stacks, letting focus-fire spend hits on fresh kills.
+    -1.7815, -2.3662,
+    // [24] posAdvanceFM (-0.66), [25] meleeRetalCostFM (+0.69) — first-mover-mitigation interactions.
+    -0.655, 0.6914,
+    // [26..32] center-mountain mining — LEARNED: mineBias 1.01 (willing to break the block), mineOutRange 0.68
+    // (more so when we out-range them), mineLaneBlocked 0.29 (block on the line to the enemy) — net a modest
+    // learned lean toward mining a reachable block instead of detouring. Values: bias, inPlace, close, group,
+    // outRange, laneBlocked, progress.
+    1.0091, -0.5941, -1.4454, -0.3316, 0.681, 0.2878, 0.1747,
+    // [33..40] AOE-melee positioning — LEARNED: aoeCoverage 2.65 (catch more enemies), aoeExposure +3.21 (a
+    // Hydra WANTS to be surrounded — Lightning Spin hits all-around and draws no counter), aoeKill 1.34
+    // (finish stacks), aoeIncumbent 0.73 (keep v0.4's cell absent a clear win). Values: coverage, value, kill,
+    // threat, exposure, moveCost, wounded, incumbent.
+    2.6464, -0.3006, 1.3421, -0.9998, 3.2068, -0.0927, -0.9579, 0.734,
 ];
 
 /**
