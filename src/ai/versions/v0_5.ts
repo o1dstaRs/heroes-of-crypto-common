@@ -619,6 +619,18 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget()) {
             return decision; // not a melee strike, or a forced target we may not retarget
         }
+        // Multi-hit melee — Hydra (Lightning Spin, all-around), Black Dragon (Fire Breath) and Pikeman
+        // (Skewer Strike, line) — is positioned by v0.4 for COVERAGE (most enemies caught in one blow). The
+        // single-target re-rank below optimises raw damage on ONE victim and would trade that coverage away,
+        // so leave their stand cell where v0.4 put it. (Measured: keeps Hydra's avg enemies/spin at v0.4's ~2.34
+        // instead of v0.5 drifting to ~2.26.)
+        if (
+            unit.hasAbilityActive("Lightning Spin") ||
+            unit.hasAbilityActive("Fire Breath") ||
+            unit.hasAbilityActive("Skewer Strike")
+        ) {
+            return decision;
+        }
         const [
             ,
             ,
