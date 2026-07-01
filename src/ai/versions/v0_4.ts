@@ -252,6 +252,11 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (firstHit.isDead() || firstHit.getTeam() === unit.getTeam()) {
             return false;
         }
+        // A single affected group whose first unit is Hidden is declined (line 494), even when the AIMED enemy
+        // isn't Hidden — an AOE splash (Area Throw / Large Caliber) can lead with a Hidden neighbour.
+        if (groups.length === 1 && firstHit.hasBuffActive("Hidden")) {
+            return false;
+        }
         if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < firstHit.getCumulativeHp()) {
             return false;
         }

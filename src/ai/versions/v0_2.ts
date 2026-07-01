@@ -545,6 +545,13 @@ export class StrategyV0_2 extends StrategyV0_1 {
                         false,
                         isAOE,
                     );
+                    // The engine declines a shot whose SOLE affected group leads with a Hidden (untargetable)
+                    // unit — even if the aimed enemy isn't Hidden (an AOE splash, e.g. Gargantuan's Area Throw,
+                    // can put a Hidden neighbour first). Skip it so we pick a different, landable aim.
+                    const primaryHit = evaluation.affectedUnits[0]?.[0];
+                    if (evaluation.affectedUnits.length === 1 && primaryHit?.hasBuffActive("Hidden")) {
+                        continue;
+                    }
                     const scored = this.scoreShot(unit, evaluation, fromTeam, enemyTeam);
                     if (scored.value <= 0) {
                         continue;
