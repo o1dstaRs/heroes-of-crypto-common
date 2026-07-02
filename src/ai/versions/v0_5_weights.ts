@@ -113,29 +113,29 @@ export const V05_WEIGHT_KEYS = [
  * ANCHORS to v0.4's coverage-max (dirIncumbent +0.71) — those lines/arcs were already near-optimal.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Long-run CONCURRENT CEM over ALL 49 dims (7h, RNG-fixed sim, panel-validated, pass 12). ~61.6% vs v0.4 on
-    // three truly-FRESH held-out seeds outside BOTH the training seeds and the 5-seed panel (61.5/61.6/61.7, 4k
-    // games each; avg 61.6%); panel 61.74% — panel≈fresh, robust not overfit. +0.6pp over the pass-17 bake
-    // (61.0% on the same fresh seeds) from refining the whole vector + training the directional-AOE block.
-    1.6989, -0.5351, 0.1209, -0.0394, 3.1819, 4.4191, 0.8675, 0.5428, -0.3078, 0.8065, -0.737, 1.5808, 1.7297, 2.8292,
-    -0.0376, 1.0486, 3.4951, 2.9443, -0.666, -0.0077, -2.0195, 0.6111,
-    // [22] meleeStandSupport (-1.90), [23] meleeTargetWounded (-2.55) — strike from a screened stand cell and
-    // strongly de-prioritise piling onto already-wounded stacks.
-    -1.8996, -2.5474,
-    // [24] posAdvanceFM (-0.99), [25] meleeRetalCostFM (+1.75) — first-mover-mitigation interactions.
-    -0.9852, 1.7509,
+    // Full 51-dim CEM (pass 1 of the gem run) — panel 61.80% (vs 61.73% base). This bake also TRAINS the two
+    // hidden-gem melee features [49..50]: warAngerSurround +0.81 (a Valkyrie seeks a surrounded stand cell,
+    // War Anger giving +dmg per enemy in range) and punishMeleeAvoid -0.17 (mild lean away from trading into
+    // Fire Shield / Dulling Defense). Aggregate gain over the pass-12 bake is small (+0.07pp panel — those
+    // units are only in a fraction of games), but it's the current best and correct for those matchups.
+    1.4841, -0.5083, 0.0391, 0.0198, 3.2615, 4.4136, 1.2554, 0.5997, 0.0358, 0.537, -1.1739, 1.8861, 1.573, 2.818,
+    -0.0254, 0.8456, 3.5469, 2.8459, -0.8899, -0.125, -1.6446, 0.8041,
+    // [22] meleeStandSupport, [23] meleeTargetWounded — screened stand cell, de-prioritise wounded stacks.
+    -1.8285, -2.6859,
+    // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions.
+    -0.5414, 1.753,
     // [26..32] center-mountain mining — LEARNED (bias, inPlace, close, group, outRange, laneBlocked, progress).
-    1.4942, -0.4027, -0.501, -0.7806, 0.5115, 0.1852, -0.1876,
-    // [33..40] Hydra spin AOE — LEARNED: aoeCoverage 2.56 + aoeExposure +3.13 (a Hydra WANTS to be surrounded),
-    // aoeIncumbent 1.69. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
-    2.5639, -0.758, 0.9309, -0.6723, 3.1302, -0.5766, -0.9204, 1.6919,
-    // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — LEARNED but ANCHOR-heavy
-    // (dirIncumbent 0.71, others small): v0.4's coverage-max line/arc was already near-optimal, so it mostly
-    // keeps it. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
-    0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142,
-    // [49..50] hidden-gem melee features — UNTRAINED (0): warAngerSurround (Valkyrie seeks surround) and
-    // punishMeleeAvoid (don't trade into Fire Shield / Dulling Defense). Searched by the next CEM pass.
-    0, 0,
+    1.4356, -0.6464, 0.3672, -0.8436, 0.492, 0.2973, 0.1443,
+    // [33..40] Hydra spin AOE — LEARNED: aoeCoverage 2.77 + aoeExposure +2.96 (a Hydra WANTS to be surrounded),
+    // aoeIncumbent 1.85. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
+    2.7736, -0.422, 0.6162, -0.6053, 2.9583, -0.6088, -1.3999, 1.8541,
+    // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — anchor-heavy (dirIncumbent
+    // 0.95): v0.4's coverage-max line/arc was already near-optimal. coverage, value, kill, threat, exposure,
+    // moveCost, wounded, incumbent.
+    0.071, 0.0973, -0.5594, 0.6612, 0.3472, 0.0802, -0.5049, 0.9476,
+    // [49..50] hidden-gem melee — LEARNED: warAngerSurround +0.81 (Valkyrie seeks surround), punishMeleeAvoid
+    // -0.17 (avoid trading into Fire Shield / Dulling Defense).
+    0.8073, -0.1741,
 ];
 
 /**

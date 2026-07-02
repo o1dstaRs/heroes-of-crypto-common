@@ -24,15 +24,15 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the trained vector (51 dims: mining + spin/directional AOE trained; 2 untrained hidden-gem dims)", () => {
-        // Concurrent CEM over 49 dims (7h, pass 12): panel 61.74%, fresh ~61.6% (61.5/61.6/61.7). The two new
-        // tail dims [49..50] — warAngerSurround (Valkyrie seeks surround) and punishMeleeAvoid (don't trade into
-        // Fire Shield / Dulling Defense) — are UNTRAINED (0), a strict no-op until the next CEM pass searches them.
+    it("ships the trained vector (51 dims, all learned incl. hidden-gem melee features)", () => {
+        // Full 51-dim CEM (gem run, pass 1): panel 61.80%. Tail dims [49..50] now TRAINED —
+        // warAngerSurround +0.81 (Valkyrie seeks surround) and punishMeleeAvoid -0.17 (avoid Fire Shield /
+        // Dulling Defense). Aggregate +0.07pp over the pass-12 bake (those units are only in a fraction of games).
         expect(DEFAULT_V05_W).toEqual([
-            1.6989, -0.5351, 0.1209, -0.0394, 3.1819, 4.4191, 0.8675, 0.5428, -0.3078, 0.8065, -0.737, 1.5808, 1.7297,
-            2.8292, -0.0376, 1.0486, 3.4951, 2.9443, -0.666, -0.0077, -2.0195, 0.6111, -1.8996, -2.5474, -0.9852,
-            1.7509, 1.4942, -0.4027, -0.501, -0.7806, 0.5115, 0.1852, -0.1876, 2.5639, -0.758, 0.9309, -0.6723, 3.1302,
-            -0.5766, -0.9204, 1.6919, 0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142, 0, 0,
+            1.4841, -0.5083, 0.0391, 0.0198, 3.2615, 4.4136, 1.2554, 0.5997, 0.0358, 0.537, -1.1739, 1.8861, 1.573,
+            2.818, -0.0254, 0.8456, 3.5469, 2.8459, -0.8899, -0.125, -1.6446, 0.8041, -1.8285, -2.6859, -0.5414, 1.753,
+            1.4356, -0.6464, 0.3672, -0.8436, 0.492, 0.2973, 0.1443, 2.7736, -0.422, 0.6162, -0.6053, 2.9583, -0.6088,
+            -1.3999, 1.8541, 0.071, 0.0973, -0.5594, 0.6612, 0.3472, 0.0802, -0.5049, 0.9476, 0.8073, -0.1741,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
         expect(DEFAULT_V05_W.length).toBe(51);
