@@ -29,8 +29,8 @@ import {
     planAuraMove,
     teamRangedFirepower,
 } from "../ai";
-import type { IDecisionContext, IAIStrategy } from "../ai_strategy";
-import { otherTeam } from "./v0_1";
+import type { IDecisionContext, IAIStrategy, IPlacementContext } from "../ai_strategy";
+import { otherTeam, STRATEGY_V0_1 } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
 
@@ -91,6 +91,31 @@ export class StrategyV0_5 extends StrategyV0_4 {
     public constructor(weights?: number[]) {
         super();
         this.w = weights ?? loadV05Weights();
+    }
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        // Placement was never CEM-trained: v0.5 inherits v0.4→v0.3's hand-coded layout, whose flyer "flank
+        // wing" is v0.3's self-described weakest bucket — and flyer-heavy mirrors (Griffin/Pegasus/Black
+        // Dragon) are exactly where v0.5 loses both seats. Measured: on flyer rosters, v0.1's simple rows beat
+        // the wing by +5.1pp (64.4% -> 69.5%) and cut flyer lose-both ~40%, +1.9pp overall, no regression.
+        // Mode selector (env for A/B; unset = shipped v0.4/v0.3 layout). NOTE: "rows-for-flyers" (v01/hybrid)
+        // wins +2.5pp vs v0.1 but is ~-0.5pp vs v0.4 across seeds — the wing is fine when paired with STRONG
+        // per-turn play, so the hand-fix optimizes the wrong target. Placement is instead being made a LEARNED
+        // seam trained against the real self-play reward (see the placement CEM). Default stays v0.4 until then.
+        const mode = process.env.V05_PLACEMENT ?? "default";
+        if (mode === "v01") {
+            return STRATEGY_V0_1.placeArmy(units, context);
+        }
+        if (mode === "default") {
+            return super.placeArmy(units, context);
+        }
+        // flyerMin=1: ANY flyer routes the army to simple rows — measured best (78.6% vs 77.6% at min=2 and
+        // 76.3% default at seed 777), i.e. v0.3's wing hurts even with a single flyer. Pure-ground/AoE armies
+        // (no flyer) keep v0.4's AoE/tank-aware placement, which adds ~+0.4pp over blanket simple rows.
+        const flyerMin = Number(process.env.V05_FLYERMIN ?? 1);
+        if (units.filter((u) => u.canFly()).length >= flyerMin) {
+            return STRATEGY_V0_1.placeArmy(units, context);
+        }
+        return super.placeArmy(units, context);
     }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         // v0.4's full decision (which already used v0.5's learned scoreShot via inheritance), then two learned
