@@ -24,19 +24,18 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the long-run-trained vector (49 dims, all learned incl. mining + spin/directional AOE; ~61.6% fresh)", () => {
-        // Concurrent CEM over all 49 dims (7h, RNG-fixed sim, pass 12): panel 61.74%, fresh held-out avg
-        // ~61.6% (61.5/61.6/61.7, 4k games each) — panel≈fresh, robust not overfit; +0.6pp over the pass-17
-        // bake (61.0% same fresh seeds). Trains the directional-AOE block [41..48] (Fire Breath / Skewer /
-        // Chain Lightning), which anchors to v0.4's coverage-max (dirIncumbent [48] +0.71 — already near-optimal).
+    it("ships the trained vector (51 dims: mining + spin/directional AOE trained; 2 untrained hidden-gem dims)", () => {
+        // Concurrent CEM over 49 dims (7h, pass 12): panel 61.74%, fresh ~61.6% (61.5/61.6/61.7). The two new
+        // tail dims [49..50] — warAngerSurround (Valkyrie seeks surround) and punishMeleeAvoid (don't trade into
+        // Fire Shield / Dulling Defense) — are UNTRAINED (0), a strict no-op until the next CEM pass searches them.
         expect(DEFAULT_V05_W).toEqual([
             1.6989, -0.5351, 0.1209, -0.0394, 3.1819, 4.4191, 0.8675, 0.5428, -0.3078, 0.8065, -0.737, 1.5808, 1.7297,
             2.8292, -0.0376, 1.0486, 3.4951, 2.9443, -0.666, -0.0077, -2.0195, 0.6111, -1.8996, -2.5474, -0.9852,
             1.7509, 1.4942, -0.4027, -0.501, -0.7806, 0.5115, 0.1852, -0.1876, 2.5639, -0.758, 0.9309, -0.6723, 3.1302,
-            -0.5766, -0.9204, 1.6919, 0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142,
+            -0.5766, -0.9204, 1.6919, 0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142, 0, 0,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
-        expect(DEFAULT_V05_W.length).toBe(49);
+        expect(DEFAULT_V05_W.length).toBe(51);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {

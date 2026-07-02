@@ -96,6 +96,9 @@ export const V05_WEIGHT_KEYS = [
     "dirMoveCost", // * 1 - moveCost/steps — prefer cheaper-to-reach cells
     "dirWounded", // * Σ wounded fraction over the hit-set — finish nearly-dead stacks
     "dirIncumbent", // * (cell, target) == v0.4's coverage-max pick (1/0) — anchor; keeps default == v0.4
+    // [49..50] LEARNED per-ability "hidden gems" folded into the melee stand-cell/target scorer.
+    "warAngerSurround", // * # living enemies within War Anger aura range of the stand cell (Valkyrie: +dmg/enemy → seek surround)
+    "punishMeleeAvoid", // * meleeing a Fire Shield (Efreet) / Dulling Defense (Goblin Knight) survivor (1/0) — a reflect/debuff cost; learn to avoid
 ] as const;
 
 /**
@@ -130,6 +133,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     // (dirIncumbent 0.71, others small): v0.4's coverage-max line/arc was already near-optimal, so it mostly
     // keeps it. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
     0.0288, 0.0292, -1.0115, 0.1992, 0.2565, 0.2656, 0.1276, 0.7142,
+    // [49..50] hidden-gem melee features — UNTRAINED (0): warAngerSurround (Valkyrie seeks surround) and
+    // punishMeleeAvoid (don't trade into Fire Shield / Dulling Defense). Searched by the next CEM pass.
+    0, 0,
 ];
 
 /**

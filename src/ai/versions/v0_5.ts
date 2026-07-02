@@ -946,6 +946,28 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // reactable trades more strongly. wRetalCostFM scales the retaliation cost by that exposure.
         const fm = this.fmExposure(unit, context);
         const wRetalCostFM = this.w[25] ?? 0;
+        // Two "hidden gem" features (default weights 0 => no change to the trained melee policy):
+        // [49] War Anger Aura (Valkyrie) — +power% melee damage per ENEMY within aura range AT ATTACK TIME, so
+        //      the unit wants a stand cell that puts MANY enemies in range (Hydra's surround lesson, for a
+        //      single-target flyer). Count living enemies within the aura range of the candidate footprint.
+        // [50] Punish-melee — the target reflects/debuffs melee attackers (Efreet Fire Shield, Goblin Knight
+        //      Dulling Defense); trading into it costs beyond the normal counter, so avoid it (weight learns -).
+        const wWarAnger = this.w[49] ?? 0;
+        const wPunishMelee = this.w[50] ?? 0;
+        const waAura = unit.getAuraEffects().find((a) => a.getName() === "War Anger");
+        const waRange = waAura ? waAura.getRange() : 0;
+        const livingEnemies = waRange > 0 ? unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead()) : [];
+        const warAngerCount = (cell: XY): number => {
+            if (waRange <= 0) {
+                return 0;
+            }
+            const f = this.footprintForCell(unit, cell, context);
+            return livingEnemies.filter((e) =>
+                e
+                    .getCells()
+                    .some((ec) => f.some((fc) => Math.max(Math.abs(ec.x - fc.x), Math.abs(ec.y - fc.y)) <= waRange)),
+            ).length;
+        };
         const score = (c: Cand): number => {
             const min = unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
             const max = unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
@@ -986,6 +1008,11 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const tDead = c.target.getAmountDied();
             const tAlive = c.target.getAmountAlive();
             const targetWounded = tDead + tAlive > 0 ? tDead / (tDead + tAlive) : 0;
+            const warAnger = warAngerCount(c.cell);
+            const punishMelee =
+                !kill && (c.target.hasAbilityActive("Fire Shield") || c.target.hasAbilityActive("Dulling Defense"))
+                    ? 1
+                    : 0;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -997,7 +1024,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wFocus * focusFire +
                 wStandSupport * standSupport +
                 wTargetWounded * targetWounded +
-                wRetalCostFM * counter * fm
+                wRetalCostFM * counter * fm +
+                wWarAnger * warAnger +
+                wPunishMelee * punishMelee
             );
         };
         let best: Cand | undefined;
