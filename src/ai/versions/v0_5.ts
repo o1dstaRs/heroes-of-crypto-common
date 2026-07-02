@@ -33,6 +33,7 @@ import type { IDecisionContext, IAIStrategy, IPlacementContext } from "../ai_str
 import { otherTeam, STRATEGY_V0_1 } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
+import { loadPlaceWeights, placeByPolicy } from "./v0_5_placement";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -107,6 +108,11 @@ export class StrategyV0_5 extends StrategyV0_4 {
         }
         if (mode === "default") {
             return super.placeArmy(units, context);
+        }
+        // "learned": the trainable placement seam — score each unit's cell by a weighted feature sum, anchored
+        // to v0.4 so DEFAULT_PLACE_W reproduces it exactly. Injected via V05_PLACE_WEIGHTS for the placement CEM.
+        if (mode === "learned") {
+            return placeByPolicy(units, context, super.placeArmy(units, context), loadPlaceWeights());
         }
         // flyerMin=1: ANY flyer routes the army to simple rows — measured best (78.6% vs 77.6% at min=2 and
         // 76.3% default at seed 777), i.e. v0.3's wing hurts even with a single flyer. Pure-ground/AoE armies
