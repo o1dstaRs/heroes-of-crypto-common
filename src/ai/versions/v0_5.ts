@@ -954,6 +954,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
         //      Dulling Defense); trading into it costs beyond the normal counter, so avoid it (weight learns -).
         const wWarAnger = this.w[49] ?? 0;
         const wPunishMelee = this.w[50] ?? 0;
+        // [51] target-caster: enemy Healers / spell-casters (Ogre Mage, Satyr, Behemoth, Troll, Angel…) are
+        // force multipliers whose value isn't captured by raw firepower — bias melee toward removing them.
+        const wMeleeCaster = this.w[51] ?? 0;
         const waAura = unit.getAuraEffects().find((a) => a.getName() === "War Anger");
         const waRange = waAura ? waAura.getRange() : 0;
         const livingEnemies = waRange > 0 ? unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead()) : [];
@@ -1013,6 +1016,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 !kill && (c.target.hasAbilityActive("Fire Shield") || c.target.hasAbilityActive("Dulling Defense"))
                     ? 1
                     : 0;
+            const targetCaster = c.target.getCanCastSpells() ? 1 : 0;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -1026,7 +1030,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wTargetWounded * targetWounded +
                 wRetalCostFM * counter * fm +
                 wWarAnger * warAnger +
-                wPunishMelee * punishMelee
+                wPunishMelee * punishMelee +
+                wMeleeCaster * targetCaster
             );
         };
         let best: Cand | undefined;
@@ -1202,6 +1207,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
         enemyTeam: number,
     ): { value: number; hitsEnemyRange: boolean } {
         const [wDamage, wKill, wRange, wFirepower, wLevel, wFriendlyFire] = this.w;
+        // [52] target-caster: silencing an enemy Healer / spell-caster is worth more than its raw firepower.
+        const wShotCaster = this.w[52] ?? 0;
         let value = 0;
         let hitsEnemyRange = false;
         const counted = new Set<string>();
@@ -1227,6 +1234,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     }
                     value += wFirepower * (firepowerOf(target) / 1000);
                     value += wLevel * target.getLevel();
+                    if (target.getCanCastSpells()) {
+                        value += wShotCaster; // silence their Healer / caster
+                    }
                 } else if (target.getTeam() === fromTeam) {
                     value -= wFriendlyFire * effective; // friendly fire (AOE splash) is a cost
                 }

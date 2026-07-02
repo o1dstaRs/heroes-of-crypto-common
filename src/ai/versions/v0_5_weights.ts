@@ -99,6 +99,10 @@ export const V05_WEIGHT_KEYS = [
     // [49..50] LEARNED per-ability "hidden gems" folded into the melee stand-cell/target scorer.
     "warAngerSurround", // * # living enemies within War Anger aura range of the stand cell (Valkyrie: +dmg/enemy → seek surround)
     "punishMeleeAvoid", // * meleeing a Fire Shield (Efreet) / Dulling Defense (Goblin Knight) survivor (1/0) — a reflect/debuff cost; learn to avoid
+    // [51..52] BROAD target-value: enemy casters/support (Healer, Ogre Mage, …) are force multipliers worth
+    // removing beyond their raw firepower. Bias melee target and shot value toward them.
+    "meleeTargetCaster", // * melee target can cast spells (1/0)
+    "shotTargetCaster", // * a shot hits an enemy that can cast spells (adds flat value per caster hit)
 ] as const;
 
 /**
@@ -136,6 +140,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     // [49..50] hidden-gem melee — LEARNED: warAngerSurround +0.81 (Valkyrie seeks surround), punishMeleeAvoid
     // -0.17 (avoid trading into Fire Shield / Dulling Defense).
     0.8073, -0.1741,
+    // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster) — UNTRAINED (0): searched
+    // by the next CEM pass. Kill the enemy Healer/Ogre Mage/etc. beyond its raw firepower.
+    0, 0,
 ];
 
 /**
