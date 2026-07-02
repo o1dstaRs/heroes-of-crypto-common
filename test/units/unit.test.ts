@@ -280,6 +280,16 @@ describe("Unit", () => {
             expect(unit.getAmountAlive()).toBe(6);
         });
 
+        it("refuses to heal Mechanism units (e.g. Tsar Cannon) at the applyHeal chokepoint", () => {
+            const mechanism = createTestUnit({ amountAlive: 3, maxHp: 10, abilities: ["Mechanism"] });
+            mechanism.applyDamage(15, 0, new SceneLogMock());
+            const wounded = mechanism.getHp();
+
+            expect(mechanism.canBeHealed()).toBe(false);
+            expect(mechanism.applyHeal(5)).toBe(0); // no HP restored, regardless of caller
+            expect(mechanism.getHp()).toBe(wounded);
+        });
+
         it("adjusts morale, armor, attack modifiers, and armageddon damage", () => {
             const unit = createTestUnit({
                 amountAlive: 10,

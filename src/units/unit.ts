@@ -1923,7 +1923,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return actualAmountResurrected;
     }
     public applyHeal(healPower: number): number {
-        if (healPower < 0) {
+        // Mechanism units (e.g. Tsar Cannon) cannot be healed — enforce it at the HP-restore chokepoint so
+        // NO path (single Heal, Mass Heal, Devour Essence, or any future caller) can restore their HP, even
+        // if a caller forgets the canBeHealed() pre-check.
+        if (healPower < 0 || !this.canBeHealed()) {
             return 0;
         }
 
