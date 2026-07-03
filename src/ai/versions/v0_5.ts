@@ -144,8 +144,41 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const flyer = this.auraFlyerSupport(unit, context, safe);
         // A melee-buff aura emitter (Crusader/Wolf Rider) covers the FRONT melee line, not the backline.
         const auraM = this.meleeAuraSupport(unit, context, flyer);
+        // Strategic hourglass: rather than charge FIRST into a reactable trade while enemies still get to
+        // react this lap, wait — converting the ~41% first-mover seat into the ~59% second-mover one.
+        const waited = this.hourglassByPolicy(unit, context, auraM);
         // Final catch-all: never emit a move whose footprint is occupied (the engine rejects move_blocked).
-        return this.dropBlockedMove(unit, context, auraM);
+        return this.dropBlockedMove(unit, context, waited);
+    }
+    /**
+     * Strategic hourglass (env-gated A/B; default off). The single biggest un-tapped edge is the second-mover
+     * advantage — measured P(win | act second) ≈ 59% vs P(win | act first) ≈ 41%. Hourglass is the only
+     * mechanic that converts one into the other: parking a unit (no lap consumed) lets it act LATER in the
+     * lap, after the enemy commits. v0.4 never does this strategically, so it's a clean asymmetric edge.
+     *
+     * Heuristic: when our chosen turn is a melee CHARGE (a strike that required MOVING to reach the target —
+     * a forward commit, path present) AND enough enemies are still YET TO ACT this lap (fmExposure ≥ thresh)
+     * AND the engine will accept a wait, hourglass instead — let them commit first, then strike on our
+     * reactive turn. In-place strikes (already adjacent), shots, moves, casts and waits are left untouched.
+     *
+     * SHIPPED ON (default). Measured vs v0.4: ~61% → ~68% (+6-7pp, consistent across 5 seeds) — by far the
+     * largest single AI gain, and orthogonal to the (plateaued) scoring/placement seams. fm≥0.67 was the best
+     * threshold in a sweep (67.4→68.1% as it rises from 0.5). Set V05_HOURGLASS=off to A/B against it.
+     */
+    private hourglassByPolicy(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if ((process.env.V05_HOURGLASS ?? "on") !== "on") {
+            return decision;
+        }
+        const isCharge = decision.some((a) => a.type === "melee_attack" && Array.isArray(a.path) && a.path.length > 0);
+        if (!isCharge || !this.canHourglass(unit, context)) {
+            return decision;
+        }
+        const fm = this.fmExposure(unit, context);
+        const thresh = Number(process.env.V05_HOURGLASS_FM ?? 0.67);
+        if (fm < thresh) {
+            return decision;
+        }
+        return [{ type: "wait_turn", unitId: unit.getId() }];
     }
     /**
      * Learned center-mountain mining (BLOCK_CENTER maps). v0.4 already breaks the block via a fixed
