@@ -11,6 +11,13 @@
 
 import { EffectHelper, type IPlacement, Spell } from "..";
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
+import {
+    ARTIFACT_POWER as AP,
+    TIER1_ARTIFACT_LIST,
+    TIER2_ARTIFACT_LIST,
+    Tier1Artifact,
+    Tier2Artifact,
+} from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
@@ -336,6 +343,157 @@ export class UnitsHolder {
                 augmentMovementBuff.setDesc(infoArr);
                 augmentMovementBuff.setPower(augmentMovementPower);
                 unit.applyBuff(augmentMovementBuff);
+            }
+        }
+    }
+    public applyArtifacts(): void {
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        // Pre-compute archer counts per team (Hunter's Longbow's bonus depends on having 3+ archers).
+        const archersPerTeam: Map<TeamType, number> = new Map();
+        for (const unit of this.getAllUnitsIterator()) {
+            if (unit.getAttackType() === PBTypes.AttackVals.RANGE) {
+                archersPerTeam.set(unit.getTeam(), (archersPerTeam.get(unit.getTeam()) ?? 0) + 1);
+            }
+        }
+
+        // All stat-artifact buff names, for cleanup on every recompute (deselect / re-pick must be clean).
+        const artifactBuffNames = [...TIER1_ARTIFACT_LIST, ...TIER2_ARTIFACT_LIST]
+            .map((props) => props.buffName)
+            .filter((name) => name.length > 0);
+
+        for (const unit of this.getAllUnitsIterator()) {
+            for (const buffName of artifactBuffNames) {
+                unit.deleteBuff(buffName);
+            }
+
+            if (!isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                continue;
+            }
+
+            const team = unit.getTeam();
+            const tier1 = fightProperties.getArtifactTier1(team);
+            const tier2 = fightProperties.getArtifactTier2(team);
+            const isRange = unit.getAttackType() === PBTypes.AttackVals.RANGE;
+            const isFlyer = unit.canFly();
+            const isMelee = unit.getAttackType() === PBTypes.AttackVals.MELEE && !isFlyer;
+
+            const applyArtifactBuff = (buffName: string, primary: number, secondary?: number): void => {
+                const buff = new Spell({
+                    spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of buff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/g, primary.toString())
+                            .replace(/\[\]/g, (secondary ?? primary).toString()),
+                    );
+                }
+                buff.setDesc(infoArr);
+                buff.setPower(primary);
+                unit.applyBuff(buff, primary, secondary);
+            };
+
+            // ---- Tier 1 stat artifacts ----
+            switch (tier1) {
+                case Tier1Artifact.VETERAN_HELM:
+                    applyArtifactBuff("Veteran Helm", AP.VETERAN_HELM_PERCENT);
+                    break;
+                case Tier1Artifact.KEEN_BLADE:
+                    applyArtifactBuff("Keen Blade", AP.KEEN_BLADE_FLAT);
+                    break;
+                case Tier1Artifact.IRON_PLATE:
+                    applyArtifactBuff("Iron Plate", AP.IRON_PLATE_FLAT);
+                    break;
+                case Tier1Artifact.SWIFT_BOOTS:
+                    if (isMelee) {
+                        applyArtifactBuff("Swift Boots", AP.SWIFT_BOOTS_STEPS);
+                    }
+                    break;
+                case Tier1Artifact.WINGED_BOOTS:
+                    if (isFlyer) {
+                        applyArtifactBuff("Winged Boots", AP.WINGED_BOOTS_STEPS);
+                    }
+                    break;
+                case Tier1Artifact.CURSED_WARD:
+                    applyArtifactBuff("Cursed Ward", AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY);
+                    break;
+                case Tier1Artifact.HUNTERS_LONGBOW:
+                    if (isRange) {
+                        if ((archersPerTeam.get(team) ?? 0) >= AP.LONGBOW_ARCHER_THRESHOLD) {
+                            applyArtifactBuff("Hunters Longbow", AP.LONGBOW_ATTACK_PERCENT_MANY_ARCHERS, 0);
+                        } else {
+                            applyArtifactBuff(
+                                "Hunters Longbow",
+                                AP.LONGBOW_ATTACK_PERCENT,
+                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT,
+                            );
+                        }
+                    }
+                    break;
+                case Tier1Artifact.HELM_OF_FOCUS:
+                    applyArtifactBuff("Helm of Focus", AP.HELM_OF_FOCUS_RESIST_PERCENT);
+                    break;
+                case Tier1Artifact.AMULET_OF_RESOLVE:
+                    applyArtifactBuff("Amulet of Resolve", AP.AMULET_OF_RESOLVE_RESIST_PERCENT);
+                    break;
+                // Combat-time markers (checked by the relevant hook via unit.getBuff).
+                case Tier1Artifact.DUAL_STRIKE_CHARM:
+                    applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
+                    break;
+                case Tier1Artifact.WOUNDING_CHARM:
+                    applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_EXTRA_STACKS);
+                    break;
+                case Tier1Artifact.AEGIS_SHIELD:
+                    applyArtifactBuff("Aegis Shield", AP.AEGIS_AREA_REDUCTION_PERCENT);
+                    break;
+                default:
+                    break;
+            }
+
+            // ---- Tier 2 stat artifacts ----
+            switch (tier2) {
+                case Tier2Artifact.WARLORDS_EDGE:
+                    applyArtifactBuff("Warlords Edge", AP.WARLORDS_EDGE_PERCENT);
+                    break;
+                case Tier2Artifact.TITAN_PLATE:
+                    applyArtifactBuff("Titan Plate", AP.TITAN_PLATE_PERCENT);
+                    break;
+                case Tier2Artifact.CLOVER_OF_FORTUNE:
+                    applyArtifactBuff("Clover of Fortune", AP.CLOVER_LUCK);
+                    break;
+                case Tier2Artifact.CROWN_OF_COMMAND:
+                    applyArtifactBuff("Crown of Command", AP.CROWN_STEPS, AP.CROWN_MORALE);
+                    break;
+                case Tier2Artifact.PENDANT_OF_VITALITY:
+                    applyArtifactBuff("Pendant of Vitality", AP.PENDANT_HP_PERCENT, AP.PENDANT_ATTACK_PENALTY_PERCENT);
+                    break;
+                case Tier2Artifact.BERSERKERS_BOND:
+                    applyArtifactBuff("Berserkers Bond", AP.BERSERKERS_BOND_FLAT, AP.BERSERKERS_BOND_FLAT);
+                    break;
+                // Combat-time / terrain markers (checked by the relevant hook via unit.getBuff).
+                case Tier2Artifact.HOLY_CROSS:
+                    applyArtifactBuff("Holy Cross", AP.HOLY_CROSS_HEAL_RES_PERCENT);
+                    break;
+                case Tier2Artifact.GIANTS_MAUL:
+                    applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_NON_PRIMARY_PERCENT);
+                    break;
+                case Tier2Artifact.FARSIGHT_QUIVER:
+                    applyArtifactBuff("Farsight Quiver", 0);
+                    break;
+                case Tier2Artifact.TOME_OF_AMPLIFICATION:
+                    applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
+                    break;
+                case Tier2Artifact.RIME_CHARM:
+                    applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
+                    break;
+                case Tier2Artifact.LAVA_STRIDERS:
+                    applyArtifactBuff("Lava Striders", 0);
+                    break;
+                default:
+                    break;
             }
         }
     }

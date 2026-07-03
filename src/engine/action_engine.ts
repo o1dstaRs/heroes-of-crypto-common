@@ -990,7 +990,12 @@ export class GameActionEngine {
             }
             if (isHeal) {
                 if (unit.canBeHealed()) {
-                    const healPower = unit.applyHeal(Math.floor(spell.getPower() * caster.getAmountAlive()));
+                    // ARTIFACT Holy Cross: +50% mass healing when the caster's army holds it.
+                    const holyCrossBuff = caster.getBuff("Holy Cross");
+                    const holyCrossFactor = holyCrossBuff ? 1 + holyCrossBuff.getPower() / 100 : 1;
+                    const healPower = unit.applyHeal(
+                        Math.floor(spell.getPower() * caster.getAmountAlive() * holyCrossFactor),
+                    );
                     if (healPower) {
                         this.context.sceneLog.updateLog(
                             `${caster.getName()} mass healed ${unit.getName()} for ${healPower} hp`,

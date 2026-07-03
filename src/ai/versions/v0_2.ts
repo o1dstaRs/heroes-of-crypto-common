@@ -357,7 +357,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
         if (!plan) {
@@ -825,7 +825,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             grid.getAggrMatrixByTeam(otherTeam(unit.getTeam())),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         const coverage = (cell: XY): number =>
             enemyRanged.filter((r) => getDistance(cell, r.getBaseCell()) <= auraR).length;
@@ -918,7 +918,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             grid.getAggrMatrixByTeam(enemyTeam),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         if (!movePath.knownPaths.size) {
             return undefined;

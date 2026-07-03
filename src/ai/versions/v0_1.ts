@@ -250,7 +250,7 @@ export class StrategyV0_1 implements IAIStrategy {
             grid.getAggrMatrixByTeam(enemyTeam),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
         if (!enemies.length || !movePath.knownPaths.size) {

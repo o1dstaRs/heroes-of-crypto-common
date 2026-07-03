@@ -1131,6 +1131,10 @@ class UnitRepr implements IUnitAIRepr {
         return this.isFlying;
     }
 
+    public canTraverseLava(): boolean {
+        return this.hasAbilityActive("Made of Fire");
+    }
+
     public isSmallSize(): boolean {
         return this.isSmall;
     }

@@ -38,6 +38,7 @@ import {
     PlacementAugment,
     SniperAugment,
 } from "../augments/augment_properties";
+import { ArtifactTier, Tier1Artifact, Tier2Artifact } from "../artifacts/artifact_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
@@ -91,6 +92,8 @@ export class FightProperties {
     private augmentMightPerTeam: Map<TeamType, MightAugment>;
     private augmentSniperPerTeam: Map<TeamType, SniperAugment>;
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
+    private artifactTier1PerTeam: Map<TeamType, Tier1Artifact>;
+    private artifactTier2PerTeam: Map<TeamType, Tier2Artifact>;
     private synergyUnitsLifePerTeam: Map<TeamType, number>;
     private synergyUnitsChaosPerTeam: Map<TeamType, number>;
     private synergyUnitsMightPerTeam: Map<TeamType, number>;
@@ -132,6 +135,8 @@ export class FightProperties {
         this.augmentMightPerTeam = new Map();
         this.augmentSniperPerTeam = new Map();
         this.augmentMovementPerTeam = new Map();
+        this.artifactTier1PerTeam = new Map();
+        this.artifactTier2PerTeam = new Map();
         this.synergyUnitsLifePerTeam = new Map();
         this.synergyUnitsChaosPerTeam = new Map();
         this.synergyUnitsMightPerTeam = new Map();
@@ -945,7 +950,42 @@ export class FightProperties {
             this.augmentMightPerTeam.set(teamType, MightAugment.NO_AUGMENT);
             this.augmentSniperPerTeam.set(teamType, SniperAugment.NO_AUGMENT);
             this.augmentMovementPerTeam.set(teamType, MovementAugment.NO_AUGMENT);
+            this.artifactTier1PerTeam.set(teamType, Tier1Artifact.NO_ARTIFACT);
+            this.artifactTier2PerTeam.set(teamType, Tier2Artifact.NO_ARTIFACT);
         }
+    }
+    public setArtifactPerTeam(teamType: TeamType, tier: ArtifactTier, artifactId: number): boolean {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
+            return false;
+        }
+
+        if (tier === ArtifactTier.TIER_1) {
+            if (!(artifactId in Tier1Artifact)) {
+                return false;
+            }
+            this.artifactTier1PerTeam.set(teamType, artifactId as Tier1Artifact);
+            return true;
+        }
+        if (tier === ArtifactTier.TIER_2) {
+            if (!(artifactId in Tier2Artifact)) {
+                return false;
+            }
+            this.artifactTier2PerTeam.set(teamType, artifactId as Tier2Artifact);
+            return true;
+        }
+        return false;
+    }
+    public getArtifactTier1(teamType: TeamType): Tier1Artifact {
+        return this.artifactTier1PerTeam.get(teamType) ?? Tier1Artifact.NO_ARTIFACT;
+    }
+    public getArtifactTier2(teamType: TeamType): Tier2Artifact {
+        return this.artifactTier2PerTeam.get(teamType) ?? Tier2Artifact.NO_ARTIFACT;
+    }
+    public hasArtifactTier1(teamType: TeamType, artifactId: Tier1Artifact): boolean {
+        return artifactId !== Tier1Artifact.NO_ARTIFACT && this.getArtifactTier1(teamType) === artifactId;
+    }
+    public hasArtifactTier2(teamType: TeamType, artifactId: Tier2Artifact): boolean {
+        return artifactId !== Tier2Artifact.NO_ARTIFACT && this.getArtifactTier2(teamType) === artifactId;
     }
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {

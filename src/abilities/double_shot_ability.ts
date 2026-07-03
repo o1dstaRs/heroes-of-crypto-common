@@ -127,6 +127,11 @@ export function processDoubleShotAbility(
             doubleShotAbility,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
         );
+        // ARTIFACT Dual Strike Charm: the second (Double Shot) attack deals extra damage.
+        const dualStrikeCharmBuff = fromUnit.getBuff("Dual Strike Charm");
+        if (dualStrikeCharmBuff) {
+            abilityMultiplier *= 1 + dualStrikeCharmBuff.getPower() / 100;
+        }
         const paralysisAttackerEffect = fromUnit.getEffect("Paralysis");
         if (paralysisAttackerEffect) {
             abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;

@@ -59,6 +59,10 @@ export function processRangeAOEAbility(
     if (aoeAbility) {
         const wasDead: Unit[] = [];
         let increaseMoraleTotal = 0;
+        // ARTIFACT Giant's Maul: mass/area units deal extra damage to every non-primary target. The
+        // primary target is the first live unit in the affected set (the unit the attack was aimed at).
+        const giantsMaulBuff = attackerUnit.getBuff("Giants Maul");
+        const primaryTargetId = affectedUnits.find((u) => !u.isDead())?.getId();
         for (const unit of affectedUnits) {
             if (unit.isDead()) {
                 unitIdsDied.push(unit.getId());
@@ -89,7 +93,11 @@ export function processRangeAOEAbility(
                     abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;
                 }
 
-                const damageFromAttack = processLuckyStrikeAbility(
+                if (giantsMaulBuff && unit.getId() !== primaryTargetId) {
+                    abilityMultiplier *= 1 + giantsMaulBuff.getPower() / 100;
+                }
+
+                let damageFromAttack = processLuckyStrikeAbility(
                     attackerUnit,
                     attackerUnit.calculateAttackDamage(
                         unit,
@@ -103,6 +111,12 @@ export function processRangeAOEAbility(
                     ),
                     sceneLog,
                 );
+
+                // ARTIFACT Aegis Shield: the victim takes reduced damage from area attacks.
+                const aegisShieldBuff = unit.getBuff("Aegis Shield");
+                if (aegisShieldBuff) {
+                    damageFromAttack = Math.floor(damageFromAttack * (1 - aegisShieldBuff.getPower() / 100));
+                }
 
                 // Snapshot position + stack BEFORE applying damage so the floating number lands where the
                 // unit stood when hit (it may die and be removed before the visuals play).

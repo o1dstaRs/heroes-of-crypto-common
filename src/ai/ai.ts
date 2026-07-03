@@ -891,7 +891,7 @@ export function findMountainMeleeStrike(
         grid.getAggrMatrixByTeam(enemyTeam),
         unit.canFly(),
         unit.isSmallSize(),
-        unit.hasAbilityActive("Made of Fire"),
+        unit.canTraverseLava(),
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1048,7 +1048,7 @@ function preferBackstabAttackCell(
         zeroAggr,
         unit.canFly(),
         unit.isSmallSize(),
-        unit.hasAbilityActive("Made of Fire"),
+        unit.canTraverseLava(),
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
@@ -1314,7 +1314,7 @@ function doFindTarget(
         ),
         unit.canFly(),
         unit.isSmallSize(),
-        unit.hasAbilityActive("Made of Fire"),
+        unit.canTraverseLava(),
     );
 
     const actualMovePath = pathHelper.getMovePath(
@@ -1326,7 +1326,7 @@ function doFindTarget(
         ),
         unit.canFly(),
         unit.isSmallSize(),
-        unit.hasAbilityActive("Made of Fire"),
+        unit.canTraverseLava(),
     );
 
     let movePath = infiniteMovePath;

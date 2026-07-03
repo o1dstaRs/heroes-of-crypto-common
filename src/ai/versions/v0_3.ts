@@ -134,7 +134,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             grid.getAggrMatrixByTeam(enemyTeam),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         let bestCell = base;
         let bestRoute: IWeightedRoute | undefined;
@@ -205,7 +205,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             grid.getAggrMatrixByTeam(enemyTeam),
             unit.canFly(),
             unit.isSmallSize(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
         );
         const meleeAllies = unitsHolder
             .getAllAllies(unit.getTeam())

@@ -99,7 +99,8 @@ export class AttackHandler {
     public getRangeAttackDivisor(attackerUnit: Unit, attackPosition: HoCMath.XY): number {
         let rangeAttackDivisor = 1;
 
-        if (!attackerUnit.hasAbilityActive("Sniper")) {
+        // ARTIFACT Farsight Quiver: allied archers shoot at full arrow (no distance falloff), like Sniper.
+        if (!attackerUnit.hasAbilityActive("Sniper") && !attackerUnit.getBuff("Farsight Quiver")) {
             const shotDistancePixels = Math.ceil(attackerUnit.getRangeShotDistance() * this.gridSettings.getStep());
             let distance = HoCMath.getDistance(attackerUnit.getPosition(), attackPosition);
             while (distance >= shotDistancePixels) {
@@ -252,23 +253,31 @@ export class AttackHandler {
             let mirroredStr = "";
             const laps = currentActiveSpell.getLapsTotal();
             let clarifyingStr = `for ${HoCLib.getLapString(laps)}`;
+            // ARTIFACT Holy Cross: +50% healing & resurrection, and the caster keeps a giftable ability
+            // (e.g. the Troll's Wild Regeneration) instead of consuming it on cast.
+            const holyCrossBuff = attackerUnit.getBuff("Holy Cross");
+            const holyCrossFactor = holyCrossBuff ? 1 + holyCrossBuff.getPower() / 100 : 1;
             if (currentActiveSpell.isBuff()) {
                 if (currentActiveSpell.getPowerType() === SpellPowerType.HEAL) {
                     if (currentActiveSpell.isGiftable()) {
-                        const deletedAbility = attackerUnit.deleteAbility(currentActiveSpell.getName());
+                        const deletedAbility = holyCrossBuff
+                            ? attackerUnit.getAbility(currentActiveSpell.getName())
+                            : attackerUnit.deleteAbility(currentActiveSpell.getName());
                         if (!targetUnit.hasAbilityActive(currentActiveSpell.getName()) && deletedAbility) {
                             targetUnit.addAbility(deletedAbility);
                         }
-                        clarifyingStr = `=> gifted`;
+                        clarifyingStr = holyCrossBuff ? `=> copied` : `=> gifted`;
                     } else {
                         const healPower = targetUnit.applyHeal(
-                            Math.floor(currentActiveSpell.getPower() * attackerUnit.getAmountAlive()),
+                            Math.floor(currentActiveSpell.getPower() * attackerUnit.getAmountAlive() * holyCrossFactor),
                         );
                         clarifyingStr = `for ${healPower} hp`;
                     }
                 } else if (currentActiveSpell.getPowerType() === SpellPowerType.RESURRECT) {
                     const wasHp = targetUnit.getHp();
-                    const resurrectedAmount = targetUnit.applyResurrection(attackerUnit.getCumulativeMaxHp());
+                    const resurrectedAmount = targetUnit.applyResurrection(
+                        Math.floor(attackerUnit.getCumulativeMaxHp() * holyCrossFactor),
+                    );
                     if (resurrectedAmount) {
                         clarifyingStr = `for ${resurrectedAmount} units`;
                     } else {
@@ -807,6 +816,7 @@ export class AttackHandler {
                 }
             } else {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -857,6 +867,7 @@ export class AttackHandler {
                     }
                 } else {
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
                         rangeResponseUnit,
@@ -1554,6 +1565,7 @@ export class AttackHandler {
                     AllAbilities.processDeepWoundsAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     updateUnitsDied(
                         AllAbilities.processChainLightningAbility(
@@ -1636,6 +1648,7 @@ export class AttackHandler {
             AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+            AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
             updateUnitsDied(
                 AllAbilities.processChainLightningAbility(
                     attackerUnit,

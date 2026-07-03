@@ -120,12 +120,24 @@ export function processLightningSpinAbility(
                 abilityMultiplier *= 1 + deepWoundsEffect.getPower() / 100;
             }
 
-            const damageFromAttack =
+            let damageFromAttack =
                 processLuckyStrikeAbility(
                     fromUnit,
                     fromUnit.calculateAttackDamage(enemy, PBTypes.AttackVals.MELEE, 1, abilityMultiplier),
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
+
+            // ARTIFACT Giant's Maul: a Lightning Spin has no single primary target, so every struck unit
+            // counts as a non-primary target and takes the bonus damage.
+            const giantsMaulBuff = fromUnit.getBuff("Giants Maul");
+            if (giantsMaulBuff) {
+                damageFromAttack = Math.floor(damageFromAttack * (1 + giantsMaulBuff.getPower() / 100));
+            }
+            // ARTIFACT Aegis Shield: the victim takes reduced damage from area attacks.
+            const aegisShieldBuff = enemy.getBuff("Aegis Shield");
+            if (aegisShieldBuff) {
+                damageFromAttack = Math.floor(damageFromAttack * (1 - aegisShieldBuff.getPower() / 100));
+            }
 
             const positionAtImpact = { ...enemy.getPosition() };
             const amountAliveBefore = enemy.getAmountAlive();

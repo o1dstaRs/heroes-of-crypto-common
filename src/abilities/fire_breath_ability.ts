@@ -79,7 +79,7 @@ export function processFireBreathAbility(
         }
 
         // take magic resist into account
-        const fireBreathAttackDamage = Math.floor(
+        let fireBreathAttackDamage = Math.floor(
             fromUnit.calculateAttackDamage(
                 nextStandingTarget,
                 PBTypes.AttackVals.MELEE,
@@ -97,6 +97,17 @@ export function processFireBreathAbility(
                 (1 - nextStandingTarget.getMagicResist() / 100) *
                 multiplier,
         );
+
+        // ARTIFACT Giant's Maul: +damage to non-primary breath targets (toUnit is the primary target).
+        const giantsMaulBuff = fromUnit.getBuff("Giants Maul");
+        if (giantsMaulBuff && nextStandingTarget.getId() !== toUnit.getId()) {
+            fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 + giantsMaulBuff.getPower() / 100));
+        }
+        // ARTIFACT Aegis Shield: the victim takes reduced damage from area attacks.
+        const aegisShieldBuff = nextStandingTarget.getBuff("Aegis Shield");
+        if (aegisShieldBuff) {
+            fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 - aegisShieldBuff.getPower() / 100));
+        }
 
         const positionAtImpact = { ...nextStandingTarget.getPosition() };
         const amountAliveBefore = nextStandingTarget.getAmountAlive();

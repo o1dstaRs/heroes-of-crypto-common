@@ -69,6 +69,12 @@ export function processDeepWoundsAbility(
         );
     }
 
+    // ARTIFACT Wounding Charm: +1 extra Deep Wounds stack for units that already inflict Deep Wounds.
+    const woundingCharmBuff = fromUnit.getBuff("Wounding Charm");
+    if (woundingCharmBuff && (deepWoundsLevel1Ability || deepWoundsLevel2Ability || deepWoundsLevel3Ability)) {
+        powerSum += woundingCharmBuff.getPower();
+    }
+
     if (powerSum && deepWoundsEffect) {
         const activeDeepWoundsEffect = targetUnit.getEffect("Deep Wounds");
 

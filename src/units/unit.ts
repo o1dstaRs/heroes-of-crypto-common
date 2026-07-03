@@ -130,6 +130,7 @@ export interface IUnitAIRepr {
     getSpeed(): number;
     getSize(): number;
     canFly(): boolean;
+    canTraverseLava(): boolean;
     getTarget(): string;
     getAttackRange(): number;
     isSmallSize(): boolean;
@@ -874,6 +875,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public canFly(): boolean {
         return this.unitProperties.movement_type === PBTypes.MovementVals.FLY;
+    }
+    // Whether this unit may path over lava cells: either it is Made of Fire, or its army carries the
+    // Lava Striders artifact (ARTIFACT). Used as the isMadeOfFire argument to PathHelper.getMovePath.
+    public canTraverseLava(): boolean {
+        return this.hasAbilityActive("Made of Fire") || !!this.getBuff("Lava Striders");
     }
     public getExp(): number {
         return this.unitProperties.exp;
@@ -1975,6 +1981,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.refreshAndGetAdjustedMaxHp(currentLap, synergyAbilityPowerIncrease, madeOfFireBuff) +
             baseStatsDiff.baseStats.hp;
 
+        // ARTIFACTS: Tome of Amplification scales the power of the team-wide System buffs
+        // (augments + artifacts) folded into effective stats below. Pendant of Vitality adds % HP here.
+        const tomeOfAmplificationBuff = this.getBuff("Tome of Amplification");
+        const artifactBuffAmp = tomeOfAmplificationBuff ? 1 + tomeOfAmplificationBuff.getPower() / 100 : 1;
+        const ampArtifact = (power: number): number => power * artifactBuffAmp;
+        const pendantOfVitalityBuff = this.getBuff("Pendant of Vitality");
+        if (pendantOfVitalityBuff) {
+            this.unitProperties.max_hp += Number(
+                ((this.unitProperties.max_hp / 100) * ampArtifact(pendantOfVitalityBuff.getPower())).toFixed(2),
+            );
+        }
+
         if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.unitProperties.hp += 5;
         }
@@ -2007,7 +2025,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (!hasFightStarted) {
                     this.luckPerTurn = 0;
                 }
-                this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease;
+                // ARTIFACTS: Cursed Ward (+luck) and Clover of Fortune (+luck).
+                let artifactLuck = 0;
+                const cursedWardLuckBuff = this.getBuff("Cursed Ward");
+                if (cursedWardLuckBuff) {
+                    artifactLuck += ampArtifact(cursedWardLuckBuff.getPower());
+                }
+                const cloverOfFortuneBuff = this.getBuff("Clover of Fortune");
+                if (cloverOfFortuneBuff) {
+                    artifactLuck += ampArtifact(cloverOfFortuneBuff.getPower());
+                }
+                this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease + artifactLuck;
                 if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
                     this.unitProperties.luck_mod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
                 } else if (this.unitProperties.luck_mod + this.unitProperties.luck < -LUCK_MAX_VALUE_TOTAL) {
@@ -2023,6 +2051,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.morale = this.initialUnitProperties.morale + synergyMoraleIncrease;
         } else {
             this.unitProperties.morale = this.initialUnitProperties.morale;
+        }
+        // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Second buff property carries morale.
+        const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
+        if (cursedWardMoraleBuff) {
+            this.unitProperties.morale -= ampArtifact(parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10));
+        }
+        const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
+        if (crownOfCommandMoraleBuff) {
+            this.unitProperties.morale += ampArtifact(
+                parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10),
+            );
         }
         if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
             this.unitProperties.morale = 0;
@@ -2082,8 +2121,43 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const armorAugmentBuff = this.getBuff("Armor Augment");
         if (armorAugmentBuff) {
             this.unitProperties.base_armor += Number(
-                ((this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower()).toFixed(2),
+                ((this.unitProperties.base_armor / 100) * ampArtifact(armorAugmentBuff.getPower())).toFixed(2),
             );
+        }
+
+        // ARTIFACTS: armor / defense.
+        const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
+        if (veteranHelmArmorBuff) {
+            this.unitProperties.base_armor += Number(
+                ((this.unitProperties.base_armor / 100) * ampArtifact(veteranHelmArmorBuff.getPower())).toFixed(2),
+            );
+        }
+        const titanPlateBuff = this.getBuff("Titan Plate");
+        if (titanPlateBuff) {
+            this.unitProperties.base_armor += Number(
+                ((this.unitProperties.base_armor / 100) * ampArtifact(titanPlateBuff.getPower())).toFixed(2),
+            );
+        }
+        const ironPlateBuff = this.getBuff("Iron Plate");
+        if (ironPlateBuff) {
+            this.unitProperties.base_armor += ampArtifact(ironPlateBuff.getPower());
+        }
+        const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
+        if (berserkersBondArmorBuff) {
+            this.unitProperties.base_armor = Math.max(
+                1,
+                this.unitProperties.base_armor -
+                    ampArtifact(parseInt(this.getBuffProperties("Berserkers Bond")[1] || "0", 10)),
+            );
+        }
+        const huntersLongbowArmorBuff = this.getBuff("Hunters Longbow");
+        if (huntersLongbowArmorBuff) {
+            const longbowDefPenaltyPercent = parseInt(this.getBuffProperties("Hunters Longbow")[1] || "0", 10);
+            if (longbowDefPenaltyPercent > 0) {
+                this.unitProperties.base_armor -= Number(
+                    ((this.unitProperties.base_armor / 100) * ampArtifact(longbowDefPenaltyPercent)).toFixed(2),
+                );
+            }
         }
 
         // BUFFS & DEBUFFS
@@ -2173,6 +2247,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
+        // ARTIFACTS: mind (Helm of Focus) and status (Amulet of Resolve) resistance, folded into magic
+        // resist as additive percentage points and capped at 100%.
+        let artifactResistPercent = 0;
+        const helmOfFocusBuff = this.getBuff("Helm of Focus");
+        if (helmOfFocusBuff) {
+            artifactResistPercent += ampArtifact(helmOfFocusBuff.getPower());
+        }
+        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
+        if (amuletOfResolveBuff) {
+            artifactResistPercent += ampArtifact(amuletOfResolveBuff.getPower());
+        }
+        if (artifactResistPercent > 0) {
+            this.unitProperties.magic_resist = Math.min(
+                100,
+                Number((this.unitProperties.magic_resist + artifactResistPercent).toFixed(2)),
+            );
+        }
+
         // SHOTS
         if (this.hasAbilityActive("Limited Supply")) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
@@ -2218,7 +2310,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const movementAugmentBuff = this.getBuff("Movement Augment");
         if (movementAugmentBuff) {
-            this.unitProperties.steps += movementAugmentBuff.getPower();
+            this.unitProperties.steps += ampArtifact(movementAugmentBuff.getPower());
+        }
+        // ARTIFACTS: movement. Swift Boots (melee) and Winged Boots (flyers) are only applied to eligible
+        // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
+        const swiftBootsBuff = this.getBuff("Swift Boots");
+        if (swiftBootsBuff) {
+            this.unitProperties.steps += ampArtifact(swiftBootsBuff.getPower());
+        }
+        const wingedBootsBuff = this.getBuff("Winged Boots");
+        if (wingedBootsBuff) {
+            this.unitProperties.steps += ampArtifact(wingedBootsBuff.getPower());
+        }
+        const crownOfCommandStepsBuff = this.getBuff("Crown of Command");
+        if (crownOfCommandStepsBuff) {
+            this.unitProperties.steps += ampArtifact(crownOfCommandStepsBuff.getPower());
         }
         const battleRoarBuff = this.getBuff("Battle Roar");
         if (battleRoarBuff) {
@@ -2259,7 +2365,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
+                ((this.unitProperties.base_attack / 100) * ampArtifact(mightAugmentBuff.getPower())).toFixed(2),
             );
         }
 
@@ -2268,13 +2374,49 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
                 this.unitProperties.base_attack += Number(
-                    ((this.unitProperties.base_attack / 100) * parseInt(buffProperties[0])).toFixed(2),
+                    ((this.unitProperties.base_attack / 100) * ampArtifact(parseInt(buffProperties[0]))).toFixed(2),
                 );
                 // SHOT DISTANCE
                 this.unitProperties.shot_distance += Number(
-                    ((this.unitProperties.shot_distance / 100) * parseInt(buffProperties[1])).toFixed(2),
+                    ((this.unitProperties.shot_distance / 100) * ampArtifact(parseInt(buffProperties[1]))).toFixed(2),
                 );
             }
+        }
+
+        // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
+        const keenBladeBuff = this.getBuff("Keen Blade");
+        if (keenBladeBuff) {
+            this.unitProperties.base_attack += ampArtifact(keenBladeBuff.getPower());
+        }
+        const berserkersBondAttackBuff = this.getBuff("Berserkers Bond");
+        if (berserkersBondAttackBuff) {
+            this.unitProperties.base_attack += ampArtifact(berserkersBondAttackBuff.getPower());
+        }
+        const veteranHelmAttackBuff = this.getBuff("Veteran Helm");
+        if (veteranHelmAttackBuff) {
+            this.unitProperties.base_attack += Number(
+                ((this.unitProperties.base_attack / 100) * ampArtifact(veteranHelmAttackBuff.getPower())).toFixed(2),
+            );
+        }
+        const warlordsEdgeBuff = this.getBuff("Warlords Edge");
+        if (warlordsEdgeBuff) {
+            this.unitProperties.base_attack += Number(
+                ((this.unitProperties.base_attack / 100) * ampArtifact(warlordsEdgeBuff.getPower())).toFixed(2),
+            );
+        }
+        const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
+        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
+            const longbowAttackPercent = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
+            this.unitProperties.base_attack += Number(
+                ((this.unitProperties.base_attack / 100) * ampArtifact(longbowAttackPercent)).toFixed(2),
+            );
+        }
+        const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
+        if (pendantOfVitalityAttackBuff) {
+            const pendantAttackPenaltyPercent = parseInt(this.getBuffProperties("Pendant of Vitality")[1] || "0", 10);
+            this.unitProperties.base_attack -= Number(
+                ((this.unitProperties.base_attack / 100) * ampArtifact(pendantAttackPenaltyPercent)).toFixed(2),
+            );
         }
 
         let baseAttackMultiplier = 1;

@@ -62,6 +62,16 @@ export function isDeterministicRandomActive(): boolean {
     return deterministicSource !== undefined;
 }
 
+/**
+ * The currently installed seeded source (or undefined). Simulation-only: the 2-ply lookahead driver
+ * SWAPS the source to a private stream while it simulates candidate moves, then restores this exact
+ * reference — so the real (tournament) RNG stream is never advanced by rollback-and-retry search and
+ * replay-determinism is preserved. Never used on a live-game path (no source is installed there).
+ */
+export function getDeterministicRandomSource(): RandomSource | undefined {
+    return deterministicSource;
+}
+
 /** One raw 53-bit value: from the seeded source if installed, else crypto-secure (the production path). */
 function nextRaw53(): bigint {
     if (deterministicSource) {
