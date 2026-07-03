@@ -954,7 +954,7 @@ export class FightProperties {
             this.artifactTier2PerTeam.set(teamType, Tier2Artifact.NO_ARTIFACT);
         }
     }
-    public setArtifactPerTeam(teamType: TeamType, tier: ArtifactTier, artifactId: number): boolean {
+    public setArtifactPerTeam(teamType: TeamType, tier: number, artifactId: number): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return false;
         }

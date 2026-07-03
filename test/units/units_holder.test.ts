@@ -11,12 +11,8 @@
 
 import { describe, expect, it } from "bun:test";
 
-import {
-    ArmorAugment,
-    MightAugment,
-    MovementAugment,
-    SniperAugment,
-} from "../../src/augments/augment_properties";
+import { ArmorAugment, MightAugment, MovementAugment, SniperAugment } from "../../src/augments/augment_properties";
+import { ArtifactTier, Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -124,14 +120,10 @@ describe("UnitsHolder", () => {
         placeUnit(grid, unitsHolder, upper, { x: 14, y: 14 });
 
         expect(
-            unitsHolder
-                .getAllAlliesPlaced(PBTypes.TeamVals.LOWER, lowerLeft, upperRight)
-                .map((unit) => unit.getId()),
+            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.LOWER, lowerLeft, upperRight).map((unit) => unit.getId()),
         ).toEqual([lowerA.getId(), lowerB.getId(), lowerC.getId()]);
         expect(
-            unitsHolder
-                .getAllAlliesPlaced(PBTypes.TeamVals.UPPER, lowerLeft, upperRight)
-                .map((unit) => unit.getId()),
+            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.UPPER, lowerLeft, upperRight).map((unit) => unit.getId()),
         ).toEqual([upper.getId()]);
         expect(unitsHolder.toCleanupRandomUnitsTillTeamSize(5, PBTypes.TeamVals.LOWER, lowerLeft, upperRight)).toEqual(
             [],
@@ -297,6 +289,86 @@ describe("UnitsHolder", () => {
         expect(melee.hasBuffActive("Might Augment")).toBe(true);
         expect(melee.hasBuffActive("Sniper Augment")).toBe(false);
         expect(melee.hasBuffActive("Movement Augment")).toBe(true);
+    });
+
+    it("applies tier 1 & tier 2 artifact buffs to the right units", () => {
+        const { unitsHolder, grid } = createCombatTestContext();
+        const ranged = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 3,
+        });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        placeUnit(grid, unitsHolder, ranged, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
+
+        expect(
+            fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM),
+        ).toBe(true);
+        expect(
+            fightProperties.setArtifactPerTeam(
+                PBTypes.TeamVals.LOWER,
+                ArtifactTier.TIER_2,
+                Tier2Artifact.WARLORDS_EDGE,
+            ),
+        ).toBe(true);
+        expect(fightProperties.getArtifactTier1(PBTypes.TeamVals.LOWER)).toBe(Tier1Artifact.VETERAN_HELM);
+        expect(fightProperties.getArtifactTier2(PBTypes.TeamVals.LOWER)).toBe(Tier2Artifact.WARLORDS_EDGE);
+
+        melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        const baseAttack = melee.getUnitProperties().base_attack;
+
+        unitsHolder.applyArtifacts();
+
+        // Veteran Helm (all units) + Warlord's Edge (all units) are applied as System buffs.
+        expect(melee.hasBuffActive("Veteran Helm")).toBe(true);
+        expect(ranged.hasBuffActive("Veteran Helm")).toBe(true);
+        expect(melee.hasBuffActive("Warlords Edge")).toBe(true);
+
+        // Veteran Helm (+5%) + Warlord's Edge (+15%) raise the melee unit's base attack once recomputed.
+        melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(melee.getUnitProperties().base_attack).toBeGreaterThan(baseAttack);
+    });
+
+    it("applies movement artifacts only to eligible units", () => {
+        const { unitsHolder, grid } = createCombatTestContext();
+        const ranged = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 3,
+        });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        placeUnit(grid, unitsHolder, ranged, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
+
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.SWIFT_BOOTS);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_2, Tier2Artifact.FARSIGHT_QUIVER);
+        unitsHolder.applyArtifacts();
+
+        // Swift Boots grants movement to melee units only.
+        expect(melee.hasBuffActive("Swift Boots")).toBe(true);
+        expect(ranged.hasBuffActive("Swift Boots")).toBe(false);
+        // Farsight Quiver is applied to every unit as a marker (read at range-attack time).
+        expect(ranged.hasBuffActive("Farsight Quiver")).toBe(true);
+    });
+
+    it("clears artifact buffs when the selection is reset", () => {
+        const { unitsHolder, grid } = createCombatTestContext();
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM);
+        unitsHolder.applyArtifacts();
+        expect(melee.hasBuffActive("Veteran Helm")).toBe(true);
+
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.NO_ARTIFACT);
+        unitsHolder.applyArtifacts();
+        expect(melee.hasBuffActive("Veteran Helm")).toBe(false);
     });
 
     it("refreshes stack power for all placed units", () => {
