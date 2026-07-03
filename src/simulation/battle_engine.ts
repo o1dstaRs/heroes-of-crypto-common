@@ -36,6 +36,7 @@ import type { XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
 import { setDeterministicRandomSource } from "../utils/lib";
 import { createCombatFactories, createUnitFromSpec, makeRng, type IArmyUnitSpec } from "./army";
+import { LookaheadDriver } from "./lookahead";
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
@@ -198,7 +199,7 @@ function advanceTowardEnemyAction(
         grid.getAggrMatrixByTeam(enemyTeam),
         unit.canFly(),
         unit.isSmallSize(),
-        unit.hasAbilityActive("Made of Fire"),
+        unit.canTraverseLava(),
     );
     if (!movePath.knownPaths.size) {
         return undefined;
@@ -320,6 +321,33 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     const greenStrategy = getAIStrategy(config.greenVersion);
     const redStrategy = getAIStrategy(config.redVersion);
+
+    // STAGE 2: 2-ply lookahead driver (env-gated V05_LOOKAHEAD, default OFF -> baseline unchanged). When
+    // enabled it replaces a v0.5 unit's single decision with the best-by-simulation candidate (see
+    // ./lookahead.ts). It reads/writes `currentActiveUnitId` (so simulated engine applies validate) and
+    // snapshots the per-lap damage stat log (not covered by battle_snapshot) alongside the battle state.
+    const lookahead = new LookaheadDriver({
+        engine,
+        turnEngine,
+        grid,
+        unitsHolder,
+        fightProperties,
+        pathHelper,
+        attackHandler,
+        strategyForTeam: (team) => (team === GREEN_TEAM ? greenStrategy : redStrategy),
+        getActiveUnitId: () => currentActiveUnitId,
+        setActiveUnitId: (id) => {
+            currentActiveUnitId = id;
+        },
+        damageDealtThisLap: () => damageStatisticHolder.has(fightProperties.getCurrentLap()),
+        captureDamageStats: () => [...damageStatisticHolder.get()],
+        restoreDamageStats: (saved) => {
+            damageStatisticHolder.clear();
+            for (const v of saved) {
+                damageStatisticHolder.add(v);
+            }
+        },
+    });
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
     const greenRoster = config.roster;
@@ -467,7 +495,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const actingUnitId = currentActiveUnitId;
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
-        const decided = strategy.decideTurn(unit, {
+        const decided0 = strategy.decideTurn(unit, {
             grid,
             matrix,
             unitsHolder,
@@ -475,6 +503,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             attackHandler,
             fightProperties,
         });
+        // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
+        // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
+        // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
+        const decided =
+            lookahead.enabled && strategy.version === "v0.5" ? lookahead.chooseDecision(unit, decided0) : decided0;
 
         let didSomething = false;
         for (const action of decided) {
