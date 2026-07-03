@@ -172,15 +172,25 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (atk !== MELEE && atk !== PBTypes.AttackVals.MELEE_MAGIC) {
             return decision; // ranged/magic units handle their own turn
         }
-        const move = decision.find((a) => a.type === "move_unit");
-        if (!move || move.type !== "move_unit" || !move.path?.length) {
-            return decision; // not a pure move
-        }
         if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
             return decision; // already striking/casting
         }
-        const dest = move.path[move.path.length - 1];
-        const destFp = this.footprintForCell(unit, dest, context);
+        const move = decision.find((a) => a.type === "move_unit");
+        // Two salvageable shapes: (a) a PURE MOVE that lands adjacent (charge → strike), or (b) an
+        // END_TURN while ALREADY adjacent (pure waste — a melee unit sitting next to an attackable enemy
+        // and passing). A wait_turn is left alone: that's the learned reactive hourglass, which acts later.
+        const isPureMove = !!move && move.type === "move_unit" && !!move.path?.length;
+        const isIdleEnd =
+            !move &&
+            process.env.V05_OPP_IDLE !== "off" &&
+            decision.some((a) => a.type === "end_turn") &&
+            !unit.isSkippingThisTurn();
+        if (!isPureMove && !isIdleEnd) {
+            return decision;
+        }
+        const base = unit.getBaseCell();
+        const dest = isPureMove ? move!.path![move!.path!.length - 1] : { x: base.x, y: base.y };
+        const destFp = isPureMove ? this.footprintForCell(unit, dest, context) : unit.getCells();
         const enemyTeam = otherTeam(unit.getTeam());
         const forced = unit.getTarget();
         const cowardlyVs = (e: Unit): boolean =>
@@ -213,9 +223,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
             attackerId: unit.getId(),
             targetId: target.getId(),
             attackFrom: { x: dest.x, y: dest.y },
-            path: move.path,
-            hasLavaCell: move.hasLavaCell,
-            hasWaterCell: move.hasWaterCell,
+            path: isPureMove ? move!.path : undefined,
+            hasLavaCell: isPureMove ? move!.hasLavaCell : undefined,
+            hasWaterCell: isPureMove ? move!.hasWaterCell : undefined,
         });
         return acts;
     }
