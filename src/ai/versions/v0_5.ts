@@ -1184,6 +1184,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (unit.getAttackTypeSelection() !== MELEE) {
             acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
         }
+        // Emit the move+strike as a SEPARATE move_unit + in-place melee_attack: the standalone move applies
+        // the full move handler (measured ~+2.5pp over folding the move into a path-bearing melee_attack). The
+        // ranked client folds this pair back into one move+attack for its transport (AIController).
         if (best.route && (best.cell.x !== base.x || best.cell.y !== base.y)) {
             acts.push({
                 type: "move_unit",
