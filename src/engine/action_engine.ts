@@ -64,6 +64,7 @@ export type GameActionRejectionReason =
     | "unit_limit_reached"
     | "delete_not_available"
     | "start_not_available"
+    | "additional_time_not_available"
     | "unsupported_action";
 
 export interface IGameActionResult {
@@ -136,6 +137,8 @@ export class GameActionEngine {
                 return this.splitUnit(action);
             case "delete_unit":
                 return this.deleteUnit(action);
+            case "request_additional_time":
+                return this.requestAdditionalTime(action.team);
             default:
                 return this.reject(
                     "unsupported_action",
@@ -262,6 +265,26 @@ export class GameActionEngine {
             completed: true,
             events: [{ type: "attack_type_selected", unitId: unit.getId(), team: unit.getTeam(), attackType }],
         };
+    }
+    /**
+     * Extend the acting team's running turn clock (once per lap per team). Only valid while a unit of
+     * that team is the active unit — otherwise a team could pad the opponent's clock. Rejects if the
+     * team already used its request this lap or there's no remaining budget (both surface as
+     * requestAdditionalTurnTime() returning 0). Produces no game events — the extension lives entirely
+     * in fightProperties.currentTurnEnd, which the snapshot re-broadcasts.
+     */
+    private requestAdditionalTime(team: TeamType): IGameActionResult {
+        const activeUnitId = this.context.getCurrentActiveUnitId?.();
+        const activeUnit = activeUnitId ? this.context.unitsHolder.getAllUnits().get(activeUnitId) : undefined;
+        if (!activeUnit || activeUnit.getTeam() !== team) {
+            return this.reject("additional_time_not_available");
+        }
+        const additionalTime = this.context.fightProperties.requestAdditionalTurnTime(team);
+        if (additionalTime <= 0) {
+            return this.reject("additional_time_not_available");
+        }
+        this.context.sceneLog.updateLog(`Team requested additional turn time (+${Math.round(additionalTime)}ms)`);
+        return { completed: true, events: [] };
     }
     private moveUnit(action: Extract<GameAction, { type: "move_unit" }>): IGameActionResult {
         const unit = this.validateTurnAction(action.unitId);

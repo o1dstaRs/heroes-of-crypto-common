@@ -269,6 +269,32 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
     });
 
+    it("grants additional turn time to the active team once per lap and refuses off-turn / repeat requests", () => {
+        const setup = setupActionFight(); // active unit belongs to LOWER
+        const before = setup.fightProperties.getCurrentTurnEnd();
+
+        // Off-turn: UPPER cannot extend the clock while a LOWER unit is active.
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.UPPER })).toMatchObject({
+            completed: false,
+            rejectionReason: "additional_time_not_available",
+        });
+        expect(setup.fightProperties.getCurrentTurnEnd()).toBe(before);
+
+        // The active team's first request this lap extends the running clock.
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LOWER }).completed).toBe(
+            true,
+        );
+        const extended = setup.fightProperties.getCurrentTurnEnd();
+        expect(extended).toBeGreaterThan(before);
+
+        // A second request in the same lap is refused (once per lap per team).
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LOWER })).toMatchObject({
+            completed: false,
+            rejectionReason: "additional_time_not_available",
+        });
+        expect(setup.fightProperties.getCurrentTurnEnd()).toBe(extended);
+    });
+
     it("defends with luck shield and completes the unit turn", () => {
         const setup = setupActionFight();
 

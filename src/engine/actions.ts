@@ -59,4 +59,8 @@ export type GameAction =
     | { type: "cast_spell"; casterId: string; spellName: string; targetId?: string; targetCell?: XY }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
     | { type: "split_unit"; unitId: string; amount: number }
-    | { type: "delete_unit"; unitId: string };
+    | { type: "delete_unit"; unitId: string }
+    // Once per lap per team, the acting team may extend its running turn clock (see
+    // FightProperties.requestAdditionalTurnTime). Carries the requesting team; the engine only
+    // honours it while that team's unit is active and it hasn't already been used this lap.
+    | { type: "request_additional_time"; team: TeamType };
