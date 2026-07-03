@@ -148,7 +148,76 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // react this lap, wait — converting the ~41% first-mover seat into the ~59% second-mover one.
         const waited = this.hourglassByPolicy(unit, context, auraM);
         // Final catch-all: never emit a move whose footprint is occupied (the engine rejects move_blocked).
-        return this.dropBlockedMove(unit, context, waited);
+        const guarded = this.dropBlockedMove(unit, context, waited);
+        // Free attack-of-opportunity: if a melee unit's move ENDS adjacent to an attackable enemy, strike it
+        // instead of just walking up (it's exposed to that enemy next turn regardless — hitting is strictly
+        // better). Fixes the common "unit moved next to the enemy but didn't attack".
+        return this.takeAdjacentAttack(unit, context, guarded);
+    }
+    /**
+     * Convert a PURE melee advance that stops next to a live, legally-attackable enemy into a move+strike on
+     * that enemy. The base flow commits to one target and, when it can't reach that target this turn, just
+     * advances — often ending adjacent to a DIFFERENT enemy it then ignores. Only fires for melee-capable
+     * units on a validated move, respects Hidden / Cowardice / forced (Aggr) targets, and reuses the move's
+     * own (already-legal) path so the emitted strike is valid by construction.
+     */
+    private takeAdjacentAttack(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (process.env.V05_OPP === "off") {
+            return decision; // A/B toggle (default ON)
+        }
+        if (unit.hasAbilityActive("No Melee")) {
+            return decision;
+        }
+        const atk = unit.getAttackType();
+        if (atk !== MELEE && atk !== PBTypes.AttackVals.MELEE_MAGIC) {
+            return decision; // ranged/magic units handle their own turn
+        }
+        const move = decision.find((a) => a.type === "move_unit");
+        if (!move || move.type !== "move_unit" || !move.path?.length) {
+            return decision; // not a pure move
+        }
+        if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+            return decision; // already striking/casting
+        }
+        const dest = move.path[move.path.length - 1];
+        const destFp = this.footprintForCell(unit, dest, context);
+        const enemyTeam = otherTeam(unit.getTeam());
+        const forced = unit.getTarget();
+        const cowardlyVs = (e: Unit): boolean =>
+            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+        const targets = context.unitsHolder
+            .getAllAllies(enemyTeam)
+            .filter(
+                (e) =>
+                    !e.isDead() &&
+                    !isHidden(e) &&
+                    !cowardlyVs(e) &&
+                    (!forced || e.getId() === forced) &&
+                    e.getCells().some((ec) => destFp.some((fc) => isAdjacentCell(fc, ec))),
+            );
+        if (!targets.length) {
+            return decision;
+        }
+        // Prefer a stack we can KILL, else the most dangerous (highest firepower) adjacent enemy.
+        const target = targets.sort((a, b) => {
+            const kA = unit.calculateAttackDamageMax(unit.getAttack(), a, false, 0, 1) >= a.getCumulativeHp() ? 1 : 0;
+            const kB = unit.calculateAttackDamageMax(unit.getAttack(), b, false, 0, 1) >= b.getCumulativeHp() ? 1 : 0;
+            return kB - kA || firepowerOf(b) - firepowerOf(a);
+        })[0];
+        const acts: GameAction[] = [];
+        if (unit.getAttackTypeSelection() !== MELEE) {
+            acts.push({ type: "select_attack_type", unitId: unit.getId(), attackType: MELEE });
+        }
+        acts.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: target.getId(),
+            attackFrom: { x: dest.x, y: dest.y },
+            path: move.path,
+            hasLavaCell: move.hasLavaCell,
+            hasWaterCell: move.hasWaterCell,
+        });
+        return acts;
     }
     /**
      * Strategic hourglass (env-gated A/B; default off). The single biggest un-tapped edge is the second-mover
