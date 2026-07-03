@@ -69,6 +69,7 @@ enum PickPhaseVals {
     ARTIFACT_2 = 6;
     AUGMENTS = 7;
     AUGMENTS_SCOUT = 8;
+    PERK = 9;
 }
 
 enum PickPhaseActionVals {
@@ -79,6 +80,7 @@ enum PickPhaseActionVals {
     SELECT_ARTIFACT = 4;
     AUGMENT = 5;
     REVEAL = 6;
+    SELECT_PERK = 7;
 }
 
 enum AugmentVals {

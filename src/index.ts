@@ -14,6 +14,7 @@ export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * as Augment from "./augments/augment_properties";
 export * as Artifact from "./artifacts/artifact_properties";
+export * as Perk from "./perks/perk_properties";
 export * from "./abilities/ability";
 export * from "./scene/animations";
 export * as AbilityHelper from "./abilities/ability_helper";

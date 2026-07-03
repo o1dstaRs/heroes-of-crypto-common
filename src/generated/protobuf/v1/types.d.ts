@@ -49,7 +49,8 @@ export declare namespace PBTypes {
         ARTIFACT_1 = 5,
         ARTIFACT_2 = 6,
         AUGMENTS = 7,
-        AUGMENTS_SCOUT = 8
+        AUGMENTS_SCOUT = 8,
+        PERK = 9
     }
     enum PickPhaseActionVals {
         NO_ACTION = 0,
@@ -58,7 +59,8 @@ export declare namespace PBTypes {
         BAN_UNIT = 3,
         SELECT_ARTIFACT = 4,
         AUGMENT = 5,
-        REVEAL = 6
+        REVEAL = 6,
+        SELECT_PERK = 7
     }
     enum AugmentVals {
         NO_AUGMENT = 0,

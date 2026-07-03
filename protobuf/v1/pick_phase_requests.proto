@@ -18,3 +18,7 @@ message ArtifactRequest {
 message RevealRequest {
     int32 creature_index = 1;
 }
+
+message PerkRequest {
+    int32 perk = 1;
+}

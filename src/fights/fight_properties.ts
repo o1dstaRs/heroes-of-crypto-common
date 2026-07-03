@@ -13,7 +13,6 @@ import Denque from "denque";
 
 import { createSecureUuid, getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
-    MAX_AUGMENT_POINTS,
     MAX_HITS_MOUNTAIN,
     MAX_SYNERGY_LEVEL,
     MAX_TIME_TO_MAKE_TURN_MILLIS,
@@ -39,6 +38,7 @@ import {
     SniperAugment,
 } from "../augments/augment_properties";
 import { ArtifactTier, Tier1Artifact, Tier2Artifact } from "../artifacts/artifact_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
@@ -94,6 +94,7 @@ export class FightProperties {
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
     private artifactTier1PerTeam: Map<TeamType, Tier1Artifact>;
     private artifactTier2PerTeam: Map<TeamType, Tier2Artifact>;
+    private perkPerTeam: Map<TeamType, Perk>;
     private synergyUnitsLifePerTeam: Map<TeamType, number>;
     private synergyUnitsChaosPerTeam: Map<TeamType, number>;
     private synergyUnitsMightPerTeam: Map<TeamType, number>;
@@ -137,6 +138,7 @@ export class FightProperties {
         this.augmentMovementPerTeam = new Map();
         this.artifactTier1PerTeam = new Map();
         this.artifactTier2PerTeam = new Map();
+        this.perkPerTeam = new Map();
         this.synergyUnitsLifePerTeam = new Map();
         this.synergyUnitsChaosPerTeam = new Map();
         this.synergyUnitsMightPerTeam = new Map();
@@ -987,6 +989,19 @@ export class FightProperties {
     public hasArtifactTier2(teamType: TeamType, artifactId: Tier2Artifact): boolean {
         return artifactId !== Tier2Artifact.NO_ARTIFACT && this.getArtifactTier2(teamType) === artifactId;
     }
+    public setPerkPerTeam(teamType: TeamType, perk: Perk): void {
+        if (teamType === PBTypes.TeamVals.NO_TEAM) {
+            return;
+        }
+        this.perkPerTeam.set(teamType, perk);
+    }
+    public getPerk(teamType: TeamType): Perk {
+        return this.perkPerTeam.get(teamType) ?? Perk.NO_PERK;
+    }
+    // Upgrade (augment) point budget for the team, determined by its chosen perk.
+    public getUpgradePoints(teamType: TeamType): number {
+        return getUpgradePoints(this.getPerk(teamType));
+    }
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return false;
@@ -1084,7 +1099,7 @@ export class FightProperties {
         }
 
         const currentAugmentPoints = augmentPlacement + augmentArmor + augmentMight + augmentSniper + augmentMovement;
-        if (currentAugmentPoints + augmentPoints > MAX_AUGMENT_POINTS) {
+        if (currentAugmentPoints + augmentPoints > this.getUpgradePoints(teamType)) {
             return false;
         }
 

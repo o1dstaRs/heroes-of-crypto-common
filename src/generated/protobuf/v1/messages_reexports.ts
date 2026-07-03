@@ -40,6 +40,9 @@ export type ArtifactRequestObject = ReturnType<InstanceType<typeof m_pick_phase_
 export const RevealRequest = m_pick_phase_requests.PBTypes.RevealRequest;
 export type RevealRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>;
 export type RevealRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>["toObject"]>;
+export const PerkRequest = m_pick_phase_requests.PBTypes.PerkRequest;
+export type PerkRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>;
+export type PerkRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>["toObject"]>;
 
 import * as m_request_code from "./request_code";
 export const RequestCode = m_request_code.PBTypes.RequestCode;
