@@ -24,10 +24,10 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(v05.version).toBe("v0.5");
     });
 
-    it("ships the trained vector (53 dims; tail [51..52] target-caster untrained/no-op)", () => {
-        // Full 51-dim CEM (gem run, pass 1): panel 61.80%, gems trained [49..50]. Two new BROAD dims [51..52]
-        // (meleeTargetCaster / shotTargetCaster — kill the enemy Healer/caster) are UNTRAINED (0), a strict
-        // no-op until the next CEM pass searches them.
+    it("ships the trained vector (53 dims; overnight retrain, panel 72.24%, fresh-guard +0.93pp)", () => {
+        // 10h CEM (2026-07-04, pass 20/21) re-trained after the Double Shot fix reopened the scoring landscape.
+        // Panel 72.24% vs 70.55% base; fresh-seed guarded +0.93pp over the prior champion. All 53 dims trained,
+        // including the target-caster features [51..52] (meleeTargetCaster / shotTargetCaster).
         expect(DEFAULT_V05_W).toEqual([
             1.878, -0.9581, -0.1678, 1.3365, 1.0323, 4.9159, 1.5845, 0.3526, -1.1937, 1.0574, 0.2617, 2.2306, 3.1763,
             2.6777, -0.0014, 0.4104, 3.9821, 5.1322, -0.7937, 0.2533, -1.7702, 0.2244, -2.6472, -2.2222, -1.3665,
