@@ -65,6 +65,7 @@ export type GameActionRejectionReason =
     | "delete_not_available"
     | "start_not_available"
     | "additional_time_not_available"
+    | "augment_not_available"
     | "unsupported_action";
 
 export interface IGameActionResult {

@@ -1057,6 +1057,11 @@ export class FightProperties {
 
         return getPlacementSizes(this.placementType, augmentPlacement, defaultPlacement);
     }
+    // Raw chosen placement-augment LEVEL (not the computed grid sizes getAugmentPlacement returns) — used to
+    // serialize/display the team's current Placement selection alongside the other augment levels.
+    public getAugmentPlacementLevel(teamType: TeamType): PlacementAugment {
+        return this.augmentPlacementPerTeam.get(teamType) ?? PlacementAugment.LEVEL_1;
+    }
     public getAugmentArmor(teamType: TeamType): ArmorAugment {
         return this.augmentArmorPerTeam.get(teamType) ?? ArmorAugment.NO_AUGMENT;
     }

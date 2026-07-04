@@ -253,9 +253,15 @@ export class UnitsHolder {
 
         return teamUnitHp;
     }
-    public applyAugments(): void {
+    // fightProperties defaults to the global singleton (client/sandbox), but server play sessions run many
+    // concurrent fights off their own per-session FightProperties, so they pass it explicitly (mirrors
+    // applyArtifacts). Applies the team's chosen army augments (armor / might / sniper / movement) as
+    // per-unit "System" buffs; placement augments are read separately when sizing the placement grid.
+    public applyAugments(
+        fightProperties: FightProperties = FightStateManager.getInstance().getFightProperties(),
+    ): void {
         for (const unit of this.getAllUnitsIterator()) {
-            const augmentArmor = FightStateManager.getInstance().getFightProperties().getAugmentArmor(unit.getTeam());
+            const augmentArmor = fightProperties.getAugmentArmor(unit.getTeam());
             const augmentArmorPower = getArmorPower(augmentArmor);
             unit.deleteBuff("Armor Augment");
             if (augmentArmor && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
@@ -276,7 +282,7 @@ export class UnitsHolder {
                 unit.applyBuff(augmentArmorBuff);
             }
 
-            const augmentMight = FightStateManager.getInstance().getFightProperties().getAugmentMight(unit.getTeam());
+            const augmentMight = fightProperties.getAugmentMight(unit.getTeam());
             const augmentMightPower = getMightPower(augmentMight);
             unit.deleteBuff("Might Augment");
             if (augmentMight && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
@@ -297,7 +303,7 @@ export class UnitsHolder {
                 unit.applyBuff(augmentMightBuff);
             }
 
-            const augmentSniper = FightStateManager.getInstance().getFightProperties().getAugmentSniper(unit.getTeam());
+            const augmentSniper = fightProperties.getAugmentSniper(unit.getTeam());
             const augmentSniperPower = getSniperPower(augmentSniper);
             unit.deleteBuff("Sniper Augment");
             if (
@@ -323,9 +329,7 @@ export class UnitsHolder {
                 unit.applyBuff(augmentSniperBuff, augmentSniperPower[0], augmentSniperPower[1]);
             }
 
-            const augmentMovement = FightStateManager.getInstance()
-                .getFightProperties()
-                .getAugmentMovement(unit.getTeam());
+            const augmentMovement = fightProperties.getAugmentMovement(unit.getTeam());
             const augmentMovementPower = getMovementPower(augmentMovement);
             unit.deleteBuff("Movement Augment");
             if (augmentMovement && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {

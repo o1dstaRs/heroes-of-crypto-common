@@ -63,4 +63,12 @@ export type GameAction =
     // Once per lap per team, the acting team may extend its running turn clock (see
     // FightProperties.requestAdditionalTurnTime). Carries the requesting team; the engine only
     // honours it while that team's unit is active and it hasn't already been used this lap.
-    | { type: "request_additional_time"; team: TeamType };
+    | { type: "request_additional_time"; team: TeamType }
+    // During placement, a team spends its perk's upgrade-point budget on an army augment. `augmentKind`
+    // is the augment category and `augmentValue` its level (see FightProperties.setAugmentPerTeam /
+    // canAugment). Applied pre-fight to the army; not a turn action.
+    | { type: "augment"; team: TeamType; augmentKind: AugmentKind; augmentValue: number };
+
+// The five spendable army-augment categories (Placement resizes the placement grid; the others are
+// stat buffs applied by UnitsHolder.applyAugments). Mirrors FightProperties' AugmentType.type union.
+export type AugmentKind = "Placement" | "Armor" | "Might" | "Sniper" | "Movement";
