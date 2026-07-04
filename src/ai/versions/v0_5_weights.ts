@@ -117,32 +117,31 @@ export const V05_WEIGHT_KEYS = [
  * ANCHORS to v0.4's coverage-max (dirIncumbent +0.71) — those lines/arcs were already near-optimal.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Full 51-dim CEM (pass 1 of the gem run) — panel 61.80% (vs 61.73% base). This bake also TRAINS the two
-    // hidden-gem melee features [49..50]: warAngerSurround +0.81 (a Valkyrie seeks a surrounded stand cell,
-    // War Anger giving +dmg per enemy in range) and punishMeleeAvoid -0.17 (mild lean away from trading into
-    // Fire Shield / Dulling Defense). Aggregate gain over the pass-12 bake is small (+0.07pp panel — those
-    // units are only in a fraction of games), but it's the current best and correct for those matchups.
-    1.4841, -0.5083, 0.0391, 0.0198, 3.2615, 4.4136, 1.2554, 0.5997, 0.0358, 0.537, -1.1739, 1.8861, 1.573, 2.818,
-    -0.0254, 0.8456, 3.5469, 2.8459, -0.8899, -0.125, -1.6446, 0.8041,
+    // Full 53-dim CEM, 10h overnight run (2026-07-04, pass 20 of 21) — panel 72.24% (vs 70.55% base on the
+    // 5-seed held-out panel). RE-TRAINED after the Double Shot damage-model fix (commit 5fe3a13), which
+    // corrected the shot scorer's ~2x under-valuation of Elf/Gargantuan and reopened a scoring landscape the
+    // prior runs found tapped. FRESH-SEED GUARDED: +0.93pp over the previous champion on seeds 7000001/03/09
+    // (outside BOTH training and panel), 72.66% vs 71.73% — a real, generalizing gain, not panel-overfit.
+    // This bake also TRAINS the previously-zero target-caster features [51..52].
+    1.878, -0.9581, -0.1678, 1.3365, 1.0323, 4.9159, 1.5845, 0.3526, -1.1937, 1.0574, 0.2617, 2.2306, 3.1763, 2.6777,
+    -0.0014, 0.4104, 3.9821, 5.1322, -0.7937, 0.2533, -1.7702, 0.2244,
     // [22] meleeStandSupport, [23] meleeTargetWounded — screened stand cell, de-prioritise wounded stacks.
-    -1.8285, -2.6859,
+    -2.6472, -2.2222,
     // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions.
-    -0.5414, 1.753,
+    -1.3665, 2.6387,
     // [26..32] center-mountain mining — LEARNED (bias, inPlace, close, group, outRange, laneBlocked, progress).
-    1.4356, -0.6464, 0.3672, -0.8436, 0.492, 0.2973, 0.1443,
-    // [33..40] Hydra spin AOE — LEARNED: aoeCoverage 2.77 + aoeExposure +2.96 (a Hydra WANTS to be surrounded),
-    // aoeIncumbent 1.85. Values: coverage, value, kill, threat, exposure, moveCost, wounded, incumbent.
-    2.7736, -0.422, 0.6162, -0.6053, 2.9583, -0.6088, -1.3999, 1.8541,
-    // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — anchor-heavy (dirIncumbent
-    // 0.95): v0.4's coverage-max line/arc was already near-optimal. coverage, value, kill, threat, exposure,
-    // moveCost, wounded, incumbent.
-    0.071, 0.0973, -0.5594, 0.6612, 0.3472, 0.0802, -0.5049, 0.9476,
-    // [49..50] hidden-gem melee — LEARNED: warAngerSurround +0.81 (Valkyrie seeks surround), punishMeleeAvoid
-    // -0.17 (avoid trading into Fire Shield / Dulling Defense).
-    0.8073, -0.1741,
-    // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster) — UNTRAINED (0): searched
-    // by the next CEM pass. Kill the enemy Healer/Ogre Mage/etc. beyond its raw firepower.
-    0, 0,
+    0.6218, -0.9772, 0.1456, -1.601, -0.4014, 0.2955, 0.1458,
+    // [33..40] Hydra spin AOE — LEARNED (coverage, value, kill, threat, exposure, moveCost, wounded, incumbent).
+    2.0687, -1.1211, 0.6944, -0.0405, 2.4438, -0.3691, -0.7115, 3.8785,
+    // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — coverage, value, kill, threat,
+    // exposure, moveCost, wounded, incumbent.
+    1.9894, -2.6533, 1.37, 0.5252, 0.0925, 1.0413, 0.3189, 1.7069,
+    // [49..50] hidden-gem melee — warAngerSurround (Valkyrie seeks surround), punishMeleeAvoid (avoid trading
+    // into Fire Shield / Dulling Defense).
+    0.4515, -0.9098,
+    // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster) — now TRAINED: kill the
+    // enemy Healer/Ogre Mage/etc. beyond its raw firepower.
+    0.265, 1.5186,
 ];
 
 /**
