@@ -31,6 +31,10 @@ export interface IThroughShotResult {
     landed: boolean;
     unitIdsDied: string[];
     animationData: IAnimationData[];
+    // Per-affected-unit damage so the client can draw a floating number on EVERY unit the shot pierced,
+    // not just the aimed target. Mirrors the AOE-range payload (Large Caliber / Area Throw); without it
+    // Through Shot's secondary hits deal damage but show no animation. See IVisibleDamage.splash.
+    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[];
 }
 
 export function processThroughShotAbility(
@@ -47,9 +51,10 @@ export function processThroughShotAbility(
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
+    const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
     const throughShotAbility = attackerUnit.getAbility("Through Shot");
     if (!throughShotAbility) {
-        return { landed: false, unitIdsDied, animationData };
+        return { landed: false, unitIdsDied, animationData, perUnitDamage };
     }
 
     let targetUnitUndex = 0;
@@ -113,15 +118,24 @@ export function processThroughShotAbility(
                 sceneLog,
             );
             sceneLog.updateLog(`${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})`);
+            const amountAliveBeforeDamage = targetUnit.getAmountAlive();
+            const positionAtImpact = { ...targetUnit.getPosition() };
+            const damageDealt = targetUnit.applyDamage(
+                damageFromAttack,
+                FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
+                sceneLog,
+            );
             damageStatisticHolder.add({
                 unitName: attackerUnit.getName(),
-                damage: targetUnit.applyDamage(
-                    damageFromAttack,
-                    FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
-                    sceneLog,
-                ),
+                damage: damageDealt,
                 team: attackerUnit.getTeam(),
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+            });
+            perUnitDamage.push({
+                unitId: targetUnit.getId(),
+                position: positionAtImpact,
+                amount: damageDealt,
+                unitsDied: Math.max(0, amountAliveBeforeDamage - targetUnit.getAmountAlive()),
             });
             const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
             if (pegasusLightEffect) {
@@ -180,5 +194,5 @@ export function processThroughShotAbility(
         });
     }
 
-    return { landed: true, unitIdsDied, animationData };
+    return { landed: true, unitIdsDied, animationData, perUnitDamage };
 }

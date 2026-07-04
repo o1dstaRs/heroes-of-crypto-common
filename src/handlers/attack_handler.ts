@@ -538,6 +538,15 @@ export class AttackHandler {
         for (const ad of throughShotResult.animationData) {
             animationData.push(ad);
         }
+        // Carry Through Shot's per-pierced-unit damage into splash so the client draws a floating number
+        // on EVERY unit the shot passed through (like Large Caliber / Area Throw). Without this the
+        // secondary hits dealt damage but rendered no animation at all.
+        if (throughShotResult.perUnitDamage.length) {
+            damageForAnimation.splash = throughShotResult.perUnitDamage.map((entry) => ({
+                ...entry,
+                position: { ...entry.position },
+            }));
+        }
 
         if (throughShotResult.landed) {
             unitsHolder.refreshStackPowerForAllUnits();
