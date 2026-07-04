@@ -129,9 +129,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // destination. They're mutually exclusive (a turn is either a strike or a pure move), and both anchor
         // to v0.4's own pick, so with the default weights v0.5 == v0.4 (a strict, validity-preserving extension).
         const base = this.healerPolicy(unit, context, super.decideTurn(unit, context));
+        // A pinned No-Melee shooter (Tsar Cannon) can neither shoot (suppressed by an adjacent enemy) nor
+        // melee — and v0.1's fallbackTurn ADVANCES it toward the enemy, deepening the pin. Retreat it to a
+        // reachable cell with no adjacent enemy so it can shoot again next lap. A 44-atk cannon left dead.
+        const unpinned = this.noMeleeRetreat(unit, context, base);
         // Learned mountain mining: on a BLOCK_CENTER map, let CEM decide whether an otherwise-advancing melee
         // unit should instead move+strike the center block to open the lane (weights [26..32], default 0 = v0.4).
-        const mined = this.mineByPolicy(unit, context, base);
+        const mined = this.mineByPolicy(unit, context, unpinned);
         const melee = this.meleeByPolicy(unit, context, mined);
         // Learned AOE-melee positioning: pick a multi-hit unit's stand cell by a weighted sum over the WHOLE
         // hit-set (coverage vs total value vs exposure), not just v0.4's max-enemy-count (weights [33..40],
@@ -161,6 +165,85 @@ export class StrategyV0_5 extends StrategyV0_4 {
      * units on a validated move, respects Hidden / Cowardice / forced (Aggr) targets, and reuses the move's
      * own (already-legal) path so the emitted strike is valid by construction.
      */
+    /**
+     * Anti-pin for No-Melee shooters (Tsar Cannon). When such a unit can't land a shot right now (an adjacent
+     * enemy suppresses it) its only base option is v0.1's fallbackTurn, which ADVANCES toward the nearest enemy
+     * — the exact wrong move for a unit that has no melee and just needs a clear cell to shoot from. Replace an
+     * advancing/holding decision with a retreat to the reachable cell FARTHEST from the enemies that has NO
+     * adjacent enemy (so the suppression lifts and it can fire next lap). Only fires for a pure move/end (never
+     * overrides a real action), and only when a genuinely-unpinned cell is reachable — else the base stands.
+     */
+    private noMeleeRetreat(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        if (process.env.V05_NOMELEE_RETREAT === "off") {
+            return decision;
+        }
+        if (unit.getAttackType() !== RANGE || !unit.hasAbilityActive("No Melee") || !unit.canMove()) {
+            return decision;
+        }
+        // Only salvage a pure move (the advance) or an end/hold — never override a shot/cast/real action.
+        if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+            return decision;
+        }
+        // Not pinned? It can shoot (or already will) — leave the base decision alone.
+        if (this.canLandRange(unit, context)) {
+            return decision;
+        }
+        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
+        if (!enemies.length) {
+            return decision;
+        }
+        const movePath = pathHelper.getMovePath(
+            unit.getBaseCell(),
+            matrix,
+            unit.getSteps(),
+            grid.getAggrMatrixByTeam(enemyTeam),
+            unit.canFly(),
+            unit.isSmallSize(),
+            unit.canTraverseLava(),
+        );
+        if (!movePath.knownPaths.size) {
+            return decision;
+        }
+        const base = unit.getBaseCell();
+        let best: IWeightedRoute | undefined;
+        let bestDist = -Infinity;
+        for (const routeList of movePath.knownPaths.values()) {
+            const route = routeList[0];
+            if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
+                continue;
+            }
+            const fp = this.footprintForCell(unit, route.cell, context);
+            const stillPinned = enemies.some((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
+            if (stillPinned) {
+                continue; // this cell is also suppressed — no good
+            }
+            const dist = Math.min(
+                ...enemies.map((e) => {
+                    const ec = e.getBaseCell();
+                    return Math.abs(route.cell.x - ec.x) + Math.abs(route.cell.y - ec.y);
+                }),
+            );
+            if (dist > bestDist) {
+                bestDist = dist;
+                best = route;
+            }
+        }
+        if (!best) {
+            return decision; // fully boxed — nothing better than the base
+        }
+        return [
+            {
+                type: "move_unit",
+                unitId: unit.getId(),
+                path: best.route.map((c: XY) => ({ x: c.x, y: c.y })),
+                targetCells: this.footprintForCell(unit, best.cell, context),
+                hasLavaCell: best.hasLavaCell,
+                hasWaterCell: best.hasWaterCell,
+            },
+        ];
+    }
     private takeAdjacentAttack(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (process.env.V05_OPP === "off") {
             return decision; // A/B toggle (default ON)
