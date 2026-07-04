@@ -1432,18 +1432,25 @@ export class FightProperties {
         return undefined;
     }
     private getRandomGridType(): GridType {
-        const randomValue = getRandomInt(0, 12);
-        if (randomValue < 4) {
-            return PBTypes.GridVals.NORMAL;
-        }
-        if (randomValue > 7) {
-            return PBTypes.GridVals.BLOCK_CENTER;
-        }
-        if (randomValue < 6) {
-            // return GridVals.WATER_CENTER;
-            return PBTypes.GridVals.LAVA_CENTER;
-        }
+        // TEMPORARY: force a CLEAR map (NORMAL — no center mountain, no lava/water) everywhere, in both
+        // sandbox and ranked, while we stabilize the game on the simplest board first. Both the client
+        // (sandbox) and the server construct FightProperties, which calls this, so this single override
+        // covers every mode. To restore randomized maps, un-comment the block below and remove this line
+        // (then rebuild common + copy to the server node_modules + restart it).
+        return PBTypes.GridVals.NORMAL;
 
-        return PBTypes.GridVals.LAVA_CENTER;
+        // --- Randomized maps (disabled while stabilizing) — NORMAL / BLOCK_CENTER (mountain) / LAVA_CENTER:
+        // const randomValue = getRandomInt(0, 12);
+        // if (randomValue < 4) {
+        //     return PBTypes.GridVals.NORMAL;
+        // }
+        // if (randomValue > 7) {
+        //     return PBTypes.GridVals.BLOCK_CENTER;
+        // }
+        // if (randomValue < 6) {
+        //     // return GridVals.WATER_CENTER;
+        //     return PBTypes.GridVals.LAVA_CENTER;
+        // }
+        // return PBTypes.GridVals.LAVA_CENTER;
     }
 }

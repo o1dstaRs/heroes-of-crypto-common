@@ -348,6 +348,50 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
 export const getTier1ArtifactProperties = (id: Tier1Artifact): ArtifactProperties => TIER1_ARTIFACTS[id];
 export const getTier2ArtifactProperties = (id: Tier2Artifact): ArtifactProperties => TIER2_ARTIFACTS[id];
 
+// Concrete power values (in order) that fill each description's placeholders: `{}` = first value,
+// `[]` = second value. Keyed by slug so it spans both tiers. Sourced from ARTIFACT_POWER — keep in sync
+// if a power constant changes. Artifacts with no numeric effect (farsight_quiver, lava_striders) are omitted.
+const AP = ARTIFACT_POWER;
+const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
+    veteran_helm: [AP.VETERAN_HELM_PERCENT],
+    amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
+    keen_blade: [AP.KEEN_BLADE_FLAT],
+    iron_plate: [AP.IRON_PLATE_FLAT],
+    swift_boots: [AP.SWIFT_BOOTS_STEPS],
+    winged_boots: [AP.WINGED_BOOTS_STEPS],
+    dual_strike_charm: [AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT],
+    wounding_charm: [AP.WOUNDING_CHARM_EXTRA_STACKS],
+    cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
+    hunters_longbow: [AP.LONGBOW_ATTACK_PERCENT, AP.LONGBOW_DEFENSE_PENALTY_PERCENT],
+    helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
+    aegis_shield: [AP.AEGIS_AREA_REDUCTION_PERCENT],
+    warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
+    titan_plate: [AP.TITAN_PLATE_PERCENT],
+    holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
+    clover_of_fortune: [AP.CLOVER_LUCK],
+    crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE],
+    giants_maul: [AP.GIANTS_MAUL_NON_PRIMARY_PERCENT],
+    pendant_of_vitality: [AP.PENDANT_HP_PERCENT, AP.PENDANT_ATTACK_PENALTY_PERCENT],
+    berserkers_bond: [AP.BERSERKERS_BOND_FLAT, AP.BERSERKERS_BOND_FLAT],
+    tome_of_amplification: [AP.TOME_BUFF_POWER_PERCENT],
+    rime_charm: [AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS],
+};
+
+// Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`
+// placeholders). Use this anywhere the effect is shown to a player (pick UI, sidebar tooltips).
+export const formatArtifactDescription = (props: ArtifactProperties): string => {
+    const values = ARTIFACT_DESCRIPTION_VALUES[props.slug];
+    if (!values || !values.length) {
+        return props.description;
+    }
+    let i = 0;
+    return props.description.replace(/\{\}|\[\]/g, () => {
+        const v = values[i];
+        i += 1;
+        return v === undefined ? "" : String(v);
+    });
+};
+
 export const getArtifactProperties = (tier: ArtifactTier, id: number): ArtifactProperties =>
     tier === ArtifactTier.TIER_1
         ? (TIER1_ARTIFACTS[id as Tier1Artifact] ?? TIER1_ARTIFACTS[Tier1Artifact.NO_ARTIFACT])
