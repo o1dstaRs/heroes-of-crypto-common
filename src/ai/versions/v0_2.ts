@@ -552,7 +552,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     if (evaluation.affectedUnits.length === 1 && primaryHit?.hasBuffActive("Hidden")) {
                         continue;
                     }
-                    const scored = this.scoreShot(unit, evaluation, fromTeam, enemyTeam);
+                    const scored = this.scoreShot(unit, evaluation, fromTeam, enemyTeam, context);
                     if (scored.value <= 0) {
                         continue;
                     }
@@ -587,6 +587,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
         fromTeam: number,
         enemyTeam: number,
+        _context: IDecisionContext,
     ): { value: number; hitsEnemyRange: boolean } {
         let value = 0;
         let hitsEnemyRange = false;

@@ -1448,10 +1448,25 @@ export class StrategyV0_5 extends StrategyV0_4 {
         evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
         fromTeam: number,
         enemyTeam: number,
+        context: IDecisionContext,
     ): { value: number; hitsEnemyRange: boolean } {
         const [wDamage, wKill, wRange, wFirepower, wLevel, wFriendlyFire] = this.w;
         // [52] target-caster: silencing an enemy Healer / spell-caster is worth more than its raw firepower.
         const wShotCaster = this.w[52] ?? 0;
+        // [53..55] NEW shot features (anchored at 0 -> no change until CEM trains them). Mirror the melee
+        // scorer's proven signals onto the (previously thin) shot scorer:
+        //   [53] shotFocusFire — allies already adjacent to the target: concentrate fire to finish it faster.
+        //   [54] shotTempo     — the target HAS NOT acted this lap: killing it DENIES its turn (the second-mover
+        //                        edge that made hourglass the biggest win). Full credit on a kill, partial on chip.
+        //   [55] shotWounded   — fraction of the stack already dead: finishing a near-dead stack removes a whole unit.
+        const wShotFocus = this.w[53] ?? 0;
+        const wShotTempo = this.w[54] ?? 0;
+        const wShotWounded = this.w[55] ?? 0;
+        const fp = context.fightProperties;
+        const myAllies =
+            wShotFocus !== 0
+                ? context.unitsHolder.getAllAllies(fromTeam).filter((a) => !a.isDead() && a.getId() !== unit.getId())
+                : [];
         let value = 0;
         let hitsEnemyRange = false;
         // Double Shot (Gargantuan) lands a SECOND full shot — target + its whole AOE splash — at 100%
@@ -1484,6 +1499,22 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     value += wLevel * target.getLevel();
                     if (target.getCanCastSpells()) {
                         value += wShotCaster; // silence their Healer / caster
+                    }
+                    if (wShotFocus !== 0) {
+                        const focus =
+                            myAllies.filter((a) =>
+                                a.getCells().some((ac) => target.getCells().some((tc) => isAdjacentCell(ac, tc))),
+                            ).length / 2;
+                        value += wShotFocus * focus; // concentrate fire on an already-engaged stack
+                    }
+                    if (wShotTempo !== 0 && fp && !fp.hasAlreadyMadeTurn(target.getId())) {
+                        // deny the target's turn — full credit on a kill, scaled by damage fraction on chip
+                        value += wShotTempo * (effective >= targetHp ? 1 : effective / targetHp);
+                    }
+                    if (wShotWounded !== 0) {
+                        const died = target.getAmountDied();
+                        const alive = target.getAmountAlive();
+                        value += wShotWounded * (died + alive > 0 ? died / (died + alive) : 0);
                     }
                 } else if (target.getTeam() === fromTeam) {
                     value -= wFriendlyFire * effective; // friendly fire (AOE splash) is a cost

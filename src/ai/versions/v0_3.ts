@@ -261,6 +261,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
         evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
         fromTeam: number,
         enemyTeam: number,
+        _context: IDecisionContext,
     ): { value: number; hitsEnemyRange: boolean } {
         let value = 0;
         let hitsEnemyRange = false;

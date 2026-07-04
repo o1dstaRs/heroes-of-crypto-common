@@ -103,6 +103,10 @@ export const V05_WEIGHT_KEYS = [
     // removing beyond their raw firepower. Bias melee target and shot value toward them.
     "meleeTargetCaster", // * melee target can cast spells (1/0)
     "shotTargetCaster", // * a shot hits an enemy that can cast spells (adds flat value per caster hit)
+    // [53..55] NEW shot-scorer features enriching the (previously thin) shot scorer with proven melee signals.
+    "shotFocusFire", // * # allies already adjacent to the shot target / 2 — concentrate fire to finish it
+    "shotTempo", // * target has NOT acted this lap — killing it denies its turn (second-mover edge); full on kill
+    "shotWounded", // * fraction of the target stack already dead — finish a near-dead stack (removes a whole unit)
 ] as const;
 
 /**
@@ -142,6 +146,10 @@ export const DEFAULT_V05_W: readonly number[] = [
     // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster) — now TRAINED: kill the
     // enemy Healer/Ogre Mage/etc. beyond its raw firepower.
     0.265, 1.5186,
+    // [53..55] NEW shot-scorer features (shotFocusFire, shotTempo=deny-turn, shotWounded) — anchored at 0, a
+    // strict no-op until the next CEM pass searches them. Enrich the previously-thin shot scorer with the
+    // melee scorer's proven signals (focus-fire / finish-wounded) + a tempo signal tied to the second-mover edge.
+    0, 0, 0,
 ];
 
 /**
