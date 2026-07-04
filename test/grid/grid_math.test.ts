@@ -96,6 +96,43 @@ describe("grid_math", () => {
         expect(getPositionForCells(testGridSettings, [])).toBeUndefined();
     });
 
+    it("reconstructs a 2x2 footprint center from its baseCell (max corner)", () => {
+        // The footprint center for the 2x2 at {5,6}x{5,6} (asserted above) is the shared corner of the
+        // four cells. A 2x2 unit's baseCell is always its MAX corner, and the center sits half a step
+        // down-left of that cell's center. hydrateSceneState / swap replay rely on this to recover a
+        // large unit's position from baseCell alone (when a snapshot carries a partial footprint) without
+        // landing it half a cell off diagonally.
+        const footprint = [
+            { x: 5, y: 5 },
+            { x: 6, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 6 },
+        ];
+        const center = getPositionForCells(testGridSettings, footprint)!;
+        expect(center).toEqual({ x: -256, y: 768 });
+
+        // baseCell is the max corner...
+        const baseCell = getCellForPosition(testGridSettings, center);
+        expect(baseCell).toEqual({ x: 6, y: 6 });
+
+        // ...and (baseCell corner center) - halfStep reconstructs the footprint center exactly.
+        const cornerCenter = getPositionForCell(
+            baseCell,
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+        expect({
+            x: cornerCenter.x - testGridSettings.getHalfStep(),
+            y: cornerCenter.y - testGridSettings.getHalfStep(),
+        }).toEqual(center);
+
+        // The reconstructed center re-derives all four footprint cells (used to fix grid occupancy too).
+        const rebuilt = getCellsAroundPosition(testGridSettings, center);
+        expect(rebuilt).toHaveLength(4);
+        expect(new Set(rebuilt.map((c) => `${c.x},${c.y}`))).toEqual(new Set(footprint.map((c) => `${c.x},${c.y}`)));
+    });
+
     it("projects lines and calculates crossing helpers", () => {
         expect(projectLineToFieldEdge(testGridSettings, 0, 0, 100, 0)).toEqual({
             x: testGridSettings.getMaxX(),

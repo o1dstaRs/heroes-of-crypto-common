@@ -784,10 +784,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.max_hp;
     }
     public getSteps(): number {
-        return this.unitProperties.steps + this.unitProperties.steps_mod;
+        // Round: %-based buffs (augments/artifacts, amplified ×1.5 by Tome of Amplification) leave steps
+        // fractional, which breaks integer-only movement math. A no-op for un-buffed integer steps.
+        return Math.round(this.unitProperties.steps + this.unitProperties.steps_mod);
     }
     public getMorale(): number {
-        const { morale } = this.unitProperties;
+        // Round: integer-semantic stat that %-buffs can leave fractional (feeds integer-only RNG/checks).
+        const morale = Math.round(this.unitProperties.morale);
         if (morale > MORALE_MAX_VALUE_TOTAL) {
             return MORALE_MAX_VALUE_TOTAL;
         }
@@ -801,7 +804,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return morale;
     }
     public getLuck(): number {
-        const luck = this.unitProperties.luck + this.unitProperties.luck_mod;
+        // Round: luck feeds HoCLib.getRandomInt (throws on non-safe-integer args). Artifact/augment buffs
+        // (esp. Tome of Amplification's ×1.5) can leave it fractional. A no-op for un-buffed integer luck.
+        const luck = Math.round(this.unitProperties.luck + this.unitProperties.luck_mod);
         if (luck > LUCK_MAX_VALUE_TOTAL) {
             return LUCK_MAX_VALUE_TOTAL;
         }
@@ -926,7 +931,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.unitProperties.stack_power < MIN_UNIT_STACK_POWER) {
             return MIN_UNIT_STACK_POWER;
         }
-        return this.unitProperties.stack_power;
+        // Round: stack power feeds HoCLib.getRandomInt (e.g. Petrifying Gaze) which throws on non-safe-integer
+        // args; %-based artifact/augment buffs can leave it fractional. A no-op for un-buffed integer values.
+        return Math.round(this.unitProperties.stack_power);
     }
     public getId(): string {
         return this.unitProperties.id;

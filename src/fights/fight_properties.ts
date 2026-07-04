@@ -908,6 +908,18 @@ export class FightProperties {
         this.alreadyHourglass.add(unitId);
         this.hourglassQueue.push(unitId);
     }
+    /**
+     * Authoritatively rebuild the "already used a hourglass this lap" set (ranked). The ranked client follows
+     * the server's fight state via snapshots instead of running the turn engine, so it never calls flipLap()
+     * (which clears this set) nor enqueueHourglass() (which fills it). Without this, alreadyHourglass is
+     * perpetually empty on the client → canHourglass is always true → the AI re-requests a hourglass on a
+     * unit's re-up, the server rejects it (hourglass_not_available), and the turn is wasted as a skip. The
+     * server sends each unit's hasHourglassed flag in the snapshot; rebuilding from it every snapshot also
+     * clears the set correctly at lap change (the server resets the flags in flipLap()).
+     */
+    public restoreAlreadyHourglass(unitIds: Iterable<string>): void {
+        this.alreadyHourglass = new Set(unitIds);
+    }
     public enqueueMoraleMinus(unitId: string) {
         this.moraleMinusQueue.push(unitId);
     }

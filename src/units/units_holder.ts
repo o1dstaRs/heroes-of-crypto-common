@@ -21,6 +21,7 @@ import {
 import { getSpellConfig } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties } from "../effects/effect_properties";
+import type { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { getCellsAroundCell, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
@@ -346,9 +347,11 @@ export class UnitsHolder {
             }
         }
     }
-    public applyArtifacts(): void {
-        const fightProperties = FightStateManager.getInstance().getFightProperties();
-
+    // fightProperties defaults to the global singleton (client/sandbox), but server play sessions run many
+    // concurrent fights off their own per-session FightProperties, so they pass it explicitly.
+    public applyArtifacts(
+        fightProperties: FightProperties = FightStateManager.getInstance().getFightProperties(),
+    ): void {
         // Pre-compute archer counts per team (Hunter's Longbow's bonus depends on having 3+ archers).
         const archersPerTeam: Map<TeamType, number> = new Map();
         for (const unit of this.getAllUnitsIterator()) {

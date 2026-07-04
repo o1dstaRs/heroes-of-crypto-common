@@ -235,6 +235,36 @@ function advanceTowardEnemyAction(
     };
 }
 
+// --- Skip audit -------------------------------------------------------------
+// Env/flag-gated instrumentation to answer "why do units skip turns". Every acting turn is bucketed into
+// exactly one category. A "skip_*" bucket = decideTurn landed NOTHING (no move/attack/hourglass) — i.e. the
+// exact situation the CLIENT renders as "skips turn" (the client has no advance/defend recovery net that the
+// sim uses below). Buckets are split by unit size and whether the turn is a hourglass re-up, and by whether
+// the sim could still ADVANCE (client would skip, sim moves) or only DEFEND (truly stuck). Zero overhead when
+// disabled. Toggle via SKIP_AUDIT.enabled = true (or V05_SKIP_AUDIT env) before running matches.
+export const SKIP_AUDIT: {
+    enabled: boolean;
+    total: number;
+    cat: Record<string, number>;
+    byUnit: Record<string, Record<string, number>>;
+} = { enabled: !!process.env.V05_SKIP_AUDIT, total: 0, cat: {}, byUnit: {} };
+
+export function resetSkipAudit(): void {
+    SKIP_AUDIT.total = 0;
+    SKIP_AUDIT.cat = {};
+    SKIP_AUDIT.byUnit = {};
+}
+
+function auditTurn(category: string, unitName: string): void {
+    if (!SKIP_AUDIT.enabled) {
+        return;
+    }
+    SKIP_AUDIT.total += 1;
+    SKIP_AUDIT.cat[category] = (SKIP_AUDIT.cat[category] ?? 0) + 1;
+    const u = (SKIP_AUDIT.byUnit[unitName] ??= {});
+    u[category] = (u[category] ?? 0) + 1;
+}
+
 /**
  * Run one headless AI-vs-AI battle to completion and return a fully recorded match (placements, every
  * action both sides took, and the winner). Pure in-process — no network, no rendering. The two sides
@@ -510,11 +540,29 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             lookahead.enabled && strategy.version === "v0.5" ? lookahead.chooseDecision(unit, decided0) : decided0;
 
         let didSomething = false;
+        // Skip-audit bookkeeping (only meaningful when SKIP_AUDIT.enabled): what actually landed this turn,
+        // and what the strategy PROPOSED, so the recovery branch can label WHY a turn landed nothing.
+        let auditWaited = false;
+        let auditAttacked = false;
+        let auditMoved = false;
+        const auditProposedAttack = decided.some((a) => a.type === "melee_attack" || a.type === "range_attack");
+        const auditProposedMove = decided.some((a) => a.type === "move_unit");
         for (const action of decided) {
             const fromCell = { ...unit.getBaseCell() };
             const result = engine.apply(action);
             if (result.completed && action.type !== "select_attack_type") {
                 didSomething = true; // a real action landed (a move or an attack)
+                if (action.type === "wait_turn") {
+                    auditWaited = true;
+                } else if (action.type === "move_unit") {
+                    auditMoved = true;
+                } else if (
+                    action.type === "melee_attack" ||
+                    action.type === "range_attack" ||
+                    action.type === "cast_spell"
+                ) {
+                    auditAttacked = true;
+                }
             }
             if (!result.completed && action.type !== "select_attack_type") {
                 // The strategy proposed a command the engine declined — a smooth AI should never do this.
@@ -605,6 +653,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // proposal (a doomed attack) — so the turn isn't wasted: advance toward the enemy, else defend.
         // Then close out the turn. Only completed actions are recorded, so a declined proposal never
         // shows up as a "rejected" turn.
+        if (SKIP_AUDIT.enabled && didSomething) {
+            // The turn landed something: hourglass park, an attack, or a plain move.
+            auditTurn(
+                auditWaited ? "hourglass" : auditAttacked ? "attack" : auditMoved ? "move" : "acted",
+                unit.getName(),
+            );
+        }
         if (!finished && currentActiveUnitId === actingUnitId && !didSomething) {
             const recover = (action: GameAction): boolean => {
                 if (finished || currentActiveUnitId !== actingUnitId) {
@@ -624,8 +679,19 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 return r.completed;
             };
             const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
-            if (!advance || !recover(advance)) {
+            const advanced = !!advance && recover(advance);
+            if (!advanced) {
                 recover({ type: "defend_turn", unitId: actingUnitId });
+            }
+            if (SKIP_AUDIT.enabled) {
+                // decideTurn landed NOTHING — this is exactly what the client renders as "skips turn" (it has
+                // no advance/defend net). Label by what was proposed, whether the sim could still advance
+                // (client would skip, sim moves) or only defend (truly stuck), unit size, and re-up state.
+                const proposed = auditProposedAttack ? "atkrej" : auditProposedMove ? "movrej" : "idle";
+                const recovery = advanced ? "advance" : "defend";
+                const size = unit.isSmallSize() ? "small" : "large";
+                const reup = fightProperties.hasAlreadyHourglass(unit.getId()) ? "_reup" : "";
+                auditTurn(`skip_${proposed}_${recovery}_${size}${reup}`, unit.getName());
             }
         }
         if (!finished && currentActiveUnitId === actingUnitId) {
