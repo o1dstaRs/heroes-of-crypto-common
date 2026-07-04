@@ -292,9 +292,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         // Prefer a stack we can KILL, else the most dangerous (highest firepower) adjacent enemy.
+        const atkMul = this.meleeAttacks(unit);
         const target = targets.sort((a, b) => {
-            const kA = unit.calculateAttackDamageMax(unit.getAttack(), a, false, 0, 1) >= a.getCumulativeHp() ? 1 : 0;
-            const kB = unit.calculateAttackDamageMax(unit.getAttack(), b, false, 0, 1) >= b.getCumulativeHp() ? 1 : 0;
+            const kA =
+                atkMul * unit.calculateAttackDamageMax(unit.getAttack(), a, false, 0, 1) >= a.getCumulativeHp() ? 1 : 0;
+            const kB =
+                atkMul * unit.calculateAttackDamageMax(unit.getAttack(), b, false, 0, 1) >= b.getCumulativeHp() ? 1 : 0;
             return kB - kA || firepowerOf(b) - firepowerOf(a);
         })[0];
         const acts: GameAction[] = [];
@@ -937,8 +940,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!target) {
             return decision;
         }
-        // A guaranteed kill or a retaliation-free hit is always worth taking, even diving.
-        const kill = unit.calculateAttackDamageMin(unit.getAttack(), target, false, 0, 1) >= target.getCumulativeHp();
+        // A guaranteed kill or a retaliation-free hit is always worth taking, even diving. (Double Punch 2x.)
+        const kill =
+            this.meleeAttacks(unit) * unit.calculateAttackDamageMin(unit.getAttack(), target, false, 0, 1) >=
+            target.getCumulativeHp();
         const retalFree = context.fightProperties?.hasAlreadyRepliedAttack(target.getId()) ?? false;
         if (kill || retalFree) {
             return decision;
@@ -1197,9 +1202,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     .some((ec) => f.some((fc) => Math.max(Math.abs(ec.x - fc.x), Math.abs(ec.y - fc.y)) <= waRange)),
             ).length;
         };
+        const atkMul = this.meleeAttacks(unit);
         const score = (c: Cand): number => {
-            const min = unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
-            const max = unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
+            const min = atkMul * unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
+            const max = atkMul * unit.calculateAttackDamageMax(unit.getAttack(), c.target, false, 0, 1);
             const hp = c.target.getCumulativeHp();
             const effective = Math.min((min + max) / 2, hp);
             const dmg = effective / Math.max(1, c.target.getMaxHp());
@@ -1429,6 +1435,14 @@ export class StrategyV0_5 extends StrategyV0_4 {
      * hitsEnemyRange is reported whenever a shot touches any enemy RANGE unit, independent of the weights,
      * so the inherited hourglass/hold logic is unaffected.
      */
+    /**
+     * Melee attacks a unit lands in one turn: 2 for Double Punch (Crusader/Wolf/Berserker land a second hit
+     * at 100% — double_punch_ability.ts), else 1. The MELEE twin of the Double Shot handling in scoreShot;
+     * without it the AI values these units at ~half and misses 2-hit kills in target selection / stand scoring.
+     */
+    private meleeAttacks(unit: Unit): number {
+        return process.env.V05_DBLPUNCH !== "off" && unit.hasAbilityActive("Double Punch") ? 2 : 1;
+    }
     protected override scoreShot(
         unit: Unit,
         evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
