@@ -489,3 +489,18 @@ export const getAuraEffectConfig = (auraEffectName: string): AuraEffectPropertie
         auraEffectPowerType,
     );
 };
+
+/**
+ * Every aura effect name that can land on a unit while it stands inside an aura's radius — the keys of
+ * aura_effects.json (minus the version marker): "Luck", "Pegasus Might", "War Anger", "Disguise", … .
+ * Auras are applied and removed continuously as units (and their neighbours) move in and out of range,
+ * so the UI must NOT animate them as freshly-applied buff/debuff pops. NOTE: the ABILITY is named
+ * "<X> Aura", but the EFFECT it applies to a unit is this short name (e.g. ability "Pegasus Might Aura"
+ * applies effect "Pegasus Might"), so a "name ends with ' Aura'" check alone misses every one of them.
+ */
+export const AURA_EFFECT_NAMES: ReadonlySet<string> = new Set(
+    Object.keys(auraEffectsJson).filter((key) => key !== "version"),
+);
+
+/** True when `name` is an aura effect (continuous, radius-based) rather than a directly-applied one. */
+export const isAuraEffectName = (name: string): boolean => name.endsWith(" Aura") || AURA_EFFECT_NAMES.has(name);
