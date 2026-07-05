@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import type { AttackType, TeamType } from "../generated/protobuf/v1/types_gen";
+import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
 import type { XY } from "../utils/math";
 
 export type GameAction =
@@ -67,7 +67,11 @@ export type GameAction =
     // During placement, a team spends its perk's upgrade-point budget on an army augment. `augmentKind`
     // is the augment category and `augmentValue` its level (see FightProperties.setAugmentPerTeam /
     // canAugment). Applied pre-fight to the army; not a turn action.
-    | { type: "augment"; team: TeamType; augmentKind: AugmentKind; augmentValue: number };
+    | { type: "augment"; team: TeamType; augmentKind: AugmentKind; augmentValue: number }
+    // During placement, a team selects one synergy per faction it fields (e.g. Might -> Auras Range).
+    // `synergyName` is the specific synergy within `faction`; the server resolves it and re-derives the
+    // level from army composition (setSynergyUnitsPerFactions), so synergies apply in the ranked fight.
+    | { type: "synergy"; team: TeamType; faction: FactionType; synergyName: string; level: number };
 
 // The five spendable army-augment categories (Placement resizes the placement grid; the others are
 // stat buffs applied by UnitsHolder.applyAugments). Mirrors FightProperties' AugmentType.type union.

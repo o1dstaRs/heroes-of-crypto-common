@@ -865,6 +865,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.unitProperties.magic_resist_mod
             : this.unitProperties.magic_resist;
     }
+    // Chance-reduction (%) against STATUS effects — Stun and Paralysis. Granted by the Amulet of Resolve
+    // artifact. Deliberately SEPARATE from magic resist (which governs magic damage and spell debuffs):
+    // status resistance only lowers the odds a status effect lands. Read as a per-unit artifact "marker"
+    // buff, like Aegis Shield / Giant's Maul. 0 when the unit carries no status-resist source.
+    public getStatusResist(): number {
+        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
+        return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
+    }
     public getSpellsCount(): number {
         if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
             return 0;
@@ -1607,7 +1615,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 ? 0.5
                 : 1;
 
-        return Math.floor(getRandomInt(min, max) * attackTypeMultiplier * abilityMultiplier);
+        // Deep Wounds damage bonus: if THIS attacker inflicts Deep Wounds and the target already carries the
+        // stacked "Deep Wounds" effect from a prior hit, this strike deals that % more damage. (calculate-
+        // ActiveDeepWoundsEffect encoded this but was never wired into damage — this is where it applies, so it
+        // works in ranked and sandbox alike since both run this same path.)
+        let deepWoundsMultiplier = 1;
+        const deepWoundsPower = enemyUnit.getEffect("Deep Wounds")?.getPower() ?? 0;
+        if (
+            deepWoundsPower > 0 &&
+            (this.getAbility("Deep Wounds Level 1") ||
+                this.getAbility("Deep Wounds Level 2") ||
+                this.getAbility("Deep Wounds Level 3"))
+        ) {
+            deepWoundsMultiplier = 1 + deepWoundsPower / 100;
+        }
+
+        return Math.floor(getRandomInt(min, max) * attackTypeMultiplier * abilityMultiplier * deepWoundsMultiplier);
     }
     public canSkipResponse(): boolean {
         if (!this.hasAbilityActive("Break")) {
@@ -2254,18 +2277,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // ARTIFACTS: mind (Helm of Focus) and status (Amulet of Resolve) resistance, folded into magic
-        // resist as additive percentage points and capped at 100%.
-        let artifactResistPercent = 0;
+        // ARTIFACT: Helm of Focus (mind) resistance, folded into magic resist as additive percentage points
+        // and capped at 100%. NOTE: Amulet of Resolve is intentionally NOT here — it grants STATUS resistance
+        // (see getStatusResist), which lowers the chance of Stun / Paralysis landing, not magic resist.
         const helmOfFocusBuff = this.getBuff("Helm of Focus");
         if (helmOfFocusBuff) {
-            artifactResistPercent += ampArtifact(helmOfFocusBuff.getPower());
-        }
-        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
-        if (amuletOfResolveBuff) {
-            artifactResistPercent += ampArtifact(amuletOfResolveBuff.getPower());
-        }
-        if (artifactResistPercent > 0) {
+            const artifactResistPercent = ampArtifact(helmOfFocusBuff.getPower());
             this.unitProperties.magic_resist = Math.min(
                 100,
                 Number((this.unitProperties.magic_resist + artifactResistPercent).toFixed(2)),

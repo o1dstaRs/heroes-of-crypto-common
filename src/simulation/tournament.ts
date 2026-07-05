@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { TIER1_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import {
     buildRoster,
     makeRng,
@@ -42,6 +43,13 @@ export interface ITournamentOptions {
      * map luck cancels alongside side/roster luck), letting map-specific tactics be measured.
      */
     mapTypes?: readonly number[];
+    /**
+     * When true, every team fields ONE random Tier-1 artifact (measure_artifacts.ts). Each mirrored pair
+     * draws two DISTINCT artifacts (A,B) and swaps which side holds which between the pair's two games, so
+     * side bias cancels and each artifact's aggregated win rate isolates the artifact's own contribution.
+     * Pair with versionA === versionB (e.g. v0.5 vs v0.5) so the AI is not a confound.
+     */
+    artifactsT1?: boolean;
 }
 
 export interface IGameRecord {
@@ -50,6 +58,10 @@ export interface IGameRecord {
     greenVersion: string;
     redVersion: string;
     winnerVersion: string | "draw";
+    /** Tier-1 artifact each side fielded (Tier1Artifact enum id; 0/undefined = none) — present only in an
+     * `artifactsT1` run, so a caller can aggregate per-artifact win rates from the streamed records. */
+    greenArtifactT1?: number;
+    redArtifactT1?: number;
     result: IMatchResult;
 }
 
@@ -111,11 +123,40 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     const greenVersion = aIsGreen ? options.versionA : options.versionB;
     const redVersion = aIsGreen ? options.versionB : options.versionA;
 
-    const result = runMatch({ greenVersion, redVersion, roster, redRoster, seed, gridType, maxLaps: options.maxLaps });
+    // Optional Tier-1 artifact A/B test. The pair draws two DISTINCT artifacts (A,B) from a decorrelated
+    // pair seed; game 2k gives green A / red B, game 2k+1 swaps them. Swapping across the pair (which shares
+    // roster + combat seed) makes the two games identical except the artifacts trade sides, so side bias
+    // cancels exactly and each artifact's aggregated win rate reflects the artifact alone.
+    let greenArtifactT1: number | undefined;
+    let redArtifactT1: number | undefined;
+    if (options.artifactsT1) {
+        const pool = TIER1_ARTIFACT_LIST.map((a) => a.id); // 12 real ids (NO_ARTIFACT excluded)
+        const artRng = makeRng((seed ^ 0x27d4eb2f) >>> 0);
+        const a = pool[Math.floor(artRng() * pool.length)];
+        let b = pool[Math.floor(artRng() * pool.length)];
+        while (pool.length > 1 && b === a) {
+            b = pool[Math.floor(artRng() * pool.length)];
+        }
+        const swap = game % 2 === 1;
+        greenArtifactT1 = swap ? b : a;
+        redArtifactT1 = swap ? a : b;
+    }
+
+    const result = runMatch({
+        greenVersion,
+        redVersion,
+        roster,
+        redRoster,
+        seed,
+        gridType,
+        maxLaps: options.maxLaps,
+        greenArtifactT1,
+        redArtifactT1,
+    });
 
     const winnerSide: Side | "draw" = result.winner;
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;
-    return { game, greenVersion, redVersion, winnerVersion, result };
+    return { game, greenVersion, redVersion, winnerVersion, greenArtifactT1, redArtifactT1, result };
 }
 
 /** Running totals over games. Accumulation is order-independent, so parallel results merge cleanly. */

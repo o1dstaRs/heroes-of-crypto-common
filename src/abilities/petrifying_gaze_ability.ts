@@ -18,6 +18,14 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
+// Petrify (instant-kill) chance climbs with the TARGET's level, so Petrifying Gaze is at its most dangerous
+// against big level-3/4 units — its whole point — instead of only mowing down cheap level-1 stacks. Kept
+// deliberately low: it's an instant kill, so it should be a gamble, not the expected outcome.
+const PETRIFY_STACK_SCALE = 0.25; // only a quarter of the caster's base chance feeds the petrify roll
+const PETRIFY_LEVEL_BONUS = 4; // +% petrify chance per target level above 1
+const PETRIFY_MAX_CHANCE = 35; // hard cap
+const PETRIFY_RANGE_FALLOFF = 0.75; // fraction of the petrify chance kept per ranged shot-distance bracket
+
 export function processPetrifyingGazeAbility(
     fromUnit: Unit,
     toUnit: Unit,
@@ -25,6 +33,8 @@ export function processPetrifyingGazeAbility(
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     secondaryDamage?: ISecondaryDamage[],
+    // Ranged shot-distance divisor for THIS attack (1 = full, 2 = half, 4 = quarter, 8 = eighth). Melee = 1.
+    rangeDivisor = 1,
 ): void {
     if (toUnit.isDead() || damageFromAttack <= 0) {
         return;
@@ -54,29 +64,22 @@ export function processPetrifyingGazeAbility(
 
     let proc = false;
     if (amountOfUnitsKilled < toUnit.getAmountAlive()) {
-        const coeff1 = toUnit.getHp() / toUnit.getMaxHp();
-        const coeff2 = 1 - (unitsKilled - Math.floor(unitsKilled));
-
-        if (fromUnit.getStackPower() > coeff1 * 100) {
+        // Chance to petrify (instantly kill) the target's front creature. The base chance already folds in the
+        // caster's power, stack power and luck (percentageMax, computed above); on top of that, higher-level
+        // targets are EASIER to petrify (+PETRIFY_LEVEL_BONUS per level), so a lone level-3/4 unit is the most
+        // likely to be turned to stone while a level-1 loses at most one creature of its stack.
+        const baseChance = Math.min(
+            PETRIFY_MAX_CHANCE,
+            Math.round(percentageMax * PETRIFY_STACK_SCALE) + PETRIFY_LEVEL_BONUS * (toUnit.getLevel() - 1),
+        );
+        // Ranged shots petrify less at longer distances (mirrors the damage falloff, but gentler): the chance
+        // keeps PETRIFY_RANGE_FALLOFF of its value per shot-distance bracket. rangeDivisor 1/2/4/8 -> brackets
+        // 0/1/2/3. Melee (rangeDivisor 1) is unaffected.
+        const rangeFactor = Math.pow(PETRIFY_RANGE_FALLOFF, Math.log2(Math.max(1, rangeDivisor)));
+        const petrifyChance = Math.max(0, Math.round(baseChance * rangeFactor));
+        if (HoCLib.getRandomInt(0, 100) < petrifyChance) {
             damageFromAbility += toUnit.getHp();
             proc = true;
-        } else {
-            const startSpread =
-                (toUnit.getLevel() === 3 ? fromUnit.getStackPower() * 3 : fromUnit.getStackPower()) +
-                fromUnit.getLuck();
-            const minimumSpread = Math.min(0, fromUnit.getStackPower() + fromUnit.getLuck());
-            const chanceToKillLastUnit = HoCLib.getRandomInt(minimumSpread, Math.max(startSpread + 1, 1));
-            const coeff2Int = Math.floor((coeff2 * 100) / (toUnit.getLevel() === 3 ? 2 : 1));
-            if (chanceToKillLastUnit >= coeff2Int) {
-                damageFromAbility += toUnit.getHp();
-                proc = true;
-            } else {
-                const rnd = HoCLib.getRandomInt(0, coeff2Int);
-                if (rnd < chanceToKillLastUnit) {
-                    damageFromAbility += toUnit.getHp();
-                    proc = true;
-                }
-            }
         }
     } else {
         amountOfUnitsKilled = toUnit.getAmountAlive();

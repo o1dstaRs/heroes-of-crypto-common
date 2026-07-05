@@ -30,6 +30,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import { SceneLogMock } from "../scene/scene_log_mock";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
+import { ArtifactTier } from "../artifacts/artifact_properties";
 import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
@@ -57,6 +58,13 @@ export interface IMatchConfig {
     maxLaps?: number;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
     gridType?: number;
+    /**
+     * Army-wide Tier-1 artifact (Tier1Artifact enum id; 0/undefined = none) granted to each team before the
+     * fight, applied via UnitsHolder.applyArtifacts exactly as the live server does. Used by the artifact
+     * A/B measurement (measure_artifacts.ts) to isolate each artifact's contribution to win rate.
+     */
+    greenArtifactT1?: number;
+    redArtifactT1?: number;
 }
 
 export interface IPlacementRecord {
@@ -139,6 +147,10 @@ export interface IMatchResult {
         possible?: string;
         cause?: string;
     }[];
+    /** Tier-1 artifact each team fielded this match (Tier1Artifact enum id; 0 = none). Provenance for the
+     * artifact A/B measurement so per-artifact win rates can be aggregated from the game record. */
+    greenArtifactT1?: number;
+    redArtifactT1?: number;
 }
 
 class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
@@ -406,6 +418,23 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         ),
         red: placeArmy(redUnits, RED_TEAM, redZone, redStrategy, redRoster, engine, grid, unitsHolder, pathHelper),
     };
+
+    // --- army-wide Tier-1 artifacts (optional) ---
+    // Mirror the live server: seed each team's chosen artifact into fightProperties, then applyArtifacts
+    // (folds stat buffs + sets the combat markers Dual Strike / Wounding Charm / Aegis / … read at their
+    // hooks) and refreshStackPowerForAllUnits so adjustBaseStats picks up the buffs before combat. Units are
+    // already placed (applyArtifacts skips any off-grid unit), and combat runs through the real handlers, so
+    // every artifact mechanic behaves exactly as in a live fight.
+    if (config.greenArtifactT1 || config.redArtifactT1) {
+        if (config.greenArtifactT1) {
+            fightProperties.setArtifactPerTeam(GREEN_TEAM, ArtifactTier.TIER_1, config.greenArtifactT1);
+        }
+        if (config.redArtifactT1) {
+            fightProperties.setArtifactPerTeam(RED_TEAM, ArtifactTier.TIER_1, config.redArtifactT1);
+        }
+        unitsHolder.applyArtifacts(fightProperties);
+        unitsHolder.refreshStackPowerForAllUnits();
+    }
 
     // --- run the fight ---
     const actions: IRecordedAction[] = [];
@@ -898,5 +927,7 @@ function buildResult(
         actions,
         outcome: { green, red },
         attrition,
+        greenArtifactT1: config.greenArtifactT1,
+        redArtifactT1: config.redArtifactT1,
     };
 }

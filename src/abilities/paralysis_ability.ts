@@ -26,6 +26,8 @@ export function processParalysisAbility(
     }
 
     const paralysisAbility = fromUnit.getAbility("Paralysis");
+    // The target's status resistance (e.g. Amulet of Resolve) lowers the odds the paralysis lands.
+    const statusResistCoeff = 1 - targetUnit.getStatusResist() / 100;
     if (
         paralysisAbility &&
         HoCLib.getRandomInt(0, 100) <
@@ -35,7 +37,8 @@ export function processParalysisAbility(
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
             ) *
-                2
+                2 *
+                statusResistCoeff
     ) {
         const paralysisEffect = paralysisAbility.getEffect();
         if (!paralysisEffect) {

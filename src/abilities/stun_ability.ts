@@ -34,6 +34,9 @@ export function processStunAbility(
     const amplifier =
         stunAbility.getType() === AbilityType.STATUS && targetUnit.hasAbilityActive("Mechanism") ? 1.5 : 1;
 
+    // The target's status resistance (e.g. Amulet of Resolve) lowers the odds the stun lands.
+    const statusResistCoeff = 1 - targetUnit.getStatusResist() / 100;
+
     if (
         HoCLib.getRandomInt(0, 100) <
         Math.min(
@@ -43,7 +46,9 @@ export function processStunAbility(
                 FightStateManager.getInstance()
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
-            ) * amplifier,
+            ) *
+                amplifier *
+                statusResistCoeff,
         )
     ) {
         const stunEffect = stunAbility.getEffect();

@@ -833,6 +833,7 @@ export class AttackHandler {
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),
+                    hoverRangeAttackDivisor,
                 );
                 AllAbilities.processSpitBallAbility(
                     attackerUnit,
@@ -884,6 +885,7 @@ export class AttackHandler {
                         this.sceneLog,
                         this.damageStatisticHolder,
                         (damageForAnimation.secondary ??= []),
+                        rangeResponseAttackDivisor,
                     );
                     AllAbilities.processSpitBallAbility(
                         targetUnit,
@@ -1010,6 +1012,7 @@ export class AttackHandler {
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),
+                    hoverRangeAttackDivisor,
                 );
                 AllAbilities.processSpitBallAbility(
                     attackerUnit,
