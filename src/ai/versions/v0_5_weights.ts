@@ -121,35 +121,33 @@ export const V05_WEIGHT_KEYS = [
  * ANCHORS to v0.4's coverage-max (dirIncumbent +0.71) — those lines/arcs were already near-optimal.
  */
 export const DEFAULT_V05_W: readonly number[] = [
-    // Full 53-dim CEM, 10h overnight run (2026-07-04, pass 20 of 21) — panel 72.24% (vs 70.55% base on the
-    // 5-seed held-out panel). RE-TRAINED after the Double Shot damage-model fix (commit 5fe3a13), which
-    // corrected the shot scorer's ~2x under-valuation of Elf/Gargantuan and reopened a scoring landscape the
-    // prior runs found tapped. FRESH-SEED GUARDED: +0.93pp over the previous champion on seeds 7000001/03/09
-    // (outside BOTH training and panel), 72.66% vs 71.73% — a real, generalizing gain, not panel-overfit.
-    // This bake also TRAINS the previously-zero target-caster features [51..52].
-    1.878, -0.9581, -0.1678, 1.3365, 1.0323, 4.9159, 1.5845, 0.3526, -1.1937, 1.0574, 0.2617, 2.2306, 3.1763, 2.6777,
-    -0.0014, 0.4104, 3.9821, 5.1322, -0.7937, 0.2533, -1.7702, 0.2244,
+    // 56-dim CEM, 10h overnight run on the 9800X3D node (2026-07-05, pass 13) — panel 72.43% (vs 72.14% base
+    // on the 5-seed held-out panel). FRESH-SEED GUARDED: +0.90pp over the previous champion on seeds
+    // 7000001/03/09 (outside BOTH training and panel), 73.93% vs 73.03% — winning all three seeds, a real
+    // generalizing gain. This bake also TRAINS the previously-zero shot-scorer features [53..55]
+    // (shotFocusFire, shotTempo=deny-turn, shotWounded), which the search moved off zero — so the shot-feature
+    // expansion contributed here after all.
+    1.7828, -0.8949, -0.3052, 1.8604, 1.5213, 5.5993, 0.5624, 0.1799, -0.9702, 1.2231, 0.2149, 2.1894, 3.1582, 3.0048,
+    -0.0237, 0.9643, 4.1739, 5.1118, -0.5432, 0.5818, -2.0671, 0.277,
     // [22] meleeStandSupport, [23] meleeTargetWounded — screened stand cell, de-prioritise wounded stacks.
-    -2.6472, -2.2222,
+    -2.6274, -2.4165,
     // [24] posAdvanceFM, [25] meleeRetalCostFM — first-mover-mitigation interactions.
-    -1.3665, 2.6387,
+    -1.3698, 2.6379,
     // [26..32] center-mountain mining — LEARNED (bias, inPlace, close, group, outRange, laneBlocked, progress).
-    0.6218, -0.9772, 0.1456, -1.601, -0.4014, 0.2955, 0.1458,
+    0.2916, -0.4279, 0.1587, -1.2452, -0.6807, 0.7213, -0.3563,
     // [33..40] Hydra spin AOE — LEARNED (coverage, value, kill, threat, exposure, moveCost, wounded, incumbent).
-    2.0687, -1.1211, 0.6944, -0.0405, 2.4438, -0.3691, -0.7115, 3.8785,
+    2.1045, -0.7515, 1.0022, 0.2311, 2.6854, -0.0261, -0.2301, 4.4516,
     // [41..48] DIRECTIONAL-AOE (Fire Breath / Skewer line, Chain Lightning arc) — coverage, value, kill, threat,
     // exposure, moveCost, wounded, incumbent.
-    1.9894, -2.6533, 1.37, 0.5252, 0.0925, 1.0413, 0.3189, 1.7069,
+    2.2054, -2.4419, 1.2098, 0.3502, -0.2083, 0.7573, -0.3856, 2.329,
     // [49..50] hidden-gem melee — warAngerSurround (Valkyrie seeks surround), punishMeleeAvoid (avoid trading
     // into Fire Shield / Dulling Defense).
-    0.4515, -0.9098,
-    // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster) — now TRAINED: kill the
-    // enemy Healer/Ogre Mage/etc. beyond its raw firepower.
-    0.265, 1.5186,
-    // [53..55] NEW shot-scorer features (shotFocusFire, shotTempo=deny-turn, shotWounded) — anchored at 0, a
-    // strict no-op until the next CEM pass searches them. Enrich the previously-thin shot scorer with the
-    // melee scorer's proven signals (focus-fire / finish-wounded) + a tempo signal tied to the second-mover edge.
-    0, 0, 0,
+    0.1822, -1.5113,
+    // [51..52] BROAD target-caster value (melee target / shot hit is an enemy caster): kill the enemy
+    // Healer/Ogre Mage/etc. beyond its raw firepower.
+    0.1957, 1.1489,
+    // [53..55] shot-scorer features (shotFocusFire, shotTempo=deny-turn, shotWounded) — now TRAINED off zero.
+    -0.4775, -0.0261, 0.4148,
 ];
 
 /**
