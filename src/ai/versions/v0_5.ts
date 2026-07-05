@@ -174,21 +174,40 @@ export class StrategyV0_5 extends StrategyV0_4 {
      * overrides a real action), and only when a genuinely-unpinned cell is reachable — else the base stands.
      */
     private noMeleeRetreat(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        if (process.env.V05_NOMELEE_RETREAT === "off") {
-            return decision;
-        }
-        if (unit.getAttackType() !== RANGE || !unit.hasAbilityActive("No Melee") || !unit.canMove()) {
-            return decision;
-        }
-        // Only salvage a pure move (the advance) or an end/hold — never override a shot/cast/real action.
-        if (decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
+        if (unit.getAttackType() !== RANGE || !unit.canMove()) {
             return decision;
         }
         // Not pinned? It can shoot (or already will) — leave the base decision alone.
         if (this.canLandRange(unit, context)) {
             return decision;
         }
+        // A pinned shooter can't fire (an adjacent enemy suppresses the shot). Two flavours, gated separately:
+        //  - No-Melee (Tsar Cannon): its base turn is a pure advance/hold → retreat to the FARTHEST safe cell.
+        //  - Any other shooter (Beholder, Elf, …): its base turn is a weak melee CHARGE (or a move). Rather than
+        //    trade 15 dmg in melee or waste the turn, DISENGAGE to the nearest clear cell so it can shoot next
+        //    lap — a ranged flyer sitting in melee is the worst option. But KEEP a melee that KILLS the pinner
+        //    (that removes the suppression outright), and never override an actual shot/cast.
+        const noMelee = unit.hasAbilityActive("No Melee");
+        const gateOn = noMelee ? process.env.V05_NOMELEE_RETREAT !== "off" : process.env.V05_RANGED_DISENGAGE !== "off";
+        if (!gateOn) {
+            return decision;
+        }
+        // Leave a real ranged/cast action alone; only a melee or a pure move is a disengage candidate.
+        if (decision.some((a) => COMBAT_ACTIONS.has(a.type) && a.type !== "melee_attack")) {
+            return decision;
+        }
         const { grid, matrix, unitsHolder, pathHelper } = context;
+        const meleeAtk = decision.find((a) => a.type === "melee_attack");
+        if (meleeAtk?.type === "melee_attack") {
+            const tgt = unitsHolder.getAllUnits().get(meleeAtk.targetId);
+            if (
+                tgt &&
+                this.meleeAttacks(unit) * unit.calculateAttackDamageMax(unit.getAttack(), tgt, false, 0, 1) >=
+                    tgt.getCumulativeHp()
+            ) {
+                return decision; // this melee wipes the pinner — better than disengaging
+            }
+        }
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (!enemies.length) {
@@ -208,7 +227,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
         }
         const base = unit.getBaseCell();
         let best: IWeightedRoute | undefined;
-        let bestDist = -Infinity;
+        // No-Melee wants max safety (farthest from enemies); a shooter wants the CHEAPEST disengage (least move,
+        // to keep shot damage up and stay in the fight) — pick by move cost then distance.
+        let bestScore = noMelee ? -Infinity : Infinity;
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];
             if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
@@ -225,8 +246,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     return Math.abs(route.cell.x - ec.x) + Math.abs(route.cell.y - ec.y);
                 }),
             );
-            if (dist > bestDist) {
-                bestDist = dist;
+            const score = noMelee ? dist : -(route.weight ?? route.route.length);
+            if (score > bestScore) {
+                bestScore = score;
                 best = route;
             }
         }
