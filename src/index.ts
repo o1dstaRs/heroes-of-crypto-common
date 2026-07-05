@@ -63,6 +63,10 @@ export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export { getAIStrategy, AI_VERSIONS, LATEST_AI_VERSION, DEFAULT_AI_VERSION } from "./ai";
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai";
+// Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
+export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
+export type { ISetupPolicy } from "./ai/setup/setup_strategy";
+export { scoreCreature, creatureInfo } from "./ai/setup/creature_score";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";
 export { default as CREATURES_JSON } from "./configuration/creatures.json";

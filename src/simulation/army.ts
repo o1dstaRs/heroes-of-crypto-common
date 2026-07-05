@@ -106,8 +106,15 @@ function getCatalog(): ICatalogEntry[] {
     return entries;
 }
 
-export function creaturesByLevel(level: number): ICatalogEntry[] {
-    return getCatalog().filter((e) => e.level === level);
+export function creaturesByLevel(level: number, faction?: string): ICatalogEntry[] {
+    const byLevel = getCatalog().filter((e) => e.level === level);
+    if (!faction) {
+        return byLevel;
+    }
+    // Restrict to the faction when asked (synergy measurement fields a faction-stacked army); fall back to
+    // the full pool for any level that faction doesn't cover, so a roster can always be built.
+    const byFaction = byLevel.filter((e) => e.faction.toLowerCase() === faction.toLowerCase());
+    return byFaction.length ? byFaction : byLevel;
 }
 
 /**
@@ -138,11 +145,12 @@ export function buildRoster(
     rng: () => number,
     composition: readonly IRosterComposition[] = DEFAULT_ROSTER_COMPOSITION,
     amountByLevel: Readonly<Record<number, number>> = DEFAULT_AMOUNT_BY_LEVEL,
+    factionFilter?: string,
 ): IArmyUnitSpec[] {
     const roster: IArmyUnitSpec[] = [];
     const forced = forcedByLevel();
     for (const { level, count } of composition) {
-        const pool = creaturesByLevel(level);
+        const pool = creaturesByLevel(level, factionFilter);
         if (!pool.length) {
             throw new Error(`No creatures found for level ${level}`);
         }

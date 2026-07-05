@@ -14,38 +14,29 @@ import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { AI_VERSIONS } from "../ai";
-import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { runTournamentConcurrent } from "./concurrent_tournament";
 import type { IGameRecord } from "./tournament";
 
 /**
- * CLI: measure which Tier-1 artifact is statistically best.
+ * CLI: measure which army AUGMENT is statistically best.
  *
- *   bun src/simulation/measure_artifacts.ts [version] [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=...]]
+ *   bun src/simulation/measure_setup.ts [version] [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=...]]
  *
- * Every team fields ONE random Tier-1 artifact. Games are played as mirrored pairs where the two artifacts
- * swap sides between the pair's two games (see tournament.playGame), so green/red side bias cancels exactly
- * and each artifact's aggregate win rate isolates the artifact's own contribution. Both sides run the SAME
- * AI version (default v0.5) so the AI is not a confound.
- *
- * Examples:
- *   bun src/simulation/measure_artifacts.ts                    # v0.5, 10000 games, mirrored rosters, NORMAL map
- *   bun src/simulation/measure_artifacts.ts v0.5 10000 1 sim-out 12 --random   # randomized rosters, 12 workers
- *   bun src/simulation/measure_artifacts.ts v0.4 20000 1 sim-out 0 --maps      # all four maps, auto concurrency
+ * Every team fields ONE stat augment (Armor/Might/Sniper/Movement × level 1-3 = 12 options). Games are played
+ * as mirrored pairs where the two augments swap sides between the pair's two games (see tournament.playGame),
+ * so green/red side bias cancels and each augment's aggregated win rate isolates its own contribution. Both
+ * sides run the SAME AI version (default v0.5). Same harness/estimator as measure_artifacts.ts.
  *
  * Writes, under outDir:
- *   artifacts_<version>_<stamp>.jsonl        — one JSON line per game (record + both sides' artifact ids)
- *   artifacts_<version>_<stamp>.summary.json — per-artifact win/loss/draw + win rate + Wilson 95% CI, ranked
+ *   setup_augments_<version>_<stamp>.jsonl        — one JSON line per game
+ *   setup_augments_<version>_<stamp>.summary.json — per-augment win/loss/draw + win rate + Wilson 95% CI, ranked
  */
 
-interface IArtifactTally {
-    id: number;
-    name: string;
+interface ITally {
+    label: string;
     wins: number;
     losses: number;
     draws: number;
-    winsAsGreen: number;
-    winsAsRed: number;
 }
 
 /** Wilson score interval for a binomial proportion — a sane CI even at the tails / small n. */
@@ -65,10 +56,11 @@ async function main(): Promise<void> {
     const flags = argv.filter((a) => a.startsWith("--"));
     const [versionArg, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
     const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
-    // --tier=2 A/B-tests the Tier-2 pool; default Tier-1. (Use the = form so it doesn't consume a positional.)
-    const tierFlag = flags.find((f) => f.startsWith("--tier="));
-    const tier = tierFlag ? Number(tierFlag.split("=")[1]) : 1;
-    const artifactList = tier === 2 ? TIER2_ARTIFACT_LIST : TIER1_ARTIFACT_LIST;
+    // --synergy=<life|chaos|might|nature> measures that faction's two synergies head-to-head; default = augments.
+    const FACTION_ID: Record<string, number> = { chaos: 1, might: 2, nature: 3, life: 4 };
+    const synergyFlag = flags.find((f) => f.startsWith("--synergy="));
+    const synergyFaction = synergyFlag ? FACTION_ID[synergyFlag.split("=")[1].trim().toLowerCase()] : undefined;
+    const mode: "augments" | "synergy" = synergyFaction ? "synergy" : "augments";
 
     const MAP_BY_NAME: Record<string, number> = { normal: 1, water: 2, lava: 3, block: 4 };
     const mapsFlag = flags.find((f) => f === "--maps" || f.startsWith("--maps="));
@@ -94,23 +86,18 @@ async function main(): Promise<void> {
     mkdirSync(outDir, { recursive: true });
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const base = `artifacts_t${tier}_${version}_${stamp}`.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const modeTag = mode === "synergy" ? `synergy_${synergyFlag?.split("=")[1]}` : "augments";
+    const base = `setup_${modeTag}_${version}_${stamp}`.replace(/[^a-zA-Z0-9._-]/g, "_");
     const jsonlPath = join(outDir, `${base}.jsonl`);
     const summaryPath = join(outDir, `${base}.summary.json`);
     writeFileSync(jsonlPath, "");
 
-    const nameById = new Map<number, string>(artifactList.map((a) => [a.id, a.name]));
-    const tallies = new Map<number, IArtifactTally>(
-        artifactList.map((a) => [
-            a.id,
-            { id: a.id, name: a.name, wins: 0, losses: 0, draws: 0, winsAsGreen: 0, winsAsRed: 0 },
-        ]),
-    );
-    const tallyFor = (id: number): IArtifactTally => {
-        let t = tallies.get(id);
+    const tallies = new Map<string, ITally>();
+    const tallyFor = (label: string): ITally => {
+        let t = tallies.get(label);
         if (!t) {
-            t = { id, name: nameById.get(id) ?? `#${id}`, wins: 0, losses: 0, draws: 0, winsAsGreen: 0, winsAsRed: 0 };
-            tallies.set(id, t);
+            t = { label, wins: 0, losses: 0, draws: 0 };
+            tallies.set(label, t);
         }
         return t;
     };
@@ -130,33 +117,23 @@ async function main(): Promise<void> {
         if (buffer.length >= 50) {
             flush();
         }
-        const g = tier === 2 ? rec.greenArtifactT2 : rec.greenArtifactT1;
-        const r = tier === 2 ? rec.redArtifactT2 : rec.redArtifactT1;
+        const g = mode === "synergy" ? rec.greenSynergy : rec.greenAugment;
+        const r = mode === "synergy" ? rec.redSynergy : rec.redAugment;
         const winner = rec.result.winner;
         if (winner === "draw") {
             draws += 1;
         }
         if (g) {
             const t = tallyFor(g);
-            if (winner === "green") {
-                t.wins += 1;
-                t.winsAsGreen += 1;
-            } else if (winner === "red") {
-                t.losses += 1;
-            } else {
-                t.draws += 1;
-            }
+            if (winner === "green") t.wins += 1;
+            else if (winner === "red") t.losses += 1;
+            else t.draws += 1;
         }
         if (r) {
             const t = tallyFor(r);
-            if (winner === "red") {
-                t.wins += 1;
-                t.winsAsRed += 1;
-            } else if (winner === "green") {
-                t.losses += 1;
-            } else {
-                t.draws += 1;
-            }
+            if (winner === "red") t.wins += 1;
+            else if (winner === "green") t.losses += 1;
+            else t.draws += 1;
         }
         logged += 1;
         if (logged % 500 === 0) {
@@ -165,7 +142,7 @@ async function main(): Promise<void> {
     };
 
     console.log(
-        `Measuring Tier-${tier} artifacts: ${version} vs ${version}, ${games} games ` +
+        `Measuring ${modeTag}: ${version} vs ${version}, ${games} games ` +
             `(seed ${baseSeed}, concurrency ${concurrency}, rosters ${randomizePicks ? "RANDOM" : "mirrored"}, ` +
             `maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}) -> ${jsonlPath}`,
     );
@@ -180,15 +157,14 @@ async function main(): Promise<void> {
             randomizePicks,
             mapTypes,
             lightweight: true,
-            artifactsT1: tier === 1,
-            artifactsT2: tier === 2,
+            augmentsAb: mode === "augments",
+            synergyFaction: mode === "synergy" ? synergyFaction : undefined,
         },
         concurrency,
         record,
     );
     flush();
 
-    // Rank by decisive win rate (draws excluded from the denominator, reported separately).
     const rows = [...tallies.values()]
         .map((t) => {
             const decisive = t.wins + t.losses;
@@ -199,14 +175,14 @@ async function main(): Promise<void> {
         .sort((a, b) => b.winRate - a.winRate);
 
     const summary = {
-        tier,
+        kind: modeTag,
         version,
         games,
         baseSeed,
         randomizePicks,
         mapTypes: mapTypes ?? [1],
         draws,
-        note: "winRate is decisive (draws excluded). Each game credits BOTH sides' artifacts. Side bias cancels via per-pair swap. CI = Wilson 95%.",
+        note: "winRate is decisive (draws excluded). Each game credits BOTH sides' augments. Side bias cancels via per-pair swap. CI = Wilson 95%.",
         ranking: rows,
     };
     writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
@@ -217,11 +193,11 @@ async function main(): Promise<void> {
     const pad = (s: string, n: number): string => s.padEnd(n);
     const padL = (s: string, n: number): string => s.padStart(n);
     console.log(
-        `${pad("rank  artifact", 26)} ${padL("games", 7)} ${padL("W", 6)} ${padL("L", 6)} ${padL("D", 5)} ${padL("win%", 7)}  95% CI`,
+        `${pad("rank  augment", 22)} ${padL("games", 7)} ${padL("W", 6)} ${padL("L", 6)} ${padL("D", 5)} ${padL("win%", 7)}  95% CI`,
     );
     rows.forEach((r, i) => {
         console.log(
-            `${pad(`${padL(`${i + 1}`, 2)}.   ${r.name}`, 26)} ${padL(`${r.appearances}`, 7)} ${padL(`${r.wins}`, 6)} ` +
+            `${pad(`${padL(`${i + 1}`, 2)}.   ${r.label}`, 22)} ${padL(`${r.appearances}`, 7)} ${padL(`${r.wins}`, 6)} ` +
                 `${padL(`${r.losses}`, 6)} ${padL(`${r.draws}`, 5)} ${padL(`${(r.winRate * 100).toFixed(1)}`, 7)}  ` +
                 `[${(r.ciLow * 100).toFixed(1)}, ${(r.ciHigh * 100).toFixed(1)}]`,
         );

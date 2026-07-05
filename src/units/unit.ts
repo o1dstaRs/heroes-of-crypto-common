@@ -2155,13 +2155,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // ARTIFACTS: armor / defense.
-        const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
-        if (veteranHelmArmorBuff) {
-            this.unitProperties.base_armor += Number(
-                ((this.unitProperties.base_armor / 100) * ampArtifact(veteranHelmArmorBuff.getPower())).toFixed(2),
-            );
-        }
+        // ARTIFACTS: armor / defense. NOTE: Veteran Helm is applied later as an ADDITIONAL stat (armor_mod),
+        // not folded into base_armor — see the armor_mod section below.
         const titanPlateBuff = this.getBuff("Titan Plate");
         if (titanPlateBuff) {
             this.unitProperties.base_armor += Number(
@@ -2239,6 +2234,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     Math.max(this.unitProperties.base_armor - shatterArmorEffectPower, 1) * armorModMultiplier -
                     shatterArmorEffectPower
                 ).toFixed(2),
+            );
+        }
+
+        // Veteran Helm: +% defense as an ADDITIONAL stat (armor_mod), scaling from base_armor rather than
+        // inflating it. Layered here (after the armor_mod reset/overwrites) so it always survives, and because
+        // armor_mod feeds BOTH getArmor and getRangeArmor it now protects vs melee AND ranged — the "+defense
+        // (all)" it was always described as (folding into base_armor only guarded melee). Additive off base, so
+        // it never compounds with other % defense buffs.
+        const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
+        if (veteranHelmArmorBuff) {
+            this.unitProperties.armor_mod += Number(
+                ((this.unitProperties.base_armor / 100) * ampArtifact(veteranHelmArmorBuff.getPower())).toFixed(2),
             );
         }
 
@@ -2416,12 +2423,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (berserkersBondAttackBuff) {
             this.unitProperties.base_attack += ampArtifact(berserkersBondAttackBuff.getPower());
         }
-        const veteranHelmAttackBuff = this.getBuff("Veteran Helm");
-        if (veteranHelmAttackBuff) {
-            this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * ampArtifact(veteranHelmAttackBuff.getPower())).toFixed(2),
-            );
-        }
+        // Veteran Helm attack is applied later as an ADDITIONAL stat (attack_mod), not folded into
+        // base_attack — see the attack_mod section below.
         const warlordsEdgeBuff = this.getBuff("Warlords Edge");
         if (warlordsEdgeBuff) {
             this.unitProperties.base_attack += Number(
@@ -2484,6 +2487,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     this.unitProperties.amount_alive /
                         (this.unitProperties.amount_alive + this.unitProperties.amount_died)) *
                 this.initialUnitProperties.base_attack;
+        }
+
+        // Veteran Helm: +% attack as an ADDITIONAL stat (attack_mod), scaling from base_attack rather than
+        // inflating it — exactly how Riot layers its bonus. Additive off the base, so it never compounds with
+        // other % attack buffs (Warlords Edge, auras). getAttack() = base_attack + attack_mod, so a lone
+        // Veteran Helm yields the same total attack as folding it into base did.
+        const veteranHelmAttackBuff = this.getBuff("Veteran Helm");
+        if (veteranHelmAttackBuff) {
+            this.unitProperties.attack_mod +=
+                (this.unitProperties.base_attack * ampArtifact(veteranHelmAttackBuff.getPower())) / 100;
         }
 
         this.unitProperties.attack_mod = Number(this.unitProperties.attack_mod.toFixed(2));

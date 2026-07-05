@@ -92,7 +92,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
 export const ARTIFACT_POWER = {
-    VETERAN_HELM_PERCENT: 5,
+    VETERAN_HELM_PERCENT: 4,
     WARLORDS_EDGE_PERCENT: 15,
     TITAN_PLATE_PERCENT: 15,
     KEEN_BLADE_FLAT: 1,

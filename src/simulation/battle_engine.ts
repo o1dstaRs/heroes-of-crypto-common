@@ -31,13 +31,22 @@ import { SceneLogMock } from "../scene/scene_log_mock";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { ArtifactTier } from "../artifacts/artifact_properties";
+import { DefaultPlacementLevel1, type AugmentType } from "../augments/augment_properties";
 import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
 import { setDeterministicRandomSource } from "../utils/lib";
 import { createCombatFactories, createUnitFromSpec, makeRng, type IArmyUnitSpec } from "./army";
+import { appendFileSync } from "node:fs";
+
 import { LookaheadDriver } from "./lookahead";
+import { extractValueFeatures } from "./value_features";
+
+// Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
+// position features from the acting team's view; at game end each snapshot is labeled with whether that team
+// won and appended to the file. Off => zero overhead. Used to fit the lookahead's leaf value function.
+const VALUE_DATA_FILE = process.env.VALUE_DATA;
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
@@ -65,6 +74,32 @@ export interface IMatchConfig {
      */
     greenArtifactT1?: number;
     redArtifactT1?: number;
+    /** Army-wide Tier-2 artifact (Tier2Artifact enum id; 0/undefined = none). Same application path. */
+    greenArtifactT2?: number;
+    redArtifactT2?: number;
+    /** Perk (Perk enum id) per team — seeds the augment upgrade-point budget (getUpgradePoints). */
+    greenPerk?: number;
+    redPerk?: number;
+    /** Army augments per team ({kind,value}; kind = Placement/Armor/Might/Sniper/Movement, value = level).
+     * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the perk. */
+    greenAugments?: ISetupAugment[];
+    redAugments?: ISetupAugment[];
+    /** Synergies per team ({faction, synergy, level}) — recorded on fightProperties; combat + adjustBaseStats
+     * read them live. Effective level is composition-gated (needs enough units of the faction). */
+    greenSynergies?: ISetupSynergy[];
+    redSynergies?: ISetupSynergy[];
+}
+
+export interface ISetupAugment {
+    kind: "Placement" | "Armor" | "Might" | "Sniper" | "Movement";
+    value: number;
+}
+
+export interface ISetupSynergy {
+    faction: number;
+    synergy: number;
+    /** Ignored — the effective level is derived from the team's unit count in that faction. */
+    level?: number;
 }
 
 export interface IPlacementRecord {
@@ -151,6 +186,9 @@ export interface IMatchResult {
      * artifact A/B measurement so per-artifact win rates can be aggregated from the game record. */
     greenArtifactT1?: number;
     redArtifactT1?: number;
+    /** Tier-2 artifact each team fielded (Tier2Artifact enum id; 0 = none). Same provenance role. */
+    greenArtifactT2?: number;
+    redArtifactT2?: number;
 }
 
 class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
@@ -419,20 +457,106 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         red: placeArmy(redUnits, RED_TEAM, redZone, redStrategy, redRoster, engine, grid, unitsHolder, pathHelper),
     };
 
-    // --- army-wide Tier-1 artifacts (optional) ---
-    // Mirror the live server: seed each team's chosen artifact into fightProperties, then applyArtifacts
-    // (folds stat buffs + sets the combat markers Dual Strike / Wounding Charm / Aegis / … read at their
-    // hooks) and refreshStackPowerForAllUnits so adjustBaseStats picks up the buffs before combat. Units are
-    // already placed (applyArtifacts skips any off-grid unit), and combat runs through the real handlers, so
-    // every artifact mechanic behaves exactly as in a live fight.
-    if (config.greenArtifactT1 || config.redArtifactT1) {
-        if (config.greenArtifactT1) {
-            fightProperties.setArtifactPerTeam(GREEN_TEAM, ArtifactTier.TIER_1, config.greenArtifactT1);
-        }
-        if (config.redArtifactT1) {
-            fightProperties.setArtifactPerTeam(RED_TEAM, ArtifactTier.TIER_1, config.redArtifactT1);
-        }
+    // --- army-wide setup (optional): perk budget, artifacts (both tiers), augments, synergies ---
+    // Mirror the live server: seed each team's chosen setup into fightProperties, then apply the buffs +
+    // refreshStackPowerForAllUnits so adjustBaseStats folds everything in before combat. Combat runs through
+    // the real handlers (which read the FightStateManager singleton this sim uses), so every mechanic behaves
+    // exactly as in a live fight — stat artifacts/augments fold into base stats, combat markers (Dual Strike,
+    // Warlords Edge, …) fire at their hooks, and synergies are read live from fightProperties.
+    const teamHasSetup = (
+        t1?: number,
+        t2?: number,
+        perk?: number,
+        augs?: ISetupAugment[],
+        syn?: ISetupSynergy[],
+    ): boolean => !!(t1 || t2 || perk || augs?.length || syn?.length);
+    const greenSetup = teamHasSetup(
+        config.greenArtifactT1,
+        config.greenArtifactT2,
+        config.greenPerk,
+        config.greenAugments,
+        config.greenSynergies,
+    );
+    const redSetup = teamHasSetup(
+        config.redArtifactT1,
+        config.redArtifactT2,
+        config.redPerk,
+        config.redAugments,
+        config.redSynergies,
+    );
+    if (greenSetup || redSetup) {
+        const applyTeamSetup = (
+            team: TeamType,
+            units: Unit[],
+            perk?: number,
+            t1?: number,
+            t2?: number,
+            augments?: ISetupAugment[],
+            synergies?: ISetupSynergy[],
+        ): void => {
+            if (perk) {
+                fightProperties.setPerkPerTeam(team, perk);
+            }
+            if (t1) {
+                fightProperties.setArtifactPerTeam(team, ArtifactTier.TIER_1, t1);
+            }
+            if (t2) {
+                fightProperties.setArtifactPerTeam(team, ArtifactTier.TIER_2, t2);
+            }
+            if (augments?.length) {
+                // Init the augment maps (canAugment/applyAugments read them); units are already placed so the
+                // default-placement value only affects budget accounting, not where units sit.
+                fightProperties.setDefaultPlacementPerTeam(team, DefaultPlacementLevel1.THREE_BY_THREE);
+                for (const a of augments) {
+                    fightProperties.setAugmentPerTeam(team, { type: a.kind, value: a.value } as AugmentType);
+                }
+            }
+            if (synergies?.length) {
+                const countByFaction = new Map<number, number>();
+                for (const u of units) {
+                    const f = u.getFaction();
+                    countByFaction.set(f, (countByFaction.get(f) ?? 0) + 1);
+                }
+                const cnt = (f: number): number => countByFaction.get(f) ?? 0;
+                // Establish per-faction counts (drives possible synergies + effective levels), then select the
+                // chosen synergy for each fielded faction. The effective level is composition-derived exactly
+                // as setSynergyUnitsPerFactions computes it, so updateSynergyPerTeam validates against the same
+                // possible-synergy set (a passed s.level would be rejected if it didn't match).
+                fightProperties.setSynergyUnitsPerFactions(
+                    team,
+                    cnt(PBTypes.FactionVals.LIFE),
+                    cnt(PBTypes.FactionVals.CHAOS),
+                    cnt(PBTypes.FactionVals.MIGHT),
+                    cnt(PBTypes.FactionVals.NATURE),
+                );
+                for (const s of synergies) {
+                    const level = Math.min(Math.floor(cnt(s.faction) / 2), 3);
+                    if (level >= 1) {
+                        fightProperties.updateSynergyPerTeam(team, s.faction, s.synergy, level);
+                    }
+                }
+            }
+        };
+        applyTeamSetup(
+            GREEN_TEAM,
+            greenUnits,
+            config.greenPerk,
+            config.greenArtifactT1,
+            config.greenArtifactT2,
+            config.greenAugments,
+            config.greenSynergies,
+        );
+        applyTeamSetup(
+            RED_TEAM,
+            redUnits,
+            config.redPerk,
+            config.redArtifactT1,
+            config.redArtifactT2,
+            config.redAugments,
+            config.redSynergies,
+        );
         unitsHolder.applyArtifacts(fightProperties);
+        unitsHolder.applyAugments(fightProperties);
         unitsHolder.refreshStackPowerForAllUnits();
     }
 
@@ -502,6 +626,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
     };
 
+    const valueSnaps: { f: number[]; team: TeamType }[] = [];
     let endReason: IMatchResult["endReason"] = "elimination";
     const maxTotalActions = maxLaps * unitsHolder.getAllUnits().size * 4 + 64;
 
@@ -552,6 +677,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             continue;
         }
         const actingUnitId = currentActiveUnitId;
+        if (VALUE_DATA_FILE) {
+            valueSnaps.push({
+                f: extractValueFeatures(unitsHolder, fightProperties, unit.getTeam()),
+                team: unit.getTeam(),
+            });
+        }
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
         const decided0 = strategy.decideTurn(unit, {
@@ -750,6 +881,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     matchResult.rejectedGreen = rejectedGreen;
     matchResult.rejectedRed = rejectedRed;
     matchResult.rejectedDetails = rejectedDetails;
+    if (VALUE_DATA_FILE && valueSnaps.length && matchResult.winner !== "draw") {
+        // Label each position by whether the acting team ultimately won, then append as JSONL. One write per
+        // game keeps concurrent-worker appends atomic enough for data gen (each line is a self-contained row).
+        const rows = valueSnaps
+            .map((s) => `${JSON.stringify([...s.f, sideForTeam(s.team) === matchResult.winner ? 1 : 0])}`)
+            .join("\n");
+        try {
+            appendFileSync(VALUE_DATA_FILE, rows + "\n");
+        } catch {
+            /* best-effort data capture */
+        }
+    }
     return matchResult;
 }
 
@@ -929,5 +1072,7 @@ function buildResult(
         attrition,
         greenArtifactT1: config.greenArtifactT1,
         redArtifactT1: config.redArtifactT1,
+        greenArtifactT2: config.greenArtifactT2,
+        redArtifactT2: config.redArtifactT2,
     };
 }

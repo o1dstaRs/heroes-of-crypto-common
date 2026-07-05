@@ -32,6 +32,15 @@ parentPort.on("message", (message: { type: "game"; game: number } | { type: "sto
     }
     if (message.type === "game") {
         const record = playGame(options, message.game);
+        // In lightweight mode (measurement / RL training), strip the heavy per-game arrays before posting
+        // back. Structured-cloning the full actions[]/placements across the worker boundary is what starves
+        // the pool at high worker counts — the tally only needs winner/laps/endReason/attrition + the setup
+        // labels, so dropping the rest keeps every worker fed and scales to all cores.
+        if (options.lightweight && record?.result) {
+            record.result.actions = [];
+            record.result.placements = { green: [], red: [] };
+            record.result.rejectedDetails = [];
+        }
         parentPort!.postMessage({ type: "result", record });
     }
 });

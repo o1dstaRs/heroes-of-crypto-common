@@ -1574,7 +1574,20 @@ export class AttackHandler {
                     );
                     AllAbilities.processBoarSalivaAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processAggrAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processDeepWoundsAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                    {
+                        const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
+                            targetUnit,
+                            attackerUnit,
+                            attackerUnit,
+                            this.sceneLog,
+                        );
+                        if (deepWoundsPower > 0) {
+                            (damageForAnimation.deepWounds ??= []).push({
+                                unitId: attackerUnit.getId(),
+                                power: deepWoundsPower,
+                            });
+                        }
+                    }
                     AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
@@ -1656,7 +1669,17 @@ export class AttackHandler {
             );
             AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processDeepWoundsAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+            {
+                const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
+                    attackerUnit,
+                    targetUnit,
+                    attackerUnit,
+                    this.sceneLog,
+                );
+                if (deepWoundsPower > 0) {
+                    (damageForAnimation.deepWounds ??= []).push({ unitId: targetUnit.getId(), power: deepWoundsPower });
+                }
+            }
             AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -1772,7 +1795,20 @@ export class AttackHandler {
                 );
                 AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processDeepWoundsAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                {
+                    const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
+                        attackerUnit,
+                        targetUnit,
+                        attackerUnit,
+                        this.sceneLog,
+                    );
+                    if (deepWoundsPower > 0) {
+                        (damageForAnimation.deepWounds ??= []).push({
+                            unitId: targetUnit.getId(),
+                            power: deepWoundsPower,
+                        });
+                    }
+                }
                 AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);

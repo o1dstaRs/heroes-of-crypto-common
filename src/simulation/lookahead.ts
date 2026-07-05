@@ -27,6 +27,7 @@ import { getDeterministicRandomSource, setDeterministicRandomSource } from "../u
 import type { XY } from "../utils/math";
 import { makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
+import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
@@ -36,8 +37,43 @@ const MELEE = PBTypes.AttackVals.MELEE;
 const REPLY_CAP = 6;
 /** Hard cap on candidate decisions scored per acting-unit turn (keeps the per-turn cost bounded). */
 const MAX_CANDIDATES = 5;
+/**
+ * RE-RANK gate (mode="rerank"): only override the policy's own decision when the best candidate's leaf value
+ * beats the policy's (base) candidate by at least this margin. The strong v0.5 policy is trusted by default;
+ * the learned value only intervenes on a clear improvement. 0 = always take argmax (pure greedy).
+ */
+const RERANK_GATE = Number(process.env.V05_RERANK_GATE ?? 0.05);
 /** Value-function positional term: HP-equivalent worth of a surviving stack advantage. 0 = pure material. */
 const POSITIONAL_WEIGHT = Number(process.env.V05_LOOKAHEAD_POSW ?? 0);
+
+/**
+ * LEARNED leaf value function (opt-in). When V05_VALUE_WEIGHTS is a valid `{b, w:[...]}` (logistic-regression
+ * coefficients from fit_value.mjs, w aligned to value_features.ts VALUE_FEATURE_NAMES), the leaf eval returns
+ * the model logit b + w·features INSTEAD of pure material. Absent/malformed => null => material eval unchanged
+ * (so V05_LOOKAHEAD's baseline is byte-identical to today). Ranking-only, so the raw logit needs no sigmoid.
+ */
+const LEARNED_VALUE: { b: number; w: number[] } | null = (() => {
+    const raw = process.env.V05_VALUE_WEIGHTS;
+    if (!raw) {
+        return null;
+    }
+    try {
+        const m = JSON.parse(raw);
+        if (
+            m &&
+            typeof m.b === "number" &&
+            Number.isFinite(m.b) &&
+            Array.isArray(m.w) &&
+            m.w.length === VALUE_FEATURE_NAMES.length &&
+            m.w.every((x: unknown) => typeof x === "number" && Number.isFinite(x))
+        ) {
+            return { b: m.b, w: m.w as number[] };
+        }
+    } catch {
+        /* malformed -> fall through to material eval */
+    }
+    return null;
+})();
 
 const otherTeam = (team: TeamType): TeamType => (team === LOWER ? UPPER : LOWER);
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
@@ -97,11 +133,15 @@ interface ICandidate {
  */
 export class LookaheadDriver {
     public readonly enabled: boolean;
+    /** "off" = no search; "on" = 2-ply (our move + opponent reply); "rerank" = 1-ply value-max, gated to the policy. */
+    private readonly mode: "off" | "on" | "rerank";
     private readonly deps: ILookaheadDeps;
     private finishedSim = false;
     public constructor(deps: ILookaheadDeps) {
         this.deps = deps;
-        this.enabled = (process.env.V05_LOOKAHEAD ?? "off") === "on";
+        const raw = process.env.V05_LOOKAHEAD ?? "off";
+        this.mode = raw === "on" || raw === "rerank" ? raw : "off";
+        this.enabled = this.mode !== "off";
     }
     /** Replace the strategy's single decision with the best-by-simulation candidate for `unit`. */
     public chooseDecision(unit: Unit, baseDecision: GameAction[]): GameAction[] {
@@ -125,15 +165,26 @@ export class LookaheadDriver {
 
             let best = baseDecision;
             let bestScore = -Infinity;
+            let bestIsBase = true;
+            let baseScore = -Infinity;
             for (const cand of candidates) {
                 const score = this.scoreCandidate(unit, cand, actingTeam, seed);
                 // Restore to the frozen pre-decision state before the next candidate.
                 restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
                 this.deps.restoreDamageStats(savedStats);
+                if (cand.kind === "base") {
+                    baseScore = score;
+                }
                 if (score > bestScore) {
                     bestScore = score;
                     best = cand.actions;
+                    bestIsBase = cand.kind === "base";
                 }
+            }
+            // RE-RANK gate: trust the policy's own move unless a challenger clearly beats it on leaf value. This
+            // is what separates "rerank" from the 2-ply search that overrode good policy moves too eagerly.
+            if (this.mode === "rerank" && !bestIsBase && bestScore - baseScore < RERANK_GATE) {
+                return baseDecision;
             }
             return best;
         } finally {
@@ -312,6 +363,13 @@ export class LookaheadDriver {
             }
         }
 
+        // RE-RANK mode is 1-ply: evaluate the position right after OUR move, with no simulated opponent reply.
+        // The opponent-reply sim is exactly what made 2-ply override the strong policy too eagerly, so we skip
+        // it and trust the learned leaf value to judge the post-move position.
+        if (this.mode === "rerank") {
+            return this.value(actingTeam);
+        }
+
         // ply 2 — advance and play until the opponent has replied once (or the fight ends).
         const enemyTeam = otherTeam(actingTeam);
         let enemyReplied = false;
@@ -338,6 +396,16 @@ export class LookaheadDriver {
     }
     /** Material differential (higher = better for the acting team), plus an optional positional term. */
     private value(actingTeam: TeamType): number {
+        // LEARNED leaf eval (opt-in): return the value model's logit for the acting team. Same board state the
+        // material path reads, but the model can weigh tempo/positional features material can't. Ranking-only.
+        if (LEARNED_VALUE) {
+            const f = extractValueFeatures(this.deps.unitsHolder, this.deps.fightProperties, actingTeam);
+            let z = LEARNED_VALUE.b;
+            for (let i = 0; i < f.length; i += 1) {
+                z += LEARNED_VALUE.w[i] * f[i];
+            }
+            return z;
+        }
         let ours = 0;
         let enemy = 0;
         let oursAlive = 0;

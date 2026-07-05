@@ -31,14 +31,17 @@ export function calculateActiveDeepWoundsEffect(fromUnit: Unit, targetUnit: Unit
     return activeDeepWoundsEffect.getPower();
 }
 
+// Returns the target's total Deep Wounds power AFTER this application (0 when nothing was applied). The
+// caller uses a non-zero return to fire the orange-claw VFX once per application — so a double-attacker
+// that wounds on each hit fires the claw once per hit.
 export function processDeepWoundsAbility(
     fromUnit: Unit,
     targetUnit: Unit,
     currentActiveUnit: Unit,
     sceneLog: ISceneLog,
-): void {
+): number {
     if (targetUnit.isDead()) {
-        return;
+        return 0;
     }
 
     const deepWoundsLevel1Ability = fromUnit.getAbility("Deep Wounds Level 1");
@@ -79,7 +82,8 @@ export function processDeepWoundsAbility(
         const activeDeepWoundsEffect = targetUnit.getEffect("Deep Wounds");
 
         // need to overwrite actual effect power here
-        deepWoundsEffect.setPower(Number(((activeDeepWoundsEffect?.getPower() ?? 0) + powerSum).toFixed(1)));
+        const totalPower = Number(((activeDeepWoundsEffect?.getPower() ?? 0) + powerSum).toFixed(1));
+        deepWoundsEffect.setPower(totalPower);
 
         const laps = deepWoundsEffect.getLaps();
 
@@ -92,5 +96,7 @@ export function processDeepWoundsAbility(
                 `${fromUnit.getName()} applied Deep Wounds on ${targetUnit.getName()} for ${HoCLib.getLapString(laps)}`,
             );
         }
+        return totalPower;
     }
+    return 0;
 }

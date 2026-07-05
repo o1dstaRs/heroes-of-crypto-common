@@ -9,7 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
-import { TIER1_ARTIFACT_LIST } from "../artifacts/artifact_properties";
+import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
+import { getUpgradePoints } from "../perks/perk_properties";
+import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
+import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
 import {
     buildRoster,
     makeRng,
@@ -17,7 +20,7 @@ import {
     DEFAULT_AMOUNT_BY_LEVEL,
     type IRosterComposition,
 } from "./army";
-import { runMatch, type IMatchResult, type Side } from "./battle_engine";
+import { runMatch, type IMatchResult, type ISetupAugment, type ISetupSynergy, type Side } from "./battle_engine";
 
 export interface ITournamentOptions {
     versionA: string;
@@ -50,7 +53,46 @@ export interface ITournamentOptions {
      * Pair with versionA === versionB (e.g. v0.5 vs v0.5) so the AI is not a confound.
      */
     artifactsT1?: boolean;
+    /** Same as artifactsT1 but A/B-tests the Tier-2 artifact pool instead (measure_artifacts --tier 2). */
+    artifactsT2?: boolean;
+    /** A/B-test army augments: each team fields ONE stat augment (Armor/Might/Sniper/Movement × level 1-3 =
+     * 12 options), paired side-swap like the artifact test. measure_setup.ts aggregates per augment. */
+    augmentsAb?: boolean;
+    /** A/B-test the two synergies of ONE faction (FactionVals: 1 CHAOS, 2 MIGHT, 3 NATURE, 4 LIFE). Both
+     * teams field a faction-stacked army (so the synergy is active at a real level); each side picks a
+     * different one of the faction's two synergies, swapped across the pair. */
+    synergyFaction?: number;
+    /** Strip the heavy per-game actions[]/placements from each record inside the worker before it's posted
+     * back (measurement / RL only need aggregate win rates). Removes the worker→main structured-clone
+     * bottleneck so the pool scales to all cores. Leave off when the full game log is needed (LLM analysis). */
+    lightweight?: boolean;
+    /** CEM setup-training self-play: one side drafts its perk + augments via the WEIGHTED setup policy
+     * (env V05_SETUP_WEIGHTS), the other via the FROZEN heuristic; sides swap across the pair to cancel bias.
+     * Everything else is mirrored, so the win rate isolates the learned perk+augment spend. The aggregator
+     * reads greenIsWeighted + result.winner to get the weighted policy's win rate (the CEM fitness). */
+    cemSetup?: boolean;
 }
+
+// Constructed once per worker process. The weighted policy reads its vector from the process env at
+// construction, which the CEM injects (propagated to worker threads); the frozen one is the shipped anchor.
+const CEM_WEIGHTED = new SetupPolicyWeighted();
+const CEM_FROZEN = SETUP_POLICY_V0;
+
+/** FactionVals id → catalog faction name (lowercased match in creaturesByLevel). Only the four synergy
+ * factions are relevant here. */
+const FACTION_NAME: Record<number, string> = { 1: "chaos", 2: "might", 3: "nature", 4: "life" };
+
+/** The stat-augment options A/B-tested by augmentsAb (Placement is excluded — it only reshapes the placement
+ * zone, irrelevant once units are already placed in the sim). Armor/Might/Sniper have levels 1-3, Movement
+ * only 1-2 (no LEVEL_3) → 11 options. Label = "Kind:Level". */
+const AUGMENT_AB_POOL: { kind: "Armor" | "Might" | "Sniper" | "Movement"; value: number; label: string }[] = (
+    [
+        { kind: "Armor", levels: [1, 2, 3] },
+        { kind: "Might", levels: [1, 2, 3] },
+        { kind: "Sniper", levels: [1, 2, 3] },
+        { kind: "Movement", levels: [1, 2] },
+    ] as const
+).flatMap(({ kind, levels }) => levels.map((value) => ({ kind, value, label: `${kind}:${value}` })));
 
 export interface IGameRecord {
     game: number;
@@ -58,10 +100,21 @@ export interface IGameRecord {
     greenVersion: string;
     redVersion: string;
     winnerVersion: string | "draw";
-    /** Tier-1 artifact each side fielded (Tier1Artifact enum id; 0/undefined = none) — present only in an
-     * `artifactsT1` run, so a caller can aggregate per-artifact win rates from the streamed records. */
+    /** Artifact each side fielded (enum id; 0/undefined = none) — present only in the matching
+     * `artifactsT1`/`artifactsT2` run, so a caller can aggregate per-artifact win rates from the records. */
     greenArtifactT1?: number;
     redArtifactT1?: number;
+    greenArtifactT2?: number;
+    redArtifactT2?: number;
+    /** Augment label ("Kind:Level") each side fielded — present only in an `augmentsAb` run. */
+    greenAugment?: string;
+    redAugment?: string;
+    /** Synergy label ("faction:synergyId") each side fielded — present only in a `synergyFaction` run. */
+    greenSynergy?: string;
+    redSynergy?: string;
+    /** In a `cemSetup` run: whether GREEN drafted via the weighted (trained) policy this game (else FROZEN).
+     * The CEM fitness is the weighted policy's win rate = games where the weighted side won. */
+    greenIsWeighted?: boolean;
     result: IMatchResult;
 }
 
@@ -108,10 +161,14 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     // Green roster from `seed`. When randomizing, red gets its own roster from a decorrelated seed;
     // both games in the pair reuse the same two rosters (fixed to their sides) so swapping versions
     // cancels side AND roster luck. Mirrored (default) → red roster === green roster.
-    const roster = buildRoster(makeRng(seed), composition, amountByLevel);
-    const redRoster = options.randomizePicks
-        ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
-        : undefined;
+    // Synergy A/B fields a faction-stacked army (so the faction's synergy is actually active) — build both
+    // rosters filtered to that faction; otherwise the normal (all-faction) pool.
+    const factionFilter = options.synergyFaction ? FACTION_NAME[options.synergyFaction] : undefined;
+    const roster = buildRoster(makeRng(seed), composition, amountByLevel, factionFilter);
+    const redRoster =
+        options.randomizePicks && !factionFilter
+            ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
+            : undefined;
 
     // The board layout is drawn once per PAIR (decorrelated from the roster seed) so both games in the pair
     // share it — keeping the comparison apples-to-apples while still varying maps across pairs.
@@ -123,23 +180,93 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     const greenVersion = aIsGreen ? options.versionA : options.versionB;
     const redVersion = aIsGreen ? options.versionB : options.versionA;
 
-    // Optional Tier-1 artifact A/B test. The pair draws two DISTINCT artifacts (A,B) from a decorrelated
-    // pair seed; game 2k gives green A / red B, game 2k+1 swaps them. Swapping across the pair (which shares
-    // roster + combat seed) makes the two games identical except the artifacts trade sides, so side bias
-    // cancels exactly and each artifact's aggregated win rate reflects the artifact alone.
+    // Optional artifact A/B test (either tier). The pair draws two DISTINCT artifacts (A,B) from a
+    // decorrelated pair seed; game 2k gives green A / red B, game 2k+1 swaps them. Swapping across the pair
+    // (which shares roster + combat seed) makes the two games identical except the artifacts trade sides, so
+    // side bias cancels exactly and each artifact's aggregated win rate reflects the artifact alone.
+    const abArtifact = (ids: number[], salt: number): [number | undefined, number | undefined] => {
+        const artRng = makeRng((seed ^ salt) >>> 0);
+        const a = ids[Math.floor(artRng() * ids.length)];
+        let b = ids[Math.floor(artRng() * ids.length)];
+        while (ids.length > 1 && b === a) {
+            b = ids[Math.floor(artRng() * ids.length)];
+        }
+        const swap = game % 2 === 1;
+        return swap ? [b, a] : [a, b];
+    };
+
     let greenArtifactT1: number | undefined;
     let redArtifactT1: number | undefined;
     if (options.artifactsT1) {
-        const pool = TIER1_ARTIFACT_LIST.map((a) => a.id); // 12 real ids (NO_ARTIFACT excluded)
-        const artRng = makeRng((seed ^ 0x27d4eb2f) >>> 0);
-        const a = pool[Math.floor(artRng() * pool.length)];
-        let b = pool[Math.floor(artRng() * pool.length)];
-        while (pool.length > 1 && b === a) {
-            b = pool[Math.floor(artRng() * pool.length)];
+        [greenArtifactT1, redArtifactT1] = abArtifact(
+            TIER1_ARTIFACT_LIST.map((a) => a.id),
+            0x27d4eb2f,
+        );
+    }
+    let greenArtifactT2: number | undefined;
+    let redArtifactT2: number | undefined;
+    if (options.artifactsT2) {
+        [greenArtifactT2, redArtifactT2] = abArtifact(
+            TIER2_ARTIFACT_LIST.map((a) => a.id),
+            0x165667b1,
+        );
+    }
+
+    // Augment A/B: draw two DISTINCT augments from the 12-option pool and swap sides across the pair, exactly
+    // like the artifact test. Budget defaults to 8 (NO_PERK) so any single level-1..3 augment fits.
+    let greenAugments: ISetupAugment[] | undefined;
+    let redAugments: ISetupAugment[] | undefined;
+    let greenAugment: string | undefined;
+    let redAugment: string | undefined;
+    if (options.augmentsAb) {
+        const artRng = makeRng((seed ^ 0x9e3779b9) >>> 0);
+        const ai = Math.floor(artRng() * AUGMENT_AB_POOL.length);
+        let bi = Math.floor(artRng() * AUGMENT_AB_POOL.length);
+        while (AUGMENT_AB_POOL.length > 1 && bi === ai) {
+            bi = Math.floor(artRng() * AUGMENT_AB_POOL.length);
         }
-        const swap = game % 2 === 1;
-        greenArtifactT1 = swap ? b : a;
-        redArtifactT1 = swap ? a : b;
+        const [gi, ri] = game % 2 === 1 ? [bi, ai] : [ai, bi];
+        greenAugment = AUGMENT_AB_POOL[gi].label;
+        redAugment = AUGMENT_AB_POOL[ri].label;
+        greenAugments = [{ kind: AUGMENT_AB_POOL[gi].kind, value: AUGMENT_AB_POOL[gi].value }];
+        redAugments = [{ kind: AUGMENT_AB_POOL[ri].kind, value: AUGMENT_AB_POOL[ri].value }];
+    }
+
+    // Synergy A/B: both sides field the faction; each picks a different one of the faction's two synergies
+    // (ids 1 and 2), swapped across the pair. Level is composition-derived inside runMatch.
+    let greenSynergies: ISetupSynergy[] | undefined;
+    let redSynergies: ISetupSynergy[] | undefined;
+    let greenSynergy: string | undefined;
+    let redSynergy: string | undefined;
+    if (options.synergyFaction) {
+        const f = options.synergyFaction;
+        const [gs, rs] = game % 2 === 1 ? [2, 1] : [1, 2];
+        greenSynergy = `${FACTION_NAME[f]}:${gs}`;
+        redSynergy = `${FACTION_NAME[f]}:${rs}`;
+        greenSynergies = [{ faction: f, synergy: gs }];
+        redSynergies = [{ faction: f, synergy: rs }];
+    }
+
+    // CEM setup training: derive perk + augments for each side from a policy — weighted (trained) vs frozen
+    // (heuristic anchor), swapped across the pair. Everything else is mirrored, so the outcome isolates the
+    // learned perk+augment spend. The perk sets the augment budget (getUpgradePoints).
+    let greenPerk: number | undefined;
+    let redPerk: number | undefined;
+    let greenIsWeighted: boolean | undefined;
+    if (options.cemSetup) {
+        const setupFor = (policy: typeof CEM_FROZEN) => {
+            const perk = policy.pickPerk();
+            return { perk, augments: policy.pickAugments(getUpgradePoints(perk)) };
+        };
+        const weighted = setupFor(CEM_WEIGHTED);
+        const frozen = setupFor(CEM_FROZEN);
+        greenIsWeighted = game % 2 === 0; // swap which side is the weighted policy across the pair
+        const g = greenIsWeighted ? weighted : frozen;
+        const r = greenIsWeighted ? frozen : weighted;
+        greenPerk = g.perk;
+        greenAugments = g.augments;
+        redPerk = r.perk;
+        redAugments = r.augments;
     }
 
     const result = runMatch({
@@ -152,11 +279,34 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         maxLaps: options.maxLaps,
         greenArtifactT1,
         redArtifactT1,
+        greenArtifactT2,
+        redArtifactT2,
+        greenPerk,
+        redPerk,
+        greenAugments,
+        redAugments,
+        greenSynergies,
+        redSynergies,
     });
 
     const winnerSide: Side | "draw" = result.winner;
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;
-    return { game, greenVersion, redVersion, winnerVersion, greenArtifactT1, redArtifactT1, result };
+    return {
+        game,
+        greenVersion,
+        redVersion,
+        winnerVersion,
+        greenArtifactT1,
+        redArtifactT1,
+        greenArtifactT2,
+        redArtifactT2,
+        greenAugment,
+        redAugment,
+        greenSynergy,
+        redSynergy,
+        greenIsWeighted,
+        result,
+    };
 }
 
 /** Running totals over games. Accumulation is order-independent, so parallel results merge cleanly. */

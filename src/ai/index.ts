@@ -15,6 +15,7 @@ import { STRATEGY_V0_2 } from "./versions/v0_2";
 import { STRATEGY_V0_3 } from "./versions/v0_3";
 import { STRATEGY_V0_4 } from "./versions/v0_4";
 import { STRATEGY_V0_5 } from "./versions/v0_5";
+import { STRATEGY_V0_6 } from "./versions/v0_6";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
@@ -23,7 +24,14 @@ export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_stra
  * tournament runner discover versions through this map, so a new version is comparable against the
  * baseline the moment it is registered. The latest entry is the default.
  */
-const STRATEGIES: readonly IAIStrategy[] = [STRATEGY_V0_1, STRATEGY_V0_2, STRATEGY_V0_3, STRATEGY_V0_4, STRATEGY_V0_5];
+const STRATEGIES: readonly IAIStrategy[] = [
+    STRATEGY_V0_1,
+    STRATEGY_V0_2,
+    STRATEGY_V0_3,
+    STRATEGY_V0_4,
+    STRATEGY_V0_5,
+    STRATEGY_V0_6,
+];
 
 const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));
 

@@ -66,4 +66,9 @@ export interface IVisibleDamage {
     // Petrifying Gaze kills, Magic Mirror reflection) — each rendered as its own floating number and
     // scene-log line. Empty/undefined when no such ability triggered.
     secondary?: ISecondaryDamage[];
+    // One entry per Deep Wounds application/increment DURING this attack — so the orange claw slash plays
+    // once for every application, not just the first. A double-attacker (e.g. Wolf's Double Punch) that
+    // wounds on both hits produces TWO entries, hence two claws. `power` is the effect's total power at
+    // that application (scales the claw). Empty/undefined when no Deep Wounds landed.
+    deepWounds?: { unitId: string; power: number }[];
 }
