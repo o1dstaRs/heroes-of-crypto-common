@@ -334,6 +334,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if ((process.env.V05_HOURGLASS ?? "on") !== "on") {
             return decision;
         }
+        // A RANGED unit only produces a melee CHARGE when its shot was suppressed (pinned). Hourglassing that
+        // fallback is a trap: waiting doesn't lift the suppression, so on the re-up it STILL can't shoot and the
+        // charge often can't execute either — the turn is wasted (the client renders it as "<unit> skips turn",
+        // e.g. a pinned Beholder). Hourglass is a melee-unit tool; keep shooters out of it (shoot or melee now).
+        if (process.env.V05_HG_RANGED !== "off" && unit.getAttackType() === RANGE) {
+            return decision;
+        }
         const isCharge = decision.some((a) => a.type === "melee_attack" && Array.isArray(a.path) && a.path.length > 0);
         if (!isCharge || !this.canHourglass(unit, context)) {
             return decision;
