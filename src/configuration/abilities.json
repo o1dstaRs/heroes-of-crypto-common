@@ -433,8 +433,9 @@
         "name": "Petrifying Gaze",
         "type": "MIND",
         "desc": [
-            "On attack, a chance to petrify (instantly kill) one of the",
-            "target's creatures. Higher-level units are easier to petrify."
+            "On attack, a chance to petrify (instantly kill) one of the target's",
+            "creatures. Higher-level units are easier to petrify; ranged shots",
+            "petrify less the farther away the target is."
         ],
         "power": 60,
         "power_type": "KILL_RANDOM_AMOUNT",
