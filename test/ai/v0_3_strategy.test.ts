@@ -48,15 +48,17 @@ function ctxFor(c: CombatTestContext): IDecisionContext {
 const moveAction = (a: GameAction[]): Extract<GameAction, { type: "move_unit" }> | undefined =>
     a.find((x) => x.type === "move_unit") as Extract<GameAction, { type: "move_unit" }> | undefined;
 
-describe("AI version registry — v0.5 is the shipped default (the RL policy went live)", () => {
-    it("registers v0.3/v0.4/v0.5 and ships v0.5 as the default (and latest)", () => {
+describe("AI version registry — v0.6 is the shipped default (the full-game AI generation)", () => {
+    it("registers v0.3/v0.4/v0.5/v0.6 and ships v0.6 as the default (and latest)", () => {
         expect(AI_VERSIONS).toContain("v0.3");
         expect(AI_VERSIONS).toContain("v0.4");
         expect(AI_VERSIONS).toContain("v0.5");
-        // v0.5 (reinforcement-learned, ~61% vs v0.4) is now the shipped default — promoted from v0.4.
-        expect(DEFAULT_AI_VERSION).toBe("v0.5");
+        expect(AI_VERSIONS).toContain("v0.6");
+        // v0.6 (full-game AI; starts as an exact clone of the v0.5 RL fight champion) is the shipped default.
+        expect(DEFAULT_AI_VERSION).toBe("v0.6");
         expect(AI_VERSIONS.indexOf("v0.4")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.3"));
         expect(AI_VERSIONS.indexOf("v0.5")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.4"));
+        expect(AI_VERSIONS.indexOf("v0.6")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.5"));
         expect(LATEST_AI_VERSION).toBe(AI_VERSIONS[AI_VERSIONS.length - 1]);
     });
 
