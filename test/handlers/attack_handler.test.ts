@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { MAX_HITS_MOUNTAIN } from "../../src/constants";
+import { MAX_HITS_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -237,6 +237,67 @@ describe("AttackHandler", () => {
     });
 
     describe("handleRangeAttack", () => {
+        it("a kill grants the attacker +MORALE_CHANGE_FOR_KILL and drops the fallen stack's same-type allies", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+
+            // One-shot the whole target stack (single 1-HP Peasant) with an overwhelming ranged hit.
+            const attacker = createTestUnit({
+                name: "Arbalester",
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                attack: 100,
+                damageMin: 100,
+                damageMax: 100,
+                rangeShots: 3,
+                amountAlive: 1,
+                morale: 0,
+            });
+            const target = createTestUnit({
+                name: "Peasant",
+                team: PBTypes.TeamVals.LOWER,
+                armor: 1,
+                amountAlive: 1,
+                maxHp: 1,
+                morale: 0,
+            });
+            // Another Peasant stack on the target's team, off to the side (same name + team → loses morale).
+            const targetAlly = createTestUnit({
+                name: "Peasant",
+                team: PBTypes.TeamVals.LOWER,
+                amountAlive: 1,
+                morale: 10,
+            });
+
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            placeUnit(grid, unitsHolder, targetAlly, { x: 6, y: 6 });
+
+            const attackerMoraleBefore = attacker.getMorale();
+            const allyMoraleBefore = targetAlly.getMorale();
+
+            const result = attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(target),
+                attacker,
+                [[target]],
+                undefined,
+                target.getPosition(),
+            );
+
+            // Kill morale is written to BASE morale; the turn flow surfaces it to effective morale on the
+            // next adjustBaseStats pass (which drives the lap-start Morale roll). Mirror that here.
+            attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            targetAlly.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(result.completed).toBe(true);
+            expect(target.isDead()).toBe(true);
+            // Killer gains morale; the fallen stack's surviving same-type ally loses it.
+            expect(attacker.getMorale()).toBe(attackerMoraleBefore + MORALE_CHANGE_FOR_KILL);
+            expect(targetAlly.getMorale()).toBe(allyMoraleBefore - MORALE_CHANGE_FOR_KILL);
+        });
+
         it("applies direct range attack damage once while recording animation and statistics", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
 

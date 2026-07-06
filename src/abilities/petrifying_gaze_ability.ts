@@ -76,7 +76,10 @@ export function processPetrifyingGazeAbility(
         // keeps PETRIFY_RANGE_FALLOFF of its value per shot-distance bracket. rangeDivisor 1/2/4/8 -> brackets
         // 0/1/2/3. Melee (rangeDivisor 1) is unaffected.
         const rangeFactor = Math.pow(PETRIFY_RANGE_FALLOFF, Math.log2(Math.max(1, rangeDivisor)));
-        const petrifyChance = Math.max(0, Math.round(baseChance * rangeFactor));
+        // The target's MIND resistance (e.g. Helm of Focus) lowers the odds the petrify lands.
+        const mindResistCoeff =
+            petrifyingGazeAbility.getType() === AbilityType.MIND ? 1 - toUnit.getMindResist() / 100 : 1;
+        const petrifyChance = Math.max(0, Math.round(baseChance * rangeFactor * mindResistCoeff));
         if (HoCLib.getRandomInt(0, 100) < petrifyChance) {
             damageFromAbility += toUnit.getHp();
             proc = true;

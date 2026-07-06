@@ -451,7 +451,10 @@ export class UnitsHolder {
                     applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
                     break;
                 case Tier1Artifact.WOUNDING_CHARM:
-                    applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_EXTRA_STACKS);
+                    // Grant Level-1 Deep Wounds to the whole army (like the Wolf) so EVERY unit inflicts Deep
+                    // Wounds on attack — plus the marker buff still adds +1 stack on top for units that had it.
+                    applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
+                    unit.grantAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.AEGIS_SHIELD:
                     applyArtifactBuff("Aegis Shield", AP.AEGIS_AREA_REDUCTION_PERCENT);

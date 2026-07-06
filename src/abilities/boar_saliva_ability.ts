@@ -27,6 +27,14 @@ export function processBoarSalivaAbility(
 
     const boarSalivaAbility = fromUnit.getAbility("Boar Saliva");
     if (boarSalivaAbility) {
+        // Boar Saliva otherwise always lands; the target's MIND resistance (e.g. Helm of Focus) gives it a
+        // chance to shrug the saliva off. No-op when the target carries no mind resist (coeff === 1).
+        const mindResistCoeff =
+            boarSalivaAbility.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
+        if (mindResistCoeff < 1 && HoCLib.getRandomInt(0, 100) >= mindResistCoeff * 100) {
+            sceneLog.updateLog(`${targetUnit.getName()} resisted from Boar Saliva`);
+            return;
+        }
         const boarSalivaEffect = boarSalivaAbility.getEffect();
         if (!boarSalivaEffect) {
             return;

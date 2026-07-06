@@ -50,10 +50,19 @@ const AUGMENT_VALUE_THRESHOLD = 10; // anchor: only Armor(+19)/Might(+15) clear 
 
 const PERKS: Perk[] = [Perk.THREE_REVEALS, Perk.SEE_ALL, Perk.SEE_NONE];
 
+/**
+ * Baked setup vector — CEM self-play champion (agent-zinc node, 2026-07-05): decisive win rate 57.8% on a
+ * held-out seed vs the all-zero heuristic anchor (+7.8pp), CEM_DIM=7 POP=12 GENS=12 GAMES=3000. Steers the
+ * perk away from THREE_REVEALS ([0..2]) and lifts Sniper past the augment buy threshold ([3..6]). This is the
+ * DEFAULT when no V05_SETUP_WEIGHTS env is set — the anchor is now the trained policy, not the raw heuristic.
+ * To recover the pre-training heuristic for an A/B, pass V05_SETUP_WEIGHTS='[0,0,0,0,0,0,0]'.
+ */
+export const DEFAULT_SETUP_W: readonly number[] = [-3.02959, -0.42867, -0.26908, 1.00639, -2.94528, 3.57446, -0.01473];
+
 export const loadSetupWeights = (): number[] => {
     const raw = process.env[SETUP_WEIGHTS_ENV];
     if (!raw) {
-        return new Array(SETUP_WEIGHT_DIM).fill(0);
+        return DEFAULT_SETUP_W.slice();
     }
     try {
         const parsed = JSON.parse(raw) as unknown;
@@ -65,7 +74,7 @@ export const loadSetupWeights = (): number[] => {
     } catch {
         // fall through to anchor
     }
-    return new Array(SETUP_WEIGHT_DIM).fill(0);
+    return DEFAULT_SETUP_W.slice();
 };
 
 export class SetupPolicyWeighted extends SetupPolicyV0 {

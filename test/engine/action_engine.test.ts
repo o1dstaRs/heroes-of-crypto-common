@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { MAX_HITS_MOUNTAIN } from "../../src/constants";
+import { MAX_HITS_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
@@ -313,6 +313,25 @@ describe("GameActionEngine", () => {
             hourglass: false,
         });
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it("defending (Luck Shield) costs MORALE_CHANGE_FOR_SHIELD morale", () => {
+        const setup = setupActionFight();
+        const before = setup.lower.getMorale();
+
+        setup.engine.apply({ type: "defend_turn", unitId: setup.lower.getId() });
+
+        expect(setup.lower.getMorale()).toBe(before - MORALE_CHANGE_FOR_SHIELD);
+    });
+
+    it("waiting on the hourglass costs MORALE_CHANGE_FOR_CLOCK morale", () => {
+        const setup = setupActionFight();
+        const before = setup.lower.getMorale();
+
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getMorale()).toBe(before - MORALE_CHANGE_FOR_CLOCK);
     });
 
     it("rejects hourglass when the active unit is the only living unit on its team", () => {

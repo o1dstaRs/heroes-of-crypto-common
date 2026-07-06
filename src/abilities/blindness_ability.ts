@@ -25,6 +25,8 @@ export function processBlindnessAbility(
     }
 
     const blindnessAbility = fromUnit.getAbility("Blindness");
+    // The target's MIND resistance (e.g. Helm of Focus) lowers the odds the blindness lands.
+    const mindResistCoeff = blindnessAbility?.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
     if (
         blindnessAbility &&
         HoCLib.getRandomInt(0, 100) <
@@ -33,7 +35,8 @@ export function processBlindnessAbility(
                 FightStateManager.getInstance()
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
-            )
+            ) *
+                mindResistCoeff
     ) {
         const blindnessEffect = blindnessAbility.getEffect();
         if (!blindnessEffect) {

@@ -115,3 +115,98 @@ export const scoreCreature = (creatureId: number): number => {
         (c.abilities.includes("Large Caliber") ? 45 : 0);
     return Math.round(c.level * 35 + c.exp / 8 + rangedBonus + pressure);
 };
+
+// ---------------------------------------------------------------------------
+// TRAINABLE draft scorer — a linear feature decomposition of scoreCreature so a CEM pass can learn the
+// draft weights (the pick-phase counterpart to the fight/setup vectors). DRAFT_ANCHOR_W reproduces
+// scoreCreature EXACTLY, so the frozen anchor policy == today's heuristic draft; the weighted policy searches
+// around it. Ranking-only (argmax/top-N over an offered set), so absolute scale/offset are irrelevant.
+// ---------------------------------------------------------------------------
+
+export const DRAFT_FEATURE_NAMES = [
+    "level", // creature level (1..4)
+    "exp", // stack experience/value
+    "ranged", // 1 if a ranged attacker (they carry most fights)
+    "rangedDmg", // max damage if ranged, else 0
+    "meleeDmg", // max damage if melee, else 0
+    "rangedShots", // shots if ranged, else 0
+    "rangedDist", // shot distance if ranged, else 0
+    "doubleShot",
+    "throughShot",
+    "areaThrow",
+    "largeCaliber",
+] as const;
+
+export const DRAFT_FEATURE_DIM = DRAFT_FEATURE_NAMES.length;
+
+/** Coefficients that make scoreCreatureWeighted(id, DRAFT_ANCHOR_W) === scoreCreature(id) (pre-round). This
+ * stays the FROZEN training reference (the heuristic), unchanged so CEM gains are always measured against it. */
+export const DRAFT_ANCHOR_W: readonly number[] = [35, 0.125, 95, 3, 1.2, 5, 6, 50, 70, 60, 45];
+
+/**
+ * Baked DRAFT vector — CO-EVOLUTION robust champion (agent-zinc node, 2026-07-05). Iterated best-response
+ * self-play (each pass best-responds to the previous champion) CONVERGED to a MELEE-favoring draft that
+ * DOMINATES every alternative in a worst-case round-robin: it beats the heuristic anchor 97.6%, a strong
+ * trained RANGED draft 64.4%, and a melee-exploit variant 61.7% — worst case 61.7%, the ONLY draft that beats
+ * all others. (An earlier ranged champion won 86% vs the anchor but is itself crushed by melee → 35.6%
+ * worst-case, NOT robust; this replaced it.) Army composition is the single biggest AI lever, and melee beats
+ * ranged vs the v0.5 fight AI — a possible melee/ranged balance signal worth a designer's eye. DEFAULT when no
+ * V05_DRAFT_WEIGHTS env; pass DRAFT_ANCHOR_W via env to A/B against the pre-training heuristic.
+ */
+export const DEFAULT_DRAFT_W: readonly number[] = [
+    22.1106, 0.5343, -90.8122, -2.8907, 3.3891, 7.2954, -9.0207, 47.2111, 74.5008, 35.7793, 5.6801,
+];
+
+export const DRAFT_WEIGHTS_ENV = "V05_DRAFT_WEIGHTS";
+
+/** Feature vector for a creature id (aligned to DRAFT_FEATURE_NAMES). Zeros for an unknown id. */
+export const creatureFeatures = (creatureId: number): number[] => {
+    const c = creatureIndex().get(creatureId);
+    if (!c) {
+        return new Array(DRAFT_FEATURE_DIM).fill(0);
+    }
+    const r = c.ranged ? 1 : 0;
+    return [
+        c.level,
+        c.exp,
+        r,
+        r ? c.maxDamage : 0,
+        r ? 0 : c.maxDamage,
+        r ? c.shots : 0,
+        r ? c.distance : 0,
+        c.abilities.includes("Double Shot") ? 1 : 0,
+        c.abilities.includes("Through Shot") ? 1 : 0,
+        c.abilities.includes("Area Throw") ? 1 : 0,
+        c.abilities.includes("Large Caliber") ? 1 : 0,
+    ];
+};
+
+/** Weighted draft score = w · features(id). Higher is a better pick. */
+export const scoreCreatureWeighted = (creatureId: number, w: readonly number[]): number => {
+    const f = creatureFeatures(creatureId);
+    let s = 0;
+    for (let i = 0; i < f.length; i += 1) {
+        s += f[i] * (w[i] ?? 0);
+    }
+    return s;
+};
+
+/** Active draft weights: process.env.V05_DRAFT_WEIGHTS (JSON number[]) for CEM/A-B, else the anchor. */
+export const loadDraftWeights = (): number[] => {
+    const raw = process.env[DRAFT_WEIGHTS_ENV];
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (
+                Array.isArray(parsed) &&
+                parsed.length === DRAFT_FEATURE_DIM &&
+                parsed.every((n) => typeof n === "number" && Number.isFinite(n))
+            ) {
+                return parsed as number[];
+            }
+        } catch {
+            /* malformed -> baked default */
+        }
+    }
+    return DEFAULT_DRAFT_W.slice();
+};

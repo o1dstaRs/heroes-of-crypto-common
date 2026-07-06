@@ -25,6 +25,8 @@ export function processAggrAbility(
     }
 
     const aggrAbility = fromUnit.getAbility("Aggr");
+    // The target's MIND resistance (e.g. Helm of Focus) lowers the odds the aggr lands.
+    const mindResistCoeff = aggrAbility?.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
     if (
         aggrAbility &&
         getRandomInt(0, 100) <
@@ -33,7 +35,8 @@ export function processAggrAbility(
                 FightStateManager.getInstance()
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
-            )
+            ) *
+                mindResistCoeff
     ) {
         const aggrEffect = aggrAbility.getEffect();
         if (!aggrEffect) {

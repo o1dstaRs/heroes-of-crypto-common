@@ -72,10 +72,12 @@ export function processDeepWoundsAbility(
         );
     }
 
-    // ARTIFACT Wounding Charm: +1 extra Deep Wounds stack for units that already inflict Deep Wounds.
+    // ARTIFACT Wounding Charm grants Deep Wounds Level 1 to the whole army (see UnitsHolder.applyArtifacts),
+    // but at a FRACTION of full strength — the buff power is a percent (default 50) — so a whole-army Deep
+    // Wounds isn't oppressive. Full-strength granting tested at ~66% (top artifact by a mile), hence the scale.
     const woundingCharmBuff = fromUnit.getBuff("Wounding Charm");
-    if (woundingCharmBuff && (deepWoundsLevel1Ability || deepWoundsLevel2Ability || deepWoundsLevel3Ability)) {
-        powerSum += woundingCharmBuff.getPower();
+    if (woundingCharmBuff) {
+        powerSum *= woundingCharmBuff.getPower() / 100;
     }
 
     if (powerSum && deepWoundsEffect) {

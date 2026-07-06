@@ -342,6 +342,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return abilityToDelete;
     }
+    // Grant an ability by name at runtime (e.g. the Wounding Charm artifact granting "Deep Wounds Level 1"
+    // to a unit that doesn't natively have it). Idempotent — no-op if the unit already has it. Builds the
+    // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
+    // hasAbilityActive / processDeepWoundsAbility all see it.
+    public grantAbility(abilityName: string): void {
+        if (this.hasAbilityActive(abilityName)) {
+            return;
+        }
+        const ability = this.abilityFactory.makeAbility(abilityName);
+        this.abilities.push(ability);
+        if (!this.unitProperties.abilities.includes(abilityName)) {
+            this.unitProperties.abilities.push(abilityName);
+        }
+    }
     public addAbility(ability: Ability): void {
         this.unitProperties.abilities.push(ability.getName());
         if (ability.getName() === "Chain Lightning") {
@@ -872,6 +886,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getStatusResist(): number {
         const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
         return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
+    }
+    // Chance-reduction (%) against MIND-type abilities — Petrifying Gaze, Blindness, Boar Saliva, Aggr.
+    // Granted by the Helm of Focus artifact. SEPARATE from magic resist (which is magic armor — flat % off
+    // magic damage); mind resistance only lowers the odds a MIND effect lands. Read as a per-unit artifact
+    // "marker" buff, exactly like getStatusResist above. 0 when the unit carries no mind-resist source.
+    public getMindResist(): number {
+        const helmOfFocusBuff = this.getBuff("Helm of Focus");
+        return helmOfFocusBuff ? helmOfFocusBuff.getPower() : 0;
     }
     public getSpellsCount(): number {
         if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
@@ -2284,17 +2306,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // ARTIFACT: Helm of Focus (mind) resistance, folded into magic resist as additive percentage points
-        // and capped at 100%. NOTE: Amulet of Resolve is intentionally NOT here — it grants STATUS resistance
-        // (see getStatusResist), which lowers the chance of Stun / Paralysis landing, not magic resist.
-        const helmOfFocusBuff = this.getBuff("Helm of Focus");
-        if (helmOfFocusBuff) {
-            const artifactResistPercent = ampArtifact(helmOfFocusBuff.getPower());
-            this.unitProperties.magic_resist = Math.min(
-                100,
-                Number((this.unitProperties.magic_resist + artifactResistPercent).toFixed(2)),
-            );
-        }
+        // NOTE: Helm of Focus is intentionally NOT folded into magic_resist (which is magic armor — flat % off
+        // magic DAMAGE). It grants MIND resistance instead (see getMindResist), which lowers the chance a
+        // MIND-type ability lands — read as a marker buff at the ability hooks, exactly like getStatusResist.
 
         // SHOTS
         if (this.hasAbilityActive("Limited Supply")) {
@@ -2347,7 +2361,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
         const swiftBootsBuff = this.getBuff("Swift Boots");
         if (swiftBootsBuff) {
-            this.unitProperties.steps += ampArtifact(swiftBootsBuff.getPower());
+            // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
+            this.unitProperties.steps += Number(
+                ((this.unitProperties.steps / 100) * ampArtifact(swiftBootsBuff.getPower())).toFixed(2),
+            );
         }
         const wingedBootsBuff = this.getBuff("Winged Boots");
         if (wingedBootsBuff) {

@@ -11,6 +11,7 @@
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { getUpgradePoints } from "../perks/perk_properties";
+import { DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
 import {
@@ -21,6 +22,7 @@ import {
     type IRosterComposition,
 } from "./army";
 import { runMatch, type IMatchResult, type ISetupAugment, type ISetupSynergy, type Side } from "./battle_engine";
+import { creatureIdForName, draftRoster } from "./draft";
 
 export interface ITournamentOptions {
     versionA: string;
@@ -71,12 +73,41 @@ export interface ITournamentOptions {
      * Everything else is mirrored, so the win rate isolates the learned perk+augment spend. The aggregator
      * reads greenIsWeighted + result.winner to get the weighted policy's win rate (the CEM fitness). */
     cemSetup?: boolean;
+    /** CEM draft-training self-play: each side DRAFTS its roster (from a shared offered subset per level) via
+     * a draft policy — one WEIGHTED (env V05_DRAFT_WEIGHTS), one FROZEN (the anchor heuristic) — sides swapped
+     * across the pair. Unlike every other mode the two rosters DIFFER (that's the point), so the win rate
+     * isolates which draft policy picks the better army. Same aggregator (greenIsWeighted + winner). */
+    cemDraft?: boolean;
 }
 
 // Constructed once per worker process. The weighted policy reads its vector from the process env at
 // construction, which the CEM injects (propagated to worker threads); the frozen one is the shipped anchor.
 const CEM_WEIGHTED = new SetupPolicyWeighted();
 const CEM_FROZEN = SETUP_POLICY_V0;
+
+// Draft-policy vectors (11-dim, DRAFT_FEATURE_NAMES). Weighted reads V05_DRAFT_WEIGHTS at load; frozen anchor
+// reproduces the scoreCreature heuristic exactly. Only used on the cemDraft path.
+const CEM_DRAFT_WEIGHTED_W: readonly number[] = loadDraftWeights();
+// Frozen opponent draft: DRAFT_ANCHOR_W by default; V05_DRAFT_FROZEN_WEIGHTS overrides it (used to A/B a
+// candidate against a NON-anchor opponent, e.g. the current champion — exposes anti-anchor hard-counters).
+const CEM_DRAFT_FROZEN_W: readonly number[] = (() => {
+    const raw = process.env.V05_DRAFT_FROZEN_WEIGHTS;
+    if (raw) {
+        try {
+            const p = JSON.parse(raw);
+            if (
+                Array.isArray(p) &&
+                p.length === DRAFT_ANCHOR_W.length &&
+                p.every((n) => typeof n === "number" && Number.isFinite(n))
+            ) {
+                return p;
+            }
+        } catch {
+            /* malformed -> anchor */
+        }
+    }
+    return DRAFT_ANCHOR_W;
+})();
 
 /** FactionVals id → catalog faction name (lowercased match in creaturesByLevel). Only the four synergy
  * factions are relevant here. */
@@ -164,8 +195,8 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     // Synergy A/B fields a faction-stacked army (so the faction's synergy is actually active) — build both
     // rosters filtered to that faction; otherwise the normal (all-faction) pool.
     const factionFilter = options.synergyFaction ? FACTION_NAME[options.synergyFaction] : undefined;
-    const roster = buildRoster(makeRng(seed), composition, amountByLevel, factionFilter);
-    const redRoster =
+    let roster = buildRoster(makeRng(seed), composition, amountByLevel, factionFilter);
+    let redRoster =
         options.randomizePicks && !factionFilter
             ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
             : undefined;
@@ -253,6 +284,22 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     let greenPerk: number | undefined;
     let redPerk: number | undefined;
     let greenIsWeighted: boolean | undefined;
+    if (options.cemDraft) {
+        // Each side drafts from the SAME offered subsets (shared `seed`); weighted vs frozen policy, swapped
+        // per pair. The two rosters differ, isolating draft-policy quality under identical fight AI.
+        greenIsWeighted = game % 2 === 0;
+        const greenW = greenIsWeighted ? CEM_DRAFT_WEIGHTED_W : CEM_DRAFT_FROZEN_W;
+        const redW = greenIsWeighted ? CEM_DRAFT_FROZEN_W : CEM_DRAFT_WEIGHTED_W;
+        roster = draftRoster(greenW, seed, composition, amountByLevel);
+        redRoster = draftRoster(redW, seed, composition, amountByLevel);
+        // Optionally activate SYNERGIES in draft self-play (CEM_DRAFT_SYNERGIES=1): each side gets the heuristic
+        // best synergy per fielded faction (2+ units) from its OWN drafted roster — a fuller, more realistic
+        // game so we can check whether the melee>ranged draft edge survives when synergies are live.
+        if (process.env.CEM_DRAFT_SYNERGIES === "1") {
+            greenSynergies = SETUP_POLICY_V0.pickSynergies(roster.map((u) => creatureIdForName(u.creatureName)));
+            redSynergies = SETUP_POLICY_V0.pickSynergies(redRoster.map((u) => creatureIdForName(u.creatureName)));
+        }
+    }
     if (options.cemSetup) {
         const setupFor = (policy: typeof CEM_FROZEN) => {
             const perk = policy.pickPerk();

@@ -556,6 +556,54 @@ describe("Unit", () => {
         });
     });
 
+    describe("armor and penetration", () => {
+        it("Piercing Spear penetrates enemy armor for more damage than a plain attacker", () => {
+            const armored = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 40, luck: 0 });
+            // Piercing Spear's penetration scales with stack power ((power/100/MAX)·stackPower), so give
+            // both attackers max stack power — the ONLY difference is the ability itself.
+            const plain = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                attack: 10,
+                damageMin: 100,
+                damageMax: 100,
+                amountAlive: 1,
+                stackPower: 5,
+            });
+            const piercer = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                attack: 10,
+                damageMin: 100,
+                damageMax: 100,
+                amountAlive: 1,
+                stackPower: 5,
+                abilities: ["Piercing Spear"],
+            });
+
+            const plainDamage = plain.calculateAttackDamageMax(plain.getAttack(), armored, false, 0);
+            const piercingDamage = piercer.calculateAttackDamageMax(piercer.getAttack(), armored, false, 0);
+
+            // Piercing Spear reduces the target's EFFECTIVE armor, so the same attack lands harder.
+            expect(piercingDamage).toBeGreaterThan(plainDamage);
+        });
+
+        it("Shatter Armor lowers effective armor and raises incoming damage", () => {
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 100, amountAlive: 1 });
+            attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            const target = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 20, luck: 0 });
+            target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            const armorBefore = target.getArmor();
+            const damageBefore = attacker.calculateAttackDamageMax(1, target, false, 0);
+
+            // Apply the Shatter Armor debuff; adjustBaseStats folds its power into armor_mod (negative).
+            target.applyEffect(new EffectFactory().makeEffect("Shatter Armor")!);
+            target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(target.getArmor()).toBeLessThan(armorBefore);
+            expect(attacker.calculateAttackDamageMax(1, target, false, 0)).toBeGreaterThan(damageBefore);
+        });
+    });
+
     describe("abilities and combat calculations", () => {
         it("adds dynamic abilities and exposes cloned properties and loss estimates", () => {
             const effectFactory = new EffectFactory();
