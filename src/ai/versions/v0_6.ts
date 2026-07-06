@@ -25,7 +25,8 @@ const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "o
  * already pinned, so a ranged unit out of range ADVANCES into melee (fallbackTurn minimises distance to the
  * enemy) and gets meleed before its range pays off. The kite makes a ranged unit that would walk into an
  * enemy's melee reach HOLD instead, so the enemy enters ITS shooting range first. Gated (V06_KITE=off →
- * byte-for-byte v0.5). DEFAULT_AI_VERSION stays v0.5 until a v0.6 seam clears the guard bar.
+ * byte-for-byte v0.5 fight). v0.6 is now the shipped DEFAULT_AI_VERSION; its draft + setup weights are the
+ * live enhancement over the frozen v0.5 baseline.
  */
 export class StrategyV0_6 extends StrategyV0_5 {
     public override readonly version: string = "v0.6";
