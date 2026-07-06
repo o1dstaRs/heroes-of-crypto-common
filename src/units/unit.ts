@@ -55,8 +55,8 @@ const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 // ARTIFACT Blighted Bulwark (cursed, tier-1): reduces area damage (via the "Aegis Shield" System buff the
 // AOE handlers already read) but curses the wielder's whole army — an extra chance to Break when hit and a
 // flat chance to miss on attack. Keyed on getBuff("Aegis Shield") (the internal buff/slug is unchanged).
-const BLIGHTED_BULWARK_BREAK_CHANCE = 10;
-const BLIGHTED_BULWARK_MISS_CHANCE = 5;
+const BLIGHTED_BULWARK_BREAK_CHANCE = 12;
+const BLIGHTED_BULWARK_MISS_CHANCE = 4;
 
 export interface IAttackTargets {
     unitIds: Set<string>;
@@ -1141,10 +1141,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (effectiveChanceToBreak > 0 && getRandomInt(0, 100) < Math.min(effectiveChanceToBreak, 100)) {
             const breakEffect = this.effectFactory.makeEffect("Break");
             if (breakEffect) {
-                const laps = breakEffect.getLaps();
                 if (extendBreak) {
                     breakEffect.extend();
                 }
+                const laps = breakEffect.getLaps();
                 if (this.applyEffect(breakEffect)) {
                     sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
                 }
