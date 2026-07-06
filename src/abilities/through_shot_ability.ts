@@ -103,7 +103,7 @@ export function processThroughShotAbility(
             if (paralysisAttackerEffect) {
                 throughShotMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;
             }
-            const damageFromAttack = processLuckyStrikeAbility(
+            let damageFromAttack = processLuckyStrikeAbility(
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
@@ -117,6 +117,8 @@ export function processThroughShotAbility(
                 ),
                 sceneLog,
             );
+            // Through Shot is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
+            damageFromAttack = Math.floor(damageFromAttack * targetUnit.getPhysicalAoeDamageMultiplier());
             sceneLog.updateLog(`${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})`);
             const amountAliveBeforeDamage = targetUnit.getAmountAlive();
             const positionAtImpact = { ...targetUnit.getPosition() };

@@ -4,7 +4,8 @@ Heroes of Crypto has **three separate resistance mechanics**. They are commonly 
 distinct stats that protect against *different* things:
 
 1. **Magic resistance** — reduces magic **damage** and the chance that a **spell debuff** lands.
-2. **Status resistance** — reduces the chance that a **status ability** (Stun, Paralysis) lands.
+2. **Status resistance** — reduces the chance that a **status ability** (Stun, Paralysis) lands, **and**
+   reduces **physical area-of-effect damage** taken.
 3. **Mind resistance** — a **binary immunity** to **MIND**-type effects.
 
 > All behaviour is in the shared engine (`src/`), so it is identical on the client and the authoritative

@@ -118,6 +118,9 @@ export function processRangeAOEAbility(
                     damageFromAttack = Math.floor(damageFromAttack * (1 - aegisShieldBuff.getPower() / 100));
                 }
 
+                // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
+                damageFromAttack = Math.floor(damageFromAttack * unit.getPhysicalAoeDamageMultiplier());
+
                 // Snapshot position + stack BEFORE applying damage so the floating number lands where the
                 // unit stood when hit (it may die and be removed before the visuals play).
                 const unitPositionAtImpact = { ...unit.getPosition() };

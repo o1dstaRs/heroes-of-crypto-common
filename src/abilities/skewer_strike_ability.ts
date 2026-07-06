@@ -107,7 +107,7 @@ export function processSkewerStrikeAbility(
             continue;
         }
 
-        const damageFromAttack = fromUnit.calculateAttackDamage(
+        let damageFromAttack = fromUnit.calculateAttackDamage(
             nextStandingTarget,
             PBTypes.AttackVals.MELEE,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
@@ -119,6 +119,9 @@ export function processSkewerStrikeAbility(
                     .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
             ),
         );
+
+        // Skewer Strike is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
+        damageFromAttack = Math.floor(damageFromAttack * nextStandingTarget.getPhysicalAoeDamageMultiplier());
 
         const amountBefore = nextStandingTarget.getAmountAlive();
         const damageDealt = nextStandingTarget.applyDamage(

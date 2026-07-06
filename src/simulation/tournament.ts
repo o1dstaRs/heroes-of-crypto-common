@@ -19,6 +19,7 @@ import {
     makeRng,
     DEFAULT_ROSTER_COMPOSITION,
     DEFAULT_AMOUNT_BY_LEVEL,
+    type IArmyUnitSpec,
     type IRosterComposition,
 } from "./army";
 import { runMatch, type IMatchResult, type ISetupAugment, type ISetupSynergy, type Side } from "./battle_engine";
@@ -78,6 +79,11 @@ export interface ITournamentOptions {
      * across the pair. Unlike every other mode the two rosters DIFFER (that's the point), so the win rate
      * isolates which draft policy picks the better army. Same aggregator (greenIsWeighted + winner). */
     cemDraft?: boolean;
+    /** CEM composition+opponent-aware AUGMENT training: each side fields its OWN random roster (so opponent
+     * composition varies and matters), the WEIGHTED side picks augments via the army-aware policy (env
+     * V05_AUGCA_WEIGHTS, sees own+enemy comp), the FROZEN side via the blind heuristic; sides swap across the
+     * pair. Win rate isolates whether composition/opponent-aware augment choice beats the blind default. */
+    cemAugCA?: boolean;
 }
 
 // Constructed once per worker process. The weighted policy reads its vector from the process env at
@@ -108,6 +114,67 @@ const CEM_DRAFT_FROZEN_W: readonly number[] = (() => {
     }
     return DRAFT_ANCHOR_W;
 })();
+
+// Composition + OPPONENT-aware augment policy (trained via cemAugCA). Scores each augment kind by its base
+// value + a weight vector over features of the OWN and ENEMY army composition — so a ranged army can learn to
+// buy Sniper, and an army facing ranged can learn to buy Armor. 20 weights = 4 kinds x 5 features; w=0 (anchor)
+// reproduces the value-only greedy ({Armor,Might}). Injected via env V05_AUGCA_WEIGHTS by the trainer.
+const AUGCA_KINDS = ["Armor", "Might", "Sniper", "Movement"] as const;
+const AUGCA_BASE: Record<(typeof AUGCA_KINDS)[number], number> = { Armor: 19, Might: 15, Sniper: 7, Movement: -5 };
+const AUGCA_MAXLVL: Record<(typeof AUGCA_KINDS)[number], number> = { Armor: 3, Might: 3, Sniper: 3, Movement: 2 };
+const AUGCA_NFEAT = 5;
+const AUGCA_WEIGHTS: number[] = (() => {
+    const raw = process.env.V05_AUGCA_WEIGHTS;
+    if (raw) {
+        try {
+            const p = JSON.parse(raw);
+            if (
+                Array.isArray(p) &&
+                p.length === AUGCA_KINDS.length * AUGCA_NFEAT &&
+                p.every((n) => Number.isFinite(n))
+            ) {
+                return p;
+            }
+        } catch {
+            /* malformed -> anchor */
+        }
+    }
+    return new Array(AUGCA_KINDS.length * AUGCA_NFEAT).fill(0);
+})();
+const rangedFracOf = (r: readonly IArmyUnitSpec[]): number =>
+    r.filter((u) => creatureInfo(creatureIdForName(u.creatureName))?.ranged).length / Math.max(1, r.length);
+/** Features seen when choosing augments: [ownRanged, ownAvgLevel/4, enemyRanged, enemyMelee, bias]. */
+const augCAFeats = (own: readonly IArmyUnitSpec[], enemy: readonly IArmyUnitSpec[]): number[] => {
+    const eR = rangedFracOf(enemy);
+    return [rangedFracOf(own), own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4, eR, 1 - eR, 1];
+};
+const augCA = (
+    own: readonly IArmyUnitSpec[],
+    enemy: readonly IArmyUnitSpec[],
+    budget: number,
+    w: number[],
+): ISetupAugment[] => {
+    const f = augCAFeats(own, enemy);
+    const scored = AUGCA_KINDS.map((kind, ki) => {
+        let v = AUGCA_BASE[kind];
+        for (let j = 0; j < AUGCA_NFEAT; j += 1) {
+            v += w[ki * AUGCA_NFEAT + j] * f[j];
+        }
+        return { kind, v };
+    })
+        .filter((c) => c.v >= 10)
+        .sort((a, b) => b.v - a.v);
+    const out: ISetupAugment[] = [];
+    let rem = Math.max(0, Math.floor(budget));
+    for (const c of scored) {
+        const lvl = Math.min(AUGCA_MAXLVL[c.kind], rem);
+        if (lvl >= 1) {
+            out.push({ kind: c.kind, value: lvl });
+            rem -= lvl;
+        }
+    }
+    return out;
+};
 
 /** FactionVals id → catalog faction name (lowercased match in creaturesByLevel). Only the four synergy
  * factions are relevant here. */
@@ -350,6 +417,21 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
             redPerk = Perk.SEE_NONE;
             redAugments = augFor(redRoster);
         }
+    }
+    if (options.cemAugCA) {
+        // Both sides field their OWN random roster (opponent comp varies); weighted side picks augments via the
+        // composition+opponent-aware policy, frozen side via the blind heuristic; swap which is weighted per pair.
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel);
+        greenIsWeighted = game % 2 === 0;
+        const budget = getUpgradePoints(Perk.SEE_NONE);
+        greenPerk = Perk.SEE_NONE;
+        redPerk = Perk.SEE_NONE;
+        greenAugments = greenIsWeighted
+            ? augCA(roster, redRoster, budget, AUGCA_WEIGHTS)
+            : CEM_FROZEN.pickAugments(budget);
+        redAugments = greenIsWeighted
+            ? CEM_FROZEN.pickAugments(budget)
+            : augCA(redRoster, roster, budget, AUGCA_WEIGHTS);
     }
     if (options.cemSetup) {
         const setupFor = (policy: typeof CEM_FROZEN) => {

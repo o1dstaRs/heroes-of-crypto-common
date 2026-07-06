@@ -139,6 +139,9 @@ export function processLightningSpinAbility(
                 damageFromAttack = Math.floor(damageFromAttack * (1 - aegisShieldBuff.getPower() / 100));
             }
 
+            // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
+            damageFromAttack = Math.floor(damageFromAttack * enemy.getPhysicalAoeDamageMultiplier());
+
             const positionAtImpact = { ...enemy.getPosition() };
             const amountAliveBefore = enemy.getAmountAlive();
             damageStatisticHolder.add({

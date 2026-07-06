@@ -48,6 +48,16 @@ import { UnitProperties } from "./unit_properties";
 import type { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 
+// Mechanism constructs have this much LOWER effective status resist vs physical AOE damage (see
+// getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
+const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
+
+// ARTIFACT Blighted Bulwark (cursed, tier-1): reduces area damage (via the "Aegis Shield" System buff the
+// AOE handlers already read) but curses the wielder's whole army — an extra chance to Break when hit and a
+// flat chance to miss on attack. Keyed on getBuff("Aegis Shield") (the internal buff/slug is unchanged).
+const BLIGHTED_BULWARK_BREAK_CHANCE = 10;
+const BLIGHTED_BULWARK_MISS_CHANCE = 5;
+
 export interface IAttackTargets {
     unitIds: Set<string>;
     attackCells: XY[];
@@ -887,6 +897,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
         return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
     }
+    // Multiplier applied to PHYSICAL area-of-effect damage this unit TAKES (Area Throw, Large Caliber,
+    // Lightning Spin, Skewer Strike, Through Shot). Status resistance (Amulet of Resolve) hardens the army
+    // against splash/cleave/line physical AOE — a 25% status resist means 25% less AOE damage. Mechanism
+    // constructs (Tsar Cannon, ...) are FRAGILE to it: a flat -50 effective status resist, so they take ~50%
+    // more. MAGIC AOE (Fire Breath / Chain Lightning) is deliberately NOT routed here — it goes through magic
+    // resist (magic armor) instead. Clamped to [0, ...] so an over-resist can never heal via negative damage.
+    public getPhysicalAoeDamageMultiplier(): number {
+        const mechanismPenalty = this.hasAbilityActive("Mechanism") ? MECHANISM_AOE_STATUS_RESIST_PENALTY : 0;
+        const effectiveResist = this.getStatusResist() - mechanismPenalty;
+        return Math.max(0, 1 - effectiveResist / 100);
+    }
     // Chance-reduction (%) against MIND-type abilities — Petrifying Gaze, Blindness, Boar Saliva, Aggr.
     // Granted by the Helm of Focus artifact. SEPARATE from magic resist (which is magic armor — flat % off
     // magic damage); mind resistance only lowers the odds a MIND effect lands. Read as a per-unit artifact
@@ -1114,7 +1135,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return 0;
         }
 
-        if (chanceToBreak > 0 && getRandomInt(0, 100) < Math.min(chanceToBreak, 100)) {
+        // ARTIFACT Blighted Bulwark (cursed): the wielder's own stacks have an extra chance to Break when hit.
+        const blightedBulwarkBreak = this.getBuff("Aegis Shield") ? BLIGHTED_BULWARK_BREAK_CHANCE : 0;
+        const effectiveChanceToBreak = chanceToBreak + blightedBulwarkBreak;
+        if (effectiveChanceToBreak > 0 && getRandomInt(0, 100) < Math.min(effectiveChanceToBreak, 100)) {
             const breakEffect = this.effectFactory.makeEffect("Break");
             if (breakEffect) {
                 const laps = breakEffect.getLaps();
@@ -1522,6 +1546,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     enemyUnit.calculateAbilityApplyChance(smallSpecieAbility, enemySynergyAbilityPowerIncrease) / 100;
                 combinedMissChances.push(dodgeChance);
             }
+        }
+
+        // ARTIFACT Blighted Bulwark (cursed): the wielder's attacks have a flat chance to miss.
+        if (this.getBuff("Aegis Shield")) {
+            combinedMissChances.push(BLIGHTED_BULWARK_MISS_CHANCE / 100);
         }
 
         if (combinedMissChances.length) {
