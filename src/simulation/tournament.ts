@@ -84,6 +84,11 @@ export interface ITournamentOptions {
      * V05_AUGCA_WEIGHTS, sees own+enemy comp), the FROZEN side via the blind heuristic; sides swap across the
      * pair. Win rate isolates whether composition/opponent-aware augment choice beats the blind default. */
     cemAugCA?: boolean;
+    /** CEM VISION-GATED setup training: each side fields its OWN random roster; the WEIGHTED side jointly picks
+     * PERK (buying vision at a budget cost) + AUGMENTS (counter-picking only the VISIBLE fraction of the enemy
+     * army) via the setupCA policy (env V05_SETUPCA_WEIGHTS); FROZEN side uses the blind heuristic. Tests whether
+     * paying for opponent vision to counter-augment beats the max-budget/no-vision default. */
+    cemSetupCA?: boolean;
 }
 
 // Constructed once per worker process. The weighted policy reads its vector from the process env at
@@ -174,6 +179,74 @@ const augCA = (
         }
     }
     return out;
+};
+
+// VISION-GATED composition+opponent-aware SETUP policy (cemSetupCA). The perk buys VISION at a budget cost
+// (SEE_NONE 7pts/no vision, THREE_REVEALS 6pts/half vision, SEE_ALL 5pts/full vision); only the VISIBLE fraction
+// of the ENEMY composition can be used to counter-pick augments. 23 weights = [0..2] vision-value (bias, ownRanged,
+// ownAvgLvl) + [3..22] augment scorer (4 kinds x 5 feats). w=0 -> SEE_NONE + blind augments (shipped heuristic).
+// Env V05_SETUPCA_WEIGHTS.
+const SETUPCA_PERKS: { perk: Perk; budget: number; vision: number }[] = [
+    { perk: Perk.SEE_NONE, budget: 7, vision: 0 },
+    { perk: Perk.THREE_REVEALS, budget: 6, vision: 0.5 },
+    { perk: Perk.SEE_ALL, budget: 5, vision: 1 },
+];
+const SETUPCA_DIM = 3 + AUGCA_KINDS.length * AUGCA_NFEAT; // 23
+const SETUPCA_WEIGHTS: number[] = (() => {
+    const raw = process.env.V05_SETUPCA_WEIGHTS;
+    if (raw) {
+        try {
+            const p = JSON.parse(raw);
+            if (Array.isArray(p) && p.length === SETUPCA_DIM && p.every((n) => Number.isFinite(n))) {
+                return p;
+            }
+        } catch {
+            /* malformed -> anchor */
+        }
+    }
+    return new Array(SETUPCA_DIM).fill(0);
+})();
+const setupCA = (
+    own: readonly IArmyUnitSpec[],
+    enemy: readonly IArmyUnitSpec[],
+    w: number[],
+): { perk: Perk; augments: ISetupAugment[] } => {
+    const ownR = rangedFracOf(own);
+    const ownLvl = own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4;
+    // Vision value depends on OWN army (known when choosing the perk). Perk maximises budget + vision*value.
+    const visionValue = w[0] + w[1] * ownR + w[2] * ownLvl;
+    let best = SETUPCA_PERKS[0];
+    let bestS = -Infinity;
+    for (const p of SETUPCA_PERKS) {
+        const s = p.budget + p.vision * visionValue;
+        if (s > bestS) {
+            bestS = s;
+            best = p;
+        }
+    }
+    // Augments: enemy features are scaled by the chosen perk's VISION (0 = blind, 1 = full sight).
+    const eR = rangedFracOf(enemy);
+    const f = [ownR, ownLvl, best.vision * eR, best.vision * (1 - eR), 1];
+    const aw = w.slice(3);
+    const scored = AUGCA_KINDS.map((kind, ki) => {
+        let v = AUGCA_BASE[kind];
+        for (let j = 0; j < AUGCA_NFEAT; j += 1) {
+            v += aw[ki * AUGCA_NFEAT + j] * f[j];
+        }
+        return { kind, v };
+    })
+        .filter((c) => c.v >= 10)
+        .sort((a, b) => b.v - a.v);
+    const augments: ISetupAugment[] = [];
+    let rem = best.budget;
+    for (const c of scored) {
+        const lvl = Math.min(AUGCA_MAXLVL[c.kind], rem);
+        if (lvl >= 1) {
+            augments.push({ kind: c.kind, value: lvl });
+            rem -= lvl;
+        }
+    }
+    return { perk: best.perk, augments };
 };
 
 /** FactionVals id → catalog faction name (lowercased match in creaturesByLevel). Only the four synergy
@@ -432,6 +505,21 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         redAugments = greenIsWeighted
             ? CEM_FROZEN.pickAugments(budget)
             : augCA(redRoster, roster, budget, AUGCA_WEIGHTS);
+    }
+    if (options.cemSetupCA) {
+        // Vision-gated joint perk+augment CA vs the blind heuristic; each side its own random roster, swap per pair.
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel);
+        greenIsWeighted = game % 2 === 0;
+        const frozen = () => {
+            const p = CEM_FROZEN.pickPerk();
+            return { perk: p, augments: CEM_FROZEN.pickAugments(getUpgradePoints(p)) };
+        };
+        const g = greenIsWeighted ? setupCA(roster, redRoster, SETUPCA_WEIGHTS) : frozen();
+        const r = greenIsWeighted ? frozen() : setupCA(redRoster, roster, SETUPCA_WEIGHTS);
+        greenPerk = g.perk;
+        greenAugments = g.augments;
+        redPerk = r.perk;
+        redAugments = r.augments;
     }
     if (options.cemSetup) {
         const setupFor = (policy: typeof CEM_FROZEN) => {
