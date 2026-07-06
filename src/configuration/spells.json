@@ -516,11 +516,11 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Aegis Shield": {
-            "name": "Aegis Shield",
+        "Broken Aegis": {
+            "name": "Broken Aegis",
             "level": 0,
             "desc": [
-                "Cursed artifact. -{}% area-attack damage, but 12% break-on-hit and 4% miss.",
+                "Your attacks have a 60% chance to Break the enemy hit (muting its abilities), at the cost of a 4% chance to miss.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

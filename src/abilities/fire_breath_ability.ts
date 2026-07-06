@@ -103,8 +103,8 @@ export function processFireBreathAbility(
         if (giantsMaulBuff && nextStandingTarget.getId() !== toUnit.getId()) {
             fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 + giantsMaulBuff.getPower() / 100));
         }
-        // ARTIFACT Aegis Shield: the victim takes reduced damage from area attacks.
-        const aegisShieldBuff = nextStandingTarget.getBuff("Aegis Shield");
+        // ARTIFACT Broken Aegis: the victim takes reduced damage from area attacks.
+        const aegisShieldBuff = nextStandingTarget.getBuff("Broken Aegis");
         if (aegisShieldBuff) {
             fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 - aegisShieldBuff.getPower() / 100));
         }

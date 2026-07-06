@@ -37,7 +37,12 @@ import {
     PlacementAugment,
     SniperAugment,
 } from "../augments/augment_properties";
-import { ArtifactTier, Tier1Artifact, Tier2Artifact } from "../artifacts/artifact_properties";
+import {
+    ArtifactTier,
+    BROKEN_AEGIS_BREAK_CHANCE,
+    Tier1Artifact,
+    Tier2Artifact,
+} from "../artifacts/artifact_properties";
 import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
@@ -675,12 +680,22 @@ export class FightProperties {
         return SynergyKeysToPower[`Chaos:${ChaosSynergy.MOVEMENT}:${synergyLevel}`]?.[0] ?? 0;
     }
     public getBreakChancePerTeam(teamType: TeamType): number {
-        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
-        if (!synergyLevel) {
-            return 0;
+        let chance = 0;
+
+        // ARTIFACT Broken Aegis (offensive): the wielder's attacks have a chance to Break the ENEMY they
+        // hit. This is the attacker's team chance; the attack handlers pass it as chanceToBreak into the
+        // target's applyDamage, so it mutes the enemy, never the wielder.
+        if (this.hasArtifactTier1(teamType, Tier1Artifact.AEGIS_SHIELD)) {
+            chance += BROKEN_AEGIS_BREAK_CHANCE;
         }
 
-        return SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`]?.[0] ?? 0;
+        // Chaos BREAK_ON_ATTACK synergy (also offensive, stacks with the artifact).
+        const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK);
+        if (synergyLevel) {
+            chance += SynergyKeysToPower[`Chaos:${ChaosSynergy.BREAK_ON_ATTACK}:${synergyLevel}`]?.[0] ?? 0;
+        }
+
+        return Math.min(100, chance);
     }
     public getAdditionalAbilityPowerPerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(

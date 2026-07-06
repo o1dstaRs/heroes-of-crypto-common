@@ -13,6 +13,7 @@ import Denque from "denque";
 import { Ability } from "../abilities/ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
     LUCK_CHANGE_FOR_SHIELD,
@@ -52,11 +53,10 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 // getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
 const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 
-// ARTIFACT Blighted Bulwark (cursed, tier-1): reduces area damage (via the "Aegis Shield" System buff the
-// AOE handlers already read) but curses the wielder's whole army — an extra chance to Break when hit and a
-// flat chance to miss on attack. Keyed on getBuff("Aegis Shield") (the internal buff/slug is unchanged).
-const BLIGHTED_BULWARK_BREAK_CHANCE = 12;
-const BLIGHTED_BULWARK_MISS_CHANCE = 4;
+// ARTIFACT Broken Aegis (tier-1): the OFFENSIVE break (a chance to Break the ENEMY the wielder attacks)
+// lives in FightProperties.getBreakChancePerTeam and flows in as `chanceToBreak` — NOT here. This file
+// only applies the self-cost: a flat chance for the wielder's OWN attacks to miss (see the miss block
+// below, keyed on the wielder's "Broken Aegis" marker buff). Constant from artifact_properties.
 
 export interface IAttackTargets {
     unitIds: Set<string>;
@@ -892,7 +892,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // Chance-reduction (%) against STATUS effects — Stun and Paralysis. Granted by the Amulet of Resolve
     // artifact. Deliberately SEPARATE from magic resist (which governs magic damage and spell debuffs):
     // status resistance only lowers the odds a status effect lands. Read as a per-unit artifact "marker"
-    // buff, like Aegis Shield / Giant's Maul. 0 when the unit carries no status-resist source.
+    // buff, like Broken Aegis / Giant's Maul. 0 when the unit carries no status-resist source.
     public getStatusResist(): number {
         const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
         return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
@@ -1135,10 +1135,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return 0;
         }
 
-        // ARTIFACT Blighted Bulwark (cursed): the wielder's own stacks have an extra chance to Break when hit.
-        const blightedBulwarkBreak = this.getBuff("Aegis Shield") ? BLIGHTED_BULWARK_BREAK_CHANCE : 0;
-        const effectiveChanceToBreak = chanceToBreak + blightedBulwarkBreak;
-        if (effectiveChanceToBreak > 0 && getRandomInt(0, 100) < Math.min(effectiveChanceToBreak, 100)) {
+        // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
+        // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
+        // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
+        if (chanceToBreak > 0 && getRandomInt(0, 100) < Math.min(chanceToBreak, 100)) {
             const breakEffect = this.effectFactory.makeEffect("Break");
             if (breakEffect) {
                 if (extendBreak) {
@@ -1548,9 +1548,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // ARTIFACT Blighted Bulwark (cursed): the wielder's attacks have a flat chance to miss.
-        if (this.getBuff("Aegis Shield")) {
-            combinedMissChances.push(BLIGHTED_BULWARK_MISS_CHANCE / 100);
+        // ARTIFACT Broken Aegis: the self-cost of the offensive break — the wielder's own attacks have a
+        // flat chance to miss (keyed on the wielder's "Broken Aegis" marker buff, not the enemy's).
+        if (this.getBuff("Broken Aegis")) {
+            combinedMissChances.push(BROKEN_AEGIS_MISS_CHANCE / 100);
         }
 
         if (combinedMissChances.length) {

@@ -15,6 +15,12 @@
 // Spell buffs (for the stat ones), and read directly from FightProperties by the combat/terrain/spell
 // hooks (for the bespoke ones). Enum values are the wire ids sent through ArtifactRequest.
 
+// ARTIFACT Broken Aegis (tier-1): OFFENSIVE break — the wielder's attacks have a chance to Break the
+// ENEMY they hit (mute its abilities), at the self-cost of a chance to miss on attack. The "Broken Aegis"
+// System buff is only a marker so units/UI show the army carries this ability (and its self-miss debuff).
+export const BROKEN_AEGIS_BREAK_CHANCE = 60;
+export const BROKEN_AEGIS_MISS_CHANCE = 4;
+
 export enum ArtifactTier {
     TIER_1 = 1,
     TIER_2 = 2,
@@ -33,7 +39,7 @@ export enum Tier1Artifact {
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // +15% ranged atk / -15% ranged def, or +30% ranged atk if 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
-    AEGIS_SHIELD = 12, // Blighted Bulwark (cursed): -15% area dmg, but army 12% break-on-hit / 4% miss (internal id/buff kept as aegis_shield)
+    AEGIS_SHIELD = 12, // Broken Aegis (offensive): wielder's attacks 60% break-the-enemy / 4% self-miss, no area reduction (internal id/buff kept as broken_aegis)
 }
 
 export enum Tier2Artifact {
@@ -115,7 +121,7 @@ export const ARTIFACT_POWER = {
     LONGBOW_ARCHER_THRESHOLD: 3,
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
-    AEGIS_AREA_REDUCTION_PERCENT: 15,
+    AEGIS_AREA_REDUCTION_PERCENT: 0,
     GIANTS_MAUL_NON_PRIMARY_PERCENT: 35,
     RIME_PROC_PERCENT: 30,
     RIME_SLOW_LAPS: 3,
@@ -252,10 +258,10 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
     ),
     [Tier1Artifact.AEGIS_SHIELD]: t1(
         Tier1Artifact.AEGIS_SHIELD,
-        "aegis_shield",
-        "Blighted Bulwark",
-        "Aegis Shield",
-        "Cursed: reduces area-attack damage by {}%, but the army has a 12% chance to break when hit and a 4% chance to miss its attacks.",
+        "broken_aegis",
+        "Broken Aegis",
+        "Broken Aegis",
+        "Broken Aegis: the wielder's attacks have a 60% chance to Break the enemy they hit (muting its abilities), at the cost of a 4% chance to miss.",
     ),
 };
 
@@ -366,7 +372,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
     hunters_longbow: [AP.LONGBOW_ATTACK_PERCENT, AP.LONGBOW_DEFENSE_PENALTY_PERCENT],
     helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
-    aegis_shield: [AP.AEGIS_AREA_REDUCTION_PERCENT],
+    broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],

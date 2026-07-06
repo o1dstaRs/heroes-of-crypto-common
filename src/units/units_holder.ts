@@ -461,7 +461,7 @@ export class UnitsHolder {
                     unit.grantAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.AEGIS_SHIELD:
-                    applyArtifactBuff("Aegis Shield", AP.AEGIS_AREA_REDUCTION_PERCENT);
+                    applyArtifactBuff("Broken Aegis", AP.AEGIS_AREA_REDUCTION_PERCENT);
                     break;
                 default:
                     break;

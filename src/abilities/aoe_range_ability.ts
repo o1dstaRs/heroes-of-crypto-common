@@ -112,8 +112,8 @@ export function processRangeAOEAbility(
                     sceneLog,
                 );
 
-                // ARTIFACT Aegis Shield: the victim takes reduced damage from area attacks.
-                const aegisShieldBuff = unit.getBuff("Aegis Shield");
+                // ARTIFACT Broken Aegis: the victim takes reduced damage from area attacks.
+                const aegisShieldBuff = unit.getBuff("Broken Aegis");
                 if (aegisShieldBuff) {
                     damageFromAttack = Math.floor(damageFromAttack * (1 - aegisShieldBuff.getPower() / 100));
                 }
