@@ -27,12 +27,27 @@ async function main(): Promise<void> {
     // Optional 4th arg: the FIGHT AI both sides use (default v0.5). Lets us check whether a draft advantage is
     // real or specific to one fight AI (e.g. melee>ranged might be a v0.5 positioning artifact).
     const fightVersion = verArg || "v0.5";
+    // Optional CEM_DRAFT_MAPS="1,4" → board layouts (1 NORMAL, 2 WATER, 3 LAVA, 4 BLOCK). Obstacle maps slow
+    // melee's approach, so ranged should fare better there if terrain is the lever.
+    const mapTypes = process.env.CEM_DRAFT_MAPS
+        ? process.env.CEM_DRAFT_MAPS.split(",")
+              .map(Number)
+              .filter((n) => Number.isFinite(n))
+        : undefined;
 
     let wins = 0;
     let losses = 0;
     let draws = 0;
     await runTournamentConcurrent(
-        { versionA: fightVersion, versionB: fightVersion, games, baseSeed: seed, cemDraft: true, lightweight: true },
+        {
+            versionA: fightVersion,
+            versionB: fightVersion,
+            games,
+            baseSeed: seed,
+            cemDraft: true,
+            lightweight: true,
+            ...(mapTypes ? { mapTypes } : {}),
+        },
         concurrency,
         (rec) => {
             const winner = rec.result.winner;

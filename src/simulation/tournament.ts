@@ -10,8 +10,8 @@
  */
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
-import { getUpgradePoints } from "../perks/perk_properties";
-import { DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
+import { Perk, getUpgradePoints } from "../perks/perk_properties";
+import { creatureInfo, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
 import {
@@ -292,12 +292,63 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         const redW = greenIsWeighted ? CEM_DRAFT_FROZEN_W : CEM_DRAFT_WEIGHTED_W;
         roster = draftRoster(greenW, seed, composition, amountByLevel);
         redRoster = draftRoster(redW, seed, composition, amountByLevel);
+        // UNIT-SPLITTING (CEM_DRAFT_SPLIT=1): model extra placement slots (Placement augment / Nature synergy) by
+        // splitting a RANGED-heavy army's stacks into more, smaller stacks — more shooters landing shots before
+        // melee contact. Small stacks (< 4) aren't split. Tests whether splitting is the lever that saves ranged.
+        if (process.env.CEM_DRAFT_SPLIT === "1") {
+            const rFrac = (r: typeof roster): number =>
+                r.filter((u) => creatureInfo(creatureIdForName(u.creatureName))?.ranged).length / Math.max(1, r.length);
+            const split = (r: typeof roster): typeof roster =>
+                rFrac(r) < 0.4
+                    ? r
+                    : r.flatMap((u) =>
+                          u.amount >= 4
+                              ? [
+                                    { ...u, amount: Math.ceil(u.amount / 2) },
+                                    { ...u, amount: Math.floor(u.amount / 2) },
+                                ]
+                              : [u],
+                      );
+            roster = split(roster);
+            redRoster = split(redRoster);
+        }
         // Optionally activate SYNERGIES in draft self-play (CEM_DRAFT_SYNERGIES=1): each side gets the heuristic
         // best synergy per fielded faction (2+ units) from its OWN drafted roster — a fuller, more realistic
         // game so we can check whether the melee>ranged draft edge survives when synergies are live.
         if (process.env.CEM_DRAFT_SYNERGIES === "1") {
             greenSynergies = SETUP_POLICY_V0.pickSynergies(roster.map((u) => creatureIdForName(u.creatureName)));
             redSynergies = SETUP_POLICY_V0.pickSynergies(redRoster.map((u) => creatureIdForName(u.creatureName)));
+        }
+        // Apply setup augments to BOTH sides. "1" = composition-BLIND shipped setup (buys Armor/Might + 1 Sniper
+        // regardless of army). "2" = composition-AWARE: a ranged-heavy army leads with SNIPER-max, a melee army
+        // with Armor/Might — the fair test of whether ranged competes when it gets its actual toolkit.
+        if (process.env.CEM_DRAFT_AUGMENTS === "1") {
+            const gp = CEM_WEIGHTED.pickPerk();
+            greenPerk = gp;
+            greenAugments = CEM_WEIGHTED.pickAugments(getUpgradePoints(gp));
+            const rp = CEM_WEIGHTED.pickPerk();
+            redPerk = rp;
+            redAugments = CEM_WEIGHTED.pickAugments(getUpgradePoints(rp));
+        } else if (process.env.CEM_DRAFT_AUGMENTS === "2") {
+            const rangedFrac = (r: typeof roster): number =>
+                r.filter((u) => creatureInfo(creatureIdForName(u.creatureName))?.ranged).length / Math.max(1, r.length);
+            // budget 7 (SEE_NONE): ranged → Sniper3+Armor3+Might1; melee → Armor3+Might3+Sniper1.
+            const augFor = (r: typeof roster): ISetupAugment[] =>
+                rangedFrac(r) >= 0.4
+                    ? [
+                          { kind: "Sniper", value: 3 },
+                          { kind: "Armor", value: 3 },
+                          { kind: "Might", value: 1 },
+                      ]
+                    : [
+                          { kind: "Armor", value: 3 },
+                          { kind: "Might", value: 3 },
+                          { kind: "Sniper", value: 1 },
+                      ];
+            greenPerk = Perk.SEE_NONE;
+            greenAugments = augFor(roster);
+            redPerk = Perk.SEE_NONE;
+            redAugments = augFor(redRoster);
         }
     }
     if (options.cemSetup) {
