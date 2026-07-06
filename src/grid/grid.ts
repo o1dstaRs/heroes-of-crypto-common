@@ -50,12 +50,7 @@ export class Grid {
 
         for (let row = 0; row < gridSize; row++) {
             for (let column = 0; column < gridSize; column++) {
-                if (
-                    row >= this.availableCenterStart &&
-                    row < this.availableCenterEnd &&
-                    column >= this.availableCenterStart &&
-                    column < this.availableCenterEnd
-                ) {
+                if (this.isCenterObstacleCell(row, column)) {
                     const obstacleType = this.getObstacleTypePerGrid();
                     if (obstacleType === ObstacleType.BLOCK) {
                         this.boardCoord[row][column] = "B";
@@ -94,10 +89,7 @@ export class Grid {
                         ((this.gridType === PBTypes.GridVals.LAVA_CENTER && boardVal === "L") ||
                             (this.gridType === PBTypes.GridVals.WATER_CENTER && boardVal === "W") ||
                             this.gridType === PBTypes.GridVals.BLOCK_CENTER) &&
-                        row >= this.availableCenterStart &&
-                        row < this.availableCenterEnd &&
-                        column >= this.availableCenterStart &&
-                        column < this.availableCenterEnd
+                        this.isCenterObstacleCell(row, column)
                     ) {
                         this.boardCoord[row][column] = NO_UNIT;
                     }
@@ -116,12 +108,7 @@ export class Grid {
 
         for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
             for (let column = 0; column < this.gridSettings.getGridSize(); column++) {
-                if (
-                    row >= this.availableCenterStart &&
-                    row < this.availableCenterEnd &&
-                    column >= this.availableCenterStart &&
-                    column < this.availableCenterEnd
-                ) {
+                if (this.isCenterObstacleCell(row, column)) {
                     const obstacleType = this.getObstacleTypePerGrid();
                     if (obstacleType === undefined) {
                         this.boardCoord[row][column] = NO_UNIT;
@@ -590,13 +577,7 @@ export class Grid {
             }
         }
 
-        if (
-            row >= this.availableCenterStart &&
-            row < this.availableCenterEnd &&
-            column >= this.availableCenterStart &&
-            column < this.availableCenterEnd &&
-            !this.cleanedUpCenter
-        ) {
+        if (!this.cleanedUpCenter && this.isCenterObstacleCell(row, column)) {
             const obstacleType = this.getObstacleTypePerGrid();
             if (obstacleType !== undefined) {
                 return obstacleType;
@@ -623,6 +604,29 @@ export class Grid {
         }
 
         return undefined;
+    }
+    // Whether (row, column) holds a center obstacle for the current grid type.
+    //   BLOCK_CENTER (mountains): two 2x2 destructible mountains flanking a 2x2 walkable corridor, centered
+    //     across the middle two rows — [MM][··][MM]. (To make the corridor run the other way, swap the row
+    //     and column roles below.)
+    //   LAVA_CENTER / WATER_CENTER: the full availableCenter square (unchanged).
+    private isCenterObstacleCell(row: number, column: number): boolean {
+        if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
+            const mid = this.gridSettings.getGridSize() >> 1;
+            const inRows = row === mid - 1 || row === mid; // two rows tall (e.g. 7,8 on a 16-grid)
+            const inMountainColumns =
+                column === mid - 3 ||
+                column === mid - 2 || // left 2x2  (cols 5,6)
+                column === mid + 1 ||
+                column === mid + 2; //  right 2x2 (cols 9,10); corridor = mid-1,mid (7,8)
+            return inRows && inMountainColumns;
+        }
+        return (
+            row >= this.availableCenterStart &&
+            row < this.availableCenterEnd &&
+            column >= this.availableCenterStart &&
+            column < this.availableCenterEnd
+        );
     }
     private updateAggrGrid(
         cell: XY,
