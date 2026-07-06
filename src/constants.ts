@@ -28,6 +28,8 @@ export const NUMBER_OF_ARMAGEDDON_WAVES = 4;
 export const NUMBER_OF_LAPS_TOTAL = NUMBER_OF_LAPS_FIRST_ARMAGEDDON + NUMBER_OF_ARMAGEDDON_WAVES - 1;
 export const MAX_HOLE_LAYERS = 5;
 export const MAX_HITS_MOUNTAIN = 5;
+// BLOCK_CENTER is two separate 2x2 mountains; each is destroyed independently after this many hits.
+export const HITS_PER_MOUNTAIN = 3;
 export const MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE = 75;
 export const MAX_NARROWING_LAPS_TOTAL = 4;
 

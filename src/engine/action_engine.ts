@@ -663,8 +663,16 @@ export class GameActionEngine {
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];
-        if (hitsAfter <= 0) {
-            this.context.grid.cleanupCenterObstacle();
+        // Destroy whichever 2x2 mountain just ran out of hits (each is independent). clearMountainSide is
+        // idempotent, so checking both after every obstacle attack is safe and cheap.
+        let clearedMountain = false;
+        if (this.context.fightProperties.getObstacleHitsLeftLeft() <= 0 && this.context.grid.clearMountainSide(false)) {
+            clearedMountain = true;
+        }
+        if (this.context.fightProperties.getObstacleHitsLeftRight() <= 0 && this.context.grid.clearMountainSide(true)) {
+            clearedMountain = true;
+        }
+        if (clearedMountain) {
             events.push({ type: "center_obstacle_cleared", gridType: this.context.fightProperties.getGridType() });
         }
         events.push(...this.turnEngine.completeTurn(attacker));

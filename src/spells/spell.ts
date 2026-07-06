@@ -107,6 +107,14 @@ export class Spell {
     public getAmount(): number {
         return this.amountRemaining;
     }
+    /**
+     * Overwrite the remaining casts (scrolls) authoritatively. Used by the ranked client to sync the used-up
+     * scroll count from the server snapshot — the client never runs the cast engine, so without this its
+     * amountRemaining stays stale-high and the AI re-proposes a spell the server already spent (spell_not_available).
+     */
+    public setAmount(amount: number): void {
+        this.amountRemaining = Math.max(0, Math.floor(amount));
+    }
     public setPower(power: number): void {
         this.spellProperties.power = power;
     }

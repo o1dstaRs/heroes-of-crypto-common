@@ -30,6 +30,9 @@ export class Grid {
     private availableCenterStart: number;
     private availableCenterEnd: number;
     private cleanedUpCenter = false;
+    // BLOCK_CENTER has two independent mountains; each is cleared to walkable when its own hit points hit 0.
+    private leftMountainCleared = false;
+    private rightMountainCleared = false;
     public constructor(gridSettings: GridSettings, gridType: GridType) {
         this.gridSettings = gridSettings;
         const gridSize = gridSettings.getGridSize();
@@ -98,6 +101,31 @@ export class Grid {
             this.cleanedUpCenter = true;
         }
     }
+    // Clear ONE of the two BLOCK_CENTER mountains (left/right) to walkable once its hit points run out.
+    // Idempotent: returns false (and does nothing) if it isn't a mountain map or that side is already gone.
+    public clearMountainSide(isRight: boolean): boolean {
+        if (this.gridType !== PBTypes.GridVals.BLOCK_CENTER) {
+            return false;
+        }
+        if (isRight ? this.rightMountainCleared : this.leftMountainCleared) {
+            return false;
+        }
+        if (isRight) {
+            this.rightMountainCleared = true;
+        } else {
+            this.leftMountainCleared = true;
+        }
+        const mid = this.gridSettings.getGridSize() >> 1;
+        // Mountains are separated along rows (world-X); both share the middle two columns (world-Y).
+        const rows = isRight ? [mid + 1, mid + 2] : [mid - 3, mid - 2];
+        const columns = [mid - 1, mid];
+        for (const row of rows) {
+            for (const column of columns) {
+                this.boardCoord[row][column] = NO_UNIT;
+            }
+        }
+        return true;
+    }
     public refreshWithNewType(gridType: GridType): void {
         this.gridType = gridType;
 
@@ -123,6 +151,8 @@ export class Grid {
             }
         }
         this.cleanedUpCenter = false;
+        this.leftMountainCleared = false;
+        this.rightMountainCleared = false;
     }
     public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
         if (!cells1.length || !cells2.length) {
@@ -451,6 +481,58 @@ export class Grid {
 
         return true;
     }
+    /**
+     * Recompute every team's AGGRO board from the grid's CURRENT occupancy, without touching occupancy itself.
+     * Mirrors the aggro-add path in occupyCells (small unit: per-cell; large unit: four corner masks). Used to
+     * repair a stale aggro board (ranked skip-rebuild snapshots move units without re-stamping aggro) so the
+     * AI's pathfinding sees the same enemy threat zones the server enforces — WITHOUT the ghost-occupancy risk
+     * of a cleanupAll/occupyCells re-stamp (occupyCells silently drops a unit whose cells are momentarily
+     * invalid). attackRangeByUnitId supplies each live unit's range (the grid does not store it).
+     */
+    public rebuildAggrBoards(attackRangeByUnitId: Map<string, number>): void {
+        // Reset to the BASELINE (1), matching the constructor — NOT 0. A cell counts as "threatened" only when
+        // its aggr exceeds 1 (path_helper: `aggrValue > 1`), and each unit's updateAggrGrid ADDS on top of the
+        // baseline. Filling 0 would leave every threatened cell at 0+1=1 (== baseline → reads as UNthreatened),
+        // making the client's aggro board LESS restrictive than the server's → the AI walks into threat cells
+        // and the move/melee is refused (attack_not_available / invalid_move) — worse than not rebuilding.
+        for (const board of this.boardAggrPerTeam.values()) {
+            for (const row of board) {
+                row.fill(1);
+            }
+        }
+        for (const unitId of Object.keys(this.cellsByUnitId)) {
+            const cells = this.cellsByUnitId[unitId];
+            const team = this.unitIdToTeam[unitId];
+            const attackRange = attackRangeByUnitId.get(unitId);
+            if (!cells?.length || !team || !attackRange) {
+                continue;
+            }
+            const aggrGrid = this.boardAggrPerTeam.get(team);
+            if (!aggrGrid) {
+                continue;
+            }
+            if (cells.length === 1) {
+                this.updateAggrGrid(cells[0], attackRange, 1, aggrGrid);
+                continue;
+            }
+            let xMin = Number.MAX_SAFE_INTEGER;
+            let xMax = Number.MIN_SAFE_INTEGER;
+            let yMin = Number.MAX_SAFE_INTEGER;
+            let yMax = Number.MIN_SAFE_INTEGER;
+            for (const c of cells) {
+                xMin = Math.min(xMin, c.x);
+                xMax = Math.max(xMax, c.x);
+                yMin = Math.min(yMin, c.y);
+                yMax = Math.max(yMax, c.y);
+            }
+            if (xMin !== xMax && yMin !== yMax) {
+                this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
+                this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
+                this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
+                this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_RIGHT);
+            }
+        }
+    }
     public getOccupantUnitId(cell: XY): string | undefined {
         const subArray = this.boardCoord[cell.x];
         if (!subArray) {
@@ -538,6 +620,28 @@ export class Grid {
         return matrix;
     }
     public getCenterCells(excludeInner = false): XY[] {
+        // Two separate 2x2 mountains: return only the cells of the mountains still standing, so obstacle
+        // attack targeting + the AI's mining only ever see intact rock. Rows are world-X (left mid-3,mid-2 /
+        // right mid+1,mid+2), columns are world-Y (mid-1,mid). excludeInner has no meaning for this shape.
+        if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
+            const mid = this.gridSettings.getGridSize() >> 1;
+            const mountainColumns = [mid - 1, mid];
+            const cells: XY[] = [];
+            const pushSide = (rows: number[]): void => {
+                for (const row of rows) {
+                    for (const column of mountainColumns) {
+                        cells.push({ x: row, y: column });
+                    }
+                }
+            };
+            if (!this.leftMountainCleared) {
+                pushSide([mid - 3, mid - 2]);
+            }
+            if (!this.rightMountainCleared) {
+                pushSide([mid + 1, mid + 2]);
+            }
+            return cells;
+        }
         const quarter = this.gridSettings.getGridSize() >> 2;
         const halfQuarter = quarter >> 1;
         const start = quarter + halfQuarter;
@@ -612,14 +716,23 @@ export class Grid {
     //   LAVA_CENTER / WATER_CENTER: the full availableCenter square (unchanged).
     private isCenterObstacleCell(row: number, column: number): boolean {
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
+            // NOTE: in this grid `row` is the horizontal (world-X) axis and `column` is vertical (world-Y).
+            // The two mountains sit side by side along X (rows), sharing the middle two Y columns, with a 2x2
+            // walkable corridor between them (rows mid-1,mid). This matches the two sprites (offset in world-X).
             const mid = this.gridSettings.getGridSize() >> 1;
-            const inRows = row === mid - 1 || row === mid; // two rows tall (e.g. 7,8 on a 16-grid)
-            const inMountainColumns =
-                column === mid - 3 ||
-                column === mid - 2 || // left 2x2  (cols 5,6)
-                column === mid + 1 ||
-                column === mid + 2; //  right 2x2 (cols 9,10); corridor = mid-1,mid (7,8)
-            return inRows && inMountainColumns;
+            if (column !== mid - 1 && column !== mid) {
+                return false;
+            }
+            const isLeftMountain = row === mid - 3 || row === mid - 2; // left 2x2  (rows 5,6)
+            const isRightMountain = row === mid + 1 || row === mid + 2; // right 2x2 (rows 9,10); corridor = 7,8
+            // A mountain stops being an obstacle once its own hit points run out.
+            if (isLeftMountain) {
+                return !this.leftMountainCleared;
+            }
+            if (isRightMountain) {
+                return !this.rightMountainCleared;
+            }
+            return false;
         }
         return (
             row >= this.availableCenterStart &&

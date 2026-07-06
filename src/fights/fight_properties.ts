@@ -13,7 +13,7 @@ import Denque from "denque";
 
 import { createSecureUuid, getRandomInt, getTimeMillis, uuidFromBytes, uuidToUint8Array } from "../utils/lib";
 import {
-    MAX_HITS_MOUNTAIN,
+    HITS_PER_MOUNTAIN,
     MAX_SYNERGY_LEVEL,
     MAX_TIME_TO_MAKE_TURN_MILLIS,
     MAX_UNITS_PER_TEAM,
@@ -106,7 +106,9 @@ export class FightProperties {
     private synergyUnitsNaturePerTeam: Map<TeamType, number>;
     private damageDealFactPerLap: Map<number, boolean>;
     private synergiesPerTeam: Map<TeamType, string[]>;
-    private obstacleHitsLeft: number = 0;
+    // Two independent 2x2 mountains (BLOCK_CENTER): left cols and right cols each have their own hit points.
+    private obstacleHitsLeftLeft: number = 0;
+    private obstacleHitsLeftRight: number = 0;
     private additionalNarrowingLaps: number = 0;
     public constructor() {
         this.id = createSecureUuid();
@@ -114,7 +116,8 @@ export class FightProperties {
         this.gridType = this.getRandomGridType();
         this.placementType = PlacementType.RECTANGLE;
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
-            this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
+            this.obstacleHitsLeftLeft = HITS_PER_MOUNTAIN;
+            this.obstacleHitsLeftRight = HITS_PER_MOUNTAIN;
         }
         this.firstTurnMade = false;
         this.fightStarted = false;
@@ -208,16 +211,27 @@ export class FightProperties {
     public getCurrentLapTotalTime(teamType: TeamType): number {
         return this.currentLapTotalTimePerTeam.get(teamType) ?? 0;
     }
+    // Total remaining mountain hit points across BOTH 2x2 mountains (0..2*HITS_PER_MOUNTAIN). Kept as the sum
+    // so existing "is any mountain still standing" guards, the AI, and the snapshot keep working unchanged.
     public getObstacleHitsLeft(): number {
-        return this.obstacleHitsLeft;
+        return this.obstacleHitsLeftLeft + this.obstacleHitsLeftRight;
+    }
+    public getObstacleHitsLeftLeft(): number {
+        return this.obstacleHitsLeftLeft;
+    }
+    public getObstacleHitsLeftRight(): number {
+        return this.obstacleHitsLeftRight;
     }
     /**
-     * Authoritatively set the remaining mountain hit points. Used by the client replay to reflect the
-     * recorded `obstacle_attacked` event's `hitsAfter` without re-running the attack through the engine
-     * (which is unreliable mid-replay once the actor's turn has handed over). Clamped to [0, MAX].
+     * Authoritatively set the remaining mountain hit points from a serialized TOTAL. Used by the client
+     * replay to reflect the recorded `obstacle_attacked` event's `hitsAfter` without re-running the attack.
+     * The wire only carries the total, so split it left-first across the two mountains (an approximation
+     * that's exact at full/empty; ranked would need a per-mountain field to be pixel-perfect mid-mine).
      */
     public setObstacleHitsLeft(hits: number): void {
-        this.obstacleHitsLeft = Math.max(0, Math.min(MAX_HITS_MOUNTAIN, Math.floor(hits)));
+        const total = Math.max(0, Math.min(2 * HITS_PER_MOUNTAIN, Math.floor(hits)));
+        this.obstacleHitsLeftLeft = Math.min(HITS_PER_MOUNTAIN, total);
+        this.obstacleHitsLeftRight = total - this.obstacleHitsLeftLeft;
     }
     public hasDamageDealFactPerLap(lap: number): boolean {
         return this.damageDealFactPerLap.get(lap) ?? false;
@@ -225,14 +239,17 @@ export class FightProperties {
     public encounterDamageDealFact(): void {
         this.damageDealFactPerLap.set(this.currentLap, true);
     }
-    public encounterObstacleHit(): void {
-        if (this.obstacleHitsLeft > 0) {
-            this.damageDealFactPerLap.set(this.currentLap, true);
-        }
-
-        this.obstacleHitsLeft--;
-        if (this.obstacleHitsLeft < 0) {
-            this.obstacleHitsLeft = 0;
+    public encounterObstacleHit(isRightMountain: boolean): void {
+        if (isRightMountain) {
+            if (this.obstacleHitsLeftRight > 0) {
+                this.damageDealFactPerLap.set(this.currentLap, true);
+            }
+            this.obstacleHitsLeftRight = Math.max(0, this.obstacleHitsLeftRight - 1);
+        } else {
+            if (this.obstacleHitsLeftLeft > 0) {
+                this.damageDealFactPerLap.set(this.currentLap, true);
+            }
+            this.obstacleHitsLeftLeft = Math.max(0, this.obstacleHitsLeftLeft - 1);
         }
     }
     public getNumberOfUnitsAvailableForPlacement(teamType: TeamType): number {
@@ -289,9 +306,11 @@ export class FightProperties {
         if (!this.fightStarted) {
             this.gridType = gridType;
             if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
-                this.obstacleHitsLeft = MAX_HITS_MOUNTAIN;
+                this.obstacleHitsLeftLeft = HITS_PER_MOUNTAIN;
+                this.obstacleHitsLeftRight = HITS_PER_MOUNTAIN;
             } else {
-                this.obstacleHitsLeft = 0;
+                this.obstacleHitsLeftLeft = 0;
+                this.obstacleHitsLeftRight = 0;
             }
         }
     }

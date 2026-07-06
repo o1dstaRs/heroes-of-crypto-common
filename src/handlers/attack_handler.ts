@@ -1865,6 +1865,9 @@ export class AttackHandler {
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
     ): IAttackResult {
         const targetCell = GridMath.getCellForPosition(this.gridSettings, targetPosition);
+        // Which of the two 2x2 mountains was struck (left columns vs right columns), so only its own hit
+        // points are spent. Corridor cells are never targeted, so the midpoint split is unambiguous.
+        const isRightMountain = targetCell.x >= this.gridSettings.getGridSize() >> 1;
         const animationData: IAnimationData[] = [];
         if (
             this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
@@ -1910,7 +1913,7 @@ export class AttackHandler {
                 toPosition: targetPosition,
                 affectedUnit: new AttackTarget(targetPosition, 1),
             });
-            FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+            FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
             attackerUnit.decreaseNumberOfShots();
             this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
             rangeLanded = true;
@@ -1929,7 +1932,7 @@ export class AttackHandler {
                     toPosition: targetPosition,
                     affectedUnit: new AttackTarget(targetPosition, 1),
                 });
-                FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+                FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                 attackerUnit.decreaseNumberOfShots();
                 this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                 rangeLanded = true;
@@ -2037,13 +2040,13 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
-                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     if (
                         FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
                         attackerUnit.getAbility("Double Punch")
                     ) {
-                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     }
                 } else {
@@ -2108,14 +2111,14 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
-                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
 
                     if (
                         FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
                         attackerUnit.getAbility("Double Punch")
                     ) {
-                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit();
+                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     }
                 } else {
