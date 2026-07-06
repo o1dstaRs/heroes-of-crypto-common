@@ -33,7 +33,7 @@ export enum Tier1Artifact {
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // +15% ranged atk / -15% ranged def, or +30% ranged atk if 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
-    AEGIS_SHIELD = 12, // +15% defense vs area attacks
+    AEGIS_SHIELD = 12, // Blighted Bulwark (cursed): -15% area dmg, but army 10% break-on-hit / 5% miss (internal id/buff kept as aegis_shield)
 }
 
 export enum Tier2Artifact {
@@ -253,9 +253,9 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
     [Tier1Artifact.AEGIS_SHIELD]: t1(
         Tier1Artifact.AEGIS_SHIELD,
         "aegis_shield",
+        "Blighted Bulwark",
         "Aegis Shield",
-        "Aegis Shield",
-        "Reduces damage taken from area attacks by {}%.",
+        "Cursed: reduces area-attack damage by {}%, but the army has a 10% chance to break when hit and a 5% chance to miss its attacks.",
     ),
 };
 

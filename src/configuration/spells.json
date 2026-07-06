@@ -519,7 +519,10 @@
         "Aegis Shield": {
             "name": "Aegis Shield",
             "level": 0,
-            "desc": ["Artifact. Reduces damage taken from area attacks by {}%.", "Lasts till the end of the fight."],
+            "desc": [
+                "Cursed artifact. -{}% area-attack damage, but 10% break-on-hit and 5% miss.",
+                "Lasts till the end of the fight."
+            ],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
