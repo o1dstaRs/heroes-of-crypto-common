@@ -22,7 +22,7 @@ export enum ArtifactTier {
 
 export enum Tier1Artifact {
     NO_ARTIFACT = 0,
-    VETERAN_HELM = 1, // +5% attack & +5% defense (all)
+    VETERAN_HELM = 1, // +4% defense (all)
     AMULET_OF_RESOLVE = 2, // +25% status resist
     KEEN_BLADE = 3, // +1 attack (flat)
     IRON_PLATE = 4, // +1 defense (flat)
@@ -111,6 +111,7 @@ export const ARTIFACT_POWER = {
     LONGBOW_ATTACK_PERCENT: 15,
     LONGBOW_DEFENSE_PENALTY_PERCENT: 15,
     LONGBOW_ATTACK_PERCENT_MANY_ARCHERS: 30,
+    LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS: 30,
     LONGBOW_ARCHER_THRESHOLD: 3,
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
@@ -177,7 +178,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "veteran_helm",
         "Veteran Helm",
         "Veteran Helm",
-        "Boosts the entire army's attack and defense by {}%.",
+        "Boosts the entire army's defense by {}%.",
     ),
     [Tier1Artifact.AMULET_OF_RESOLVE]: t1(
         Tier1Artifact.AMULET_OF_RESOLVE,
@@ -226,7 +227,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "wounding_charm",
         "Wounding Charm",
         "Wounding Charm",
-        "Adds +{} Deep Wounds stack for the whole army.",
+        "Grants the whole army a Deep Wounds ability at {}% strength (melee hits stack damage amplification).",
     ),
     [Tier1Artifact.CURSED_WARD]: t1(
         Tier1Artifact.CURSED_WARD,
@@ -240,7 +241,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "hunters_longbow",
         "Hunter's Longbow",
         "Hunters Longbow",
-        "Ranged units gain +{}% attack and -[]% defense (or +30% attack with 3+ archers).",
+        "Ranged units gain +{}% attack and -[]% defense (or +30% attack and -30% defense with 3+ archers).",
     ),
     [Tier1Artifact.HELM_OF_FOCUS]: t1(
         Tier1Artifact.HELM_OF_FOCUS,

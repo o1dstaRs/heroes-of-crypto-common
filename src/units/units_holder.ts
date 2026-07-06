@@ -430,7 +430,11 @@ export class UnitsHolder {
                 case Tier1Artifact.HUNTERS_LONGBOW:
                     if (isRange) {
                         if ((archersPerTeam.get(team) ?? 0) >= AP.LONGBOW_ARCHER_THRESHOLD) {
-                            applyArtifactBuff("Hunters Longbow", AP.LONGBOW_ATTACK_PERCENT_MANY_ARCHERS, 0);
+                            applyArtifactBuff(
+                                "Hunters Longbow",
+                                AP.LONGBOW_ATTACK_PERCENT_MANY_ARCHERS,
+                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS,
+                            );
                         } else {
                             applyArtifactBuff(
                                 "Hunters Longbow",

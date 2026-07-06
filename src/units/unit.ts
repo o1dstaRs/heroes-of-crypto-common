@@ -2506,15 +2506,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.initialUnitProperties.base_attack;
         }
 
-        // Veteran Helm: +% attack as an ADDITIONAL stat (attack_mod), scaling from base_attack rather than
-        // inflating it — exactly how Riot layers its bonus. Additive off the base, so it never compounds with
-        // other % attack buffs (Warlords Edge, auras). getAttack() = base_attack + attack_mod, so a lone
-        // Veteran Helm yields the same total attack as folding it into base did.
-        const veteranHelmAttackBuff = this.getBuff("Veteran Helm");
-        if (veteranHelmAttackBuff) {
-            this.unitProperties.attack_mod +=
-                (this.unitProperties.base_attack * ampArtifact(veteranHelmAttackBuff.getPower())) / 100;
-        }
+        // Veteran Helm is a DEFENSE-ONLY artifact (see the armor_mod block above); it grants no attack.
 
         this.unitProperties.attack_mod = Number(this.unitProperties.attack_mod.toFixed(2));
         this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));
