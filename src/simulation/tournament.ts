@@ -361,9 +361,17 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     // The fight champion was trained on random rosters; this lets a fight CEM (cem.mjs OPT=v0.6 vs BASE) retrain
     // it on the distribution we truly deploy. Decorrelated per-side offer seeds → two distinct melee armies (like
     // randomizePicks but drafted). Only active with the flag; default tournaments are untouched.
-    if (process.env.FIGHT_MELEE_ROSTERS === "1" && !factionFilter) {
-        roster = draftRoster(DEFAULT_DRAFT_W, seed, composition, amountByLevel);
-        redRoster = draftRoster(DEFAULT_DRAFT_W, (seed ^ 0x85ebca6b) >>> 0, composition, amountByLevel);
+    const meleeFrac = Number(process.env.FIGHT_MELEE_ROSTERS);
+    if (meleeFrac > 0 && !factionFilter) {
+        // Fraction of games (deterministic per pair) that field melee-drafted armies; the rest keep the
+        // random/mirrored rosters above. =1 → ALL melee, which overfits a melee-specialist that regresses ~4.6pp
+        // on varied armies (measured); a MIX (e.g. 0.5) keeps the fight vector ROBUST across the opponent
+        // compositions live play actually faces, so a CEM can only bake a gain that survives on BOTH.
+        const useMelee = meleeFrac >= 1 || makeRng((seed ^ 0x1b873593) >>> 0)() < meleeFrac;
+        if (useMelee) {
+            roster = draftRoster(DEFAULT_DRAFT_W, seed, composition, amountByLevel);
+            redRoster = draftRoster(DEFAULT_DRAFT_W, (seed ^ 0x85ebca6b) >>> 0, composition, amountByLevel);
+        }
     }
 
     // The board layout is drawn once per PAIR (decorrelated from the roster seed) so both games in the pair
