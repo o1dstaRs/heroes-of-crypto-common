@@ -11,7 +11,7 @@
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { Perk, getUpgradePoints } from "../perks/perk_properties";
-import { creatureInfo, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
+import { creatureInfo, DEFAULT_DRAFT_W, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
 import { loadSynergyWeights, pickSynergiesSituational } from "../ai/setup/synergy_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
@@ -350,6 +350,16 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         options.randomizePicks && !factionFilter
             ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
             : undefined;
+
+    // FIGHT-ON-DEPLOYMENT-DISTRIBUTION mode (env FIGHT_MELEE_ROSTERS=1): both sides field the MELEE-drafted
+    // armies our baked draft (DEFAULT_DRAFT_W) actually produces in live play, instead of random/mirrored rosters.
+    // The fight champion was trained on random rosters; this lets a fight CEM (cem.mjs OPT=v0.6 vs BASE) retrain
+    // it on the distribution we truly deploy. Decorrelated per-side offer seeds → two distinct melee armies (like
+    // randomizePicks but drafted). Only active with the flag; default tournaments are untouched.
+    if (process.env.FIGHT_MELEE_ROSTERS === "1" && !factionFilter) {
+        roster = draftRoster(DEFAULT_DRAFT_W, seed, composition, amountByLevel);
+        redRoster = draftRoster(DEFAULT_DRAFT_W, (seed ^ 0x85ebca6b) >>> 0, composition, amountByLevel);
+    }
 
     // The board layout is drawn once per PAIR (decorrelated from the roster seed) so both games in the pair
     // share it — keeping the comparison apples-to-apples while still varying maps across pairs.
