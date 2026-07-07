@@ -17,8 +17,37 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
+import { DEFAULT_V05_W } from "./v0_5_weights";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+
+/**
+ * v0.6's OWN fight-weight vector, kept SEPARATE from v0.5's so v0.6 can be trained further while v0.5 stays
+ * byte-for-byte frozen. It starts identical to the v0.5 champion (DEFAULT_V05_W) — so an untrained v0.6 fights
+ * exactly like v0.5 — and a co-evolution CEM (OPT=v0.6 vs BASE=v0.5, injecting V06_WEIGHTS) bakes a
+ * best-response champion here without ever touching DEFAULT_V05_W. Read from process.env.V06_WEIGHTS during a
+ * sim; falls back to this default (== v0.5) on any malformed input so a bad env can never crash live play.
+ */
+export const DEFAULT_V06_W: readonly number[] = DEFAULT_V05_W.slice();
+
+export function loadV06Weights(): number[] {
+    const raw = process.env.V06_WEIGHTS;
+    if (raw) {
+        try {
+            const arr = JSON.parse(raw);
+            if (
+                Array.isArray(arr) &&
+                arr.length === DEFAULT_V06_W.length &&
+                arr.every((x) => typeof x === "number" && Number.isFinite(x))
+            ) {
+                return arr as number[];
+            }
+        } catch {
+            /* malformed -> fall through to default (== frozen v0.5 champion) */
+        }
+    }
+    return DEFAULT_V06_W.slice();
+}
 const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "obstacle_attack", "area_throw_attack"]);
 
 /**
@@ -32,6 +61,10 @@ const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "o
  */
 export class StrategyV0_6 extends StrategyV0_5 {
     public override readonly version: string = "v0.6";
+    /** Load v0.6's OWN fight weights (V06_WEIGHTS env or DEFAULT_V06_W) — decoupled from v0.5's V05_WEIGHTS. */
+    public constructor() {
+        super(loadV06Weights());
+    }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const decision = super.decideTurn(unit, context);
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly

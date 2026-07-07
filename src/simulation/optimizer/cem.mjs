@@ -87,7 +87,9 @@ const fmt = (a) => "[" + a.map((x) => x.toFixed(3)).join(", ") + "]";
 // (a single tournament doesn't saturate them, and each pays bun-startup serially). Instead run CEM_BATCH
 // candidates at once, each tournament given CORES/BATCH worker concurrency, so the cores stay pinned and the
 // startups overlap. Each concurrent eval writes to a UNIQUE temp dir to avoid summary-file races.
-const CORES = Math.max(1, availableParallelism());
+// CEM_CORES caps the worker pool below the machine's true core count — leave headroom on a shared box (the
+// node owner's cores) or on a laptop that must stay responsive. Defaults to all available parallelism.
+const CORES = Math.max(1, Number(process.env.CEM_CORES) || availableParallelism());
 const BATCH = Math.max(1, Number(process.env.CEM_BATCH ?? 3));
 const PER_CONC = Math.max(1, Math.floor(CORES / BATCH));
 let evalUid = 0;
@@ -109,7 +111,11 @@ async function mapBatched(items, fn) {
  * files after scoring (disk hygiene for long runs).
  */
 async function evalWeights(weights, seed, games) {
-    const env = { ...process.env, V05_WEIGHTS: JSON.stringify(weights) };
+    // Which env var carries the candidate vector into the spawned tournament. Default V05_WEIGHTS (v0.5 fight
+    // training); set OPT_WEIGHTS_ENV=V06_WEIGHTS to train v0.6's OWN vector (co-evolution vs a frozen v0.5 BASE
+    // that reads V05_WEIGHTS from its baked default) without touching the frozen v0.5 weights.
+    const optWeightsEnv = process.env.OPT_WEIGHTS_ENV ?? "V05_WEIGHTS";
+    const env = { ...process.env, [optWeightsEnv]: JSON.stringify(weights) };
     for (let attempt = 0; attempt < 3; attempt += 1) {
         const dir = join(STATE_DIR, `eval_${process.pid}_${evalUid++}`);
         try {
