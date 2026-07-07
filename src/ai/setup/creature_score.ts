@@ -32,6 +32,14 @@ export interface ICreatureInfo {
     distance: number;
     exp: number;
     abilities: string;
+    /** movement_type === "FLY" — the beneficiary signal for Nature's +Fly-Armor synergy. */
+    canFly: boolean;
+    /** attack_type includes MELEE (MELEE or MELEE_MAGIC) — beneficiary for Chaos Movement. */
+    melee: boolean;
+    /** # abilities whose name contains "Aura" — beneficiary for Might's +Auras-Range synergy. */
+    auraCount: number;
+    /** # non-aura abilities — beneficiary for Might's +Stack-Abilities-Power synergy. */
+    abilityCount: number;
 }
 
 const CreatureJsonShape = CREATURES_JSON as unknown as Record<
@@ -46,6 +54,7 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             exp?: number;
             level?: number;
             abilities?: string[];
+            movement_type?: string;
         }
     >
 >;
@@ -68,6 +77,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
             if (typeof id !== "number" || id <= 0) {
                 continue;
             }
+            const abilityList = cfg.abilities ?? [];
             index.set(id, {
                 id,
                 name,
@@ -78,7 +88,11 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,
                 exp: cfg.exp ?? 0,
-                abilities: (cfg.abilities ?? []).join(" "),
+                abilities: abilityList.join(" "),
+                canFly: cfg.movement_type === "FLY",
+                melee: (cfg.attack_type ?? "").includes("MELEE"),
+                auraCount: abilityList.filter((a) => a.includes("Aura")).length,
+                abilityCount: abilityList.filter((a) => !a.includes("Aura")).length,
             });
         }
     }

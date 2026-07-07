@@ -12,6 +12,7 @@
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { Perk, getUpgradePoints } from "../perks/perk_properties";
 import { creatureInfo, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
+import { loadSynergyWeights, pickSynergiesSituational } from "../ai/setup/synergy_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
 import {
@@ -89,6 +90,11 @@ export interface ITournamentOptions {
      * army) via the setupCA policy (env V05_SETUPCA_WEIGHTS); FROZEN side uses the blind heuristic. Tests whether
      * paying for opponent vision to counter-augment beats the max-budget/no-vision default. */
     cemSetupCA?: boolean;
+    /** CEM SITUATIONAL-SYNERGY training: each side fields its OWN random roster; the WEIGHTED side picks synergies
+     * via the situational picker (env V05_SYNERGY_WEIGHTS — scores each synergy by how much of the army benefits),
+     * the FROZEN side via the fixed BEST_SYNERGY_BY_FACTION table; swap per pair. Win rate isolates whether
+     * situational synergy choice (e.g. +Fly-Armor only with enough flyers) beats the fixed table. */
+    cemSynergy?: boolean;
 }
 
 // Constructed once per worker process. The weighted policy reads its vector from the process env at
@@ -248,6 +254,10 @@ const setupCA = (
     }
     return { perk: best.perk, augments };
 };
+
+// Situational synergy weights (16-dim). Weighted reads V05_SYNERGY_WEIGHTS at load; anchor reproduces the fixed
+// BEST_SYNERGY_BY_FACTION table. Only used on the cemSynergy path.
+const SYNERGY_WEIGHTS: number[] = loadSynergyWeights();
 
 /** FactionVals id → catalog faction name (lowercased match in creaturesByLevel). Only the four synergy
  * factions are relevant here. */
@@ -520,6 +530,25 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         greenAugments = g.augments;
         redPerk = r.perk;
         redAugments = r.augments;
+    }
+    if (options.cemSynergy) {
+        // Field FACTION-CONCENTRATED armies (rotating faction per pair via the seed) so the synergy is reliably
+        // active at a real level and the situational choice (which of the faction's two synergies) matters every
+        // game — otherwise random mixed armies rarely field 2+ of a faction and the signal is diluted. Both sides
+        // same faction; weighted picks situationally, frozen via the fixed table; swap per pair.
+        const synFacNames = ["chaos", "might", "nature", "life"];
+        const synFac = synFacNames[Math.floor(makeRng((seed ^ 0x51ed270b) >>> 0)() * synFacNames.length)];
+        roster = buildRoster(makeRng(seed), composition, amountByLevel, synFac);
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, synFac);
+        greenIsWeighted = game % 2 === 0;
+        const gIds = roster.map((u) => creatureIdForName(u.creatureName));
+        const rIds = redRoster.map((u) => creatureIdForName(u.creatureName));
+        greenSynergies = greenIsWeighted
+            ? pickSynergiesSituational(gIds, SYNERGY_WEIGHTS)
+            : SETUP_POLICY_V0.pickSynergies(gIds);
+        redSynergies = greenIsWeighted
+            ? SETUP_POLICY_V0.pickSynergies(rIds)
+            : pickSynergiesSituational(rIds, SYNERGY_WEIGHTS);
     }
     if (options.cemSetup) {
         const setupFor = (policy: typeof CEM_FROZEN) => {
