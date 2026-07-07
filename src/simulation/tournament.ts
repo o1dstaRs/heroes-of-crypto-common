@@ -154,10 +154,15 @@ const AUGCA_WEIGHTS: number[] = (() => {
 })();
 const rangedFracOf = (r: readonly IArmyUnitSpec[]): number =>
     r.filter((u) => creatureInfo(creatureIdForName(u.creatureName))?.ranged).length / Math.max(1, r.length);
-/** Features seen when choosing augments: [ownRanged, ownAvgLevel/4, enemyRanged, enemyMelee, bias]. */
+/** Features seen when choosing augments: [ownRanged, ownAvgLevel/4, enemyRanged, enemyMelee, bias]. With
+ * AUGCA_NOVISION=1 the two ENEMY features are zeroed — modelling the live SEE_NONE reality (no enemy vision at
+ * augment time), so a CEM run learns an OWN-COMPOSITION-only policy that is actually realizable in ranked
+ * (the full 20-dim champion's enemy-counter-pick edge needs paid vision the setupCA verdict rejected). */
 const augCAFeats = (own: readonly IArmyUnitSpec[], enemy: readonly IArmyUnitSpec[]): number[] => {
-    const eR = rangedFracOf(enemy);
-    return [rangedFracOf(own), own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4, eR, 1 - eR, 1];
+    const noVision = process.env.AUGCA_NOVISION === "1";
+    const eR = noVision ? 0 : rangedFracOf(enemy);
+    const eM = noVision ? 0 : 1 - rangedFracOf(enemy);
+    return [rangedFracOf(own), own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4, eR, eM, 1];
 };
 const augCA = (
     own: readonly IArmyUnitSpec[],
