@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { MAX_HITS_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
+import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -586,54 +586,156 @@ describe("AttackHandler", () => {
         });
     });
 
-    describe("handleObstacleAttack", () => {
-        it("hits block-center obstacles with range attacks", () => {
-            const { grid, unitsHolder, attackHandler } = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+    describe("handleObstacleAttack (two 2x2 mountains)", () => {
+        // BLOCK_CENTER is two 2x2 mountains: left = rows 5,6 / right = rows 9,10, both on cols 7,8, with a
+        // 2x2 walkable corridor (rows 7,8) between them. Each mountain has its own HITS_PER_MOUNTAIN pool.
+        const setupMountainFight = () => {
+            const ctx = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+            const moveHandler = new MoveHandler(testGridSettings, ctx.grid, ctx.unitsHolder);
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+            return { ...ctx, moveHandler, fightProperties };
+        };
+        const leftMountainCell = { x: 6, y: 7 };
+        const rightMountainCell = { x: 9, y: 7 };
+
+        it("range attack hits the LEFT mountain and spends only its own hit points", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({
                 name: "Siege Archer",
                 team: PBTypes.TeamVals.UPPER,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
             });
-            const fightProperties = FightStateManager.getInstance().getFightProperties();
-
-            fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
 
-            const targetPosition = positionForCell(grid.getCenterCells()[0]);
-            const result = attackHandler.handleObstacleAttack(targetPosition, unitsHolder, moveHandler, attacker);
-
-            expect(result.completed).toBe(true);
-            expect(result.animationData).toHaveLength(1);
-            expect(attacker.getRangeShots()).toBe(2);
-            expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN - 1);
-        });
-
-        it("hits block-center obstacles with adjacent melee attacks", () => {
-            const { grid, unitsHolder, attackHandler } = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-            const attacker = createTestUnit({
-                name: "Mountain Breaker",
-                team: PBTypes.TeamVals.UPPER,
-                attackType: PBTypes.AttackVals.MELEE,
-            });
-            const fightProperties = FightStateManager.getInstance().getFightProperties();
-
-            fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
-            placeUnit(grid, unitsHolder, attacker, { x: 5, y: 6 });
-
             const result = attackHandler.handleObstacleAttack(
-                positionForCell({ x: 6, y: 6 }),
+                positionForCell(leftMountainCell),
                 unitsHolder,
                 moveHandler,
                 attacker,
-                { x: 5, y: 6 },
             );
 
             expect(result.completed).toBe(true);
             expect(result.animationData).toHaveLength(1);
-            expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN - 1);
+            expect(attacker.getRangeShots()).toBe(2);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+        });
+
+        it("range attack hits the RIGHT mountain and spends only its own hit points", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+            });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(rightMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN);
+        });
+
+        it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            placeUnit(grid, unitsHolder, attacker, { x: 6, y: 6 }); // col-6 side of the left mountain
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(leftMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 6, y: 6 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+        });
+
+        it("small melee unit strikes the LEFT mountain from the corridor between the two mountains", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            placeUnit(grid, unitsHolder, attacker, { x: 7, y: 7 }); // corridor cell, adjacent to left (6,7)
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(leftMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 7, y: 7 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+        });
+
+        it("small melee unit strikes the RIGHT mountain from the corridor between the two mountains", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            placeUnit(grid, unitsHolder, attacker, { x: 8, y: 7 }); // corridor cell, adjacent to right (9,7)
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(rightMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 8, y: 7 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN);
+        });
+
+        it("does not land a melee strike from a non-adjacent cell", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(leftMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 1, y: 1 },
+            );
+
+            expect(result.completed).toBe(false);
+            expect(fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
+        });
+
+        it("large (2x2) melee unit strikes an adjacent mountain", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({
+                name: "Mountain Breaker",
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.MELEE,
+                size: PBTypes.UnitSizeVals.LARGE,
+            });
+            // 2x2 footprint below the left mountain (cols 5,6 / rows 5,6), adjacent to it, no overlap.
+            placeUnit(grid, unitsHolder, attacker, { x: 6, y: 6 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(leftMountainCell),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 6, y: 6 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
         });
 
         it("returns incomplete for non-block grids", () => {

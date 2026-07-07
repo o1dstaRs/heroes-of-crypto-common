@@ -1,4 +1,3 @@
-
 import { describe, test, expect, beforeEach } from "bun:test";
 import { Grid } from "../../src/grid/grid";
 import { GridSettings } from "../../src/grid/grid_settings";
@@ -18,15 +17,7 @@ describe("Grid Aggregation Matrix Tests", () => {
     const UNIT_SIZE_DELTA = 0.06;
 
     beforeEach(() => {
-        gridSettings = new GridSettings(
-            GRID_SIZE,
-            MAX_Y,
-            MIN_Y,
-            MAX_X,
-            MIN_X,
-            MOVEMENT_DELTA,
-            UNIT_SIZE_DELTA
-        );
+        gridSettings = new GridSettings(GRID_SIZE, MAX_Y, MIN_Y, MAX_X, MIN_X, MOVEMENT_DELTA, UNIT_SIZE_DELTA);
         grid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
     });
 
@@ -71,7 +62,7 @@ describe("Grid Aggregation Matrix Tests", () => {
             { x: 2, y: 2 },
             { x: 3, y: 2 },
             { x: 2, y: 3 },
-            { x: 3, y: 3 }
+            { x: 3, y: 3 },
         ];
         const range = 4;
         const team = 1;
@@ -96,7 +87,10 @@ describe("Grid Aggregation Matrix Tests", () => {
         const blockGrid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
         const waterGrid = new Grid(gridSettings, PBTypes.GridVals.WATER_CENTER);
         const lavaGrid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
-        const centerCell = blockGrid.getCenterCells()[0];
+        // A cell that is a center obstacle for ALL three center types: the two BLOCK_CENTER mountains sit
+        // on cols 7,8 (rows 5,6 / 9,10), while WATER/LAVA fill the rows-6..9 × cols-6..9 square — (6,7) is
+        // in both, so it reads as rock/water/lava respectively.
+        const centerCell = { x: 6, y: 7 };
 
         expect(blockGrid.getOccupantUnitId(centerCell)).toBe("B");
         expect(waterGrid.getOccupantUnitId(centerCell)).toBe("W");
@@ -121,6 +115,50 @@ describe("Grid Aggregation Matrix Tests", () => {
         expect(blockGrid.getOccupantUnitId(centerCell)).toBe("");
     });
 
+    test("the corridor between the two BLOCK_CENTER mountains is walkable", () => {
+        const blockGrid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        const corridor = [
+            { x: 7, y: 7 },
+            { x: 7, y: 8 },
+            { x: 8, y: 7 },
+            { x: 8, y: 8 },
+        ];
+        // The 2x2 gap between the mountains is open ground, not rock...
+        expect(corridor.every((cell) => blockGrid.getOccupantUnitId(cell) === "")).toBe(true);
+        // ...and none of those cells are reported as mountain (center) cells.
+        const centerKeys = new Set(blockGrid.getCenterCells().map((cell) => `${cell.x},${cell.y}`));
+        expect(corridor.some((cell) => centerKeys.has(`${cell.x},${cell.y}`))).toBe(false);
+    });
+
+    test("clearMountainSide destroys each of the two mountains independently", () => {
+        const blockGrid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        const leftCells = blockGrid.getCenterCells().filter((cell) => cell.x < 8);
+        const rightCells = blockGrid.getCenterCells().filter((cell) => cell.x >= 8);
+
+        expect(leftCells.length).toBe(4);
+        expect(rightCells.length).toBe(4);
+        expect(leftCells.every((cell) => blockGrid.getOccupantUnitId(cell) === "B")).toBe(true);
+        expect(rightCells.every((cell) => blockGrid.getOccupantUnitId(cell) === "B")).toBe(true);
+
+        // Clear the LEFT mountain only — it becomes walkable and drops out of the center cells.
+        expect(blockGrid.clearMountainSide(false)).toBe(true);
+        expect(blockGrid.clearMountainSide(false)).toBe(false); // idempotent
+        expect(leftCells.every((cell) => blockGrid.getOccupantUnitId(cell) === "")).toBe(true);
+        expect(rightCells.every((cell) => blockGrid.getOccupantUnitId(cell) === "B")).toBe(true);
+        expect(blockGrid.getCenterCells()).toEqual(rightCells);
+
+        // Clearing the RIGHT mountain empties the whole center.
+        expect(blockGrid.clearMountainSide(true)).toBe(true);
+        expect(rightCells.every((cell) => blockGrid.getOccupantUnitId(cell) === "")).toBe(true);
+        expect(blockGrid.getCenterCells()).toEqual([]);
+    });
+
+    test("clearMountainSide is a no-op on non-mountain grids", () => {
+        const lavaGrid = new Grid(gridSettings, PBTypes.GridVals.LAVA_CENTER);
+        expect(lavaGrid.clearMountainSide(false)).toBe(false);
+        expect(lavaGrid.clearMountainSide(true)).toBe(false);
+    });
+
     test("should expose matrices, holes, occupancy checks, and printable board state", () => {
         const printable = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
         const centerCell = printable.getCenterCells()[0];
@@ -135,7 +173,16 @@ describe("Grid Aggregation Matrix Tests", () => {
         expect(printable.areAllCellsEmpty([{ x: 1, y: 1 }], "unit1")).toBe(true);
         expect(printable.areAllCellsEmpty([{ x: 1, y: 1 }])).toBe(false);
         expect(printable.areAllCellsEmpty([{ x: 0, y: 0 }])).toBe(false);
-        expect(printable.canOccupyCells([{ x: 1, y: 1 }, { x: 2, y: 2 }], false, false)).toBe(false);
+        expect(
+            printable.canOccupyCells(
+                [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 2 },
+                ],
+                false,
+                false,
+            ),
+        ).toBe(false);
         expect(printable.canOccupyCells([centerCell], false, false)).toBe(false);
 
         const matrix = printable.getMatrix();

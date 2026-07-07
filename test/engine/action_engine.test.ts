@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { MAX_HITS_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
+import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
@@ -910,15 +910,17 @@ describe("GameActionEngine", () => {
             attackerId: setup.lower.getId(),
             targetPosition,
             attackFrom: undefined,
-            hitsBefore: MAX_HITS_MOUNTAIN,
-            hitsAfter: MAX_HITS_MOUNTAIN - 1,
+            hitsBefore: 2 * HITS_PER_MOUNTAIN,
+            hitsAfter: 2 * HITS_PER_MOUNTAIN - 1,
+            hitsAfterLeft: HITS_PER_MOUNTAIN - 1,
+            hitsAfterRight: HITS_PER_MOUNTAIN,
             animations: expect.any(Array),
         });
         expect(setup.lower.getRangeShots()).toBe(2);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
-    it("clears the center obstacle when the final common obstacle hit lands", () => {
+    it("clears ONLY the struck mountain, leaving the other standing", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
             lowerAttackType: PBTypes.AttackVals.RANGE,
@@ -927,12 +929,60 @@ describe("GameActionEngine", () => {
             upperCell: { x: 9, y: 9 },
         });
         setup.lower.refreshPossibleAttackTypes(true);
-        for (let hit = 1; hit < MAX_HITS_MOUNTAIN; hit++) {
-            setup.fightProperties.encounterObstacleHit();
+        const leftCells = setup.grid.getCenterCells().filter((cell) => cell.x < 8);
+        const rightCells = setup.grid.getCenterCells().filter((cell) => cell.x >= 8);
+        // Spend the left mountain down to its final hit so this attack (on a left cell) clears it.
+        for (let hit = 1; hit < HITS_PER_MOUNTAIN; hit++) {
+            setup.fightProperties.encounterObstacleHit(false);
         }
         const settings = setup.grid.getSettings();
         const targetPosition = getPositionForCell(
-            setup.grid.getCenterCells()[0],
+            leftCells[0],
+            settings.getMinX(),
+            settings.getStep(),
+            settings.getHalfStep(),
+        );
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.lower.getId(),
+            targetPosition,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual({
+            type: "center_obstacle_cleared",
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+        });
+        // Left mountain gone (walkable, no longer a center cell); right mountain untouched.
+        expect(setup.fightProperties.getObstacleHitsLeftLeft()).toBe(0);
+        expect(setup.fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+        expect(leftCells.every((cell) => setup.grid.getOccupantUnitId(cell) === "")).toBe(true);
+        expect(rightCells.every((cell) => setup.grid.getOccupantUnitId(cell) === "B")).toBe(true);
+        expect(setup.grid.getCenterCells()).toEqual(rightCells);
+    });
+
+    it("clears the whole center once BOTH mountains are spent", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerRangeShots: 3,
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 9, y: 9 },
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+        const allCenterCells = [...setup.grid.getCenterCells()];
+        const rightCells = allCenterCells.filter((cell) => cell.x >= 8);
+        // Left fully spent, right down to its final hit — this attack (on a right cell) clears both.
+        for (let hit = 0; hit < HITS_PER_MOUNTAIN; hit++) {
+            setup.fightProperties.encounterObstacleHit(false); // left → 0
+        }
+        for (let hit = 1; hit < HITS_PER_MOUNTAIN; hit++) {
+            setup.fightProperties.encounterObstacleHit(true); // right → 1
+        }
+        const settings = setup.grid.getSettings();
+        const targetPosition = getPositionForCell(
+            rightCells[0],
             settings.getMinX(),
             settings.getStep(),
             settings.getHalfStep(),
@@ -950,7 +1000,8 @@ describe("GameActionEngine", () => {
             gridType: PBTypes.GridVals.BLOCK_CENTER,
         });
         expect(setup.fightProperties.getObstacleHitsLeft()).toBe(0);
-        expect(setup.grid.getCenterCells().every((cell) => setup.grid.getOccupantUnitId(cell) === "")).toBe(true);
+        expect(allCenterCells.every((cell) => setup.grid.getOccupantUnitId(cell) === "")).toBe(true);
+        expect(setup.grid.getCenterCells()).toEqual([]);
     });
 
     it("rejects obstacle attacks when no ranged hit or melee approach can land", () => {
@@ -981,7 +1032,7 @@ describe("GameActionEngine", () => {
             rejectionReason: "attack_not_available",
             message: undefined,
         });
-        expect(setup.fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN);
+        expect(setup.fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
     });
 
@@ -1017,7 +1068,7 @@ describe("GameActionEngine", () => {
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN);
+        expect(setup.fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
         expect(setup.lower.getBaseCell()).toEqual(currentCell);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
     });

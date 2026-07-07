@@ -233,6 +233,15 @@ export class FightProperties {
         this.obstacleHitsLeftLeft = Math.min(HITS_PER_MOUNTAIN, total);
         this.obstacleHitsLeftRight = total - this.obstacleHitsLeftLeft;
     }
+    /**
+     * Authoritatively set the remaining hit points of EACH mountain independently. Preferred over
+     * setObstacleHitsLeft when the source knows both sides (the obstacle_attacked event carries them), so
+     * the mountain that was actually struck loses HP instead of the total being re-split left-first.
+     */
+    public setObstacleHitsPerMountain(left: number, right: number): void {
+        this.obstacleHitsLeftLeft = Math.max(0, Math.min(HITS_PER_MOUNTAIN, Math.floor(left)));
+        this.obstacleHitsLeftRight = Math.max(0, Math.min(HITS_PER_MOUNTAIN, Math.floor(right)));
+    }
     public hasDamageDealFactPerLap(lap: number): boolean {
         return this.damageDealFactPerLap.get(lap) ?? false;
     }
@@ -1483,25 +1492,18 @@ export class FightProperties {
         return undefined;
     }
     private getRandomGridType(): GridType {
-        // TEMPORARY: force a CLEAR map (NORMAL — no center mountain, no lava/water) everywhere, in both
-        // sandbox and ranked, while we stabilize the game on the simplest board first. Both the client
-        // (sandbox) and the server construct FightProperties, which calls this, so this single override
-        // covers every mode. To restore randomized maps, un-comment the block below and remove this line
-        // (then rebuild common + copy to the server node_modules + restart it).
-        return PBTypes.GridVals.NORMAL;
-
-        // --- Randomized maps (disabled while stabilizing) — NORMAL / BLOCK_CENTER (mountain) / LAVA_CENTER:
-        // const randomValue = getRandomInt(0, 12);
-        // if (randomValue < 4) {
-        //     return PBTypes.GridVals.NORMAL;
-        // }
-        // if (randomValue > 7) {
-        //     return PBTypes.GridVals.BLOCK_CENTER;
-        // }
-        // if (randomValue < 6) {
-        //     // return GridVals.WATER_CENTER;
-        //     return PBTypes.GridVals.LAVA_CENTER;
-        // }
-        // return PBTypes.GridVals.LAVA_CENTER;
+        // Randomized maps — an equal 1/3 (33.333%) chance of each of the three board types. getRandomInt is
+        // upper-exclusive, so getRandomInt(0, 3) yields 0/1/2 uniformly. The raw source is crypto-secure in
+        // production and a seeded PRNG only when a sim/test installed one. Both the client (sandbox) and the
+        // server construct FightProperties, so this single site covers every mode.
+        const roll = getRandomInt(0, 3);
+        if (roll === 0) {
+            return PBTypes.GridVals.NORMAL;
+        }
+        if (roll === 1) {
+            return PBTypes.GridVals.BLOCK_CENTER;
+        }
+        // roll === 2 — LAVA_CENTER (WATER_CENTER is not yet enabled)
+        return PBTypes.GridVals.LAVA_CENTER;
     }
 }

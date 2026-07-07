@@ -1942,13 +1942,6 @@ export class AttackHandler {
         // land melee attack
         if (!rangeLanded && attackFromCell) {
             let isAdjacentToCenter = false;
-            const excludeCells: number[] = [];
-            excludeCells.push(
-                ((this.gridSettings.getGridSize() / 2) << 4) | (this.gridSettings.getGridSize() / 2),
-                ((this.gridSettings.getGridSize() / 2 - 1) << 4) | (this.gridSettings.getGridSize() / 2 - 1),
-                ((this.gridSettings.getGridSize() / 2) << 4) | (this.gridSettings.getGridSize() / 2 - 1),
-                ((this.gridSettings.getGridSize() / 2 - 1) << 4) | (this.gridSettings.getGridSize() / 2),
-            );
 
             const currentCell = GridMath.getCellForPosition(this.gridSettings, attackerUnit.getPosition());
 
@@ -1966,11 +1959,10 @@ export class AttackHandler {
             }
 
             for (const c of attackFromCells) {
-                if (excludeCells.includes((c.x << 4) | c.y)) {
-                    break;
-                }
-
-                let centerCells = this.grid.getCenterCells(true);
+                // Two-mountain BLOCK_CENTER: the 2x2 corridor between the mountains is WALKABLE, so a
+                // unit standing there is a legal attack-from position. No inner-cell exclusion here —
+                // that was a single solid-block leftover that blocked attacks from between the mountains.
+                const centerCells = this.grid.getCenterCells(true);
                 for (const centerCell of centerCells) {
                     if (Math.abs(c.x - centerCell.x) <= 1 && Math.abs(c.y - centerCell.y) <= 1) {
                         isAdjacentToCenter = true;

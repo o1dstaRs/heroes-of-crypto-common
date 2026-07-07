@@ -660,6 +660,8 @@ export class GameActionEngine {
                 attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
                 hitsBefore,
                 hitsAfter,
+                hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
+                hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];

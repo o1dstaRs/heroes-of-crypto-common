@@ -20,7 +20,7 @@ import {
     SniperAugment,
 } from "../../src/augments/augment_properties";
 import {
-    MAX_HITS_MOUNTAIN,
+    HITS_PER_MOUNTAIN,
     NUMBER_OF_LAPS_FIRST_ARMAGEDDON,
     NUMBER_OF_LAPS_TILL_NARROWING_NORMAL,
     STEPS_MORALE_MULTIPLIER,
@@ -47,7 +47,7 @@ describe("FightProperties", () => {
 
             expect(fightProperties.getGridType()).toBe(PBTypes.GridVals.BLOCK_CENTER);
             expect(fightProperties.getPlacementType()).toBe(PlacementType.RECTANGLE);
-            expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN);
+            expect(fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
             expect(fightProperties.hasFightStarted()).toBe(false);
             expect(fightProperties.hasFightFinished()).toBe(false);
             expect(fightProperties.getFirstTurnMade()).toBe(false);
@@ -71,10 +71,10 @@ describe("FightProperties", () => {
             fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "done");
             fightProperties.increaseStepsMoraleMultiplier();
             fightProperties.encounterDamageDealFact();
-            fightProperties.encounterObstacleHit();
+            fightProperties.encounterObstacleHit(false);
 
             expect(fightProperties.hasDamageDealFactPerLap(1)).toBe(true);
-            expect(fightProperties.getObstacleHitsLeft()).toBe(MAX_HITS_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN - 1);
             expect(fightProperties.hasAlreadyMadeTurn("done")).toBe(true);
             expect(fightProperties.getAlreadyMadeTurnSize()).toBe(1);
             expect(fightProperties.hasAlreadyHourglass("hourglass")).toBe(true);
@@ -527,6 +527,43 @@ describe("FightProperties", () => {
             fightProperties.prefetchNextUnitsToTurn(allUnits, upperUnits, lowerUnits);
 
             expect(Array.from(fightProperties.getUpNextQueueIterable())[0]).toBe(lowerUnits[0].getId());
+        });
+    });
+
+    describe("obstacle hit points per mountain (BLOCK_CENTER)", () => {
+        it("setObstacleHitsPerMountain restores each mountain independently", () => {
+            const fightProperties = new FightProperties();
+            fightProperties.setObstacleHitsPerMountain(3, 1);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(3);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(1);
+            expect(fightProperties.getObstacleHitsLeft()).toBe(4);
+        });
+
+        it("encounterObstacleHit spends only the struck mountain's hit points", () => {
+            const fightProperties = new FightProperties();
+            fightProperties.setObstacleHitsPerMountain(3, 3);
+
+            fightProperties.encounterObstacleHit(false); // left mountain struck
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(2);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(3);
+
+            fightProperties.encounterObstacleHit(true); // right mountain struck
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(2);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(2);
+        });
+
+        it("restoring from the TOTAL alone mis-routes the damage — why the event carries both sides", () => {
+            // Regression guard for the bug: the left mountain took a hit (left 3->2, total 5), but a client
+            // that restores from the TOTAL only re-splits it left-first (left=3, right=2), so the RIGHT
+            // mountain visually loses the HP instead. The obstacle_attacked event now carries hitsAfterLeft/
+            // Right so the client applies the loss to the mountain that was actually struck.
+            const fightProperties = new FightProperties();
+            fightProperties.setObstacleHitsPerMountain(2, 3); // left is the one that was hit
+            const total = fightProperties.getObstacleHitsLeft(); // 5
+
+            fightProperties.setObstacleHitsLeft(total); // total-only restore
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(3); // left wrongly back to full
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(2); // loss wrongly moved to the right
         });
     });
 });

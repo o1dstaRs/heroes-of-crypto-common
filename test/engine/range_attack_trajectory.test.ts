@@ -210,9 +210,10 @@ describe("range attack trajectory (server/common engine)", () => {
             targetCell: { x: 14, y: 8 },
             gridType: PBTypes.GridVals.BLOCK_CENTER,
         });
-        // Sanity: the board center really is a mountain on row 8.
+        // Sanity: the two mountains really sit on the shot's line (col 8) — (6,8) is the left mountain,
+        // (9,8) the right; (7,8)/(8,8) between them are the walkable corridor, not rock.
         const centerOccupant =
-            setup.grid.getOccupantUnitId({ x: 7, y: 8 }) || setup.grid.getOccupantUnitId({ x: 8, y: 8 });
+            setup.grid.getOccupantUnitId({ x: 6, y: 8 }) || setup.grid.getOccupantUnitId({ x: 9, y: 8 });
         expect(centerOccupant).toBe("B");
 
         const evaluation = setup.attackHandler.evaluateRangeAttack(

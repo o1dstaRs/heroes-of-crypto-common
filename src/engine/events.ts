@@ -76,6 +76,13 @@ export type GameEvent =
           attackFrom?: XY;
           hitsBefore: number;
           hitsAfter: number;
+          // Remaining hit points of EACH of the two BLOCK_CENTER mountains after this strike. The total
+          // (hitsAfter) alone can't say which mountain was hit, so clients that restore it by splitting the
+          // total drop the wrong sprite's HP (attacking the left mountain showed the right one losing HP).
+          // Carry both sides so the client applies the damage to the mountain that was actually struck.
+          // Optional so events replayed from an older journal (total-only) still typecheck.
+          hitsAfterLeft?: number;
+          hitsAfterRight?: number;
           animations: IGameAnimationEvent[];
       }
     | {
