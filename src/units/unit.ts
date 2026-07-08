@@ -1138,7 +1138,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
         // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
         // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
-        if (chanceToBreak > 0 && getRandomInt(0, 100) < Math.min(chanceToBreak, 100)) {
+        // Break doesn't stack: if the unit is already Broken, don't attempt it again — re-applying would
+        // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
+        // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
+        // unless a caller explicitly wants to extend it.
+        if (
+            chanceToBreak > 0 &&
+            (extendBreak || !this.hasEffectActive("Break")) &&
+            getRandomInt(0, 100) < Math.min(chanceToBreak, 100)
+        ) {
             const breakEffect = this.effectFactory.makeEffect("Break");
             if (breakEffect) {
                 if (extendBreak) {
