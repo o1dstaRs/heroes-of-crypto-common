@@ -372,6 +372,9 @@ export class UnitsHolder {
         for (const unit of this.getAllUnitsIterator()) {
             for (const buffName of artifactBuffNames) {
                 unit.deleteBuff(buffName);
+                // Dual/cursed artifacts also apply a display-only marker DEBUFF under the same name
+                // (see applyDualArtifact); clear it too so nothing accumulates across recompute.
+                unit.deleteDebuff(buffName);
             }
 
             if (!isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
@@ -403,6 +406,39 @@ export class UnitsHolder {
                 unit.applyBuff(buff, primary, secondary);
             };
 
+            // Cursed / dual artifacts have an upside AND a downside. Apply the functional buff (positive half)
+            // exactly like a normal artifact — the stat hooks read the `;primary;secondary` suffix that
+            // applyBuff appends, so the visible text can be positive-only — then ALSO apply a power-0 marker
+            // DEBUFF carrying the negative half. Power 0 means it never affects stats or trips a real debuff
+            // check; it exists purely so the sidebar shows the downside on the Debuffs side (same name/icon as
+            // the buff). The cleanup loop above deletes both by name each recompute, so nothing accumulates.
+            const applyDualArtifact = (
+                buffName: string,
+                buffDesc: string,
+                debuffDesc: string,
+                primary: number,
+                secondary?: number,
+            ): void => {
+                const buff = new Spell({
+                    spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                buff.setDesc([buffDesc.replace(/\{\}/g, primary.toString()), "Lasts till the end of the fight."]);
+                buff.setPower(primary);
+                unit.applyBuff(buff, primary, secondary);
+
+                const debuff = new Spell({
+                    spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                debuff.setDesc([
+                    debuffDesc.replace(/\{\}/g, (secondary ?? primary).toString()),
+                    "Lasts till the end of the fight.",
+                ]);
+                debuff.setPower(0);
+                unit.applyDebuff(debuff, secondary);
+            };
+
             // ---- Tier 1 stat artifacts ----
             switch (tier1) {
                 case Tier1Artifact.VETERAN_HELM:
@@ -425,19 +461,29 @@ export class UnitsHolder {
                     }
                     break;
                 case Tier1Artifact.CURSED_WARD:
-                    applyArtifactBuff("Cursed Ward", AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY);
+                    applyDualArtifact(
+                        "Cursed Ward",
+                        "Blessed: +{} luck for the whole army.",
+                        "Cursed: -{} morale for the whole army.",
+                        AP.CURSED_WARD_LUCK,
+                        AP.CURSED_WARD_MORALE_PENALTY,
+                    );
                     break;
                 case Tier1Artifact.HUNTERS_LONGBOW:
                     if (isRange) {
                         if ((archersPerTeam.get(team) ?? 0) >= AP.LONGBOW_ARCHER_THRESHOLD) {
-                            applyArtifactBuff(
+                            applyDualArtifact(
                                 "Hunters Longbow",
+                                "Ranged units gain +{}% attack.",
+                                "Ranged units suffer -{}% defense.",
                                 AP.LONGBOW_ATTACK_PERCENT_MANY_ARCHERS,
                                 AP.LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS,
                             );
                         } else {
-                            applyArtifactBuff(
+                            applyDualArtifact(
                                 "Hunters Longbow",
+                                "Ranged units gain +{}% attack.",
+                                "Ranged units suffer -{}% defense.",
                                 AP.LONGBOW_ATTACK_PERCENT,
                                 AP.LONGBOW_DEFENSE_PENALTY_PERCENT,
                             );
@@ -461,7 +507,12 @@ export class UnitsHolder {
                     unit.grantAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.BROKEN_AEGIS:
-                    applyArtifactBuff("Broken Aegis", AP.AEGIS_AREA_REDUCTION_PERCENT);
+                    applyDualArtifact(
+                        "Broken Aegis",
+                        "Reduces area-attack damage taken by {}%.",
+                        "Cursed: the army may break when hit and miss on attack.",
+                        AP.AEGIS_AREA_REDUCTION_PERCENT,
+                    );
                     break;
                 default:
                     break;
@@ -482,10 +533,22 @@ export class UnitsHolder {
                     applyArtifactBuff("Crown of Command", AP.CROWN_STEPS, AP.CROWN_MORALE);
                     break;
                 case Tier2Artifact.PENDANT_OF_VITALITY:
-                    applyArtifactBuff("Pendant of Vitality", AP.PENDANT_HP_PERCENT, AP.PENDANT_ATTACK_PENALTY_PERCENT);
+                    applyDualArtifact(
+                        "Pendant of Vitality",
+                        "+{}% maximum HP for the whole army.",
+                        "-{}% attack for the whole army.",
+                        AP.PENDANT_HP_PERCENT,
+                        AP.PENDANT_ATTACK_PENALTY_PERCENT,
+                    );
                     break;
                 case Tier2Artifact.BERSERKERS_BOND:
-                    applyArtifactBuff("Berserkers Bond", AP.BERSERKERS_BOND_FLAT, AP.BERSERKERS_BOND_FLAT);
+                    applyDualArtifact(
+                        "Berserkers Bond",
+                        "+{} attack for the whole army.",
+                        "-{} defense for the whole army.",
+                        AP.BERSERKERS_BOND_FLAT,
+                        AP.BERSERKERS_BOND_FLAT,
+                    );
                     break;
                 // Combat-time / terrain markers (checked by the relevant hook via unit.getBuff).
                 case Tier2Artifact.HOLY_CROSS:
