@@ -2478,8 +2478,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (berserkersBondAttackBuff) {
             this.unitProperties.base_attack += ampArtifact(berserkersBondAttackBuff.getPower());
         }
-        // Veteran Helm attack is applied later as an ADDITIONAL stat (attack_mod), not folded into
-        // base_attack — see the attack_mod section below.
+        // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         const warlordsEdgeBuff = this.getBuff("Warlords Edge");
         if (warlordsEdgeBuff) {
             this.unitProperties.base_attack += Number(
