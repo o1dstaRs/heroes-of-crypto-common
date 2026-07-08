@@ -713,7 +713,7 @@ export class FightProperties {
         // ARTIFACT Broken Aegis (offensive): the wielder's attacks have a chance to Break the ENEMY they
         // hit. This is the attacker's team chance; the attack handlers pass it as chanceToBreak into the
         // target's applyDamage, so it mutes the enemy, never the wielder.
-        if (this.hasArtifactTier1(teamType, Tier1Artifact.AEGIS_SHIELD)) {
+        if (this.hasArtifactTier1(teamType, Tier1Artifact.BROKEN_AEGIS)) {
             chance += BROKEN_AEGIS_BREAK_CHANCE;
         }
 

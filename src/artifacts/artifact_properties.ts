@@ -39,7 +39,7 @@ export enum Tier1Artifact {
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // +15% ranged atk / -15% ranged def, or +30% ranged atk if 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
-    AEGIS_SHIELD = 12, // Broken Aegis (offensive): wielder's attacks 60% break-the-enemy / 4% self-miss, no area reduction (internal id/buff kept as broken_aegis)
+    BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 60% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
 }
 
 export enum Tier2Artifact {
@@ -76,7 +76,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "9": Tier1Artifact.CURSED_WARD,
     "10": Tier1Artifact.HUNTERS_LONGBOW,
     "11": Tier1Artifact.HELM_OF_FOCUS,
-    "12": Tier1Artifact.AEGIS_SHIELD,
+    "12": Tier1Artifact.BROKEN_AEGIS,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -256,8 +256,8 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Helm of Focus",
         "Increases the army's mind resistance by {}%.",
     ),
-    [Tier1Artifact.AEGIS_SHIELD]: t1(
-        Tier1Artifact.AEGIS_SHIELD,
+    [Tier1Artifact.BROKEN_AEGIS]: t1(
+        Tier1Artifact.BROKEN_AEGIS,
         "broken_aegis",
         "Broken Aegis",
         "Broken Aegis",

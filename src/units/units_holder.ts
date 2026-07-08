@@ -460,7 +460,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
                     unit.grantAbility("Deep Wounds Level 1");
                     break;
-                case Tier1Artifact.AEGIS_SHIELD:
+                case Tier1Artifact.BROKEN_AEGIS:
                     applyArtifactBuff("Broken Aegis", AP.AEGIS_AREA_REDUCTION_PERCENT);
                     break;
                 default:

@@ -49,7 +49,7 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier1Artifact.VETERAN_HELM]: 61.1,
     [Tier1Artifact.IRON_PLATE]: 53.3,
     [Tier1Artifact.KEEN_BLADE]: 53.2,
-    [Tier1Artifact.AEGIS_SHIELD]: 50.2,
+    [Tier1Artifact.BROKEN_AEGIS]: 50.2,
     [Tier1Artifact.HUNTERS_LONGBOW]: 49.5,
     [Tier1Artifact.SWIFT_BOOTS]: 47.1,
     [Tier1Artifact.WINGED_BOOTS]: 45.5,
