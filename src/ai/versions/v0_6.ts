@@ -46,6 +46,9 @@ export const DEFAULT_V06_W: readonly number[] = [
     0.5054064078311156, 1.951625586424147, -0.7168503825154638, 1.4148114632296496, 0.24884470489427854,
     -2.753057668341909, 0.3892462431626682, 0.7293253574050823, 0.3358745432824668, 0.26720797483195136,
     1.0411928379179989,
+    // [56] Rapid Charge weight — anchor 0 (v0.5-equivalent, no charge-distance bias). v0.6 trains this on melee
+    // fights so Champion/Wolf Rider/Nomad prefer a longer charge (more damage) instead of short/in-place strikes.
+    0,
 ];
 
 export function loadV06Weights(): number[] {

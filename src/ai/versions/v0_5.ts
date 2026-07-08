@@ -1217,6 +1217,14 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // [51] target-caster: enemy Healers / spell-casters (Ogre Mage, Satyr, Behemoth, Troll, Angel…) are
         // force multipliers whose value isn't captured by raw firepower — bias melee toward removing them.
         const wMeleeCaster = this.w[51] ?? 0;
+        // [56] RAPID CHARGE — this unit's melee damage scales with the charge DISTANCE (cells moved before the
+        // strike; processRapidChargeAbility multiplies damage by ~1+(m-1)*cells). Champion/Wolf Rider/Nomad carry
+        // it. The v0.4/base damage estimate is charge-agnostic, so the AI under-uses it (takes short/in-place hits
+        // when a long charge would hit far harder). Feature = normalized charge distance of the candidate; 0 for
+        // non-Rapid-Charge units or in-place strikes. Default weight 0 (v0.5 frozen); v0.6 trains it to exploit charge.
+        const wRapidCharge = this.w[56] ?? 0;
+        const hasRapidCharge = !!unit.getAbility("Rapid Charge");
+        const rcStepsNorm = Math.max(1, unit.getSteps());
         const waAura = unit.getAuraEffects().find((a) => a.getName() === "War Anger");
         const waRange = waAura ? waAura.getRange() : 0;
         const livingEnemies = waRange > 0 ? unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead()) : [];
@@ -1278,6 +1286,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     ? 1
                     : 0;
             const targetCaster = c.target.getCanCastSpells() ? 1 : 0;
+            // Rapid Charge: the charge bonus is proportional to BOTH distance and base damage (the multiplier
+            // scales the hit), so the feature is dmg * normalized-charge-distance — reward a long charge most when
+            // it actually lands a big hit, not just any long move. 0 for non-Rapid-Charge units / in-place strikes.
+            const rapidCharge = hasRapidCharge ? dmg * ((c.route?.route.length ?? 0) / rcStepsNorm) : 0;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -1292,7 +1304,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wRetalCostFM * counter * fm +
                 wWarAnger * warAnger +
                 wPunishMelee * punishMelee +
-                wMeleeCaster * targetCaster
+                wMeleeCaster * targetCaster +
+                wRapidCharge * rapidCharge
             );
         };
         let best: Cand | undefined;
