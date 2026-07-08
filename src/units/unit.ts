@@ -1727,6 +1727,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public setResponded(hasResponded: boolean) {
         this.responded = hasResponded;
     }
+    // Whether this unit has already used its retaliation this lap (set by processOneInTheFieldAbility on any
+    // responding unit, cleared at the lap flip). Serialized into the ranked wire snapshot so the client can
+    // render the "responded" tag; in sandbox the client reads the live flag directly.
+    public getResponded(): boolean {
+        return this.responded;
+    }
     public setOnHourglass(onHourglass: boolean) {
         this.onHourglass = onHourglass;
     }
