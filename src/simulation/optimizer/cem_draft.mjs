@@ -71,12 +71,17 @@ const gauss = () => {
 };
 
 // The current frozen opponent (co-evolution updates it each pass; otherwise stays the anchor via default).
-let frozen = ANCHOR.slice();
+// Frozen opponent: default the scoreCreature ANCHOR, but CEM_DRAFT_FROZEN lets us co-evolve against the SHIPPED
+// champion (DEFAULT_DRAFT_W) so a candidate must BEAT what we ship (not just the weak anchor, which saturates ~97%).
+let frozen = process.env.CEM_DRAFT_FROZEN ? JSON.parse(process.env.CEM_DRAFT_FROZEN) : ANCHOR.slice();
 
 /** Evaluate one weight vector as a subprocess → decisive win rate of the weighted draft policy vs `frozen`. */
 const evaluate = (weights, games, seed) =>
     new Promise((resolve) => {
-        const child = spawn("bun", [EVAL, String(games), String(seed), String(CONC)], {
+        // 4th arg = the FIGHT AI both sides use during the draft tournament. Default v0.5; set CEM_FIGHT_VERSION=v0.6
+        // to re-optimise the draft against the SHIPPED (BESTMIX) fight — the draft optimum can shift with the fight.
+        const fightVer = process.env.CEM_FIGHT_VERSION || "v0.5";
+        const child = spawn("bun", [EVAL, String(games), String(seed), String(CONC), fightVer], {
             env: {
                 ...process.env,
                 V05_DRAFT_WEIGHTS: JSON.stringify(weights),
@@ -96,7 +101,7 @@ const evaluate = (weights, games, seed) =>
         });
     });
 
-const mean = ANCHOR.slice();
+const mean = process.env.CEM_DRAFT_MEAN ? JSON.parse(process.env.CEM_DRAFT_MEAN) : ANCHOR.slice();
 let sigma = scale.slice();
 
 async function main() {
