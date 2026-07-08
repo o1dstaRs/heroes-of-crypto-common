@@ -485,6 +485,23 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
             roster = split(roster);
             redRoster = split(redRoster);
         }
+        // SPLIT-MELEE A/B (CEM_DRAFT_SPLIT_MELEE=1): split ONLY the WEIGHTED side's stacks (any composition incl.
+        // melee) regardless of rangedFrac — models the extra placement slots (Nature Increase-Board-Units /
+        // placement augments) applied to our MELEE deployment. With weighted==frozen draft weights both sides field
+        // the SAME army, so this isolates whether splitting a melee army into more/smaller stacks beats single-stack.
+        if (process.env.CEM_DRAFT_SPLIT_MELEE === "1") {
+            const splitAll = (r: typeof roster): typeof roster =>
+                r.flatMap((u) =>
+                    u.amount >= 4
+                        ? [
+                              { ...u, amount: Math.ceil(u.amount / 2) },
+                              { ...u, amount: Math.floor(u.amount / 2) },
+                          ]
+                        : [u],
+                );
+            if (greenIsWeighted) roster = splitAll(roster);
+            else redRoster = splitAll(redRoster);
+        }
         // Optionally activate SYNERGIES in draft self-play (CEM_DRAFT_SYNERGIES=1): each side gets the heuristic
         // best synergy per fielded faction (2+ units) from its OWN drafted roster — a fuller, more realistic
         // game so we can check whether the melee>ranged draft edge survives when synergies are live.
