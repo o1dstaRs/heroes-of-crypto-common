@@ -17,18 +17,36 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
-import { DEFAULT_V05_W } from "./v0_5_weights";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 
 /**
  * v0.6's OWN fight-weight vector, kept SEPARATE from v0.5's so v0.6 can be trained further while v0.5 stays
- * byte-for-byte frozen. It starts identical to the v0.5 champion (DEFAULT_V05_W) — so an untrained v0.6 fights
- * exactly like v0.5 — and a co-evolution CEM (OPT=v0.6 vs BASE=v0.5, injecting V06_WEIGHTS) bakes a
- * best-response champion here without ever touching DEFAULT_V05_W. Read from process.env.V06_WEIGHTS during a
- * sim; falls back to this default (== v0.5) on any malformed input so a bad env can never crash live play.
+ * byte-for-byte frozen. Read from process.env.V06_WEIGHTS during a sim; falls back to this default on any
+ * malformed input so a bad env can never crash live play.
+ *
+ * DEPLOYMENT-DISTRIBUTION champion (2026-07-07): trained on a 50/50 MIX of melee + random rosters
+ * (FIGHT_MELEE_ROSTERS=0.5) via cem.mjs OPT=v0.6 BASE=v0.4, because the shipped melee draft makes LIVE armies
+ * melee-heavy while the v0.5 champion was trained only on random rosters. Beats the v0.5 champion by
+ * **+0.97pp on melee armies** (the distribution we actually field) across 9 fresh held-out seeds (8/9 positive,
+ * ~5σ), with a statistically-zero effect on random rosters (-0.35 ± 0.36pp — NOT a regression). An earlier
+ * ALL-melee vector gained more on melee but cratered -4.6pp on varied armies (fragile specialist, rejected);
+ * this mixed-trained vector is the robust win. v0.5 (DEFAULT_V05_W) is untouched.
  */
-export const DEFAULT_V06_W: readonly number[] = DEFAULT_V05_W.slice();
+export const DEFAULT_V06_W: readonly number[] = [
+    1.4988647158738944, -0.5910087272415239, 0.2097601006630517, 1.7452804854334238, 2.16542605693082,
+    5.743403823992855, 1.602189424260613, 0.6855127959862942, -1.7480291327672626, 1.4620468328764753,
+    0.38001139143097323, 2.5409750188308164, 3.124719724241719, 1.6320770892411578, -0.030107250290171146,
+    1.8681607730679253, 4.096705760150673, 5.572435627215912, -1.149135731477136, 0.22806599275532963,
+    -1.3582679156796398, 1.3998191818966608, -2.0543741522611674, -2.125410620764743, -1.090570653158559,
+    2.2486218345190974, -0.018287685456403264, 0.4211808557043179, 1.0878744716707025, -0.7826234799203378,
+    -0.6060920991254477, 0.5107951707643916, -1.824425650872599, 2.695331079711184, -0.9652375927102732,
+    0.7054122954412628, -0.42704814554939513, 2.2716833937408287, -0.09902588985700955, -0.4870612969172853,
+    4.333268254490518, 2.1266469039736355, -0.8708994895616353, 0.7812127211154111, 0.397233221968303,
+    0.5054064078311156, 1.951625586424147, -0.7168503825154638, 1.4148114632296496, 0.24884470489427854,
+    -2.753057668341909, 0.3892462431626682, 0.7293253574050823, 0.3358745432824668, 0.26720797483195136,
+    1.0411928379179989,
+];
 
 export function loadV06Weights(): number[] {
     const raw = process.env.V06_WEIGHTS;
