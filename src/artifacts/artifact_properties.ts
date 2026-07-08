@@ -18,8 +18,8 @@
 // ARTIFACT Broken Aegis (tier-1): OFFENSIVE break — the wielder's attacks have a chance to Break the
 // ENEMY they hit (mute its abilities), at the self-cost of a chance to miss on attack. The "Broken Aegis"
 // System buff is only a marker so units/UI show the army carries this ability (and its self-miss debuff).
-export const BROKEN_AEGIS_BREAK_CHANCE = 60;
-export const BROKEN_AEGIS_MISS_CHANCE = 4;
+export const BROKEN_AEGIS_BREAK_CHANCE = 15;
+export const BROKEN_AEGIS_MISS_CHANCE = 5;
 
 export enum ArtifactTier {
     TIER_1 = 1,
@@ -39,7 +39,7 @@ export enum Tier1Artifact {
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // +15% ranged atk / -15% ranged def, or +30% ranged atk if 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
-    BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 60% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
+    BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 15% break-the-enemy / 5% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
 }
 
 export enum Tier2Artifact {
@@ -261,7 +261,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "broken_aegis",
         "Broken Aegis",
         "Broken Aegis",
-        "Broken Aegis: the wielder's attacks have a 60% chance to Break the enemy they hit (muting its abilities), at the cost of a 4% chance to miss.",
+        "Broken Aegis: the wielder's attacks have a 15% chance to Break the enemy they hit (muting its abilities), at the cost of a 5% chance to miss.",
     ),
 };
 
