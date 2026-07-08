@@ -13,6 +13,8 @@ import { EffectHelper, type IPlacement, Spell } from "..";
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
 import {
     ARTIFACT_POWER as AP,
+    BROKEN_AEGIS_BREAK_CHANCE,
+    BROKEN_AEGIS_MISS_CHANCE,
     TIER1_ARTIFACT_LIST,
     TIER2_ARTIFACT_LIST,
     Tier1Artifact,
@@ -507,11 +509,15 @@ export class UnitsHolder {
                     unit.grantAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.BROKEN_AEGIS:
+                    // Upside (offensive break, resolved in getBreakChancePerTeam) vs downside (self-miss).
+                    // Functional buff power stays AEGIS_AREA_REDUCTION_PERCENT (0) so the legacy area-damage
+                    // hook is a no-op; the displayed numbers come from the break/miss constants.
                     applyDualArtifact(
                         "Broken Aegis",
-                        "Reduces area-attack damage taken by {}%.",
-                        "Cursed: the army may break when hit and miss on attack.",
+                        `The army's attacks have a ${BROKEN_AEGIS_BREAK_CHANCE}% chance to Break the enemy hit (muting its abilities).`,
+                        `Cursed: ${BROKEN_AEGIS_MISS_CHANCE}% chance to miss on attack.`,
                         AP.AEGIS_AREA_REDUCTION_PERCENT,
+                        BROKEN_AEGIS_MISS_CHANCE,
                     );
                     break;
                 default:
