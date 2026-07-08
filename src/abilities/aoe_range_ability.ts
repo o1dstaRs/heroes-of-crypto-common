@@ -148,7 +148,7 @@ export function processRangeAOEAbility(
                     increaseMoraleTotal += pegasusLightEffect.getPower();
                 }
                 sceneLog.updateLog(
-                    `${attackerUnit.getName()} ${isAttack ? "attk" : "resp"} ${unit.getName()} (${damageFromAttack})`,
+                    `${attackerUnit.getName()} ${isAttack ? "🏹" : "resp"} ${unit.getName()} (${damageFromAttack})`,
                 );
                 maxDamage = Math.max(maxDamage, damageFromAttack);
 

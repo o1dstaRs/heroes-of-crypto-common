@@ -68,13 +68,6 @@ export function processSkewerStrikeAbility(
         return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam, secondaryDamages: [] };
     }
 
-    let actionString: string;
-    if (isAttack) {
-        actionString = "attk";
-    } else {
-        actionString = "resp";
-    }
-
     const unitsDead: Unit[] = [];
     const secondaryDamages: ISkewerStrikeDamage[] = [];
     const targets = AbilityHelper.nextStandingTargets(
@@ -148,7 +141,7 @@ export function processSkewerStrikeAbility(
         });
 
         sceneLog.updateLog(
-            `${fromUnit.getName()} ${actionString} ${nextStandingTarget.getName()} (${damageFromAttack})`,
+            `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${nextStandingTarget.getName()} (${damageFromAttack})`,
         );
 
         if (nextStandingTarget.isDead()) {

@@ -167,7 +167,9 @@ export function processLightningSpinAbility(
                 increaseMoraleTotal += pegasusLightEffect.getPower();
             }
 
-            sceneLog.updateLog(`${fromUnit.getName()} ${actionString} ${enemy.getName()} (${damageFromAttack})`);
+            sceneLog.updateLog(
+                `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${enemy.getName()} (${damageFromAttack})`,
+            );
 
             if (enemy.isDead()) {
                 unitsDead.push(enemy);

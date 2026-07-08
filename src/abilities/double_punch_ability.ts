@@ -97,7 +97,7 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
         if (pegasusLightEffect) {
             moraleIncrease = pegasusLightEffect.getPower();
         }
-        sceneLog.updateLog(`${fromUnit.getName()} attk ${toUnit.getName()} (${damageFromAttack})`);
+        sceneLog.updateLog(`${fromUnit.getName()} ⚔️ ${toUnit.getName()} (${damageFromAttack})`);
 
         secondPunchLanded = true;
     }

@@ -433,6 +433,52 @@ describe("ability processors", () => {
         ).toBe(false);
     });
 
+    it("logs the Double Shot second attack with the range icon, not the literal 'attk'", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const lines: string[] = [];
+        const capturingLog = {
+            getLog: () => lines.join("\n"),
+            updateLog: (line?: string) => {
+                if (line) lines.push(line);
+            },
+            hasBeenUpdated: () => true,
+        };
+        const attacker = createTestUnit({
+            name: "Repeater",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Double Shot"],
+            attack: 10,
+            damageMin: 10,
+            damageMax: 10,
+            rangeShots: 2,
+            stackPower: 100,
+        });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 2, maxHp: 20 });
+        placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, target, { x: 7, y: 7 });
+
+        processDoubleShotAbility(
+            attacker,
+            target,
+            [],
+            capturingLog,
+            unitsHolder,
+            grid,
+            1,
+            target.getPosition(),
+            createVisibleDamage(target),
+            new DamageStatisticHolder(),
+            false,
+        );
+
+        const hitLine = lines.find((l) => l.includes(target.getName()) && l.includes("("));
+        expect(hitLine).toBeDefined();
+        // The second (Double Shot) strike must read like the first: 🏹 for a ranged hit, never " attk ".
+        expect(hitLine).toContain("🏹");
+        expect(hitLine).not.toContain(" attk ");
+    });
+
     it("uses double shot to trigger ranged AOE damage when available", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();

@@ -119,7 +119,7 @@ export function processThroughShotAbility(
             );
             // Through Shot is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * targetUnit.getPhysicalAoeDamageMultiplier());
-            sceneLog.updateLog(`${attackerUnit.getName()} attk ${targetUnit.getName()} (${damageFromAttack})`);
+            sceneLog.updateLog(`${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})`);
             const amountAliveBeforeDamage = targetUnit.getAmountAlive();
             const positionAtImpact = { ...targetUnit.getPosition() };
             const damageDealt = targetUnit.applyDamage(

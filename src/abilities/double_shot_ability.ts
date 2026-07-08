@@ -167,7 +167,7 @@ export function processDoubleShotAbility(
         if (pegasusLightEffect) {
             moraleIncrease += pegasusLightEffect.getPower();
         }
-        sceneLog.updateLog(`${fromUnit.getName()} attk ${toUnit.getName()} (${damageFromAttack})`);
+        sceneLog.updateLog(`${fromUnit.getName()} 🏹 ${toUnit.getName()} (${damageFromAttack})`);
     }
 
     return {
