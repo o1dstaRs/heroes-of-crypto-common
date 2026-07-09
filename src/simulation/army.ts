@@ -62,6 +62,8 @@ interface ICatalogEntry {
     creatureName: string;
     level: number;
     size: number;
+    /** creatures.json attack_type — "MELEE" | "RANGE" | "MELEE_MAGIC" | "MAGIC". */
+    attackType: string;
 }
 
 let catalogCache: ICatalogEntry[] | undefined;
@@ -83,7 +85,10 @@ function getCatalog(): ICatalogEntry[] {
     if (catalogCache) {
         return catalogCache;
     }
-    const json = CREATURES_JSON as unknown as Record<string, Record<string, { level?: number; size?: number }>>;
+    const json = CREATURES_JSON as unknown as Record<
+        string,
+        Record<string, { level?: number; size?: number; attack_type?: string }>
+    >;
     const entries: ICatalogEntry[] = [];
     for (const faction of Object.keys(json)) {
         const factionCreatures = json[faction];
@@ -98,7 +103,13 @@ function getCatalog(): ICatalogEntry[] {
                 typeof cfg.size === "number" &&
                 isCreatureEnabled(creatureName)
             ) {
-                entries.push({ faction, creatureName, level: cfg.level, size: cfg.size });
+                entries.push({
+                    faction,
+                    creatureName,
+                    level: cfg.level,
+                    size: cfg.size,
+                    attackType: cfg.attack_type ?? "MELEE",
+                });
             }
         }
     }
@@ -141,37 +152,91 @@ function forcedByLevel(): Record<number, string> {
     return out;
 }
 
+/**
+ * Diagnostic-only: constrain the number of RANGE (ranged-attacker) stacks per roster via
+ * ROSTER_RANGED_MIN / ROSTER_RANGED_MAX, e.g. `ROSTER_RANGED_MIN=2 ROSTER_RANGED_MAX=3` for range-heavy
+ * armies. Applied by rejection sampling (rebuild until the RANGE count is in range), so it stays fully
+ * deterministic for a given seed — the retries consume the same rng stream. Off by default (no env set),
+ * so existing runs are unaffected.
+ */
+function rangedConstraint(): { min: number; max: number } | undefined {
+    const min = process.env.ROSTER_RANGED_MIN;
+    const max = process.env.ROSTER_RANGED_MAX;
+    if (min === undefined && max === undefined) {
+        return undefined;
+    }
+    return {
+        min: min !== undefined ? Number(min) : 0,
+        max: max !== undefined ? Number(max) : Number.MAX_SAFE_INTEGER,
+    };
+}
+
 export function buildRoster(
     rng: () => number,
     composition: readonly IRosterComposition[] = DEFAULT_ROSTER_COMPOSITION,
     amountByLevel: Readonly<Record<number, number>> = DEFAULT_AMOUNT_BY_LEVEL,
     factionFilter?: string,
 ): IArmyUnitSpec[] {
-    const roster: IArmyUnitSpec[] = [];
     const forced = forcedByLevel();
-    for (const { level, count } of composition) {
-        const pool = creaturesByLevel(level, factionFilter);
-        if (!pool.length) {
-            throw new Error(`No creatures found for level ${level}`);
-        }
-        for (let i = 0; i < count; i += 1) {
-            let pick = pool[Math.floor(rng() * pool.length)];
-            if (i === 0 && forced[level]) {
-                const forcedPick = pool.find((p) => p.creatureName === forced[level]);
-                if (forcedPick) {
-                    pick = forcedPick;
-                }
+    const buildOnce = (): { roster: IArmyUnitSpec[]; ranged: number } => {
+        const roster: IArmyUnitSpec[] = [];
+        let ranged = 0;
+        for (const { level, count } of composition) {
+            const pool = creaturesByLevel(level, factionFilter);
+            if (!pool.length) {
+                throw new Error(`No creatures found for level ${level}`);
             }
-            roster.push({
-                faction: pick.faction,
-                creatureName: pick.creatureName,
-                level: pick.level,
-                size: pick.size,
-                amount: amountByLevel[level] ?? 1,
-            });
+            for (let i = 0; i < count; i += 1) {
+                let pick = pool[Math.floor(rng() * pool.length)];
+                if (i === 0 && forced[level]) {
+                    const forcedPick = pool.find((p) => p.creatureName === forced[level]);
+                    if (forcedPick) {
+                        pick = forcedPick;
+                    }
+                }
+                if (pick.attackType === "RANGE") {
+                    ranged += 1;
+                }
+                roster.push({
+                    faction: pick.faction,
+                    creatureName: pick.creatureName,
+                    level: pick.level,
+                    size: pick.size,
+                    amount: amountByLevel[level] ?? 1,
+                });
+            }
+        }
+        return { roster, ranged };
+    };
+
+    const constraint = rangedConstraint();
+    if (!constraint) {
+        return buildOnce().roster;
+    }
+    // Rejection-sample until the RANGE-stack count lands in [min, max]. Deterministic per seed; the retry
+    // budget is a safety valve (feasibility is high — every level has ranged creatures), and we keep the
+    // build closest to the window if it's ever exhausted.
+    let best = buildOnce();
+    let bestDist = rangeDistance(best.ranged, constraint);
+    for (let attempt = 0; attempt < 2000 && bestDist > 0; attempt += 1) {
+        const next = buildOnce();
+        const dist = rangeDistance(next.ranged, constraint);
+        if (dist < bestDist) {
+            best = next;
+            bestDist = dist;
         }
     }
-    return roster;
+    return best.roster;
+}
+
+function rangeDistance(value: number, { min, max }: { min: number; max: number }): number {
+    if (value < min) {
+        return min - value;
+    }
+    if (value > max) {
+        return value - max;
+    }
+    return 0;
 }
 
 /** Instantiate a Unit for the given spec and team. The abilityFactory/effectFactory are shared per match. */

@@ -10,7 +10,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { BROKEN_AEGIS_MISS_CHANCE } from "../../src/artifacts/artifact_properties";
+import { BROKEN_AEGIS_BREAK_CHANCE, BROKEN_AEGIS_MISS_CHANCE } from "../../src/artifacts/artifact_properties";
 import { createTestUnit } from "../helpers/combat";
 import type { ISceneLog } from "../../src/scene/scene_log_interface";
 
@@ -40,8 +40,9 @@ const makeTarget = (name: string) =>
     });
 
 describe("Broken Aegis break-on-attack", () => {
-    it("self-miss cost constant is 5%", () => {
-        expect(BROKEN_AEGIS_MISS_CHANCE).toBe(5);
+    it("tuned to 20% break / 4% self-miss (~48% overall win rate)", () => {
+        expect(BROKEN_AEGIS_BREAK_CHANCE).toBe(20);
+        expect(BROKEN_AEGIS_MISS_CHANCE).toBe(4);
     });
 
     it("applyDamage with a positive break chance lands a Break effect (recorded for the HUD)", () => {
