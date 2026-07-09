@@ -15,6 +15,7 @@ import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import { auraRelevanceWeight } from "../ai";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 
@@ -88,6 +89,10 @@ export class StrategyV0_6 extends StrategyV0_5 {
     /** Load v0.6's OWN fight weights (V06_WEIGHTS env or DEFAULT_V06_W) — decoupled from v0.5's V05_WEIGHTS. */
     public constructor() {
         super(loadV06Weights());
+        // v0.6 improvement: aura-bearers weight covered targets by relevance, so Griffin's range-null aura
+        // chases enemy SHOOTERS instead of blanketing the most bodies. V06_AURA_FLAT=1 restores v0.5's flat
+        // count for A/B measurement.
+        this.auraWeight = process.env.V06_AURA_FLAT === "1" ? () => 1 : auraRelevanceWeight;
     }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const decision = super.decideTurn(unit, context);

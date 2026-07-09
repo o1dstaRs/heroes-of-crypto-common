@@ -22,6 +22,7 @@ import { MAX_HITS_MOUNTAIN } from "../../constants";
 import {
     analyzeEngagement,
     auraCoverageScore,
+    type AuraWeightFn,
     countMeleeThreatsToCell,
     findMountainMeleeStrike,
     isLineBlockedByObstacle,
@@ -89,6 +90,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
     public override readonly version: string = "v0.5";
     /** Learned coefficients; see V05_WEIGHT_KEYS for the layout. */
     private readonly w: number[];
+    /**
+     * How an aura-bearer weights the targets it covers when repositioning to keep them in its auras. v0.5
+     * counts each covered target equally (flat +1 — unchanged). v0.6 overrides this with a relevance weight
+     * (see auraRelevanceWeight) so e.g. Griffin's range-null aura chases enemy SHOOTERS, not melee bodies.
+     */
+    protected auraWeight: AuraWeightFn = () => 1;
     public constructor(weights?: number[]) {
         super();
         this.w = weights ?? loadV05Weights();
@@ -998,7 +1005,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const gridSettings = grid.getSettings();
         const base = unit.getBaseCell();
         // Nothing to protect right now -> just attack as before.
-        if (auraCoverageScore(unit, base, gridSettings, unitsHolder) < 1) {
+        if (auraCoverageScore(unit, base, gridSettings, unitsHolder, this.auraWeight) < 1) {
             return decision;
         }
         const enemyTeam = otherTeam(unit.getTeam());
@@ -1011,7 +1018,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
         );
-        const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
+        const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder, this.auraWeight);
         // 1) A reachable cell covers more allies -> reposition there (stay in support).
         if (
             plan &&
@@ -1248,6 +1255,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // a shooter). Beyond the generic `threat` (firepower) term, this directly biases melee toward ranged
         // targets. Default weight 0 → v0.5 frozen; v0.6 trains it (matters in mixed fights, not pure-melee).
         const wRangedTarget = this.w[57] ?? 0;
+        // Proactive retaliation-BAITING (dim 58, default 0 = v0.5 behaviour). Reward an EXPENDABLE unit for
+        // striking a FRESH high-firepower enemy to spend its retaliation, setting up allies' free hits.
+        const wBait = this.w[58] ?? 0;
+        const myFirepower = firepowerOf(unit);
         const waAura = unit.getAuraEffects().find((a) => a.getName() === "War Anger");
         const waRange = waAura ? waAura.getRange() : 0;
         const livingEnemies = waRange > 0 ? unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead()) : [];
@@ -1315,6 +1326,11 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const rapidCharge = hasRapidCharge ? dmg * ((c.route?.route.length ?? 0) / rcStepsNorm) : 0;
             // Target-ranged: 1 if the target is an enemy shooter (pre-empt/pin it), 0 otherwise.
             const targetRanged = c.target.getAttackType() === RANGE ? 1 : 0;
+            // Retaliation-bait: high when THIS unit is much weaker than a FRESH (not-replied), non-killed target
+            // — i.e. an expendable unit trading its retaliation to open the strong enemy up for the army. 0 once
+            // the target has replied (bait already spent) or this strike kills it.
+            const expendable = threat > 0 ? Math.max(0, 1 - myFirepower / firepowerOf(c.target)) : 0;
+            const baitRetal = replied || kill ? 0 : threat * expendable;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -1331,7 +1347,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wPunishMelee * punishMelee +
                 wMeleeCaster * targetCaster +
                 wRapidCharge * rapidCharge +
-                wRangedTarget * targetRanged
+                wRangedTarget * targetRanged +
+                wBait * baitRetal
             );
         };
         let best: Cand | undefined;

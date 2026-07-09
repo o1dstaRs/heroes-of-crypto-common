@@ -21,6 +21,8 @@ import type { IUnitAIRepr } from "./../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import * as HoCLib from "../utils/lib";
 import * as EffectHelper from "../effects/effect_helper";
+import type { AuraEffect } from "../effects/aura_effect";
+import { AbilityPowerType } from "../abilities/ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
 
@@ -1147,11 +1149,33 @@ export function findSaferMoveCell(
  * buff auras that both reach an ally scores that ally twice; that's fine for relative comparison between
  * candidate cells. Large units are approximated as emitting from their base cell.
  */
+/**
+ * Weights a covered target when scoring an aura-bearer's position. Default is a flat +1 per covered target
+ * (v0.4/v0.5 behavior). v0.6 supplies `auraRelevanceWeight` so an aura that only helps against SPECIFIC
+ * targets (Griffin's range-null vs melee enemies) doesn't chase the ones it can't affect.
+ */
+export type AuraWeightFn = (target: Unit, aura: AuraEffect) => number;
+
+/**
+ * v0.6 aura-relevance weight. Today it fixes ONE mismatch: Griffin's Range Null Field aura
+ * (DISABLE_RANGE_ATTACK) only silences ENEMY SHOOTERS — covering a melee enemy is worthless. So weight a
+ * covered enemy by its shooter stack size (amount_alive) when the aura disables ranged attacks, else 0,
+ * pushing the bearer to blanket enemy ranged units. All other auras (e.g. Valkyrie's War Anger, which
+ * scales with EVERY nearby enemy) keep the flat count — that's already the right metric for them.
+ */
+export const auraRelevanceWeight: AuraWeightFn = (target, aura) => {
+    if (aura.getPowerType() === AbilityPowerType.DISABLE_RANGE_ATTACK) {
+        return target.getAttackType() === PBTypes.AttackVals.RANGE ? target.getAmountAlive() : 0;
+    }
+    return 1;
+};
+
 export function auraCoverageScore(
     unit: Unit,
     fromCell: HoCMath.XY,
     gridSettings: GridSettings,
     unitsHolder: UnitsHolder,
+    weight: AuraWeightFn = () => 1,
 ): number {
     const auras = unit.getAuraEffects();
     if (!auras.length) {
@@ -1177,7 +1201,7 @@ export function auraCoverageScore(
         for (const t of targets) {
             const bc = t.getBaseCell();
             if (cellKeys.has((bc.x << 4) | bc.y)) {
-                score += 1;
+                score += weight(t, aura);
             }
         }
     }
@@ -1209,6 +1233,7 @@ export function planAuraMove(
     gridSettings: GridSettings,
     matrix: number[][],
     unitsHolder: UnitsHolder,
+    weight: AuraWeightFn = () => 1,
 ): IAuraMovePlan | undefined {
     const auras = unit.getAuraEffects();
     if (!auras.length) {
@@ -1216,7 +1241,7 @@ export function planAuraMove(
     }
     const enemyTeam = unit.getOppositeTeam();
     const baseCell = unit.getBaseCell();
-    const currentScore = auraCoverageScore(unit, baseCell, gridSettings, unitsHolder);
+    const currentScore = auraCoverageScore(unit, baseCell, gridSettings, unitsHolder, weight);
 
     const aliveAllies = unitsHolder
         .getAllAllies(unit.getTeam())
@@ -1243,7 +1268,7 @@ export function planAuraMove(
                 continue;
             }
             const cell = { x: cx, y: cy };
-            const score = auraCoverageScore(unit, cell, gridSettings, unitsHolder);
+            const score = auraCoverageScore(unit, cell, gridSettings, unitsHolder, weight);
             // Higher coverage wins; on a tie prefer staying closer to the current cell (less exposure).
             if (
                 score > bestScore ||
