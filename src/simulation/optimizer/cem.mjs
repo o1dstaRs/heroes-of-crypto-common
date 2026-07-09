@@ -62,7 +62,12 @@ const DEADLINE = HOURS > 0 ? Date.now() + HOURS * 3600 * 1000 : 0;
 // Freeze the leading dims [0, FREEZE_BELOW) at the mean (sigma 0) — search only the trailing dims. Used to
 // bolt a NEW feature block onto a proven vector without disturbing it (e.g. mountain mining dims 26..32).
 const FREEZE_BELOW = Number(process.env.CEM_FREEZE_BELOW ?? 0);
-const maskFrozen = (s) => s.map((v, d) => (d < FREEZE_BELOW ? 0 : v));
+// FREEZE_ABOVE (default DIM = no trailing freeze) also pins the trailing dims [FREEZE_ABOVE, DIM) at the mean,
+// so combined with FREEZE_BELOW you can train an INTERIOR block only — e.g. FREEZE_BELOW=26 FREEZE_ABOVE=33
+// retrains just the mountain-mining dims [26..32] for the new two-mountain map without disturbing the rest of
+// the proven vector.
+const FREEZE_ABOVE = Number(process.env.CEM_FREEZE_ABOVE ?? DIM);
+const maskFrozen = (s) => s.map((v, d) => (d < FREEZE_BELOW || d >= FREEZE_ABOVE ? 0 : v));
 
 // Seeded PRNG (mulberry32) + Box-Muller.
 function mulberry32(a) {
