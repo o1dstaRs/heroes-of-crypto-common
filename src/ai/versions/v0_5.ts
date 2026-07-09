@@ -367,6 +367,24 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!isCharge || !this.canHourglass(unit, context)) {
             return decision;
         }
+        // BUFF-WAIT: if the charge would trade into an enemy carrying a STRONG, SOON-EXPIRING temporary buff
+        // (Riot / Mass Riot / Armor / Behemoth-style), it's often better to HOLD and let the buff drop first than
+        // to attack into inflated stats. Wait when the target has such a buff (power >= threshold, expiring within
+        // a couple laps). Gated (V05_BUFFWAIT=on) — default off keeps v0.5 byte-for-byte; v0.6 A/Bs + tunes it.
+        if (process.env.V05_BUFFWAIT === "on") {
+            const strike = decision.find((a) => a.type === "melee_attack");
+            const tgt =
+                strike?.type === "melee_attack" ? context.unitsHolder.getAllUnits().get(strike.targetId) : undefined;
+            const minPow = Number(process.env.V05_BUFFWAIT_POW ?? 20);
+            const maxLaps = Number(process.env.V05_BUFFWAIT_LAPS ?? 2);
+            if (
+                tgt &&
+                !tgt.isDead() &&
+                tgt.getBuffs().some((b) => b.getPower() >= minPow && b.getLaps() >= 1 && b.getLaps() <= maxLaps)
+            ) {
+                return [{ type: "wait_turn", unitId: unit.getId() }];
+            }
+        }
         const fm = this.fmExposure(unit, context);
         const thresh = Number(process.env.V05_HOURGLASS_FM ?? 0.67);
         if (fm < thresh) {
