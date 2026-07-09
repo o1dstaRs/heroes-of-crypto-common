@@ -49,6 +49,9 @@ export const DEFAULT_V06_W: readonly number[] = [
     // [56] Rapid Charge weight — anchor 0 (v0.5-equivalent, no charge-distance bias). v0.6 trains this on melee
     // fights so Champion/Wolf Rider/Nomad prefer a longer charge (more damage) instead of short/in-place strikes.
     0,
+    // [57] Target-ranged (pre-emption) weight — anchor 0. v0.6 trains it to bias melee toward enemy shooters
+    // (pre-empt/pin them before their firepower lands). Matters in mixed fights; 0 keeps current behavior.
+    0,
 ];
 
 export function loadV06Weights(): number[] {

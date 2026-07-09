@@ -1243,6 +1243,11 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const wRapidCharge = this.w[56] ?? 0;
         const hasRapidCharge = !!unit.getAbility("Rapid Charge");
         const rcStepsNorm = Math.max(1, unit.getSteps());
+        // [57] TARGET-RANGED (pre-emption) — prefer engaging enemy RANGED units: they are the shot-dealers, so
+        // closing on / killing / pinning them shuts down their firepower before it lands (and melee adjacency pins
+        // a shooter). Beyond the generic `threat` (firepower) term, this directly biases melee toward ranged
+        // targets. Default weight 0 → v0.5 frozen; v0.6 trains it (matters in mixed fights, not pure-melee).
+        const wRangedTarget = this.w[57] ?? 0;
         const waAura = unit.getAuraEffects().find((a) => a.getName() === "War Anger");
         const waRange = waAura ? waAura.getRange() : 0;
         const livingEnemies = waRange > 0 ? unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead()) : [];
@@ -1308,6 +1313,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             // scales the hit), so the feature is dmg * normalized-charge-distance — reward a long charge most when
             // it actually lands a big hit, not just any long move. 0 for non-Rapid-Charge units / in-place strikes.
             const rapidCharge = hasRapidCharge ? dmg * ((c.route?.route.length ?? 0) / rcStepsNorm) : 0;
+            // Target-ranged: 1 if the target is an enemy shooter (pre-empt/pin it), 0 otherwise.
+            const targetRanged = c.target.getAttackType() === RANGE ? 1 : 0;
             return (
                 wDmg * dmg +
                 wKill * kill +
@@ -1323,7 +1330,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wWarAnger * warAnger +
                 wPunishMelee * punishMelee +
                 wMeleeCaster * targetCaster +
-                wRapidCharge * rapidCharge
+                wRapidCharge * rapidCharge +
+                wRangedTarget * targetRanged
             );
         };
         let best: Cand | undefined;
