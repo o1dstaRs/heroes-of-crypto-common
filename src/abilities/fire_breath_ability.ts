@@ -56,12 +56,15 @@ export function processFireBreathAbility(
     const targets = AbilityHelper.nextStandingTargets(fromUnit, toUnit, grid, unitsHolder, targetMovePosition);
 
     for (const nextStandingTarget of targets) {
-        if (
-            nextStandingTarget.isDead() ||
-            nextStandingTarget.getMagicResist() >= 100 ||
-            nextStandingTarget.hasAbilityActive("Fire Element")
-        ) {
+        // A dead unit doesn't block the wave — the fire passes through its (about-to-be-emptied) cell.
+        if (nextStandingTarget.isDead()) {
             continue;
+        }
+        // A FULLY fire-immune unit (Fire Element, e.g. Efreet / Black Dragon, or 100% magic resist) takes no
+        // damage AND acts as a fire wall: it shields every unit behind it in the wave's path. Stop the sweep
+        // here — do not carry the breath through to further targets.
+        if (nextStandingTarget.getMagicResist() >= 100 || nextStandingTarget.hasAbilityActive("Fire Element")) {
+            break;
         }
 
         const heavyArmorAbility = nextStandingTarget.getAbility("Heavy Armor");

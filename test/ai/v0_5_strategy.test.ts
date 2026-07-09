@@ -34,16 +34,19 @@ describe("v0.5 — reinforcement-learned strategy", () => {
             0.2916, -0.4279, 0.1587, -1.2452, -0.6807, 0.7213, -0.3563, 2.1045, -0.7515, 1.0022, 0.2311, 2.6854,
             -0.0261, -0.2301, 4.4516, 2.2054, -2.4419, 1.2098, 0.3502, -0.2083, 0.7573, -0.3856, 2.329, 0.1822, -1.5113,
             0.1957, 1.1489, -0.4775, -0.0261, 0.4148,
+            // [56..58] meleeRapidCharge, meleeRangedTarget, meleeBaitRetal — untrained (0), v0.5 byte-identical.
+            0, 0, 0,
         ]);
         expect(DEFAULT_V05_W.length).toBe(V05_WEIGHT_KEYS.length);
-        expect(DEFAULT_V05_W.length).toBe(56);
+        expect(DEFAULT_V05_W.length).toBe(59);
     });
 
     it("loadV05Weights honours a well-formed process.env.V05_WEIGHTS override", () => {
         const trained = [
             1.2, 0.5, 0.8, 0.1, 0.05, 1.0, 0.4, -0.2, -0.6, 1.0, 0.3, -0.5, 0.7, 0.2, 0.9, 0.6, 0.3, 0.1, -0.4, 1.5,
             -0.7, 0.4, 0.3, -0.2, -0.5, -0.8, 0.2, -0.3, 0.1, 0.4, -0.1, 0.6, -0.2, 0.9, -0.4, 1.1, -0.7, 0.2, -0.9,
-            0.5, 0.3, 0.15, -0.25, 0.35, -0.15, 0.45, -0.55, 0.65, -0.35, 0.2, -0.4, 0.6, -0.1, 0.25, -0.15, 0.35,
+            0.5, 0.3, 0.15, -0.25, 0.35, -0.15, 0.45, -0.55, 0.65, -0.35, 0.2, -0.4, 0.6, -0.1, 0.25, -0.15, 0.35, 0.12,
+            -0.22, 0.32,
         ];
         process.env.V05_WEIGHTS = JSON.stringify(trained);
         expect(loadV05Weights()).toEqual(trained);

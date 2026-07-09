@@ -107,6 +107,13 @@ export const V05_WEIGHT_KEYS = [
     "shotFocusFire", // * # allies already adjacent to the shot target / 2 — concentrate fire to finish it
     "shotTempo", // * target has NOT acted this lap — killing it denies its turn (second-mover edge); full on kill
     "shotWounded", // * fraction of the target stack already dead — finish a near-dead stack (removes a whole unit)
+    // [56..57] previously code-only (read as w[56]/w[57] with ?? 0); keyed here so the vector length matches.
+    "meleeRapidCharge", // * Rapid Charge units: dmg * normalized charge distance (0 for others / in-place)
+    "meleeRangedTarget", // * melee target is an enemy shooter (pre-empt/pin it)
+    // [58] NEW: proactive retaliation-BAITING. An EXPENDABLE unit (weaker than the target) is rewarded for
+    // striking a FRESH (not-yet-retaliated) HIGH-firepower enemy to SPEND its retaliation, so valuable allies
+    // then hit that now-responded target for free (the existing retalFree signal exploits it → emergent combo).
+    "meleeBaitRetal",
 ] as const;
 
 /**
@@ -148,6 +155,9 @@ export const DEFAULT_V05_W: readonly number[] = [
     0.1957, 1.1489,
     // [53..55] shot-scorer features (shotFocusFire, shotTempo=deny-turn, shotWounded) — now TRAINED off zero.
     -0.4775, -0.0261, 0.4148,
+    // [56..58] meleeRapidCharge, meleeRangedTarget, meleeBaitRetal — all 0 (untrained → v0.5 behaviour byte-
+    // identical). [58] baiting is trained separately on the node (CEM_FREEZE_BELOW=58).
+    0, 0, 0,
 ];
 
 /**
