@@ -229,5 +229,9 @@ describe("range attack trajectory (server/common engine)", () => {
         // The mountain is hit; the unit behind it is NOT reachable on this line.
         expect(evaluation.attackObstacle).toBeDefined();
         expect(evaluation.affectedUnits.flat()).not.toContain(setup.target);
+        // The intercept marks the LEFT mountain the shot first reaches (world-X < the board centre 0),
+        // not the old "centre of the board" projection that landed in the empty corridor between the two.
+        expect(evaluation.attackObstacle!.position.x).toBeLessThan(0);
+        expect(evaluation.attackObstacle!.size).toBe(2);
     });
 });

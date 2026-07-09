@@ -2141,14 +2141,15 @@ export class AttackHandler {
 
             const possibleUnitId = this.grid.getOccupantUnitId(cell);
             if (possibleUnitId === "B" && !isSelection && !isAOEShot) {
-                const obstablePosition = {
-                    x: (this.gridSettings.getMinX() + this.gridSettings.getMaxX()) / 2,
-                    y: (this.gridSettings.getMinY() + this.gridSettings.getMaxY()) / 2,
-                };
+                // Intercept at the actual mountain cell the shot first reaches — NOT the board centre.
+                // BLOCK_CENTER now has TWO 2x2 mountains flanking a walkable corridor, so the old "centre of
+                // the board, size 4" (the single big mountain) projected the block marker into the empty
+                // corridor between them; a shot at the left mountain still pointed at the middle.
+                const obstaclePosition = { x: position.x, y: position.y };
                 attackObstacle = {
-                    position: obstablePosition,
-                    size: 4,
-                    distance: HoCMath.getDistance(attackerUnit.getPosition(), obstablePosition),
+                    position: obstaclePosition,
+                    size: 2,
+                    distance: HoCMath.getDistance(attackerUnit.getPosition(), obstaclePosition),
                 };
                 break;
             }
