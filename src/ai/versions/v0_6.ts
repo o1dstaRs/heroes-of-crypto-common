@@ -15,7 +15,7 @@ import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
-import { auraRelevanceWeight } from "../ai";
+import { auraRelevanceWeight, setPreferAttackOverMining } from "../ai";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 
@@ -95,7 +95,16 @@ export class StrategyV0_6 extends StrategyV0_5 {
         this.auraWeight = process.env.V06_AURA_FLAT === "1" ? () => 1 : auraRelevanceWeight;
     }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        const decision = super.decideTurn(unit, context);
+        // v0.6: an idle melee unit that can instead reach + attack an enemy this turn does that rather than
+        // mining the center mountain ("why is the AI attacking the mountain?"). On by default; V06_LEGACY_MINE=1
+        // restores the old attack-preempting mining so a tournament can A/B the change against the same v0.5.
+        setPreferAttackOverMining(process.env.V06_LEGACY_MINE !== "1");
+        let decision: GameAction[];
+        try {
+            decision = super.decideTurn(unit, context);
+        } finally {
+            setPreferAttackOverMining(false);
+        }
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
         // negative (melee 64.8%→66.2% vs ranged) — too crude; a real kite needs advance-to-range→shoot→retreat.
         // Default off keeps v0.6's fight byte-for-byte v0.5 (only the draft/setup weights differ).

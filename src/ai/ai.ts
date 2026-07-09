@@ -28,6 +28,15 @@ import type { GridSettings } from "../grid/grid_settings";
 
 const DEBUG_AI = false;
 
+// v0.6-only gate: when set, an idle-melee mountain-mining decision defers to a reachable enemy attack
+// (mining must never preempt actually hitting a unit this turn). v0.5 leaves it unset (frozen behaviour)
+// so a v0.6-vs-v0.5 tournament measures the change. Set synchronously around a single decideTurn call —
+// JS is single-threaded and findTarget is synchronous, so it only affects that one unit's decision.
+let preferAttackOverMining = false;
+export function setPreferAttackOverMining(value: boolean): void {
+    preferAttackOverMining = value;
+}
+
 export interface IAI {
     nextMovingTarget(): HoCMath.XY | undefined;
 
@@ -186,7 +195,19 @@ export function findTarget(
         // hold/regroup strategies below — in the "we out-range them" case mining is exactly what idle
         // melee should do instead of holding.
         const mountainAction = evaluateMountainStrategy(unit, grid, matrix, unitsHolder, pathHelper, engagement);
-        if (mountainAction) {
+        if (mountainAction && preferAttackOverMining) {
+            // v0.6: mining the mountain must NEVER preempt actually hitting an enemy. evaluateMountainStrategy
+            // only checked for an ADJACENT enemy (via `!action`), so a unit that can MOVE-AND-MELEE a reachable
+            // enemy this turn would otherwise chip rock instead — the "why is the AI attacking the mountain?"
+            // bug. Compute the normal decision and, if it's a real attack, take it instead of the strike.
+            const normalAction = doFindTarget(unit, unitsHolder, grid, matrix, pathHelper, DEBUG_AI);
+            const normalIsAttack =
+                !!normalAction &&
+                (normalAction.actionType() === AIActionType.MELEE_ATTACK ||
+                    normalAction.actionType() === AIActionType.MOVE_AND_MELEE_ATTACK ||
+                    normalAction.actionType() === AIActionType.RANGE_ATTACK);
+            action = normalIsAttack ? normalAction : mountainAction;
+        } else if (mountainAction) {
             action = mountainAction;
         } else {
             // Strategy 1: Ranged-heavy team → defensive posture. Melee units hold position
