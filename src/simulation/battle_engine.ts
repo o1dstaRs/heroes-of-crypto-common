@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getAIStrategy } from "../ai";
+import { getAIStrategy, type IDecisionContext } from "../ai";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -54,6 +54,14 @@ export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LOWER;
 export const RED_TEAM: TeamType = PBTypes.TeamVals.UPPER;
 const sideForTeam = (team: TeamType): Side => (team === GREEN_TEAM ? "green" : "red");
 
+/** Synchronous, read-only view of one strategy decision before search or recovery modifies its execution. */
+export interface IDecisionObservation {
+    unit: Unit;
+    context: IDecisionContext;
+    incumbent: readonly GameAction[];
+    strategyVersion: string;
+}
+
 export interface IMatchConfig {
     greenVersion: string;
     redVersion: string;
@@ -88,6 +96,8 @@ export interface IMatchConfig {
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
     redSynergies?: ISetupSynergy[];
+    /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
+    decisionObserver?: (observation: IDecisionObservation) => void;
 }
 
 export interface ISetupAugment {
@@ -685,14 +695,23 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
-        const decided0 = strategy.decideTurn(unit, {
+        const decisionContext: IDecisionContext = {
             grid,
             matrix,
             unitsHolder,
             pathHelper,
             attackHandler,
             fightProperties,
-        });
+        };
+        const decided0 = strategy.decideTurn(unit, decisionContext);
+        if (config.decisionObserver) {
+            config.decisionObserver({
+                unit,
+                context: decisionContext,
+                incumbent: decided0,
+                strategyVersion: strategy.version,
+            });
+        }
         // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
         // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
