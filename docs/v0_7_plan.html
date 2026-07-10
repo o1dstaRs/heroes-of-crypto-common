@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HoC — v0.7 AI Program · The Plan</title>
+<style>
+  :root{
+    --bg:#0d0f12; --panel:#13161b; --panel2:#181c23; --ink:#d6dae2; --ink-dim:#8b93a1; --ink-faint:#5a6272;
+    --rule:#262c36; --accent:#e8b04b; --accent2:#5fb3a1; --danger:#c96a5e; --ok:#7fae6d; --run:#6d9fce;
+    --stamp:#e8b04b;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --serif:"Iowan Old Style",Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f1ea; --panel:#fbf9f4; --panel2:#efece3; --ink:#23262c; --ink-dim:#5a5f6a; --ink-faint:#8a8f99;
+      --rule:#d8d3c6; --accent:#9a6b12; --accent2:#2e7d6c; --danger:#a83e31; --ok:#4a7a38; --run:#2f6699;
+      --stamp:#9a6b12;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--mono); font-size:14px; line-height:1.55;
+    background-image:radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,176,75,.05), transparent),
+      repeating-linear-gradient(0deg, transparent 0 2px, rgba(127,127,127,.012) 2px 4px);
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:48px 28px 80px}
+  header{border:1px solid var(--rule); border-top:4px solid var(--accent); background:var(--panel); padding:28px 32px; position:relative; overflow:hidden}
+  header .kicker{color:var(--accent); letter-spacing:.25em; font-size:11px; text-transform:uppercase}
+  header h1{font-family:var(--serif); font-size:clamp(28px,4.5vw,44px); font-weight:600; letter-spacing:.01em; margin:10px 0 6px}
+  header .sub{color:var(--ink-dim); max-width:64ch}
+  .stamp{
+    position:absolute; right:22px; top:22px; transform:rotate(6deg);
+    border:3px double var(--stamp); color:var(--stamp); padding:6px 14px;
+    font-size:13px; letter-spacing:.3em; text-transform:uppercase; font-weight:700; opacity:.9; white-space:nowrap;
+  }
+  .meta{display:flex; flex-wrap:wrap; gap:18px; margin-top:18px; padding-top:14px; border-top:1px dashed var(--rule); color:var(--ink-faint); font-size:12px}
+  .meta b{color:var(--ink-dim); font-weight:600}
+  nav{display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 0}
+  nav a{color:var(--ink-dim); text-decoration:none; border:1px solid var(--rule); padding:4px 10px; font-size:12px; background:var(--panel)}
+  nav a:hover{color:var(--accent); border-color:var(--accent)}
+  section{margin-top:44px}
+  h2{font-family:var(--serif); font-size:24px; font-weight:600; display:flex; align-items:baseline; gap:12px; margin-bottom:6px}
+  h2 .no{color:var(--accent); font-family:var(--mono); font-size:14px; letter-spacing:.1em}
+  .lede{color:var(--ink-dim); max-width:78ch; margin-bottom:18px}
+  h2::after{content:""; display:block; flex:1; border-bottom:1px solid var(--rule); transform:translateY(-4px)}
+  .grid{display:grid; gap:12px}
+  @media(min-width:760px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
+  .card{background:var(--panel); border:1px solid var(--rule); padding:18px 20px; position:relative}
+  .card h3{font-size:14px; letter-spacing:.02em; margin-bottom:8px; padding-right:84px}
+  .card h3 .id{color:var(--accent); margin-right:8px}
+  .card p{color:var(--ink-dim); font-size:13px; margin-bottom:8px}
+  .card p:last-child{margin-bottom:0}
+  .kv{font-size:12px; color:var(--ink-faint)} .kv b{color:var(--ink-dim); font-weight:600}
+  .kill{border-left:3px solid var(--danger); padding:6px 10px; background:color-mix(in srgb, var(--danger) 6%, transparent); font-size:12px; color:var(--ink-dim); margin-top:10px}
+  .kill b{color:var(--danger); letter-spacing:.1em; font-size:11px}
+  .gain{color:var(--accent2); font-weight:600}
+  .badge{
+    position:absolute; top:14px; right:14px; font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    padding:3px 9px; border:1px solid; white-space:nowrap;
+  }
+  .badge.done{color:var(--ok); border-color:var(--ok)}
+  .badge.run{color:var(--run); border-color:var(--run); animation:pulse 2.2s ease-in-out infinite}
+  .badge.queued{color:var(--ink-faint); border-color:var(--ink-faint)}
+  .badge.gated{color:var(--accent); border-color:var(--accent)}
+  .badge.dead{color:var(--danger); border-color:var(--danger)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .chain{display:flex; flex-wrap:wrap; gap:0; align-items:stretch; margin:18px 0 6px}
+  .chain .link{flex:1 1 180px; background:var(--panel); border:1px solid var(--rule); padding:14px 16px; position:relative}
+  .chain .link + .link{margin-left:-1px}
+  .chain .link h4{font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--accent); margin-bottom:6px}
+  .chain .link p{font-size:12px; color:var(--ink-dim)}
+  .chain .link .pp{font-family:var(--serif); font-size:22px; color:var(--ink); display:block; margin-top:6px}
+  ol.limits{counter-reset:lim; list-style:none}
+  ol.limits li{
+    counter-increment:lim; padding:14px 18px 14px 58px; border:1px solid var(--rule); background:var(--panel);
+    margin-bottom:8px; position:relative; color:var(--ink-dim); font-size:13px;
+  }
+  ol.limits li::before{
+    content:counter(lim,decimal-leading-zero); position:absolute; left:16px; top:12px;
+    font-family:var(--serif); font-size:22px; color:var(--accent);
+  }
+  ol.limits li b{color:var(--ink)}
+  table{width:100%; border-collapse:collapse; background:var(--panel); font-size:13px}
+  .tablewrap{overflow-x:auto; border:1px solid var(--rule)}
+  th,td{padding:10px 14px; border-bottom:1px solid var(--rule); text-align:left; vertical-align:top}
+  th{color:var(--accent); font-size:11px; letter-spacing:.18em; text-transform:uppercase; font-weight:600; background:var(--panel2)}
+  td:first-child{color:var(--accent2); white-space:nowrap; font-weight:600}
+  tr:last-child td{border-bottom:none}
+  ul.dead{list-style:none; columns:1}
+  @media(min-width:760px){ul.dead{columns:2; column-gap:12px}}
+  ul.dead li{
+    break-inside:avoid; border:1px solid var(--rule); border-left:3px solid var(--danger);
+    background:var(--panel); padding:10px 14px; margin-bottom:8px; font-size:12.5px; color:var(--ink-dim);
+  }
+  ul.dead li b{color:var(--ink); display:block; margin-bottom:2px}
+  ul.dead li b::before{content:"✕ "; color:var(--danger)}
+  .law{
+    border:1px solid var(--accent); background:color-mix(in srgb, var(--accent) 7%, transparent);
+    padding:18px 22px; font-family:var(--serif); font-size:17px; line-height:1.6; margin-top:16px;
+  }
+  .law small{display:block; font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); margin-bottom:8px}
+  #log .entry{border-left:3px solid var(--accent2); background:var(--panel); border-top:1px solid var(--rule); border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); padding:10px 16px; margin-bottom:8px; font-size:12.5px; color:var(--ink-dim)}
+  #log .entry time{color:var(--accent2); margin-right:10px; font-weight:600}
+  footer{margin-top:56px; border-top:1px solid var(--rule); padding-top:18px; color:var(--ink-faint); font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px}
+  code{color:var(--accent2); font-size:.93em}
+  @media print{
+    :root{--bg:#fff; --panel:#fff; --panel2:#f3f3f3; --ink:#111; --ink-dim:#444; --ink-faint:#777; --rule:#bbb}
+    body{background:none; font-size:11px} .badge.run{animation:none} nav{display:none} .wrap{padding:0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="stamp">Set in stone</div>
+  <div class="kicker">Heroes of Crypto · AI Program</div>
+  <h1>v0.7 — Win the war upstream, widen the fight.</h1>
+  <p class="sub">The binding constraint is no longer the optimizer. It is what the AI can consider, what feeds the fight, and where gains are measured. This document is the committed plan; statuses change, the plan does not.</p>
+  <div class="meta">
+    <span><b>Ratified:</b> 2026-07-09</span>
+    <span><b>Provenance:</b> 34-agent analysis · 6 proposals · 18 adversarial verdicts · 0 dead on 2+ lenses</span>
+    <span><b>Full dossier:</b> docs/v0_7_roadmap.md</span>
+  </div>
+  <nav>
+    <a href="#goal">Acceptance</a><a href="#ceiling">Ceiling</a><a href="#chain">Causal chain</a>
+    <a href="#foundation">Foundation</a><a href="#bets">Big bets</a><a href="#wins">Quick wins</a>
+    <a href="#sequence">Sequence</a><a href="#dead">Dead levers</a><a href="#signoff">Sign-off</a><a href="#log">Status log</a>
+  </nav>
+</header>
+
+<section id="goal">
+  <h2><span class="no">§0</span>Acceptance metric</h2>
+  <div class="law">
+    <small>The single definition of done</small>
+    v0.7 beats v0.6 by <b>≥ +4pp full-game</b> on the committed LiveTwin config (exp-budget stacks · melee-drafted cohorts · SEE_NONE), 9 fresh seeds × 3,000 games, round-robin vs <b>both</b> v0.6 and v0.4, with per-cohort non-regression — plus a journal-replay decision-divergence check once bot-seat games exist. No bake without the LiveTwin headline and owner sign-off.
+  </div>
+</section>
+
+<section id="ceiling">
+  <h2><span class="no">§1</span>Why v0.6 is at its ceiling</h2>
+  <p class="lede">Five structural limits, each evidenced in the ledger. The optimizer (CEM) is fine — everything around it binds.</p>
+  <ol class="limits">
+    <li><b>The policy class cannot express new behavior.</b> 56 linear weights re-rank only candidates v0.4's heuristics emit. Every multi-pp win in history was a new play shape (hourglass +6–7pp, splash dispersion +5.58pp), never a weight movement. Resurrection, Wind Flow, Castling, area-throw, defend, morale/luck carry zero probability.</li>
+    <li><b>One bit of credit per ~60-turn match.</b> Selection SE ≈ 1.07pp at 2,200 games/candidate — at sub-pp headroom, CEM ranks candidates at random. Gains per run: +9.7 → +0.9 → +0.97 → 0.</li>
+    <li><b>Frozen-anchor self-play is saturated &amp; non-transitive.</b> ~39% of mirrors are seat-decided; mirror ceiling ≈ 72–73%; beat-the-champion vectors that lose to v0.4 are documented.</li>
+    <li><b>Both sides share the blind spots.</b> A mechanic neither side uses reads as noise. Three multi-pp fixes baked <i>after</i> the "all levers exhausted" verdict.</li>
+    <li><b>The sim certifies a game nobody plays.</b> No live bot seat exists; live stacks are ceil(1000/exp) vs trained {50,30,15,8}; takeover ran pre-v0.5 findTarget; placement was a random scatter; the client truncated multi-action turns; live draft ran untrained weights (champion beats them 97.6%).</li>
+  </ol>
+</section>
+
+<section id="chain">
+  <h2><span class="no">§2</span>The causal chain</h2>
+  <p class="lede">Battle-stage strength is the goal; the stages feeding it are where the un-mined pp lives.</p>
+  <div class="chain">
+    <div class="link"><h4>Draft</h4><p>decides which armies fight; counter-pick triangle flyers &gt; ranged &gt; ground-melee</p><span class="pp">±15pp</span></div>
+    <div class="link"><h4>Setup</h4><p>perks · augments · artifacts; T2 table alone spans</p><span class="pp">34.4pp</span></div>
+    <div class="link"><h4>Placement</h4><p>opening tempo; dispersion precedent</p><span class="pp">+5.58pp</span></div>
+    <div class="link"><h4>Fight</h4><p>converts the entering advantage; at mirror ceiling ≈72–73%</p><span class="pp">~1–2pp left</span></div>
+  </div>
+</section>
+
+<section id="foundation">
+  <h2><span class="no">§3</span>Foundation — unblocks everything</h2>
+  <div class="grid g2">
+    <div class="card" data-ws="F1"><span class="badge done">done 07-09</span>
+      <h3><span class="id">F1</span>Reclaim agent-zinc</h3>
+      <p>Kill the 58-dim keepalive CEM (panel gains always overfit — utilization theater). Harvest <code>best_iter_*.json</code> for one fresh-seed check, free 48 cores for League.</p>
+      <p class="kv"><b>Verified:</b> KEEP=0 CEM=0 TOURN=0 · 9 best-iters + log harvested to <code>rl_state/zinc_harvest_20260709/</code></p>
+    </div>
+    <div class="card" data-ws="F2"><span class="badge done">landed 07-10</span>
+      <h3><span class="id">F2</span>LiveTwin eval config</h3>
+      <p>Committed, one-switch live-faithful eval: per-creature <code>ceil(1000/exp)</code> stacks, melee-drafted cohorts, SEE_NONE, paired side-swap seeds — honored by <code>run_tournament</code> and <code>cem.mjs</code>. Every future gate reports its headline here.</p>
+      <div class="kill"><b>KILL TEST</b> — v0.6 vs v0.4 under trained vs live amounts, 2×8,000 × 3 seeds. Edge shift ⇒ LiveTwin retrain is warranted; either way the config ships.</div>
+    </div>
+    <div class="card" data-ws="F3"><span class="badge done">landed · mm wiring left</span>
+      <h3><span class="id">F3</span>Deployment parity + bot seat</h3>
+      <p>Client executes the full <code>GameAction[]</code>; server takeover → trained strategy (not pre-v0.5 findTarget); AI placement → <code>placeArmy</code> (not scatter); journal tags <code>actorType=AI + aiVersion</code>; persistent bot seat so v0.7 actually fights humans and real-game data accrues. ArangoDB audit decides real-loss-mining viability.</p>
+      <p class="kv"><b>Honesty rule:</b> audit the fraction of turns hitting takeover/scatter/truncation before crediting parity pp — the bot seat is what makes it real.</p>
+    </div>
+    <div class="card" data-ws="F4"><span class="badge done">landed 07-10</span>
+      <h3><span class="id">F4</span>One candidate generator, three consumers</h3>
+      <p>Enumerate <i>all</i> legal actions (move, melee target×stand, shots, area-throw cells, every castable spell incl. Resurrection/Wind Flow/Castling, defend, wait); candidate 0 = incumbent decision. Micro A/Bs it, RAWS searches it, any future neural policy trains on it. Morale/luck + initiative features enter the backlog here.</p>
+    </div>
+  </div>
+</section>
+
+<section id="bets">
+  <h2><span class="no">§4</span>Big bets — the substantial win</h2>
+  <div class="grid">
+    <div class="card" data-ws="B1"><span class="badge dead">dead for good 07-10</span>
+      <h3><span class="id">B1</span>Full-Game League <span class="kv">(rank 1 — only triple-strong verdict)</span></h3>
+      <p>Freeze the fight vector; optimize upstream where the proven ±15pp lives. Build <code>pick_sim</code> in common with injectable RNG (server consumes it — parity by construction); one ~90-dim anchored chain: state-conditioned counter-draft (the triangle is currently structurally unlearnable), augment/T2 heads, discrete placement-template selector. Train vs an exploiter pool with worst-case/Nash fitness in <code>cem_league.mjs</code> — replacing the frozen-anchor objective behind every non-transitivity artifact. League becomes the shared evaluator for B2/B3 gating.</p>
+      <p class="kv"><b>Gain:</b> <span class="gain">+4–8pp</span> full-game · <b>Compute:</b> league pass ≈ 3–4h on zinc, 2/night · <b>Perk head:</b> anchored at SEE_NONE, frozen until pick_sim measures reveal frequency</p>
+      <div class="kill"><b>KILL TEST</b> — 5-archetype payoff matrix (melee_coevo, flyer-max, ranged-max+Sniper3, hybrid, anchor), 2,000 games/cell, full live config. Dead if no archetype ≥55% vs melee_coevo AND oracle counter-picker &lt;+3pp at 5,000 games.</div>
+    </div>
+    <div class="card" data-ws="B2"><span class="badge gated">all gates cleared · sign-off S2</span>
+      <h3><span class="id">B2</span>RAWS — wide-candidate rollout search</h3>
+      <p>The 2-ply "tie" is code-verified to have tested ≤5 melee-only candidates with a single-sample leaf — search never saw the missing actions. Generalize <code>LookaheadDriver</code> into a SearchDriver over F4's generator; N=3 paired-seed rollouts to ~12-turn horizon on the learned-value leaf (refit +spatial features); override gate; kite candidates excluded (ledger-dead twice). Live path: fold-able shapes until F3 ships; price vs the 240s total-match budget; prefer distilling disagreements back into anchored dims (the Double Shot pattern).</p>
+      <p class="kv"><b>Gain:</b> <span class="gain">+1–3pp</span> honest, upside in caster/ranged cohorts · <b>Cost:</b> ~4–6s/game; kill 2×2 fits 4–8h local</p>
+      <div class="kill"><b>TRIPWIRE (same-day)</b> — SEARCH_AUDIT over 500 games: if search overrides the policy on &lt;5% of turns at gate 0.01, the angle dies before the 2×2. Full kill: ≤+0.5pp live-mix AND ≤+1pp range-heavy at 12–16k paired games.</div>
+    </div>
+    <div class="card" data-ws="B3"><span class="badge gated">gated on B2</span>
+      <h3><span class="id">B3</span>NEURO — per-decision neural policy</h3>
+      <p>BC-anchored AWR over the same enumerated space; ~200k-param pure-TS MLP; per-decision labels via the VALUE_DATA hook. Run only if RAWS shows the widened envelope carries signal but rollout scoring binds — or if RAWS wins and distillation outgrows linear dims. Binary per-worker shards; gates ≥20k fresh-seed games on the LiveTwin config.</p>
+      <p class="kv"><b>Gain:</b> <span class="gain">+1–3pp</span> near-term, +3–6pp speculative with league generations · ~1–2 node-weeks</p>
+    </div>
+  </div>
+</section>
+
+<section id="wins">
+  <h2><span class="no">§5</span>Quick wins — cheap pp while big bets train</h2>
+  <div class="grid g3">
+    <div class="card" data-ws="Q1"><span class="badge gated">census PASS · M1 salvage awaits sign-off</span>
+      <h3><span class="id">Q1</span>Repertoire modules</h3>
+      <p>MISPLAY_AUDIT census under the live distribution, then: <b>M1</b> universal caster router — Resurrection first (Angel/Harpy/Valkyrie/Troll are MELEE_MAGIC ⇒ fire on live melee drafts); <b>M2</b> Gargantuan area-throw + occlusion bugfix; <b>M3</b> rider-EV terms (petrify kill-EV, stun denial, kill-secure). One freeze-CEM pass on only the new dims restores selection signal above the 1pp floor. Validate through the ranked server path.</p>
+      <p class="kv"><b>Gain:</b> <span class="gain">+1–3pp</span> live-weighted (M1 dominant)</p>
+      <div class="kill"><b>KILL</b> — top-3 census gaps &lt;1.5% of unit-turns ⇒ dead in two days.</div>
+    </div>
+    <div class="card" data-ws="Q2"><span class="badge gated">+18.8pp SHIPPED at gate · sign-off</span>
+      <h3><span class="id">Q2</span>Tempo Commander probe</h3>
+      <p>Joint wait-sets have verifiably never been in any candidate space (lookahead stops at the first enemy reply). Act-vs-wait lap-rollout oracle as a driver-level interception, rolled through hourglass-queue resolution. Lap-horizon ablation first — if horizon doesn't change wait choices, it dies for ~zero compute. Gate-2 kill-plan is demoted (tactical-dart pattern).</p>
+      <p class="kv"><b>Gain if alive:</b> <span class="gain">+1–3pp</span> distilled · days on the Mac</p>
+    </div>
+    <div class="card" data-ws="Q3"><span class="badge gated">gated on B1 pick_sim</span>
+      <h3><span class="id">Q3</span>Ship the upstream stack live</h3>
+      <p>Trained draft champion beats the live untrained heuristic 97.6% — but the pick-phase redesign changed the landscape. Validate melee_coevo inside pick_sim, then ship <code>scoreCreatureWeighted</code> into <code>pick_decider.ts</code>, unify the bundle scorer, add conditional T1/T2 fit terms, wire the placement zone-size augment into the AI action space.</p>
+      <p class="kv"><b>Rule:</b> no blind weight ship — the augCA reversal is the cautionary tale.</p>
+    </div>
+  </div>
+</section>
+
+<section id="sequence">
+  <h2><span class="no">§6</span>Sequence</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Week</th><th>Deliverables</th></tr></thead>
+    <tbody>
+      <tr><td>W1</td><td>F1 node reclaim · F2 config + distribution kill test · F3(i–iii) parity fixes · B1 archetype payoff matrix · Q2 Gate-0 ablation · ArangoDB data audit</td></tr>
+      <tr><td>W2</td><td>F4 generator · B1 pick_sim (in common, injectable RNG) · Q1 census + M1 Resurrection · B2 SEARCH_AUDIT tripwire · F3(iv) bot-seat design</td></tr>
+      <tr><td>W3–4</td><td>B1 league training on zinc · B2 kill 2×2 → tune or kill · Q1 M2/M3 A/Bs + freeze-CEM · Q3 draft-weight validation → live ship</td></tr>
+      <tr><td>W5+</td><td>B1 bake per protocol · B2 distill-or-ship under the 240s budget · B3 only if B2's evidence warrants · journal-replay pipeline once bot-seat games accrue</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="dead">
+  <h2><span class="no">§7</span>Dead levers — do not re-run</h2>
+  <p class="lede">Each burned real compute and is closed for the current {feature set, action envelope, opponent pool, environment}. Change one of those four and re-measurement is warranted; change none and it isn't.</p>
+  <ul class="dead">
+    <li><b>Single-anchor fight-vector CEM (56–58d)</b>fresh-seed gains sign-flip at +0.16pp; best-response wins non-transitive</li>
+    <li><b>zinc keepalive 58-dim run</b>panel gains always overfit — killed 2026-07-09, do not restart</li>
+    <li><b>Placement CEM on the 13-dim seam</b>trained twice, zero panel gain; can't express screening/corner camps</li>
+    <li><b>augCA composition-aware augments</b>+1.6pp sim was free-vision artifact; −1.3pp live — never bake</li>
+    <li><b>Augment micro-tuning (melee+SEE_NONE)</b>blind Armor3+Might3+Sniper1 already optimal for the live distribution</li>
+    <li><b>Kiting as a rule</b>dead twice; may only emerge from ≥2-own-turn search; excluded from RAWS classes</li>
+    <li><b>Unit splitting for ranged</b>melee wins 92.2%; concentrated stacks win</li>
+    <li><b>Situational synergy picker</b>anchor table never beaten in 3h of training</li>
+    <li><b>Hourglass threshold refinements</b>neutral to −5pp; only the joint/lap-horizon question (Q2) is open</li>
+    <li><b>Shallow value-guided search as configured</b>1-ply rerank craters −6.7pp; 2-ply over ≤5 melee candidates ties</li>
+    <li><b>Manual tactical darts</b>3/3 dead 2026-07-09; hand-perturbing converged decisions is over</li>
+    <li><b>All-melee specialist fight training</b>+0.5pp melee, −4.6pp random — fragile</li>
+    <li><b>Any pp claimed off the LiveTwin config</b>random rosters / free vision / {50,30,15,8} stacks each converted a "win" into a live regression</li>
+    <li><b>B1 counter-draft league</b>DEAD FOR GOOD 07-10: full-information oracle on the REAL pick structure (bans/bundles/snake/collision reveals) monetizes all opponent information at +0.79pp±0.76 (95% upper ≈+2.3 &lt; +3pp gate); collisions already reveal in 47–100% of games; vision perk head stays frozen. Salvage = a NEW static-draft lever: blind role-prior policy beats DEFAULT_DRAFT_W by +13.63pp (missing flyer feature) — peer league work covers the retrain</li>
+    <li><b>LiveTwin fight-vector retrain</b>killed 07-10: cross-config edge shift 0.92±0.41pp &lt; 1.5pp gate — the config is an eval standard, not a training opportunity</li>
+    <li><b>M1 caster router, wholesale enable</b>killed 07-10: −9.24pp±0.64 (Wild Regeneration gift −5.71pp, pre-empting Resurrection −2.36pp); only the res-no-preempt+windflow salvage (+1.3pp in-cohort) survives, behind owner sign-off</li>
+  </ul>
+</section>
+
+<section id="signoff">
+  <h2><span class="no">§9</span>Owner sign-off queue</h2>
+  <p class="lede">Everything below is measured, committed locally (default-OFF), and waiting on a human decision. Nothing ships live without it.</p>
+  <div class="grid g2">
+    <div class="card"><span class="badge gated">decision 1</span>
+      <h3><span class="id">S1</span>Flip the wait-scorer default ON</h3>
+      <p>+18.82pp ±0.42 fresh-seed LIVETWIN; cohorts +16.2 (mixed) / +8.8 (random); transitivity vs v0.4: 81.1% vs 73.2%; integrity clean; CEM refinement tapped at gate (distilled weights are final). Commits <code>13b59a3</code>/<code>24f6521</code>, weights <code>DISTILLED_WAIT_WEIGHTS_2026_07_10</code>. This alone clears the §0 acceptance bar. Recommend: make it the code default for v0.6+ (becoming v0.7's core), remove the env dependence.</p>
+    </div>
+    <div class="card"><span class="badge gated">decision 2</span>
+      <h3><span class="id">S2</span>Search-enabled bot seat (server-side RAWS)</h3>
+      <p>Marginal +40.3pp ±0.5 on top of the scorer; opponent-model risk RESOLVED by zinc Arm E: with a deliberately wrong model (v0.4 vs actual v0.6) search still gains <b>+27.8pp ±0.5</b> — ~72% of the edge survives model error. Powered zinc arms: A +38.9±0.3, B range-heavy +38.3±0.4, C vs v0.4 +43.5±0.3. Cost ~86ms/searched turn ⇒ fits the 240s budget server-side. Needs: mm-queue vs-AI wiring (F3 leftover) + the S1 flip. Recommend: enable for bot seats only.</p>
+    </div>
+    <div class="card"><span class="badge gated">decision 3</span>
+      <h3><span class="id">S3</span>M1 caster-router salvage package</h3>
+      <p><code>V06_CASTER_ROUTER=on V06_CASTER_SPELLS=resurrection,windflow V06_RES_PREEMPT=off</code>: +1.3pp ±0.42 in-cohort (Angel/Harpy/Valkyrie/Troll drafts), +0.08 neutral on the default mix, 0 engine rejections. Wholesale enable stays DEAD (−9.2pp). Recommend: make the salvage variant the code default; validate ranked-server cast path first (obstacle-attack precedent).</p>
+    </div>
+    <div class="card"><span class="badge gated">decision 4</span>
+      <h3><span class="id">S4</span>Fund the residual tail? + push commits</h3>
+      <p>+6.49pp ±1.11 tempo tail remains beyond the linear scorer (NEURO-class capacity or joint wait-sets would chase it; B2 search already covers it when active — low priority if S2 ships). Also: ~a dozen local-only commits across common/server/client mains need a push decision, and the journal enrichment flag (<code>HOC_JOURNAL_FULL=1</code>) needs enabling in an environment to start accruing real-game data.</p>
+    </div>
+  </div>
+</section>
+
+<section id="log">
+  <h2><span class="no">§8</span>Status log</h2>
+  <div class="entry"><time>07-10 15:2x</time>PROGRAM COMPLETE — final measurement in. Zinc Arm E (rollouts mis-modeling the opponent as v0.4): <b>+27.84pp ±0.54</b> vs Arm A's +38.88 with the true model ⇒ ~72% of the search edge survives a badly wrong opponent model; opponent-model share ≈ 11pp. All four zinc arms + both Mac arbitration cells cleared every gate. v0.7 = v0.6 + wait-scorer (S1) + server-side search for bot seats (S2) + M1 salvage (S3), all default-OFF awaiting sign-off. Zinc frees up when Arm E's remaining shards drain; keepalive stays dead (peer co-manages the node).</div>
+  <div class="entry"><time>07-10 14:5x</time>Zinc Arms B+C collected: range-heavy <b>+38.30pp ±0.37</b> (audit fallback earned its keep — 32/40 shards hit the timeout but per-game records survived); transitivity vs v0.4 <b>+43.49pp ±0.28</b> (plain v0.6 is +22.9 vs v0.4 — search's edge is fully transitive). Original B2 kill gate: obliterated on every arm. Arm E (opponent-model mismatch, the S2 risk number) lands ~15:45 PDT.</div>
+  <div class="entry"><time>07-10 14:0x</time>Zinc Arm A collected (peer session had invalidated the pre-fix run and relaunched on tree dbe9356 — engine caveat retired): search vs plain v0.6 = <b>+38.88pp ±0.26</b> (15.2k games) — the powered confirmation of the tripwire. Arms B (range-heavy, mid-run), C (vs v0.4), E (opponent-model mismatch — the key remaining number) finish ~15:45–16:30 PDT. §9 Owner sign-off queue added.</div>
+  <div class="entry"><time>07-10 13:4x</time>WAVE 5 RESOLVED. Wait-dim freeze-CEM: TAPPED at gate — held-out panel flattered it (+21.1/+21.5 vs distilled's +19.4 vs-plain) but the pre-registered head-to-head decider scored +0.20pp ±0.46 &lt; +1.0pp ⇒ distilled weights stand. Residual oracle: +6.49pp ±1.11 tempo tail remains beyond the linear scorer (anchor cell +29.78 independently reproduces Gate-1's +30.2 — validation clean); scorer captured ~78% of the oracle. B2 arbitration already resolved at +40.3pp marginal. Outstanding: zinc 2×2 collection (~15:00 PDT) — Arm E opponent-model share is the key number left.</div>
+  <div class="entry"><time>07-10 12:5x</time>B2 ARBITRATION RESOLVED — search is NOT superseded by the scorer; it is the opposite of superseded: with BOTH seats scorer-armed, full rollout search scores <b>+40.32pp ±0.47</b> primary (3,602–386 of 4,000; seat-balanced) and <b>+41.81pp ±0.88</b> range-heavy — far above the ≤+0.5/+1.0pp supersede gate. Cost 2.44s search/game (~86ms per searched turn — trivially inside live turn budgets if run server-side). Caveat: rollouts model the TRUE opponent policy; zinc Arm E (rollouts deliberately mis-modeling the opponent as v0.4) prices how much survives model error. Wait-dim CEM at iter 4: train-seed best 72.0% vs 69.0% init — held-out panel + fresh-seed re-A/B will judge (overfit risk per ledger).</div>
+  <div class="entry"><time>07-10 11:4x</time>Wave-5 execution moved in-house: two agent attempts at the arbitration run died mid-tournament (killing their child processes; second died at 1,900/4,000 games), and the CEM pass stalled with them. Remaining compute now runs as a session background orchestrator (arb primary 4,000 @967001 → range-heavy 1,000 @967002 → analysis → wait-dim freeze-CEM @947001). Preregistrations already on file are being followed verbatim; residual-oracle seed moves to 987001 (967001 was double-claimed by two preregs — logged deviation). Marginal gate: B2 superseded if ≤+0.5pp primary AND ≤+1.0pp range-heavy on top of the scorer.</div>
+  <div class="entry"><time>07-10 12:2x</time>Wave 5 launched: freeze-CEM headroom pass on the wait dims (toward the +30.2pp oracle bound) + the DECISIVE B2 arbitration arm — search on top of the scorer, both seats scorer-enabled (the scorer likely ate ~49% of B2's override value). Zinc 2×2 collects ~15:00 PDT.</div>
+  <div class="entry"><time>07-10 12:1x</time>WAVE 4 — Q2 GATE-2: <b>SHIP</b>. Distilled linear wait-scorer = <b>+18.82pp ±0.42</b> fresh-seed LIVETWIN (12k games; mixed50 +16.2, random +8.8; transitivity: +scorer vs v0.4 = 81.1% vs plain 73.2%; integrity 0.47% &lt; 1% ceiling; AUC 0.719; 62% of the oracle bound at ZERO inference cost). Mechanism: v0.5's hourglass rule was charge-only — 8k of 24k oracle overrides were pure MOVE-advance waits, a structurally unreachable class until this seam. Commits 13b59a3/24f6521, default OFF — <b>flipping it on is the owner's bake decision</b> (exceeds the §0 ≥+4pp acceptance bar on its own, pending round-robin protocol + sign-off). Peer coordination: league genome COVERS the +13.6pp static-draft lever (canFly dim + role interactions inside pick_sim, LIVETWIN fitness) — no duplication.</div>
+  <div class="entry"><time>07-10 11:4x</time>Wave 4 launched: Q2 Gate-2 distillation (oracle dataset → logistic wait-scorer → anchored dims → freeze-CEM fallback → ≥+1pp ship bar) + read-only coordination check on the peer session's league-training files (static-draft lever ownership).</div>
+  <div class="entry"><time>07-10 11:3x</time>WAVE 3 RESOLVED (audited): Q2 Gate-1 ALIVE — wait-only oracle +30.21pp ±0.36 (12k LIVETWIN games; wait share 46.8% vs 21.1%; meanΔ≈0 ⇒ value is tail discrimination, blanket rules stay dead; 0.40s/game). B1 DEAD FOR GOOD — real-pick-structure oracle informed component +0.79pp ±0.76 &lt; +3pp; the +14.4pp headline was STATIC draft quality (+13.63pp blind — DEFAULT_DRAFT_W lacks a flyer feature) → new static-draft lever, peer league work owns it. RAWS 2×2 running on zinc (40 shards, 2.37 games/s, arms A/B/C/E; D skipped — best_v06br unregistered; collect ~15:00 PDT; re-verify any survivor on engine ≥0a036b0). Discovered: UPPER seat wins 53.6% of champion-mirror drafts — the real pick structure has a seat advantage.</div>
+  <div class="entry"><time>07-10 10:3x</time>Wave 3 launched: RAWS powered 2×2 on agent-zinc (16k paired + range-heavy/v0.4/best_v06br/opp-model arms, detached) · Q2 Gate-1 act-vs-wait lap-rollout oracle A/B (≥6k pairs) · B1 re-check through the real pick_sim before burial.</div>
+  <div class="entry"><time>07-10 10:2x</time>WAVE 2 COMPLETE, integration green (574 common tests; server lint fixed de886d3). VERDICTS — B1 archetype matrix: KILL (melee_coevo dominates; oracle +0.00pp; flyers no longer counter ranged under live stacks — triangle was stack-size dependent). B2 RAWS tripwire: PASS (33.7% override rate, 445–54 unpowered, 3.15s/game; 20-dim value leaf 75.1%). Q2 gate-0: PASS (40.5% wait flips). Q1 census: PASS (9.12% unit-turns) but M1 wholesale enable: KILL (−9.24pp); salvage package +1.3pp in-cohort awaits owner sign-off. F2: NO retrain (0.92pp shift &lt; 1.5pp gate) — LIVETWIN confirmed as the eval standard.</div>
+  <div class="entry"><time>07-10 09:2x</time>Wave 2 launched: B1 archetype payoff matrix (5×5 × 2,000 games, LIVETWIN) · B2 RAWS SearchDriver + 500-game tripwire + Q2 gate-0 ablation · Q1 misplay census + M1 caster router · F2 distribution kill test (2×8,000×3 seeds) · Castling context wiring.</div>
+  <div class="entry"><time>07-10 09:1x</time>WAVE 1 COMPLETE, integration gate passed with zero fixes. F2 LiveTwin preset (1990c20; 13 tests; live config runs FASTER — 5.0 vs 7.4 avg laps). F4 candidate generator (c93f83e; ~37 cands/turn @ 0.2ms; 513-test suite green). F3 server parity + persistent bot seat via 'ai:'-prefixed playerId (404b8cd/bd4c9de/97cbc7d) — dev human-vs-bot smoke ran to FINISHED; HOC_JOURNAL_FULL enrichment landed. F3 client full-sequence execution (b2bca3d; Playwright ranked smoke 4-0 clean). Corrections logged: FIGHT_MELEE_ROSTERS/AUGCA_NOVISION were already committed (ledger wrong); takeover placement parity is a no-op (armies pre-placed) — placement matters at bot-seat creation.</div>
+  <div class="entry"><time>07-10 08:1x</time>Wave 1 RESUMED after the stall — 4 implementers re-launched against their salvaged partial edits (LiveTwin module+tests, server ai_seat.ts+journal, client AIController rework existed uncommitted); audit replays from cache.</div>
+  <div class="entry"><time>07-10 00:0x</time>STALL: session usage limit (reset 02:00 PT) killed 5/6 Wave-1 agents mid-work; program paused ~8h. Only the Arango audit completed.</div>
+  <div class="entry"><time>07-10 00:0x</time>F3.v audit VERDICT: NO-GO on mining existing real data — 0 decisive games, 0% AI-tagged, and (worse than premised) the durable journal persists NO coords/spellId/events at all; actionJson survives only in-memory. Real data is forward-only: ship flag-gated journal enrichment (HOC_JOURNAL_FULL) with the F3 parity commit, then the bot seat accrues data. Fidelity-spike design recorded in the audit report.</div>
+  <div class="entry"><time>07-09 02:2x</time>F1 complete: keepalive + CEM + 40 tournament workers killed on agent-zinc (verified 0/0/0); 9 best-iter JSONs + log harvested. Node free for League.</div>
+  <div class="entry"><time>07-09 02:1x</time>Wave 1 launched: 5 parallel implementers (F2 LiveTwin · F4 generator · F3 server parity · F3 client parity · Arango audit) + integration gate.</div>
+  <div class="entry"><time>07-09 01:5x</time>Plan ratified from the 34-agent analysis (docs/v0_7_roadmap.md). This page is the canonical plan.</div>
+</section>
+
+<footer>
+  <span>HoC v0.7 AI Program — plan of record. Statuses update; scope changes require a new ratification.</span>
+  <span>Generated 2026-07-09 · Claude Code</span>
+</footer>
+
+</div>
+</body>
+</html>
