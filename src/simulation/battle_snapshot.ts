@@ -11,6 +11,7 @@
 
 import Denque from "denque";
 
+import { captureAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import type { FightProperties } from "../fights/fight_properties";
 import type { Grid } from "../grid/grid";
 import type { Unit } from "../units/unit";
@@ -236,6 +237,8 @@ export interface BattleSnapshot {
     grid: Bag;
     fight: Bag;
     holder: Bag;
+    /** Battle-scoped policy memory used by the legacy target-selection heuristic. */
+    aiTargetMemory: Map<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +265,7 @@ export function snapshotBattle(unitsHolder: UnitsHolder, grid: Grid, fightProper
         grid: captureFields(grid, GRID_FIELDS),
         fight: captureFields(fightProperties, FIGHT_FIELDS),
         holder: captureFields(unitsHolder, HOLDER_FIELDS),
+        aiTargetMemory: captureAITargetMemory(unitsHolder),
     };
 }
 
@@ -292,4 +296,5 @@ export function restoreBattle(
     writeFields(grid, GRID_FIELDS, snapshot.grid);
     writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight);
     writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder);
+    restoreAITargetMemory(unitsHolder, snapshot.aiTargetMemory);
 }

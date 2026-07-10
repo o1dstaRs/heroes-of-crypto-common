@@ -59,7 +59,31 @@ export interface IAI {
     action(unit: Unit, grid: Grid, matrix: number[][]): IAIAction;
 }
 
-const previousTargets: Map<string, string> = new Map<string, string>();
+// Target stickiness belongs to one battle. A module-global id -> target map leaked across matches and,
+// more importantly, rollout search mutated the live policy's memory while evaluating hypothetical futures.
+// Keying by UnitsHolder isolates concurrent fights and lets SearchDriver snapshot the policy-side state.
+const previousTargetsByBattle = new WeakMap<UnitsHolder, Map<string, string>>();
+
+function previousTargetsFor(unitsHolder: UnitsHolder): Map<string, string> {
+    let targets = previousTargetsByBattle.get(unitsHolder);
+    if (!targets) {
+        targets = new Map<string, string>();
+        previousTargetsByBattle.set(unitsHolder, targets);
+    }
+    return targets;
+}
+
+export function captureAITargetMemory(unitsHolder: UnitsHolder): Map<string, string> {
+    return new Map(previousTargetsFor(unitsHolder));
+}
+
+export function restoreAITargetMemory(unitsHolder: UnitsHolder, snapshot: ReadonlyMap<string, string>): void {
+    const targets = previousTargetsFor(unitsHolder);
+    targets.clear();
+    for (const [unitId, targetId] of snapshot) {
+        targets.set(unitId, targetId);
+    }
+}
 
 export enum AIActionType {
     MELEE_ATTACK,
@@ -119,6 +143,7 @@ export function findTarget(
     unitsHolder: UnitsHolder,
     pathHelper: PathHelper,
 ): BasicAIAction | undefined {
+    const previousTargets = previousTargetsFor(unitsHolder);
     if (DEBUG_AI) {
         console.group("Start AI check");
         console.time("AI step");
@@ -370,6 +395,7 @@ function findRangeAttackAction(
     matrix: number[][],
     unitsHolder: UnitsHolder,
 ): BasicAIAction | undefined {
+    const previousTargets = previousTargetsFor(unitsHolder);
     if (unit.getRangeShots() <= 0) {
         return undefined;
     }
@@ -1329,6 +1355,7 @@ function doFindTarget(
     pathHelper: PathHelper,
     debug: boolean,
 ): BasicAIAction | undefined {
+    const previousTargets = previousTargetsFor(unitsHolder);
     const unitCell = unit.getBaseCell();
     const numRows = matrix.length;
     const numCols = matrix[0].length;
