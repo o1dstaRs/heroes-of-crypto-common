@@ -21,6 +21,7 @@ import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 import { routeAreaThrow } from "./area_throw_router";
 import { routeUniversalCaster } from "./caster_router";
+import { routeMeleeRiderEV } from "./rider_ev_router";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -118,6 +119,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
         }
         decision = routeUniversalCaster(unit, context, decision);
         decision = routeAreaThrow(unit, context, decision);
+        decision = routeMeleeRiderEV(unit, context, decision);
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
         // negative (melee 64.8%→66.2% vs ranged) — too crude; a real kite needs advance-to-range→shoot→retreat.
         // Default off keeps v0.6's fight byte-for-byte v0.5 (only the draft/setup weights differ).

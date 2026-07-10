@@ -15,6 +15,25 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 
+/** Engine-identical marginal chance that an attack applies Stun to `targetUnit`. */
+export function calculateStunApplyChance(fromUnit: Unit, targetUnit: Unit, additionalAbilityPower: number): number {
+    const stunAbility = fromUnit.getAbility("Stun");
+    if (!stunAbility) {
+        return 0;
+    }
+    const amplifier =
+        stunAbility.getType() === AbilityType.STATUS && targetUnit.hasAbilityActive("Mechanism") ? 1.5 : 1;
+    return Math.max(
+        0,
+        Math.min(
+            100,
+            fromUnit.calculateAbilityApplyChance(stunAbility, additionalAbilityPower) *
+                amplifier *
+                (1 - targetUnit.getStatusResist() / 100),
+        ),
+    );
+}
+
 export function processStunAbility(
     fromUnit: Unit,
     targetUnit: Unit,
@@ -31,26 +50,12 @@ export function processStunAbility(
         return;
     }
 
-    const amplifier =
-        stunAbility.getType() === AbilityType.STATUS && targetUnit.hasAbilityActive("Mechanism") ? 1.5 : 1;
-
-    // The target's status resistance (e.g. Amulet of Resolve) lowers the odds the stun lands.
-    const statusResistCoeff = 1 - targetUnit.getStatusResist() / 100;
-
-    if (
-        HoCLib.getRandomInt(0, 100) <
-        Math.min(
-            100,
-            fromUnit.calculateAbilityApplyChance(
-                stunAbility,
-                FightStateManager.getInstance()
-                    .getFightProperties()
-                    .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
-            ) *
-                amplifier *
-                statusResistCoeff,
-        )
-    ) {
+    const chance = calculateStunApplyChance(
+        fromUnit,
+        targetUnit,
+        FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
+    );
+    if (HoCLib.getRandomInt(0, 100) < chance) {
         const stunEffect = stunAbility.getEffect();
         if (!stunEffect) {
             return;
