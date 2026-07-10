@@ -509,6 +509,7 @@ describe("B1 league CEM validity", () => {
 
     it("snapshots a custom pool and persists the complete selection-panel fingerprint", () => {
         const temporaryDirectory = mkdtempSync(join(tmpdir(), "hoc-league-cem-"));
+        const packageRoot = join(import.meta.dir, "../..");
         try {
             const pool = defaultLeaguePool().map((entry, index) => ({ ...entry, prior: index ? 1 : 3 }));
             const poolPath = join(temporaryDirectory, "pool.json");
@@ -516,7 +517,7 @@ describe("B1 league CEM validity", () => {
             writeFileSync(poolPath, JSON.stringify({ entries: pool }));
             const processResult = Bun.spawnSync({
                 cmd: [process.execPath, "src/simulation/optimizer/cem_league.mjs"],
-                cwd: process.cwd(),
+                cwd: packageRoot,
                 env: {
                     ...process.env,
                     CEM_AGGREGATE: "softmin",
