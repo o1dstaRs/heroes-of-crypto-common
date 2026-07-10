@@ -15,6 +15,7 @@ import type { IDecisionContext } from "../../src/ai";
 import {
     applyWaitScorer,
     canWaitOnHourglassMirror,
+    DISTILLED_WAIT_WEIGHTS_2026_07_10,
     extractWaitFeatures,
     incumbentRuleWaits,
     parseWaitWeights,
@@ -246,6 +247,13 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
         const lone = buildBoard();
         fp().setTeamUnitsAlive(LOWER, 1);
         expect(applyWaitScorer(lone.actor, lone.context, lone.charge, "v0.6s")).toBe(lone.charge);
+    });
+
+    it("the committed SHIP weights are width-aligned, non-anchor and round-trip through the env parser", () => {
+        const parsed = parseWaitWeights(JSON.stringify(DISTILLED_WAIT_WEIGHTS_2026_07_10));
+        expect(parsed).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        expect(parsed!.w).toHaveLength(WAIT_FEATURE_NAMES.length);
+        expect(parsed!.b !== 0 || parsed!.w.some((x) => x !== 0)).toBe(true);
     });
 
     it("waitScore is the plain linear form b + w·f used by the fit", () => {

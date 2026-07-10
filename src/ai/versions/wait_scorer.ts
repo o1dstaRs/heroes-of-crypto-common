@@ -228,6 +228,28 @@ export function extractWaitFeatures(
     return f;
 }
 
+/**
+ * The Gate-2 SHIP-verdict weights (2026-07-10): the logistic distillation of the Gate-1 wait oracle,
+ * fit on 74,315 scored wait-eligible points from 5,000 LIVETWIN oracle games (seed 917001; held-out
+ * AUC 0.719 split by game). Verified fresh-seed A/B vs plain v0.6 (weights as-is, no CEM pass):
+ *   - LIVETWIN melee (pre-registered primary, 12,000 games, seed 927001): +18.82pp ± 0.42
+ *   - LIVETWIN mixed 50/50 (2,000, seed 927002): +16.21pp ± 1.07
+ *   - LIVETWIN random rosters (2,000, seed 927003): +8.78pp ± 1.13
+ *   - transitivity anchor: (v0.6 + scorer) vs v0.4 81.10% vs plain v0.6's 73.17% (4,000 each, seed 957001)
+ * NOT wired as a default — the scorer stays env-gated OFF (the anchor pattern). To arm it:
+ *   V07_WAIT_SCORER=on V07_WAIT_WEIGHTS=$(json of this constant) [V07_WAIT_VERSIONS=v0.6]
+ * Committed so a future bake/freeze-CEM starts from the verified artifact instead of a scratchpad file.
+ */
+export const DISTILLED_WAIT_WEIGHTS_2026_07_10: IWaitWeights = {
+    b: -0.61904,
+    w: [
+        -1.05018, -1.70154, -0.00408, -0.02473, 0.05777, -1.13469, -0.40734, -0.06348, -0.03023, -0.32258, -0.44617,
+        -0.12358, 0, -0.32372, 0.73015, -0.1288, 0.73438, 0.62633, -0.40413, -0.19118, 0.92768, 0.96246, 0.05013,
+        -0.02312, -0.09702, 0.05079, -0.03375, 0.56183, -0.45781, -0.35882, -0.19441, 0.00517, 0.01446, -0.47843,
+        0.76528, -0.06198, 0.1818, -0.08579, -0.43219, -0.03901, -0.05801,
+    ],
+};
+
 /** Parse {b, w[WAIT_FEATURE_NAMES.length]} — malformed/absent ⇒ null (anchor: scorer never fires). */
 export function parseWaitWeights(raw: string | undefined): IWaitWeights | null {
     if (!raw) {
