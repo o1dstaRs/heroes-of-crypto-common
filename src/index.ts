@@ -32,6 +32,8 @@ export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
 export * from "./spells/spell";
 export * as PickHelper from "./picks/pick_helper";
+export * as PickSim from "./picks/pick_sim";
+export * from "./picks/pick_sim";
 export * from "./engine/actions";
 export * from "./engine/action_engine";
 export * from "./engine/events";
@@ -61,8 +63,24 @@ export * from "./factions/faction_type";
 export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
-export { getAIStrategy, AI_VERSIONS, LATEST_AI_VERSION, DEFAULT_AI_VERSION } from "./ai";
-export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai";
+export {
+    getAIStrategy,
+    enumerateCandidates,
+    getEnemiesCellsWithinMovementRange,
+    AI_VERSIONS,
+    LATEST_AI_VERSION,
+    DEFAULT_AI_VERSION,
+} from "./ai";
+export type {
+    IAIStrategy,
+    IDecisionContext,
+    IPlacementContext,
+    CandidateKind,
+    ICandidateFeatures,
+    ICandidateSet,
+    IEnumeratedCandidate,
+    IEnumerateOptions,
+} from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
 export type { ISetupPolicy } from "./ai/setup/setup_strategy";
