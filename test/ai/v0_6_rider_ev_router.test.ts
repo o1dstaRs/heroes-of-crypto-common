@@ -11,17 +11,26 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { calculatePetrifyingGazeKillChance } from "../../src/abilities/petrifying_gaze_ability";
 import { calculateStunApplyChance } from "../../src/abilities/stun_ability";
 import type { IDecisionContext } from "../../src/ai";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
 import { estimateMeleeRiderEV, routeMeleeRiderEV } from "../../src/ai/versions/rider_ev_router";
+import { getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
+import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
+import { EffectFactory } from "../../src/effects/effect_factory";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
-import type { Unit } from "../../src/units/unit";
+import { Spell } from "../../src/spells/spell";
+import { Unit } from "../../src/units/unit";
+import type { XY } from "../../src/utils/math";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -33,6 +42,61 @@ import {
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
+
+function makeReal(team: number, faction: string, name: string): Unit {
+    const effectFactory = new EffectFactory();
+    const abilityFactory = new AbilityFactory(effectFactory);
+    return Unit.createUnit(
+        getCreatureConfig(team, faction, name, "", 100),
+        testGridSettings,
+        team,
+        PBTypes.UnitVals.CREATURE,
+        abilityFactory,
+        effectFactory,
+        false,
+    );
+}
+
+function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
+    const cells = [
+        { x: base.x, y: base.y },
+        { x: base.x - 1, y: base.y },
+        { x: base.x, y: base.y - 1 },
+        { x: base.x - 1, y: base.y - 1 },
+    ];
+    const position = getPositionForCells(testGridSettings, cells);
+    if (!position) {
+        throw new Error("Invalid large-unit test placement");
+    }
+    unit.setPosition(position.x, position.y);
+    combat.grid.occupyCells(
+        cells,
+        unit.getId(),
+        unit.getTeam(),
+        unit.getAttackRange(),
+        unit.hasAbilityActive("Made of Fire"),
+        unit.hasAbilityActive("Made of Water"),
+    );
+    combat.unitsHolder.addUnit(unit);
+}
+
+function activateEngine(combat: CombatTestContext, active: Unit): GameActionEngine {
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    fightProperties.setGridType(PBTypes.GridVals.NORMAL);
+    fightProperties.startFight();
+    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
+    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.startTurn(active.getTeam(), 1_000);
+    return new GameActionEngine({
+        fightProperties,
+        grid: combat.grid,
+        unitsHolder: combat.unitsHolder,
+        moveHandler: new MoveHandler(testGridSettings, combat.grid, combat.unitsHolder),
+        sceneLog: new SceneLogMock(),
+        attackHandler: combat.attackHandler,
+        getCurrentActiveUnitId: () => active.getId(),
+    });
+}
 
 function contextFor(combat: CombatTestContext, withFightState = true): IDecisionContext {
     return {
@@ -82,6 +146,39 @@ function placeThree(combat: CombatTestContext, unit: Unit, left: Unit, right: Un
     placeUnit(combat.grid, combat.unitsHolder, right, { x: 7, y: 6 });
 }
 
+function estimateWithMissSource(mutate?: (attacker: Unit, target: Unit) => void) {
+    const combat = createCombatTestContext();
+    const attacker = createTestUnit({
+        name: "Large Petrifier",
+        team: LOWER,
+        attackType: MELEE,
+        damageMin: 10,
+        damageMax: 10,
+        amountAlive: 10,
+        maxHp: 100,
+        stackPower: 100,
+        size: PBTypes.UnitSizeVals.LARGE,
+        abilities: ["Petrifying Gaze"],
+    });
+    const target = createTestUnit({
+        name: "Target",
+        team: UPPER,
+        attackType: MELEE,
+        amountAlive: 20,
+        maxHp: 100,
+        stackPower: 100,
+    });
+    placeLarge(combat, attacker, { x: 6, y: 6 });
+    placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 6 });
+    mutate?.(attacker, target);
+    const context = contextFor(combat);
+    const estimate = estimateMeleeRiderEV(attacker, context, candidateFor(attacker, target, context));
+    if (!estimate) {
+        throw new Error("Expected a supported single-hit rider estimate");
+    }
+    return estimate;
+}
+
 afterEach(() => {
     delete process.env.V06_RIDER_EV;
 });
@@ -106,6 +203,67 @@ describe("v0.6 melee rider EV router", () => {
         expect(calculateStunApplyChance(attacker, ordinary, 0)).toBe(35);
         expect(calculateStunApplyChance(attacker, mechanism, 0)).toBe(52.5);
         expect(calculateStunApplyChance(attacker, ordinary, 10)).toBe(45);
+    });
+
+    it("hit-weights base and Petrify EV for Dodge, Small Specie, Broken Aegis, and Boar Saliva", () => {
+        const baseline = estimateWithMissSource();
+        const dodge = estimateWithMissSource((_attacker, target) => target.grantAbility("Dodge"));
+        const smallSpecie = estimateWithMissSource((_attacker, target) => target.grantAbility("Small Specie"));
+        const brokenAegis = estimateWithMissSource((attacker) => {
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Broken Aegis", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setPower(20);
+            attacker.applyBuff(buff);
+        });
+        const boarSaliva = estimateWithMissSource((attacker) => {
+            attacker.applyEffect(new EffectFactory().makeEffect("Boar Saliva"));
+        });
+
+        for (const evasive of [dodge, smallSpecie, brokenAegis, boarSaliva]) {
+            expect(evasive.hitChance).toBeLessThan(baseline.hitChance);
+            expect(evasive.baseDamageEv).toBeLessThan(baseline.baseDamageEv);
+            expect(evasive.petrifyKillEv).toBeLessThan(baseline.petrifyKillEv);
+        }
+    });
+
+    it("does not let an evasive target outrank a reliable target at the same stand cell", () => {
+        process.env.V06_RIDER_EV = "on";
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Large Petrifier",
+            team: LOWER,
+            attackType: MELEE,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 10,
+            stackPower: 100,
+            size: PBTypes.UnitSizeVals.LARGE,
+            abilities: ["Petrifying Gaze"],
+        });
+        const evasive = createTestUnit({
+            name: "Evasive",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 100,
+            stackPower: 100,
+            abilities: ["Dodge", "Small Specie"],
+        });
+        const reliable = createTestUnit({
+            name: "Reliable",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 100,
+        });
+        placeLarge(combat, attacker, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, evasive, { x: 4, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, reliable, { x: 7, y: 6 });
+        const context = contextFor(combat);
+
+        expect(selectedTarget(routeMeleeRiderEV(attacker, context, melee(attacker, evasive)))).toBe(reliable.getId());
     });
 
     it("is byte-parity inert while gated off and when fight state is unavailable", () => {
@@ -215,65 +373,51 @@ describe("v0.6 melee rider EV router", () => {
         expect(routeMeleeRiderEV(squire, context, incumbent)).toBe(incumbent);
     });
 
-    it("values Devour Essence only on a minimum-damage kill that restores current front HP", () => {
+    it("preserves the incumbent for the shipped Hydra replacement-hit and Devour sequence", () => {
         process.env.V06_RIDER_EV = "on";
         const combat = createCombatTestContext();
-        const hydra = createTestUnit({
-            name: "Hydra",
-            team: LOWER,
-            attackType: MELEE,
-            damageMin: 10,
-            damageMax: 10,
-            maxHp: 100,
-            stackPower: 100,
-            abilities: ["Devour Essence"],
-        });
-        const secure = createTestUnit({
-            name: "Secure kill",
-            team: UPPER,
-            attackType: MELEE,
-            maxHp: 5,
-        });
-        const survivor = createTestUnit({
-            name: "Survivor",
-            team: UPPER,
-            attackType: MELEE,
-            maxHp: 50,
-        });
-        placeThree(combat, hydra, survivor, secure);
-        hydra.applyDamage(80, 0, new SceneLogMock());
+        const hydra = makeReal(LOWER, "Chaos", "Hydra");
+        const target = createTestUnit({ name: "Target", team: UPPER, attackType: MELEE, maxHp: 500 });
+        placeLarge(combat, hydra, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 6 });
         const context = contextFor(combat);
+        const candidate = candidateFor(hydra, target, context);
+        const incumbent = candidate.actions;
 
-        const secureEv = estimateMeleeRiderEV(hydra, context, candidateFor(hydra, secure, context));
-        const survivorEv = estimateMeleeRiderEV(hydra, context, candidateFor(hydra, survivor, context));
-        expect(secureEv?.secureKill).toBe(true);
-        expect(secureEv?.devourKillSecureEv).toBe(80);
-        expect(survivorEv?.secureKill).toBe(false);
-        expect(survivorEv?.devourKillSecureEv).toBe(0);
-        expect(selectedTarget(routeMeleeRiderEV(hydra, context, melee(hydra, survivor)))).toBe(secure.getId());
+        expect(hydra.hasAbilityActive("Lightning Spin")).toBe(true);
+        expect(hydra.hasAbilityActive("Devour Essence")).toBe(true);
+        expect(estimateMeleeRiderEV(hydra, context, candidate)).toBeUndefined();
+        expect(routeMeleeRiderEV(hydra, context, incumbent)).toBe(incumbent);
     });
 
-    it("does not invent a kill bonus when Devour Essence has no missing HP", () => {
+    it("preserves an incumbent whose pending Stun target has a multi-hit turn", () => {
         process.env.V06_RIDER_EV = "on";
         const combat = createCombatTestContext();
-        const hydra = createTestUnit({
-            name: "Hydra",
+        const squire = createTestUnit({
+            name: "Squire",
             team: LOWER,
             attackType: MELEE,
-            damageMin: 10,
-            damageMax: 10,
-            maxHp: 100,
+            damageMin: 2,
+            damageMax: 2,
             stackPower: 100,
-            abilities: ["Devour Essence"],
+            abilities: ["Stun"],
         });
-        const small = createTestUnit({ name: "Small", team: UPPER, attackType: MELEE, maxHp: 5 });
-        const large = createTestUnit({ name: "Large", team: UPPER, attackType: MELEE, maxHp: 50 });
-        placeThree(combat, hydra, large, small);
+        const target = createTestUnit({
+            name: "Double Punch target",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 100,
+            abilities: ["Double Punch"],
+        });
+        placeUnit(combat.grid, combat.unitsHolder, squire, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 6 });
         const context = contextFor(combat);
-        const incumbent = melee(hydra, large);
+        const candidate = candidateFor(squire, target, context);
+        const incumbent = melee(squire, target);
 
-        expect(estimateMeleeRiderEV(hydra, context, candidateFor(hydra, small, context))?.devourKillSecureEv).toBe(0);
-        expect(routeMeleeRiderEV(hydra, context, incumbent)).toBe(incumbent);
+        expect(estimateMeleeRiderEV(squire, context, candidate)).toBeUndefined();
+        expect(routeMeleeRiderEV(squire, context, incumbent)).toBe(incumbent);
     });
 
     it("re-targets a move-plus-melee candidate without changing its incumbent stand cell", () => {
@@ -311,6 +455,7 @@ describe("v0.6 melee rider EV router", () => {
         placeUnit(combat.grid, combat.unitsHolder, squire, { x: 6, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, acted, { x: 5, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, pending, { x: 7, y: 6 });
+        const engine = activateEngine(combat, squire);
         const context = contextFor(combat);
         context.fightProperties!.addAlreadyMadeTurn(UPPER, acted.getId(), 0);
         const standCell = { x: 6, y: 5 };
@@ -323,13 +468,22 @@ describe("v0.6 melee rider EV router", () => {
                 candidate.standCell.y === standCell.y,
         );
         expect(incumbent).toBeDefined();
-        expect(incumbent!.actions.some((action) => action.type === "move_unit")).toBe(true);
+        const incumbentMove = incumbent!.actions.find((action) => action.type === "move_unit");
+        expect(incumbentMove?.type).toBe("move_unit");
 
         const routed = routeMeleeRiderEV(squire, context, incumbent!.actions);
         const routedMove = routed.find((action) => action.type === "move_unit");
         const routedAttack = routed.find((action) => action.type === "melee_attack");
         expect(routedAttack?.type === "melee_attack" && routedAttack.targetId).toBe(pending.getId());
         expect(routedAttack?.type === "melee_attack" && routedAttack.attackFrom).toEqual(standCell);
+        expect(routedMove).toBe(incumbentMove);
+        expect(routedMove?.type === "move_unit" && routedMove.path).toBe(
+            incumbentMove?.type === "move_unit" ? incumbentMove.path : undefined,
+        );
         expect(routedMove?.type === "move_unit" && routedMove.path[routedMove.path.length - 1]).toEqual(standCell);
+        for (const action of routed) {
+            const result = engine.apply(action);
+            expect(result.completed, `${action.type}: ${result.rejectionReason ?? "rejected"}`).toBe(true);
+        }
     });
 });

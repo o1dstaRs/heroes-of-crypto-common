@@ -13,9 +13,11 @@ import { AbilityType } from "../../abilities/ability_properties";
 import { calculatePetrifyingGazeKillChance } from "../../abilities/petrifying_gaze_ability";
 import { calculateStunApplyChance } from "../../abilities/stun_ability";
 import type { GameAction } from "../../engine/actions";
+import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IDecisionContext } from "../ai_strategy";
+import { estimatePrimaryMeleeDamage, type IPrimaryMeleeDamageEstimate } from "../melee_damage_estimate";
 import {
     enumerateCandidates,
     type ICandidateSet,
@@ -31,17 +33,19 @@ type CandidateEnumerator = (
 ) => ICandidateSet;
 
 export interface IMeleeRiderEV {
-    /** F4's expected effective primary-target damage. */
+    /** Engine-equivalent probability that the supported direct primary hit lands. */
+    hitChance: number;
+    /** Hit-weighted expected effective primary-target damage for a supported single-hit sequence. */
     baseDamageEv: number;
-    /** Expected extra HP removed by Petrifying Gaze's stack kills and front-creature kill roll. */
+    /** Hit- and damage-roll-weighted Petrifying Gaze stack/front-creature damage. */
     petrifyKillEv: number;
-    /** Expected basic-attack HP denied when Stun lands before the target's turn. */
+    /** Conservative lower-bound basic-melee HP denied when Stun lands before the target's turn. */
     stunTurnDenialEv: number;
-    /** Exact Devour Essence healing unlocked by a minimum-damage primary-target kill. */
+    /** Reserved for a future engine rollout; Devour sequences are currently left on the incumbent. */
     devourKillSecureEv: number;
-    /** Whether the ordinary melee minimum damage removes the primary target. */
+    /** Whether every supported outcome lands and removes the primary target. */
     secureKill: boolean;
-    /** Sum of like-for-like HP terms; no trained or hand-authored coefficients. */
+    /** Sum of supported HP terms; no trained or hand-authored coefficients. */
     totalEv: number;
 }
 
@@ -58,9 +62,22 @@ function meleeAction(actions: readonly GameAction[]): Extract<GameAction, { type
     return undefined;
 }
 
-function expectedPetrifyDamage(unit: Unit, target: Unit, baseDamage: number, additionalAbilityPower: number): number {
+function retargetActions(
+    incumbent: GameAction[],
+    incumbentAttack: Extract<GameAction, { type: "melee_attack" }>,
+    targetId: string,
+): GameAction[] {
+    return incumbent.map((action) => (action === incumbentAttack ? { ...action, targetId } : action));
+}
+
+function petrifyDamageForLandedHit(
+    unit: Unit,
+    target: Unit,
+    landedDamage: number,
+    additionalAbilityPower: number,
+): number {
     const ability = unit.getAbility("Petrifying Gaze");
-    const residualHp = Math.max(0, target.getCumulativeHp() - baseDamage);
+    const residualHp = Math.max(0, target.getCumulativeHp() - landedDamage);
     if (!ability || residualHp <= 0 || target.hasMindAttackResistance()) {
         return 0;
     }
@@ -75,7 +92,7 @@ function expectedPetrifyDamage(unit: Unit, target: Unit, baseDamage: number, add
         roll < percentageMax || (percentageMax === percentageMin && roll === percentageMin);
         roll += 1
     ) {
-        const killed = Math.min(Math.floor((baseDamage * (roll / 100)) / target.getMaxHp()), remainingCreatures - 1);
+        const killed = Math.min(Math.floor((landedDamage * (roll / 100)) / target.getMaxHp()), remainingCreatures - 1);
         randomStackKillDamage += killed * target.getMaxHp();
         if (percentageMax === percentageMin) {
             break;
@@ -89,58 +106,78 @@ function expectedPetrifyDamage(unit: Unit, target: Unit, baseDamage: number, add
     return Math.min(residualHp, randomStackKillDamage + killChance * frontHp);
 }
 
+function expectedPetrifyDamage(
+    unit: Unit,
+    target: Unit,
+    damage: IPrimaryMeleeDamageEstimate,
+    additionalAbilityPower: number,
+): number {
+    return (
+        damage.hitChance *
+        damage.landedOutcomes.reduce(
+            (total, outcome) =>
+                total +
+                outcome.probability * petrifyDamageForLandedHit(unit, target, outcome.damage, additionalAbilityPower),
+            0,
+        )
+    );
+}
+
 function expectedStunDenial(
     unit: Unit,
     target: Unit,
-    baseDamage: number,
+    damage: IPrimaryMeleeDamageEstimate,
     context: IDecisionContext,
     additionalAbilityPower: number,
-): number {
+): number | undefined {
     const fp = context.fightProperties;
-    const residualHp = Math.max(0, target.getCumulativeHp() - baseDamage);
     if (
         !unit.getAbility("Stun") ||
         !fp ||
-        residualHp <= 0 ||
         fp.hasAlreadyMadeTurn(target.getId()) ||
         target.isSkippingThisTurn() ||
         target.hasAbilityActive("No Melee")
     ) {
         return 0;
     }
-    const attacks = target.hasAbilityActive("Double Punch") ? 2 : 1;
-    const currentTurnDamage = Math.min(
-        unit.getCumulativeHp(),
-        (attacks *
-            (target.calculateAttackDamageMin(target.getAttack(), unit, false, 0, 1) +
-                target.calculateAttackDamageMax(target.getAttack(), unit, false, 0, 1))) /
-            2,
-    );
-    const remainingStackFraction = residualHp / Math.max(1, target.getCumulativeHp());
-    const chance = calculateStunApplyChance(unit, target, additionalAbilityPower) / 100;
-    return chance * currentTurnDamage * remainingStackFraction;
-}
-
-function devourKillSecureValue(
-    unit: Unit,
-    target: Unit,
-    additionalAbilityPower: number,
-): { secureKill: boolean; value: number } {
-    const attacks = unit.hasAbilityActive("Double Punch") ? 2 : 1;
-    const minimumDamage = attacks * unit.calculateAttackDamageMin(unit.getAttack(), target, false, 0, 1);
-    const uncertainHit =
-        !!unit.getBuff("Broken Aegis") ||
-        !!unit.getEffect("Boar Saliva") ||
-        !!target.getAbility("Dodge") ||
-        (!unit.isSmallSize() && !!target.getAbility("Small Specie"));
-    const secureKill = !uncertainHit && minimumDamage >= target.getCumulativeHp();
-    const ability = unit.getAbility("Devour Essence");
-    if (!secureKill || !ability?.getPower() || !unit.canBeHealed()) {
-        return { secureKill, value: 0 };
+    if (target.hasAbilityActive("Double Punch")) {
+        return undefined;
     }
-    const power = Number(unit.calculateAbilityApplyChance(ability, additionalAbilityPower).toFixed(2));
-    const healedUpTo = Math.ceil(unit.getMaxHp() * Math.min(1, power / 100));
-    return { secureKill, value: Math.max(0, healedUpTo - unit.getHp()) };
+
+    const targetAbilityPower = fp.getAdditionalAbilityPowerPerTeam(target.getTeam());
+    const defenderAbilityPower = fp.getAdditionalAbilityPowerPerTeam(unit.getTeam());
+    const targetHitChance =
+        1 - Math.min(100, Math.max(0, target.calculateMissChance(unit, defenderAbilityPower))) / 100;
+    const nativeMeleeMultiplier =
+        target.getAttackType() === PBTypes.AttackVals.RANGE && !target.hasAbilityActive("Handyman") ? 0.5 : 1;
+    const paralysis = target.getEffect("Paralysis");
+    const paralysisMultiplier = paralysis ? (100 - paralysis.getPower()) / 100 : 1;
+    const currentMinimumDamage = target.calculateAttackDamageMin(
+        target.getAttack(),
+        unit,
+        false,
+        targetAbilityPower,
+        1,
+    );
+    const currentAmount = Math.max(1, target.getAmountAlive());
+    const deniedBasicDamage = damage.landedOutcomes.reduce((total, outcome) => {
+        const residualHp = Math.max(0, target.getCumulativeHp() - outcome.damage);
+        if (residualHp <= 0) {
+            return total;
+        }
+        const remainingAmount = Math.ceil(residualHp / target.getMaxHp());
+        // This is deliberately a lower-bound basic-melee term: it uses minimum damage and scales by whole
+        // creatures remaining. It does not pretend to predict the target's spell/ranged/movement policy.
+        const lowerBoundDamage = Math.max(
+            0,
+            Math.floor(
+                currentMinimumDamage * (remainingAmount / currentAmount) * nativeMeleeMultiplier * paralysisMultiplier,
+            ),
+        );
+        return total + outcome.probability * Math.min(unit.getCumulativeHp(), lowerBoundDamage);
+    }, 0);
+    const stunChance = calculateStunApplyChance(unit, target, additionalAbilityPower) / 100;
+    return damage.hitChance * stunChance * targetHitChance * deniedBasicDamage;
 }
 
 /**
@@ -156,38 +193,50 @@ export function estimateMeleeRiderEV(
         return undefined;
     }
     const target = context.unitsHolder.getAllUnits().get(candidate.targetId);
-    const baseDamageEv = candidate.features.expectedDamage;
-    if (!target || target.isDead() || !Number.isFinite(baseDamageEv) || baseDamageEv < 0) {
+    if (!target || target.isDead() || !candidate.standCell) {
         return undefined;
     }
-    // Two independent Petrify/Stun rolls on Double Punch require a joint estimate. None of today's M3 units
-    // combine those abilities, so preserve the incumbent if a future/inherited kit creates that unknown case.
-    if (unit.hasAbilityActive("Double Punch") && (unit.getAbility("Petrifying Gaze") || unit.getAbility("Stun"))) {
+    const riders = [
+        unit.getAbility("Petrifying Gaze"),
+        unit.getAbility("Stun"),
+        unit.getAbility("Devour Essence"),
+    ].filter(Boolean);
+    // Devour depends on retaliation/reflection and on any kill in the whole hit set; multiple riders and
+    // replacement/multi-hit sequences need a joint rollout. Preserve the incumbent until that rollout exists.
+    if (unit.getAbility("Devour Essence") || riders.length !== 1) {
         return undefined;
     }
 
     const additionalAbilityPower = context.fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam());
-    const petrifyKillEv = expectedPetrifyDamage(unit, target, baseDamageEv, additionalAbilityPower);
-    const stunTurnDenialEv = expectedStunDenial(unit, target, baseDamageEv, context, additionalAbilityPower);
-    const killSecure = devourKillSecureValue(unit, target, additionalAbilityPower);
-    const totalEv = baseDamageEv + petrifyKillEv + stunTurnDenialEv + killSecure.value;
+    const damage = estimatePrimaryMeleeDamage(unit, target, context, candidate.standCell, candidate.actions);
+    if (!damage) {
+        return undefined;
+    }
+    const baseDamageEv = damage.expectedEffectiveDamage;
+    const petrifyKillEv = expectedPetrifyDamage(unit, target, damage, additionalAbilityPower);
+    const stunTurnDenialEv = expectedStunDenial(unit, target, damage, context, additionalAbilityPower);
+    if (stunTurnDenialEv === undefined) {
+        return undefined;
+    }
+    const totalEv = baseDamageEv + petrifyKillEv + stunTurnDenialEv;
     if (!Number.isFinite(totalEv)) {
         return undefined;
     }
     return {
+        hitChance: damage.hitChance,
         baseDamageEv,
         petrifyKillEv,
         stunTurnDenialEv,
-        devourKillSecureEv: killSecure.value,
-        secureKill: killSecure.secureKill,
+        devourKillSecureEv: 0,
+        secureKill: damage.secureKill,
         totalEv,
     };
 }
 
 /**
- * Q1/M3 evidence-gated melee rider router. It only re-picks the target from the incumbent's exact stand cell,
- * keeping path length, exposure and area-melee coverage fixed. Strict improvement is required; ties, missing
- * fight state, an unpriced incumbent, and every gate-off call preserve the exact incumbent array.
+ * Q1/M3 evidence-gated melee rider router. It only re-picks the target from the incumbent's exact stand cell
+ * and rewrites only that target id, retaining the incumbent's action sequence and path. Strict improvement is
+ * required; ties, unsupported sequences, missing fight state and every gate-off call preserve the exact array.
  */
 export function routeMeleeRiderEV(
     unit: Unit,
@@ -198,6 +247,7 @@ export function routeMeleeRiderEV(
     if (
         process.env.V06_RIDER_EV !== "on" ||
         !context.fightProperties ||
+        !!unit.getAbility("Devour Essence") ||
         (!unit.getAbility("Petrifying Gaze") && !unit.getAbility("Stun") && !unit.getAbility("Devour Essence"))
     ) {
         return incumbent;
@@ -219,7 +269,12 @@ export function routeMeleeRiderEV(
     if (!incumbentCandidate) {
         return incumbent;
     }
-    const incumbentEv = estimateMeleeRiderEV(unit, context, incumbentCandidate);
+    const estimateOnIncumbentPath = (candidate: IEnumeratedCandidate): IMeleeRiderEV | undefined =>
+        estimateMeleeRiderEV(unit, context, {
+            ...candidate,
+            actions: retargetActions(incumbent, incumbentAttack, candidate.targetId ?? incumbentAttack.targetId),
+        });
+    const incumbentEv = estimateOnIncumbentPath(incumbentCandidate);
     if (!incumbentEv) {
         return incumbent;
     }
@@ -227,11 +282,15 @@ export function routeMeleeRiderEV(
     let best: IEnumeratedCandidate | undefined;
     let bestEv = incumbentEv.totalEv;
     for (const candidate of meleeCandidates) {
-        const estimate = estimateMeleeRiderEV(unit, context, candidate);
+        const estimate = estimateOnIncumbentPath(candidate);
         if (estimate && estimate.totalEv > bestEv) {
             best = candidate;
             bestEv = estimate.totalEv;
         }
     }
-    return best?.actions ?? incumbent;
+    if (!best?.targetId) {
+        return incumbent;
+    }
+    const targetId = best.targetId;
+    return retargetActions(incumbent, incumbentAttack, targetId);
 }
