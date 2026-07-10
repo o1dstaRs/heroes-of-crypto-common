@@ -17,6 +17,7 @@ import { STRATEGY_V0_4 } from "./versions/v0_4";
 import { STRATEGY_V0_5 } from "./versions/v0_5";
 import { STRATEGY_V0_6 } from "./versions/v0_6";
 import { STRATEGY_V0_6S } from "./versions/v0_6s";
+import { STRATEGY_V0_7 } from "./versions/v0_7";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
@@ -49,6 +50,9 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // exactly one seat of a mirror (see versions/v0_6s.ts). Registered BEFORE v0.6 on purpose: the last
     // entry defines LATEST_AI_VERSION, which must remain the shipped v0.6.
     STRATEGY_V0_6S,
+    // Explicit tournament candidate only. Keep it before v0.6 so neither LATEST nor DEFAULT promotes before
+    // the full acceptance battery and owner sign-off.
+    STRATEGY_V0_7,
     STRATEGY_V0_6,
 ];
 

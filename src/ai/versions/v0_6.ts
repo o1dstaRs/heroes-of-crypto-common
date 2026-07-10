@@ -131,6 +131,10 @@ export class StrategyV0_6 extends StrategyV0_5 {
         // sees the same final decision the oracle arbitrated on. Gate off / absent / all-zero weights
         // (V07_WAIT_SCORER + V07_WAIT_WEIGHTS + V07_WAIT_VERSIONS, default scope "v0.6s") return the
         // exact `decision` reference — byte-identical incumbent hourglass behavior (see wait_scorer.ts).
+        return this.finalizeDecision(unit, context, decision);
+    }
+    /** Final strategy-version seam. Experimental descendants can freeze a committed final policy here. */
+    protected finalizeDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         return applyWaitScorer(unit, context, decision, this.version);
     }
     /**
