@@ -359,8 +359,9 @@ describe("lookahead driver — replay determinism / no RNG leak", () => {
             h.playTurns(10);
             const unit = h.activeUnit();
             expect(unit).toBeDefined();
+            const incumbent = h.decideActive();
             const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
-            const chosen = h.driver.chooseDecision(unit!, h.decideActive());
+            const chosen = h.driver.chooseDecision(unit!, incumbent);
             expect(chosen.length).toBeGreaterThan(0);
             const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
             expect(after).toEqual(before);

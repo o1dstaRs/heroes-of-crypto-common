@@ -10,7 +10,7 @@
  */
 
 import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../ai";
-import { clearAITargetMemory, recordAITargetMemory } from "../ai/ai";
+import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -722,6 +722,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             fightProperties,
             getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
         };
+        const searchApplies = search.appliesTo(strategy.version);
+        const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
+        const targetMemoryBeforeDecision =
+            searchApplies || lookaheadApplies ? captureAITargetMemory(unitsHolder) : undefined;
         const decided0 = strategy.decideTurn(unit, decisionContext);
         if (config.decisionObserver) {
             config.decisionObserver({
@@ -736,13 +740,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
-        const searchApplies = search.appliesTo(strategy.version);
         const decided = searchApplies
             ? search.chooseDecision(unit, strategy.version, decided0)
-            : lookahead.enabled && strategy.version === "v0.5"
+            : lookaheadApplies
               ? lookahead.chooseDecision(unit, decided0)
               : decided0;
-        if (searchApplies && decided !== decided0) {
+        if ((searchApplies || lookaheadApplies) && decided !== decided0) {
+            restoreAITargetMemory(unitsHolder, targetMemoryBeforeDecision!);
             const executedAttack = [...decided]
                 .reverse()
                 .find((action) => action.type === "melee_attack" || action.type === "range_attack");
