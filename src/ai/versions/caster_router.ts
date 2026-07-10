@@ -191,21 +191,59 @@ function bestWildRegeneration(
  * return the exact incumbent array without enumerating, preserving frozen v0.6 and all existing MAGIC
  * behavior. Every routed action is an unmodified F4 candidate, so spell target and engine legality remain
  * centralized in candidates.ts.
+ *
+ * A/B seat scoping: both seats of a sim game share process env, so a plain on/off can never produce the
+ * routed-vs-unrouted pairing the LiveTwin A/B needs. `V06_CASTER_ROUTER=green` routes ONLY the LOWER
+ * team's casters and `=red` only the UPPER team's ("both" == "on"); the paired runner flips the value
+ * between the two side-swapped games of a seed so seat luck cancels. Any other value keeps the gate off.
  */
+function casterRouterGateOn(unit: Unit): boolean {
+    const gate = process.env.V06_CASTER_ROUTER;
+    if (gate === "on" || gate === "both") {
+        return true;
+    }
+    if (gate === "green" || gate === "red") {
+        return gate === (unit.getTeam() === LOWER ? "green" : "red");
+    }
+    return false;
+}
+
+/**
+ * Optional per-spell ablation scope for the A/B: V06_CASTER_SPELLS="resurrection,windflow,castling,
+ * wildregen" (comma list, case-insensitive). Unset/empty = all four routed — the plain gate semantics
+ * are unchanged. The 2026-07-10 cohort A/B measured the four TOGETHER at −9.2pp, so per-spell
+ * decomposition decides which components are salvageable before any default flips on.
+ */
+function spellRouted(key: "resurrection" | "windflow" | "castling" | "wildregen"): boolean {
+    const raw = process.env.V06_CASTER_SPELLS;
+    if (!raw) {
+        return true;
+    }
+    return raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .includes(key);
+}
+
 export function routeUniversalCaster(
     unit: Unit,
     context: IDecisionContext,
     incumbent: GameAction[],
     enumerate: CandidateEnumerator = enumerateCandidates,
 ): GameAction[] {
-    if (process.env.V06_CASTER_ROUTER !== "on" || unit.getAttackType() !== MELEE_MAGIC) {
+    if (!casterRouterGateOn(unit) || unit.getAttackType() !== MELEE_MAGIC) {
         return incumbent;
     }
 
     const candidates = enumerate(unit, context, incumbent).candidates;
-    const resurrection = bestResurrection(unit, context, candidates);
-    if (resurrection) {
-        return resurrection.actions;
+    // V06_RES_PREEMPT=off demotes Resurrection to the same "never replace a committed combat/wait turn"
+    // bar as the utility spells — the 2026-07-10 cohort ablation measured pre-empting attacks at −2.4pp,
+    // so the A/B needs the non-pre-empting variant separable before any default flips on.
+    if (spellRouted("resurrection") && (process.env.V06_RES_PREEMPT !== "off" || !incumbentCommitsTurn(incumbent))) {
+        const resurrection = bestResurrection(unit, context, candidates);
+        if (resurrection) {
+            return resurrection.actions;
+        }
     }
 
     // Preserve v0.4's Troll wait/cast sequencing, Ogre/Behemoth openers, strategic hourglass, and every
@@ -214,15 +252,22 @@ export function routeUniversalCaster(
         return incumbent;
     }
 
-    const windFlow = candidates.find((candidate) => isSpell(candidate, "Wind Flow"));
-    if (windFlow && shouldCastWindFlow(unit, context)) {
-        return windFlow.actions;
+    if (spellRouted("windflow")) {
+        const windFlow = candidates.find((candidate) => isSpell(candidate, "Wind Flow"));
+        if (windFlow && shouldCastWindFlow(unit, context)) {
+            return windFlow.actions;
+        }
     }
 
-    const castling = bestCastling(unit, context, candidates);
-    if (castling) {
-        return castling.actions;
+    if (spellRouted("castling")) {
+        const castling = bestCastling(unit, context, candidates);
+        if (castling) {
+            return castling.actions;
+        }
     }
 
-    return bestWildRegeneration(context, candidates)?.actions ?? incumbent;
+    if (spellRouted("wildregen")) {
+        return bestWildRegeneration(context, candidates)?.actions ?? incumbent;
+    }
+    return incumbent;
 }
