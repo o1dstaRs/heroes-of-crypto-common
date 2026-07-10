@@ -76,7 +76,7 @@ export interface ILeagueEvaluationOptions {
     aggregate?: LeagueAggregateMethod;
     /** Probability scale for the entropy-regularized adversarial pool. Default 0.025. */
     softminTemperature?: number;
-    /** Normal-approximation z used by the Wilson lower bound. Default 1.96 (95%). */
+    /** Normal-approximation z used by the offer-board cluster lower bound. Default 1.96 (95%). */
     confidenceZ?: number;
 }
 
@@ -104,7 +104,13 @@ export interface IResolvedLeaguePick {
 export interface ILeagueGameRecord {
     opponentId: string;
     game: number;
+    /** Four games share one offer board: two pick-seat assignments x an exact battle-side mirror. */
+    offerBoard: number;
+    pickSeat: "candidate-lower" | "candidate-upper";
+    battleMirror: 0 | 1;
+    setupFingerprint: number;
     pairSeed: number;
+    battleSeed: number;
     candidateSide: Side;
     winner: Side | "draw";
     candidateResult: "win" | "loss" | "draw";
@@ -120,8 +126,9 @@ export interface ILeagueOpponentResult {
     losses: number;
     draws: number;
     decisiveGames: number;
+    offerBoards: number;
     decisiveWinRate: number;
-    wilsonLowerBound: number;
+    clusteredLowerBound: number;
 }
 
 export interface ILeagueAggregate {
@@ -148,7 +155,7 @@ export interface ILeagueEvaluationReport {
         stackAmounts: "LiveTwin expBudget";
         setup: "genome heads; synergies frozen at setup-v0";
         fightVector: string;
-        uncertainty: "Wilson lower bound over decisive games";
+        uncertainty: "cluster-robust lower bound over four-game offer boards";
         nashQualification: string;
     };
 }
@@ -168,8 +175,8 @@ export function defaultLeaguePool(): ILeaguePoolEntry[] {
 }
 
 function normalizeOptions(options: ILeagueEvaluationOptions): INormalizedLeagueOptions {
-    if (!Number.isInteger(options.gamesPerOpponent) || options.gamesPerOpponent < 2 || options.gamesPerOpponent % 2) {
-        throw new RangeError("gamesPerOpponent must be an even integer >= 2 so every pick is seat-mirrored");
+    if (!Number.isInteger(options.gamesPerOpponent) || options.gamesPerOpponent < 8 || options.gamesPerOpponent % 4) {
+        throw new RangeError("gamesPerOpponent must be a multiple of 4 and at least 8 for clustered uncertainty");
     }
     if (!Number.isInteger(options.baseSeed) || options.baseSeed < 0) {
         throw new RangeError("baseSeed must be a non-negative integer");
@@ -300,10 +307,30 @@ export function resolveLeaguePick(
 
     const lowerOpponent = leagueOpponentCreatures(state, LOWER, !!lowerGenome.omniscientDraft);
     const upperOpponent = leagueOpponentCreatures(state, UPPER, !!upperGenome.omniscientDraft);
+    const deployablePlacement = (
+        requested: LeaguePlacementTemplate,
+        knownOpponent: readonly number[],
+    ): LeaguePlacementTemplate => {
+        if (requested !== "adaptive") return "tight";
+        // v0.6's adaptive template internally checks the full enemy holder for these abilities. Only enable
+        // that branch when the policy's legitimate view already proves the answer, so hidden stacks can never
+        // change the placement. With the gate disabled, JS short-circuiting avoids the full-roster inspection.
+        const knownAoe = knownOpponent.some((creatureId) => {
+            const abilities = creatureInfo(creatureId)?.abilities ?? "";
+            return abilities.includes("Area Throw") || abilities.includes("Large Caliber");
+        });
+        return knownAoe ? "adaptive" : "tight";
+    };
     return {
         state,
-        lowerPlacement: pickLeaguePlacement(state.lower.creatures, lowerOpponent, lowerGenome),
-        upperPlacement: pickLeaguePlacement(state.upper.creatures, upperOpponent, upperGenome),
+        lowerPlacement: deployablePlacement(
+            pickLeaguePlacement(state.lower.creatures, lowerOpponent, lowerGenome),
+            lowerOpponent,
+        ),
+        upperPlacement: deployablePlacement(
+            pickLeaguePlacement(state.upper.creatures, upperOpponent, upperGenome),
+            upperOpponent,
+        ),
         lowerAugments: pickLeagueAugments(
             state.lower.creatures,
             lowerOpponent,
@@ -383,50 +410,85 @@ export function playLeagueGame(
     game: number,
     dependencies: Partial<ILeagueEvaluationDependencies> = {},
 ): ILeagueGameRecord {
+    if (isMainThread && dependencies.matchRunner === undefined) {
+        throw new Error(
+            "Direct in-process league fights are not environment-isolated; use evaluateLeagueCandidate or inject a test matchRunner",
+        );
+    }
     const normalized = normalizeOptions(options);
     if (!Number.isInteger(game) || game < 0 || game >= normalized.gamesPerOpponent) {
         throw new RangeError(`game must be in [0, ${normalized.gamesPerOpponent})`);
     }
     const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
-    const pairIndex = Math.floor(game / 2);
-    const pairSeed = (normalized.baseSeed + Math.imul(pairIndex, PAIR_SEED_STEP)) >>> 0;
+    const offerBoard = Math.floor(game / 4);
+    const withinBoard = game % 4;
+    const pickAssignment = Math.floor(withinBoard / 2) as 0 | 1;
+    const battleMirror = (withinBoard % 2) as 0 | 1;
+    const pairSeed = (normalized.baseSeed + Math.imul(offerBoard, PAIR_SEED_STEP)) >>> 0;
     const pickSeed = hashSimulationParts("league-pick", pairSeed);
-    const battleSeed = hashSimulationParts("league-battle", pairSeed);
-    const candidateIsLower = game % 2 === 0;
-    const lowerGenome = candidateIsLower ? candidate : opponent;
-    const upperGenome = candidateIsLower ? opponent : candidate;
+    const battleSeed = hashSimulationParts("league-battle", pairSeed, pickAssignment);
+    const candidatePickedLower = pickAssignment === 0;
+    const lowerGenome = candidatePickedLower ? candidate : opponent;
+    const upperGenome = candidatePickedLower ? opponent : candidate;
     const pick = resolveLeaguePick(pickSeed, lowerGenome, upperGenome, normalized.freezePerk);
-    const lowerRoster = leagueRoster(pick.state.lower.creatures);
-    const upperRoster = leagueRoster(pick.state.upper.creatures);
-    const gridType = normalized.mapTypes[pairIndex % normalized.mapTypes.length];
-    const lowerSynergies = SETUP_POLICY_V0.pickSynergies(pick.state.lower.creatures);
-    const upperSynergies = SETUP_POLICY_V0.pickSynergies(pick.state.upper.creatures);
-    const result = withFightEnvironment(pick.lowerPlacement, pick.upperPlacement, () =>
+    const pickLower = {
+        roster: leagueRoster(pick.state.lower.creatures),
+        placement: pick.lowerPlacement,
+        artifactT1: pick.state.lower.tier1Artifact,
+        artifactT2: pick.state.lower.tier2Artifact,
+        perk: pick.state.lower.perk,
+        augments: pick.lowerAugments,
+        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.lower.creatures),
+    };
+    const pickUpper = {
+        roster: leagueRoster(pick.state.upper.creatures),
+        placement: pick.upperPlacement,
+        artifactT1: pick.state.upper.tier1Artifact,
+        artifactT2: pick.state.upper.tier2Artifact,
+        perk: pick.state.upper.perk,
+        augments: pick.upperAugments,
+        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.upper.creatures),
+    };
+    const matchLower = battleMirror ? pickUpper : pickLower;
+    const matchUpper = battleMirror ? pickLower : pickUpper;
+    const setupFingerprint = hashSimulationParts(
+        "league-fixed-setup",
+        JSON.stringify(pickLower),
+        JSON.stringify(pickUpper),
+    );
+    const gridType = normalized.mapTypes[offerBoard % normalized.mapTypes.length];
+    const result = withFightEnvironment(matchLower.placement, matchUpper.placement, () =>
         deps.matchRunner({
             greenVersion: normalized.fightVersion,
             redVersion: normalized.fightVersion,
-            roster: lowerRoster,
-            redRoster: upperRoster,
+            roster: matchLower.roster,
+            redRoster: matchUpper.roster,
             seed: battleSeed,
             maxLaps: normalized.maxLaps,
             gridType,
-            greenArtifactT1: pick.state.lower.tier1Artifact,
-            redArtifactT1: pick.state.upper.tier1Artifact,
-            greenArtifactT2: pick.state.lower.tier2Artifact,
-            redArtifactT2: pick.state.upper.tier2Artifact,
-            greenPerk: pick.state.lower.perk,
-            redPerk: pick.state.upper.perk,
-            greenAugments: pick.lowerAugments,
-            redAugments: pick.upperAugments,
-            greenSynergies: lowerSynergies,
-            redSynergies: upperSynergies,
+            greenArtifactT1: matchLower.artifactT1,
+            redArtifactT1: matchUpper.artifactT1,
+            greenArtifactT2: matchLower.artifactT2,
+            redArtifactT2: matchUpper.artifactT2,
+            greenPerk: matchLower.perk,
+            redPerk: matchUpper.perk,
+            greenAugments: matchLower.augments,
+            redAugments: matchUpper.augments,
+            greenSynergies: matchLower.synergies,
+            redSynergies: matchUpper.synergies,
         }),
     );
-    const candidateSide: Side = candidateIsLower ? "green" : "red";
+    const candidateIsMatchLower = battleMirror ? !candidatePickedLower : candidatePickedLower;
+    const candidateSide: Side = candidateIsMatchLower ? "green" : "red";
     return {
         opponentId: opponent.id,
         game,
+        offerBoard,
+        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        battleMirror,
+        setupFingerprint,
         pairSeed,
+        battleSeed,
         candidateSide,
         winner: result.winner,
         candidateResult: result.winner === "draw" ? "draw" : result.winner === candidateSide ? "win" : "loss",
@@ -435,16 +497,40 @@ export function playLeagueGame(
     };
 }
 
-export function wilsonLowerBound(wins: number, losses: number, z: number = 1.96): number {
-    const total = wins + losses;
-    if (!total) {
-        return 0;
+/** Cluster-robust normal lower bound for decisive win rate, clustered by the four-game offer board. */
+export function clusteredLowerBound(records: readonly ILeagueGameRecord[], z: number = 1.96): number {
+    const wins = records.filter((record) => record.candidateResult === "win").length;
+    const losses = records.filter((record) => record.candidateResult === "loss").length;
+    const decisive = wins + losses;
+    if (!decisive) return 0;
+    const point = wins / decisive;
+    const byBoard = new Map<number, ILeagueGameRecord[]>();
+    for (const record of records) {
+        const board = byBoard.get(record.offerBoard) ?? [];
+        board.push(record);
+        byBoard.set(record.offerBoard, board);
     }
-    const p = wins / total;
+    const decisiveBoards = [...byBoard.values()].filter((board) =>
+        board.some((record) => record.candidateResult !== "draw"),
+    );
+    if (decisiveBoards.length < 2) return 0;
+    let residualSquares = 0;
+    for (const board of decisiveBoards) {
+        const boardWins = board.filter((record) => record.candidateResult === "win").length;
+        const boardLosses = board.filter((record) => record.candidateResult === "loss").length;
+        residualSquares += (boardWins - point * (boardWins + boardLosses)) ** 2;
+    }
+    const finiteClusterCorrection = decisiveBoards.length / (decisiveBoards.length - 1);
+    const standardError = Math.sqrt(finiteClusterCorrection * residualSquares) / decisive;
+    const robustNormal = Math.max(0, point - z * standardError);
+    // A zero empirical cluster variance must not imply certainty on a small deterministic panel. Use one
+    // effective Bernoulli observation per decisive offer board as a conservative finite-panel floor on confidence.
     const z2 = z * z;
-    const center = p + z2 / (2 * total);
-    const spread = z * Math.sqrt((p * (1 - p) + z2 / (4 * total)) / total);
-    return Math.max(0, (center - spread) / (1 + z2 / total));
+    const effective = decisiveBoards.length;
+    const center = point + z2 / (2 * effective);
+    const spread = z * Math.sqrt((point * (1 - point) + z2 / (4 * effective)) / effective);
+    const effectiveWilson = Math.max(0, (center - spread) / (1 + z2 / effective));
+    return Math.min(robustNormal, effectiveWilson);
 }
 
 export function summarizeLeagueRecords(
@@ -477,6 +563,33 @@ export function summarizeLeagueRecords(
         ) {
             throw new Error(`League opponent ${entry.id} has duplicate or out-of-range game ids`);
         }
+        for (const record of own) {
+            const expectedWithinBoard = record.game % 4;
+            const expectedPickSeat = expectedWithinBoard < 2 ? "candidate-lower" : "candidate-upper";
+            const expectedMirror = (expectedWithinBoard % 2) as 0 | 1;
+            const expectedSide: Side = expectedWithinBoard === 0 || expectedWithinBoard === 3 ? "green" : "red";
+            const expectedBoard = Math.floor(record.game / 4);
+            const expectedPairSeed = (normalized.baseSeed + Math.imul(expectedBoard, PAIR_SEED_STEP)) >>> 0;
+            const expectedResult =
+                record.winner === "draw" ? "draw" : record.winner === record.candidateSide ? "win" : "loss";
+            if (
+                record.offerBoard !== expectedBoard ||
+                record.pickSeat !== expectedPickSeat ||
+                record.battleMirror !== expectedMirror ||
+                record.candidateSide !== expectedSide ||
+                record.pairSeed !== expectedPairSeed ||
+                record.candidateResult !== expectedResult
+            ) {
+                throw new Error(`League opponent ${entry.id} has invalid mirror metadata for game ${record.game}`);
+            }
+        }
+        for (let game = 0; game < normalized.gamesPerOpponent; game += 2) {
+            const first = own.find((record) => record.game === game)!;
+            const mirror = own.find((record) => record.game === game + 1)!;
+            if (first.setupFingerprint !== mirror.setupFingerprint || first.battleSeed !== mirror.battleSeed) {
+                throw new Error(`League opponent ${entry.id} game ${game} is not a fixed-setup battle mirror`);
+            }
+        }
         const wins = own.filter((record) => record.candidateResult === "win").length;
         const losses = own.filter((record) => record.candidateResult === "loss").length;
         const draws = own.length - wins - losses;
@@ -489,14 +602,18 @@ export function summarizeLeagueRecords(
             losses,
             draws,
             decisiveGames,
+            offerBoards: own.length / 4,
             decisiveWinRate: decisiveGames ? wins / decisiveGames : 0.5,
-            wilsonLowerBound: wilsonLowerBound(wins, losses, normalized.confidenceZ),
+            clusteredLowerBound: clusteredLowerBound(own, normalized.confidenceZ),
         };
     });
-    const worst = opponents.reduce((left, right) => (right.wilsonLowerBound < left.wilsonLowerBound ? right : left));
-    const minimum = worst.wilsonLowerBound;
+    const worst = opponents.reduce((left, right) =>
+        right.clusteredLowerBound < left.clusteredLowerBound ? right : left,
+    );
+    const minimum = worst.clusteredLowerBound;
     const unnormalized = opponents.map(
-        (opponent) => opponent.prior * Math.exp(-(opponent.wilsonLowerBound - minimum) / normalized.softminTemperature),
+        (opponent) =>
+            opponent.prior * Math.exp(-(opponent.clusteredLowerBound - minimum) / normalized.softminTemperature),
     );
     const adversaryTotal = unnormalized.reduce((sum, weight) => sum + weight, 0);
     const adversarialMixture = opponents.map((opponent, index) => ({
@@ -523,7 +640,8 @@ export function summarizeLeagueRecords(
         aggregate,
         limitations: [
             "The built-in anchor/melee pool is a bootstrap smoke pool, not a powered acceptance panel; provide accumulated champions and exploiters with --pool.",
-            "The placement head selects the existing v0.6 adaptive-dispersion or tight template; placement-zone expansion and stack splitting are not yet engine action-space choices.",
+            "The deployable placement head may enable adaptive dispersion only after a legitimate AOE reveal; otherwise it uses the tight template. Placement-zone expansion and stack splitting are not yet engine action-space choices.",
+            "Each offer board costs four games: both pick-seat assignments and a fixed-setup battle-side mirror for each assignment.",
             "SEE_NONE remains frozen by default; use --unfreeze-perk only for an explicit reveal-value experiment.",
             "No training or bake verdict is inferred from this report; acceptance still requires fresh-seed powered evaluation.",
         ],
@@ -532,7 +650,7 @@ export function summarizeLeagueRecords(
             stackAmounts: "LiveTwin expBudget",
             setup: "genome heads; synergies frozen at setup-v0",
             fightVector: `${normalized.fightVersion} for both sides`,
-            uncertainty: "Wilson lower bound over decisive games",
+            uncertainty: "cluster-robust lower bound over four-game offer boards",
             nashQualification:
                 "softmin is an entropy-regularized adversarial response over the configured pool; a full Nash equilibrium requires a complete entrant-by-entrant payoff matrix",
         },
@@ -543,18 +661,8 @@ export function evaluateLeagueCandidateSequential(
     candidate: ILeagueGenome,
     pool: readonly ILeaguePoolEntry[],
     options: ILeagueEvaluationOptions,
-    dependencies: Partial<ILeagueEvaluationDependencies> = {},
-): ILeagueEvaluationReport {
-    const normalized = normalizeOptions(options);
-    validateEntrants(candidate, pool);
-    const deps = { ...DEFAULT_DEPENDENCIES, ...dependencies };
-    const records: ILeagueGameRecord[] = [];
-    for (const opponent of pool) {
-        for (let game = 0; game < normalized.gamesPerOpponent; game += 1) {
-            records.push(playLeagueGame(candidate, opponent, normalized, game, deps));
-        }
-    }
-    return summarizeLeagueRecords(candidate, pool, normalized, records, deps.now());
+): Promise<ILeagueEvaluationReport> {
+    return evaluateLeagueCandidate(candidate, pool, { ...options, concurrency: 1 });
 }
 
 type LeagueWorkerMessage = { type: "ready" } | { type: "result"; opponentIndex: number; record: ILeagueGameRecord };
@@ -567,17 +675,11 @@ interface ILeagueWorkerData {
 
 /** Fight policies have several simulation-only environment overrides, some read at module initialization.
  * League workers start from a clean copy so an ambient CEM/A-B shell cannot silently mutate the frozen fight. */
-function frozenWorkerEnvironment(): NodeJS.ProcessEnv {
-    const environment = { ...process.env };
+export function sanitizedLeagueEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+    const environment = { ...source };
+    const explicitMeasurementKeys = new Set(["VALUE_DATA", "FORCE_CREATURES", "LIVETWIN", "SIM_NO_ACTIONS"]);
     for (const key of Object.keys(environment)) {
-        if (
-            key.startsWith("V05_") ||
-            key.startsWith("V06_") ||
-            key.startsWith("V07_") ||
-            key.startsWith("SEARCH_") ||
-            key.startsWith("Q2_") ||
-            key === "VALUE_DATA"
-        ) {
+        if (/^(?:V\d+_|SEARCH_|Q\d+_|CEM_|FIGHT_|ROSTER_|AUGCA_)/.test(key) || explicitMeasurementKeys.has(key)) {
             delete environment[key];
         }
     }
@@ -619,7 +721,7 @@ export function evaluateLeagueCandidate(
         for (let index = 0; index < concurrency; index += 1) {
             const worker = new Worker(new URL(import.meta.url), {
                 workerData: { candidate, pool: [...pool], options: normalized } satisfies ILeagueWorkerData,
-                env: frozenWorkerEnvironment(),
+                env: sanitizedLeagueEnvironment(),
             });
             workers.push(worker);
             worker.on("message", (message: LeagueWorkerMessage) => {

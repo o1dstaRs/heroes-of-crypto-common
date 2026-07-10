@@ -6,7 +6,7 @@
  * -----------------------------------------------------------------------------
  * Full-game league CEM for the anchored upstream genome. Every candidate goes through the exact common
  * pick reducer and then fights mirrored LiveTwin battles against every configured exploiter/champion.
- * Training fitness defaults to the minimum per-opponent 95% Wilson lower bound. `softmin` is available as
+ * Training fitness defaults to the minimum per-opponent offer-board-cluster lower bound. `softmin` is available as
  * an entropy-regularized adversarial mixture, but is deliberately not described as a full Nash equilibrium:
  * that requires a complete entrant-by-entrant payoff matrix, not one candidate row.
  *
@@ -18,11 +18,24 @@
  */
 
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LEAGUE_ANCHOR_GENOME, LEAGUE_GENOME_DIM, LEAGUE_SCHEMA_VERSION } from "../league_genome.ts";
+import {
+    LEAGUE_ANCHOR_GENOME,
+    LEAGUE_GENOME_DIM,
+    LEAGUE_GENOME_LAYOUT,
+    LEAGUE_SCHEMA_VERSION,
+} from "../league_genome.ts";
+import { loadLeaguePool } from "../league_eval.ts";
+import {
+    createLeagueCemSigma,
+    refitLeagueCemDistribution,
+    retainComparableLeagueBest,
+    sampleLeagueCemPopulation,
+} from "./cem_league_core.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EVAL = join(HERE, "..", "league_eval.ts");
@@ -40,12 +53,16 @@ const ZERO_SIGMA = Number(process.env.CEM_ZERO_SIGMA || 2.5);
 const SIGMA_DECAY = Number(process.env.CEM_SIGMA_DECAY || 0.9);
 const SIGMA_FLOOR_RATIO = Number(process.env.CEM_SIGMA_FLOOR_RATIO || 0.2);
 const BASE_SEED = Number(process.env.CEM_SEED || 1) >>> 0;
+const SELECTION_SEED = BASE_SEED;
 const VAL_SEED = BASE_SEED ^ 0x5f356495;
+const FREEZE_PERK = process.env.CEM_UNFREEZE_PERK !== "1";
 const AGGREGATE = process.env.CEM_AGGREGATE || "worst-case";
-const POOL = process.env.CEM_LEAGUE_POOL;
+const POOL_SOURCE = process.env.CEM_LEAGUE_POOL;
 const FIGHT_VERSION = process.env.CEM_FIGHT_VERSION || "v0.6";
-const MAPS = process.env.CEM_MAPS || "1";
-const TEMPERATURE = process.env.CEM_SOFTMIN_TEMPERATURE || "0.025";
+const MAP_TYPES = (process.env.CEM_MAPS || "1").split(",").map(Number);
+const TEMPERATURE = Number(process.env.CEM_SOFTMIN_TEMPERATURE || 0.025);
+const MAX_LAPS = 60;
+const CONFIDENCE_Z = 1.96;
 const OUT = process.env.CEM_OUT || join(process.cwd(), "sim-out", "cem_league");
 const LOG = join(OUT, "trace.log");
 const activeChildren = new Set();
@@ -73,35 +90,57 @@ if (
 ) {
     throw new Error("CEM sigma controls must be finite and positive; CEM_SIGMA_DECAY must be <= 1");
 }
-if (!Number.isInteger(GAMES) || GAMES < 2 || GAMES % 2 || !Number.isInteger(VAL_GAMES) || VAL_GAMES % 2) {
-    throw new Error("CEM_GAMES and CEM_VAL_GAMES must be positive even seat-mirrored counts");
+if (
+    !Number.isInteger(GAMES) ||
+    GAMES < 8 ||
+    GAMES % 4 ||
+    !Number.isInteger(VAL_GAMES) ||
+    VAL_GAMES < 8 ||
+    VAL_GAMES % 4
+) {
+    throw new Error("CEM_GAMES and CEM_VAL_GAMES must be multiples of four and at least eight");
 }
 if (AGGREGATE !== "worst-case" && AGGREGATE !== "softmin") {
     throw new Error("CEM_AGGREGATE must be worst-case or softmin");
 }
+if (!MAP_TYPES.length || !MAP_TYPES.every((mapType) => Number.isInteger(mapType) && mapType >= 1 && mapType <= 4)) {
+    throw new Error("CEM_MAPS must contain comma-separated GridVals ids in [1, 4]");
+}
+if (!Number.isFinite(TEMPERATURE) || TEMPERATURE <= 0) {
+    throw new Error("CEM_SOFTMIN_TEMPERATURE must be positive");
+}
 
 mkdirSync(OUT, { recursive: true });
+const POOL_ENTRIES = loadLeaguePool(POOL_SOURCE, process.cwd());
+const POOL_SNAPSHOT_CONTENT = `${JSON.stringify({ entries: POOL_ENTRIES }, null, 2)}\n`;
+const POOL_FINGERPRINT = createHash("sha256").update(POOL_SNAPSHOT_CONTENT).digest("hex");
+const POOL_SNAPSHOT = join(OUT, `pool.${POOL_FINGERPRINT}.snapshot.json`);
+try {
+    writeFileSync(POOL_SNAPSHOT, POOL_SNAPSHOT_CONTENT, { flag: "wx", mode: 0o444 });
+} catch (error) {
+    if (error?.code !== "EEXIST" || readFileSync(POOL_SNAPSHOT, "utf8") !== POOL_SNAPSHOT_CONTENT) throw error;
+}
+chmodSync(POOL_SNAPSHOT, 0o444);
+const SELECTION_PANEL = {
+    schemaVersion: 1,
+    seed: SELECTION_SEED,
+    gamesPerOpponent: GAMES,
+    fightVersion: FIGHT_VERSION,
+    maxLaps: MAX_LAPS,
+    mapTypes: MAP_TYPES,
+    freezePerk: FREEZE_PERK,
+    aggregate: AGGREGATE,
+    softminTemperature: TEMPERATURE,
+    confidenceZ: CONFIDENCE_Z,
+    pool: POOL_ENTRIES,
+};
+const SELECTION_PANEL_FINGERPRINT = createHash("sha256").update(JSON.stringify(SELECTION_PANEL)).digest("hex");
 const log = (message) => {
     console.log(message);
     appendFileSync(LOG, `${message}\n`);
 };
 
-let rngState = BASE_SEED || 1;
-const rand = () => {
-    rngState = (rngState * 1664525 + 1013904223) >>> 0;
-    return rngState / 0x100000000;
-};
-const gaussian = () => {
-    let u = 0;
-    let v = 0;
-    while (!u) u = rand();
-    while (!v) v = rand();
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-};
-
-const initialSigma = ANCHOR.map((coefficient) =>
-    coefficient === 0 ? ZERO_SIGMA : REL_SIGMA * (Math.abs(coefficient) + 0.5),
-);
+const initialSigma = createLeagueCemSigma(ANCHOR, REL_SIGMA, ZERO_SIGMA, FREEZE_PERK);
 const sigmaFloor = initialSigma.map((value) => value * SIGMA_FLOOR_RATIO);
 
 const parseLastJson = (stdout) => {
@@ -129,13 +168,19 @@ const evaluate = (weights, games, seed) =>
             "--aggregate",
             AGGREGATE,
             "--temperature",
-            TEMPERATURE,
+            String(TEMPERATURE),
             "--fight-version",
             FIGHT_VERSION,
             "--maps",
-            MAPS,
+            MAP_TYPES.join(","),
+            "--max-laps",
+            String(MAX_LAPS),
+            "--confidence-z",
+            String(CONFIDENCE_Z),
+            "--pool",
+            POOL_SNAPSHOT,
         ];
-        if (POOL) args.push("--pool", POOL);
+        if (!FREEZE_PERK) args.push("--unfreeze-perk");
         const child = spawn("bun", args, { cwd: process.cwd(), env: process.env });
         activeChildren.add(child);
         let stdout = "";
@@ -191,34 +236,36 @@ async function main() {
     log(
         `CEM league: DIM=${LEAGUE_GENOME_DIM} POP=${POP} ELITE=${ELITE} GENS=${GENS} ` +
             `games/opponent=${GAMES} evalParallel=${EVAL_PARALLEL} matchConc=${MATCH_CONC} ` +
-            `aggregate=${AGGREGATE} pool=${POOL || "default(anchor,melee_coevo)"} seed=${BASE_SEED}`,
+            `aggregate=${AGGREGATE} pool=${POOL_SOURCE || "default(anchor,melee_coevo)"} ` +
+            `selectionSeed=${SELECTION_SEED} selectionPanel=${SELECTION_PANEL_FINGERPRINT.slice(0, 12)} ` +
+            `freezePerk=${FREEZE_PERK}`,
     );
     const mean = process.env.CEM_LEAGUE_MEAN ? JSON.parse(process.env.CEM_LEAGUE_MEAN) : ANCHOR.slice();
     if (!Array.isArray(mean) || mean.length !== LEAGUE_GENOME_DIM || !mean.every(Number.isFinite)) {
         throw new Error(`CEM_LEAGUE_MEAN must contain ${LEAGUE_GENOME_DIM} finite coefficients`);
     }
+    if (FREEZE_PERK) {
+        mean.splice(
+            LEAGUE_GENOME_LAYOUT.perks.offset,
+            LEAGUE_GENOME_LAYOUT.perks.length,
+            ...ANCHOR.slice(
+                LEAGUE_GENOME_LAYOUT.perks.offset,
+                LEAGUE_GENOME_LAYOUT.perks.offset + LEAGUE_GENOME_LAYOUT.perks.length,
+            ),
+        );
+    }
     let sigma = initialSigma.slice();
     let best;
 
     for (let generation = 0; generation < GENS; generation += 1) {
-        const generationSeed = (BASE_SEED + Math.imul(generation, 0x9e3779b1)) >>> 0;
-        const candidates = [mean.slice()];
-        for (let candidate = 1; candidate < POP; candidate += 1) {
-            candidates.push(mean.map((value, dimension) => value + sigma[dimension] * gaussian()));
-        }
-        const scores = await mapLimit(candidates, EVAL_PARALLEL, (weights) => evaluate(weights, GAMES, generationSeed));
+        const candidates = sampleLeagueCemPopulation(mean, sigma, POP, BASE_SEED, generation, FREEZE_PERK);
+        const scores = await mapLimit(candidates, EVAL_PARALLEL, (weights) => evaluate(weights, GAMES, SELECTION_SEED));
         const ranked = candidates
             .map((weights, index) => ({ weights, ...scores[index] }))
             .sort((left, right) => right.fitness - left.fitness);
         const elite = ranked.slice(0, ELITE);
-        for (let dimension = 0; dimension < LEAGUE_GENOME_DIM; dimension += 1) {
-            const values = elite.map((candidate) => candidate.weights[dimension]);
-            const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-            const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length;
-            mean[dimension] = average;
-            sigma[dimension] = Math.max(sigmaFloor[dimension], Math.sqrt(variance), sigma[dimension] * SIGMA_DECAY);
-        }
-        if (!best || ranked[0].fitness > best.fitness) best = ranked[0];
+        refitLeagueCemDistribution(elite, mean, sigma, sigmaFloor, SIGMA_DECAY, FREEZE_PERK);
+        best = retainComparableLeagueBest(best, ranked[0], generation, SELECTION_SEED, SELECTION_PANEL_FINGERPRINT);
         log(
             `gen ${generation}: fitness=${(ranked[0].fitness * 100).toFixed(2)}% ` +
                 `worstLCB=${(ranked[0].worstCase * 100).toFixed(2)}% ` +
@@ -230,18 +277,26 @@ async function main() {
             JSON.stringify(
                 {
                     schemaVersion: LEAGUE_SCHEMA_VERSION,
+                    status: "measurement_only",
                     id: "league-cem-best",
                     weights: best.weights,
                     train: {
                         fitness: best.fitness,
                         worstCaseLowerBound: best.worstCase,
                         softminLowerBound: best.softmin,
-                        generation,
-                        seed: generationSeed,
+                        generationFound: best.foundGeneration,
+                        selectionSeed: best.selectionSeed,
+                        selectionPanelFingerprint: best.selectionPanelFingerprint,
                         gamesPerOpponent: GAMES,
+                        freezePerk: FREEZE_PERK,
                     },
-                    pool: POOL || "default",
-                    aggregate: AGGREGATE,
+                    selectionPanel: SELECTION_PANEL,
+                    poolSnapshot: {
+                        source: POOL_SOURCE || "default",
+                        path: POOL_SNAPSHOT,
+                        fingerprint: POOL_FINGERPRINT,
+                    },
+                    qualification: "Training-panel optimizer output; not a bake or acceptance verdict.",
                 },
                 null,
                 2,
@@ -259,6 +314,7 @@ async function main() {
         join(OUT, "validation.json"),
         JSON.stringify(
             {
+                status: "measurement_only",
                 candidate: {
                     schemaVersion: LEAGUE_SCHEMA_VERSION,
                     id: "league-cem-best",
