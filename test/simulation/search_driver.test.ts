@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getAIStrategy, type IAIStrategy } from "../../src/ai";
+import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -55,6 +55,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_INCLUDE_MOVES",
+    "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
@@ -516,6 +517,54 @@ describe("search driver — gating, hygiene, determinism", () => {
         driver.simAdvance();
 
         expect(h.activeUnit()).toBeDefined();
+    });
+
+    it("SEARCH_OPP_MODEL: an unknown version throws at construction instead of silently no-opping", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_OPP_MODEL: "no-such-version" });
+        const h = buildBattle(321, "v0.6");
+        expect(() => h.makeDriver()).toThrow("Unknown AI version");
+    });
+
+    it("SEARCH_OPP_MODEL: rollouts re-model ONLY the searched unit's enemy; the acting side keeps its true policy", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "6",
+            SEARCH_OPP_MODEL: "v0.4",
+        });
+        const trueTeams: TeamType[] = [];
+        const trueStrategy = getAIStrategy("v0.6");
+        const recordingTrue = {
+            version: "v0.6",
+            decideTurn: (unit: Unit, context: IDecisionContext): GameAction[] => {
+                trueTeams.push(unit.getTeam());
+                return trueStrategy.decideTurn(unit, context);
+            },
+        } as unknown as IAIStrategy;
+        const h = buildBattle(1313, "v0.6", recordingTrue);
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const enemyTeam = unit!.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+
+        const v04 = getAIStrategy("v0.4");
+        const originalDecide = v04.decideTurn.bind(v04);
+        const oppTeams: TeamType[] = [];
+        (v04 as { decideTurn: IAIStrategy["decideTurn"] }).decideTurn = (u, ctx) => {
+            oppTeams.push(u.getTeam());
+            return originalDecide(u, ctx);
+        };
+        try {
+            h.makeDriver().chooseDecision(unit!, "v0.6", h.decideActive());
+        } finally {
+            (v04 as { decideTurn: IAIStrategy["decideTurn"] }).decideTurn = originalDecide;
+        }
+
+        expect(oppTeams.length).toBeGreaterThan(0);
+        expect(oppTeams.every((t) => t === enemyTeam)).toBe(true);
+        expect(trueTeams.length).toBeGreaterThan(0);
+        expect(trueTeams.every((t) => t === unit!.getTeam())).toBe(true);
     });
 
     it("Q2 ablation mode is observational: always returns the incumbent reference", () => {

@@ -12,7 +12,13 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { enumerateCandidates, type IDecisionContext, type IEnumeratedCandidate } from "../ai";
+import {
+    enumerateCandidates,
+    getAIStrategy,
+    type IAIStrategy,
+    type IDecisionContext,
+    type IEnumeratedCandidate,
+} from "../ai";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -65,6 +71,12 @@ import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
  * AUDIT (SEARCH_AUDIT=<jsonl path, or "1" for ./search_audit.jsonl>): one summary line per game with the
  * override/flip counters, per-class distributions and wall-clock cost; SEARCH_AUDIT_TURNS=1 adds one line
  * per searched turn. Lines are buffered per game and appended once (atomic enough across worker threads).
+ *
+ * OPPONENT-MODEL MISMATCH (SEARCH_OPP_MODEL=<version>, experiment-only): inside rollouts, the ENEMY of the
+ * searched unit is simulated with this strategy instead of its true one (the acting side keeps its real
+ * policy, and the LIVE opponent still plays its true policy — only the search's internal model changes).
+ * Quantifies how much of the search gain is perfect-opponent-model knowledge that live opponents won't
+ * grant. Unknown version strings throw at construction — a silently ignored knob would fake the A/B.
  */
 
 const MAX_LAP_HORIZON_TURNS = 64;
@@ -203,6 +215,10 @@ export class SearchDriver {
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly learned: ILearnedValue | null;
+    /** SEARCH_OPP_MODEL — rollouts simulate the searched unit's ENEMY with this strategy (null = true policy). */
+    private readonly oppModel: IAIStrategy | null;
+    /** The enemy team of the rollout in flight (only meaningful while a rollout runs; null otherwise). */
+    private rolloutEnemyTeam: TeamType | null = null;
     private readonly auditPath: string | undefined;
     private readonly auditTurns: boolean;
     private readonly caps: {
@@ -231,6 +247,8 @@ export class SearchDriver {
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
         this.learned = parseLearnedValue(process.env.V07_VALUE_WEIGHTS);
+        const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
+        this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
         this.auditPath =
             !rawAudit || rawAudit === "0"
@@ -294,6 +312,7 @@ export class SearchDriver {
             setDeterministicRandomSource(savedSource);
             this.deps.setActiveUnitId(savedActive);
             this.finishedSim = false;
+            this.rolloutEnemyTeam = null;
         }
     }
     /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows). */
@@ -314,6 +333,7 @@ export class SearchDriver {
             horizon: this.horizon,
             rollouts: this.rollouts,
             leaf: this.learned ? "learned" : "material",
+            ...(this.oppModel ? { oppModel: this.oppModel.version } : {}),
             decisions: c.decisions,
             searched: c.searched,
             overrides: c.overrides,
@@ -526,6 +546,7 @@ export class SearchDriver {
         this.finishedSim = false;
         this.deps.setActiveUnitId(unit.getId());
         const actingTeam = unit.getTeam();
+        this.rolloutEnemyTeam = otherTeam(actingTeam);
         const startLap = this.deps.fightProperties.getCurrentLap();
         const isIncumbent = cand.kind === "incumbent";
 
@@ -623,7 +644,11 @@ export class SearchDriver {
     }
     // ---- simulated turn plumbing (mirrors lookahead.ts / battle_engine's loop, minus recording) ----
     private simPlayTurn(unit: Unit): void {
-        const strat = this.deps.strategyForTeam(unit.getTeam());
+        // SEARCH_OPP_MODEL: the searched side keeps its true self-model; only the enemy is re-modelled.
+        const strat =
+            this.oppModel && unit.getTeam() === this.rolloutEnemyTeam
+                ? this.oppModel
+                : this.deps.strategyForTeam(unit.getTeam());
         const id = unit.getId();
         let decided: GameAction[];
         try {
