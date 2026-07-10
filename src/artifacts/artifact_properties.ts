@@ -37,7 +37,7 @@ export enum Tier1Artifact {
     DUAL_STRIKE_CHARM = 7, // +50% damage on a unit's second attack
     WOUNDING_CHARM = 8, // +1 Deep Wounds stack to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
-    HUNTERS_LONGBOW = 10, // +15% ranged atk / -15% ranged def, or +30% ranged atk if 3+ archers
+    HUNTERS_LONGBOW = 10, // +1 flat ranged atk / -15% ranged def, or +2 flat ranged atk if 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
 }
@@ -114,9 +114,9 @@ export const ARTIFACT_POWER = {
     // Swift Boots is now a PERCENT of base steps (not a flat +1), applied to melee units.
     SWIFT_BOOTS_STEPS: 15,
     WINGED_BOOTS_STEPS: 1,
-    LONGBOW_ATTACK_PERCENT: 15,
+    LONGBOW_ATTACK_FLAT: 1,
     LONGBOW_DEFENSE_PENALTY_PERCENT: 15,
-    LONGBOW_ATTACK_PERCENT_MANY_ARCHERS: 30,
+    LONGBOW_ATTACK_FLAT_MANY_ARCHERS: 2,
     LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS: 30,
     LONGBOW_ARCHER_THRESHOLD: 3,
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
@@ -184,7 +184,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "veteran_helm",
         "Veteran Helm",
         "Veteran Helm",
-        "Boosts the entire army's defense by {}%.",
+        "Boosts the entire army's defense by an additional {}%.",
     ),
     [Tier1Artifact.AMULET_OF_RESOLVE]: t1(
         Tier1Artifact.AMULET_OF_RESOLVE,
@@ -198,28 +198,28 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "keen_blade",
         "Keen Blade",
         "Keen Blade",
-        "Increases the army's attack by {}.",
+        "Increases the army's base attack (both ranged and melee) by {}.",
     ),
     [Tier1Artifact.IRON_PLATE]: t1(
         Tier1Artifact.IRON_PLATE,
         "iron_plate",
         "Iron Plate",
         "Iron Plate",
-        "Increases the army's defense by {}.",
+        "Increases the army's base armor by {}.",
     ),
     [Tier1Artifact.SWIFT_BOOTS]: t1(
         Tier1Artifact.SWIFT_BOOTS,
         "swift_boots",
         "Swift Boots",
         "Swift Boots",
-        "Increases melee units' movement by {}%.",
+        "Increases melee units' movement by {}% of their base steps.",
     ),
     [Tier1Artifact.WINGED_BOOTS]: t1(
         Tier1Artifact.WINGED_BOOTS,
         "winged_boots",
         "Winged Boots",
         "Winged Boots",
-        "Grants +{} movement to flying units.",
+        "Grants +{} base movement distance to all flying units.",
     ),
     [Tier1Artifact.DUAL_STRIKE_CHARM]: t1(
         Tier1Artifact.DUAL_STRIKE_CHARM,
@@ -247,7 +247,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "hunters_longbow",
         "Hunter's Longbow",
         "Hunters Longbow",
-        "Ranged units gain +{}% attack and -[]% defense (or +30% attack and -30% defense with 3+ archers).",
+        "Ranged units gain +{} attack and -[]% defense (or +2 attack and -30% defense with 3+ archers).",
     ),
     [Tier1Artifact.HELM_OF_FOCUS]: t1(
         Tier1Artifact.HELM_OF_FOCUS,
@@ -370,7 +370,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     dual_strike_charm: [AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT],
     wounding_charm: [AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT],
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
-    hunters_longbow: [AP.LONGBOW_ATTACK_PERCENT, AP.LONGBOW_DEFENSE_PENALTY_PERCENT],
+    hunters_longbow: [AP.LONGBOW_ATTACK_FLAT, AP.LONGBOW_DEFENSE_PENALTY_PERCENT],
     helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_PERCENT],

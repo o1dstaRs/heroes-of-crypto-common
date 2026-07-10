@@ -476,17 +476,17 @@ export class UnitsHolder {
                         if ((archersPerTeam.get(team) ?? 0) >= AP.LONGBOW_ARCHER_THRESHOLD) {
                             applyDualArtifact(
                                 "Hunters Longbow",
-                                "Ranged units gain +{}% attack.",
+                                "Ranged units gain +{} attack.",
                                 "Ranged units suffer -{}% defense.",
-                                AP.LONGBOW_ATTACK_PERCENT_MANY_ARCHERS,
+                                AP.LONGBOW_ATTACK_FLAT_MANY_ARCHERS,
                                 AP.LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS,
                             );
                         } else {
                             applyDualArtifact(
                                 "Hunters Longbow",
-                                "Ranged units gain +{}% attack.",
+                                "Ranged units gain +{} attack.",
                                 "Ranged units suffer -{}% defense.",
-                                AP.LONGBOW_ATTACK_PERCENT,
+                                AP.LONGBOW_ATTACK_FLAT,
                                 AP.LONGBOW_DEFENSE_PENALTY_PERCENT,
                             );
                         }
@@ -500,7 +500,11 @@ export class UnitsHolder {
                     break;
                 // Combat-time markers (checked by the relevant hook via unit.getBuff).
                 case Tier1Artifact.DUAL_STRIKE_CHARM:
-                    applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
+                    // Only meaningful on units that actually get a second attack in the fight, so restrict the
+                    // marker buff to units with Double Punch (melee) or Double Shot (ranged).
+                    if (unit.hasAbilityActive("Double Punch") || unit.hasAbilityActive("Double Shot")) {
+                        applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
+                    }
                     break;
                 case Tier1Artifact.WOUNDING_CHARM:
                     // Grant Level-1 Deep Wounds to the whole army (like the Wolf) so EVERY unit inflicts Deep
