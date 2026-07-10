@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getAIStrategy, type IDecisionContext } from "../ai";
+import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../ai";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -367,6 +367,20 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
 
     let currentActiveUnitId = "";
+    const currentEnemiesCellsWithinMovementRange = (): XY[] | undefined => {
+        const activeUnit = currentActiveUnitId ? unitsHolder.getAllUnits().get(currentActiveUnitId) : undefined;
+        if (!activeUnit || activeUnit.isDead()) {
+            return undefined;
+        }
+        return getEnemiesCellsWithinMovementRange(activeUnit, {
+            grid,
+            matrix: grid.getMatrix(),
+            unitsHolder,
+            pathHelper,
+            attackHandler,
+            fightProperties,
+        });
+    };
     const engineContext = {
         fightProperties,
         grid,
@@ -380,6 +394,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // agree on what's legal. Without this the turn engine defaults to "can always range".
         canLandRangeAttack: (unit: Unit) =>
             attackHandler.canLandRangeAttack(unit, grid.getEnemyAggrMatrixByUnitId(unit.getId())),
+        // Castling is enumerated against this exact target set and the action engine re-validates against
+        // the same callback. Keeping one source prevents a candidate that is legal to the AI from being
+        // rejected when it reaches GameActionEngine.
+        getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
         // No known-paths provider: the engine trusts the legal path the AI computed (mirrors the live
         // server, which also omits it). canPlaceUnit restricts placement to each team's zone.
         canPlaceUnit: (unit: Unit, cells: XY[]) => cells.every((c) => zoneHashesFor(unit.getTeam()).has(cellKey(c))),
@@ -702,6 +720,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             attackHandler,
             fightProperties,
+            getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
         };
         const decided0 = strategy.decideTurn(unit, decisionContext);
         if (config.decisionObserver) {
