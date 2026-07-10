@@ -39,6 +39,12 @@ mkdirSync(STATE_DIR, { recursive: true });
 
 const OPT = process.env.OPT_VERSION ?? "v0.5";
 const BASE = process.env.BASE_VERSION ?? "v0.4";
+// LIVETWIN=1 — the committed live-faithful eval preset (src/simulation/livetwin.ts): exp-budget stacks,
+// melee-drafted rosters, SEE_NONE shipped setup. It reaches the spawned tournaments automatically (evalWeights
+// forwards {...process.env}); surfaced here so every CEM run's config is auditable in its log, and because the
+// live L1 stacks (~73-200 bodies vs the table's 50) lengthen games -> the safety-net timeout needs more room.
+const LIVETWIN = process.env.LIVETWIN === "1";
+const PER_GAME_TIMEOUT_MS = LIVETWIN ? 900 : 300;
 const DEFAULT_MEAN = JSON.parse(process.env.CEM_MEAN ?? "[1.0,0.0,1.0,0.0,0.0,1.0]");
 const DIM = Number(process.env.CEM_DIM ?? DEFAULT_MEAN.length);
 const POP = Number(process.env.CEM_POP ?? 16);
@@ -141,7 +147,10 @@ async function evalWeights(weights, seed, games) {
                 // legit-but-slow eval corrupts the search (it returns null -> fitness -1 and a good candidate looks
                 // terrible). p.kill kills the child directly — at PER_CONC=1 the tournament runs games in-process,
                 // so there are no orphans. Override with CEM_EVAL_TIMEOUT_MS for unusual configs.
-                const timeoutMs = Math.max(120_000, Number(process.env.CEM_EVAL_TIMEOUT_MS) || games * 300);
+                const timeoutMs = Math.max(
+                    120_000,
+                    Number(process.env.CEM_EVAL_TIMEOUT_MS) || games * PER_GAME_TIMEOUT_MS,
+                );
                 let done = false;
                 const timer = setTimeout(() => {
                     if (done) return;
@@ -202,13 +211,16 @@ if (!existsSync(LOG)) {
         LOG,
         `# ${OPT} CEM self-play log (reward = decisive win% vs frozen ${BASE})\n\n` +
             `dim=${DIM} pop=${POP} elite=${ELITE} games/cand=${GAMES} panel=[${VAL_SEEDS.join(",")}]x${VAL_GAMES}` +
-            `${HOURS ? ` hours=${HOURS}` : ""}\n\n` +
+            `${HOURS ? ` hours=${HOURS}` : ""} livetwin=${LIVETWIN ? "ON" : "off"}\n\n` +
             `| pass | gen | traj win% | best-cand | panel best% | mean weights |\n|---|---|---|---|---|---|\n`,
     );
 }
 
 let globalMean = DEFAULT_MEAN.slice();
 let globalBest = { panel: -1, weights: globalMean.slice(), pass: 0 };
+if (LIVETWIN) {
+    console.log("[cem] LIVETWIN=1 — live-faithful eval (expBudget stacks, melee drafts, SEE_NONE setup)");
+}
 const basePanel = await panelVal(DEFAULT_MEAN);
 globalBest = { panel: basePanel, weights: DEFAULT_MEAN.slice(), pass: 0 };
 writeFileSync(

@@ -11,7 +11,14 @@
 
 import { scoreCreatureWeighted } from "../ai/setup/creature_score";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { creaturesByLevel, makeRng, type IArmyUnitSpec, type IRosterComposition } from "./army";
+import {
+    creaturesByLevel,
+    makeRng,
+    resolveStackAmount,
+    type IArmyUnitSpec,
+    type IRosterComposition,
+    type StackAmountMode,
+} from "./army";
 
 /**
  * DRAFTED roster construction for self-play draft training. Instead of `buildRoster`'s uniform-random pick,
@@ -27,7 +34,7 @@ export const creatureIdForName = (name: string): number => creatureEnum[name.toU
 const idForName = creatureIdForName;
 
 /** Number of creatures offered per level slot-group (the "reveal" size). Capped by the pool. */
-const DEFAULT_OFFER_K = 6;
+export const DEFAULT_OFFER_K = 6;
 
 /** A seeded partial shuffle: return `k` distinct entries of `arr` (Fisher–Yates prefix). */
 function sample<T>(arr: readonly T[], k: number, rng: () => number): T[] {
@@ -51,6 +58,7 @@ export function draftRoster(
     composition: readonly IRosterComposition[],
     amountByLevel: Readonly<Record<number, number>>,
     offerK: number = DEFAULT_OFFER_K,
+    amountMode: StackAmountMode = "levelTable",
 ): IArmyUnitSpec[] {
     const roster: IArmyUnitSpec[] = [];
     const rng = makeRng(offerSeed);
@@ -71,7 +79,7 @@ export function draftRoster(
                 creatureName: pick.creatureName,
                 level: pick.level,
                 size: pick.size,
-                amount: amountByLevel[level] ?? 1,
+                amount: resolveStackAmount(pick.creatureName, level, amountByLevel, amountMode),
             });
         }
     }

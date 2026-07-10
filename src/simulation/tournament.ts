@@ -22,9 +22,11 @@ import {
     DEFAULT_AMOUNT_BY_LEVEL,
     type IArmyUnitSpec,
     type IRosterComposition,
+    type StackAmountMode,
 } from "./army";
 import { runMatch, type IMatchResult, type ISetupAugment, type ISetupSynergy, type Side } from "./battle_engine";
-import { creatureIdForName, draftRoster } from "./draft";
+import { creatureIdForName, DEFAULT_OFFER_K, draftRoster } from "./draft";
+import { isLiveTwin, LIVETWIN_PRESET, liveTwinMeleeFraction, liveTwinSetup } from "./livetwin";
 
 export interface ITournamentOptions {
     versionA: string;
@@ -36,6 +38,13 @@ export interface ITournamentOptions {
     maxLaps?: number;
     composition?: readonly IRosterComposition[];
     amountByLevel?: Readonly<Record<number, number>>;
+    /**
+     * How stack amounts are sized: 'levelTable' (default — the historical amountByLevel table, byte-identical)
+     * or 'expBudget' (the LIVE server per-creature rule ceil(1000/exp); see army.ts resolveStackAmount).
+     * amountByLevel CANNOT express per-creature amounts, hence a mode + resolver rather than a table.
+     * Unset it defers to the LIVETWIN preset (env LIVETWIN=1 -> 'expBudget'), else 'levelTable'.
+     */
+    amountMode?: StackAmountMode;
     /**
      * Off by default → both teams field the SAME roster (mirror match; isolates AI skill from luck).
      * On → each team gets its OWN randomly-picked roster (same composition/stack sizes, likely different
@@ -159,7 +168,9 @@ const rangedFracOf = (r: readonly IArmyUnitSpec[]): number =>
  * augment time), so a CEM run learns an OWN-COMPOSITION-only policy that is actually realizable in ranked
  * (the full 20-dim champion's enemy-counter-pick edge needs paid vision the setupCA verdict rejected). */
 const augCAFeats = (own: readonly IArmyUnitSpec[], enemy: readonly IArmyUnitSpec[]): number[] => {
-    const noVision = process.env.AUGCA_NOVISION === "1";
+    // LIVETWIN implies no enemy vision (the live SEE_NONE reality) — the free-vision trap is exactly what
+    // turned augCA's +1.6pp sim "win" into a −1.3pp ranked regression.
+    const noVision = process.env.AUGCA_NOVISION === "1" || (isLiveTwin() && LIVETWIN_PRESET.noVision);
     const eR = noVision ? 0 : rangedFracOf(enemy);
     const eM = noVision ? 0 : 1 - rangedFracOf(enemy);
     return [rangedFracOf(own), own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4, eR, eM, 1];
@@ -341,6 +352,9 @@ const emptyStats = (version: string): IVersionStats => ({ version, wins: 0, wins
 export function playGame(options: ITournamentOptions, game: number): IGameRecord {
     const composition = options.composition ?? DEFAULT_ROSTER_COMPOSITION;
     const amountByLevel = options.amountByLevel ?? DEFAULT_AMOUNT_BY_LEVEL;
+    const liveTwin = isLiveTwin();
+    // Stack sizing: explicit option wins; else the LIVETWIN preset's live exp-budget rule; else the table.
+    const amountMode: StackAmountMode = options.amountMode ?? (liveTwin ? LIVETWIN_PRESET.amountMode : "levelTable");
 
     const pairIndex = Math.floor(game / 2);
     const seed = (options.baseSeed + pairIndex * 0x9e3779b1) >>> 0;
@@ -350,10 +364,10 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     // Synergy A/B fields a faction-stacked army (so the faction's synergy is actually active) — build both
     // rosters filtered to that faction; otherwise the normal (all-faction) pool.
     const factionFilter = options.synergyFaction ? FACTION_NAME[options.synergyFaction] : undefined;
-    let roster = buildRoster(makeRng(seed), composition, amountByLevel, factionFilter);
+    let roster = buildRoster(makeRng(seed), composition, amountByLevel, factionFilter, amountMode);
     let redRoster =
         options.randomizePicks && !factionFilter
-            ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel)
+            ? buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, undefined, amountMode)
             : undefined;
 
     // FIGHT-ON-DEPLOYMENT-DISTRIBUTION mode (env FIGHT_MELEE_ROSTERS=1): both sides field the MELEE-drafted
@@ -361,7 +375,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     // The fight champion was trained on random rosters; this lets a fight CEM (cem.mjs OPT=v0.6 vs BASE) retrain
     // it on the distribution we truly deploy. Decorrelated per-side offer seeds → two distinct melee armies (like
     // randomizePicks but drafted). Only active with the flag; default tournaments are untouched.
-    const meleeFrac = Number(process.env.FIGHT_MELEE_ROSTERS);
+    const meleeFrac = liveTwinMeleeFraction(); // explicit FIGHT_MELEE_ROSTERS wins; LIVETWIN=1 defaults it to 1
     if (meleeFrac > 0 && !factionFilter) {
         // Fraction of games (deterministic per pair) that field melee-drafted armies; the rest keep the
         // random/mirrored rosters above. =1 → ALL melee, which overfits a melee-specialist that regresses ~4.6pp
@@ -369,8 +383,15 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         // compositions live play actually faces, so a CEM can only bake a gain that survives on BOTH.
         const useMelee = meleeFrac >= 1 || makeRng((seed ^ 0x1b873593) >>> 0)() < meleeFrac;
         if (useMelee) {
-            roster = draftRoster(DEFAULT_DRAFT_W, seed, composition, amountByLevel);
-            redRoster = draftRoster(DEFAULT_DRAFT_W, (seed ^ 0x85ebca6b) >>> 0, composition, amountByLevel);
+            roster = draftRoster(DEFAULT_DRAFT_W, seed, composition, amountByLevel, DEFAULT_OFFER_K, amountMode);
+            redRoster = draftRoster(
+                DEFAULT_DRAFT_W,
+                (seed ^ 0x85ebca6b) >>> 0,
+                composition,
+                amountByLevel,
+                DEFAULT_OFFER_K,
+                amountMode,
+            );
         }
     }
 
@@ -463,8 +484,8 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         greenIsWeighted = game % 2 === 0;
         const greenW = greenIsWeighted ? CEM_DRAFT_WEIGHTED_W : CEM_DRAFT_FROZEN_W;
         const redW = greenIsWeighted ? CEM_DRAFT_FROZEN_W : CEM_DRAFT_WEIGHTED_W;
-        roster = draftRoster(greenW, seed, composition, amountByLevel);
-        redRoster = draftRoster(redW, seed, composition, amountByLevel);
+        roster = draftRoster(greenW, seed, composition, amountByLevel, DEFAULT_OFFER_K, amountMode);
+        redRoster = draftRoster(redW, seed, composition, amountByLevel, DEFAULT_OFFER_K, amountMode);
         // UNIT-SPLITTING (CEM_DRAFT_SPLIT=1): model extra placement slots (Placement augment / Nature synergy) by
         // splitting a RANGED-heavy army's stacks into more, smaller stacks — more shooters landing shots before
         // melee contact. Small stacks (< 4) aren't split. Tests whether splitting is the lever that saves ranged.
@@ -544,7 +565,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     if (options.cemAugCA) {
         // Both sides field their OWN random roster (opponent comp varies); weighted side picks augments via the
         // composition+opponent-aware policy, frozen side via the blind heuristic; swap which is weighted per pair.
-        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel);
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, undefined, amountMode);
         greenIsWeighted = game % 2 === 0;
         const budget = getUpgradePoints(Perk.SEE_NONE);
         greenPerk = Perk.SEE_NONE;
@@ -558,7 +579,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     }
     if (options.cemSetupCA) {
         // Vision-gated joint perk+augment CA vs the blind heuristic; each side its own random roster, swap per pair.
-        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel);
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, undefined, amountMode);
         greenIsWeighted = game % 2 === 0;
         const frozen = () => {
             const p = CEM_FROZEN.pickPerk();
@@ -578,8 +599,8 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         // same faction; weighted picks situationally, frozen via the fixed table; swap per pair.
         const synFacNames = ["chaos", "might", "nature", "life"];
         const synFac = synFacNames[Math.floor(makeRng((seed ^ 0x51ed270b) >>> 0)() * synFacNames.length)];
-        roster = buildRoster(makeRng(seed), composition, amountByLevel, synFac);
-        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, synFac);
+        roster = buildRoster(makeRng(seed), composition, amountByLevel, synFac, amountMode);
+        redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, synFac, amountMode);
         greenIsWeighted = game % 2 === 0;
         const gIds = roster.map((u) => creatureIdForName(u.creatureName));
         const rIds = redRoster.map((u) => creatureIdForName(u.creatureName));
@@ -604,6 +625,23 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         greenAugments = g.augments;
         redPerk = r.perk;
         redAugments = r.augments;
+    }
+
+    // LIVETWIN: any side whose setup no mode above chose fields the SHIPPED live setup — perk SEE_NONE + the
+    // blind Armor3/Might3/Sniper1 spend — exactly what ranked deploys for every AI army (default sim games
+    // field NO perk/augments at all, another sim-vs-live gap). Applied identically to both sides, so it never
+    // biases the A-vs-B comparison; cem*/A-B modes that set a side's perk or augments keep their experiment.
+    if (liveTwin) {
+        if (greenPerk === undefined && greenAugments === undefined) {
+            const setup = liveTwinSetup();
+            greenPerk = setup.perk;
+            greenAugments = setup.augments;
+        }
+        if (redPerk === undefined && redAugments === undefined) {
+            const setup = liveTwinSetup();
+            redPerk = setup.perk;
+            redAugments = setup.augments;
+        }
     }
 
     const result = runMatch({

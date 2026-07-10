@@ -45,6 +45,59 @@ export const DEFAULT_ROSTER_COMPOSITION: readonly IRosterComposition[] = [
 /** Default stack sizes per level (same for both teams, so they never bias the comparison). */
 export const DEFAULT_AMOUNT_BY_LEVEL: Readonly<Record<number, number>> = { 1: 50, 2: 30, 3: 15, 4: 8 };
 
+/** LIVE-server stack sizing: every stack is worth ~this much creature experience (server play_session.ts
+ * STACK_EXPERIENCE_BUDGET). A stack's amount is ceil(budget / creature exp), so cheap L1 creatures field
+ * ~73-200 bodies while an L4 fields 1-3 — very different from the sim's historical {50,30,15,8} table. */
+export const STACK_EXPERIENCE_BUDGET = 1000;
+
+/**
+ * How roster stack AMOUNTS are sized:
+ *  - 'levelTable' (default): the historical per-level table (DEFAULT_AMOUNT_BY_LEVEL / options.amountByLevel).
+ *    Byte-identical to every run before this mode existed.
+ *  - 'expBudget': the LIVE server rule — per-CREATURE ceil(STACK_EXPERIENCE_BUDGET / exp) (a port of the
+ *    server's creature_lookup.ts amountForCreatureExperienceBudget). A level table CANNOT express this
+ *    (creatures of one level differ, e.g. Centaur 73 vs Peasant 200), hence a per-creature resolver.
+ */
+export type StackAmountMode = "levelTable" | "expBudget";
+
+/** creatures.json `exp` for an enabled creature (by display name), else undefined. */
+export function getCreatureExperience(creatureName: string): number | undefined {
+    const entry = getCatalog().find((e) => e.creatureName === creatureName);
+    const exp = entry?.exp;
+    return typeof exp === "number" && exp > 0 ? exp : undefined;
+}
+
+/**
+ * Port of the server's `amountForCreatureExperienceBudget` (creature_lookup.ts), keyed by creature name
+ * (the sim's roster key) instead of enum id: how many creatures fit the experience budget, at least 1.
+ * Unknown creature / invalid budget -> fallbackAmount, exactly like the server.
+ */
+export function amountForCreatureExperienceBudget(
+    creatureName: string,
+    experienceBudget: number,
+    fallbackAmount: number,
+): number {
+    const exp = getCreatureExperience(creatureName);
+    if (!exp || !Number.isFinite(experienceBudget) || experienceBudget <= 0) {
+        return fallbackAmount;
+    }
+    return Math.max(1, Math.ceil(experienceBudget / exp));
+}
+
+/** Resolve one stack's amount under the given mode (expBudget falls back to the level table if exp is missing). */
+export function resolveStackAmount(
+    creatureName: string,
+    level: number,
+    amountByLevel: Readonly<Record<number, number>>,
+    amountMode: StackAmountMode,
+): number {
+    const tableAmount = amountByLevel[level] ?? 1;
+    if (amountMode === "expBudget") {
+        return amountForCreatureExperienceBudget(creatureName, STACK_EXPERIENCE_BUDGET, tableAmount);
+    }
+    return tableAmount;
+}
+
 /** Deterministic PRNG (mulberry32) so a recorded seed reproduces a roster exactly. */
 export function makeRng(seed: number): () => number {
     let state = seed >>> 0;
@@ -64,6 +117,8 @@ interface ICatalogEntry {
     size: number;
     /** creatures.json attack_type — "MELEE" | "RANGE" | "MELEE_MAGIC" | "MAGIC". */
     attackType: string;
+    /** creatures.json exp — the creature's experience cost (drives the live exp-budget stack sizing). */
+    exp?: number;
 }
 
 let catalogCache: ICatalogEntry[] | undefined;
@@ -87,7 +142,7 @@ function getCatalog(): ICatalogEntry[] {
     }
     const json = CREATURES_JSON as unknown as Record<
         string,
-        Record<string, { level?: number; size?: number; attack_type?: string }>
+        Record<string, { level?: number; size?: number; attack_type?: string; exp?: number }>
     >;
     const entries: ICatalogEntry[] = [];
     for (const faction of Object.keys(json)) {
@@ -109,6 +164,7 @@ function getCatalog(): ICatalogEntry[] {
                     level: cfg.level,
                     size: cfg.size,
                     attackType: cfg.attack_type ?? "MELEE",
+                    exp: typeof cfg.exp === "number" && cfg.exp > 0 ? cfg.exp : undefined,
                 });
             }
         }
@@ -176,6 +232,7 @@ export function buildRoster(
     composition: readonly IRosterComposition[] = DEFAULT_ROSTER_COMPOSITION,
     amountByLevel: Readonly<Record<number, number>> = DEFAULT_AMOUNT_BY_LEVEL,
     factionFilter?: string,
+    amountMode: StackAmountMode = "levelTable",
 ): IArmyUnitSpec[] {
     const forced = forcedByLevel();
     const buildOnce = (): { roster: IArmyUnitSpec[]; ranged: number } => {
@@ -202,7 +259,7 @@ export function buildRoster(
                     creatureName: pick.creatureName,
                     level: pick.level,
                     size: pick.size,
-                    amount: amountByLevel[level] ?? 1,
+                    amount: resolveStackAmount(pick.creatureName, level, amountByLevel, amountMode),
                 });
             }
         }

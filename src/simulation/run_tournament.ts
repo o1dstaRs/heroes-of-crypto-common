@@ -40,6 +40,14 @@ async function main(): Promise<void> {
     const flags = argv.filter((a) => a.startsWith("--"));
     const [versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
     const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
+    // --livetwin (or env LIVETWIN=1): the committed live-faithful eval preset — exp-budget stacks
+    // (ceil(1000/exp) per creature), melee-drafted rosters (FIGHT_MELEE_ROSTERS default 1), SEE_NONE shipped
+    // setup on both sides, paired side-swap seeds (the tournament default). Set BEFORE workers spawn so the
+    // env is inherited by every worker thread. See src/simulation/livetwin.ts.
+    if (flags.includes("--livetwin")) {
+        process.env.LIVETWIN = "1";
+    }
+    const liveTwin = process.env.LIVETWIN === "1";
     // --maps                -> sample all four layouts; --maps=lava,water,normal -> just those.
     const MAP_BY_NAME: Record<string, number> = { normal: 1, water: 2, lava: 3, block: 4 };
     const mapsFlag = flags.find((f) => f === "--maps" || f.startsWith("--maps="));
@@ -50,7 +58,7 @@ async function main(): Promise<void> {
         : undefined;
     if (!versionA || !versionB) {
         console.error(
-            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]]",
+            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]] [--livetwin]",
         );
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
@@ -83,7 +91,8 @@ async function main(): Promise<void> {
 
     console.log(
         `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}, ` +
-            `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}, maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}) -> ${jsonlPath}`,
+            `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}, maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}, ` +
+            `LIVETWIN ${liveTwin ? "ON [expBudget stacks + melee drafts + SEE_NONE setup]" : "off"}) -> ${jsonlPath}`,
     );
     const summary = await runTournamentConcurrent(
         { versionA, versionB, games, baseSeed, randomizePicks, mapTypes },
