@@ -29,6 +29,7 @@ import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import type { ILookaheadDeps } from "./lookahead";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
+import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 
 /**
@@ -44,9 +45,10 @@ import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
  * SCORING: each candidate is played through the REAL engine on the live battle state (battle_snapshot
  * save/restore around every rollout), then the game rolls forward — both sides playing their real
  * policies — to a fixed horizon of SEARCH_HORIZON unit-turns (default 12, roughly one lap). The leaf is
- * the LEARNED VALUE function (fit_value.mjs logistic weights over value_features.ts, via
- * V07_VALUE_WEIGHTS={b,w:[...]}) expressed as P(win) for the acting team; without weights it falls back
- * to a normalized-material probability. Each candidate is scored by SEARCH_ROLLOUTS (default 3)
+ * the LEARNED VALUE function (fit_value.mjs logistic weights over value_features.ts; the committed
+ * LiveTwin fit is the default, V07_VALUE_WEIGHTS={b,w:[...]} overrides it, and `material` selects the
+ * normalized-material fallback) expressed as P(win) for the acting team. Each candidate is scored by
+ * SEARCH_ROLLOUTS (default 3)
  * PAIRED-SEED rollouts: rollout r uses the same private RNG seed for every candidate, so candidates are
  * compared on identical luck and the tournament's seeded stream is never advanced (same RNG hygiene as
  * lookahead.ts — source swapped around the whole search and restored in `finally`).
@@ -290,7 +292,13 @@ export class SearchDriver {
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
-        this.learned = parseLearnedValue(process.env.V07_VALUE_WEIGHTS);
+        const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
+        this.learned =
+            rawValueWeights === "material"
+                ? null
+                : rawValueWeights
+                  ? parseLearnedValue(rawValueWeights)
+                  : { b: DEFAULT_V07_VALUE_WEIGHTS.b, w: [...DEFAULT_V07_VALUE_WEIGHTS.w] };
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;

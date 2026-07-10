@@ -44,6 +44,7 @@ import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulati
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { SearchDriver } from "../../src/simulation/search_driver";
+import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { Unit } from "../../src/units/unit";
 import { UnitsHolder } from "../../src/units/units_holder";
 import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
@@ -359,6 +360,18 @@ function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrate
 }
 
 describe("search driver — gating, hygiene, determinism", () => {
+    it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
+        const learned = buildBattle(91, "v0.6").makeDriver() as unknown as {
+            learned: { b: number; w: number[] } | null;
+        };
+        expect(learned.learned).toEqual(DEFAULT_V07_VALUE_WEIGHTS);
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", V07_VALUE_WEIGHTS: "material" });
+        const material = buildBattle(92, "v0.6").makeDriver() as unknown as { learned: unknown };
+        expect(material.learned).toBeNull();
+    });
+
     it("is OFF by default: chooseDecision returns the incumbent reference untouched", () => {
         setEnv({});
         const h = buildBattle(101, "v0.6");
