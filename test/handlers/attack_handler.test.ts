@@ -698,6 +698,25 @@ describe("AttackHandler", () => {
             expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN);
         });
 
+        it("small melee unit strikes the left mountain from a DIAGONAL corner cell", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            // (4,6) is diagonally (Chebyshev 1) adjacent to left mountain cell (5,7) — a legal corner strike.
+            placeUnit(grid, unitsHolder, attacker, { x: 4, y: 6 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell({ x: 5, y: 7 }),
+                unitsHolder,
+                moveHandler,
+                attacker,
+                { x: 4, y: 6 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+            expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+        });
+
         it("does not land a melee strike from a non-adjacent cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
