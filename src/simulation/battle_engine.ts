@@ -10,6 +10,7 @@
  */
 
 import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../ai";
+import { clearAITargetMemory, recordAITargetMemory } from "../ai/ai";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -301,6 +302,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     FightStateManager.getInstance().reset();
     const grid = new Grid(gridSettings, config.gridType ?? PBTypes.GridVals.NORMAL);
     const unitsHolder = new UnitsHolder(grid);
+    clearAITargetMemory(unitsHolder);
     const sceneLog = new SceneLogMock();
     const damageStatisticHolder = new DamageStatHolder();
     const attackHandler = new AttackHandler(gridSettings, grid, sceneLog, damageStatisticHolder);
@@ -734,11 +736,20 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
-        const decided = search.appliesTo(strategy.version)
+        const searchApplies = search.appliesTo(strategy.version);
+        const decided = searchApplies
             ? search.chooseDecision(unit, strategy.version, decided0)
             : lookahead.enabled && strategy.version === "v0.5"
               ? lookahead.chooseDecision(unit, decided0)
               : decided0;
+        if (searchApplies && decided !== decided0) {
+            const executedAttack = [...decided]
+                .reverse()
+                .find((action) => action.type === "melee_attack" || action.type === "range_attack");
+            if (executedAttack && (executedAttack.type === "melee_attack" || executedAttack.type === "range_attack")) {
+                recordAITargetMemory(unitsHolder, actingUnitId, executedAttack.targetId);
+            }
+        }
 
         let didSomething = false;
         // Skip-audit bookkeeping (only meaningful when SKIP_AUDIT.enabled): what actually landed this turn,

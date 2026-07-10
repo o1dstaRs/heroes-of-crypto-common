@@ -85,6 +85,14 @@ export function restoreAITargetMemory(unitsHolder: UnitsHolder, snapshot: Readon
     }
 }
 
+export function recordAITargetMemory(unitsHolder: UnitsHolder, unitId: string, targetId: string): void {
+    previousTargetsFor(unitsHolder).set(unitId, targetId);
+}
+
+export function clearAITargetMemory(unitsHolder: UnitsHolder): void {
+    previousTargetsByBattle.delete(unitsHolder);
+}
+
 export enum AIActionType {
     MELEE_ATTACK,
     RANGE_ATTACK,
