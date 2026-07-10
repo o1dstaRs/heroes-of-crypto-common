@@ -14,12 +14,21 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
-import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { auraRelevanceWeight, setPreferAttackOverMining } from "../ai";
+import { GRID_SIZE } from "../../grid/grid_constants";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+const MELEE = PBTypes.AttackVals.MELEE;
+
+// Adjacent-SPLASH ranged AOE: a shot deals % damage to every unit ADJACENT to the target cell, so a
+// clustered deployment eats one blast across several stacks. Dispersing our army against these is a
+// measured win (150k A/B: Gargantuan/Area Throw +5.58pp, Tsar Cannon/Large Caliber +0.47pp for the
+// dispersing side). Deliberately NOT dispersing vs Fire Breath (a LINE — spreading doesn't dodge it and
+// the lost cohesion cost -3.08pp) or Chain Lightning (bounce — neutral). So the trigger is splash-only.
+const AOE_PLACEMENT_ABILITIES = ["Area Throw", "Large Caliber"];
 
 /**
  * v0.6's OWN fight-weight vector, kept SEPARATE from v0.5's so v0.6 can be trained further while v0.5 stays
@@ -204,6 +213,115 @@ export class StrategyV0_6 extends StrategyV0_5 {
             },
         ];
     }
+    /**
+     * Enemy-AOE-aware deployment. If the opponent fields an adjacent-SPLASH shooter (Area Throw / Large
+     * Caliber — Gargantuan, Tsar Cannon), spread our stacks so one blast can't catch several — otherwise
+     * keep v0.5's formation. Placement is otherwise enemy-BLIND, so this is the first time deployment
+     * reacts to who it's facing. Splash-only by design: a 150k A/B showed dispersion HELPS vs splash
+     * (+5.58pp Gargantuan) but HURTS vs Fire Breath's line (-3.08pp, cohesion loss). Gated per-team by
+     * V06_DISPERSE_TEAM for A/B; unset = production default (disperse whenever the enemy has splash AOE).
+     * v0.5 is untouched.
+     */
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        const gate = process.env.V06_DISPERSE_TEAM;
+        const teamName = context.team === PBTypes.TeamVals.LOWER ? "lower" : "upper";
+        const gateOn = gate ? gate === "both" || gate === teamName : true;
+        if (gateOn && this.enemyHasAoe(context)) {
+            return placeArmyDispersed(units, context);
+        }
+        return super.placeArmy(units, context);
+    }
+    private enemyHasAoe(context: IPlacementContext): boolean {
+        return context.unitsHolder
+            .getAllEnemyUnits(context.team)
+            .some((u) => !u.isDead() && AOE_PLACEMENT_ABILITIES.some((ab) => u.hasAbilityActive(ab)));
+    }
+}
+
+/**
+ * v0.5's formation (ranged deep, melee front wall, flyer wing, support back) but each stack is placed on a
+ * cell with NO already-placed ally in its 8-neighbourhood — a 1-cell gap that breaks the adjacency an AOE
+ * blast needs to chain across stacks. Falls back to the tightest free cell when the zone is too small to
+ * keep gaps. Mirrors StrategyV0_3.placeArmy; only the placeBy adds the anti-cluster pass.
+ */
+function placeArmyDispersed(units: Unit[], context: IPlacementContext): Map<string, XY> {
+    const placements = new Map<string, XY>();
+    const occupied = new Set<number>();
+    const legal = context.placement.possibleCellHashes();
+    const baseCells = [...legal].map((h) => ({ x: h >> 4, y: h & 0xf }));
+    if (!baseCells.length) {
+        return placements;
+    }
+    const key = (c: XY): number => (c.x << 4) | c.y;
+    const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
+    const xs = baseCells.map((c) => c.x);
+    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const edgeness = (c: XY): number => Math.abs(c.x - centreX);
+    const footprintFor = (u: Unit, base: XY): XY[] =>
+        u.isSmallSize()
+            ? [base]
+            : [
+                  { x: base.x, y: base.y },
+                  { x: base.x - 1, y: base.y },
+                  { x: base.x, y: base.y - 1 },
+                  { x: base.x - 1, y: base.y - 1 },
+              ];
+    const footprintFree = (fp: XY[]): boolean => fp.every((c) => legal.has(key(c)) && !occupied.has(key(c)));
+    const clusters = (fp: XY[]): boolean => {
+        for (const c of fp) {
+            for (let dx = -1; dx <= 1; dx += 1) {
+                for (let dy = -1; dy <= 1; dy += 1) {
+                    if ((dx || dy) && occupied.has(key({ x: c.x + dx, y: c.y + dy }))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+    const commit = (u: Unit, base: XY, fp: XY[]): void => {
+        for (const c of fp) {
+            occupied.add(key(c));
+        }
+        placements.set(u.getId(), { x: base.x, y: base.y });
+    };
+    const placeBy = (u: Unit, compare: (a: XY, b: XY) => number): void => {
+        const sorted = [...baseCells].sort(compare);
+        for (const base of sorted) {
+            const fp = footprintFor(u, base);
+            if (footprintFree(fp) && !clusters(fp)) {
+                commit(u, base, fp);
+                return;
+            }
+        }
+        for (const base of sorted) {
+            const fp = footprintFor(u, base);
+            if (footprintFree(fp)) {
+                commit(u, base, fp);
+                return;
+            }
+        }
+    };
+    const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
+    const isRange = (u: Unit): boolean => u.getAttackType() === RANGE;
+    const isMeleeU = (u: Unit): boolean => u.getAttackType() === MELEE;
+    const ranged = units.filter(isRange).sort(bySizeLargeFirst);
+    const melee = units.filter(isMeleeU).sort(bySizeLargeFirst);
+    const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(bySizeLargeFirst);
+    for (const u of ranged) {
+        placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a));
+    }
+    const isFlyer = (u: Unit): boolean => u.canFly();
+    for (const u of melee.filter((u) => !isFlyer(u))) {
+        placeBy(u, (a, b) => frontness(b) - frontness(a) || edgeness(a) - edgeness(b));
+    }
+    for (const u of melee.filter(isFlyer)) {
+        placeBy(u, (a, b) => frontness(b) - frontness(a) || a.x - b.x);
+    }
+    for (const u of support) {
+        placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(a) - edgeness(b));
+    }
+    return placements;
 }
 
 export const STRATEGY_V0_6: IAIStrategy = new StrategyV0_6();
