@@ -47,25 +47,28 @@ import { creatureIdForName } from "./draft";
 import { LIVETWIN_PRESET } from "./livetwin";
 
 /**
- * B1 FINAL DISPOSITION — the pick_sim oracle re-check the Wave-2 KILL left open.
+ * B1 pick_sim oracle re-check of the question left open by the Wave-2 KILL.
  *
  * The Wave-2 archetype matrix (measure_archetypes.ts) killed B1 under a shared-offer PROXY draft. This
  * harness replays the question under the REAL pick structure (picks/pick_sim.ts): auto-bans 5/5/3/3,
  * two-bundle choice [L1,L2,T1], snake pick order, the shared exclusive creature pool with hidden-pick
- * collision reveals, and the 3-of-12 Tier-2 artifact pick. A full-information ORACLE picker (sees every
- * opponent pick so far, exactly what the real phase's reveal machinery would eventually expose) best-responds
- * each decision using the Wave-2 payoff-matrix priors + greedy roster-fit scoring, and plays against the
- * CURRENT policy: the live untrained heuristic (SETUP_POLICY_V0 / scoreCreature) and the DEFAULT_DRAFT_W
- * melee champion. Resulting armies fight under LIVETWIN with the frozen v0.6 vector on both sides.
+ * collision reveals, and the 3-of-12 Tier-2 artifact pick. A deliberately advantaged ORACLE picker sees every
+ * opponent pick immediately and removes already-taken creatures through the omniscient legal-choice API. That
+ * is strictly more information than live collision reveals provide. It best-responds using the Wave-2
+ * payoff-matrix priors + greedy roster-fit scoring and plays against the CURRENT policy: the live untrained
+ * heuristic (SETUP_POLICY_V0 / scoreCreature) and the DEFAULT_DRAFT_W melee champion. Resulting armies fight
+ * under LIVETWIN with the frozen v0.6 vector on both sides.
  *
  * REGISTERED GATE (same +3pp bar as the Wave-2 B1 kill test): oracle decisive win rate vs the melee champion
- * baseline gains < +3pp over the 50% mirror -> B1 is DEAD for good (counter-draft has no cashable value even
- * under the real pick structure vs the frozen fight AI). >= +3pp -> B1 REOPENS with pick_sim as the training
- * environment.
+ * baseline gains < +3pp over the 50% mirror -> B1 is DEAD by the registered oracle criterion. >= +3pp -> B1
+ * REOPENS with pick_sim as the training environment. Runs below the registered sample floor are INCONCLUSIVE
+ * regardless of their point estimate.
  *
  * Also reported: how often collisions / collision reveals actually occur (the roadmap froze the vision-gated
- * perk head pending this number), and an informed-vs-blind oracle ablation isolating the counter-pick
- * component of any gain from generic draft-quality.
+ * perk head pending this number), and an informed-vs-blind ablation. That difference is an upper-bound proxy
+ * for information value, not an isolated live counter-pick effect: it includes the informed oracle's
+ * omniscient collision avoidance. Its uncertainty conservatively treats each same-seed two-game re-draft pair
+ * as one cluster.
  */
 
 export type Role = "melee" | "ranged" | "flyer";
@@ -277,11 +280,12 @@ const emptyTeamPickStats = (): ITeamPickStats => ({
 });
 
 /**
- * Drive one complete live-faithful pick through pick_sim. Snake order and phase gating come from the sim
- * itself; in the two simultaneous phases (perk+bundle, T2) the non-oracle side commits first, which hands the
- * full-information oracle its maximal (most favorable) information edge. Baselines pick greedily from their
- * VISIBLE choices and re-pick on collision — outcome-identical to the live daemon's omniscient-pool argmax
- * (pick_decider.ts) while exercising the collision/reveal machinery this measurement must report on.
+ * Drive one complete pick through pick_sim. Snake order and phase gating come from the sim itself; in the two
+ * simultaneous phases (perk+bundle, T2) the non-oracle side commits first, which hands the full-information
+ * oracle its maximal (most favorable) information edge. The oracle also chooses from omniscient legal choices,
+ * avoiding collisions before live reveal machinery would permit that knowledge. Baselines pick greedily from
+ * their VISIBLE choices and re-pick on collision — outcome-identical to the live daemon's omniscient-pool
+ * argmax (pick_decider.ts) while exercising the collision/reveal machinery this measurement reports on.
  */
 export function runPickPhase(
     seed: number,
@@ -577,9 +581,11 @@ const mergeOverrides = (
 };
 
 /**
- * Play one independently addressable game: full pick phase + LIVETWIN fight. Games 2k/2k+1 share the pick
- * seed (same bundles/bans/offers) and combat seed with slot A moved between the LOWER and UPPER seats, so
- * seat-structural luck (bundle quality, snake position, green/red) cancels within a pair.
+ * Play one independently addressable game: full pick phase + LIVETWIN fight. Games 2k/2k+1 share the offer
+ * board RNG and combat seed, with slot A assigned to opposite LOWER/UPPER pick seats. Both policies re-draft in
+ * the second game, so this is not a fixed-army battle side swap and pick-seat luck need not cancel exactly.
+ * The shared seed makes the two games a statistical cluster, which the reported conservative uncertainty
+ * accounts for.
  */
 export function playPickSimGame(
     cell: IPickSimCell,
@@ -772,6 +778,10 @@ export const PICKSIM_GATE = {
     headlineCell: "oracle__vs__champion",
 } as const;
 
+/** Same-seed pairs contain two re-drafted games; the conservative variance bound treats them as one cluster. */
+export const PICKSIM_PAIR_CLUSTER_SIZE = 2;
+const NORMAL_95_Z = 1.959963984540054;
+
 export interface IPickSimGateVerdict {
     thresholds: typeof PICKSIM_GATE;
     oracleWinRate: number;
@@ -779,7 +789,7 @@ export interface IPickSimGateVerdict {
     oracleGames: number;
     oracleGainPp: number;
     adequatelyPowered: boolean;
-    verdict: "REOPEN" | "DEAD";
+    verdict: "REOPEN" | "DEAD" | "INCONCLUSIVE";
     reason: string;
 }
 
@@ -789,6 +799,7 @@ export function evaluatePickSimGate(input: {
     oracleGames: number;
 }): IPickSimGateVerdict {
     const oracleGainPp = (input.oracleWinRate - 0.5) * 100;
+    const adequatelyPowered = input.oracleGames >= PICKSIM_GATE.minGames;
     const reopen = oracleGainPp >= PICKSIM_GATE.oracleGainThresholdPp;
     return {
         thresholds: PICKSIM_GATE,
@@ -796,14 +807,71 @@ export function evaluatePickSimGate(input: {
         oracleDecisive: input.oracleDecisive,
         oracleGames: input.oracleGames,
         oracleGainPp,
-        adequatelyPowered: input.oracleGames >= PICKSIM_GATE.minGames,
-        verdict: reopen ? "REOPEN" : "DEAD",
-        reason: reopen
-            ? `The full-information oracle gains +${oracleGainPp.toFixed(2)}pp (>= +3pp) over the melee champion ` +
-              `under the real pick structure — B1 reopens with pick_sim as the training environment.`
-            : `The full-information oracle gains only ${oracleGainPp >= 0 ? "+" : ""}${oracleGainPp.toFixed(2)}pp ` +
-              `(< +3pp) vs the melee champion under the real pick structure — counter-draft is dead for good ` +
-              `vs the frozen fight AI.`,
+        adequatelyPowered,
+        verdict: adequatelyPowered ? (reopen ? "REOPEN" : "DEAD") : "INCONCLUSIVE",
+        reason: !adequatelyPowered
+            ? `Only ${input.oracleGames} games were run (< ${PICKSIM_GATE.minGames} registered minimum); ` +
+              `the ${oracleGainPp >= 0 ? "+" : ""}${oracleGainPp.toFixed(2)}pp point estimate cannot decide ` +
+              `the B1 gate.`
+            : reopen
+              ? `The advantaged oracle gains +${oracleGainPp.toFixed(2)}pp (>= +3pp) over the melee champion ` +
+                `under pick_sim — B1 draft optimization reopens, without attributing the gain to information.`
+              : `The advantaged oracle gains only ${oracleGainPp >= 0 ? "+" : ""}${oracleGainPp.toFixed(2)}pp ` +
+                `(< +3pp) vs the melee champion under pick_sim — B1 is dead by the registered oracle criterion ` +
+                `against the frozen fight AI.`,
+    };
+}
+
+export interface IInformationUpperBoundEstimate {
+    interpretation: "upper_bound_proxy_including_omniscient_collision_avoidance";
+    uncertaintyMethod: "independent_cells_max_design_effect_two_game_seed_clusters";
+    /** Informed minus blind point estimate; includes omniscient collision avoidance. */
+    valuePp: number;
+    /** Standard error if games were independent, retained only for diagnostic comparison. */
+    independentGameSePp: number;
+    /** Maximum-design-effect standard error for same-seed clusters of two games. */
+    conservativeClusterSePp: number;
+    /** One-sided interpretation uses the upper endpoint of a two-sided normal 95% interval. */
+    upper95Pp: number;
+    thresholdPp: number;
+    adequatelyPowered: boolean;
+    thresholdVerdict: "EXCLUDED_AT_95" | "NOT_EXCLUDED_AT_95" | "INCONCLUSIVE";
+}
+
+/**
+ * Conservative uncertainty for the informed-minus-blind upper-bound proxy. The cells use independent seed
+ * streams, while each cell's games arrive in same-seed pairs. Multiplying the independent-game variance by
+ * the maximum cluster size (2) is a safe design-effect bound for arbitrary within-pair correlation.
+ */
+export function estimateInformationUpperBound(input: {
+    informedWinRate: number;
+    blindWinRate: number;
+    informedSePp: number;
+    blindSePp: number;
+    informedGames: number;
+    blindGames: number;
+    thresholdPp?: number;
+}): IInformationUpperBoundEstimate {
+    const valuePp = (input.informedWinRate - input.blindWinRate) * 100;
+    const independentGameSePp = Math.hypot(input.informedSePp, input.blindSePp);
+    const conservativeClusterSePp = Math.sqrt(PICKSIM_PAIR_CLUSTER_SIZE) * independentGameSePp;
+    const upper95Pp = valuePp + NORMAL_95_Z * conservativeClusterSePp;
+    const thresholdPp = input.thresholdPp ?? PICKSIM_GATE.oracleGainThresholdPp;
+    const adequatelyPowered = input.informedGames >= PICKSIM_GATE.minGames && input.blindGames >= PICKSIM_GATE.minGames;
+    return {
+        interpretation: "upper_bound_proxy_including_omniscient_collision_avoidance",
+        uncertaintyMethod: "independent_cells_max_design_effect_two_game_seed_clusters",
+        valuePp,
+        independentGameSePp,
+        conservativeClusterSePp,
+        upper95Pp,
+        thresholdPp,
+        adequatelyPowered,
+        thresholdVerdict: !adequatelyPowered
+            ? "INCONCLUSIVE"
+            : upper95Pp < thresholdPp
+              ? "EXCLUDED_AT_95"
+              : "NOT_EXCLUDED_AT_95",
     };
 }
 
@@ -1050,7 +1118,7 @@ export interface IMeasurePickSimOptions {
 }
 
 export interface IMeasurePickSimSummary {
-    schemaVersion: 1;
+    schemaVersion: 2;
     kind: "b1_picksim_oracle_recheck";
     fightVersion: typeof FROZEN_FIGHT_VERSION;
     startedAt: string;
@@ -1061,7 +1129,12 @@ export interface IMeasurePickSimSummary {
         amountMode: typeof LIVETWIN_PRESET.amountMode;
         perk: number;
         grid: "NORMAL";
-        pairedSideSwap: true;
+        pairing: {
+            clusterSize: typeof PICKSIM_PAIR_CLUSTER_SIZE;
+            sharedOfferAndCombatSeed: true;
+            policiesRedraftedInOppositePickSeats: true;
+            fixedArmyBattleSideSwap: false;
+        };
         artifactsApplied: true;
         synergiesApplied: true;
         tier2PolicySymmetric: true;
@@ -1078,8 +1151,8 @@ export interface IMeasurePickSimSummary {
         cell: string;
         oracleGainPp: number;
         blindGainPp: number;
-        counterpickComponentPp: number;
-        counterpickComponentSePp: number;
+        /** Upper-bound proxy: informed oracle minus blind oracle, including omniscient collision avoidance. */
+        informationValueUpperBound: IInformationUpperBoundEstimate;
     };
     gate: IPickSimGateVerdict;
 }
@@ -1112,8 +1185,16 @@ export async function runMeasurePickSim(options: IMeasurePickSimOptions): Promis
     const blindCell = byId.get("oracle_blind__vs__champion")!;
     const oracleGainPp = (oracleCell.winRateA - 0.5) * 100;
     const blindGainPp = (blindCell.winRateA - 0.5) * 100;
+    const informationValueUpperBound = estimateInformationUpperBound({
+        informedWinRate: oracleCell.winRateA,
+        blindWinRate: blindCell.winRateA,
+        informedSePp: oracleCell.sePp,
+        blindSePp: blindCell.sePp,
+        informedGames: oracleCell.games,
+        blindGames: blindCell.games,
+    });
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         kind: "b1_picksim_oracle_recheck",
         fightVersion: FROZEN_FIGHT_VERSION,
         startedAt,
@@ -1124,7 +1205,12 @@ export async function runMeasurePickSim(options: IMeasurePickSimOptions): Promis
             amountMode: LIVETWIN_PRESET.amountMode,
             perk: SETUP_POLICY_V0.pickPerk(),
             grid: "NORMAL",
-            pairedSideSwap: true,
+            pairing: {
+                clusterSize: PICKSIM_PAIR_CLUSTER_SIZE,
+                sharedOfferAndCombatSeed: true,
+                policiesRedraftedInOppositePickSeats: true,
+                fixedArmyBattleSideSwap: false,
+            },
             artifactsApplied: true,
             synergiesApplied: true,
             tier2PolicySymmetric: true,
@@ -1141,8 +1227,7 @@ export async function runMeasurePickSim(options: IMeasurePickSimOptions): Promis
             cell: PICKSIM_GATE.headlineCell,
             oracleGainPp,
             blindGainPp,
-            counterpickComponentPp: oracleGainPp - blindGainPp,
-            counterpickComponentSePp: Math.hypot(oracleCell.sePp, blindCell.sePp),
+            informationValueUpperBound,
         },
         gate: evaluatePickSimGate({
             oracleWinRate: oracleCell.winRateA,
@@ -1241,10 +1326,13 @@ export async function main(): Promise<void> {
                 `oracle overrides ${(cell.oracle.overrideRate * 100).toFixed(1)}%`,
         );
     }
+    const information = summary.headline.informationValueUpperBound;
     console.error(
-        `Counter-pick component (informed - blind): ${summary.headline.counterpickComponentPp >= 0 ? "+" : ""}` +
-            `${summary.headline.counterpickComponentPp.toFixed(2)}pp ` +
-            `+/- ${summary.headline.counterpickComponentSePp.toFixed(2)}pp`,
+        `Information-value upper-bound proxy (informed - blind; includes omniscient collision avoidance): ` +
+            `${information.valuePp >= 0 ? "+" : ""}${information.valuePp.toFixed(2)}pp, conservative ` +
+            `paired-cluster SE ${information.conservativeClusterSePp.toFixed(2)}pp, ` +
+            `95% upper ${information.upper95Pp.toFixed(2)}pp; +${information.thresholdPp}pp ` +
+            `${information.thresholdVerdict}`,
     );
     console.error(`GATE VERDICT: ${summary.gate.verdict} — ${summary.gate.reason}`);
 }

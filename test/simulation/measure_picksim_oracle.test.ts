@@ -22,6 +22,7 @@ import {
     defaultCells,
     emptyAggregate,
     evaluatePickSimGate,
+    estimateInformationUpperBound,
     playPickSimGame,
     rolePayoffFromMatrix,
     roleMix,
@@ -171,8 +172,8 @@ describe("measure_picksim_oracle armies and games", () => {
         expect(army.roleStacks.reduce((sum, count) => sum + count, 0)).toBe(6);
     });
 
-    it("plays paired side-swap games that pass the full pick output into the fight config", () => {
-        const cell = defaultCells().find((candidate) => candidate.control)!;
+    it("pairs the seed but re-drafts policies in opposite pick seats", () => {
+        const cell = defaultCells().find((candidate) => candidate.id === PICKSIM_GATE.headlineCell)!;
         const configs: IMatchConfig[] = [];
         const runFake = (game: number): IPickSimGameRecord =>
             playPickSimGame(cell, { gamesPerCell: 4, baseSeed: 123 }, game, {
@@ -183,10 +184,10 @@ describe("measure_picksim_oracle armies and games", () => {
             });
         const even = runFake(0);
         const odd = runFake(1);
-        // Mirror cell + shared pair seed: both games field identical armies, only the A/B labels move.
-        expect(configs[0].roster).toEqual(configs[1].roster);
-        expect(configs[0].redRoster).toEqual(configs[1].redRoster);
+        // The offer/combat seed is shared, but each policy sees the other pick seat and re-drafts its army.
         expect(configs[0].seed).toBe(configs[1].seed);
+        expect(even.armyA).not.toBe(odd.armyA);
+        expect(even.armyB).not.toBe(odd.armyB);
         expect(configs[0].greenArtifactT1).toBeGreaterThanOrEqual(1);
         expect(configs[0].greenArtifactT2).toBeGreaterThanOrEqual(1);
         expect(configs[0].greenPerk).toBe(3);
@@ -220,5 +221,35 @@ describe("measure_picksim_oracle armies and games", () => {
         expect(reopen.verdict).toBe("REOPEN");
         const underpowered = evaluatePickSimGate({ oracleWinRate: 0.6, oracleDecisive: 100, oracleGames: 100 });
         expect(underpowered.adequatelyPowered).toBe(false);
+        expect(underpowered.verdict).toBe("INCONCLUSIVE");
+        expect(underpowered.reason).toContain("cannot decide");
+    });
+
+    it("uses a conservative pair-cluster bound for the information upper-bound proxy", () => {
+        const estimate = estimateInformationUpperBound({
+            informedWinRate: 0.6442,
+            blindWinRate: 0.6363,
+            informedSePp: 0.535,
+            blindSePp: 0.538,
+            informedGames: 8000,
+            blindGames: 8000,
+        });
+        expect(estimate.interpretation).toBe("upper_bound_proxy_including_omniscient_collision_avoidance");
+        expect(estimate.valuePp).toBeCloseTo(0.79, 8);
+        expect(estimate.independentGameSePp).toBeCloseTo(Math.hypot(0.535, 0.538), 10);
+        expect(estimate.conservativeClusterSePp).toBeCloseTo(Math.SQRT2 * Math.hypot(0.535, 0.538), 10);
+        expect(estimate.upper95Pp).toBeLessThan(3);
+        expect(estimate.thresholdVerdict).toBe("EXCLUDED_AT_95");
+
+        const underpowered = estimateInformationUpperBound({
+            informedWinRate: 0.5,
+            blindWinRate: 0.5,
+            informedSePp: 0.1,
+            blindSePp: 0.1,
+            informedGames: 100,
+            blindGames: 100,
+        });
+        expect(underpowered.upper95Pp).toBeLessThan(3);
+        expect(underpowered.thresholdVerdict).toBe("INCONCLUSIVE");
     });
 });
