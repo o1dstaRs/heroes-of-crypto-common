@@ -27,6 +27,21 @@ type CandidateEnumerator = (
     options?: IEnumerateOptions,
 ) => ICandidateSet;
 
+export type CasterRouterSpell = "resurrection" | "windflow" | "castling" | "wildregen";
+
+export interface ICasterRouterPolicy {
+    readonly spells: readonly CasterRouterSpell[];
+    readonly resurrectionPreemptsCommitted: boolean;
+}
+
+const ALL_CASTER_ROUTER_SPELLS = ["resurrection", "windflow", "castling", "wildregen"] as const;
+
+/** v0.7's measured M1 salvage: only Resurrection + Wind Flow, with Resurrection pre-emption disabled. */
+export const V07_CASTER_ROUTER_POLICY = Object.freeze({
+    spells: Object.freeze(["resurrection", "windflow"] as const),
+    resurrectionPreemptsCommitted: false,
+}) satisfies ICasterRouterPolicy;
+
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -66,10 +81,10 @@ function resurrectionPassiveReserve(caster: Unit): number {
 }
 
 /**
- * Resurrection is the only routed spell allowed to pre-empt an incumbent combat action. It does so only
- * when the recoverable allied HP strictly exceeds the Angel's own auto-resurrection reserve. Candidate F4
- * explicitly marks whether the cast burns that shared charge; a future non-burning source therefore has
- * zero opportunity cost without another named-unit rule here.
+ * Resurrection is the only routed spell that a policy may allow to pre-empt an incumbent combat action.
+ * It does so only when the recoverable allied HP strictly exceeds the Angel's own auto-resurrection reserve.
+ * Candidate F4 explicitly marks whether the cast burns that shared charge; a future non-burning source
+ * therefore has zero opportunity cost without another named-unit rule here.
  */
 function bestResurrection(
     caster: Unit,
@@ -185,12 +200,12 @@ function bestWildRegeneration(
 }
 
 /**
- * Q1/M1: evidence-gated universal router for the MELEE_MAGIC caster gap.
+ * Q1/M1: v0.6's evidence-gated wrapper for the MELEE_MAGIC caster gap.
  *
- * `V06_CASTER_ROUTER=on` is required until the LiveTwin A/B clears. Gate-off and non-MELEE_MAGIC calls
- * return the exact incumbent array without enumerating, preserving frozen v0.6 and all existing MAGIC
- * behavior. Every routed action is an unmodified F4 candidate, so spell target and engine legality remain
- * centralized in candidates.ts.
+ * `V06_CASTER_ROUTER=on` remains required for v0.6 experiments. Gate-off and non-MELEE_MAGIC calls return
+ * the exact incumbent array without enumerating, preserving frozen v0.6 and all existing MAGIC behavior.
+ * v0.7 uses the typed policy core below instead of consulting this gate. Every routed action is an unmodified
+ * F4 candidate, so spell target and engine legality remain centralized in candidates.ts.
  *
  * A/B seat scoping: both seats of a sim game share process env, so a plain on/off can never produce the
  * routed-vs-unrouted pairing the LiveTwin A/B needs. `V06_CASTER_ROUTER=green` routes ONLY the LOWER
@@ -211,35 +226,36 @@ function casterRouterGateOn(unit: Unit): boolean {
 /**
  * Optional per-spell ablation scope for the A/B: V06_CASTER_SPELLS="resurrection,windflow,castling,
  * wildregen" (comma list, case-insensitive). Unset/empty = all four routed — the plain gate semantics
- * are unchanged. The 2026-07-10 cohort A/B measured the four TOGETHER at −9.2pp, so per-spell
- * decomposition decides which components are salvageable before any default flips on.
+ * are unchanged. The 2026-07-10 cohort A/B measured the four TOGETHER at −9.2pp; v0.7 bakes only the
+ * separately measured Resurrection + Wind Flow subset while this scope remains available for experiments.
  */
-function spellRouted(key: "resurrection" | "windflow" | "castling" | "wildregen"): boolean {
+function environmentSpellScope(): readonly CasterRouterSpell[] {
     const raw = process.env.V06_CASTER_SPELLS;
     if (!raw) {
-        return true;
+        return ALL_CASTER_ROUTER_SPELLS;
     }
-    return raw
-        .split(",")
-        .map((s) => s.trim().toLowerCase())
-        .includes(key);
+    const requested = new Set(raw.split(",").map((spell) => spell.trim().toLowerCase()));
+    return ALL_CASTER_ROUTER_SPELLS.filter((spell) => requested.has(spell));
 }
 
-export function routeUniversalCaster(
+/**
+ * Environment-independent caster routing core. Strategy versions can bake a measured policy directly
+ * without temporarily mutating the v0.6 experiment environment.
+ */
+export function routeUniversalCasterWithPolicy(
     unit: Unit,
     context: IDecisionContext,
     incumbent: GameAction[],
+    policy: ICasterRouterPolicy,
     enumerate: CandidateEnumerator = enumerateCandidates,
 ): GameAction[] {
-    if (!casterRouterGateOn(unit) || unit.getAttackType() !== MELEE_MAGIC) {
+    if (unit.getAttackType() !== MELEE_MAGIC) {
         return incumbent;
     }
 
+    const spellRouted = (spell: CasterRouterSpell): boolean => policy.spells.includes(spell);
     const candidates = enumerate(unit, context, incumbent).candidates;
-    // V06_RES_PREEMPT=off demotes Resurrection to the same "never replace a committed combat/wait turn"
-    // bar as the utility spells — the 2026-07-10 cohort ablation measured pre-empting attacks at −2.4pp,
-    // so the A/B needs the non-pre-empting variant separable before any default flips on.
-    if (spellRouted("resurrection") && (process.env.V06_RES_PREEMPT !== "off" || !incumbentCommitsTurn(incumbent))) {
+    if (spellRouted("resurrection") && (policy.resurrectionPreemptsCommitted || !incumbentCommitsTurn(incumbent))) {
         const resurrection = bestResurrection(unit, context, candidates);
         if (resurrection) {
             return resurrection.actions;
@@ -270,4 +286,27 @@ export function routeUniversalCaster(
         return bestWildRegeneration(context, candidates)?.actions ?? incumbent;
     }
     return incumbent;
+}
+
+export function routeUniversalCaster(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+    enumerate: CandidateEnumerator = enumerateCandidates,
+): GameAction[] {
+    if (!casterRouterGateOn(unit)) {
+        return incumbent;
+    }
+    // V06_RES_PREEMPT=off demotes Resurrection to the same "never replace a committed combat/wait turn"
+    // bar as the utility spells. Every other value preserves the original pre-empting experiment behavior.
+    return routeUniversalCasterWithPolicy(
+        unit,
+        context,
+        incumbent,
+        {
+            spells: environmentSpellScope(),
+            resurrectionPreemptsCommitted: process.env.V06_RES_PREEMPT !== "off",
+        },
+        enumerate,
+    );
 }

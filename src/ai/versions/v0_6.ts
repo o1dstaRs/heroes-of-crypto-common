@@ -118,7 +118,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
         } finally {
             setPreferAttackOverMining(false);
         }
-        decision = routeUniversalCaster(unit, context, decision);
+        decision = this.routeCasterDecision(unit, context, decision);
         decision = routeAreaThrow(unit, context, decision);
         decision = routeMeleeRiderEV(unit, context, decision);
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
@@ -136,6 +136,10 @@ export class StrategyV0_6 extends StrategyV0_5 {
     /** Final strategy-version seam. Experimental descendants can freeze a committed final policy here. */
     protected finalizeDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         return applyWaitScorer(unit, context, decision, this.version);
+    }
+    /** Strategy-version seam: v0.6 retains its environment-gated caster experiment unchanged. */
+    protected routeCasterDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        return routeUniversalCaster(unit, context, decision);
     }
     /**
      * Proactive kite: if a RANGED unit's chosen turn is a pure ADVANCE (a move with no attack/shot) and it can't

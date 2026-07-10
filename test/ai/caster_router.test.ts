@@ -13,8 +13,14 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
 import type { IDecisionContext } from "../../src/ai";
-import { routeUniversalCaster } from "../../src/ai/versions/caster_router";
+import type { IEnumeratedCandidate } from "../../src/ai/candidates";
+import {
+    routeUniversalCaster,
+    routeUniversalCasterWithPolicy,
+    V07_CASTER_ROUTER_POLICY,
+} from "../../src/ai/versions/caster_router";
 import { StrategyV0_6 } from "../../src/ai/versions/v0_6";
+import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
@@ -95,6 +101,8 @@ const castSpell = (actions: GameAction[]): Extract<GameAction, { type: "cast_spe
 
 afterEach(() => {
     delete process.env.V06_CASTER_ROUTER;
+    delete process.env.V06_CASTER_SPELLS;
+    delete process.env.V06_RES_PREEMPT;
 });
 
 describe("v0.6 universal MELEE_MAGIC caster router", () => {
@@ -281,5 +289,118 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
 
         process.env.V06_CASTER_ROUTER = "on";
         expect(castSpell(strategy.decideTurn(valkyrie, contextFor(combat)))?.spellName).toBe("Wind Flow");
+    });
+});
+
+describe("v0.7 baked caster salvage", () => {
+    it("routes Wind Flow with the experiment env off while v0.6 stays gated", () => {
+        process.env.V06_CASTER_ROUTER = "off";
+        process.env.V06_CASTER_SPELLS = "castling,wildregen";
+        process.env.V06_RES_PREEMPT = "on";
+        const combat = createCombatTestContext();
+        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        valkyrie.setStackPower(5);
+        const enemyFlyer = createTestUnit({
+            team: UPPER,
+            attackType: MELEE,
+            movementType: FLY,
+            speed: 8,
+            damageMax: 10,
+            amountAlive: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
+        const context = contextFor(combat);
+
+        expect(castSpell(new StrategyV0_6().decideTurn(valkyrie, context))?.spellName).not.toBe("Wind Flow");
+        expect(castSpell(new StrategyV0_7().decideTurn(valkyrie, context))?.spellName).toBe("Wind Flow");
+    });
+
+    it("does not let Resurrection pre-empt a committed v0.7 action", () => {
+        const combat = createCombatTestContext();
+        const angel = makeReal(LOWER, "Life", "Angel");
+        angel.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, name: "High-value ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: UPPER, name: "Adjacent enemy", attackType: MELEE });
+        placeLarge(combat, angel, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 4 });
+        ally.applyDamage(9_500, 0, new SceneLogMock());
+        const context = contextFor(combat);
+        const incumbent = new StrategyV0_6().decideTurn(angel, context);
+
+        expect(incumbent.some((action) => action.type === "melee_attack")).toBe(true);
+        const actual = new StrategyV0_7().decideTurn(angel, context);
+        expect(actual).toEqual(incumbent);
+        expect(castSpell(actual)?.spellName).not.toBe("Resurrection");
+    });
+
+    it("keeps Castling and Wild Regeneration outside the baked policy", () => {
+        expect(V07_CASTER_ROUTER_POLICY.spells).toEqual(["resurrection", "windflow"]);
+        const combat = createCombatTestContext();
+        const caster = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, caster, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
+        const incumbent = fallback(caster);
+        const features: IEnumeratedCandidate["features"] = {
+            moraleDelta: 0,
+            luckDelta: 0,
+            enemiesNotYetActedFrac: 0,
+            alliesNotYetActedFrac: 0,
+            lap: 0,
+            hourglassSpent: 0,
+            spendsRangeShot: 0,
+            spendsSpellCharge: 1,
+            burnsResurrectionCharge: 0,
+            expectedDamage: 0,
+            expectedKill: 0,
+        };
+        const excluded: IEnumeratedCandidate[] = ["Castling", "Wild Regeneration"].map((spellName) => ({
+            kind: "spell",
+            spellName,
+            actions: [{ type: "cast_spell", casterId: caster.getId(), spellName, targetId: enemy.getId() }],
+            targetId: enemy.getId(),
+            features: { ...features },
+        }));
+
+        expect(
+            routeUniversalCasterWithPolicy(caster, contextFor(combat), incumbent, V07_CASTER_ROUTER_POLICY, () => ({
+                candidates: excluded,
+                truncated: [],
+            })),
+        ).toBe(incumbent);
+    });
+
+    it("preserves v0.6 gate, spell-scope, and Resurrection-preemption experiments", () => {
+        const combat = createCombatTestContext();
+        const angel = makeReal(LOWER, "Life", "Angel");
+        angel.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, name: "High-value ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeLarge(combat, angel, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
+        ally.applyDamage(9_500, 0, new SceneLogMock());
+        const incumbent: GameAction[] = [
+            {
+                type: "melee_attack",
+                attackerId: angel.getId(),
+                targetId: enemy.getId(),
+                attackFrom: angel.getBaseCell(),
+            },
+        ];
+        const context = contextFor(combat);
+
+        process.env.V06_CASTER_ROUTER = "on";
+        process.env.V06_CASTER_SPELLS = "resurrection";
+        process.env.V06_RES_PREEMPT = "off";
+        expect(routeUniversalCaster(angel, context, incumbent)).toBe(incumbent);
+
+        delete process.env.V06_RES_PREEMPT;
+        expect(castSpell(routeUniversalCaster(angel, context, incumbent))?.spellName).toBe("Resurrection");
+
+        process.env.V06_CASTER_SPELLS = "windflow";
+        expect(routeUniversalCaster(angel, context, incumbent)).toBe(incumbent);
     });
 });

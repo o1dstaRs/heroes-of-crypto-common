@@ -290,9 +290,9 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
 /**
  * v0.7 BAKED weight resolution (S1 sign-off): the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 are the
  * BUILT-IN DEFAULT — no V07_WAIT_SCORER gate, no version scope: v0.7's scorer is always armed. An explicit
- * V07_WAIT_WEIGHTS env still overrides for experiments, and the anchor property is preserved: an ALL-ZERO
- * override resolves to null, so v0.7 reproduces v0.6 byte-for-byte (the anchor escape hatch). An absent or
- * MALFORMED env falls back to the committed defaults — a bad env can never crash or silently de-bake live
+ * V07_WAIT_WEIGHTS env still overrides for experiments, and the scorer anchor is preserved: an ALL-ZERO
+ * override resolves to null, disabling this stage while retaining v0.7's other baked policy stages. An absent
+ * or MALFORMED env falls back to the committed defaults — a bad env can never crash or silently de-bake live
  * play (loadV06Weights lineage). v0.6/v0.6s keep the env-gated waitWeightsForVersion path below untouched.
  */
 const bakedSlot: { raw: string | undefined | null; weights: IWaitWeights | null } = {

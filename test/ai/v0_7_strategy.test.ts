@@ -274,7 +274,7 @@ describe("v0.7 strategy — wait-scorer always on", () => {
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
     });
 
-    it("ALL-ZERO weights reproduce v0.6 — the anchor property", () => {
+    it("ALL-ZERO weights reproduce v0.6 on a non-caster board", () => {
         const { actor, context } = buildBoard(10);
         const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 0, w: zeroWeights() });
