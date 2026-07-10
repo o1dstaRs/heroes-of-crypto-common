@@ -9,6 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
@@ -48,6 +52,7 @@ import type { XY } from "../../src/utils/math";
 const SEARCH_ENV_KEYS = [
     "V07_SEARCH",
     "Q2_WAIT_ABLATION",
+    "Q2_ORACLE",
     "SEARCH_VERSIONS",
     "SEARCH_GATE",
     "SEARCH_HORIZON",
@@ -578,6 +583,186 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.appliesTo("v0.6")).toBe(true); // ablation defaults SEARCH_VERSIONS to v0.6
         const chosen = driver.chooseDecision(unit!, "v0.6", incumbent);
         expect(chosen).toBe(incumbent);
+    });
+});
+
+describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
+    /** Play forward to a decision point the oracle would actually score: wait-eligible, non-wait incumbent. */
+    const findOraclePoint = (h: Harness): { unit: Unit; incumbent: GameAction[] } => {
+        for (let i = 0; i < 80 && !h.finished(); i += 1) {
+            const unit = h.activeUnit();
+            if (!unit) {
+                break;
+            }
+            const fp = h.fightProperties;
+            const id = unit.getId();
+            const eligible =
+                fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
+                !fp.hourglassIncludes(id) &&
+                !fp.hasAlreadyMadeTurn(id) &&
+                !fp.hasAlreadyHourglass(id);
+            const incumbent = h.decideActive();
+            if (eligible && incumbent.length > 0 && !incumbent.some((a) => a.type === "wait_turn")) {
+                return { unit, incumbent };
+            }
+            h.playTurns(1);
+        }
+        throw new Error("no oracle-eligible decision point found");
+    };
+
+    it("is gated: Q2_ORACLE=1 applies to v0.6s only by default (the A/B alias), and is off without the env", () => {
+        setEnv({});
+        const off = buildBattle(11, "v0.6").makeDriver();
+        expect(off.enabled).toBe(false);
+        setEnv({ Q2_ORACLE: "1" });
+        const on = buildBattle(11, "v0.6").makeDriver();
+        expect(on.enabled).toBe(true);
+        expect(on.appliesTo("v0.6s")).toBe(true);
+        expect(on.appliesTo("v0.6")).toBe(false);
+        expect(on.appliesTo("v0.5")).toBe(false);
+    });
+
+    it("scores ONLY {incumbent, wait}: the chosen decision is the incumbent reference or a lone wait_turn", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "2", SEARCH_GATE: "0" });
+        const h = buildBattle(2024, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const chosen = h.makeDriver().chooseDecision(unit, "v0.6", incumbent);
+        if (chosen !== incumbent) {
+            expect(chosen).toHaveLength(1);
+            expect(chosen[0]).toEqual({ type: "wait_turn", unitId: unit.getId() });
+        }
+    });
+
+    it("never overrides when the gate cannot be cleared (SEARCH_GATE=99)", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_GATE: "99" });
+        const h = buildBattle(2024, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        expect(h.makeDriver().chooseDecision(unit, "v0.6", incumbent)).toBe(incumbent);
+    });
+
+    it("keeps an incumbent that already waits, without running any rollout (degenerate {wait, wait})", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1" });
+        const h = buildBattle(2025, "v0.6");
+        const { unit } = findOraclePoint(h);
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        let applies = 0;
+        const originalApply = h.engine.apply.bind(h.engine);
+        h.engine.apply = ((action: GameAction) => {
+            applies += 1;
+            return originalApply(action);
+        }) as GameActionEngine["apply"];
+        expect(h.makeDriver().chooseDecision(unit, "v0.6", incumbent)).toBe(incumbent);
+        expect(applies).toBe(0);
+    });
+
+    it("skips a unit that cannot hourglass, without running any rollout", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1" });
+        const h = buildBattle(2026, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        h.fightProperties.enqueueHourglass(unit.getId()); // hourglassIncludes -> engine would reject the wait
+        let applies = 0;
+        const originalApply = h.engine.apply.bind(h.engine);
+        h.engine.apply = ((action: GameAction) => {
+            applies += 1;
+            return originalApply(action);
+        }) as GameActionEngine["apply"];
+        expect(h.makeDriver().chooseDecision(unit, "v0.6", incumbent)).toBe(incumbent);
+        expect(applies).toBe(0);
+    });
+
+    it("does not consume the tournament's seeded RNG stream", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "2" });
+        const h = buildBattle(2027, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        const draw = (n: number): number[] => {
+            const out: number[] = [];
+            for (let i = 0; i < n; i += 1) out.push(getRandomInt(0, 1_000_000));
+            return out;
+        };
+        setDeterministicRandomSource(makeRng(0x517e57));
+        const seqNoOracle = draw(40);
+        setDeterministicRandomSource(makeRng(0x517e57));
+        driver.chooseDecision(unit, "v0.6", incumbent);
+        expect(draw(40)).toEqual(seqNoOracle);
+    });
+
+    it("does not mutate the live battle state", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "2" });
+        const h = buildBattle(2028, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        h.makeDriver().chooseDecision(unit, "v0.6", incumbent);
+        const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        expect(after).toEqual(before);
+    });
+
+    it("is deterministic: the same decision point yields the same choice twice", () => {
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "2", SEARCH_GATE: "0" });
+        const h = buildBattle(2029, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        const first = JSON.stringify(driver.chooseDecision(unit, "v0.6", incumbent));
+        const second = JSON.stringify(driver.chooseDecision(unit, "v0.6", incumbent));
+        expect(second).toEqual(first);
+    });
+
+    it("counts an engine-rejected wait as the alreadyHourglass desync tripwire instead of overriding", () => {
+        const auditPath = join(mkdtempSync(join(tmpdir(), "q2o-")), "audit.jsonl");
+        setEnv({ Q2_ORACLE: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_AUDIT: auditPath });
+        const h = buildBattle(2030, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        const originalApply = h.engine.apply.bind(h.engine);
+        h.engine.apply = ((action: GameAction) => {
+            if (action.type === "wait_turn") {
+                return { completed: false, events: [], rejectionReason: "hourglass_not_available" };
+            }
+            return originalApply(action);
+        }) as GameActionEngine["apply"];
+        let chosen: GameAction[];
+        try {
+            chosen = driver.chooseDecision(unit, "v0.6", incumbent);
+        } finally {
+            h.engine.apply = originalApply as GameActionEngine["apply"];
+        }
+        expect(chosen).toBe(incumbent); // an illegal wait can never win
+
+        driver.onMatchEnd("v0.6", "elimination");
+        const lines = readFileSync(auditPath, "utf8").trim().split("\n");
+        const summary = JSON.parse(lines[lines.length - 1]);
+        expect(summary.mode).toBe("oracle");
+        expect(summary.horizon).toBe("lap");
+        expect(summary.q2oScored).toBe(1);
+        expect(summary.q2oWaitRejected).toBe(1);
+        expect(summary.q2oWaits).toBe(0);
+    });
+
+    it("writes the oracle audit summary with the wait-decision statistics", () => {
+        const auditPath = join(mkdtempSync(join(tmpdir(), "q2o-")), "audit.jsonl");
+        setEnv({
+            Q2_ORACLE: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_GATE: "0",
+            SEARCH_AUDIT: auditPath,
+            SEARCH_AUDIT_TURNS: "1",
+        });
+        const h = buildBattle(2031, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        driver.chooseDecision(unit, "v0.6", incumbent);
+        driver.chooseDecision(unit, "v0.6", [{ type: "wait_turn", unitId: unit.getId() }]);
+        driver.onMatchEnd("v0.6", "elimination");
+        const lines = readFileSync(auditPath, "utf8").trim().split("\n");
+        const summary = JSON.parse(lines[lines.length - 1]);
+        expect(summary.q2oPoints).toBe(2);
+        expect(summary.q2oScored).toBe(1);
+        expect(summary.q2oIncumbentWait).toBe(1);
+        expect(summary.q2oDeltaCount).toBeLessThanOrEqual(1);
+        expect(summary.q2oWaits + (summary.q2oScored - summary.q2oWaits)).toBe(summary.q2oScored);
+        const turnRows = lines.slice(0, -1).map((l) => JSON.parse(l));
+        expect(turnRows.some((r) => r.t === "q2o")).toBe(true);
     });
 });
 

@@ -67,6 +67,20 @@ import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
  *                         resolution, so the wait branch actually sees its payoff), and log whether the
  *                         wait-vs-act choice FLIPS between horizons. Default SEARCH_VERSIONS "v0.6"
  *                         (both sides of a v0.6 mirror contribute on-policy decision points).
+ *   Q2_ORACLE=1         — the Q2 Tempo-Commander GATE-1 act-vs-wait ORACLE (overriding): at every
+ *                         decision point where the hourglass wait is engine-legal for the acting unit,
+ *                         score ONLY {incumbent action, wait} — each by SEARCH_ROLLOUTS paired-seed
+ *                         rollouts to the END-OF-LAP horizon (rolled THROUGH hourglass-queue
+ *                         resolution, so the wait branch sees its second-mover payoff; a first-reply
+ *                         horizon structurally undervalues wait — Gate-0 measured 40.5% verdict flips
+ *                         between the two) — and take the wait when it beats the incumbent's mean by
+ *                         SEARCH_GATE. NO other candidate class is generated or scored: this isolates
+ *                         the tempo axis from B2's full wide-candidate search. An incumbent that
+ *                         already waits is a degenerate {wait, wait} point and is kept unchanged (the
+ *                         oracle only arbitrates act->wait; re-litigating policy waits is B2's job).
+ *                         Default SEARCH_VERSIONS "v0.6s" (so `run_tournament v0.6s v0.6` measures
+ *                         exactly "v0.6 + wait-oracle vs plain v0.6"). SEARCH_HORIZON is ignored — the
+ *                         horizon is always the lap boundary (capped at MAX_LAP_HORIZON_TURNS).
  *
  * AUDIT (SEARCH_AUDIT=<jsonl path, or "1" for ./search_audit.jsonl>): one summary line per game with the
  * override/flip counters, per-class distributions and wall-clock cost; SEARCH_AUDIT_TURNS=1 adds one line
@@ -82,8 +96,11 @@ import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 const MAX_LAP_HORIZON_TURNS = 64;
 const MAX_REPLY_HORIZON_TURNS = 12;
 
-type SearchMode = "off" | "search" | "ablation";
+type SearchMode = "off" | "search" | "ablation" | "oracle";
 type HorizonMode = "turns" | "reply" | "lap";
+
+/** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
+type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
 
 /** Learned leaf weights (fit_value.mjs output) aligned to VALUE_FEATURE_NAMES. */
 interface ILearnedValue {
@@ -171,6 +188,20 @@ interface ISearchCounters {
     q2IncumbentWait: number;
     q2ReplyAgreesIncumbent: number;
     q2LapAgreesIncumbent: number;
+    // --- Q2 gate-1 oracle ---
+    /** Wait-eligible decision points seen (degenerate incumbent-wait points included). */
+    q2oPoints: number;
+    /** Points where both {incumbent, wait} were actually rollout-scored. */
+    q2oScored: number;
+    /** Points whose incumbent already waits (degenerate — kept, never scored). */
+    q2oIncumbentWait: number;
+    /** Scored points the oracle overrode to wait. */
+    q2oWaits: number;
+    /** Engine rejected a wait the driver-side canWaitOnHourglass mirror allowed (desync tripwire; expect 0). */
+    q2oWaitRejected: number;
+    /** Sum/count of (wait - incumbent) mean-leaf deltas over points where both were legal. */
+    q2oDeltaSum: number;
+    q2oDeltaCount: number;
 }
 
 const emptyCounters = (): ISearchCounters => ({
@@ -192,6 +223,13 @@ const emptyCounters = (): ISearchCounters => ({
     q2IncumbentWait: 0,
     q2ReplyAgreesIncumbent: 0,
     q2LapAgreesIncumbent: 0,
+    q2oPoints: 0,
+    q2oScored: 0,
+    q2oIncumbentWait: 0,
+    q2oWaits: 0,
+    q2oWaitRejected: 0,
+    q2oDeltaSum: 0,
+    q2oDeltaCount: 0,
 });
 
 const bump = (rec: Record<string, number>, key: string): void => {
@@ -234,7 +272,13 @@ export class SearchDriver {
         this.deps = deps;
         this.match = match;
         this.mode =
-            process.env.Q2_WAIT_ABLATION === "1" ? "ablation" : process.env.V07_SEARCH === "1" ? "search" : "off";
+            process.env.Q2_WAIT_ABLATION === "1"
+                ? "ablation"
+                : process.env.Q2_ORACLE === "1"
+                  ? "oracle"
+                  : process.env.V07_SEARCH === "1"
+                    ? "search"
+                    : "off";
         this.enabled = this.mode !== "off";
         this.versions = new Set(
             (process.env.SEARCH_VERSIONS ?? (this.mode === "ablation" ? "v0.6" : "v0.6s"))
@@ -271,8 +315,9 @@ export class SearchDriver {
         return this.enabled && this.versions.has(version);
     }
     /**
-     * Replace the strategy's single decision with the best-by-rollout candidate (search mode), or log the
-     * Q2 wait-horizon ablation and return the incumbent unchanged (ablation mode).
+     * Replace the strategy's single decision with the best-by-rollout candidate (search mode), arbitrate
+     * act-vs-wait by lap rollout (oracle mode), or log the Q2 wait-horizon ablation and return the
+     * incumbent unchanged (ablation mode).
      */
     public chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[] {
         if (!this.appliesTo(version)) {
@@ -288,6 +333,10 @@ export class SearchDriver {
         // lookahead.ts, so V07_SEARCH off/on stay individually reproducible and paired A/Bs stay paired.
         setDeterministicRandomSource(makeRng(seedBase));
         try {
+            if (this.mode === "oracle") {
+                // Gate-1 never enumerates: the candidate pair is {incumbent, wait} by construction.
+                return this.oracle(unit, incumbent, seedBase, t0);
+            }
             const context: IDecisionContext = {
                 grid: this.deps.grid,
                 matrix: this.deps.grid.getMatrix(),
@@ -330,7 +379,7 @@ export class SearchDriver {
             winner,
             endReason,
             gate: this.gate,
-            horizon: this.horizon,
+            horizon: this.mode === "oracle" ? "lap" : this.horizon,
             rollouts: this.rollouts,
             leaf: this.learned ? "learned" : "material",
             ...(this.oppModel ? { oppModel: this.oppModel.version } : {}),
@@ -354,6 +403,17 @@ export class SearchDriver {
                       q2IncumbentWait: c.q2IncumbentWait,
                       q2ReplyAgreesIncumbent: c.q2ReplyAgreesIncumbent,
                       q2LapAgreesIncumbent: c.q2LapAgreesIncumbent,
+                  }
+                : {}),
+            ...(this.mode === "oracle"
+                ? {
+                      q2oPoints: c.q2oPoints,
+                      q2oScored: c.q2oScored,
+                      q2oIncumbentWait: c.q2oIncumbentWait,
+                      q2oWaits: c.q2oWaits,
+                      q2oWaitRejected: c.q2oWaitRejected,
+                      q2oDeltaCount: c.q2oDeltaCount,
+                      q2oDeltaSum: Number(c.q2oDeltaSum.toFixed(6)),
                   }
                 : {}),
         };
@@ -498,11 +558,97 @@ export class SearchDriver {
         }
         return incumbent;
     }
+    // ---- Q2 gate-1 act-vs-wait oracle -------------------------------------------------------------
+    /**
+     * Driver-side mirror of GameActionEngine.canWaitOnHourglass (private there; ai/candidates.addWait
+     * keeps the same copy). Every scored wait the engine then REJECTS anyway is counted in
+     * q2oWaitRejected — the alreadyHourglass state-desync tripwire (see ranked-skip-rejections): in a
+     * healthy sim this predicate and the engine agree 100%, so the counter must stay 0.
+     */
+    private canHourglass(unit: Unit): boolean {
+        const fp = this.deps.fightProperties;
+        const team = unit.getTeam();
+        const id = unit.getId();
+        return (
+            (team === PBTypes.TeamVals.LOWER || team === PBTypes.TeamVals.UPPER) &&
+            fp.getTeamUnitsAlive(team) > 1 &&
+            !fp.hourglassIncludes(id) &&
+            !fp.hasAlreadyMadeTurn(id) &&
+            !fp.hasAlreadyHourglass(id)
+        );
+    }
+    /**
+     * GATE-1 (the tempo-axis falsifier): if the acting unit can hourglass, score ONLY {incumbent, wait}
+     * — each by SEARCH_ROLLOUTS paired-seed rollouts to the END-OF-LAP horizon (through hourglass-queue
+     * resolution, so the wait branch sees its second-mover payoff) — and take the wait when its mean
+     * leaf beats the incumbent's by SEARCH_GATE. The set is deliberately this narrow: it measures the
+     * act-vs-wait tempo axis in isolation from B2's full wide-candidate search. An incumbent that is
+     * illegal in sim (nothing lands) is always replaced by a legal wait, mirroring search mode.
+     */
+    private oracle(unit: Unit, incumbent: GameAction[], seedBase: number, t0: number): GameAction[] {
+        const c = this.counters;
+        if (incumbent.some((a) => a.type === "wait_turn")) {
+            // Degenerate {wait, wait} point: the policy already waits; there is no "act" branch to score.
+            c.q2oPoints += 1;
+            c.q2oIncumbentWait += 1;
+            return incumbent;
+        }
+        if (!this.canHourglass(unit)) {
+            return incumbent; // not a wait-eligible decision point
+        }
+        c.q2oPoints += 1;
+        c.q2oScored += 1;
+        c.searched += 1;
+        c.candidatesTotal += 2;
+        const incumbentKind = classifyActions(incumbent);
+        bump(c.searchedByIncumbentKind, incumbentKind);
+        const candidates: ISearchCandidate[] = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "wait", actions: [{ type: "wait_turn", unitId: unit.getId() }] },
+        ];
+        const means = this.scoreCandidates(unit, candidates, seedBase, "lap");
+        const incumbentIllegal = means[0] === -Infinity;
+        const waitRejected = means[1] === -Infinity;
+        if (incumbentIllegal) {
+            c.illegalIncumbent += 1;
+        }
+        if (waitRejected) {
+            c.q2oWaitRejected += 1; // pre-registered desync tripwire — investigate any nonzero total
+        }
+        if (!incumbentIllegal && !waitRejected) {
+            c.q2oDeltaSum += means[1] - means[0];
+            c.q2oDeltaCount += 1;
+        }
+        const overridden = !waitRejected && (incumbentIllegal || means[1] - means[0] >= this.gate);
+        if (overridden) {
+            c.overrides += 1;
+            c.q2oWaits += 1;
+            bump(c.overridesByIncumbentKind, incumbentKind);
+            bump(c.overridesToKind, "wait");
+        }
+        const ms = performance.now() - t0;
+        c.msTotal += ms;
+        if (this.auditPath && this.auditTurns) {
+            this.turnRows.push(
+                JSON.stringify({
+                    t: "q2o",
+                    lap: this.deps.fightProperties.getCurrentLap(),
+                    unit: unit.getName(),
+                    inc: incumbentKind,
+                    ov: overridden ? 1 : 0,
+                    rej: waitRejected ? 1 : 0,
+                    d: incumbentIllegal || waitRejected ? null : Number((means[1] - means[0]).toFixed(4)),
+                    ms: Math.round(ms * 10) / 10,
+                }),
+            );
+        }
+        return overridden ? candidates[1].actions : incumbent;
+    }
     // ---- rollout scoring --------------------------------------------------------------------------
     /** Mean leaf value per candidate over SEARCH_ROLLOUTS paired-seed rollouts (-Infinity = illegal). */
     private scoreCandidates(
         unit: Unit,
-        candidates: IEnumeratedCandidate[],
+        candidates: readonly ISearchCandidate[],
         seedBase: number,
         horizonMode: HorizonMode,
     ): number[] {
@@ -535,13 +681,7 @@ export class SearchDriver {
      * their real policies forward to the horizon; return the leaf P(win) for the acting team.
      * Paired seeds: rollout r reseeds the private stream identically for every candidate.
      */
-    private rollout(
-        unit: Unit,
-        cand: IEnumeratedCandidate,
-        seedBase: number,
-        r: number,
-        horizonMode: HorizonMode,
-    ): number {
+    private rollout(unit: Unit, cand: ISearchCandidate, seedBase: number, r: number, horizonMode: HorizonMode): number {
         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));
         this.finishedSim = false;
         this.deps.setActiveUnitId(unit.getId());
