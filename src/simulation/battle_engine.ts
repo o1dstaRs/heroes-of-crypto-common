@@ -40,7 +40,8 @@ import { setDeterministicRandomSource } from "../utils/lib";
 import { createCombatFactories, createUnitFromSpec, makeRng, type IArmyUnitSpec } from "./army";
 import { appendFileSync } from "node:fs";
 
-import { LookaheadDriver } from "./lookahead";
+import { LookaheadDriver, type ILookaheadDeps } from "./lookahead";
+import { SearchDriver } from "./search_driver";
 import { extractValueFeatures } from "./value_features";
 
 // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
@@ -434,7 +435,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // enabled it replaces a v0.5 unit's single decision with the best-by-simulation candidate (see
     // ./lookahead.ts). It reads/writes `currentActiveUnitId` (so simulated engine applies validate) and
     // snapshots the per-lap damage stat log (not covered by battle_snapshot) alongside the battle state.
-    const lookahead = new LookaheadDriver({
+    const driverDeps: ILookaheadDeps = {
         engine,
         turnEngine,
         grid,
@@ -455,6 +456,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 damageStatisticHolder.add(v);
             }
         },
+    };
+    const lookahead = new LookaheadDriver(driverDeps);
+    // B2/RAWS wide-candidate rollout SEARCH driver (env-gated V07_SEARCH=1, or Q2_WAIT_ABLATION=1 for the
+    // observational wait-horizon ablation; default OFF -> byte-identical). Shares the lookahead's dependency
+    // seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT live in
+    // ./search_driver.ts.
+    const search = new SearchDriver(driverDeps, {
+        seed: config.seed,
+        greenVersion: config.greenVersion,
+        redVersion: config.redVersion,
     });
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
@@ -734,8 +745,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
         // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
-        const decided =
-            lookahead.enabled && strategy.version === "v0.5" ? lookahead.chooseDecision(unit, decided0) : decided0;
+        // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
+        // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
+        const decided = search.appliesTo(strategy.version)
+            ? search.chooseDecision(unit, strategy.version, decided0)
+            : lookahead.enabled && strategy.version === "v0.5"
+              ? lookahead.chooseDecision(unit, decided0)
+              : decided0;
 
         let didSomething = false;
         // Skip-audit bookkeeping (only meaningful when SKIP_AUDIT.enabled): what actually landed this turn,
@@ -931,6 +947,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             /* best-effort data capture */
         }
     }
+    // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
+    search.onMatchEnd(matchResult.winner, matchResult.endReason);
     return matchResult;
 }
 

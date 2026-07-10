@@ -10,7 +10,9 @@ const LR = Number(process.argv[4] ?? 0.5);
 // Known feature names (must match value_features.ts VALUE_FEATURE_NAMES order); padded with f<i> if the data
 // carries more. D is derived from the DATA row width so the trainer never needs re-syncing when features change.
 const KNOWN = ["hpAdv", "cntAdv", "atkAdv", "rangedAdv", "woundedOurs", "woundedEnemy", "advOurs", "advEnemy",
-    "lapNorm", "seatAdv", "enemyExposed", "ourExposed", "hourglassFrac", "upNextFrac"];
+    "lapNorm", "seatAdv", "enemyExposed", "ourExposed", "hourglassFrac", "upNextFrac",
+    // v0.7 B2 spatial block (value_features.ts)
+    "nearEnemyDistOurs", "nearEnemyDistEnemy", "spreadOurs", "spreadEnemy", "centerDistOurs", "centerDistEnemy"];
 
 const rows = readFileSync(FILE, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
 console.log(`rows=${rows.length}`);

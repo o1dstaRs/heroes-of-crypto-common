@@ -16,6 +16,7 @@ import { STRATEGY_V0_3 } from "./versions/v0_3";
 import { STRATEGY_V0_4 } from "./versions/v0_4";
 import { STRATEGY_V0_5 } from "./versions/v0_5";
 import { STRATEGY_V0_6 } from "./versions/v0_6";
+import { STRATEGY_V0_6S } from "./versions/v0_6s";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
@@ -44,6 +45,10 @@ const STRATEGIES: readonly IAIStrategy[] = [
     STRATEGY_V0_3,
     STRATEGY_V0_4,
     STRATEGY_V0_5,
+    // v0.6s = v0.6 under a distinct version string, so the env-gated rollout SearchDriver can be applied to
+    // exactly one seat of a mirror (see versions/v0_6s.ts). Registered BEFORE v0.6 on purpose: the last
+    // entry defines LATEST_AI_VERSION, which must remain the shipped v0.6.
+    STRATEGY_V0_6S,
     STRATEGY_V0_6,
 ];
 

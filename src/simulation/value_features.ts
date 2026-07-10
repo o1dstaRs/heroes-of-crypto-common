@@ -26,6 +26,13 @@ export const VALUE_FEATURE_NAMES = [
     "ourExposed", // ourYetToAct / totalStacks
     "hourglassFrac", // units parked in the hourglass queue / totalStacks
     "upNextFrac", // remaining upNext queue size / totalStacks (how much of the lap is left)
+    // --- SPATIAL block (v0.7 B2: cheap board-geometry terms for the rollout-search leaf) -----------------
+    "nearEnemyDistOurs", // avg normalized Chebyshev distance from each of our stacks to its nearest enemy
+    "nearEnemyDistEnemy", // same for the enemy's stacks (their engagement distance to us)
+    "spreadOurs", // avg pairwise Chebyshev distance among our stacks (dispersion vs clustering)
+    "spreadEnemy", // same for the enemy
+    "centerDistOurs", // avg normalized Chebyshev distance of our stacks to the board center (narrowing safety)
+    "centerDistEnemy", // same for the enemy
 ] as const;
 
 export function extractValueFeatures(
@@ -47,6 +54,8 @@ export function extractValueFeatures(
     let enemyAdv = 0;
     let ourYet = 0;
     let enemyYet = 0;
+    const ourCells: { x: number; y: number }[] = [];
+    const enemyCells: { x: number; y: number }[] = [];
     for (const u of unitsHolder.getAllUnits().values()) {
         if (u.isDead()) {
             continue;
@@ -70,6 +79,7 @@ export function extractValueFeatures(
             ourWounded += wounded;
             ourAdv += adv;
             ourYet += yet;
+            ourCells.push(cell);
         } else {
             enemyHP += hp;
             enemyCnt += 1;
@@ -78,10 +88,57 @@ export function extractValueFeatures(
             enemyWounded += wounded;
             enemyAdv += adv;
             enemyYet += yet;
+            enemyCells.push(cell);
         }
     }
     const norm = (a: number, b: number): number => (a - b) / (a + b + 1);
     const totalStacks = ourCnt + enemyCnt + 1;
+    // --- spatial block (O(n^2) over <=~16 living stacks — trivially cheap) ---
+    const cheb = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+        Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+    const span = GRID_SIZE - 1;
+    const nearestEnemyDist = (own: { x: number; y: number }[], other: { x: number; y: number }[]): number => {
+        if (!own.length || !other.length) {
+            return 0;
+        }
+        let sum = 0;
+        for (const c of own) {
+            let best = Infinity;
+            for (const e of other) {
+                const d = cheb(c, e);
+                if (d < best) {
+                    best = d;
+                }
+            }
+            sum += best;
+        }
+        return sum / own.length / span;
+    };
+    const spread = (own: { x: number; y: number }[]): number => {
+        if (own.length < 2) {
+            return 0;
+        }
+        let sum = 0;
+        let pairs = 0;
+        for (let i = 0; i < own.length; i += 1) {
+            for (let j = i + 1; j < own.length; j += 1) {
+                sum += cheb(own[i], own[j]);
+                pairs += 1;
+            }
+        }
+        return sum / pairs / span;
+    };
+    const center = { x: span / 2, y: span / 2 };
+    const centerDist = (own: { x: number; y: number }[]): number => {
+        if (!own.length) {
+            return 0;
+        }
+        let sum = 0;
+        for (const c of own) {
+            sum += Math.max(Math.abs(c.x - center.x), Math.abs(c.y - center.y));
+        }
+        return sum / own.length / (span / 2);
+    };
     return [
         norm(ourHP, enemyHP),
         norm(ourCnt, enemyCnt),
@@ -97,5 +154,11 @@ export function extractValueFeatures(
         ourYet / totalStacks,
         fightProperties.getHourglassQueueSize() / totalStacks,
         fightProperties.getUpNextQueueSize() / totalStacks,
+        nearestEnemyDist(ourCells, enemyCells),
+        nearestEnemyDist(enemyCells, ourCells),
+        spread(ourCells),
+        spread(enemyCells),
+        centerDist(ourCells),
+        centerDist(enemyCells),
     ];
 }
