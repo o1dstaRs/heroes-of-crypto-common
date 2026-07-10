@@ -134,8 +134,37 @@ async function evalWeights(weights, seed, games) {
                     ["src/simulation/run_tournament.ts", OPT, BASE, String(games), String(seed), dir, String(PER_CONC), mapsFlag],
                     { cwd: REPO, env, stdio: "ignore" },
                 );
-                p.on("close", (code) => (code === 0 ? resolve() : reject(new Error("exit " + code))));
-                p.on("error", reject);
+                // Per-tournament wall-clock cap — a pure safety net against a TRULY non-terminating battle (an AI
+                // pair that never resolves). It must sit WELL ABOVE the legit runtime: a tournament costs ~0.15s
+                // /game at concurrency 1, so the default scales with the game count (300ms/game ≈ 2x headroom
+                // even under full 44-way load, e.g. 3000 games -> 900s). It only trips on a real hang; killing a
+                // legit-but-slow eval corrupts the search (it returns null -> fitness -1 and a good candidate looks
+                // terrible). p.kill kills the child directly — at PER_CONC=1 the tournament runs games in-process,
+                // so there are no orphans. Override with CEM_EVAL_TIMEOUT_MS for unusual configs.
+                const timeoutMs = Math.max(120_000, Number(process.env.CEM_EVAL_TIMEOUT_MS) || games * 300);
+                let done = false;
+                const timer = setTimeout(() => {
+                    if (done) return;
+                    done = true;
+                    try {
+                        p.kill("SIGKILL");
+                    } catch {
+                        /* already gone */
+                    }
+                    reject(new Error(`timeout ${timeoutMs}ms`));
+                }, timeoutMs);
+                p.on("close", (code) => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    return code === 0 ? resolve() : reject(new Error("exit " + code));
+                });
+                p.on("error", (e) => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    reject(e);
+                });
             });
             const f = readdirSync(dir).find((x) => x.endsWith(".summary.json"));
             if (!f) {
@@ -148,6 +177,12 @@ async function evalWeights(weights, seed, games) {
         } catch (e) {
             rmSync(dir, { recursive: true, force: true });
             console.log(`[cem] tournament failed (seed ${seed}, attempt ${attempt + 1}/3): ${String(e).slice(0, 120)}`);
+            // A timeout is DETERMINISTIC for this (seed, weights): the same battle will hang again, so retrying
+            // just burns another timeoutMs and stalls the whole generation (mapBatched waits on the slowest
+            // candidate). Prune immediately — a weight vector that produces non-terminating games is bad anyway.
+            if (String(e).includes("timeout")) {
+                break;
+            }
         }
     }
     return null;
