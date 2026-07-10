@@ -15,6 +15,7 @@ import { AbilityFactory } from "../../src/abilities/ability_factory";
 import type { IDecisionContext } from "../../src/ai";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
 import { routeAreaThrow } from "../../src/ai/versions/area_throw_router";
+import { StrategyV0_6 } from "../../src/ai/versions/v0_6";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
@@ -106,7 +107,7 @@ const candidatesOfKind = (candidates: readonly IEnumeratedCandidate[], kind: str
     candidates.filter((candidate) => candidate.kind === kind);
 
 describe("v0.6 Area Throw router", () => {
-    it("routes a two-target empty-cell splash when it strictly beats the incumbent shot", () => {
+    it("StrategyV0_6 routes a two-target empty-cell splash only when the gate is on", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
         const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
@@ -118,10 +119,16 @@ describe("v0.6 Area Throw router", () => {
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
         const context = contextFor(combat);
         const all = enumerateCandidates(gargantuan, context, endTurn(gargantuan)).candidates;
-        const incumbent = candidatesOfKind(all, "shot").find((candidate) => candidate.targetId === enemyA.getId());
+        const strategy = new StrategyV0_6();
+        const incumbentActions = withAreaThrowGate(undefined, () => strategy.decideTurn(gargantuan, context));
+        const incumbentAction = lastAction(incumbentActions);
+        expect(incumbentAction.type).toBe("range_attack");
+        const incumbent = candidatesOfKind(all, "shot").find(
+            (candidate) => candidate.targetId === (incumbentAction.type === "range_attack" && incumbentAction.targetId),
+        );
         expect(incumbent).toBeDefined();
 
-        const routed = withAreaThrowGate("on", () => routeAreaThrow(gargantuan, context, incumbent!.actions));
+        const routed = withAreaThrowGate("on", () => strategy.decideTurn(gargantuan, context));
         const action = lastAction(routed);
         expect(action.type).toBe("area_throw_attack");
 

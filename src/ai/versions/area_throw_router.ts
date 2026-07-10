@@ -131,7 +131,11 @@ export function routeAreaThrow(
         // Candidate 0 is intentionally the feature-light anchor, and the equivalent generated attack is
         // deduped against it. Re-enumerate with a neutral anchor to recover the incumbent attack's F4 score.
         const neutral: GameAction[] = [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
-        incumbentExpectedDamage = incumbentDamage(attack, enumerate(unit, context, neutral).candidates) ?? NaN;
+        const estimatedDamage = incumbentDamage(attack, enumerate(unit, context, neutral).candidates);
+        if (estimatedDamage === undefined) {
+            return incumbent;
+        }
+        incumbentExpectedDamage = estimatedDamage;
     }
 
     return best.features.expectedDamage > incumbentExpectedDamage ? best.actions : incumbent;
