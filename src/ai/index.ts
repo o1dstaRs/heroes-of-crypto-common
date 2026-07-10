@@ -67,11 +67,15 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * Promoted to v0.6 — the shipped default for in-game AI (was v0.5). v0.6 starts byte-for-byte identical to
- * v0.5 (extends it with no overrides); v0.5 is now PARKED as the frozen baseline that future v0.6 improvements
- * are measured against (the same role v0.4 played for v0.5).
+ * Promoted to v0.7 — the shipped default for in-game AI (was v0.6): v0.6 + the distilled wait-scorer baked
+ * in (S1 sign-off). Bake battery 2026-07-10 (fresh seeds 1000700..1080708 + 1090709/1091700/1092701, LIVETWIN):
+ * v0.7 vs v0.6 pooled 68.83% ± 0.24 (+18.83pp >= the +4pp §0 bar; 9/9 seeds positive), v0.7 vs v0.4 80.59%
+ * (plain v0.6's anchor was 73.17%), cohorts vs v0.6 all non-negative (melee 70.09 / mixed 62.67 / random
+ * 57.53), default-amount config 55.10% (seed 1093702), integrity <= 0.36% draws+armageddon, 0 rejections.
+ * v0.6 is now PARKED as the frozen baseline that future v0.7 improvements are measured against (the same
+ * role v0.5 played for v0.6).
  */
-export const DEFAULT_AI_VERSION = "v0.6";
+export const DEFAULT_AI_VERSION = "v0.7";
 
 export function getAIStrategy(version: string): IAIStrategy {
     const strategy = STRATEGY_BY_VERSION.get(version);
