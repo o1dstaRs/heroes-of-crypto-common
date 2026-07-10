@@ -124,6 +124,7 @@
     <span><b>Ratified:</b> 2026-07-09</span>
     <span><b>Provenance:</b> 34-agent analysis · 6 proposals · 18 adversarial verdicts · 0 dead on 2+ lenses</span>
     <span><b>Full dossier:</b> docs/v0_7_roadmap.md</span>
+    <span><b>Shipped:</b> v0.7 live default 2026-07-10 (Wave 6 — §9 executed)</span>
   </div>
   <nav>
     <a href="#goal">Acceptance</a><a href="#ceiling">Ceiling</a><a href="#chain">Causal chain</a>
@@ -176,7 +177,7 @@
       <p>Committed, one-switch live-faithful eval: per-creature <code>ceil(1000/exp)</code> stacks, melee-drafted cohorts, SEE_NONE, paired side-swap seeds — honored by <code>run_tournament</code> and <code>cem.mjs</code>. Every future gate reports its headline here.</p>
       <div class="kill"><b>KILL TEST</b> — v0.6 vs v0.4 under trained vs live amounts, 2×8,000 × 3 seeds. Edge shift ⇒ LiveTwin retrain is warranted; either way the config ships.</div>
     </div>
-    <div class="card" data-ws="F3"><span class="badge done">landed · mm wiring left</span>
+    <div class="card" data-ws="F3"><span class="badge done">done 07-10 · vs-AI mm wired</span>
       <h3><span class="id">F3</span>Deployment parity + bot seat</h3>
       <p>Client executes the full <code>GameAction[]</code>; server takeover → trained strategy (not pre-v0.5 findTarget); AI placement → <code>placeArmy</code> (not scatter); journal tags <code>actorType=AI + aiVersion</code>; persistent bot seat so v0.7 actually fights humans and real-game data accrues. ArangoDB audit decides real-loss-mining viability.</p>
       <p class="kv"><b>Honesty rule:</b> audit the fraction of turns hitting takeover/scatter/truncation before crediting parity pp — the bot seat is what makes it real.</p>
@@ -197,7 +198,7 @@
       <p class="kv"><b>Gain:</b> <span class="gain">+4–8pp</span> full-game · <b>Compute:</b> league pass ≈ 3–4h on zinc, 2/night · <b>Perk head:</b> anchored at SEE_NONE, frozen until pick_sim measures reveal frequency</p>
       <div class="kill"><b>KILL TEST</b> — 5-archetype payoff matrix (melee_coevo, flyer-max, ranged-max+Sniper3, hybrid, anchor), 2,000 games/cell, full live config. Dead if no archetype ≥55% vs melee_coevo AND oracle counter-picker &lt;+3pp at 5,000 games.</div>
     </div>
-    <div class="card" data-ws="B2"><span class="badge gated">all gates cleared · sign-off S2</span>
+    <div class="card" data-ws="B2"><span class="badge done">live for bot seats 07-10 (S2)</span>
       <h3><span class="id">B2</span>RAWS — wide-candidate rollout search</h3>
       <p>The 2-ply "tie" is code-verified to have tested ≤5 melee-only candidates with a single-sample leaf — search never saw the missing actions. Generalize <code>LookaheadDriver</code> into a SearchDriver over F4's generator; N=3 paired-seed rollouts to ~12-turn horizon on the learned-value leaf (refit +spatial features); override gate; kite candidates excluded (ledger-dead twice). Live path: fold-able shapes until F3 ships; price vs the 240s total-match budget; prefer distilling disagreements back into anchored dims (the Double Shot pattern).</p>
       <p class="kv"><b>Gain:</b> <span class="gain">+1–3pp</span> honest, upside in caster/ranged cohorts · <b>Cost:</b> ~4–6s/game; kill 2×2 fits 4–8h local</p>
@@ -214,13 +215,13 @@
 <section id="wins">
   <h2><span class="no">§5</span>Quick wins — cheap pp while big bets train</h2>
   <div class="grid g3">
-    <div class="card" data-ws="Q1"><span class="badge gated">census PASS · M1 salvage awaits sign-off</span>
+    <div class="card" data-ws="Q1"><span class="badge done">M1 salvage baked in v0.7 07-10</span>
       <h3><span class="id">Q1</span>Repertoire modules</h3>
       <p>MISPLAY_AUDIT census under the live distribution, then: <b>M1</b> universal caster router — Resurrection first (Angel/Harpy/Valkyrie/Troll are MELEE_MAGIC ⇒ fire on live melee drafts); <b>M2</b> Gargantuan area-throw + occlusion bugfix; <b>M3</b> rider-EV terms (petrify kill-EV, stun denial, kill-secure). One freeze-CEM pass on only the new dims restores selection signal above the 1pp floor. Validate through the ranked server path.</p>
       <p class="kv"><b>Gain:</b> <span class="gain">+1–3pp</span> live-weighted (M1 dominant)</p>
       <div class="kill"><b>KILL</b> — top-3 census gaps &lt;1.5% of unit-turns ⇒ dead in two days.</div>
     </div>
-    <div class="card" data-ws="Q2"><span class="badge gated">+18.8pp SHIPPED at gate · sign-off</span>
+    <div class="card" data-ws="Q2"><span class="badge done">baked into v0.7 07-10 (+18.8pp)</span>
       <h3><span class="id">Q2</span>Tempo Commander probe</h3>
       <p>Joint wait-sets have verifiably never been in any candidate space (lookahead stops at the first enemy reply). Act-vs-wait lap-rollout oracle as a driver-level interception, rolled through hourglass-queue resolution. Lap-horizon ablation first — if horizon doesn't change wait choices, it dies for ~zero compute. Gate-2 kill-plan is demoted (tactical-dart pattern).</p>
       <p class="kv"><b>Gain if alive:</b> <span class="gain">+1–3pp</span> distilled · days on the Mac</p>
@@ -265,35 +266,41 @@
     <li><b>Any pp claimed off the LiveTwin config</b>random rosters / free vision / {50,30,15,8} stacks each converted a "win" into a live regression</li>
     <li><b>B1 counter-draft league</b>DEAD FOR GOOD 07-10: full-information oracle on the REAL pick structure (bans/bundles/snake/collision reveals) monetizes all opponent information at +0.79pp±0.76 (95% upper ≈+2.3 &lt; +3pp gate); collisions already reveal in 47–100% of games; vision perk head stays frozen. Salvage = a NEW static-draft lever: blind role-prior policy beats DEFAULT_DRAFT_W by +13.63pp (missing flyer feature) — peer league work covers the retrain</li>
     <li><b>LiveTwin fight-vector retrain</b>killed 07-10: cross-config edge shift 0.92±0.41pp &lt; 1.5pp gate — the config is an eval standard, not a training opportunity</li>
-    <li><b>M1 caster router, wholesale enable</b>killed 07-10: −9.24pp±0.64 (Wild Regeneration gift −5.71pp, pre-empting Resurrection −2.36pp); only the res-no-preempt+windflow salvage (+1.3pp in-cohort) survives, behind owner sign-off</li>
+    <li><b>M1 caster router, wholesale enable</b>killed 07-10: −9.24pp±0.64 (Wild Regeneration gift −5.71pp, pre-empting Resurrection −2.36pp); only the res-no-preempt+windflow salvage survives — baked into v0.7 on 07-10 (+3.07pp in-cohort on the v0.7 base)</li>
   </ul>
 </section>
 
 <section id="signoff">
   <h2><span class="no">§9</span>Owner sign-off queue</h2>
-  <p class="lede">Everything below is measured, committed locally (default-OFF), and waiting on a human decision. Nothing ships live without it.</p>
+  <p class="lede">Everything below was measured and committed default-OFF, then EXECUTED under the owner's 07-10 Wave-6 authorization. S1–S3 are live code defaults; S4 shipped its journal flag (residual tail unfunded).</p>
   <div class="grid g2">
-    <div class="card"><span class="badge gated">decision 1</span>
+    <div class="card"><span class="badge done">executed 07-10</span>
       <h3><span class="id">S1</span>Flip the wait-scorer default ON</h3>
       <p>+18.82pp ±0.42 fresh-seed LIVETWIN; cohorts +16.2 (mixed) / +8.8 (random); transitivity vs v0.4: 81.1% vs 73.2%; integrity clean; CEM refinement tapped at gate (distilled weights are final). Commits <code>13b59a3</code>/<code>24f6521</code>, weights <code>DISTILLED_WAIT_WEIGHTS_2026_07_10</code>. This alone clears the §0 acceptance bar. Recommend: make it the code default for v0.6+ (becoming v0.7's core), remove the env dependence.</p>
+      <p class="kv"><b>Executed:</b> v0.7 minted — scorer baked as the built-in default (ALL-ZERO <code>V07_WAIT_WEIGHTS</code> = scorer-off escape hatch), <code>DEFAULT_AI_VERSION → v0.7</code> (<code>96ff38a</code>/<code>35ab838</code>). Powered bake battery: 68.83% ±0.24 vs v0.6 (9/9 fresh seeds), 80.59% vs v0.4.</p>
     </div>
-    <div class="card"><span class="badge gated">decision 2</span>
+    <div class="card"><span class="badge done">executed 07-10</span>
       <h3><span class="id">S2</span>Search-enabled bot seat (server-side RAWS)</h3>
       <p>Marginal +40.3pp ±0.5 on top of the scorer; opponent-model risk RESOLVED by zinc Arm E: with a deliberately wrong model (v0.4 vs actual v0.6) search still gains <b>+27.8pp ±0.5</b> — ~72% of the edge survives model error. Powered zinc arms: A +38.9±0.3, B range-heavy +38.3±0.4, C vs v0.4 +43.5±0.3. Cost ~86ms/searched turn ⇒ fits the 240s budget server-side. Needs: mm-queue vs-AI wiring (F3 leftover) + the S1 flip. Recommend: enable for bot seats only.</p>
+      <p class="kv"><b>Executed:</b> server-side SearchDriver for PERSISTENT BOT SEATS only (<code>bot_search.ts</code>, config-on in dev+prod, <code>HOC_BOT_SEARCH</code> override; takeover turns never pay the cost; gate/isolation hardening <code>1319896</code>). Live cost 86–250ms per overridden turn. vs-AI matchmaking auto-accepts <code>ai:</code> seats (<code>19f7b34</code>).</p>
     </div>
-    <div class="card"><span class="badge gated">decision 3</span>
+    <div class="card"><span class="badge done">executed 07-10</span>
       <h3><span class="id">S3</span>M1 caster-router salvage package</h3>
       <p><code>V06_CASTER_ROUTER=on V06_CASTER_SPELLS=resurrection,windflow V06_RES_PREEMPT=off</code>: +1.3pp ±0.42 in-cohort (Angel/Harpy/Valkyrie/Troll drafts), +0.08 neutral on the default mix, 0 engine rejections. Wholesale enable stays DEAD (−9.2pp). Recommend: make the salvage variant the code default; validate ranked-server cast path first (obstacle-attack precedent).</p>
+      <p class="kv"><b>Executed:</b> ranked-path gate PASSED live (7/7 routed casts accepted, 0 declined) → salvage baked into v0.7 as <code>V07_CASTER_ROUTER_POLICY</code> (<code>637178f</code>; res+windflow, non-pre-empting; wholesale rules stay dead; v0.6 experiments untouched). Preregistered POWERED battery on the shipped tree: 69.23% vs v0.6 / 80.74% vs v0.4, all cohorts green, 0 rejections. Salvage marginal on the v0.7 base: <b>+3.07pp ±0.65</b> in-cohort (6k paired, seed 77260710), dead-neutral 50.00% default mix.</p>
     </div>
-    <div class="card"><span class="badge gated">decision 4</span>
+    <div class="card"><span class="badge done">executed 07-10 · tail unfunded</span>
       <h3><span class="id">S4</span>Fund the residual tail? + push commits</h3>
       <p>+6.49pp ±1.11 tempo tail remains beyond the linear scorer (NEURO-class capacity or joint wait-sets would chase it; B2 search already covers it when active — low priority if S2 ships). Also: ~a dozen local-only commits across common/server/client mains need a push decision, and the journal enrichment flag (<code>HOC_JOURNAL_FULL=1</code>) needs enabling in an environment to start accruing real-game data.</p>
+      <p class="kv"><b>Executed:</b> journal full-replay ON in dev, OFF in prod (<code>HOC_JOURNAL_FULL</code> override) — 109/109 full-payload entries verified live. All three repos pushed. Residual tempo tail NOT funded: B2 search covers it on bot seats; revisit only if bot-seat journals show tempo misses.</p>
     </div>
   </div>
 </section>
 
 <section id="log">
   <h2><span class="no">§8</span>Status log</h2>
+  <div class="entry"><time>07-10 16:5x</time>WAVE 6 SHIPPED — <b>v0.7 IS THE LIVE DEFAULT</b>. S1: v0.7 minted (wait-scorer baked; <code>DEFAULT_AI_VERSION → v0.7</code>); powered bake battery 68.83% ±0.24 vs v0.6 (9/9 fresh seeds; 80.59% vs v0.4). S3: ranked-path gate passed live (7/7 routed casts accepted, 0 declined) → caster salvage baked as v0.7 policy (<code>637178f</code>, Resurrection+Wind Flow non-pre-empting); preregistered POWERED battery on the shipped tree: <b>PASS</b> — 69.23% vs v0.6, 80.74% vs v0.4, all 6 cohort gates green, integrity 0.39%, 0 rejections; salvage marginal on the v0.7 base <b>+3.07pp ±0.65</b> in-cohort (6k paired) and dead-neutral 50.00% on the default mix (6k). S2: server-side RAWS live for persistent bot seats only (86–250ms per overridden turn; humans never wait); vs-AI mm auto-accepts <code>ai:</code> seats; hardening <code>1319896</code>. S4: <code>HOC_JOURNAL_FULL</code> on in dev (109/109 full-payload). Integration: common 672 / server 243 / client 773 tests green, tsc+lint clean; default-path LIVETWIN sanity <b>69.9%</b> (2k, fresh seed 77270711); client submodule → <code>637178f</code>; all three repos pushed. Residual tail stays unfunded — B2 covers it where it matters.</div>
+  <div class="entry"><time>07-10 16:0x</time>Zinc run fully drained (RUN DONE, 40/40 all arms). Arm E FINAL: <b>+28.21pp ±0.46</b> (8k games) — confirms the partial; ~73% of the search edge survives a wrong opponent model. Node idle and reserved for the v0.7 mega-validation once Wave 6's mint lands. Wave 6 (S1–S4 execution, owner-authorized) in flight: mint v0_7 + bake battery → server vs-AI wiring + ranked caster validation → client bump → integration.</div>
   <div class="entry"><time>07-10 15:2x</time>PROGRAM COMPLETE — final measurement in. Zinc Arm E (rollouts mis-modeling the opponent as v0.4): <b>+27.84pp ±0.54</b> vs Arm A's +38.88 with the true model ⇒ ~72% of the search edge survives a badly wrong opponent model; opponent-model share ≈ 11pp. All four zinc arms + both Mac arbitration cells cleared every gate. v0.7 = v0.6 + wait-scorer (S1) + server-side search for bot seats (S2) + M1 salvage (S3), all default-OFF awaiting sign-off. Zinc frees up when Arm E's remaining shards drain; keepalive stays dead (peer co-manages the node).</div>
   <div class="entry"><time>07-10 14:5x</time>Zinc Arms B+C collected: range-heavy <b>+38.30pp ±0.37</b> (audit fallback earned its keep — 32/40 shards hit the timeout but per-game records survived); transitivity vs v0.4 <b>+43.49pp ±0.28</b> (plain v0.6 is +22.9 vs v0.4 — search's edge is fully transitive). Original B2 kill gate: obliterated on every arm. Arm E (opponent-model mismatch, the S2 risk number) lands ~15:45 PDT.</div>
   <div class="entry"><time>07-10 14:0x</time>Zinc Arm A collected (peer session had invalidated the pre-fix run and relaunched on tree dbe9356 — engine caveat retired): search vs plain v0.6 = <b>+38.88pp ±0.26</b> (15.2k games) — the powered confirmation of the tripwire. Arms B (range-heavy, mid-run), C (vs v0.4), E (opponent-model mismatch — the key remaining number) finish ~15:45–16:30 PDT. §9 Owner sign-off queue added.</div>
