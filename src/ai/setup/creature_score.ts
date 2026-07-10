@@ -31,6 +31,9 @@ export interface ICreatureInfo {
     shots: number;
     distance: number;
     exp: number;
+    hp: number;
+    armor: number;
+    speed: number;
     abilities: string;
     /** movement_type === "FLY" — the beneficiary signal for Nature's +Fly-Armor synergy. */
     canFly: boolean;
@@ -52,6 +55,9 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             range_shots?: number;
             shot_distance?: number;
             exp?: number;
+            hp?: number;
+            armor?: number;
+            speed?: number;
             level?: number;
             abilities?: string[];
             movement_type?: string;
@@ -88,6 +94,9 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,
                 exp: cfg.exp ?? 0,
+                hp: cfg.hp ?? 0,
+                armor: cfg.armor ?? 0,
+                speed: cfg.speed ?? 0,
                 abilities: abilityList.join(" "),
                 canFly: cfg.movement_type === "FLY",
                 melee: (cfg.attack_type ?? "").includes("MELEE"),
