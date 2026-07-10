@@ -1273,6 +1273,19 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     .some((ec) => f.some((fc) => Math.max(Math.abs(ec.x - fc.x), Math.abs(ec.y - fc.y)) <= waRange)),
             ).length;
         };
+        // Armageddon-aware trade caution (dim 59, default 0 = v0.5). Near armageddon (lap 12, escalating damage to
+        // ALL units) the mutual attrition favours whoever is AHEAD on total HP. Modulate the retaliation-cost by
+        // proximity*(-lead): AHEAD+late → more caution (preserve the lead); BEHIND+late → less caution (force
+        // trades before it evens out). Computed once per decision (constant across candidate targets).
+        const wArmageddon = this.w[59] ?? 0;
+        const armaLap = fp?.getCurrentLap?.() ?? 0;
+        const armaProximity = Math.max(0, Math.min(1, (armaLap - 8) / 4));
+        let myTeamHp = unit.getCumulativeHp();
+        for (const a of myAllies) myTeamHp += a.getCumulativeHp();
+        let enemyTeamHp = 0;
+        for (const e of enemies) enemyTeamHp += e.getCumulativeHp();
+        const armaLead = (myTeamHp - enemyTeamHp) / Math.max(1, myTeamHp + enemyTeamHp);
+        const armageddonTrade = armaProximity * -armaLead;
         const atkMul = this.meleeAttacks(unit);
         const score = (c: Cand): number => {
             const min = atkMul * unit.calculateAttackDamageMin(unit.getAttack(), c.target, false, 0, 1);
@@ -1348,7 +1361,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wMeleeCaster * targetCaster +
                 wRapidCharge * rapidCharge +
                 wRangedTarget * targetRanged +
-                wBait * baitRetal
+                wBait * baitRetal +
+                wArmageddon * armageddonTrade * counter
             );
         };
         let best: Cand | undefined;

@@ -114,6 +114,11 @@ export const V05_WEIGHT_KEYS = [
     // striking a FRESH (not-yet-retaliated) HIGH-firepower enemy to SPEND its retaliation, so valuable allies
     // then hit that now-responded target for free (the existing retalFree signal exploits it → emergent combo).
     "meleeBaitRetal",
+    // [59] NEW: armageddon-aware trade caution. Near armageddon (lap 12+, escalating damage to ALL units) the
+    // mutual attrition favours whoever's AHEAD on total HP. So when ahead+late, avoid trades (preserve the
+    // lead, let armageddon finish them); when behind+late, ACCEPT trades to force kills before it evens out.
+    // Modulates the retaliation-cost (counter) term by proximity*(-lead). 0 = v0.5 behaviour.
+    "meleeArmageddonTrade",
 ] as const;
 
 /**
@@ -158,6 +163,8 @@ export const DEFAULT_V05_W: readonly number[] = [
     // [56..58] meleeRapidCharge, meleeRangedTarget, meleeBaitRetal — all 0 (untrained → v0.5 behaviour byte-
     // identical). [58] baiting is trained separately on the node (CEM_FREEZE_BELOW=58).
     0, 0, 0,
+    // [59] meleeArmageddonTrade — 0 (untrained → v0.5 byte-identical). Trained on the node (CEM_FREEZE_BELOW=59).
+    0,
 ];
 
 /**
