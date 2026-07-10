@@ -28,14 +28,7 @@ import { LIVETWIN_PRESET, liveTwinSetup } from "./livetwin";
 
 export const AUDITED_VERSION = "v0.6";
 export const MISPLAY_KILL_THRESHOLD = 0.015;
-export const FOCUS_CAPABILITIES = [
-    "spell:Resurrection",
-    "spell:Wind Flow",
-    "spell:Castling",
-    "area_throw",
-    "defend",
-    "wait",
-] as const;
+export const FOCUS_CAPABILITIES = ["spell:Resurrection", "spell:Wind Flow", "spell:Castling", "area_throw"] as const;
 
 export type FocusCapability = (typeof FOCUS_CAPABILITIES)[number];
 export type CandidateEnumerator = (unit: Unit, context: IDecisionContext, incumbent: GameAction[]) => ICandidateSet;
@@ -131,6 +124,8 @@ export interface IMisplayAuditReport {
     classBreakdown: IOpportunitySummary[];
     spellBreakdown: IOpportunitySummary[];
     focusBreakdown: Record<FocusCapability, IOpportunitySummary>;
+    /** Q1 M1/M2 repertoire gaps only. Baseline move/melee/shot/defend/wait remain class diagnostics. */
+    repertoireGapBreakdown: IOpportunitySummary[];
     topMissedCapabilities: IOpportunitySummary[];
     creatures: ICreatureAuditSummary[];
     topCreatures: ICreatureAuditSummary[];
@@ -140,7 +135,8 @@ export interface IMisplayAuditReport {
         ignoredStrategyTurns: number;
     };
     topThreeKillMetric: {
-        metric: "sum of the top three per-turn omission shares; opportunities may overlap on one turn";
+        metric: "sum of the top three Q1 repertoire-gap shares (spell:* and area_throw); opportunities may overlap on one turn";
+        eligibleCapabilities: "spell:* and area_throw";
         topThree: IOpportunitySummary[];
         summedOpportunityShare: number;
         threshold: typeof MISPLAY_KILL_THRESHOLD;
@@ -425,6 +421,9 @@ export function finalizeMisplayAudit(options: IMisplayAuditOptions, tally: IMisp
     const classBreakdown = summaries(tally.classCounters, turns);
     const spellBreakdown = summaries(tally.spellCounters, turns);
     const topMissedCapabilities = summaries(tally.capabilityCounters, turns);
+    const repertoireGapBreakdown = topMissedCapabilities.filter(
+        (summary) => summary.key === "area_throw" || summary.key.startsWith("spell:"),
+    );
     const zeroSummary = (key: string): IOpportunitySummary => ({
         key,
         opportunityTurns: 0,
@@ -465,7 +464,7 @@ export function finalizeMisplayAudit(options: IMisplayAuditOptions, tally: IMisp
                 b.actingTurns - a.actingTurns ||
                 a.creature.localeCompare(b.creature),
         );
-    const topThree = topMissedCapabilities.slice(0, 3);
+    const topThree = repertoireGapBreakdown.slice(0, 3);
     const summedOpportunityShare = topThree.reduce((sum, entry) => sum + entry.shareOfActingTurns, 0);
     const setup = liveTwinSetup();
     return {
@@ -499,6 +498,7 @@ export function finalizeMisplayAudit(options: IMisplayAuditOptions, tally: IMisp
         classBreakdown,
         spellBreakdown,
         focusBreakdown,
+        repertoireGapBreakdown,
         topMissedCapabilities,
         creatures,
         topCreatures: creatures.slice(0, 20),
@@ -508,7 +508,8 @@ export function finalizeMisplayAudit(options: IMisplayAuditOptions, tally: IMisp
             ignoredStrategyTurns: tally.ignoredStrategyTurns,
         },
         topThreeKillMetric: {
-            metric: "sum of the top three per-turn omission shares; opportunities may overlap on one turn",
+            metric: "sum of the top three Q1 repertoire-gap shares (spell:* and area_throw); opportunities may overlap on one turn",
+            eligibleCapabilities: "spell:* and area_throw",
             topThree,
             summedOpportunityShare,
             threshold: MISPLAY_KILL_THRESHOLD,
@@ -518,8 +519,9 @@ export function finalizeMisplayAudit(options: IMisplayAuditOptions, tally: IMisp
         limitations: [
             "An omission means an engine-legal alternative class existed and v0.6 chose no action in that class; it is not evidence the alternative was better.",
             "Opportunity shares overlap because one unit-turn can omit multiple candidate classes or spells.",
+            "The Q1 top-three threshold uses only repertoire gaps (individual spells and area_throw); always-legal baseline classes remain diagnostic and cannot dominate the gate.",
+            "M3 rider-EV scorer gaps (petrify/stun/kill-secure/charge valuation) are not observable from action-class enumeration yet and require score-level instrumentation.",
             "The top-three threshold is reported as the roadmap's census gate, but this harness never claims a performance or bake verdict.",
-            "Castling is enumerator-legal, but executing it in battle_engine still requires wiring the same movement-range callback into GameActionEngine.",
             "The census covers fight decisions only; pick_sim draft/setup/placement opportunities are outside its scope.",
         ],
     };

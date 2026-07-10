@@ -123,7 +123,10 @@ describe("MISPLAY_AUDIT census", () => {
                     candidate("incumbent"),
                     candidate("defend"),
                     candidate("wait"),
+                    candidate("spell", "Wind Flow"),
+                    ...(i < 3 ? [candidate("area_throw")] : []),
                     ...(i < 2 ? [candidate("spell", "Castling")] : []),
+                    ...(i < 1 ? [candidate("spell", "Resurrection")] : []),
                 ],
                 truncated: [],
             }));
@@ -131,14 +134,24 @@ describe("MISPLAY_AUDIT census", () => {
         tally.games = 1;
         const report = finalizeMisplayAudit({ games: 1, baseSeed: 1 }, tally);
         expect(report.focusBreakdown["spell:Castling"].opportunityTurns).toBe(2);
+        expect(report.classBreakdown.find((entry) => entry.key === "defend")?.opportunityTurns).toBe(4);
+        expect(report.repertoireGapBreakdown.map((entry) => entry.key)).toEqual([
+            "spell:Wind Flow",
+            "area_throw",
+            "spell:Castling",
+            "spell:Resurrection",
+        ]);
         expect(report.topThreeKillMetric.topThree.map((entry) => entry.key)).toEqual([
-            "defend",
-            "wait",
+            "spell:Wind Flow",
+            "area_throw",
             "spell:Castling",
         ]);
-        expect(report.topThreeKillMetric.summedOpportunityShare).toBe(2.5);
+        expect(report.topThreeKillMetric.summedOpportunityShare).toBe(2.25);
+        expect(report.topThreeKillMetric.eligibleCapabilities).toBe("spell:* and area_throw");
         expect(report.topThreeKillMetric.threshold).toBe(0.015);
         expect(report.topThreeKillMetric.verdict).toBe("not_claimed");
         expect(report.limitations.some((limitation) => limitation.includes("not evidence"))).toBe(true);
+        expect(report.limitations.some((limitation) => limitation.includes("M3 rider-EV"))).toBe(true);
+        expect(report.limitations.some((limitation) => limitation.includes("still requires wiring"))).toBe(false);
     });
 });
