@@ -1,0 +1,430 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import { describe, expect, it } from "bun:test";
+
+import { AbilityFactory } from "../../src/abilities/ability_factory";
+import type { IDecisionContext } from "../../src/ai";
+import {
+    enumerateCandidates,
+    getEnemiesCellsWithinMovementRange,
+    type IEnumeratedCandidate,
+} from "../../src/ai/candidates";
+import { getCreatureConfig } from "../../src/configuration/config_provider";
+import { EffectFactory } from "../../src/effects/effect_factory";
+import type { GameAction } from "../../src/engine/actions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getPositionForCells } from "../../src/grid/grid_math";
+import { PathHelper } from "../../src/grid/path_helper";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Unit } from "../../src/units/unit";
+import type { XY } from "../../src/utils/math";
+import {
+    createCombatTestContext,
+    createTestUnit,
+    placeUnit,
+    testGridSettings,
+    type CombatTestContext,
+} from "../helpers/combat";
+
+const LOWER = PBTypes.TeamVals.LOWER;
+const UPPER = PBTypes.TeamVals.UPPER;
+const MELEE = PBTypes.AttackVals.MELEE;
+const RANGE = PBTypes.AttackVals.RANGE;
+const FLY = PBTypes.MovementVals.FLY;
+
+function ctxFor(c: CombatTestContext, withFight = false): IDecisionContext {
+    return {
+        grid: c.grid,
+        matrix: c.grid.getMatrix(),
+        unitsHolder: c.unitsHolder,
+        pathHelper: new PathHelper(testGridSettings),
+        attackHandler: c.attackHandler,
+        fightProperties: withFight ? FightStateManager.getInstance().getFightProperties() : undefined,
+    };
+}
+
+function makeReal(team: number, faction: string, name: string): Unit {
+    const ef = new EffectFactory();
+    const af = new AbilityFactory(ef);
+    return Unit.createUnit(
+        getCreatureConfig(team, faction, name, "", 100),
+        testGridSettings,
+        team,
+        PBTypes.UnitVals.CREATURE,
+        af,
+        ef,
+        false,
+    );
+}
+
+/** Place a LARGE (2x2) unit with its 4-cell footprint properly occupied (placeUnit only does 1 cell). */
+function placeLarge(c: CombatTestContext, unit: Unit, base: XY): void {
+    const cells = [
+        { x: base.x, y: base.y },
+        { x: base.x - 1, y: base.y },
+        { x: base.x, y: base.y - 1 },
+        { x: base.x - 1, y: base.y - 1 },
+    ];
+    const position = getPositionForCells(testGridSettings, cells);
+    if (!position) {
+        throw new Error("bad large placement");
+    }
+    unit.setPosition(position.x, position.y);
+    c.grid.occupyCells(
+        cells,
+        unit.getId(),
+        unit.getTeam(),
+        unit.getAttackRange(),
+        unit.hasAbilityActive("Made of Fire"),
+        unit.hasAbilityActive("Made of Water"),
+    );
+    c.unitsHolder.addUnit(unit);
+}
+
+const endTurn = (unit: Unit): GameAction[] => [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+const ofKind = (cands: IEnumeratedCandidate[], kind: string): IEnumeratedCandidate[] =>
+    cands.filter((cand) => cand.kind === kind);
+
+describe("candidates — the F4 enumerated candidate generator", () => {
+    it("candidate 0 is ALWAYS the incumbent decision (anchor pattern), verbatim", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 2 });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 4, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 4, y: 5 });
+        const incumbent = endTurn(unit);
+        const { candidates } = enumerateCandidates(unit, ctxFor(c), incumbent);
+        expect(candidates.length).toBeGreaterThan(1);
+        expect(candidates[0].kind).toBe("incumbent");
+        expect(candidates[0].actions).toBe(incumbent); // the exact array, not a copy
+    });
+
+    it("melee: emits in-place strikes on EVERY adjacent enemy", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, speed: 3, amountAlive: 5 });
+        const adj1 = createTestUnit({ team: UPPER, name: "Adj1", attackType: MELEE, amountAlive: 3 });
+        const adj2 = createTestUnit({ team: UPPER, name: "Adj2", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, adj1, { x: 5, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, adj2, { x: 6, y: 5 });
+        const { candidates } = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+
+        const melee = ofKind(candidates, "melee");
+        const targets = new Set(melee.map((m) => m.targetId));
+        expect(targets.has(adj1.getId())).toBe(true);
+        expect(targets.has(adj2.getId())).toBe(true);
+
+        // In-place strike: single melee_attack from the current cell, no move.
+        const inPlace = melee.find((m) => m.targetId === adj1.getId() && m.standCell?.x === 5 && m.standCell?.y === 5);
+        expect(inPlace).toBeDefined();
+        expect(inPlace!.actions.some((a) => a.type === "move_unit")).toBe(false);
+        // Every melee candidate carries a damage feature.
+        for (const m of melee) {
+            expect(m.features.expectedDamage).toBeGreaterThan(0);
+        }
+    });
+
+    it("melee: emits move-and-strike (move_unit + stationary melee_attack) pairs across stand cells", () => {
+        const c = createCombatTestContext();
+        // Unengaged unit (aggro pathing constrains movement once adjacent to an enemy — that legality
+        // is intentional and mirrors v0.5's enumeration).
+        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, speed: 4, amountAlive: 5 });
+        const far = createTestUnit({ team: UPPER, name: "Far", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, far, { x: 5, y: 8 }); // stand cells (4..6,7) reachable within 3 steps
+        const { candidates } = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+        const melee = ofKind(candidates, "melee").filter((m) => m.targetId === far.getId());
+        expect(melee.length).toBeGreaterThan(1); // several distinct stand cells around the target
+
+        const moveStrike = melee[0];
+        const types = moveStrike.actions.map((a) => a.type);
+        expect(types).toContain("move_unit");
+        expect(types[types.length - 1]).toBe("melee_attack");
+        const strike = moveStrike.actions[moveStrike.actions.length - 1];
+        if (strike.type === "melee_attack") {
+            expect(strike.attackFrom).toEqual(moveStrike.standCell!);
+            expect(strike.path).toBeUndefined(); // stationary strike after the standalone move
+        }
+        // Distinct stand cells enumerated (target x stand-cell pairs, not just one per target).
+        const stands = new Set(melee.map((m) => `${m.standCell!.x},${m.standCell!.y}`));
+        expect(stands.size).toBe(melee.length);
+    });
+
+    it("moves: every reachable destination; capped enumeration reports truncation", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Runner", attackType: MELEE, speed: 4 });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
+
+        const full = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+        const fullMoves = ofKind(full.candidates, "move");
+        expect(fullMoves.length).toBeGreaterThan(10); // speed 4 in open field
+        expect(full.truncated).toEqual([]);
+
+        const capped = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMoveDestinations: 3 });
+        const cappedMoves = ofKind(capped.candidates, "move");
+        expect(cappedMoves.length).toBe(3);
+        expect(capped.truncated).toContain("move");
+        // Principled top-K: kept destinations are the nearest-to-enemy ones (advance).
+        for (const m of cappedMoves) {
+            expect(m.targetCell!.y).toBeGreaterThan(8);
+        }
+    });
+
+    it("defend is always offered; wait (hourglass) only when the engine would accept it", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 1 });
+        const ally = createTestUnit({ team: LOWER, name: "A", attackType: MELEE });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 3, y: 12 });
+        const fp = FightStateManager.getInstance().getFightProperties();
+        fp.setTeamUnitsAlive(LOWER, 2);
+
+        const withWait = enumerateCandidates(unit, ctxFor(c, true), endTurn(unit));
+        expect(ofKind(withWait.candidates, "defend").length).toBe(1);
+        const wait = ofKind(withWait.candidates, "wait");
+        expect(wait.length).toBe(1);
+        expect(wait[0].features.hourglassSpent).toBe(1);
+        expect(wait[0].features.moraleDelta).toBeLessThan(0);
+
+        // Already hourglassed this lap -> the engine would reject wait -> no wait candidate.
+        fp.enqueueHourglass(unit.getId());
+        const noWait = enumerateCandidates(unit, ctxFor(c, true), endTurn(unit));
+        expect(ofKind(noWait.candidates, "wait").length).toBe(0);
+        // No fightProperties in context -> wait legality unknowable -> not offered.
+        const noFp = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+        expect(ofKind(noFp.candidates, "wait").length).toBe(0);
+    });
+
+    it("shots: aim alternatives per enemy, deduped by identical hit set; lone enemy -> exactly one shot", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            speed: 2,
+            amountAlive: 5,
+        });
+        const lone = createTestUnit({ team: UPPER, name: "Lone", attackType: MELEE, amountAlive: 5 });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, lone, { x: 10, y: 10 });
+        const { candidates } = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter));
+        const shots = ofKind(candidates, "shot");
+        // Every observable edge of a lone small enemy hits the identical {enemy} set at the same
+        // divisor -> alternative aims collapse to ONE candidate.
+        expect(shots.length).toBe(1);
+        expect(shots[0].targetId).toBe(lone.getId());
+        expect(shots[0].features.spendsRangeShot).toBe(1);
+        expect(shots[0].features.expectedDamage).toBeGreaterThan(0);
+        const shot = shots[0].actions[shots[0].actions.length - 1];
+        expect(shot.type).toBe("range_attack");
+        if (shot.type === "range_attack") {
+            expect(shot.aimCell).toBeDefined();
+            expect(shot.aimSide).toBeDefined();
+        }
+    });
+
+    it("shots: a pinned shooter (adjacent enemy) gets NO shot candidates (engine would reject)", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({ team: LOWER, name: "Pinned", attackType: RANGE, rangeShots: 5 });
+        const pinner = createTestUnit({ team: UPPER, name: "Pinner", attackType: MELEE, amountAlive: 5 });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, pinner, { x: 3, y: 4 });
+        const { candidates } = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter));
+        expect(ofKind(candidates, "shot").length).toBe(0);
+        expect(ofKind(candidates, "area_throw").length).toBe(0);
+    });
+
+    it("area_throw (Gargantuan): aim cells whose splash reaches enemies, incl. a two-enemy cluster aim", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan"); // RANGE, size 2, Area Throw + Double Shot
+        const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 5, maxHp: 50 });
+        const e2 = createTestUnit({ team: UPPER, name: "E2", attackType: MELEE, amountAlive: 5, maxHp: 50 });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        // Clustered enemies with the empty cell (10,10) adjacent to BOTH.
+        placeUnit(c.grid, c.unitsHolder, e1, { x: 10, y: 11 });
+        placeUnit(c.grid, c.unitsHolder, e2, { x: 11, y: 10 });
+        const { candidates } = enumerateCandidates(garg, ctxFor(c), endTurn(garg));
+        const throws = ofKind(candidates, "area_throw");
+        expect(throws.length).toBeGreaterThan(0);
+        for (const t of throws) {
+            // Engine legality: in-grid and not unit-occupied.
+            const occupant = c.grid.getOccupantUnitId(t.targetCell!);
+            expect(!occupant || occupant === "L" || occupant === "W").toBe(true);
+            expect(t.features.spendsRangeShot).toBe(1);
+        }
+        // The cluster cell must be among the aims, and its splash (both enemies) out-damages
+        // any single-enemy splash.
+        const cluster = throws.find((t) => t.targetCell!.x === 10 && t.targetCell!.y === 10);
+        expect(cluster).toBeDefined();
+        const maxDamage = Math.max(...throws.map((t) => t.features.expectedDamage));
+        expect(cluster!.features.expectedDamage).toBe(maxDamage);
+        // Gargantuan also gets plain ranged shots (it is a shooter).
+        expect(ofKind(candidates, "shot").length).toBeGreaterThan(0);
+    });
+
+    it("Angel: Resurrection candidates target living allies with dead bodies and price the passive charge", () => {
+        const c = createCombatTestContext();
+        const angel = makeReal(LOWER, "Life", "Angel"); // MELEE_MAGIC, ability-granted Resurrection
+        angel.setStackPower(5); // spell requires caster stack power >= 3
+        const hurt = createTestUnit({ team: LOWER, name: "Hurt", attackType: MELEE, amountAlive: 5, maxHp: 10 });
+        const fresh = createTestUnit({ team: LOWER, name: "Fresh", attackType: MELEE, amountAlive: 5, maxHp: 10 });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        placeLarge(c, angel, { x: 4, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, hurt, { x: 8, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, fresh, { x: 9, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 12 });
+        hurt.applyDamage(25, 0, new SceneLogMock()); // kills 2 of the 10-hp stack -> amountDied > 0
+        expect(hurt.getAmountDied()).toBeGreaterThan(0);
+
+        const { candidates } = enumerateCandidates(angel, ctxFor(c), endTurn(angel));
+        const res = ofKind(candidates, "spell").filter((s) => s.spellName === "Resurrection");
+        expect(res.length).toBe(1); // only the ally with dead bodies is a legal target
+        expect(res[0].targetId).toBe(hurt.getId());
+        // Opportunity cost: the cast burns the Angel's own on-death auto-res charge.
+        expect(res[0].features.burnsResurrectionCharge).toBe(1);
+        expect(res[0].features.spendsSpellCharge).toBe(1);
+        // And the MELEE_MAGIC Angel still gets melee/move candidates alongside the cast.
+        expect(ofKind(candidates, "move").length).toBeGreaterThan(0);
+    });
+
+    it("Valkyrie: Wind Flow (ALL_FLYING mass) is emitted when a flyer is on the board", () => {
+        const c = createCombatTestContext();
+        const valk = makeReal(LOWER, "Life", "Valkyrie");
+        valk.setStackPower(5); // Wind Flow requires stack power 5
+        const flyer = createTestUnit({ team: UPPER, name: "Flyer", attackType: MELEE, movementType: FLY });
+        placeUnit(c.grid, c.unitsHolder, valk, { x: 4, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, flyer, { x: 4, y: 12 });
+        const { candidates } = enumerateCandidates(valk, ctxFor(c), endTurn(valk));
+        const wind = ofKind(candidates, "spell").filter((s) => s.spellName === "Wind Flow");
+        expect(wind.length).toBe(1);
+        expect(wind[0].targetId).toBeUndefined(); // mass cast carries no target
+        const cast = wind[0].actions[0];
+        expect(cast.type).toBe("cast_spell");
+    });
+
+    it("Harpy: Castling targets exactly the SMALL enemies within movement range", () => {
+        const c = createCombatTestContext();
+        const harpy = makeReal(LOWER, "Might", "Harpy"); // speed 7.6 flyer with Castling
+        harpy.setStackPower(5); // Castling requires stack power 4
+        const near = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 3 });
+        const farAway = createTestUnit({ team: UPPER, name: "FarAway", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, harpy, { x: 2, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, near, { x: 5, y: 5 }); // within ~7 steps
+        placeUnit(c.grid, c.unitsHolder, farAway, { x: 15, y: 15 }); // out of reach
+        const ctx = ctxFor(c);
+
+        const cells = getEnemiesCellsWithinMovementRange(harpy, ctx);
+        expect(cells).toContainEqual({ x: 5, y: 5 });
+        expect(cells).not.toContainEqual({ x: 15, y: 15 });
+
+        const { candidates } = enumerateCandidates(harpy, ctx, endTurn(harpy));
+        const castling = ofKind(candidates, "spell").filter((s) => s.spellName === "Castling");
+        expect(castling.length).toBe(1);
+        expect(castling[0].targetId).toBe(near.getId());
+    });
+
+    it("Harpy: a LARGE enemy within range is NOT a Castling target", () => {
+        const c = createCombatTestContext();
+        const harpy = makeReal(LOWER, "Might", "Harpy");
+        harpy.setStackPower(5);
+        const big = makeReal(UPPER, "Nature", "Gargantuan"); // size 2
+        placeUnit(c.grid, c.unitsHolder, harpy, { x: 2, y: 2 });
+        placeLarge(c, big, { x: 6, y: 6 });
+        const { candidates } = enumerateCandidates(harpy, ctxFor(c), endTurn(harpy));
+        expect(ofKind(candidates, "spell").filter((s) => s.spellName === "Castling").length).toBe(0);
+    });
+
+    it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 2, amountAlive: 3 });
+        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
+        // Incumbent IS the in-place strike -> the melee enumeration must not repeat it.
+        const incumbent: GameAction[] = [
+            { type: "melee_attack", attackerId: unit.getId(), targetId: enemy.getId(), attackFrom: { x: 5, y: 5 } },
+        ];
+        const { candidates } = enumerateCandidates(unit, ctxFor(c), incumbent);
+        const dupes = candidates.filter(
+            (cand) =>
+                cand.kind === "melee" &&
+                cand.targetId === enemy.getId() &&
+                cand.standCell?.x === 5 &&
+                cand.standCell?.y === 5,
+        );
+        expect(dupes.length).toBe(0);
+        expect(candidates[0].actions).toBe(incumbent);
+    });
+
+    it("is deterministic: two runs on the same board produce identical candidate sets", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 3, amountAlive: 4 });
+        const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 4 });
+        const e2 = createTestUnit({ team: UPPER, name: "E2", attackType: MELEE, amountAlive: 4 });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 6, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, e1, { x: 6, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, e2, { x: 9, y: 6 });
+        const a = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+        const b = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
+        expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    });
+
+    it("bench: enumeration cost per turn on a populated board (logged)", () => {
+        const c = createCombatTestContext();
+        const movers: Unit[] = [];
+        // 2x6 mid-game-ish board: melee wall + shooters + the Gargantuan (widest enumeration).
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        placeLarge(c, garg, { x: 3, y: 3 });
+        movers.push(garg);
+        for (let i = 0; i < 4; i += 1) {
+            const m = createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, speed: 4, amountAlive: 5 });
+            placeUnit(c.grid, c.unitsHolder, m, { x: 5 + i * 2, y: 4 });
+            movers.push(m);
+        }
+        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 8, amountAlive: 5 });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 13, y: 3 });
+        movers.push(shooter);
+        for (let i = 0; i < 6; i += 1) {
+            const e = createTestUnit({ team: UPPER, name: `E${i}`, attackType: MELEE, speed: 4, amountAlive: 5 });
+            placeUnit(c.grid, c.unitsHolder, e, { x: 3 + i * 2, y: 9 });
+        }
+        const ctx = ctxFor(c);
+        // Warm-up + timed runs across all our units.
+        for (const u of movers) {
+            enumerateCandidates(u, ctx, endTurn(u));
+        }
+        const iterations = 20;
+        const start = performance.now();
+        let total = 0;
+        for (let i = 0; i < iterations; i += 1) {
+            for (const u of movers) {
+                total += enumerateCandidates(u, ctx, endTurn(u)).candidates.length;
+            }
+        }
+        const elapsed = performance.now() - start;
+        const perTurnMs = elapsed / (iterations * movers.length);
+
+        console.log(
+            `[candidates bench] ${movers.length} units x ${iterations} iters: ` +
+                `${perTurnMs.toFixed(2)} ms/turn avg, ${(total / (iterations * movers.length)).toFixed(1)} candidates/turn avg`,
+        );
+        // Generous CI bound — locally this is ~1-6 ms/turn; the point is catching accidental O(n^3) blowups.
+        expect(perTurnMs).toBeLessThan(150);
+    });
+});

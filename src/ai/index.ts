@@ -19,6 +19,20 @@ import { STRATEGY_V0_6 } from "./versions/v0_6";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
+// F4 — the shared enumerated candidate generator (./candidates.ts): every engine-legal candidate turn
+// for the acting unit (moves, melee target x stand-cell, shot aims, area throws, all castable spells,
+// defend, wait) with candidate 0 always the incumbent decision, per-candidate morale/luck-economy +
+// initiative-order featurization stubs, and opt-in per-class caps reported via `truncated`. Consumed by
+// the Q1 tactical modules, B2/RAWS rollout search, and any future learned policy.
+export { enumerateCandidates, getEnemiesCellsWithinMovementRange } from "./candidates";
+export type {
+    CandidateKind,
+    ICandidateFeatures,
+    ICandidateSet,
+    IEnumeratedCandidate,
+    IEnumerateOptions,
+} from "./candidates";
+
 /**
  * Registry of every in-game AI version. Add the next generation here — the battle engine and
  * tournament runner discover versions through this map, so a new version is comparable against the
