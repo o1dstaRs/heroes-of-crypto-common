@@ -57,7 +57,7 @@ export const KILL_GATE = {
     minOracleGames: 5000,
 } as const;
 
-export const MELEE_BASELINE: ArchetypeName = "melee_coevo";
+export const MELEE_BASELINE = "melee_coevo" satisfies ArchetypeName;
 
 /** Seed-stream phases: 1 = the 5x5 matrix, 2 = the oracle powering pass (always fresh seeds). */
 export type SeedPhase = 1 | 2;

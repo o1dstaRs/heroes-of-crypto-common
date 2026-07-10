@@ -870,17 +870,18 @@ async function cliMain(): Promise<void> {
 }
 
 function workerMain(data: ILeagueWorkerData): void {
-    if (!parentPort) throw new Error("league_eval worker requires a parent port");
-    parentPort.on("message", (message: { type: "game"; opponentIndex: number; game: number } | { type: "stop" }) => {
+    const port = parentPort;
+    if (!port) throw new Error("league_eval worker requires a parent port");
+    port.on("message", (message: { type: "game"; opponentIndex: number; game: number } | { type: "stop" }) => {
         if (message.type === "stop") {
-            parentPort.close();
+            port.close();
             return;
         }
         const opponent = data.pool[message.opponentIndex];
         const record = playLeagueGame(data.candidate, opponent, data.options, message.game);
-        parentPort!.postMessage({ type: "result", opponentIndex: message.opponentIndex, record });
+        port.postMessage({ type: "result", opponentIndex: message.opponentIndex, record });
     });
-    parentPort.postMessage({ type: "ready" });
+    port.postMessage({ type: "ready" });
 }
 
 if (!isMainThread) {
