@@ -293,6 +293,8 @@ const AUGMENT_AB_POOL: { kind: "Armor" | "Might" | "Sniper" | "Movement"; value:
 
 export interface IGameRecord {
     game: number;
+    /** Stable entrant identity; unlike version strings this remains unambiguous in same-version controls. */
+    greenEntrant: "a" | "b";
     /** Which version played which side this game (sides swap every other game). */
     greenVersion: string;
     redVersion: string;
@@ -668,6 +670,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;
     return {
         game,
+        greenEntrant: aIsGreen ? "a" : "b",
         greenVersion,
         redVersion,
         winnerVersion,
@@ -707,11 +710,13 @@ export function createTally(options: ITournamentOptions): ITournamentTally {
     };
 }
 
-export function tallyGame(tally: ITournamentTally, record: IGameRecord, options: ITournamentOptions): void {
+export function tallyGame(tally: ITournamentTally, record: IGameRecord, _options: ITournamentOptions): void {
     if (record.winnerVersion === "draw") {
         tally.draws += 1;
     } else {
-        const stats = record.winnerVersion === options.versionA ? tally.a : tally.b;
+        const greenWon = record.result.winner === "green";
+        const aWon = greenWon ? record.greenEntrant === "a" : record.greenEntrant === "b";
+        const stats = aWon ? tally.a : tally.b;
         stats.wins += 1;
         if (record.result.winner === "green") {
             stats.winsAsGreen += 1;

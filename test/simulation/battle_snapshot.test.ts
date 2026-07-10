@@ -336,6 +336,44 @@ function dumpGrid(grid: Grid) {
 // ---------------------------------------------------------------------------
 
 describe("battle snapshot round-trip", () => {
+    it("restores independent BLOCK_CENTER mountain HP and cleared-side flags", () => {
+        FightStateManager.getInstance().reset();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+        const grid = new Grid(simulationGridSettings(), PBTypes.GridVals.BLOCK_CENTER);
+        const unitsHolder = new UnitsHolder(grid);
+        const initialMatrix = grid.getMatrix();
+        const initialLeft = fightProperties.getObstacleHitsLeftLeft();
+        const initialRight = fightProperties.getObstacleHitsLeftRight();
+        const snapshot = snapshotBattle(unitsHolder, grid, fightProperties);
+
+        fightProperties.setObstacleHitsPerMountain(0, 1);
+        expect(grid.clearMountainSide(false)).toBe(true);
+        expect(grid.clearMountainSide(true)).toBe(true);
+        expect(grid.getMatrix()).not.toEqual(initialMatrix);
+
+        restoreBattle(snapshot, unitsHolder, grid, fightProperties);
+
+        expect(fightProperties.getObstacleHitsLeftLeft()).toBe(initialLeft);
+        expect(fightProperties.getObstacleHitsLeftRight()).toBe(initialRight);
+        expect(grid.getMatrix()).toEqual(initialMatrix);
+        // The booleans, not only boardCoord, were restored: either mountain can be cleared again.
+        expect(grid.clearMountainSide(false)).toBe(true);
+        expect(grid.clearMountainSide(true)).toBe(true);
+    });
+
+    it("fails closed when a future mutable field is not classified", () => {
+        FightStateManager.getInstance().reset();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const grid = new Grid(simulationGridSettings(), PBTypes.GridVals.NORMAL);
+        const unitsHolder = new UnitsHolder(grid);
+        Object.defineProperty(grid, "futureMutableField", { value: 1, enumerable: true, configurable: true });
+
+        expect(() => snapshotBattle(unitsHolder, grid, fightProperties)).toThrow(
+            "Battle snapshot field coverage incomplete for Grid: futureMutableField",
+        );
+    });
+
     it("losslessly restores full mid-fight state after real engine turns mutate it", () => {
         try {
             const h = buildBattle(20240626);

@@ -17,6 +17,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
+import { uuidFromBytes } from "../utils/lib";
 
 /** A single creature stack picked for a roster. */
 export interface IArmyUnitSpec {
@@ -108,6 +109,44 @@ export function makeRng(seed: number): () => number {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+}
+
+export type SimulationIdentityPart = string | number | boolean;
+
+/** Stable non-cryptographic hash for simulation identity and private rollout seeds. */
+export function hashSimulationParts(...parts: readonly SimulationIdentityPart[]): number {
+    let hash = 0x811c9dc5;
+    for (const part of parts) {
+        const value = String(part);
+        const framed = `${value.length}:${value}|`;
+        for (let i = 0; i < framed.length; i += 1) {
+            hash = Math.imul(hash ^ framed.charCodeAt(i), 0x01000193) >>> 0;
+        }
+    }
+    hash ^= hash >>> 16;
+    hash = Math.imul(hash, 0x85ebca6b) >>> 0;
+    hash ^= hash >>> 13;
+    hash = Math.imul(hash, 0xc2b2ae35) >>> 0;
+    return (hash ^ (hash >>> 16)) >>> 0;
+}
+
+/**
+ * Produce a stable UUID-shaped id without touching secure randomness. The four salted words make collisions
+ * negligible for the handful of stacks in one match while preserving the UUID format expected by serializers.
+ */
+export function deterministicSimulationId(...parts: readonly SimulationIdentityPart[]): string {
+    const bytes = new Uint8Array(16);
+    for (let word = 0; word < 4; word += 1) {
+        const value = hashSimulationParts("simulation-unit", word, ...parts);
+        const offset = word * 4;
+        bytes[offset] = value >>> 24;
+        bytes[offset + 1] = value >>> 16;
+        bytes[offset + 2] = value >>> 8;
+        bytes[offset + 3] = value;
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x50;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    return uuidFromBytes(bytes);
 }
 
 interface ICatalogEntry {
@@ -304,9 +343,13 @@ export function createUnitFromSpec(
     abilityFactory: AbilityFactory,
     effectFactory: EffectFactory,
     summoned = false,
+    simulationId?: string,
 ): Unit {
     const textureName = `${spec.creatureName.toLowerCase().replace(/ /g, "_")}_128`;
     const properties = getCreatureConfig(team, spec.faction, spec.creatureName, textureName, spec.amount);
+    if (simulationId) {
+        Object.defineProperty(properties, "id", { value: simulationId, enumerable: true });
+    }
     return Unit.createUnit(
         properties,
         gridSettings,

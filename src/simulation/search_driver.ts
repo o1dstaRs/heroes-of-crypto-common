@@ -19,9 +19,10 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
-import { makeRng } from "./army";
+import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import type { ILookaheadDeps } from "./lookahead";
+import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 
 /**
@@ -492,9 +493,13 @@ export class SearchDriver {
             let sum = 0;
             let illegal = false;
             for (let r = 0; r < this.rollouts; r += 1) {
-                const score = this.rollout(unit, cand, seedBase, r, horizonMode);
-                restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
-                this.deps.restoreDamageStats(savedStats);
+                let score: number;
+                try {
+                    score = this.rollout(unit, cand, seedBase, r, horizonMode);
+                } finally {
+                    restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
+                    this.deps.restoreDamageStats(savedStats);
+                }
                 if (score === -Infinity) {
                     illegal = true;
                     break;
@@ -645,7 +650,7 @@ export class SearchDriver {
             this.processEvents(r.events);
         }
         if (!this.finishedSim && this.deps.getActiveUnitId() === id && !didSomething) {
-            this.processEvents(this.deps.engine.apply({ type: "defend_turn", unitId: id }).events);
+            this.recoverNoopTurn(unit);
         }
         if (!this.finishedSim && this.deps.getActiveUnitId() === id) {
             const end = this.deps.engine.apply({ type: "end_turn", unitId: id, reason: "manual" });
@@ -656,6 +661,16 @@ export class SearchDriver {
         }
     }
     private simAdvance(): void {
+        this.advanceQueue();
+        if (
+            !this.finishedSim &&
+            !this.deps.getActiveUnitId() &&
+            forceStalledLap(this.deps.fightProperties, this.deps.unitsHolder)
+        ) {
+            this.advanceQueue();
+        }
+    }
+    private advanceQueue(): void {
         const holder = this.deps.unitsHolder;
         const maxAttempts = holder.getAllUnits().size + 2;
         for (let i = 0; i < maxAttempts && !this.finishedSim && !this.deps.getActiveUnitId(); i += 1) {
@@ -673,6 +688,19 @@ export class SearchDriver {
             if (!result.events.length && this.deps.fightProperties.getUpNextQueueSize() === 0) {
                 break;
             }
+        }
+    }
+    private recoverNoopTurn(unit: Unit): void {
+        const id = unit.getId();
+        const advance = advanceTowardEnemyAction(unit, this.deps.grid, this.deps.unitsHolder, this.deps.pathHelper);
+        let advanced = false;
+        if (advance && !this.finishedSim && this.deps.getActiveUnitId() === id) {
+            const result = this.deps.engine.apply(advance);
+            advanced = result.completed;
+            this.processEvents(result.events);
+        }
+        if (!advanced && !this.finishedSim && this.deps.getActiveUnitId() === id) {
+            this.processEvents(this.deps.engine.apply({ type: "defend_turn", unitId: id }).events);
         }
     }
     private processEvents(events: GameEvent[]): void {
@@ -693,15 +721,41 @@ export class SearchDriver {
             }
         }
     }
-    /** Deterministic per-decision seed (same for every candidate/rollout mix → paired comparison). */
+    /** Stable per-decision seed from match + semantic battle state, never from crypto-generated identities. */
     private simSeed(unit: Unit): number {
-        let h = (this.deps.fightProperties.getCurrentLap() * 0x9e3779b1) >>> 0;
-        const id = unit.getId();
-        for (let i = 0; i < id.length; i += 1) {
-            h = (Math.imul(h ^ id.charCodeAt(i), 0x85ebca77) + 1) >>> 0;
-        }
-        h = (h ^ ((this.match.seed ?? 0) >>> 0)) >>> 0;
-        return (h ^ 0x7f4a7c15) >>> 0;
+        const unitState = (candidate: Unit): string => {
+            const cell = candidate.getBaseCell();
+            return [
+                candidate.getTeam(),
+                candidate.getName(),
+                cell.x,
+                cell.y,
+                candidate.getHp(),
+                candidate.getAmountAlive(),
+                candidate.getAmountDied(),
+                candidate.getRangeShots(),
+                candidate.getAttackTypeSelection(),
+                candidate.getResponded() ? 1 : 0,
+                candidate.isOnHourglass() ? 1 : 0,
+                candidate.hasMovedThisTurn() ? 1 : 0,
+            ].join(":");
+        };
+        const allUnits = [...this.deps.unitsHolder.getAllUnits().values()].map(unitState).sort();
+        const fight = this.deps.fightProperties;
+        return hashSimulationParts(
+            "search-decision",
+            this.match.seed ?? 0,
+            fight.getCurrentLap(),
+            fight.getGridType(),
+            fight.getPreviousTurnTeam(),
+            fight.getAlreadyMadeTurnSize(),
+            fight.getHourglassQueueSize(),
+            fight.getMoralePlusQueueSize(),
+            fight.getMoraleMinusQueueSize(),
+            fight.getUpNextQueueSize(),
+            unitState(unit),
+            ...allUnits,
+        );
     }
 }
 

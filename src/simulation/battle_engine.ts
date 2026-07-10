@@ -20,7 +20,6 @@ import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Grid } from "../grid/grid";
 import { GRID_SIZE, MAX_X, MAX_Y, MIN_X, MIN_Y, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../grid/grid_constants";
 import { GridSettings } from "../grid/grid_settings";
-import type { IWeightedRoute } from "../grid/path_definitions";
 import { PathHelper } from "../grid/path_helper";
 import { PlacementPositionType } from "../grid/placement_properties";
 import { RectanglePlacement } from "../grid/rectangle_placement";
@@ -37,11 +36,18 @@ import { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
 import { setDeterministicRandomSource } from "../utils/lib";
-import { createCombatFactories, createUnitFromSpec, makeRng, type IArmyUnitSpec } from "./army";
+import {
+    createCombatFactories,
+    createUnitFromSpec,
+    deterministicSimulationId,
+    makeRng,
+    type IArmyUnitSpec,
+} from "./army";
 import { appendFileSync } from "node:fs";
 
 import { LookaheadDriver, type ILookaheadDeps } from "./lookahead";
 import { SearchDriver } from "./search_driver";
+import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures } from "./value_features";
 
 // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
@@ -234,68 +240,6 @@ const footprintCells = (unit: Unit, base: XY): XY[] =>
               { x: base.x - 1, y: base.y - 1 },
           ];
 
-/**
- * A guaranteed-legal "advance toward the nearest enemy" move (closest reachable cell to any enemy),
- * used to recover a turn whose attack the engine declined — so the unit closes distance instead of
- * stalling. Returns undefined if the unit can't move or no enemy/route exists (caller then defends).
- */
-function advanceTowardEnemyAction(
-    unit: Unit,
-    grid: Grid,
-    unitsHolder: UnitsHolder,
-    pathHelper: PathHelper,
-): GameAction | undefined {
-    if (!unit.canMove()) {
-        return undefined;
-    }
-    const enemyTeam = unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
-    const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
-    if (!enemies.length) {
-        return undefined;
-    }
-    const movePath = pathHelper.getMovePath(
-        unit.getBaseCell(),
-        grid.getMatrix(),
-        unit.getSteps(),
-        grid.getAggrMatrixByTeam(enemyTeam),
-        unit.canFly(),
-        unit.isSmallSize(),
-        unit.canTraverseLava(),
-    );
-    if (!movePath.knownPaths.size) {
-        return undefined;
-    }
-    const base = unit.getBaseCell();
-    let best: IWeightedRoute | undefined;
-    let bestScore = Infinity;
-    for (const routeList of movePath.knownPaths.values()) {
-        const route = routeList[0];
-        if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
-            continue;
-        }
-        const score = Math.min(
-            ...enemies.map(
-                (e) => Math.abs(route.cell.x - e.getBaseCell().x) + Math.abs(route.cell.y - e.getBaseCell().y),
-            ),
-        );
-        if (score < bestScore) {
-            bestScore = score;
-            best = route;
-        }
-    }
-    if (!best?.route.length) {
-        return undefined;
-    }
-    return {
-        type: "move_unit",
-        unitId: unit.getId(),
-        path: best.route.map((c) => ({ x: c.x, y: c.y })),
-        targetCells: footprintCells(unit, best.cell),
-        hasLavaCell: best.hasLavaCell,
-        hasWaterCell: best.hasWaterCell,
-    };
-}
-
 // --- Skip audit -------------------------------------------------------------
 // Env/flag-gated instrumentation to answer "why do units skip turns". Every acting turn is bucketed into
 // exactly one category. A "skip_*" bucket = decideTurn landed NOTHING (no move/attack/hourglass) — i.e. the
@@ -336,6 +280,10 @@ export function runMatch(config: IMatchConfig): IMatchResult {
     // AI-vs-AI measurement into a paired, noise-free comparison. Simulation-only: production code never sets
     // a deterministic source, so live matches keep crypto-secure randomness. Cleared in `finally` so a
     // thrown match can't leak the seeded source into the next game on this worker (which would desync it).
+    // Construct the singleton before installing the seeded source. Otherwise a worker's first match creates
+    // one FightProperties in getInstance() and another in reset(), consuming a different seeded RNG prefix
+    // from every subsequent match in that worker.
+    FightStateManager.getInstance();
     if (config.seed !== undefined) {
         setDeterministicRandomSource(makeRng((config.seed ^ 0x6d2b79f5) >>> 0));
     }
@@ -404,7 +352,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         canPlaceUnit: (unit: Unit, cells: XY[]) => cells.every((c) => zoneHashesFor(unit.getTeam()).has(cellKey(c))),
         // Spell summons (e.g. Satyr's Summon Wolves) build a real creature stack of the summoned type.
         // The engine passes the numeric FactionType; getCreatureConfig keys by faction NAME, so map it.
-        createSummonedUnit: (opts: { team: TeamType; faction: number; unitName: string; amount: number }) => {
+        createSummonedUnit: (opts: {
+            team: TeamType;
+            faction: number;
+            unitName: string;
+            amount: number;
+            caster: Unit;
+        }) => {
             const factionName = ToFactionName[opts.faction];
             if (!factionName) {
                 return undefined;
@@ -417,6 +371,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     abilityFactory,
                     effectFactory,
                     true,
+                    deterministicSimulationId(
+                        "summon",
+                        config.seed,
+                        opts.team,
+                        opts.faction,
+                        opts.unitName,
+                        opts.caster.getId(),
+                    ),
                 );
             } catch {
                 return undefined; // unknown summon creature -> engine rejects the cast cleanly
@@ -471,11 +433,43 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
     const greenRoster = config.roster;
     const redRoster = config.redRoster ?? config.roster;
-    const greenUnits = greenRoster.map((spec) =>
-        createUnitFromSpec(spec, GREEN_TEAM, gridSettings, abilityFactory, effectFactory),
+    const greenUnits = greenRoster.map((spec, index) =>
+        createUnitFromSpec(
+            spec,
+            GREEN_TEAM,
+            gridSettings,
+            abilityFactory,
+            effectFactory,
+            false,
+            deterministicSimulationId(
+                "roster",
+                config.seed,
+                GREEN_TEAM,
+                index,
+                spec.faction,
+                spec.creatureName,
+                spec.amount,
+            ),
+        ),
     );
-    const redUnits = redRoster.map((spec) =>
-        createUnitFromSpec(spec, RED_TEAM, gridSettings, abilityFactory, effectFactory),
+    const redUnits = redRoster.map((spec, index) =>
+        createUnitFromSpec(
+            spec,
+            RED_TEAM,
+            gridSettings,
+            abilityFactory,
+            effectFactory,
+            false,
+            deterministicSimulationId(
+                "roster",
+                config.seed,
+                RED_TEAM,
+                index,
+                spec.faction,
+                spec.creatureName,
+                spec.amount,
+            ),
+        ),
     );
     for (const unit of [...greenUnits, ...redUnits]) {
         unitsHolder.addUnit(unit);
@@ -688,14 +682,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 // after deaths/hourglass). Mirror the server's recovery: force a lap transition by
                 // marking every living unit as having taken its turn, then advance again. This reuses
                 // the normal lap-flip (re-seeds the queue) instead of stranding the match.
-                let forced = false;
-                for (const u of unitsHolder.getAllUnits().values()) {
-                    if (!u.isDead()) {
-                        fightProperties.addAlreadyMadeTurn(u.getTeam(), u.getId());
-                        forced = true;
-                    }
-                }
-                if (forced) {
+                if (forceStalledLap(fightProperties, unitsHolder)) {
                     advance();
                 }
                 if (finished) {

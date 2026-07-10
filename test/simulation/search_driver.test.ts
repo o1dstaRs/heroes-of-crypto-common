@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getAIStrategy } from "../../src/ai";
+import { getAIStrategy, type IAIStrategy } from "../../src/ai";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -29,7 +29,13 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { IDamageStatistic } from "../../src/scene/scene_stats";
 import type { IStatisticHolder } from "../../src/scene/statistic_holder_interface";
-import { buildRoster, createCombatFactories, createUnitFromSpec, makeRng } from "../../src/simulation/army";
+import {
+    buildRoster,
+    createCombatFactories,
+    createUnitFromSpec,
+    deterministicSimulationId,
+    makeRng,
+} from "../../src/simulation/army";
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
@@ -105,19 +111,22 @@ const footprint = (unit: Unit, base: XY): XY[] =>
           ];
 
 interface Harness {
+    engine: GameActionEngine;
     grid: Grid;
     unitsHolder: UnitsHolder;
     fightProperties: ReturnType<FightStateManager["getFightProperties"]>;
     /** Construct a driver AFTER the desired env is set (the driver reads env in its constructor). */
     makeDriver: () => SearchDriver;
     activeUnit: () => Unit | undefined;
+    setActiveUnitId: (id: string) => void;
     decideActive: () => GameAction[];
     playTurns: (n: number) => void;
     finished: () => boolean;
 }
 
 /** Mid-fight harness mirroring battle_engine's loop with a deterministic clock (see lookahead.test.ts). */
-function buildBattle(seed: number, version = "v0.6"): Harness {
+function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrategy): Harness {
+    FightStateManager.getInstance();
     setDeterministicRandomSource(makeRng((seed ^ 0x6d2b79f5) >>> 0));
 
     const gridSettings = simulationGridSettings();
@@ -166,7 +175,7 @@ function buildBattle(seed: number, version = "v0.6"): Harness {
         fightProperties,
         pathHelper,
         attackHandler,
-        strategyForTeam: () => strategy,
+        strategyForTeam: () => rolloutStrategy ?? strategy,
         getActiveUnitId: () => currentActiveUnitId,
         setActiveUnitId: (id) => {
             currentActiveUnitId = id;
@@ -182,10 +191,28 @@ function buildBattle(seed: number, version = "v0.6"): Harness {
     };
 
     const roster = buildRoster(makeRng(seed));
-    const greenUnits = roster.map((s) =>
-        createUnitFromSpec(s, GREEN_TEAM, gridSettings, abilityFactory, effectFactory),
+    const greenUnits = roster.map((s, index) =>
+        createUnitFromSpec(
+            s,
+            GREEN_TEAM,
+            gridSettings,
+            abilityFactory,
+            effectFactory,
+            false,
+            deterministicSimulationId("search-test", seed, GREEN_TEAM, index, s.creatureName, s.amount),
+        ),
     );
-    const redUnits = roster.map((s) => createUnitFromSpec(s, RED_TEAM, gridSettings, abilityFactory, effectFactory));
+    const redUnits = roster.map((s, index) =>
+        createUnitFromSpec(
+            s,
+            RED_TEAM,
+            gridSettings,
+            abilityFactory,
+            effectFactory,
+            false,
+            deterministicSimulationId("search-test", seed, RED_TEAM, index, s.creatureName, s.amount),
+        ),
+    );
     for (const u of [...greenUnits, ...redUnits]) {
         unitsHolder.addUnit(u);
     }
@@ -306,11 +333,15 @@ function buildBattle(seed: number, version = "v0.6"): Harness {
     };
 
     return {
+        engine,
         grid,
         unitsHolder,
         fightProperties,
         makeDriver: () => new SearchDriver(deps, { seed, greenVersion: version, redVersion: version }),
         activeUnit: ensureActive,
+        setActiveUnitId: (id) => {
+            currentActiveUnitId = id;
+        },
         decideActive,
         finished: () => finished,
         playTurns: (n: number) => {
@@ -400,6 +431,91 @@ describe("search driver — gating, hygiene, determinism", () => {
         const first = JSON.stringify(driver.chooseDecision(unit!, "v0.6", incumbent));
         const second = JSON.stringify(driver.chooseDecision(unit!, "v0.6", incumbent));
         expect(second).toEqual(first);
+    });
+
+    it("is deterministic across fresh same-seed battles, not only repeated calls on one Unit", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "2",
+            SEARCH_HORIZON: "6",
+            SEARCH_GATE: "0",
+        });
+        const chooseFresh = (): string => {
+            const h = buildBattle(0x5eed, "v0.6");
+            h.playTurns(10);
+            const unit = h.activeUnit();
+            expect(unit).toBeDefined();
+            return JSON.stringify(h.makeDriver().chooseDecision(unit!, "v0.6", h.decideActive()));
+        };
+
+        expect(chooseFresh()).toBe(chooseFresh());
+    });
+
+    it("restores battle and damage state when a rollout throws after mutating the engine", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_HORIZON: "2" });
+        const h = buildBattle(909, "v0.6");
+        h.playTurns(4);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent = h.decideActive();
+        const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        const originalApply = h.engine.apply.bind(h.engine);
+        h.engine.apply = ((action: GameAction) => {
+            const result = originalApply(action);
+            if (action.type !== "select_attack_type") {
+                throw new Error("injected rollout failure");
+            }
+            return result;
+        }) as GameActionEngine["apply"];
+
+        expect(() => h.makeDriver().chooseDecision(unit!, "v0.6", incumbent)).toThrow("injected rollout failure");
+        expect(JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)))).toBe(before);
+    });
+
+    it("recovers future no-op policy turns by advancing before defending", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_HORIZON: "2" });
+        let awaitingRecovery = false;
+        const noOpStrategy = {
+            version: "test-noop",
+            decideTurn: () => {
+                awaitingRecovery = true;
+                return [];
+            },
+        } as unknown as IAIStrategy;
+        const h = buildBattle(606, "v0.6", noOpStrategy);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const recoveryActions: GameAction["type"][] = [];
+        const originalApply = h.engine.apply.bind(h.engine);
+        h.engine.apply = ((action: GameAction) => {
+            if (awaitingRecovery && action.type !== "select_attack_type") {
+                recoveryActions.push(action.type);
+                awaitingRecovery = false;
+            }
+            return originalApply(action);
+        }) as GameActionEngine["apply"];
+
+        h.makeDriver().chooseDecision(unit!, "v0.6", h.decideActive());
+
+        expect(recoveryActions.length).toBeGreaterThan(0);
+        expect(recoveryActions).toContain("move_unit");
+        expect(recoveryActions.every((action) => action === "move_unit" || action === "defend_turn")).toBe(true);
+    });
+
+    it("force-transitions a live stalled lap instead of scoring a premature leaf", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
+        const h = buildBattle(707, "v0.6");
+        expect(h.activeUnit()).toBeDefined();
+        h.setActiveUnitId("");
+        while (h.fightProperties.dequeueNextUnitId()) {
+            // Deliberately reproduce an empty queue with living, not-yet-acted units.
+        }
+        const driver = h.makeDriver() as unknown as { simAdvance(): void };
+
+        driver.simAdvance();
+
+        expect(h.activeUnit()).toBeDefined();
     });
 
     it("Q2 ablation mode is observational: always returns the incumbent reference", () => {

@@ -230,14 +230,23 @@ describe("tournament", () => {
     it("tallies every game and invokes the per-game callback", () => {
         const games = 6;
         const records: number[] = [];
+        let expectedA = 0;
+        let expectedB = 0;
         const summary = runTournament({ versionA: "v0.1", versionB: "v0.1", games, baseSeed: 5, maxLaps: 60 }, (r) => {
             records.push(r.game);
             expect(["green", "red", "draw"]).toContain(r.result.winner);
+            if (r.result.winner !== "draw") {
+                const winnerEntrant = r.result.winner === "green" ? r.greenEntrant : r.greenEntrant === "a" ? "b" : "a";
+                if (winnerEntrant === "a") expectedA += 1;
+                else expectedB += 1;
+            }
         });
 
         expect(records).toEqual([0, 1, 2, 3, 4, 5]);
         expect(summary.games).toBe(games);
         expect(summary.a.wins + summary.b.wins + summary.draws).toBe(games);
+        expect(summary.a.wins).toBe(expectedA);
+        expect(summary.b.wins).toBe(expectedB);
         expect(summary.avgLaps).toBeGreaterThan(0);
         // Sides swap each game, so across the run each version plays green and red.
         expect(Object.values(summary.endReasons).reduce((a, b) => a + b, 0)).toBe(games);
@@ -252,14 +261,16 @@ describe("tournament", () => {
     });
 
     it("runs concurrently across worker threads with the same coverage as sequential", async () => {
-        const games = 8;
+        const games = 4;
         const options = { versionA: "v0.1", versionB: "v0.2", games, baseSeed: 3, maxLaps: 60 };
-        const seen: number[] = [];
-        const summary = await runTournamentConcurrent(options, 4, (r) => seen.push(r.game));
+        const sequential: ReturnType<typeof playGame>[] = [];
+        runTournament(options, (record) => sequential.push(record));
+        const concurrent: ReturnType<typeof playGame>[] = [];
+        const summary = await runTournamentConcurrent(options, 4, (record) => concurrent.push(record));
         expect(summary.games).toBe(games);
         expect(summary.a.wins + summary.b.wins + summary.draws).toBe(games);
-        // Every game index 0..games-1 ran exactly once (completion order may differ).
-        expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+        concurrent.sort((a, b) => a.game - b.game);
+        expect(concurrent).toEqual(sequential);
     }, 30000);
 
     it("runs single-threaded when concurrency <= 1 (delegates to runTournament)", async () => {
@@ -277,9 +288,9 @@ describe("battle engine determinism (seeded for reproducible measurement)", () =
         const cfg = (seed: number) => ({ greenVersion: "v0.2", redVersion: "v0.3", roster, seed, maxLaps: 60 });
         const a = runMatch(cfg(4242));
         const b = runMatch(cfg(4242));
-        // Same (versions, roster, seed) -> identical winner and identical number of actions taken.
-        expect(b.winner).toBe(a.winner);
-        expect(b.actions.length).toBe(a.actions.length);
+        // These are fresh armies with fresh Unit instances. IDs, placements, actions and outcome all reproduce.
+        expect(a.actions.some((action) => action.creatureName === "Wolf")).toBe(true); // summoned stack id included
+        expect(b).toEqual(a);
         // The seeded source is cleared after each match, so a later default match is unaffected (no throw).
         const c = runMatch(cfg(99));
         expect(["green", "red", "draw"]).toContain(c.winner);

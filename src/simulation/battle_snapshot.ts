@@ -104,6 +104,15 @@ const UNIT_FIELDS = [
     "luckPerTurn",
 ] as const;
 
+const UNIT_SHARED_FIELDS = [
+    "gridSettings",
+    "teamType",
+    "unitType",
+    "summoned",
+    "effectFactory",
+    "abilityFactory",
+] as const;
+
 /** The mutable Grid fields captured by the snapshot (gridSettings is shared/immutable — excluded). */
 const GRID_FIELDS = [
     "cellsByUnitId",
@@ -114,7 +123,11 @@ const GRID_FIELDS = [
     "availableCenterStart",
     "availableCenterEnd",
     "cleanedUpCenter",
+    "leftMountainCleared",
+    "rightMountainCleared",
 ] as const;
+
+const GRID_SHARED_FIELDS = ["gridSettings"] as const;
 
 /**
  * All mutable FightProperties fields. `gridSettings`-like shared refs don't exist here — every field
@@ -152,18 +165,22 @@ const FIGHT_FIELDS = [
     "augmentMovementPerTeam",
     "artifactTier1PerTeam",
     "artifactTier2PerTeam",
+    "perkPerTeam",
     "synergyUnitsLifePerTeam",
     "synergyUnitsChaosPerTeam",
     "synergyUnitsMightPerTeam",
     "synergyUnitsNaturePerTeam",
     "damageDealFactPerLap",
     "synergiesPerTeam",
-    "obstacleHitsLeft",
+    "obstacleHitsLeftLeft",
+    "obstacleHitsLeftRight",
     "additionalNarrowingLaps",
 ] as const;
 
 /** The mutable UnitsHolder caches (derived, but snapshotted so restore is byte-for-byte). */
 const HOLDER_FIELDS = ["teamsAuraEffects", "distancesToClosestEnemies"] as const;
+
+const HOLDER_SHARED_FIELDS = ["grid", "allUnits", "gridSettings"] as const;
 
 type Bag = Record<string, unknown>;
 
@@ -174,6 +191,24 @@ function captureFields(obj: object, fields: readonly string[]): Bag {
         bag[f] = deepClone(src[f]);
     }
     return bag;
+}
+
+/**
+ * Fail closed when a class gains an own field that the snapshot does not explicitly classify. This keeps
+ * future mutable state additions from silently making rollout restore lossy. Shared immutable references and
+ * `UnitsHolder.allUnits` (captured separately as unitRefs/unitOrder) are the only intentional exclusions.
+ */
+function assertFieldCoverage(
+    label: string,
+    obj: object,
+    captured: readonly string[],
+    intentionallyShared: readonly string[] = [],
+): void {
+    const classified = new Set([...captured, ...intentionallyShared]);
+    const missing = Object.keys(obj).filter((field) => !classified.has(field));
+    if (missing.length) {
+        throw new Error(`Battle snapshot field coverage incomplete for ${label}: ${missing.sort().join(", ")}`);
+    }
 }
 
 function writeFields(obj: object, fields: readonly string[], bag: Bag): void {
@@ -208,10 +243,14 @@ export interface BattleSnapshot {
 // ---------------------------------------------------------------------------
 
 export function snapshotBattle(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): BattleSnapshot {
+    assertFieldCoverage("Grid", grid, GRID_FIELDS, GRID_SHARED_FIELDS);
+    assertFieldCoverage("FightProperties", fightProperties, FIGHT_FIELDS);
+    assertFieldCoverage("UnitsHolder", unitsHolder, HOLDER_FIELDS, HOLDER_SHARED_FIELDS);
     const units = new Map<string, Bag>();
     const unitRefs = new Map<string, Unit>();
     const unitOrder: string[] = [];
     for (const [id, unit] of unitsHolder.getAllUnits()) {
+        assertFieldCoverage("Unit", unit, UNIT_FIELDS, UNIT_SHARED_FIELDS);
         units.set(id, captureFields(unit, UNIT_FIELDS));
         unitRefs.set(id, unit);
         unitOrder.push(id);
