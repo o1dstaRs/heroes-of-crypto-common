@@ -287,6 +287,34 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
     return slot.weights;
 }
 
+/**
+ * v0.7 BAKED weight resolution (S1 sign-off): the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 are the
+ * BUILT-IN DEFAULT — no V07_WAIT_SCORER gate, no version scope: v0.7's scorer is always armed. An explicit
+ * V07_WAIT_WEIGHTS env still overrides for experiments, and the anchor property is preserved: an ALL-ZERO
+ * override resolves to null, so v0.7 reproduces v0.6 byte-for-byte (the anchor escape hatch). An absent or
+ * MALFORMED env falls back to the committed defaults — a bad env can never crash or silently de-bake live
+ * play (loadV06Weights lineage). v0.6/v0.6s keep the env-gated waitWeightsForVersion path below untouched.
+ */
+const bakedSlot: { raw: string | undefined | null; weights: IWaitWeights | null } = {
+    raw: null,
+    weights: DISTILLED_WAIT_WEIGHTS_2026_07_10,
+};
+export function v07BakedWaitWeights(): IWaitWeights | null {
+    const raw = process.env.V07_WAIT_WEIGHTS;
+    if (raw !== bakedSlot.raw) {
+        bakedSlot.raw = raw;
+        const parsed = parseWaitWeights(raw);
+        if (!parsed) {
+            bakedSlot.weights = DISTILLED_WAIT_WEIGHTS_2026_07_10;
+        } else if (parsed.b === 0 && parsed.w.every((x) => x === 0)) {
+            bakedSlot.weights = null;
+        } else {
+            bakedSlot.weights = parsed;
+        }
+    }
+    return bakedSlot.weights;
+}
+
 /** Is `version` listed in the comma-separated env var (or its fallback default)? */
 function inVersionScope(version: string, envVar: string, fallback?: string): boolean {
     const raw = process.env[envVar] ?? fallback;
@@ -343,7 +371,20 @@ export function applyWaitScorer(
     incumbent: GameAction[],
     version: string,
 ): GameAction[] {
-    const weights = waitWeightsForVersion(version);
+    return applyWaitScorerWeights(unit, context, incumbent, waitWeightsForVersion(version));
+}
+
+/**
+ * The scorer stage with EXPLICIT weights — the shared core of the env-gated stage above and v0.7's baked
+ * stage (versions/v0_7.ts finalizeDecision with v07BakedWaitWeights()). `weights` null is the anchor: the
+ * exact `incumbent` reference is returned, byte-identical incumbent hourglass behavior.
+ */
+export function applyWaitScorerWeights(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+    weights: IWaitWeights | null,
+): GameAction[] {
     const fightProperties = context.fightProperties;
     if (!weights || !fightProperties) {
         return incumbent;

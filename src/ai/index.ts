@@ -47,13 +47,13 @@ const STRATEGIES: readonly IAIStrategy[] = [
     STRATEGY_V0_4,
     STRATEGY_V0_5,
     // v0.6s = v0.6 under a distinct version string, so the env-gated rollout SearchDriver can be applied to
-    // exactly one seat of a mirror (see versions/v0_6s.ts). Registered BEFORE v0.6 on purpose: the last
-    // entry defines LATEST_AI_VERSION, which must remain the shipped v0.6.
+    // exactly one seat of a mirror (see versions/v0_6s.ts). Registered before v0.6 on purpose: it is an
+    // experiment alias, never a LATEST/DEFAULT candidate.
     STRATEGY_V0_6S,
-    // Explicit tournament candidate only. Keep it before v0.6 so neither LATEST nor DEFAULT promotes before
-    // the full acceptance battery and owner sign-off.
-    STRATEGY_V0_7,
     STRATEGY_V0_6,
+    // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts). Registered LAST:
+    // LATEST_AI_VERSION resolves to v0.7.
+    STRATEGY_V0_7,
 ];
 
 const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));

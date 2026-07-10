@@ -9,14 +9,15 @@
  * -----------------------------------------------------------------------------
  */
 
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION, type IDecisionContext } from "../../src/ai";
-import { applyV07WaitCandidate } from "../../src/ai/versions/v0_7";
 import {
+    applyWaitScorerWeights,
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
     extractWaitFeatures,
+    v07BakedWaitWeights,
     waitScore,
 } from "../../src/ai/versions/wait_scorer";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -31,8 +32,14 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
-const ENV_KEYS = ["V07_WAIT_SCORER", "V07_WAIT_WEIGHTS", "V07_WAIT_VERSIONS"] as const;
+const ENV_KEYS = ["V07_WAIT_SCORER", "V07_WAIT_WEIGHTS", "V07_WAIT_WEIGHTS_B", "V07_WAIT_VERSIONS"] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+
+beforeEach(() => {
+    for (const key of ENV_KEYS) {
+        delete process.env[key];
+    }
+});
 
 afterEach(() => {
     for (const key of ENV_KEYS) {
@@ -44,6 +51,8 @@ afterEach(() => {
         }
     }
 });
+
+const zeroWeights = (): number[] => DISTILLED_WAIT_WEIGHTS_2026_07_10.w.map(() => 0);
 
 interface Board {
     actor: Unit;
@@ -90,16 +99,42 @@ function buildBoard(enemyAmountAlive = 1): Board {
     };
 }
 
-describe("v0.7 candidate registry", () => {
-    it("registers v0.7 for explicit tournaments without promoting the shipping version", () => {
+describe("v0.7 registry", () => {
+    it("registers v0.7 as the LATEST version; the shipping default stays v0.6 until the bake battery passes", () => {
         expect(AI_VERSIONS).toContain("v0.7");
         expect(getAIStrategy("v0.7").version).toBe("v0.7");
+        expect(LATEST_AI_VERSION).toBe("v0.7");
         expect(DEFAULT_AI_VERSION).toBe("v0.6");
-        expect(LATEST_AI_VERSION).toBe("v0.6");
     });
 });
 
-describe("v0.7 committed wait candidate", () => {
+describe("v0.7 baked weight resolution", () => {
+    it("defaults to the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 with no env and no gate", () => {
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        // The env-gated pattern's gate is NOT consulted — v0.7's scorer is always armed.
+        process.env.V07_WAIT_SCORER = "off";
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+    });
+
+    it("honors a valid V07_WAIT_WEIGHTS override", () => {
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 7, w: zeroWeights() });
+        expect(v07BakedWaitWeights()).toEqual({ b: 7, w: zeroWeights() });
+    });
+
+    it("treats an ALL-ZERO override as the anchor (null: scorer never fires)", () => {
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 0, w: zeroWeights() });
+        expect(v07BakedWaitWeights()).toBeNull();
+    });
+
+    it("falls back to the committed defaults on malformed env — a bad env never de-bakes live play", () => {
+        process.env.V07_WAIT_WEIGHTS = "{not json";
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1, w: [1, 2, 3] });
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+    });
+});
+
+describe("v0.7 strategy — wait-scorer always on", () => {
     it("matches the exact committed linear scorer at an eligible decision point", () => {
         const { actor, context, incumbent } = buildBoard();
         const fightProperties = context.fightProperties!;
@@ -108,7 +143,7 @@ describe("v0.7 committed wait candidate", () => {
             DISTILLED_WAIT_WEIGHTS_2026_07_10,
             extractWaitFeatures(actor, context.unitsHolder, fightProperties, incumbent),
         );
-        const actual = applyV07WaitCandidate(actor, context, incumbent);
+        const actual = applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights());
         expect(actual).toEqual(score > 0 ? [{ type: "wait_turn", unitId: actor.getId() }] : incumbent);
         expect(score).not.toBe(0);
         expect(score).toBeLessThan(0);
@@ -123,15 +158,12 @@ describe("v0.7 committed wait candidate", () => {
         );
 
         expect(score).toBeGreaterThan(0);
-        expect(applyV07WaitCandidate(actor, context, incumbent)).toEqual([
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toEqual([
             { type: "wait_turn", unitId: actor.getId() },
         ]);
     });
 
     it("emits a wait that the action engine accepts at a positive-score decision point", () => {
-        delete process.env.V07_WAIT_SCORER;
-        delete process.env.V07_WAIT_WEIGHTS;
-        delete process.env.V07_WAIT_VERSIONS;
         const { actor, context } = buildBoard(10);
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
@@ -163,34 +195,42 @@ describe("v0.7 committed wait candidate", () => {
         expect(fightProperties.hasAlreadyMadeTurn(actor.getId())).toBe(false);
     });
 
-    it("applies the committed scorer after the inherited v0.6 decision", () => {
-        delete process.env.V07_WAIT_SCORER;
-        delete process.env.V07_WAIT_WEIGHTS;
-        delete process.env.V07_WAIT_VERSIONS;
+    it("applies the baked scorer after the full inherited v0.6 decision chain", () => {
         const { actor, context } = buildBoard();
         const incumbent = getAIStrategy("v0.6").decideTurn(actor, context);
-        const expected = applyV07WaitCandidate(actor, context, incumbent);
+        const expected = applyWaitScorerWeights(actor, context, incumbent, DISTILLED_WAIT_WEIGHTS_2026_07_10);
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(expected);
     });
 
-    it("does not consult env-gated weights even when v0.7 is explicitly put in their scope", () => {
+    it("a V07_WAIT_WEIGHTS override steers v0.7's act-vs-wait decision", () => {
         const { actor, context } = buildBoard();
-        delete process.env.V07_WAIT_SCORER;
-        delete process.env.V07_WAIT_WEIGHTS;
-        delete process.env.V07_WAIT_VERSIONS;
-        const baseline = getAIStrategy("v0.7").decideTurn(actor, context);
-        expect(baseline.some((action) => action.type === "wait_turn")).toBe(false);
-        process.env.V07_WAIT_SCORER = "on";
-        process.env.V07_WAIT_VERSIONS = "v0.7";
-        process.env.V07_WAIT_WEIGHTS = JSON.stringify({
-            b: 1_000,
-            w: DISTILLED_WAIT_WEIGHTS_2026_07_10.w.map(() => 0),
-        });
-        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(baseline);
+        expect(canWaitOnHourglassMirror(actor, context.fightProperties!)).toBe(true);
+        const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
+        // z = +1000 everywhere: every eligible non-wait decision becomes a wait (a policy wait stays a wait).
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        expect(
+            getAIStrategy("v0.7")
+                .decideTurn(actor, context)
+                .some((a) => a.type === "wait_turn"),
+        ).toBe(true);
+        // z = -1000 everywhere: the scorer never fires; v0.7 returns exactly v0.6's decision.
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: -1_000, w: zeroWeights() });
+        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
     });
 
-    it("leaves the registered default strategy isolated from the candidate", () => {
-        expect(getAIStrategy(DEFAULT_AI_VERSION)).toBe(getAIStrategy("v0.6"));
-        expect(getAIStrategy(DEFAULT_AI_VERSION)).not.toBe(getAIStrategy("v0.7"));
+    it("ALL-ZERO weights reproduce v0.6 — the anchor property", () => {
+        const { actor, context } = buildBoard(10);
+        const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 0, w: zeroWeights() });
+        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+    });
+
+    it("leaves v0.6 byte-identical: baked weights never leak into the env-gated stage", () => {
+        const { actor, context } = buildBoard(10);
+        const plain = getAIStrategy("v0.6").decideTurn(actor, context);
+        // Even with override weights present in the env, v0.6's scorer stays behind its own gate + scope.
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        expect(getAIStrategy("v0.6").decideTurn(actor, context)).toEqual(plain);
+        expect(plain.some((action) => action.type === "wait_turn")).toBe(false);
     });
 });
