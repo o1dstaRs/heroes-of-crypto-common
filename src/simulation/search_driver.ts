@@ -19,6 +19,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
+import { canWaitOnHourglassMirror, extractWaitFeatures } from "../ai/versions/wait_scorer";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -87,6 +88,15 @@ import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
  * AUDIT (SEARCH_AUDIT=<jsonl path, or "1" for ./search_audit.jsonl>): one summary line per game with the
  * override/flip counters, per-class distributions and wall-clock cost; SEARCH_AUDIT_TURNS=1 adds one line
  * per searched turn. Lines are buffered per game and appended once (atomic enough across worker threads).
+ *
+ * Q2 GATE-2 DATASET (Q2_DATASET=<jsonl path>, oracle mode only): one line per wait-eligible decision
+ * point with the FULL wait-scorer feature vector (ai/versions/wait_scorer.ts WAIT_FEATURE_NAMES — the 20
+ * LiveTwin value features + tempo/hourglass context + unit-class flags + fmExposure + narrowing phase +
+ * the incumbent rule's verdict + fixed crosses), the oracle's decision (y: 1 = wait) and the rollout
+ * value delta (d, null on degenerate/rejected points). Rows: {t:"q2d", s: seed, g/r: versions, lap, u,
+ * k: incumbent kind, iw: incumbent-already-waits, rej: engine-rejected-wait, y, d, f: [...]}. Buffered
+ * per game and appended once in onMatchEnd, like the audit. Features are extracted with the SAME pure
+ * extractor the deployed scorer uses, so fit weights wire into V07_WAIT_WEIGHTS unchanged.
  *
  * OPPONENT-MODEL MISMATCH (SEARCH_OPP_MODEL=<version>, experiment-only): inside rollouts, the ENEMY of the
  * searched unit is simulated with this strategy instead of its true one (the acting side keeps its real
@@ -261,6 +271,9 @@ export class SearchDriver {
     private rolloutEnemyTeam: TeamType | null = null;
     private readonly auditPath: string | undefined;
     private readonly auditTurns: boolean;
+    /** Q2_DATASET (oracle mode only): per-decision wait-scorer feature/label rows for Gate-2's fit. */
+    private readonly datasetPath: string | undefined;
+    private readonly datasetRows: string[] = [];
     private readonly caps: {
         maxMoveDestinations: number;
         maxMeleePairs: number;
@@ -309,6 +322,7 @@ export class SearchDriver {
                   ? join(process.cwd(), "search_audit.jsonl")
                   : rawAudit;
         this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
+        this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
         this.caps = {
             // Moves are class-filtered out below (kite/retreat is ledger-dead); cap the enumeration to 1 so
             // the generator does no wasted per-destination work when they are excluded anyway.
@@ -372,8 +386,16 @@ export class SearchDriver {
             this.rolloutEnemyTeam = null;
         }
     }
-    /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows). */
+    /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the Q2 dataset. */
     public onMatchEnd(winner?: string, endReason?: string): void {
+        if (this.datasetPath && this.datasetRows.length) {
+            try {
+                appendFileSync(this.datasetPath, `${this.datasetRows.join("\n")}\n`);
+            } catch {
+                /* best-effort dump */
+            }
+            this.datasetRows.length = 0;
+        }
         if (!this.enabled || !this.auditPath || this.counters.decisions === 0) {
             return;
         }
@@ -572,17 +594,34 @@ export class SearchDriver {
      * keeps the same copy). Every scored wait the engine then REJECTS anyway is counted in
      * q2oWaitRejected — the alreadyHourglass state-desync tripwire (see ranked-skip-rejections): in a
      * healthy sim this predicate and the engine agree 100%, so the counter must stay 0.
+     * Shared with the Gate-2 wait-scorer (ai/versions/wait_scorer.ts) so the deployed scorer's
+     * applicability domain is EXACTLY the domain the oracle's training labels came from.
      */
     private canHourglass(unit: Unit): boolean {
-        const fp = this.deps.fightProperties;
-        const team = unit.getTeam();
-        const id = unit.getId();
-        return (
-            (team === PBTypes.TeamVals.LOWER || team === PBTypes.TeamVals.UPPER) &&
-            fp.getTeamUnitsAlive(team) > 1 &&
-            !fp.hourglassIncludes(id) &&
-            !fp.hasAlreadyMadeTurn(id) &&
-            !fp.hasAlreadyHourglass(id)
+        return canWaitOnHourglassMirror(unit, this.deps.fightProperties);
+    }
+    /** Buffer one Q2 Gate-2 dataset row (Q2_DATASET, oracle mode) for this decision point. */
+    private pushDatasetRow(
+        unit: Unit,
+        incumbent: readonly GameAction[],
+        features: number[],
+        row: { iw: 0 | 1; rej: 0 | 1; y: 0 | 1; d: number | null },
+    ): void {
+        this.datasetRows.push(
+            JSON.stringify({
+                t: "q2d",
+                s: this.match.seed,
+                g: this.match.greenVersion,
+                r: this.match.redVersion,
+                lap: this.deps.fightProperties.getCurrentLap(),
+                u: unit.getName(),
+                k: classifyActions(incumbent),
+                iw: row.iw,
+                rej: row.rej,
+                y: row.y,
+                d: row.d === null ? null : Number(row.d.toFixed(5)),
+                f: features.map((x) => Number(x.toFixed(5))),
+            }),
         );
     }
     /**
@@ -599,6 +638,16 @@ export class SearchDriver {
             // Degenerate {wait, wait} point: the policy already waits; there is no "act" branch to score.
             c.q2oPoints += 1;
             c.q2oIncumbentWait += 1;
+            if (this.datasetPath) {
+                // Kept-wait row (iw=1): no oracle arbitration happened — excluded from the Gate-2 fit's
+                // scored set, dumped so the class balance and the incumbent rule's domain stay auditable.
+                this.pushDatasetRow(
+                    unit,
+                    incumbent,
+                    extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent),
+                    { iw: 1, rej: 0, y: 1, d: null },
+                );
+            }
             return incumbent;
         }
         if (!this.canHourglass(unit)) {
@@ -610,6 +659,11 @@ export class SearchDriver {
         c.candidatesTotal += 2;
         const incumbentKind = classifyActions(incumbent);
         bump(c.searchedByIncumbentKind, incumbentKind);
+        // Features are extracted on the LIVE pre-rollout state (scoreCandidates snapshot/restores around
+        // every rollout, so ordering is belt-and-braces) with the SAME extractor the deployed scorer uses.
+        const datasetFeatures = this.datasetPath
+            ? extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent)
+            : undefined;
         const candidates: ISearchCandidate[] = [
             { kind: "incumbent", actions: incumbent },
             { kind: "wait", actions: [{ type: "wait_turn", unitId: unit.getId() }] },
@@ -633,6 +687,14 @@ export class SearchDriver {
             c.q2oWaits += 1;
             bump(c.overridesByIncumbentKind, incumbentKind);
             bump(c.overridesToKind, "wait");
+        }
+        if (datasetFeatures) {
+            this.pushDatasetRow(unit, incumbent, datasetFeatures, {
+                iw: 0,
+                rej: waitRejected ? 1 : 0,
+                y: overridden ? 1 : 0,
+                d: incumbentIllegal || waitRejected ? null : means[1] - means[0],
+            });
         }
         const ms = performance.now() - t0;
         c.msTotal += ms;

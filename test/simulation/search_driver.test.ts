@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
+import { WAIT_FEATURE_NAMES } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -54,6 +55,7 @@ const SEARCH_ENV_KEYS = [
     "V07_SEARCH",
     "Q2_WAIT_ABLATION",
     "Q2_ORACLE",
+    "Q2_DATASET",
     "SEARCH_VERSIONS",
     "SEARCH_GATE",
     "SEARCH_HORIZON",
@@ -63,6 +65,9 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
+    "V07_WAIT_SCORER",
+    "V07_WAIT_WEIGHTS",
+    "V07_WAIT_VERSIONS",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
 for (const k of SEARCH_ENV_KEYS) {
@@ -751,6 +756,45 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         expect(summary.q2oWaits).toBe(0);
     });
 
+    it("Q2_DATASET dumps one wait-scorer-aligned row per wait-eligible point (Gate-2 fit input)", () => {
+        const datasetPath = join(mkdtempSync(join(tmpdir(), "q2d-")), "dataset.jsonl");
+        setEnv({
+            Q2_ORACLE: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_GATE: "0",
+            Q2_DATASET: datasetPath,
+        });
+        const h = buildBattle(2032, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        driver.chooseDecision(unit, "v0.6", incumbent); // scored act point
+        driver.chooseDecision(unit, "v0.6", [{ type: "wait_turn", unitId: unit.getId() }]); // kept policy wait
+        driver.onMatchEnd("v0.6", "elimination");
+        const rows = readFileSync(datasetPath, "utf8")
+            .trim()
+            .split("\n")
+            .map((l) => JSON.parse(l));
+        expect(rows).toHaveLength(2);
+        for (const row of rows) {
+            expect(row.t).toBe("q2d");
+            expect(row.s).toBe(2032);
+            expect(row.g).toBe("v0.6");
+            expect(row.f).toHaveLength(WAIT_FEATURE_NAMES.length);
+            expect(row.f.every((x: unknown) => typeof x === "number" && Number.isFinite(x))).toBe(true);
+        }
+        const scored = rows.find((r) => r.iw === 0);
+        const keptWait = rows.find((r) => r.iw === 1);
+        expect(scored).toBeDefined();
+        expect(keptWait).toBeDefined();
+        expect([0, 1]).toContain(scored.y);
+        expect(scored.rej).toBe(0);
+        expect(typeof scored.d).toBe("number"); // the rollout value delta (wait minus act)
+        expect(keptWait.y).toBe(1);
+        expect(keptWait.d).toBeNull();
+        expect(keptWait.k).toBe("wait");
+    });
+
     it("writes the oracle audit summary with the wait-decision statistics", () => {
         const auditPath = join(mkdtempSync(join(tmpdir(), "q2o-")), "audit.jsonl");
         setEnv({
@@ -776,6 +820,69 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         expect(summary.q2oWaits + (summary.q2oScored - summary.q2oWaits)).toBe(summary.q2oScored);
         const turnRows = lines.slice(0, -1).map((l) => JSON.parse(l));
         expect(turnRows.some((r) => r.t === "q2o")).toBe(true);
+    });
+});
+
+describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battle)", () => {
+    /** Fast-forward (scorer disarmed) to a wait-eligible point whose incumbent decision is an act. */
+    const findEligibleActPoint = (h: Harness): { unit: Unit; incumbent: GameAction[] } => {
+        for (let i = 0; i < 80 && !h.finished(); i += 1) {
+            const unit = h.activeUnit();
+            if (!unit) {
+                break;
+            }
+            const fp = h.fightProperties;
+            const id = unit.getId();
+            const eligible =
+                fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
+                !fp.hourglassIncludes(id) &&
+                !fp.hasAlreadyMadeTurn(id) &&
+                !fp.hasAlreadyHourglass(id);
+            const incumbent = h.decideActive();
+            if (eligible && incumbent.length > 0 && !incumbent.some((a) => a.type === "wait_turn")) {
+                return { unit, incumbent };
+            }
+            h.playTurns(1);
+        }
+        throw new Error("no wait-eligible act point found");
+    };
+    const armedBias = (b: number): string => JSON.stringify({ b, w: new Array(WAIT_FEATURE_NAMES.length).fill(0) });
+
+    it("armed scorer overrides v0.6s's act to a wait the ENGINE ACCEPTS (mirror/engine legality parity)", () => {
+        setEnv({});
+        const h = buildBattle(3101, "v0.6s");
+        const { unit } = findEligibleActPoint(h);
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(9) });
+        const decided = h.decideActive();
+        expect(decided).toEqual([{ type: "wait_turn", unitId: unit.getId() }]);
+        const applied = h.engine.apply(decided[0]);
+        expect(applied.completed).toBe(true);
+    });
+
+    it("scorer stays scoped to v0.6s by default: plain v0.6 decides identically even when armed", () => {
+        setEnv({});
+        const a = buildBattle(3103, "v0.6");
+        findEligibleActPoint(a);
+        const offDecision = JSON.stringify(a.decideActive());
+
+        setEnv({});
+        const b = buildBattle(3103, "v0.6");
+        findEligibleActPoint(b);
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(9) });
+        expect(JSON.stringify(b.decideActive())).toBe(offDecision);
+    });
+
+    it("anchor: gate on with ALL-ZERO weights decides byte-identically to the env being unset", () => {
+        setEnv({});
+        const a = buildBattle(3102, "v0.6s");
+        findEligibleActPoint(a);
+        const offDecision = JSON.stringify(a.decideActive());
+
+        setEnv({});
+        const b = buildBattle(3102, "v0.6s");
+        findEligibleActPoint(b);
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(0) });
+        expect(JSON.stringify(b.decideActive())).toBe(offDecision);
     });
 });
 

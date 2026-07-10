@@ -22,6 +22,7 @@ import { StrategyV0_5 } from "./v0_5";
 import { routeAreaThrow } from "./area_throw_router";
 import { routeUniversalCaster } from "./caster_router";
 import { routeMeleeRiderEV } from "./rider_ev_router";
+import { applyWaitScorer } from "./wait_scorer";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -123,10 +124,14 @@ export class StrategyV0_6 extends StrategyV0_5 {
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
         // negative (melee 64.8%→66.2% vs ranged) — too crude; a real kite needs advance-to-range→shoot→retreat.
         // Default off keeps v0.6's fight byte-for-byte v0.5 (only the draft/setup weights differ).
-        if (process.env.V06_KITE !== "on") {
-            return decision;
+        if (process.env.V06_KITE === "on") {
+            decision = this.rangedKite(unit, context, decision);
         }
-        return this.rangedKite(unit, context, decision);
+        // Q2 Gate-2: the anchored WAIT-SCORER — the distilled Gate-1 act-vs-wait oracle. Runs LAST so it
+        // sees the same final decision the oracle arbitrated on. Gate off / absent / all-zero weights
+        // (V07_WAIT_SCORER + V07_WAIT_WEIGHTS + V07_WAIT_VERSIONS, default scope "v0.6s") return the
+        // exact `decision` reference — byte-identical incumbent hourglass behavior (see wait_scorer.ts).
+        return applyWaitScorer(unit, context, decision, this.version);
     }
     /**
      * Proactive kite: if a RANGED unit's chosen turn is a pure ADVANCE (a move with no attack/shot) and it can't
