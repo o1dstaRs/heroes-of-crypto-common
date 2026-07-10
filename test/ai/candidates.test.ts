@@ -18,7 +18,8 @@ import {
     getEnemiesCellsWithinMovementRange,
     type IEnumeratedCandidate,
 } from "../../src/ai/candidates";
-import { getCreatureConfig } from "../../src/configuration/config_provider";
+import { getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
+import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -26,6 +27,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -278,6 +280,101 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(ofKind(candidates, "shot").length).toBeGreaterThan(0);
     });
 
+    it("area_throw: only emits aims whose engine primary hit satisfies a forced target", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE, amountAlive: 20 });
+        const clusterA = createTestUnit({ team: UPPER, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
+        const clusterB = createTestUnit({ team: UPPER, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, forced, { x: 14, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, clusterA, { x: 10, y: 9 });
+        placeUnit(c.grid, c.unitsHolder, clusterB, { x: 10, y: 11 });
+        garg.setTarget(forced.getId());
+
+        const throws = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "area_throw");
+        expect(throws.length).toBeGreaterThan(0);
+        expect(throws.every((candidate) => candidate.targetId === forced.getId())).toBe(true);
+    });
+
+    it("area_throw: hit probability prevents a Dodge/Small Specie cluster from outranking a clean shot", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const evasive = {
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 1_000,
+            stackPower: 5,
+            abilities: ["Dodge", "Small Specie"],
+        };
+        const clusterA = createTestUnit({ ...evasive, name: "Cluster A" });
+        const clusterB = createTestUnit({ ...evasive, name: "Cluster B" });
+        const reliable = createTestUnit({
+            team: UPPER,
+            name: "Reliable",
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 1_000,
+        });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, clusterA, { x: 10, y: 9 });
+        placeUnit(c.grid, c.unitsHolder, clusterB, { x: 10, y: 11 });
+        placeUnit(c.grid, c.unitsHolder, reliable, { x: 8, y: 3 });
+
+        const candidates = enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates;
+        const cluster = ofKind(candidates, "area_throw").find(
+            (candidate) => candidate.targetCell?.x === 10 && candidate.targetCell.y === 10,
+        );
+        const cleanShot = ofKind(candidates, "shot").find((candidate) => candidate.targetId === reliable.getId());
+        expect(cluster).toBeDefined();
+        expect(cleanShot).toBeDefined();
+        expect(cluster!.features.expectedDamage).toBeLessThan(cleanShot!.features.expectedDamage);
+    });
+
+    it("AOE damage estimates use the engine's miss, artifact, and physical-resistance modifiers", () => {
+        const score = (mutate?: (attacker: Unit, target: Unit) => void): number => {
+            const c = createCombatTestContext();
+            const garg = makeReal(LOWER, "Nature", "Gargantuan");
+            const target = createTestUnit({
+                team: UPPER,
+                name: "Target",
+                attackType: MELEE,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            placeLarge(c, garg, { x: 3, y: 3 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 10 });
+            mutate?.(garg, target);
+            const shot = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "shot").find(
+                (candidate) => candidate.targetId === target.getId(),
+            );
+            expect(shot).toBeDefined();
+            return shot!.features.expectedDamage;
+        };
+        const giveBuff = (unit: Unit, name: "Amulet of Resolve" | "Broken Aegis", power: number): void => {
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", name, NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setPower(power);
+            unit.applyBuff(buff);
+        };
+
+        const baseline = score();
+        const boarSaliva = score((attacker) => attacker.applyEffect(new EffectFactory().makeEffect("Boar Saliva")));
+        const brokenAegisMiss = score((attacker) => giveBuff(attacker, "Broken Aegis", 20));
+        const brokenAegisReduction = score((_attacker, target) => giveBuff(target, "Broken Aegis", 20));
+        const statusResistance = score((_attacker, target) => giveBuff(target, "Amulet of Resolve", 25));
+        const mechanismVulnerability = score((_attacker, target) => target.grantAbility("Mechanism"));
+
+        expect(boarSaliva).toBeLessThan(baseline);
+        expect(brokenAegisMiss).toBeLessThan(baseline);
+        expect(brokenAegisReduction).toBeLessThan(baseline);
+        expect(statusResistance).toBeLessThan(baseline);
+        expect(mechanismVulnerability).toBeGreaterThan(baseline);
+    });
+
     it("Angel: Resurrection candidates target living allies with dead bodies and price the passive charge", () => {
         const c = createCombatTestContext();
         const angel = makeReal(LOWER, "Life", "Angel"); // MELEE_MAGIC, ability-granted Resurrection
@@ -301,6 +398,16 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(res[0].features.spendsSpellCharge).toBe(1);
         // And the MELEE_MAGIC Angel still gets melee/move candidates alongside the cast.
         expect(ofKind(candidates, "move").length).toBeGreaterThan(0);
+
+        // Break suppresses hasAbilityActive(), but the cast remains engine-legal and still burns the stored
+        // passive. The opportunity-cost feature must therefore remain set while Angel is Broken.
+        angel.applyEffect(new EffectFactory().makeEffect("Break"));
+        expect(angel.hasAbilityActive("Resurrection")).toBe(false);
+        const brokenRes = ofKind(enumerateCandidates(angel, ctxFor(c), endTurn(angel)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Resurrection",
+        );
+        expect(brokenRes).toHaveLength(1);
+        expect(brokenRes[0].features.burnsResurrectionCharge).toBe(1);
     });
 
     it("Valkyrie: Wind Flow (ALL_FLYING mass) is emitted when a flyer is on the board", () => {

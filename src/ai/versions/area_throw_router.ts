@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IDecisionContext } from "../ai_strategy";
@@ -31,6 +32,19 @@ type ImmediateAttack = Extract<
     GameAction,
     { type: "melee_attack" | "range_attack" | "area_throw_attack" | "obstacle_attack" | "cast_spell" }
 >;
+
+const LOWER = PBTypes.TeamVals.LOWER;
+
+function areaThrowGateOn(unit: Unit): boolean {
+    const gate = process.env.V06_AREA_THROW;
+    if (gate === "on" || gate === "both") {
+        return true;
+    }
+    if (gate === "green" || gate === "red") {
+        return gate === (unit.getTeam() === LOWER ? "green" : "red");
+    }
+    return false;
+}
 
 const sameCell = (a: XY | undefined, b: XY | undefined): boolean =>
     a === undefined || b === undefined ? a === b : a.x === b.x && a.y === b.y;
@@ -97,9 +111,10 @@ function incumbentDamage(attack: ImmediateAttack, candidates: readonly IEnumerat
  * score the resulting 3x3 splash, with enemy effective damage positive and friendly fire negative. This
  * router deliberately consumes that engine-mirrored score instead of reimplementing geometry here.
  *
- * `V06_AREA_THROW=on` is required until the LiveTwin A/B clears. Gate-off returns the exact incumbent array
- * without enumerating, preserving the frozen v0.6 fight behaviour. A strict comparison also preserves the
- * incumbent on ties or whenever F4 cannot price the incumbent combat action safely.
+ * `V06_AREA_THROW=on` is required until the LiveTwin A/B clears. `green`/`red` scope the router to one seat
+ * for paired A/Bs and `both` aliases `on`. Gate-off returns the exact incumbent array without enumerating,
+ * preserving frozen v0.6 fight behaviour. A strict comparison also preserves the incumbent on ties or whenever
+ * F4 cannot price the incumbent combat action safely.
  */
 export function routeAreaThrow(
     unit: Unit,
@@ -107,15 +122,18 @@ export function routeAreaThrow(
     incumbent: GameAction[],
     enumerate: CandidateEnumerator = enumerateCandidates,
 ): GameAction[] {
-    if (process.env.V06_AREA_THROW !== "on" || !unit.hasAbilityActive("Area Throw")) {
+    if (!areaThrowGateOn(unit) || !unit.hasAbilityActive("Area Throw")) {
         return incumbent;
     }
 
     const enumerated = enumerate(unit, context, incumbent);
+    const forcedTarget = context.unitsHolder.getAllUnits().get(unit.getTarget());
+    const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
     let best: IEnumeratedCandidate | undefined;
     for (const candidate of enumerated.candidates) {
         if (
             candidate.kind === "area_throw" &&
+            (!forcedTargetId || candidate.targetId === forcedTargetId) &&
             (!best || candidate.features.expectedDamage > best.features.expectedDamage)
         ) {
             best = candidate;

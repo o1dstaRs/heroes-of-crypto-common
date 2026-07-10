@@ -107,7 +107,7 @@ export interface ICandidateFeatures {
      * The opportunity cost of casting Resurrection on an ally is losing the Angel's own auto-res.
      */
     burnsResurrectionCharge: 0 | 1;
-    /** Raw expected effective damage (enemies add, splash friendly-fire subtracts); 0 for non-attacks. */
+    /** Hit-weighted damage estimate using engine miss/AOE modifiers; splash friendly-fire subtracts. */
     expectedDamage: number;
     /** 1 when the estimate kills the primary target stack outright. */
     expectedKill: 0 | 1;
@@ -268,6 +268,17 @@ class CandidateGenerator {
             ...overrides,
         };
     }
+    /**
+     * Resurrection's cast and Angel's on-death passive share one stored charge. Active-ability queries are
+     * intentionally unsuitable here: Break temporarily hides abilities but does not remove the castable spell,
+     * and casting while Broken still permanently consumes both the spell and the persisted passive.
+     */
+    private ownsResurrectionCharge(): boolean {
+        return (
+            this.unit.getUnitProperties().abilities.includes("Resurrection") &&
+            this.unit.getSpells().some((spell) => spell.getName() === "Resurrection" && spell.isRemaining())
+        );
+    }
     /** Derive the cheap economy features of an arbitrary (incumbent) action list. */
     private incumbentFeatureOverrides(actions: GameAction[]): Partial<ICandidateFeatures> {
         const o: Partial<ICandidateFeatures> = {};
@@ -282,7 +293,7 @@ class CandidateGenerator {
                 o.spendsRangeShot = 1;
             } else if (a.type === "cast_spell") {
                 o.spendsSpellCharge = 1;
-                if (a.spellName === "Resurrection" && this.unit.hasAbilityActive("Resurrection")) {
+                if (a.spellName === "Resurrection" && this.ownsResurrectionCharge()) {
                     o.burnsResurrectionCharge = 1;
                 }
             }
@@ -580,15 +591,47 @@ class CandidateGenerator {
             ? [{ type: "select_attack_type", unitId: this.unit.getId(), attackType: RANGE }]
             : [];
     }
-    /** Expected effective damage of a hit set (enemies add, splash friendly fire subtracts). */
+    /** n-choose-k for the one/two-shot expected-damage calculation. */
+    private combinations(n: number, k: number): number {
+        if (k < 0 || k > n) {
+            return 0;
+        }
+        const smaller = Math.min(k, n - k);
+        let result = 1;
+        for (let i = 1; i <= smaller; i += 1) {
+            result = (result * (n - smaller + i)) / i;
+        }
+        return result;
+    }
+    /**
+     * Expected effective damage of a hit set (enemies add, splash friendly fire subtracts).
+     *
+     * The engine owns all target-specific combat semantics used here: calculateMissChance covers Dodge,
+     * Small Specie, Boar Saliva and the Broken Aegis self-cost; getPhysicalAoeDamageMultiplier covers status
+     * resistance and Mechanism vulnerability. Keeping those terms in the score prevents a high-raw-damage but
+     * low-hit-probability cluster from incorrectly beating a reliable incumbent shot.
+     */
     private shotDamage(
         evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] },
         primaryTargetId: string | undefined,
         shots: number,
+        isAOE: boolean,
     ): { value: number; kill: 0 | 1 } {
         let value = 0;
         let kill: 0 | 1 = 0;
         const counted = new Set<string>();
+        const fightProperties = this.context.fightProperties;
+        const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(this.unit.getTeam()) ?? 0;
+        const aoeAbility = isAOE
+            ? (this.unit.getAbility("Area Throw") ?? this.unit.getAbility("Large Caliber"))
+            : undefined;
+        let sharedAoeMultiplier = aoeAbility
+            ? this.unit.calculateAbilityMultiplier(aoeAbility, attackerAbilityPower)
+            : 1;
+        const paralysis = this.unit.getEffect("Paralysis");
+        if (paralysis) {
+            sharedAoeMultiplier *= (100 - paralysis.getPower()) / 100;
+        }
         for (let i = 0; i < evaluation.affectedUnits.length; i += 1) {
             const divisor = evaluation.rangeAttackDivisors[i] ?? 1;
             for (const target of evaluation.affectedUnits[i]) {
@@ -596,10 +639,44 @@ class CandidateGenerator {
                     continue;
                 }
                 counted.add(target.getId());
-                const min = shots * this.unit.calculateAttackDamageMin(this.unit.getAttack(), target, true, 0, divisor);
-                const max = shots * this.unit.calculateAttackDamageMax(this.unit.getAttack(), target, true, 0, divisor);
+                const minRaw = this.unit.calculateAttackDamageMin(
+                    this.unit.getAttack(),
+                    target,
+                    true,
+                    attackerAbilityPower,
+                    divisor,
+                );
+                const maxRaw = this.unit.calculateAttackDamageMax(
+                    this.unit.getAttack(),
+                    target,
+                    true,
+                    attackerAbilityPower,
+                    divisor,
+                );
+                const applyEngineAoeModifiers = (rawDamage: number): number => {
+                    if (!isAOE) {
+                        return rawDamage;
+                    }
+                    let adjusted = Math.floor(rawDamage * sharedAoeMultiplier);
+                    const brokenAegis = target.getBuff("Broken Aegis");
+                    if (brokenAegis) {
+                        adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
+                    }
+                    return Math.floor(adjusted * target.getPhysicalAoeDamageMultiplier());
+                };
+                const min = applyEngineAoeModifiers(minRaw);
+                const max = applyEngineAoeModifiers(maxRaw);
                 const hp = target.getCumulativeHp();
-                const effective = Math.min((min + max) / 2, hp);
+                const conditionalDamage = (min + max) / 2;
+                const defenderAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
+                const hitChance =
+                    1 - Math.min(100, Math.max(0, this.unit.calculateMissChance(target, defenderAbilityPower))) / 100;
+                let effective = 0;
+                for (let hits = 1; hits <= shots; hits += 1) {
+                    const probability =
+                        this.combinations(shots, hits) * hitChance ** hits * (1 - hitChance) ** (shots - hits);
+                    effective += probability * Math.min(hits * conditionalDamage, hp);
+                }
                 if (target.getTeam() === this.enemyTeam) {
                     value += effective;
                     if (primaryTargetId && target.getId() === primaryTargetId && effective >= hp) {
@@ -681,7 +758,7 @@ class CandidateGenerator {
                         continue;
                     }
                     hitSetSeen.add(hitSig);
-                    const { value, kill } = this.shotDamage(evaluation, enemy.getId(), shots);
+                    const { value, kill } = this.shotDamage(evaluation, enemy.getId(), shots, isAOE);
                     found.push({
                         targetId: enemy.getId(),
                         aimCell: { x: cell.x, y: cell.y },
@@ -743,6 +820,8 @@ class CandidateGenerator {
         const allUnits = unitsHolder.getAllUnits();
         const prefix = this.rangePrefix();
         const shots = this.unit.hasAbilityActive("Double Shot") ? 2 : 1;
+        const forcedTarget = allUnits.get(this.unit.getTarget());
+        const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
 
         // Aim-cell pool: empty cells adjacent to a living enemy's footprint (the only aims whose splash
         // can reach an enemy), deduped, in deterministic enemy/cell order.
@@ -770,6 +849,7 @@ class CandidateGenerator {
 
         interface IThrow {
             aim: XY;
+            primaryTargetId: string;
             value: number;
             kill: 0 | 1;
         }
@@ -781,16 +861,18 @@ class CandidateGenerator {
             const targetPosition = getPositionForCell(projected, gs.getMinX(), gs.getStep(), gs.getHalfStep());
             const affectedCells = [...getCellsAroundCell(gs, projected), projected];
             const affectedUnits = evaluateAffectedUnits(affectedCells, unitsHolder, grid) ?? [];
+            const primaryTargetId = affectedUnits[0]?.[0]?.getId();
+            if (!primaryTargetId || (forcedTargetId && forcedTargetId !== primaryTargetId)) {
+                continue; // AttackHandler enforces the same first-affected-unit forced-target check.
+            }
             const divisor = attackHandler.getRangeAttackDivisor(this.unit, targetPosition);
             const { value, kill } = this.shotDamage(
                 { affectedUnits, rangeAttackDivisors: affectedUnits.map(() => divisor) },
-                undefined,
+                primaryTargetId,
                 shots,
+                true,
             );
-            if (value === 0 && !affectedUnits.length) {
-                continue; // projection landed on bare ground — splash reaches nobody
-            }
-            found.push({ aim, value, kill });
+            found.push({ aim, primaryTargetId, value, kill });
         }
         const cap = this.options.maxAreaThrowCells ?? 0;
         let kept = found;
@@ -809,6 +891,7 @@ class CandidateGenerator {
                         targetCell: { x: t.aim.x, y: t.aim.y },
                     },
                 ],
+                targetId: t.primaryTargetId,
                 targetCell: { x: t.aim.x, y: t.aim.y },
                 features: this.features({ spendsRangeShot: 1, expectedDamage: t.value, expectedKill: t.kill }),
             });
@@ -840,8 +923,7 @@ class CandidateGenerator {
             targetCell,
             features: this.features({
                 spendsSpellCharge: 1,
-                burnsResurrectionCharge:
-                    spell.getName() === "Resurrection" && this.unit.hasAbilityActive("Resurrection") ? 1 : 0,
+                burnsResurrectionCharge: spell.getName() === "Resurrection" && this.ownsResurrectionCharge() ? 1 : 0,
                 ...overrides,
             }),
         });

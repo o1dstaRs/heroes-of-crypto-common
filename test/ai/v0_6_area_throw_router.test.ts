@@ -18,10 +18,14 @@ import { routeAreaThrow } from "../../src/ai/versions/area_throw_router";
 import { StrategyV0_6 } from "../../src/ai/versions/v0_6";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -46,18 +50,43 @@ function contextFor(combat: CombatTestContext): IDecisionContext {
     };
 }
 
-function makeGargantuan(): Unit {
+function makeGargantuan(team = LOWER): Unit {
     const effectFactory = new EffectFactory();
     const abilityFactory = new AbilityFactory(effectFactory);
     return Unit.createUnit(
-        getCreatureConfig(LOWER, "Nature", "Gargantuan", "", 100),
+        getCreatureConfig(team, "Nature", "Gargantuan", "", 100),
         testGridSettings,
-        LOWER,
+        team,
         PBTypes.UnitVals.CREATURE,
         abilityFactory,
         effectFactory,
         false,
     );
+}
+
+function activateEngine(combat: CombatTestContext, active: Unit): GameActionEngine {
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    fightProperties.setGridType(PBTypes.GridVals.NORMAL);
+    fightProperties.startFight();
+    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
+    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.startTurn(active.getTeam(), 1_000);
+    return new GameActionEngine({
+        fightProperties,
+        grid: combat.grid,
+        unitsHolder: combat.unitsHolder,
+        moveHandler: new MoveHandler(testGridSettings, combat.grid, combat.unitsHolder),
+        sceneLog: new SceneLogMock(),
+        attackHandler: combat.attackHandler,
+        getCurrentActiveUnitId: () => active.getId(),
+    });
+}
+
+function expectActionsToApply(engine: GameActionEngine, actions: readonly GameAction[]): void {
+    for (const action of actions) {
+        const result = engine.apply(action);
+        expect(result.completed, `${action.type}: ${result.rejectionReason ?? "rejected"}`).toBe(true);
+    }
 }
 
 function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
@@ -143,6 +172,7 @@ describe("v0.6 Area Throw router", () => {
         });
         expect(selected).toBeDefined();
         expect(selected!.features.expectedDamage).toBeGreaterThan(incumbent!.features.expectedDamage);
+        expectActionsToApply(activateEngine(combat, gargantuan), routed);
     });
 
     it("uses net effective damage, so a friendly stack in the shared splash prevents a tie override", () => {
@@ -198,6 +228,72 @@ describe("v0.6 Area Throw router", () => {
         }
     });
 
+    it("never routes an Area Throw whose engine primary hit violates a forced target", () => {
+        const combat = createCombatTestContext();
+        const gargantuan = makeGargantuan();
+        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE, amountAlive: 20 });
+        const clusterA = createTestUnit({ team: UPPER, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
+        const clusterB = createTestUnit({ team: UPPER, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
+        placeLarge(combat, gargantuan, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, forced, { x: 14, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, clusterA, { x: 10, y: 9 });
+        placeUnit(combat.grid, combat.unitsHolder, clusterB, { x: 10, y: 11 });
+        gargantuan.setTarget(forced.getId());
+        const context = contextFor(combat);
+        const all = enumerateCandidates(gargantuan, context, endTurn(gargantuan)).candidates;
+        const incumbent = candidatesOfKind(all, "shot").find((candidate) => candidate.targetId === forced.getId());
+        expect(incumbent).toBeDefined();
+        expect(candidatesOfKind(all, "area_throw").every((candidate) => candidate.targetId === forced.getId())).toBe(
+            true,
+        );
+
+        const routed = withAreaThrowGate("on", () => routeAreaThrow(gargantuan, context, incumbent!.actions));
+        const routedAttack = lastAction(routed);
+        if (routedAttack.type === "area_throw_attack") {
+            const routedCandidate = candidatesOfKind(all, "area_throw").find(
+                (candidate) =>
+                    candidate.targetCell?.x === routedAttack.targetCell.x &&
+                    candidate.targetCell.y === routedAttack.targetCell.y,
+            );
+            expect(routedCandidate?.targetId).toBe(forced.getId());
+        } else {
+            expect(routedAttack.type).toBe("range_attack");
+        }
+        expectActionsToApply(activateEngine(combat, gargantuan), routed);
+    });
+
+    it("supports both-seat and green/red seat-scoped gates", () => {
+        const setup = (team: number) => {
+            const combat = createCombatTestContext();
+            const gargantuan = makeGargantuan(team);
+            const enemyTeam = team === LOWER ? UPPER : LOWER;
+            const enemyA = createTestUnit({ team: enemyTeam, attackType: MELEE, amountAlive: 20 });
+            const enemyB = createTestUnit({ team: enemyTeam, attackType: MELEE, amountAlive: 20 });
+            placeLarge(combat, gargantuan, { x: 3, y: 3 });
+            placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
+            placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
+            return { gargantuan, context: contextFor(combat), incumbent: endTurn(gargantuan) };
+        };
+        const expectRouted = (team: number, gate: string) => {
+            const { gargantuan, context, incumbent } = setup(team);
+            const routed = withAreaThrowGate(gate, () => routeAreaThrow(gargantuan, context, incumbent));
+            expect(lastAction(routed).type).toBe("area_throw_attack");
+        };
+        const expectInert = (team: number, gate: string) => {
+            const { gargantuan, context, incumbent } = setup(team);
+            const routed = withAreaThrowGate(gate, () => routeAreaThrow(gargantuan, context, incumbent));
+            expect(routed).toBe(incumbent);
+        };
+
+        expectRouted(LOWER, "on");
+        expectRouted(UPPER, "both");
+        expectRouted(LOWER, "green");
+        expectRouted(UPPER, "red");
+        expectInert(LOWER, "red");
+        expectInert(UPPER, "green");
+        expectInert(LOWER, "1");
+    });
+
     it("is byte-parity inert gate-off: same array reference and no candidate enumeration", () => {
         const gargantuan = makeGargantuan();
         const incumbent = endTurn(gargantuan);
@@ -207,10 +303,12 @@ describe("v0.6 Area Throw router", () => {
             return { candidates: [], truncated: [] };
         };
 
-        const routed = withAreaThrowGate(undefined, () =>
-            routeAreaThrow(gargantuan, {} as IDecisionContext, incumbent, enumerate),
-        );
-        expect(routed).toBe(incumbent);
+        for (const gate of [undefined, "off", "1", "red"]) {
+            const routed = withAreaThrowGate(gate, () =>
+                routeAreaThrow(gargantuan, {} as IDecisionContext, incumbent, enumerate),
+            );
+            expect(routed).toBe(incumbent);
+        }
         expect(enumerations).toBe(0);
     });
 });
