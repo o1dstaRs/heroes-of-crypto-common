@@ -273,31 +273,53 @@ export function parseWaitWeights(raw: string | undefined): IWaitWeights | null {
     return null;
 }
 
-/** Memoized env read (per distinct V07_WAIT_WEIGHTS string — decideTurn runs per unit-turn). */
-let cachedRaw: string | undefined | null = null;
-let cachedWeights: IWaitWeights | null = null;
-function loadWaitWeights(): IWaitWeights | null {
-    const raw = process.env.V07_WAIT_WEIGHTS;
-    if (raw !== cachedRaw) {
-        cachedRaw = raw;
+/** Memoized env reads (one slot per weights env var — decideTurn runs per unit-turn). */
+const weightsCache: Record<string, { raw: string | undefined | null; weights: IWaitWeights | null }> = {};
+function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
+    const slot = (weightsCache[envVar] ??= { raw: null, weights: null });
+    const raw = process.env[envVar];
+    if (raw !== slot.raw) {
+        slot.raw = raw;
         const parsed = parseWaitWeights(raw);
         // ALL-ZERO weights are the explicit anchor: byte-identical incumbent hourglass behavior.
-        cachedWeights = parsed && (parsed.b !== 0 || parsed.w.some((x) => x !== 0)) ? parsed : null;
+        slot.weights = parsed && (parsed.b !== 0 || parsed.w.some((x) => x !== 0)) ? parsed : null;
     }
-    return cachedWeights;
+    return slot.weights;
 }
 
-/** Version-scoped gate: V07_WAIT_SCORER=on + version listed in V07_WAIT_VERSIONS (default "v0.6s"). */
-function waitScorerGateOn(version: string): boolean {
-    const gate = process.env.V07_WAIT_SCORER;
-    if (gate !== "on" && gate !== "1") {
+/** Is `version` listed in the comma-separated env var (or its fallback default)? */
+function inVersionScope(version: string, envVar: string, fallback?: string): boolean {
+    const raw = process.env[envVar] ?? fallback;
+    if (!raw) {
         return false;
     }
-    const versions = (process.env.V07_WAIT_VERSIONS ?? "v0.6s")
+    return raw
         .split(",")
         .map((v) => v.trim())
-        .filter(Boolean);
-    return versions.includes(version);
+        .filter(Boolean)
+        .includes(version);
+}
+
+/**
+ * Version-scoped weight resolution. `V07_WAIT_SCORER=on` is required; then a version listed in
+ * `V07_WAIT_VERSIONS` (default "v0.6s") uses `V07_WAIT_WEIGHTS`, and a version listed in
+ * `V07_WAIT_VERSIONS_B` (default: NONE — the second scope is inert unless explicitly set) uses
+ * `V07_WAIT_WEIGHTS_B`. The primary scope wins on overlap. The B scope exists for weight-vs-weight
+ * head-to-heads (Wave-5 headroom: CEM candidate on v0.6s vs the distilled incumbent on v0.6 in ONE
+ * paired tournament) — with a single global weights var two seats could never carry different fits.
+ */
+function waitWeightsForVersion(version: string): IWaitWeights | null {
+    const gate = process.env.V07_WAIT_SCORER;
+    if (gate !== "on" && gate !== "1") {
+        return null;
+    }
+    if (inVersionScope(version, "V07_WAIT_VERSIONS", "v0.6s")) {
+        return loadWaitWeightsFrom("V07_WAIT_WEIGHTS");
+    }
+    if (inVersionScope(version, "V07_WAIT_VERSIONS_B")) {
+        return loadWaitWeightsFrom("V07_WAIT_WEIGHTS_B");
+    }
+    return null;
 }
 
 /** z = b + w·f for a decision point (exported for tests and the fit's sanity cross-check). */
@@ -321,10 +343,7 @@ export function applyWaitScorer(
     incumbent: GameAction[],
     version: string,
 ): GameAction[] {
-    if (!waitScorerGateOn(version)) {
-        return incumbent;
-    }
-    const weights = loadWaitWeights();
+    const weights = waitWeightsForVersion(version);
     const fightProperties = context.fightProperties;
     if (!weights || !fightProperties) {
         return incumbent;

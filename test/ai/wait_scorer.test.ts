@@ -41,7 +41,13 @@ const UPPER = PBTypes.TeamVals.UPPER;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
-const ENV_KEYS = ["V07_WAIT_SCORER", "V07_WAIT_WEIGHTS", "V07_WAIT_VERSIONS"] as const;
+const ENV_KEYS = [
+    "V07_WAIT_SCORER",
+    "V07_WAIT_WEIGHTS",
+    "V07_WAIT_VERSIONS",
+    "V07_WAIT_WEIGHTS_B",
+    "V07_WAIT_VERSIONS_B",
+] as const;
 const savedEnv: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) {
     savedEnv[k] = process.env[k];
@@ -217,6 +223,49 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
         ]);
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5), V07_WAIT_VERSIONS: "v0.6,v0.6s" });
         expect(applyWaitScorer(actor, context, charge, "v0.6")).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
+    });
+
+    it("second scope: V07_WAIT_VERSIONS_B/WEIGHTS_B carries a DIFFERENT weight set for weight-vs-weight A/Bs", () => {
+        const { context, actor, charge } = buildBoard();
+        // inert by default: no B scope -> versions outside the primary scope stay anchored
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
+        expect(applyWaitScorer(actor, context, charge, "v0.6")).toBe(charge);
+        // armed: v0.6s waits on the primary weights while v0.6 acts on the B weights (and vice versa)
+        setEnv({
+            V07_WAIT_SCORER: "on",
+            V07_WAIT_WEIGHTS: biasOnly(5),
+            V07_WAIT_VERSIONS_B: "v0.6",
+            V07_WAIT_WEIGHTS_B: biasOnly(-5),
+        });
+        expect(applyWaitScorer(actor, context, charge, "v0.6s")).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+        expect(applyWaitScorer(actor, context, charge, "v0.6")).toBe(charge);
+        setEnv({
+            V07_WAIT_SCORER: "on",
+            V07_WAIT_WEIGHTS: biasOnly(-5),
+            V07_WAIT_VERSIONS_B: "v0.6",
+            V07_WAIT_WEIGHTS_B: biasOnly(5),
+        });
+        expect(applyWaitScorer(actor, context, charge, "v0.6s")).toBe(charge);
+        expect(applyWaitScorer(actor, context, charge, "v0.6")).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
+        // the primary scope wins on overlap, and B-scope weights keep the anchor semantics (all-zero ⇒ off)
+        setEnv({
+            V07_WAIT_SCORER: "on",
+            V07_WAIT_WEIGHTS: biasOnly(5),
+            V07_WAIT_VERSIONS_B: "v0.6s,v0.6",
+            V07_WAIT_WEIGHTS_B: biasOnly(-5),
+        });
+        expect(applyWaitScorer(actor, context, charge, "v0.6s")).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+        setEnv({
+            V07_WAIT_SCORER: "on",
+            V07_WAIT_WEIGHTS: biasOnly(-5),
+            V07_WAIT_VERSIONS_B: "v0.6",
+            V07_WAIT_WEIGHTS_B: zeros(),
+        });
+        expect(applyWaitScorer(actor, context, charge, "v0.6")).toBe(charge);
     });
 
     it("armed: overrides an eligible act to a lone hourglass wait iff z > 0", () => {
