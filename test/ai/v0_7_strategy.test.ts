@@ -19,10 +19,13 @@ import {
     extractWaitFeatures,
     waitScore,
 } from "../../src/ai/versions/wait_scorer";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
@@ -48,13 +51,13 @@ interface Board {
     incumbent: GameAction[];
 }
 
-function buildBoard(): Board {
+function buildBoard(enemyAmountAlive = 1): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4 });
     const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2 });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3 });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5 });
+    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3, amountAlive: enemyAmountAlive });
+    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5, amountAlive: enemyAmountAlive });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });
@@ -109,6 +112,55 @@ describe("v0.7 committed wait candidate", () => {
         expect(actual).toEqual(score > 0 ? [{ type: "wait_turn", unitId: actor.getId() }] : incumbent);
         expect(score).not.toBe(0);
         expect(score).toBeLessThan(0);
+    });
+
+    it("replaces an eligible action when the committed scorer is positive", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        const fightProperties = context.fightProperties!;
+        const score = waitScore(
+            DISTILLED_WAIT_WEIGHTS_2026_07_10,
+            extractWaitFeatures(actor, context.unitsHolder, fightProperties, incumbent),
+        );
+
+        expect(score).toBeGreaterThan(0);
+        expect(applyV07WaitCandidate(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+    });
+
+    it("emits a wait that the action engine accepts at a positive-score decision point", () => {
+        delete process.env.V07_WAIT_SCORER;
+        delete process.env.V07_WAIT_WEIGHTS;
+        delete process.env.V07_WAIT_VERSIONS;
+        const { actor, context } = buildBoard(10);
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.startTurn(LOWER, 1_000);
+
+        expect(
+            getAIStrategy("v0.6")
+                .decideTurn(actor, context)
+                .some((action) => action.type === "wait_turn"),
+        ).toBe(false);
+        const actions = getAIStrategy("v0.7").decideTurn(actor, context);
+        expect(actions).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
+
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => actor.getId(),
+        });
+        const result = engine.apply(actions[0]);
+
+        expect(result.completed).toBe(true);
+        expect(result.rejectionReason).toBeUndefined();
+        expect(result.events).toContainEqual({ type: "unit_waited", unitId: actor.getId(), team: LOWER });
+        expect(fightProperties.hourglassIncludes(actor.getId())).toBe(true);
+        expect(fightProperties.hasAlreadyMadeTurn(actor.getId())).toBe(false);
     });
 
     it("applies the committed scorer after the inherited v0.6 decision", () => {
