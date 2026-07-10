@@ -2493,10 +2493,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
-            const longbowAttackPercent = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
-            this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * ampArtifact(longbowAttackPercent)).toFixed(2),
-            );
+            // Flat additional attack (NOT a percent of base attack) for ranged units.
+            const longbowAttackFlat = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
+            this.unitProperties.base_attack += ampArtifact(longbowAttackFlat);
         }
         const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityAttackBuff) {
