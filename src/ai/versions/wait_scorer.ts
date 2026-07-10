@@ -396,7 +396,8 @@ export function applyWaitScorerWeights(
         return incumbent; // not a wait-eligible decision point
     }
     const features = extractWaitFeatures(unit, context.unitsHolder, fightProperties, incumbent);
-    if (waitScore(weights, features) <= 0) {
+    const score = waitScore(weights, features);
+    if (!Number.isFinite(score) || score <= 0) {
         return incumbent;
     }
     return [{ type: "wait_turn", unitId: unit.getId() }];

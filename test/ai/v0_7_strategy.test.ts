@@ -135,6 +135,62 @@ describe("v0.7 baked weight resolution", () => {
 });
 
 describe("v0.7 strategy — wait-scorer always on", () => {
+    it("keeps the incumbent when fight state is unavailable", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        const contextWithoutFight: IDecisionContext = { ...context, fightProperties: undefined };
+
+        expect(applyWaitScorerWeights(actor, contextWithoutFight, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("keeps an incumbent wait untouched", () => {
+        const { actor, context } = buildBoard(10);
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: actor.getId() }];
+
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("keeps the incumbent for a team's lone living stack", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        context.fightProperties!.setTeamUnitsAlive(LOWER, 1);
+
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("keeps the incumbent when the actor is already queued on the hourglass", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        const fightProperties = context.fightProperties!;
+        fightProperties.enqueueHourglass(actor.getId());
+        fightProperties.restoreAlreadyHourglass([]);
+
+        expect(fightProperties.hourglassIncludes(actor.getId())).toBe(true);
+        expect(fightProperties.hasAlreadyHourglass(actor.getId())).toBe(false);
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("keeps the incumbent after the actor has made its turn", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        context.fightProperties!.addAlreadyMadeTurn(LOWER, actor.getId());
+
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("keeps the incumbent after the actor has already used its hourglass", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        const fightProperties = context.fightProperties!;
+        fightProperties.restoreAlreadyHourglass([actor.getId()]);
+
+        expect(fightProperties.hourglassIncludes(actor.getId())).toBe(false);
+        expect(fightProperties.hasAlreadyHourglass(actor.getId())).toBe(true);
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
+    it("fails closed when malformed state produces a non-finite score", () => {
+        const { actor, context, incumbent } = buildBoard(10);
+        Object.defineProperty(actor, "getSpeed", { value: () => Number.NaN });
+
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+    });
+
     it("matches the exact committed linear scorer at an eligible decision point", () => {
         const { actor, context, incumbent } = buildBoard();
         const fightProperties = context.fightProperties!;
