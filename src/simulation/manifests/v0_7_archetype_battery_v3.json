@@ -1,0 +1,44 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-fixed-archetypes-v3",
+    "createdAt": "2026-07-11T01:34:00Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "gamesPerCell": 3000,
+    "cells": {
+        "mage_frontline": {
+            "v0.6": 3793639308,
+            "v0.4": 2878295071
+        },
+        "mage_fireline": {
+            "v0.6": 1107198593,
+            "v0.4": 1708532201
+        },
+        "melee_magic_utility": {
+            "v0.6": 1872179763,
+            "v0.4": 2124301433
+        },
+        "melee_magic_brawler": {
+            "v0.6": 3624729706,
+            "v0.4": 2526569943
+        },
+        "aura_support": {
+            "v0.6": 157216744,
+            "v0.4": 817455206
+        },
+        "aura_offense": {
+            "v0.6": 3818379896,
+            "v0.4": 2615786880
+        },
+        "ranged_precision": {
+            "v0.6": 614863515,
+            "v0.4": 842826712
+        },
+        "ranged_control": {
+            "v0.6": 2949483064,
+            "v0.4": 2053877352
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated and committed after the v2 gate mismatch and before any v3 fixed-archetype outcome was evaluated; no v1 or v2 seed is reused."
+}
