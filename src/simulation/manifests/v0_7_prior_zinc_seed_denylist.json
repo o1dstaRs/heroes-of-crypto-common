@@ -1,0 +1,213 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-prior-zinc-seed-denylist-2026-07-11",
+    "createdAt": "2026-07-11T00:00:00.000Z",
+    "status": "historical_seed_denylist",
+    "pairSeedStep": 2654435761,
+    "expectedDerivedScenarioSeeds": 144600,
+    "sources": [
+        {
+            "path": "/home/agent-zinc/hoc-common-v0_7/run_v07_validation.sh",
+            "revision": "35ab838",
+            "purpose": "v0.7 mega-validation outcomes referenced by docs/v0_7_plan.html"
+        },
+        {
+            "path": "/home/agent-zinc/hoc-common-v07-dbe9356/raws_2x2/run_arms.sh",
+            "revision": "dbe9356",
+            "purpose": "RAWS A/B/C/E outcomes used to design the v0.7+RAWS search"
+        },
+        {
+            "path": "/home/agent-zinc/hoc-common-v07/raws_2x2_invalid_88008c1_target_memory/run_arms.sh",
+            "revision": "88008c1",
+            "purpose": "invalidated RAWS run that opened the same A/B/C/E streams as dbe9356"
+        },
+        {
+            "path": "sim-out/v0_7_acceptance/v0.7-s1-final-48ef649/manifests/v0.7-final-2026-07-10-r2.json",
+            "revision": "48ef649",
+            "purpose": "opened headline and cohort acceptance panels that certified the v0.7 default"
+        },
+        {
+            "path": "sim-out/v0_7_acceptance/v0.7-s3-final-637178f/manifests/v0.7-s3-final-2026-07-10.json",
+            "revision": "637178f",
+            "purpose": "opened S3 headline and cohort acceptance panels"
+        },
+        {
+            "path": "sim-out/v0_7_archetypes",
+            "revision": "multiple",
+            "purpose": "fixed Mage, Melee Mage, Aura, and Ranged diagnostic panels used to define this protocol"
+        },
+        {
+            "path": "docs/v0_7_plan.html",
+            "revision": "e1339a3",
+            "purpose": "recoverable Mac arbitration, guard, caster, and CEM streams recorded in the plan ledger"
+        }
+    ],
+    "seedSeries": [
+        {
+            "id": "raws-a",
+            "baseSeed": 910710,
+            "streams": 40,
+            "streamStride": 1000000,
+            "gamesPerStream": 400
+        },
+        {
+            "id": "raws-b",
+            "baseSeed": 920710,
+            "streams": 40,
+            "streamStride": 1000000,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "raws-c",
+            "baseSeed": 930710,
+            "streams": 40,
+            "streamStride": 1000000,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "raws-e",
+            "baseSeed": 950710,
+            "streams": 40,
+            "streamStride": 1000000,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "validation-v1",
+            "baseSeed": 1100710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 800
+        },
+        {
+            "id": "validation-v2",
+            "baseSeed": 1200710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 400
+        },
+        {
+            "id": "validation-v3",
+            "baseSeed": 1300710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "validation-v4a",
+            "baseSeed": 1400710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "validation-v4b",
+            "baseSeed": 1450710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 200
+        },
+        {
+            "id": "validation-v4c",
+            "baseSeed": 1500710,
+            "streams": 40,
+            "streamStride": 7919,
+            "gamesPerStream": 200
+        },
+        { "id": "acceptance-s1-h1", "baseSeed": 4236113278, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h2", "baseSeed": 388011601, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h3", "baseSeed": 3201848803, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h4", "baseSeed": 302104245, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h5", "baseSeed": 3677129843, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h6", "baseSeed": 146780338, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h7", "baseSeed": 1141181615, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h8", "baseSeed": 2160407141, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s1-h9", "baseSeed": 2564742925, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        {
+            "id": "acceptance-s1-melee",
+            "baseSeed": 2092343433,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        {
+            "id": "acceptance-s1-mixed",
+            "baseSeed": 2855454106,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        {
+            "id": "acceptance-s1-random",
+            "baseSeed": 3950606105,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        { "id": "acceptance-s3-h1", "baseSeed": 597977206, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h2", "baseSeed": 1124343234, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h3", "baseSeed": 2851351223, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h4", "baseSeed": 2548127688, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h5", "baseSeed": 2336450290, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h6", "baseSeed": 2044696625, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h7", "baseSeed": 568114001, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h8", "baseSeed": 3035810057, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "acceptance-s3-h9", "baseSeed": 2307126422, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        {
+            "id": "acceptance-s3-melee",
+            "baseSeed": 2492377671,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        {
+            "id": "acceptance-s3-mixed",
+            "baseSeed": 1220565605,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        {
+            "id": "acceptance-s3-random",
+            "baseSeed": 218830643,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 3000
+        },
+        { "id": "archetype-3100711", "baseSeed": 3100711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3200711", "baseSeed": 3200711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3201711", "baseSeed": 3201711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3300711", "baseSeed": 3300711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3301711", "baseSeed": 3301711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3400711", "baseSeed": 3400711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3401711", "baseSeed": 3401711, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "archetype-3500711", "baseSeed": 3500711, "streams": 1, "streamStride": 0, "gamesPerStream": 6000 },
+        { "id": "archetype-3501711", "baseSeed": 3501711, "streams": 1, "streamStride": 0, "gamesPerStream": 6000 },
+        { "id": "archetype-3600711", "baseSeed": 3600711, "streams": 1, "streamStride": 0, "gamesPerStream": 6000 },
+        { "id": "mac-raws-primary", "baseSeed": 967001, "streams": 1, "streamStride": 0, "gamesPerStream": 4000 },
+        { "id": "mac-raws-range", "baseSeed": 967002, "streams": 1, "streamStride": 0, "gamesPerStream": 1000 },
+        { "id": "mac-freeze-cem", "baseSeed": 947001, "streams": 1, "streamStride": 0, "gamesPerStream": 2200 },
+        {
+            "id": "mac-held-out-conservative",
+            "baseSeed": 937001,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 12000
+        },
+        {
+            "id": "mac-residual-oracle-conservative",
+            "baseSeed": 987001,
+            "streams": 1,
+            "streamStride": 0,
+            "gamesPerStream": 12000
+        },
+        { "id": "caster-salvage", "baseSeed": 77260710, "streams": 1, "streamStride": 0, "gamesPerStream": 6000 },
+        { "id": "guard-forced-1", "baseSeed": 7815710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-forced-2", "baseSeed": 7816710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-forced-3", "baseSeed": 7817710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-forced-4", "baseSeed": 7818710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-acceptance-1", "baseSeed": 7822710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-acceptance-2", "baseSeed": 7823710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 },
+        { "id": "guard-acceptance-3", "baseSeed": 7824710, "streams": 1, "streamStride": 0, "gamesPerStream": 3000 }
+    ],
+    "declaration": "These 144,600 unique paired-scenario seeds were opened or conservatively reserved by prior v0.7, cohort, guard, CEM, or RAWS experiments and are excluded from every v0.7 96-hour panel."
+}
