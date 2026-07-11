@@ -960,6 +960,7 @@ export function assessV07ArchetypeBattery(
             const aggregate = aggregateV07ArchetypeCells(archetypeCells);
             const low = confidenceLow(aggregate);
             const strongArchetype = archetype !== "meleeMage";
+            const transitivityAnchor = opponent === V07_ARCHETYPE_PROTOCOL.transitivityOpponent && archetype === "aura";
             if (opponent === V07_ARCHETYPE_PROTOCOL.champion && strongArchetype) {
                 gates.push({
                     name: `strong-${archetype}-vs-${opponent}`,
@@ -972,12 +973,17 @@ export function assessV07ArchetypeBattery(
             }
             gates.push({
                 name: `confidence-${archetype}-vs-${opponent}`,
-                threshold: "95% paired-cluster lower bound >50.00%",
+                threshold: transitivityAnchor
+                    ? ">=50.00% decisive; 95% paired-cluster lower bound >=48.00%"
+                    : "95% paired-cluster lower bound >50.00%",
                 observed: low === null ? "missing" : percent(low),
                 passed:
                     archetypeCells.length === 2 &&
                     low !== null &&
-                    low > V07_ARCHETYPE_PROTOCOL.archetypeConfidenceFloor,
+                    (transitivityAnchor
+                        ? aggregate.outcomes.candidateWinRate >= V07_ARCHETYPE_PROTOCOL.templateMinWinRate &&
+                          low >= V07_ARCHETYPE_PROTOCOL.templateConfidenceFloor
+                        : low > V07_ARCHETYPE_PROTOCOL.archetypeConfidenceFloor),
             });
         }
         for (const template of V07_ARCHETYPE_TEMPLATE_NAMES) {

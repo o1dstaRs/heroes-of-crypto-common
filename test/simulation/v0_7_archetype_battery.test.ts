@@ -311,6 +311,11 @@ describe("v0.7 archetype attribution and evidence gates", () => {
             (cell) => cell.spec.template === "ranged_control" && cell.spec.opponent === "v0.6",
         )!;
         rangedControl.outcomes = outcomes(0.62);
+        for (const cell of cells.filter(
+            (candidate) => candidate.spec.archetype === "aura" && candidate.spec.opponent === "v0.4",
+        )) {
+            cell.outcomes = outcomes(0.5);
+        }
         ranged.integrity.armageddonDecided = 930;
         ranged.integrity.drawOrArmageddon = 930;
         ranged.integrity.drawOrArmageddonRate = 0.31;
@@ -322,6 +327,10 @@ describe("v0.7 archetype attribution and evidence gates", () => {
         expect(pass.gates.find((gate) => gate.name === "strong-ranged-vs-v0.6")).toMatchObject({ passed: true });
         expect(pass.gates.find((gate) => gate.name === "confidence-ranged-vs-v0.6")).toMatchObject({
             threshold: "95% paired-cluster lower bound >50.00%",
+            passed: true,
+        });
+        expect(pass.gates.find((gate) => gate.name === "confidence-aura-vs-v0.4")).toMatchObject({
+            threshold: ">=50.00% decisive; 95% paired-cluster lower bound >=48.00%",
             passed: true,
         });
         expect(pass.bakeDecision).toBe("NOT_EVALUATED");
