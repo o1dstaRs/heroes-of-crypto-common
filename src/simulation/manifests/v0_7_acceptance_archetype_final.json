@@ -1,0 +1,23 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-archetype-final-2026-07-11",
+    "createdAt": "2026-07-11T01:42:54Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "headline": {
+        "seeds": [
+            2130088098, 3337516055, 2760036936, 289100438, 1380437238, 3192226733, 1594705713, 1050624555, 2766793339
+        ],
+        "gamesPerSeed": 3000
+    },
+    "cohorts": {
+        "gamesPerSeed": 3000,
+        "seeds": {
+            "melee": [939174798],
+            "mixed": [1572276652],
+            "random": [2350704426]
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated and committed after the v3 fixed-archetype PASS and before any final acceptance outcome was evaluated; no prior acceptance or archetype seed stream is reused."
+}
