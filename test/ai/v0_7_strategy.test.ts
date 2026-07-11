@@ -12,7 +12,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION, type IDecisionContext } from "../../src/ai";
-import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
+import {
+    isAuraSaturatedArmy,
+    isMeleeMagicAnchorArmy,
+    shouldUseArchetypePlacementAnchor,
+    StrategyV0_7,
+} from "../../src/ai/versions/v0_7";
 import {
     applyWaitScorerWeights,
     canWaitOnHourglassMirror,
@@ -142,6 +147,37 @@ describe("v0.7 baked weight resolution", () => {
 });
 
 describe("v0.7 strategy — baked wait scorer", () => {
+    it("recognizes the fixed aura, melee-magic, and Area Throw policy domains", () => {
+        const auraArmy = Array.from({ length: 3 }, () =>
+            createTestUnit({ auraEffects: ["Luck"], auraRanges: [2], auraIsBuff: [true] }),
+        );
+        const brawlerArmy = [
+            ...Array.from({ length: 4 }, () => createTestUnit({ attackType: PBTypes.AttackVals.MELEE_MAGIC })),
+            createTestUnit(),
+            createTestUnit(),
+        ];
+        const salvageArmy = [
+            ...brawlerArmy.slice(0, 3),
+            createTestUnit({ attackType: PBTypes.AttackVals.MELEE_MAGIC, spells: ["System:Resurrection"] }),
+            ...brawlerArmy.slice(4),
+        ];
+        const rangedArmy = Array.from({ length: 6 }, () =>
+            createTestUnit({ attackType: PBTypes.AttackVals.RANGE, rangeShots: 5 }),
+        );
+        const areaThrow = createTestUnit({ abilities: ["Area Throw"] });
+        const largeCaliber = createTestUnit({ abilities: ["Large Caliber"] });
+
+        expect(isAuraSaturatedArmy(auraArmy)).toBe(true);
+        expect(isAuraSaturatedArmy([...auraArmy, createTestUnit()])).toBe(false);
+        expect(isMeleeMagicAnchorArmy(brawlerArmy)).toBe(true);
+        expect(isMeleeMagicAnchorArmy(salvageArmy)).toBe(false);
+        expect(shouldUseArchetypePlacementAnchor(rangedArmy, [areaThrow])).toBe(true);
+        expect(shouldUseArchetypePlacementAnchor(rangedArmy, [largeCaliber])).toBe(false);
+        expect(shouldUseArchetypePlacementAnchor([...rangedArmy.slice(0, 5), createTestUnit()], [areaThrow])).toBe(
+            false,
+        );
+    });
+
     it("keeps the incumbent when fight state is unavailable", () => {
         const { actor, context, incumbent } = buildBoard(10);
         const contextWithoutFight: IDecisionContext = { ...context, fightProperties: undefined };

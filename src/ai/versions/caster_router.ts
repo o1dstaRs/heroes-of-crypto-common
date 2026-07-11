@@ -123,9 +123,10 @@ function shouldCastWindFlow(caster: Unit, context: IDecisionContext): boolean {
         .getAllEnemyUnits(caster.getTeam())
         .filter(affected)
         .reduce((sum, unit) => sum + flyingPressure(unit), 0);
+    // Wind Flow also slows a flying caster; excluding it makes symmetric Valkyrie armies cast for no gain.
     const alliedCollateral = context.unitsHolder
         .getAllAllies(caster.getTeam())
-        .filter((unit) => unit.getId() !== caster.getId() && affected(unit))
+        .filter(affected)
         .reduce((sum, unit) => sum + flyingPressure(unit), 0);
     return enemyPressure > alliedCollateral;
 }

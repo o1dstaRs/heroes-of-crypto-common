@@ -180,8 +180,8 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
             attackType: MELEE,
             movementType: FLY,
             speed: 8,
-            damageMax: 10,
-            amountAlive: 10,
+            damageMax: 100,
+            amountAlive: 100,
         });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 12 });
@@ -212,6 +212,25 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
         });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, alliedFlyer, { x: 6, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 12 });
+        const incumbent = fallback(valkyrie);
+
+        expect(routeUniversalCaster(valkyrie, contextFor(combat), incumbent)).toBe(incumbent);
+    });
+
+    it("counts the flying caster itself as Wind Flow collateral", () => {
+        process.env.V06_CASTER_ROUTER = "on";
+        const combat = createCombatTestContext();
+        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        valkyrie.setStackPower(5);
+        const enemyFlyer = createTestUnit({
+            team: UPPER,
+            movementType: FLY,
+            speed: 2,
+            damageMax: 1,
+            amountAlive: 1,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 12 });
         const incumbent = fallback(valkyrie);
 
@@ -277,10 +296,12 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
             attackType: MELEE,
             movementType: FLY,
             speed: 8,
-            damageMax: 10,
-            amountAlive: 10,
+            damageMax: 100,
+            amountAlive: 100,
         });
+        const nonAuraAlly = createTestUnit({ team: LOWER, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, nonAuraAlly, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
         const strategy = new StrategyV0_6();
 
@@ -305,10 +326,12 @@ describe("v0.7 baked caster salvage", () => {
             attackType: MELEE,
             movementType: FLY,
             speed: 8,
-            damageMax: 10,
-            amountAlive: 10,
+            damageMax: 100,
+            amountAlive: 100,
         });
+        const nonAuraAlly = createTestUnit({ team: LOWER, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, nonAuraAlly, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
         const context = contextFor(combat);
 
