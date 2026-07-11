@@ -21,6 +21,7 @@ import {
     parseWaitWeights,
     WAIT_FEATURE_NAMES,
     waitScore,
+    waitScorerInSupport,
 } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -47,6 +48,7 @@ const ENV_KEYS = [
     "V07_WAIT_VERSIONS",
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS_B",
+    "V07_WAIT_GUARD",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) {
@@ -83,11 +85,14 @@ interface Board {
 }
 
 /** 2v2 board with hourglass-eligible LOWER actor and a melee-CHARGE incumbent (path present). */
-function buildBoard(actorOptions: Parameters<typeof createTestUnit>[0] = {}): Board {
+function buildBoard(
+    actorOptions: Parameters<typeof createTestUnit>[0] = {},
+    allyOptions: Parameters<typeof createTestUnit>[0] = {},
+): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4, ...actorOptions });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2 });
+    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2, ...allyOptions });
     const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3 });
     const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5 });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
@@ -296,6 +301,51 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
         const lone = buildBoard();
         fp().setTeamUnitsAlive(LOWER, 1);
         expect(applyWaitScorer(lone.actor, lone.context, lone.charge, "v0.6s")).toBe(lone.charge);
+    });
+
+    it("training-support guard: a RANGE actor keeps the exact incumbent even at z > 0", () => {
+        const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
+        expect(canWaitOnHourglassMirror(ranged.actor, fp())).toBe(true);
+        expect(applyWaitScorer(ranged.actor, ranged.context, ranged.charge, "v0.6s")).toBe(ranged.charge);
+        // V07_WAIT_GUARD=off reproduces the unguarded pre-fix scorer (the ranged-collapse configuration)
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5), V07_WAIT_GUARD: "off" });
+        expect(applyWaitScorer(ranged.actor, ranged.context, ranged.charge, "v0.6s")).toEqual([
+            { type: "wait_turn", unitId: ranged.actor.getId() },
+        ]);
+    });
+
+    it("training-support guard: 'support' also requires a majority melee-attack-type own army", () => {
+        // melee actor + ranged ally -> melee is 1 of 2 own stacks: NOT a majority -> out of support
+        const mixed = buildBoard({}, { attackType: RANGE, rangeShots: 5 });
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
+        expect(waitScorerInSupport(mixed.actor, mixed.context.unitsHolder)).toBe(false);
+        expect(applyWaitScorer(mixed.actor, mixed.context, mixed.charge, "v0.6s")).toBe(mixed.charge);
+        // the class-only arm keeps firing on melee units regardless of army composition
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5), V07_WAIT_GUARD: "class" });
+        expect(waitScorerInSupport(mixed.actor, mixed.context.unitsHolder)).toBe(true);
+        expect(applyWaitScorer(mixed.actor, mixed.context, mixed.charge, "v0.6s")).toEqual([
+            { type: "wait_turn", unitId: mixed.actor.getId() },
+        ]);
+        // an all-melee army is in support in every guarded mode (the training distribution)
+        const melee = buildBoard();
+        setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
+        expect(waitScorerInSupport(melee.actor, melee.context.unitsHolder)).toBe(true);
+        expect(applyWaitScorer(melee.actor, melee.context, melee.charge, "v0.6s")).toEqual([
+            { type: "wait_turn", unitId: melee.actor.getId() },
+        ]);
+    });
+
+    it("training-support guard: unit-class support is MELEE and MELEE_MAGIC only (MAGIC had zero fit rows)", () => {
+        const meleeMagic = buildBoard({ attackType: MELEE_MAGIC });
+        expect(waitScorerInSupport(meleeMagic.actor, meleeMagic.context.unitsHolder)).toBe(true);
+        const magic = buildBoard({ attackType: PBTypes.AttackVals.MAGIC });
+        expect(waitScorerInSupport(magic.actor, magic.context.unitsHolder)).toBe(false);
+        const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        expect(waitScorerInSupport(ranged.actor, ranged.context.unitsHolder)).toBe(false);
+        // an unknown V07_WAIT_GUARD value falls back to the default "support" mode, never "off"
+        setEnv({ V07_WAIT_GUARD: "banana" });
+        expect(waitScorerInSupport(ranged.actor, ranged.context.unitsHolder)).toBe(false);
     });
 
     it("the committed SHIP weights are width-aligned, non-anchor and round-trip through the env parser", () => {

@@ -37,6 +37,7 @@ import {
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
     extractWaitFeatures,
     waitScore,
+    waitScorerInSupport,
 } from "../ai/versions/wait_scorer";
 
 /**
@@ -57,6 +58,15 @@ import {
  * with V07_WAIT_WEIGHTS all-zero (scorer disabled, salvage kept) every ranged cohort returns to EXACT
  * 50.00% parity — the collapse is 100% the wait-scorer.
  *
+ * FIXED (same day) by the wait_scorer.ts TRAINING-SUPPORT GUARD (default "support": melee-attack-type
+ * acting unit AND majority-melee own army). Guarded v0.7 vs v0.6, 3k paired games per cell, seeds
+ * 7815710/7816710/7817710/7818710: melee_coevo 71.5%±0.8 (edge retained), hybrid 60.2%±0.9,
+ * ranged_max_sniper3 50.6%±0.9 (was 25.0), pure_ranged EXACT 50.00%±1.1 (was 2.1). The "class"-only
+ * arm scored 48.9%±0.9 on ranged_max (paired seed 7817710) — the army-context clause is worth +1.7pp
+ * there, so "support" ships as the default. Diag (200 games, seed 7821710): v0.7 wait rate 4.0% vs
+ * v0.6 3.9% (was 40.9% vs 5.1%), shot damage/game 1011 vs 1008 (was 753 vs 1304), casualty curves
+ * indistinguishable, cfScorerFiresInSupport = 0 on the armed seat.
+ *
  * Usage:
  *   bun src/simulation/measure_mirror_cohorts.ts --cohort ranged_max_sniper3 --games 4000 --seed 7803710 \
  *       --concurrency 10 --out sim-out/mirror_ranged            # LIVETWIN exp-budget amounts (default)
@@ -65,6 +75,8 @@ import {
  *       per-side wait rates per lap, wait-scorer counterfactual fires, first-volley stats, casualty curves
  *   ... --zero-scorer                                           # V07_WAIT_WEIGHTS=all-zero (disables ONLY
  *       v0.7's baked wait-scorer; caster salvage stays) — the scorer-attribution arm
+ *   ... --guard off|class|support                               # V07_WAIT_GUARD arm: "off" reproduces the
+ *       pre-fix unguarded scorer; empty = the code default ("support", the shipped training-support guard)
  */
 
 export const PURE_RANGED_ROSTER_NAMES: readonly { level: number; creatureName: string }[] = [
@@ -90,6 +102,8 @@ export interface IMirrorRunConfig {
     livetwin: boolean;
     diag: boolean;
     zeroScorer: boolean;
+    /** V07_WAIT_GUARD arm for the run: "" = code default ("support"); "off" reproduces the pre-fix scorer. */
+    guard?: "" | "support" | "class" | "off";
 }
 
 export interface IMirrorLapDiag {
@@ -108,6 +122,8 @@ export interface IMirrorSideDiag {
     eligible: number;
     cfFires: number;
     cfFiresRangedUnit: number;
+    /** cfFires that are ALSO inside the training-support guard (wait_scorer.ts waitScorerInSupport). */
+    cfFiresInSupport: number;
     byLap: IMirrorLapDiag[];
     shots: number;
     shotDamage: number;
@@ -181,6 +197,7 @@ function newSideDiag(version: string): IMirrorSideDiag {
         eligible: 0,
         cfFires: 0,
         cfFiresRangedUnit: 0,
+        cfFiresInSupport: 0,
         byLap: [],
         shots: 0,
         shotDamage: 0,
@@ -242,6 +259,9 @@ export function playMirrorGame(
                   slot.cfFires += 1;
                   if (isRangedUnit) {
                       side.cfFiresRangedUnit += 1;
+                  }
+                  if (waitScorerInSupport(obs.unit, obs.context.unitsHolder)) {
+                      side.cfFiresInSupport += 1;
                   }
               }
           }
@@ -332,6 +352,7 @@ export interface IMirrorSummary {
     amountMode: StackAmountMode;
     livetwin: boolean;
     zeroScorer: boolean;
+    guard: string;
     pairedSideSwap: true;
     symmetricRosters: true;
     winsA: number;
@@ -370,6 +391,7 @@ export function summarizeMirrorRecords(records: readonly IMirrorGameRecord[], cf
         amountMode: cfg.amountMode,
         livetwin: cfg.livetwin,
         zeroScorer: cfg.zeroScorer,
+        guard: cfg.guard || "default(support)",
         pairedSideSwap: true,
         symmetricRosters: true,
         winsA,
@@ -395,6 +417,7 @@ interface IVersionAggregate {
     eligible: number;
     cfFires: number;
     cfFiresRangedUnit: number;
+    cfFiresInSupport: number;
     byLap: Map<number, { decisions: number; waits: number; eligible: number; cfFires: number }>;
     firstVolleyLaps: number[];
     shots: number;
@@ -420,6 +443,7 @@ export function aggregateMirrorDiag(
                 eligible: 0,
                 cfFires: 0,
                 cfFiresRangedUnit: 0,
+                cfFiresInSupport: 0,
                 byLap: new Map(),
                 firstVolleyLaps: [],
                 shots: 0,
@@ -446,6 +470,7 @@ export function aggregateMirrorDiag(
             a.eligible += side.eligible;
             a.cfFires += side.cfFires;
             a.cfFiresRangedUnit += side.cfFiresRangedUnit;
+            a.cfFiresInSupport += side.cfFiresInSupport ?? 0;
             a.shots += side.shots;
             a.shotDamage += side.shotDamage;
             a.meleeDamage += side.meleeDamage;
@@ -481,6 +506,7 @@ export function aggregateMirrorDiag(
             cfScorerFires: a.cfFires,
             cfScorerFireRate: a.cfFires / Math.max(1, a.eligible),
             cfScorerFiresRangedUnit: a.cfFiresRangedUnit,
+            cfScorerFiresInSupport: a.cfFiresInSupport,
             meanFirstVolleyLap: a.firstVolleyLaps.length
                 ? a.firstVolleyLaps.reduce((s, x) => s + x, 0) / a.firstVolleyLaps.length
                 : null,
@@ -505,8 +531,10 @@ export function aggregateMirrorDiag(
     return {
         versions: out,
         note:
-            "cfScorerFires = counterfactual z>0 (baked weights) on non-wait eligible points; on the armed " +
-            `${cfg.vA} seat this must be ~0 (already converted); on ${cfg.vB} it estimates the would-fire rate`,
+            "cfScorerFires = counterfactual z>0 (baked weights, UNGUARDED) on non-wait eligible points; " +
+            `on the armed ${cfg.vA} seat cfScorerFiresInSupport must be ~0 (in-support fires are already ` +
+            `converted) while cfScorerFires-cfScorerFiresInSupport counts points the training-support guard ` +
+            `suppressed; on ${cfg.vB} cfScorerFires estimates the unguarded would-fire rate`,
     };
 }
 
@@ -548,6 +576,7 @@ export async function main(): Promise<void> {
             vB: { type: "string", default: "v0.6" },
             diag: { type: "boolean", default: false },
             "zero-scorer": { type: "boolean", default: false },
+            guard: { type: "string", default: "" },
             out: { type: "string", default: "sim-out/mirror_cohort" },
         },
         strict: true,
@@ -563,7 +592,11 @@ export async function main(): Promise<void> {
         livetwin: values.livetwin === "1",
         diag: values.diag!,
         zeroScorer: values["zero-scorer"]!,
+        guard: values.guard as IMirrorRunConfig["guard"],
     };
+    if (cfg.guard && !["support", "class", "off"].includes(cfg.guard)) {
+        throw new Error(`--guard must be support|class|off (or empty for the code default); got ${cfg.guard}`);
+    }
     if (!MIRROR_COHORTS.includes(cfg.cohort)) {
         throw new Error(`--cohort must be one of ${MIRROR_COHORTS.join(", ")}; got ${String(cfg.cohort)}`);
     }
@@ -590,6 +623,11 @@ export async function main(): Promise<void> {
     } else {
         delete process.env.V07_WAIT_WEIGHTS;
     }
+    if (cfg.guard) {
+        process.env.V07_WAIT_GUARD = cfg.guard;
+    } else {
+        delete process.env.V07_WAIT_GUARD;
+    }
 
     const outBase = resolve(String(values.out));
     mkdirSync(dirname(outBase), { recursive: true });
@@ -601,7 +639,7 @@ export async function main(): Promise<void> {
     console.error(
         `[mirror_cohort] cohort=${cfg.cohort} games=${cfg.games} seed=${cfg.seed} ` +
             `${cfg.vA} vs ${cfg.vB} amountMode=${cfg.amountMode} LIVETWIN=${cfg.livetwin ? 1 : 0} ` +
-            `diag=${cfg.diag} zeroScorer=${cfg.zeroScorer} conc=${concurrency}`,
+            `diag=${cfg.diag} zeroScorer=${cfg.zeroScorer} guard=${cfg.guard || "default"} conc=${concurrency}`,
     );
 
     const records: IMirrorGameRecord[] = [];
