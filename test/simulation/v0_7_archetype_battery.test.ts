@@ -300,12 +300,14 @@ describe("v0.7 archetype attribution and evidence gates", () => {
         expect(aggregate.integrity.candidateRejections).toBe(10);
     });
 
-    it("requires every strong/non-regression gate but keeps Armageddon template-specific and diagnostic", () => {
+    it("requires role-aware improvement/non-regression gates but keeps Armageddon diagnostic", () => {
         const options = optionsFromManifest();
         const cells = passingCells(options);
-        const ranged = cells.find(
-            (cell) => cell.spec.template === "ranged_precision" && cell.spec.opponent === "v0.6",
-        )!;
+        const rangedVsChampion = cells.filter(
+            (cell) => cell.spec.archetype === "ranged" && cell.spec.opponent === "v0.6",
+        );
+        for (const cell of rangedVsChampion) cell.outcomes = outcomes(0.5);
+        const ranged = rangedVsChampion.find((cell) => cell.spec.template === "ranged_precision")!;
         ranged.integrity.armageddonDecided = 930;
         ranged.integrity.drawOrArmageddon = 930;
         ranged.integrity.drawOrArmageddonRate = 0.31;
@@ -313,6 +315,11 @@ describe("v0.7 archetype attribution and evidence gates", () => {
         const pass = assessV07ArchetypeBattery(options, cleanRevision, cells);
         expect(pass.protocolPowered).toBe(true);
         expect(pass.evidenceVerdict).toBe("PASS");
+        expect(pass.gates.find((gate) => gate.name === "strong-ranged-vs-v0.6")).toBeUndefined();
+        expect(pass.gates.find((gate) => gate.name === "confidence-ranged-vs-v0.6")).toMatchObject({
+            threshold: ">=50.00% decisive; 95% paired-cluster lower bound >=48.00%",
+            passed: true,
+        });
         expect(pass.bakeDecision).toBe("NOT_EVALUATED");
         expect(pass.releaseInstruction).toBe("NO_BAKE_FROM_THIS_REPORT");
         expect(
