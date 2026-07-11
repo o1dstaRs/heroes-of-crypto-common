@@ -1,18 +1,19 @@
 // Phase-B MULTI-COHORT refit of the learned VALUE LEAF (search_driver leaf eval).
 //
 // The committed 20-dim leaf (v0_7_value_weights.ts, 75.1% held-out) was fit on LIVETWIN MELEE drafts
-// only — OOD on ranged/mixed boards. This trainer consumes VALUE_DATA_FEATURES=v2 dumps (battle_engine:
-// [f0..f29, label, seed] rows, extractValueFeaturesV2 = base 20 + class/composition block) generated
-// across cohorts, splits held-out BY GAME SEED, and reports per-cohort held-out accuracy/log-loss for:
+// only — OOD on ranged/mixed boards. This trainer consumes self-describing VALUE_DATA_FEATURES=v2 rows
+// generated across cohorts, requires their shared preregistered run fingerprint, splits held-out BY GAME
+// SEED, and reports per-cohort held-out accuracy/log-loss for:
 //   - MATERIAL baseline (sigmoid(6*hpAdv))
 //   - the COMMITTED 20-dim leaf (DEFAULT_V07_VALUE_WEIGHTS)
 //   - a REFIT of the 20 base dims on the multi-cohort data (does the data alone fix it?)
 //   - the full 30-dim V2 fit (do the composition dims earn their keep?)
 // Prints V07_VALUE_WEIGHTS_V2 JSON for the 30-dim fit (and the 20-dim refit for reference).
 //
-// Usage: bun fit_value_v2.mjs melee=path.jsonl mixed=path.jsonl ranged=path.jsonl ... [epochs=300] [lr=0.5] [l2=0.0001]
+// Usage: bun fit_value_v2.mjs fingerprint=<64hex> melee=path.jsonl mixed=path.jsonl ... epochs=300 lr=0.5 l2=0.0001
 import { readFileSync } from "node:fs";
 
+import { parsePhaseBFitterArgs, parsePhaseBValueRow } from "../phase_b_dataset";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../v0_7_value_weights";
 import {
     expandValueFeaturesV2,
@@ -21,40 +22,34 @@ import {
     VALUE_FEATURE_NAMES_V2_RAW,
 } from "../value_features";
 
-const args = process.argv.slice(2);
-const fileArgs = args.filter((a) => a.includes("="));
-const numArgs = args.filter((a) => !a.includes("=")).map(Number);
-const EPOCHS = numArgs[0] ?? 300;
-const LR = numArgs[1] ?? 0.5;
-const L2 = numArgs[2] ?? 0.0001;
-if (!fileArgs.length) {
-    console.error("usage: bun fit_value_v2.mjs <cohort>=<data.jsonl> [...] [epochs] [lr] [l2]");
-    process.exit(1);
-}
+const parsedArgs = parsePhaseBFitterArgs(process.argv.slice(2), {
+    epochs: 300,
+    learningRate: 0.5,
+    l2: 0.0001,
+});
+const { runFingerprint, files, epochs: EPOCHS, learningRate: LR, l2: L2 } = parsedArgs;
 
 const D2 = VALUE_FEATURE_NAMES_V2_RAW.length; // 30 (the dumped raw width)
 const D1 = VALUE_FEATURE_NAMES.length; // 20
-const ROW_W = D2 + 2; // raw features + label + seed
 
 /** rows: { f: number[D2], y: 0|1, s: seed, cohort } */
 const rows = [];
-for (const arg of fileArgs) {
-    const eq = arg.indexOf("=");
-    const cohort = arg.slice(0, eq);
-    const path = arg.slice(eq + 1);
+for (const { cohort, path } of files) {
     let n = 0;
-    for (const line of readFileSync(path, "utf8").split("\n")) {
+    const lines = readFileSync(path, "utf8").split("\n");
+    for (let lineNumber = 0; lineNumber < lines.length; lineNumber += 1) {
+        const line = lines[lineNumber].trim();
         if (!line) continue;
-        const r = JSON.parse(line);
-        if (!Array.isArray(r) || r.length !== ROW_W) {
-            throw new Error(`${cohort}: row width ${r.length} != ${ROW_W} — dump with VALUE_DATA_FEATURES=v2`);
-        }
-        rows.push({ f: r.slice(0, D2), y: r[D2], s: r[D2 + 1], cohort });
+        const parsed = parsePhaseBValueRow(JSON.parse(line), D2, runFingerprint, `${cohort}:${lineNumber + 1}`);
+        rows.push({ f: parsed.features, y: parsed.label, s: parsed.seed, cohort });
         n += 1;
     }
+    if (!n) throw new Error(`${cohort}: dataset has no rows`);
     console.log(`${cohort}: ${n} rows from ${path}`);
 }
+if (!rows.length) throw new Error("No Phase-B value rows were loaded");
 console.log(`total rows: ${rows.length}`);
+console.log(`run fingerprint: ${runFingerprint}`);
 
 // --- held-out split BY GAME SEED (deterministic hash, 15%) ---
 const hash = (n) => {
@@ -65,6 +60,17 @@ const hash = (n) => {
 };
 const train = rows.filter((r) => hash(r.s) >= 0.15);
 const test = rows.filter((r) => hash(r.s) < 0.15);
+if (!train.length || !test.length) {
+    throw new Error(`split by seed produced an empty ${train.length ? "test" : "train"} partition`);
+}
+const cohorts = files.map((file) => file.cohort);
+for (const cohort of cohorts) {
+    const trainRows = train.filter((row) => row.cohort === cohort).length;
+    const testRows = test.filter((row) => row.cohort === cohort).length;
+    if (!trainRows || !testRows) {
+        throw new Error(`${cohort}: split must contain nonempty train and test rows; got ${trainRows}/${testRows}`);
+    }
+}
 console.log(`split by seed: train ${train.length} / test ${test.length}`);
 
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
@@ -149,7 +155,6 @@ const models = [
     ],
 ];
 
-const cohorts = [...new Set(rows.map((r) => r.cohort))];
 console.log("\n=== held-out test accuracy / logloss (split by game seed) ===");
 for (const [label, score] of models) {
     const per = cohorts.map((c) => {

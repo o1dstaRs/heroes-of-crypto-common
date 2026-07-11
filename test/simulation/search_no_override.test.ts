@@ -32,6 +32,9 @@ const ENV_KEYS = [
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
+    "V07_VALUE_WEIGHTS_V2",
+    "Q2_DATASET_V2",
+    "PHASE_B_RUN_FINGERPRINT",
 ] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 

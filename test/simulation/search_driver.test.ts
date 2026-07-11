@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
-import { WAIT_FEATURE_NAMES } from "../../src/ai/versions/wait_scorer";
+import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -44,8 +44,10 @@ import {
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
+import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { SearchDriver } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
+import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
 import { Unit } from "../../src/units/unit";
 import { UnitsHolder } from "../../src/units/units_holder";
 import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
@@ -56,6 +58,8 @@ const SEARCH_ENV_KEYS = [
     "Q2_WAIT_ABLATION",
     "Q2_ORACLE",
     "Q2_DATASET",
+    "Q2_DATASET_V2",
+    "PHASE_B_RUN_FINGERPRINT",
     "SEARCH_VERSIONS",
     "SEARCH_GATE",
     "SEARCH_HORIZON",
@@ -65,6 +69,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
+    "V07_VALUE_WEIGHTS_V2",
     "V07_WAIT_SCORER",
     "V07_WAIT_WEIGHTS",
     "V07_WAIT_VERSIONS",
@@ -368,13 +373,58 @@ describe("search driver — gating, hygiene, determinism", () => {
     it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const learned = buildBattle(91, "v0.6").makeDriver() as unknown as {
-            learned: { b: number; w: number[] } | null;
+            learned: { b: number; w: readonly number[] } | null;
         };
         expect(learned.learned).toEqual(DEFAULT_V07_VALUE_WEIGHTS);
 
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", V07_VALUE_WEIGHTS: "material" });
         const material = buildBattle(92, "v0.6").makeDriver() as unknown as { learned: unknown };
         expect(material.learned).toBeNull();
+    });
+
+    it("V2 leaf resolution falls back on malformed/all-zero weights and accepts a sole non-zero candidate", () => {
+        const weightsV2 = (b: number): string =>
+            JSON.stringify({ b, w: new Array(VALUE_FEATURE_NAMES_V2.length).fill(0) });
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", V07_VALUE_WEIGHTS_V2: "not-json" });
+        const malformed = buildBattle(93, "v0.6").makeDriver() as unknown as {
+            learned: unknown;
+            learnedV2: unknown;
+        };
+        expect(malformed.learned).toEqual(DEFAULT_V07_VALUE_WEIGHTS);
+        expect(malformed.learnedV2).toBeNull();
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            V07_VALUE_WEIGHTS: "material",
+            V07_VALUE_WEIGHTS_V2: weightsV2(0),
+        });
+        const disabled = buildBattle(94, "v0.6").makeDriver() as unknown as {
+            learned: unknown;
+            learnedV2: unknown;
+        };
+        expect(disabled.learned).toBeNull();
+        expect(disabled.learnedV2).toBeNull();
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", V07_VALUE_WEIGHTS_V2: weightsV2(0.25) });
+        const v2 = buildBattle(95, "v0.6").makeDriver() as unknown as {
+            learnedV2: { b: number; w: number[] } | null;
+        };
+        expect(v2.learnedV2?.b).toBe(0.25);
+        expect(v2.learnedV2?.w).toHaveLength(VALUE_FEATURE_NAMES_V2.length);
+    });
+
+    it("rejects a valid V2 leaf combined with any explicit V07_VALUE_WEIGHTS selector", () => {
+        const candidate = JSON.stringify({ b: 0.25, w: new Array(VALUE_FEATURE_NAMES_V2.length).fill(0) });
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            V07_VALUE_WEIGHTS: "material",
+            V07_VALUE_WEIGHTS_V2: candidate,
+        });
+        expect(() => buildBattle(96, "v0.6").makeDriver()).toThrow(
+            "V07_VALUE_WEIGHTS_V2 cannot be combined with explicit V07_VALUE_WEIGHTS",
+        );
     });
 
     it("is OFF by default: chooseDecision returns the incumbent reference untouched", () => {
@@ -793,6 +843,61 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         expect(keptWait.y).toBe(1);
         expect(keptWait.d).toBeNull();
         expect(keptWait.k).toBe("wait");
+    });
+
+    it("Q2_DATASET_V2 requires provenance and emits self-describing oracle rows", () => {
+        const datasetPath = join(mkdtempSync(join(tmpdir(), "q2d-v2-")), "dataset.jsonl");
+        const fingerprint = "a".repeat(64);
+        setEnv({
+            Q2_ORACLE: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_GATE: "0",
+            SEARCH_OPP_MODEL: "v0.4",
+            Q2_DATASET: datasetPath,
+            Q2_DATASET_V2: "1",
+        });
+        const missing = buildBattle(2033, "v0.6");
+        expect(() => missing.makeDriver()).toThrow("PHASE_B_RUN_FINGERPRINT");
+
+        setEnv({
+            Q2_ORACLE: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_GATE: "0",
+            SEARCH_OPP_MODEL: "v0.4",
+            Q2_DATASET: datasetPath,
+            Q2_DATASET_V2: "1",
+            PHASE_B_RUN_FINGERPRINT: fingerprint,
+        });
+        const h = buildBattle(2033, "v0.6");
+        const { unit, incumbent } = findOraclePoint(h);
+        const driver = h.makeDriver();
+        driver.chooseDecision(unit, "v0.6", incumbent);
+        driver.chooseDecision(unit, "v0.6", [{ type: "wait_turn", unitId: unit.getId() }]);
+        driver.onMatchEnd("v0.6", "elimination");
+
+        const rows = readFileSync(datasetPath, "utf8")
+            .trim()
+            .split("\n")
+            .map((line, index) =>
+                parsePhaseBQ2Row(JSON.parse(line), WAIT_FEATURE_NAMES_V2_RAW.length, fingerprint, `row ${index}`),
+            );
+        expect(rows).toHaveLength(2);
+        for (const row of rows) {
+            expect(row.v).toBe(2);
+            expect(row.runFingerprint).toBe(fingerprint);
+            expect(row.seed).toBe(2033);
+            expect(row.features).toHaveLength(WAIT_FEATURE_NAMES_V2_RAW.length);
+            expect(row.oracle).toEqual({
+                gate: 0,
+                rollouts: 1,
+                horizon: "lap",
+                leaf: "learned",
+                opponentModel: "v0.4",
+            });
+        }
+        expect(rows.find((row) => row.incumbentWait === 1)?.delta).toBeNull();
     });
 
     it("writes the oracle audit summary with the wait-decision statistics", () => {

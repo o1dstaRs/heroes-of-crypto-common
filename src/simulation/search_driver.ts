@@ -29,6 +29,13 @@ import { getDeterministicRandomSource, setDeterministicRandomSource } from "../u
 import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import type { ILookaheadDeps } from "./lookahead";
+import {
+    canonicalPhaseBSeed,
+    PHASE_B_DATASET_VERSION,
+    PHASE_B_Q2_ROW_TYPE,
+    type PhaseBLeafKind,
+    requirePhaseBRunFingerprint,
+} from "./phase_b_dataset";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
 import {
@@ -287,6 +294,8 @@ export class SearchDriver {
     private readonly datasetPath: string | undefined;
     /** Q2_DATASET_V2=1 — dump WAIT_FEATURE_NAMES_V2_RAW rows (49 dims, marker v:2) for the Phase-B refit. */
     private readonly datasetV2: boolean;
+    private readonly datasetFingerprint: string | null;
+    private readonly datasetSeed: number | null;
     private readonly datasetRows: string[] = [];
     private readonly caps: {
         maxMoveDestinations: number;
@@ -326,8 +335,13 @@ export class SearchDriver {
                 : rawValueWeights
                   ? parseLearnedValue(rawValueWeights)
                   : { b: DEFAULT_V07_VALUE_WEIGHTS.b, w: [...DEFAULT_V07_VALUE_WEIGHTS.w] };
-        // V2 leaf candidate: valid weights win over the v1/default leaf; absent/malformed leaves v1 intact.
-        this.learnedV2 = parseLearnedValueWidth(process.env.V07_VALUE_WEIGHTS_V2, VALUE_FEATURE_NAMES_V2.length);
+        // V2 leaf candidate: absent, malformed, or all-zero falls back to the prior leaf. Two explicit leaf
+        // selectors are ambiguous experiment provenance, so reject the combination instead of guessing.
+        const parsedV2 = parseLearnedValueWidth(process.env.V07_VALUE_WEIGHTS_V2, VALUE_FEATURE_NAMES_V2.length);
+        this.learnedV2 = parsedV2 && (parsedV2.b !== 0 || parsedV2.w.some((weight) => weight !== 0)) ? parsedV2 : null;
+        if (this.learnedV2 && rawValueWeights !== undefined) {
+            throw new Error("V07_VALUE_WEIGHTS_V2 cannot be combined with explicit V07_VALUE_WEIGHTS");
+        }
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
@@ -340,6 +354,16 @@ export class SearchDriver {
         this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
         this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
         this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
+        if (this.datasetPath && this.datasetV2) {
+            this.datasetFingerprint = requirePhaseBRunFingerprint(process.env.PHASE_B_RUN_FINGERPRINT);
+            this.datasetSeed = canonicalPhaseBSeed(this.match.seed, "Q2 dataset seed");
+            if (!this.match.greenVersion || !this.match.redVersion) {
+                throw new Error("Phase-B Q2 dataset rows require green and red strategy versions");
+            }
+        } else {
+            this.datasetFingerprint = null;
+            this.datasetSeed = null;
+        }
         this.caps = {
             // Moves are class-filtered out below (kite/retreat is ledger-dead); cap the enumeration to 1 so
             // the generator does no wasted per-destination work when they are excluded anyway.
@@ -623,17 +647,48 @@ export class SearchDriver {
             ? extractWaitFeaturesV2Raw(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent)
             : extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent);
     }
+    private leafKind(): PhaseBLeafKind {
+        return this.learnedV2 ? "learned_v2" : this.learned ? "learned" : "material";
+    }
     /** Buffer one Q2 Gate-2 dataset row (Q2_DATASET, oracle mode) for this decision point. */
     private pushDatasetRow(
         unit: Unit,
         incumbent: readonly GameAction[],
         features: number[],
-        row: { iw: 0 | 1; rej: 0 | 1; y: 0 | 1; d: number | null },
+        row: { iw: 0 | 1; ii: 0 | 1; rej: 0 | 1; y: 0 | 1; d: number | null },
     ): void {
+        if (this.datasetV2) {
+            this.datasetRows.push(
+                JSON.stringify({
+                    t: PHASE_B_Q2_ROW_TYPE,
+                    v: PHASE_B_DATASET_VERSION,
+                    runFingerprint: this.datasetFingerprint!,
+                    seed: this.datasetSeed!,
+                    greenVersion: this.match.greenVersion!,
+                    redVersion: this.match.redVersion!,
+                    lap: this.deps.fightProperties.getCurrentLap(),
+                    unit: unit.getName(),
+                    incumbentKind: classifyActions(incumbent),
+                    incumbentWait: row.iw,
+                    incumbentIllegal: row.ii,
+                    waitRejected: row.rej,
+                    label: row.y,
+                    delta: row.d === null ? null : Number(row.d.toFixed(5)),
+                    features: features.map((feature) => Number(feature.toFixed(5))),
+                    oracle: {
+                        gate: this.gate,
+                        rollouts: this.rollouts,
+                        horizon: "lap",
+                        leaf: this.leafKind(),
+                        opponentModel: this.oppModel?.version ?? null,
+                    },
+                }),
+            );
+            return;
+        }
         this.datasetRows.push(
             JSON.stringify({
                 t: "q2d",
-                ...(this.datasetV2 ? { v: 2 } : {}),
                 s: this.match.seed,
                 g: this.match.greenVersion,
                 r: this.match.redVersion,
@@ -667,6 +722,7 @@ export class SearchDriver {
                 // scored set, dumped so the class balance and the incumbent rule's domain stay auditable.
                 this.pushDatasetRow(unit, incumbent, this.datasetFeaturesOf(unit, incumbent), {
                     iw: 1,
+                    ii: 0,
                     rej: 0,
                     y: 1,
                     d: null,
@@ -713,6 +769,7 @@ export class SearchDriver {
         if (datasetFeatures) {
             this.pushDatasetRow(unit, incumbent, datasetFeatures, {
                 iw: 0,
+                ii: incumbentIllegal ? 1 : 0,
                 rej: waitRejected ? 1 : 0,
                 y: overridden ? 1 : 0,
                 d: incumbentIllegal || waitRejected ? null : means[1] - means[0],

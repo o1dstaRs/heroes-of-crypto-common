@@ -50,6 +50,7 @@ const UPPER = PBTypes.TeamVals.UPPER;
 const ENV_KEYS = [
     "V07_WAIT_SCORER",
     "V07_WAIT_WEIGHTS",
+    "V07_WAIT_WEIGHTS_V2",
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS",
     "V07_WAIT_GUARD",
