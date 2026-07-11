@@ -16,6 +16,7 @@ import {
     buildEmpiricalLeaguePayoff,
     canonicalJson,
     leagueFingerprint,
+    normalizeLeagueSeed,
     solveApproximateZeroSumLeague,
 } from "../../src/simulation/optimizer/league_cycle_core";
 
@@ -23,6 +24,18 @@ describe("B1 iterative league core", () => {
     it("fingerprints objects canonically", () => {
         expect(canonicalJson({ z: 1, a: { d: 2, b: 3 } })).toBe('{"a":{"b":3,"d":2},"z":1}');
         expect(leagueFingerprint({ z: 1, a: [2, 3] })).toBe(leagueFingerprint({ a: [2, 3], z: 1 }));
+    });
+
+    it("canonicalizes signed and unsigned high-bit seed representations", () => {
+        const roundSeed = 2_654_435_762;
+        const signedHeldOutSeed = roundSeed ^ 0x5f356495;
+        const unsignedHeldOutSeed = signedHeldOutSeed >>> 0;
+
+        expect(signedHeldOutSeed).toBe(-1_056_826_073);
+        expect(unsignedHeldOutSeed).toBe(3_238_141_223);
+        expect(normalizeLeagueSeed(signedHeldOutSeed)).toBe(unsignedHeldOutSeed);
+        expect(normalizeLeagueSeed(unsignedHeldOutSeed)).toBe(unsignedHeldOutSeed);
+        expect(() => normalizeLeagueSeed(0x1_0000_0000)).toThrow("signed int32 or uint32");
     });
 
     it("builds a complete antisymmetric matrix while retaining directional disagreement", () => {
@@ -81,7 +94,7 @@ describe("B1 iterative league smoke", () => {
             CEM_MAPS: "1",
             CEM_MATCH_CONC: "1",
             CEM_POP: "2",
-            CEM_SEED: "17",
+            CEM_SEED: "2654435762",
             CEM_UNFREEZE_PERK: "0",
             CEM_VAL_GAMES: "8",
             LEAGUE_INITIAL_POOL: poolPath,

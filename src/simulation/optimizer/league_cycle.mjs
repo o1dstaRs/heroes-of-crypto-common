@@ -50,6 +50,7 @@ import {
     canonicalJson,
     leagueFingerprint,
     leagueGenomeFingerprint,
+    normalizeLeagueSeed,
     solveApproximateZeroSumLeague,
 } from "./league_cycle_core.ts";
 
@@ -435,6 +436,9 @@ async function executeRound(round) {
     const validationContent = readFileSync(validationPath, "utf8");
     const best = JSON.parse(bestContent);
     const validation = JSON.parse(validationContent);
+    const heldOutSeed = normalizeLeagueSeed(validation.heldOutSeed);
+    const reportBaseSeed = normalizeLeagueSeed(validation.report?.options?.baseSeed);
+    const expectedHeldOutSeed = normalizeLeagueSeed(seed ^ 0x5f356495);
     const expectedSelectionPanel = {
         schemaVersion: 1,
         seed,
@@ -455,10 +459,10 @@ async function executeRound(round) {
         !semanticEqual(best.selectionPanel, expectedSelectionPanel) ||
         best.train?.selectionPanelFingerprint !== sha256(JSON.stringify(best.selectionPanel)) ||
         !semanticEqual(validation.candidate?.weights, best.weights) ||
-        validation.heldOutSeed !== (seed ^ 0x5f356495) >>> 0 ||
+        heldOutSeed !== expectedHeldOutSeed ||
         validation.gamesPerOpponent !== CEM_CONFIG.validationGamesPerOpponent ||
         !semanticEqual(validation.report?.options?.mapTypes, CEM_CONFIG.mapTypes) ||
-        validation.report?.options?.baseSeed !== (seed ^ 0x5f356495) >>> 0
+        reportBaseSeed !== expectedHeldOutSeed
     ) {
         throw new Error(`CEM output failed provenance validation for round ${round}`);
     }
@@ -489,7 +493,7 @@ async function executeRound(round) {
             trainingFitness: best.train.fitness,
             trainingWorstCaseLowerBound: best.train.worstCaseLowerBound,
             trainingSoftminLowerBound: best.train.softminLowerBound,
-            heldOutSeed: validation.heldOutSeed,
+            heldOutSeed,
             heldOutGamesPerOpponent: validation.gamesPerOpponent,
             heldOutAggregate: validation.report?.aggregate,
             bestArtifactSha256: sha256(bestContent),
@@ -523,7 +527,7 @@ const usedTrainingSeeds = new Set();
 for (let round = 1; round <= ROUNDS; round += 1) {
     const seed = (BASE_SEED + Math.imul(round - 1, ROUND_SEED_STEP)) >>> 0;
     usedTrainingSeeds.add(seed);
-    usedTrainingSeeds.add((seed ^ 0x5f356495) >>> 0);
+    usedTrainingSeeds.add(normalizeLeagueSeed(seed ^ 0x5f356495));
 }
 if (usedTrainingSeeds.has(MATRIX_CONFIG.seed)) {
     throw new Error("LEAGUE_MATRIX_SEED must be separate from every CEM selection and validation seed");

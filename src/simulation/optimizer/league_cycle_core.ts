@@ -71,6 +71,14 @@ export function leagueFingerprint(value: unknown): string {
     return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/** Accept either signed-int32 or uint32 seed serialization and return the canonical uint32 value. */
+export function normalizeLeagueSeed(value: number): number {
+    if (!Number.isInteger(value) || value < -0x80000000 || value > 0xffffffff) {
+        throw new RangeError("League seed must be a signed int32 or uint32 integer");
+    }
+    return value >>> 0;
+}
+
 export function leagueGenomeFingerprint(genome: Pick<ILeagueGenome, "weights" | "omniscientDraft">): string {
     assertLeagueWeights(genome.weights);
     return leagueFingerprint({

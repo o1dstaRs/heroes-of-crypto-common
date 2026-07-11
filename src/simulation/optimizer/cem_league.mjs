@@ -36,6 +36,7 @@ import {
     retainComparableLeagueBest,
     sampleLeagueCemPopulation,
 } from "./cem_league_core.ts";
+import { normalizeLeagueSeed } from "./league_cycle_core.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EVAL = join(HERE, "..", "league_eval.ts");
@@ -54,7 +55,7 @@ const SIGMA_DECAY = Number(process.env.CEM_SIGMA_DECAY || 0.9);
 const SIGMA_FLOOR_RATIO = Number(process.env.CEM_SIGMA_FLOOR_RATIO || 0.2);
 const BASE_SEED = Number(process.env.CEM_SEED || 1) >>> 0;
 const SELECTION_SEED = BASE_SEED;
-const VAL_SEED = BASE_SEED ^ 0x5f356495;
+const VAL_SEED = normalizeLeagueSeed(BASE_SEED ^ 0x5f356495);
 const FREEZE_PERK = process.env.CEM_UNFREEZE_PERK !== "1";
 const AGGREGATE = process.env.CEM_AGGREGATE || "worst-case";
 const POOL_SOURCE = process.env.CEM_LEAGUE_POOL;
