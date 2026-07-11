@@ -469,6 +469,41 @@ export function v07WaitWeightsV2(): IWaitWeights | "disabled" | null {
     return v2Slot.resolved;
 }
 
+/**
+ * Phase-B MULTI-COHORT V2 wait-scorer CANDIDATE (2026-07-11, env-gated -- NOT a default): 98 coefficients
+ * over WAIT_FEATURE_NAMES_V2, fit by optimizer/fit_wait_v2.mjs (logistic, class-conditional structure B)
+ * on 195,736 scored act-vs-wait oracle points from 8,000 games across five cohorts (LIVETWIN melee drafts
+ * 2k / mixed FMR=0.5 drafts 2k / forced ranged_max_sniper3 mirrors 2k / hybrid mirrors 1k / pure_ranged
+ * mirrors 1k; seeds 79021710..79025710; oracle leaf: committed 20d on drafts+hybrid, material on
+ * ranged/pure). Held-out (by game): pooled AUC 0.730 (v1 distilled 0.605 unguarded / 0.646 guarded);
+ * RANGE-class AUC 0.656 -- real ranking signal, but the positive-delta RANGED tail is NOT linearly
+ * separable: payoff-optimal threshold tuning on train captures ~0% of the oracle's ranged delta mass
+ * (melee-class capture ~18%), so on RANGE units this model fires ~never (safe guard-zero behavior).
+ * Fresh-seed A/B, v0.7(this, no guard) vs v0.6 against v0.7(baked v1+guard) vs v0.6, 2k paired
+ * side-swap games per cell (seeds 80001710..80007710):
+ *   melee_coevo mirror 72.88+-1.00 (v1 70.75) | hybrid mirror 64.23+-1.08 (62.44) | ranged_max mirror
+ *   51.45+-1.16 (50.35) | pure_ranged exact 50.00 both | drafted melee 67.59+-1.05 (66.45) | drafted
+ *   mixed FMR=0.5 65.71+-1.08 (64.75) | drafted random 65.19+-1.09 (63.74)
+ * = +1.0..+2.1pp over the shipped scorer on every non-pure cell, no regressions; the ranged>=55% Phase-B
+ * gate was NOT met (oracle upper bounds: ranged_max 65.3+-1.1, pure 59.4+-1.8 -- reaching them needs
+ * per-point rollouts or richer features, not a linear scorer). Arm via V07_WAIT_WEIGHTS_V2=$(json of
+ * this constant); the v1 training-support guard is intentionally NOT applied to the V2 path.
+ */
+export const MULTICOHORT_WAIT_WEIGHTS_V2_2026_07_11: IWaitWeights = {
+    b: -0.28654,
+    w: [
+        -0.6117, -0.40903, -0.49845, 0.13824, -0.222, -0.49043, -0.33095, -0.20116, -0.20786, 0.00604, -0.0554,
+        -0.06144, -0.00054, 0.27718, 0.01869, 0.10265, 0.19313, 0.37745, 0.03194, -0.03483, 0.20187, 0.09252, -0.03555,
+        0.05559, -0.07458, -0.42362, -0.19021, -0.05769, -0.09447, -0.12186, -0.07189, -0.10536, -0.01328, -0.17237,
+        0.12758, -0.17307, -0.12728, 0.01591, 0.03291, 0.08218, -0.14184, -0.28908, -0.3518, -0.00386, 0.08602, 0.10551,
+        0.12969, -0.02397, 0.06282, 0.17775, 0.11891, 0.2764, 0.14776, 0.15794, 0.11798, -0.03078, -0.03055, 0.07899,
+        -0.27104, -0.14432, 0.12672, -0.00047, 0.11349, -0.08967, -0.11255, 0.16564, 0.19213, -0.03737, -0.0268,
+        -0.13853, 0.0389, -0.25159, 0.1521, -0.14184, -0.1915, 0.16519, 0.13959, 0.10756, 0, -0.07189, 0, 0.05824,
+        -0.12599, -0.26121, 0.01972, 0.07014, 0, 0.09075, 0, -0.14184, -0.21837, -0.1854, 0.11104, 0.08141, 0.1038,
+        0.0858, -0.02397, -0.06551,
+    ],
+};
+
 /** Is `version` listed in the comma-separated env var (or its fallback default)? */
 function inVersionScope(version: string, envVar: string, fallback?: string): boolean {
     const raw = process.env[envVar] ?? fallback;
