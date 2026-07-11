@@ -48,8 +48,6 @@ export const V07_ARCHETYPE_PROTOCOL = {
     strongArchetypeWinRate: 0.54,
     transitivityOpponent: "v0.4",
     archetypeConfidenceFloor: 0.5,
-    rangedAnchorWinRate: 0.5,
-    rangedAnchorConfidenceFloor: 0.48,
     templateMinWinRate: 0.5,
     templateConfidenceFloor: 0.48,
     candidateRejectionLimit: 0,
@@ -961,8 +959,8 @@ export function assessV07ArchetypeBattery(
             );
             const aggregate = aggregateV07ArchetypeCells(archetypeCells);
             const low = confidenceLow(aggregate);
-            const anchoredRanged = opponent === V07_ARCHETYPE_PROTOCOL.champion && archetype === "ranged";
-            if (opponent === V07_ARCHETYPE_PROTOCOL.champion && !anchoredRanged) {
+            const strongArchetype = archetype !== "meleeMage";
+            if (opponent === V07_ARCHETYPE_PROTOCOL.champion && strongArchetype) {
                 gates.push({
                     name: `strong-${archetype}-vs-${opponent}`,
                     threshold: ">=54.00% decisive win rate",
@@ -974,17 +972,12 @@ export function assessV07ArchetypeBattery(
             }
             gates.push({
                 name: `confidence-${archetype}-vs-${opponent}`,
-                threshold: anchoredRanged
-                    ? ">=50.00% decisive; 95% paired-cluster lower bound >=48.00%"
-                    : "95% paired-cluster lower bound >50.00%",
+                threshold: "95% paired-cluster lower bound >50.00%",
                 observed: low === null ? "missing" : percent(low),
                 passed:
                     archetypeCells.length === 2 &&
                     low !== null &&
-                    (anchoredRanged
-                        ? aggregate.outcomes.candidateWinRate >= V07_ARCHETYPE_PROTOCOL.rangedAnchorWinRate &&
-                          low >= V07_ARCHETYPE_PROTOCOL.rangedAnchorConfidenceFloor
-                        : low > V07_ARCHETYPE_PROTOCOL.archetypeConfidenceFloor),
+                    low > V07_ARCHETYPE_PROTOCOL.archetypeConfidenceFloor,
             });
         }
         for (const template of V07_ARCHETYPE_TEMPLATE_NAMES) {
