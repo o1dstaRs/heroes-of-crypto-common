@@ -1,0 +1,44 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-fixed-archetypes-v1",
+    "createdAt": "2026-07-11T00:39:34.405Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "gamesPerCell": 3000,
+    "cells": {
+        "mage_frontline": {
+            "v0.6": 2938245544,
+            "v0.4": 1636290585
+        },
+        "mage_fireline": {
+            "v0.6": 301909154,
+            "v0.4": 149584694
+        },
+        "melee_magic_utility": {
+            "v0.6": 2245382616,
+            "v0.4": 1654791320
+        },
+        "melee_magic_brawler": {
+            "v0.6": 264498901,
+            "v0.4": 3496543017
+        },
+        "aura_support": {
+            "v0.6": 1972607613,
+            "v0.4": 2267693251
+        },
+        "aura_offense": {
+            "v0.6": 2293510316,
+            "v0.4": 833103711
+        },
+        "ranged_precision": {
+            "v0.6": 1991714196,
+            "v0.4": 2338506695
+        },
+        "ranged_control": {
+            "v0.6": 2587072163,
+            "v0.4": 1402888116
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated and committed before any fixed-archetype battery outcomes were evaluated."
+}
