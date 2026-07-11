@@ -1,0 +1,44 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-fixed-archetypes-v4-final-cdb4332",
+    "createdAt": "2026-07-11T02:25:50Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "gamesPerCell": 3000,
+    "cells": {
+        "mage_frontline": {
+            "v0.6": 2296293474,
+            "v0.4": 394259491
+        },
+        "mage_fireline": {
+            "v0.6": 618640950,
+            "v0.4": 3126086730
+        },
+        "melee_magic_utility": {
+            "v0.6": 2415524488,
+            "v0.4": 2882324147
+        },
+        "melee_magic_brawler": {
+            "v0.6": 2328174936,
+            "v0.4": 2730776619
+        },
+        "aura_support": {
+            "v0.6": 1194500986,
+            "v0.4": 2162647298
+        },
+        "aura_offense": {
+            "v0.6": 1506078701,
+            "v0.4": 2166251678
+        },
+        "ranged_precision": {
+            "v0.6": 647854608,
+            "v0.4": 48321169
+        },
+        "ranged_control": {
+            "v0.6": 2628657109,
+            "v0.4": 1628619492
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated after the final v0.7 policy and cross-archetype protocol were frozen at cdb4332 and before any v4 outcome was evaluated. Each base seed is the first uint32 of SHA-256('hoc-v07-final-frozen-cdb4332|archetype-v4:<template>:<opponent>|0'). All 24,000 derived pair scenarios were verified mutually disjoint and disjoint from the 90,000 scenarios in archetype v1-v3 and the prior final-acceptance manifest."
+}

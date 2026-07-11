@@ -1,0 +1,16 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-cross-archetype-v1-cdb4332",
+    "createdAt": "2026-07-11T02:25:50Z",
+    "candidate": "v0.7",
+    "opponent": "v0.6",
+    "gamesPerCell": 3000,
+    "cells": {
+        "mage_frontline_vs_mage_fireline": 563486731,
+        "melee_magic_utility_vs_melee_magic_brawler": 1580165667,
+        "aura_support_vs_mage_frontline": 1213156936,
+        "ranged_precision_vs_ranged_control": 2470157662
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated after the final v0.7 policy and cross-archetype protocol were frozen at cdb4332 and before any cross-panel outcome was evaluated. Each base seed is the first uint32 of SHA-256('hoc-v07-final-frozen-cdb4332|cross-v1:<matchup>|0'). All 3,000 derived quartet scenarios were verified mutually disjoint and disjoint from every prior acceptance/archetype scenario and the concurrently preregistered v4/final-v2 panels."
+}

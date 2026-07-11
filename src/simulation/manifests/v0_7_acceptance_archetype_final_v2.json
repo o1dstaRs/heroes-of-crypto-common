@@ -1,0 +1,23 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-archetype-final-v2-cdb4332",
+    "createdAt": "2026-07-11T02:25:50Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "headline": {
+        "seeds": [
+            3004287101, 2360521660, 1026930331, 3252117882, 3370406122, 885830150, 3004886610, 619246803, 583227527
+        ],
+        "gamesPerSeed": 3000
+    },
+    "cohorts": {
+        "gamesPerSeed": 3000,
+        "seeds": {
+            "melee": [2084249497],
+            "mixed": [3548689549],
+            "random": [1860841030]
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated after the final v0.7 policy and cross-archetype protocol were frozen at cdb4332 and before any final-v2 outcome was evaluated. Each base seed is the first uint32 of SHA-256('hoc-v07-final-frozen-cdb4332|acceptance-v2:<cell>|0'). All 18,000 derived pair scenarios were verified mutually disjoint and disjoint from every prior acceptance/archetype scenario and the concurrently preregistered v4/cross panels."
+}
