@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION, type IDecisionContext } from "../../src/ai";
+import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
 import {
     applyWaitScorerWeights,
     canWaitOnHourglassMirror,
@@ -54,16 +55,22 @@ afterEach(() => {
 
 const zeroWeights = (): number[] => DISTILLED_WAIT_WEIGHTS_2026_07_10.w.map(() => 0);
 
+class TestStrategyV0_7 extends StrategyV0_7 {
+    public finalizeForTest(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        return this.finalizeDecision(unit, context, decision);
+    }
+}
+
 interface Board {
     actor: Unit;
     context: IDecisionContext;
     incumbent: GameAction[];
 }
 
-function buildBoard(enemyAmountAlive = 1): Board {
+function buildBoard(enemyAmountAlive = 1, actorOptions: Parameters<typeof createTestUnit>[0] = {}): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4 });
+    const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4, ...actorOptions });
     const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2 });
     const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3, amountAlive: enemyAmountAlive });
     const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5, amountAlive: enemyAmountAlive });
@@ -134,7 +141,7 @@ describe("v0.7 baked weight resolution", () => {
     });
 });
 
-describe("v0.7 strategy — wait-scorer always on", () => {
+describe("v0.7 strategy — baked wait scorer", () => {
     it("keeps the incumbent when fight state is unavailable", () => {
         const { actor, context, incumbent } = buildBoard(10);
         const contextWithoutFight: IDecisionContext = { ...context, fightProperties: undefined };
@@ -272,6 +279,40 @@ describe("v0.7 strategy — wait-scorer always on", () => {
         // z = -1000 everywhere: the scorer never fires; v0.7 returns exactly v0.6's decision.
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: -1_000, w: zeroWeights() });
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+    });
+
+    it("anchors ranged actors even when an override would wait everywhere", () => {
+        const { actor, context } = buildBoard(10, {
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+        });
+        const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
+        expect(plainV06.some((action) => action.type === "wait_turn")).toBe(false);
+
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+
+        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+    });
+
+    it("preserves a committed cast while leaving non-cast mage turns scorer-eligible", () => {
+        const { actor, context, incumbent } = buildBoard(10, {
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+        });
+        const strategy = new TestStrategyV0_7();
+        const cast: GameAction[] = [
+            {
+                type: "cast_spell",
+                casterId: actor.getId(),
+                spellName: "Wind Flow",
+                targetId: actor.getId(),
+            },
+        ];
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+
+        expect(strategy.finalizeForTest(actor, context, cast)).toBe(cast);
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
     });
 
     it("ALL-ZERO weights reproduce v0.6 on a non-caster board", () => {

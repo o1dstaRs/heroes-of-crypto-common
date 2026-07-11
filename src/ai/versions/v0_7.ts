@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
 import { routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
@@ -18,7 +19,8 @@ import { applyWaitScorerWeights, v07BakedWaitWeights } from "./wait_scorer";
 
 /**
  * v0.7 — the shipped v0.7 program on top of the full v0.6 chain:
- * - S1: the Q2 Gate-2 distilled act-vs-wait scorer is baked in;
+ * - S1: the Q2 Gate-2 distilled act-vs-wait scorer is baked in for its supported non-ranged,
+ *   non-cast decision domain;
  * - S3: only the measured Resurrection + Wind Flow caster salvage is baked in, without Resurrection
  *   pre-emption. Castling and Wild Regeneration remain experimental-only.
  *
@@ -37,8 +39,20 @@ export class StrategyV0_7 extends StrategyV0_6 {
     ): GameAction[] {
         return routeUniversalCasterWithPolicy(unit, context, decision, V07_CASTER_ROUTER_POLICY);
     }
-    /** v0.6's final-stage seam: replace the env-gated experiment stage with the committed baked scorer. */
+    /** v0.6's final-stage seam: apply the committed scorer only inside its measured decision domain. */
     protected override finalizeDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+        // The distilled scorer was trained on melee-drafted/random armies, not the held-out range-specialist
+        // cohort. On that cohort, allowing it to delay ranged actors regressed 47.1% vs v0.6; anchoring only
+        // ranged actors then scored 58.9% on a fresh 6,000-game panel while retaining teammate wait gains.
+        if (unit.getAttackType() === PBTypes.AttackVals.RANGE) {
+            return decision;
+        }
+        // Caster routing and inherited spellbooks have already compared the available spell with combat
+        // alternatives. The wait model has no incumbent-action feature, so it cannot safely distinguish a
+        // committed cast from a generic advance; preserve casts while leaving non-cast mage turns eligible.
+        if (decision.some((action) => action.type === "cast_spell")) {
+            return decision;
+        }
         return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());
     }
 }
