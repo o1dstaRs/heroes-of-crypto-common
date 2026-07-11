@@ -19,7 +19,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
-import { canWaitOnHourglassMirror, extractWaitFeatures } from "../ai/versions/wait_scorer";
+import { canWaitOnHourglassMirror, extractWaitFeatures, extractWaitFeaturesV2Raw } from "../ai/versions/wait_scorer";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -31,7 +31,12 @@ import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import type { ILookaheadDeps } from "./lookahead";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
-import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
+import {
+    extractValueFeatures,
+    extractValueFeaturesV2,
+    VALUE_FEATURE_NAMES,
+    VALUE_FEATURE_NAMES_V2,
+} from "./value_features";
 
 /**
  * B2 / RAWS — the WIDE-CANDIDATE ROLLOUT SEARCH driver (v0.7 roadmap).
@@ -120,7 +125,7 @@ interface ILearnedValue {
     w: number[];
 }
 
-function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
+function parseLearnedValueWidth(raw: string | undefined, width: number): ILearnedValue | null {
     if (!raw) {
         return null;
     }
@@ -131,7 +136,7 @@ function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
             typeof m.b === "number" &&
             Number.isFinite(m.b) &&
             Array.isArray(m.w) &&
-            m.w.length === VALUE_FEATURE_NAMES.length &&
+            m.w.length === width &&
             m.w.every((x: unknown) => typeof x === "number" && Number.isFinite(x))
         ) {
             return { b: m.b, w: m.w as number[] };
@@ -140,6 +145,10 @@ function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
         /* malformed -> material fallback */
     }
     return null;
+}
+
+function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
+    return parseLearnedValueWidth(raw, VALUE_FEATURE_NAMES.length);
 }
 
 const envNum = (name: string, fallback: number, min: number): number => {
@@ -265,6 +274,9 @@ export class SearchDriver {
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly learned: ILearnedValue | null;
+    /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
+     * (raw 30 + rangedness-interaction block); a valid vector wins over the v1/default 20-dim leaf. */
+    private readonly learnedV2: ILearnedValue | null;
     /** SEARCH_OPP_MODEL — rollouts simulate the searched unit's ENEMY with this strategy (null = true policy). */
     private readonly oppModel: IAIStrategy | null;
     /** The enemy team of the rollout in flight (only meaningful while a rollout runs; null otherwise). */
@@ -273,6 +285,8 @@ export class SearchDriver {
     private readonly auditTurns: boolean;
     /** Q2_DATASET (oracle mode only): per-decision wait-scorer feature/label rows for Gate-2's fit. */
     private readonly datasetPath: string | undefined;
+    /** Q2_DATASET_V2=1 — dump WAIT_FEATURE_NAMES_V2_RAW rows (49 dims, marker v:2) for the Phase-B refit. */
+    private readonly datasetV2: boolean;
     private readonly datasetRows: string[] = [];
     private readonly caps: {
         maxMoveDestinations: number;
@@ -312,6 +326,8 @@ export class SearchDriver {
                 : rawValueWeights
                   ? parseLearnedValue(rawValueWeights)
                   : { b: DEFAULT_V07_VALUE_WEIGHTS.b, w: [...DEFAULT_V07_VALUE_WEIGHTS.w] };
+        // V2 leaf candidate: valid weights win over the v1/default leaf; absent/malformed leaves v1 intact.
+        this.learnedV2 = parseLearnedValueWidth(process.env.V07_VALUE_WEIGHTS_V2, VALUE_FEATURE_NAMES_V2.length);
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
@@ -323,6 +339,7 @@ export class SearchDriver {
                   : rawAudit;
         this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
         this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
+        this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
         this.caps = {
             // Moves are class-filtered out below (kite/retreat is ledger-dead); cap the enumeration to 1 so
             // the generator does no wasted per-destination work when they are excluded anyway.
@@ -411,7 +428,7 @@ export class SearchDriver {
             gate: this.gate,
             horizon: this.mode === "oracle" ? "lap" : this.horizon,
             rollouts: this.rollouts,
-            leaf: this.learned ? "learned" : "material",
+            leaf: this.learnedV2 ? "learned_v2" : this.learned ? "learned" : "material",
             ...(this.oppModel ? { oppModel: this.oppModel.version } : {}),
             decisions: c.decisions,
             searched: c.searched,
@@ -600,6 +617,12 @@ export class SearchDriver {
     private canHourglass(unit: Unit): boolean {
         return canWaitOnHourglassMirror(unit, this.deps.fightProperties);
     }
+    /** The dataset featurization: v1 (41 dims) by default, WAIT_FEATURE_NAMES_V2_RAW (49) under Q2_DATASET_V2=1. */
+    private datasetFeaturesOf(unit: Unit, incumbent: readonly GameAction[]): number[] {
+        return this.datasetV2
+            ? extractWaitFeaturesV2Raw(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent)
+            : extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent);
+    }
     /** Buffer one Q2 Gate-2 dataset row (Q2_DATASET, oracle mode) for this decision point. */
     private pushDatasetRow(
         unit: Unit,
@@ -610,6 +633,7 @@ export class SearchDriver {
         this.datasetRows.push(
             JSON.stringify({
                 t: "q2d",
+                ...(this.datasetV2 ? { v: 2 } : {}),
                 s: this.match.seed,
                 g: this.match.greenVersion,
                 r: this.match.redVersion,
@@ -641,12 +665,12 @@ export class SearchDriver {
             if (this.datasetPath) {
                 // Kept-wait row (iw=1): no oracle arbitration happened — excluded from the Gate-2 fit's
                 // scored set, dumped so the class balance and the incumbent rule's domain stay auditable.
-                this.pushDatasetRow(
-                    unit,
-                    incumbent,
-                    extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent),
-                    { iw: 1, rej: 0, y: 1, d: null },
-                );
+                this.pushDatasetRow(unit, incumbent, this.datasetFeaturesOf(unit, incumbent), {
+                    iw: 1,
+                    rej: 0,
+                    y: 1,
+                    d: null,
+                });
             }
             return incumbent;
         }
@@ -661,9 +685,7 @@ export class SearchDriver {
         bump(c.searchedByIncumbentKind, incumbentKind);
         // Features are extracted on the LIVE pre-rollout state (scoreCandidates snapshot/restores around
         // every rollout, so ordering is belt-and-braces) with the SAME extractor the deployed scorer uses.
-        const datasetFeatures = this.datasetPath
-            ? extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent)
-            : undefined;
+        const datasetFeatures = this.datasetPath ? this.datasetFeaturesOf(unit, incumbent) : undefined;
         const candidates: ISearchCandidate[] = [
             { kind: "incumbent", actions: incumbent },
             { kind: "wait", actions: [{ type: "wait_turn", unitId: unit.getId() }] },
@@ -830,11 +852,14 @@ export class SearchDriver {
     }
     /** Leaf eval as P(win) for `team`: learned logistic value when configured, else normalized material. */
     private leafValue(team: TeamType): number {
-        if (this.learned) {
-            const f = extractValueFeatures(this.deps.unitsHolder, this.deps.fightProperties, team);
-            let z = this.learned.b;
+        const model = this.learnedV2 ?? this.learned;
+        if (model) {
+            const f = this.learnedV2
+                ? extractValueFeaturesV2(this.deps.unitsHolder, this.deps.fightProperties, team)
+                : extractValueFeatures(this.deps.unitsHolder, this.deps.fightProperties, team);
+            let z = model.b;
             for (let i = 0; i < f.length; i += 1) {
-                z += this.learned.w[i] * f[i];
+                z += model.w[i] * f[i];
             }
             return 1 / (1 + Math.exp(-z));
         }

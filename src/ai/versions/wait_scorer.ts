@@ -12,6 +12,7 @@
 import type { GameAction } from "../../engine/actions";
 import type { FightProperties } from "../../fights/fight_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { GRID_SIZE } from "../../grid/grid_constants";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "../../simulation/value_features";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
@@ -80,6 +81,36 @@ export const WAIT_FEATURE_NAMES: readonly string[] = [
     "xFmLap", // fmExposure * lapCapped
     "xEnemyYetMelee", // enemyYetFrac * isMelee
     "xEnemyYetRanged", // enemyYetFrac * isRanged
+] as const;
+
+/**
+ * V2 RAW block (Phase-B multi-cohort refit): the 41 v1 features + an ARMY-COMPOSITION / acting-unit
+ * block. The v1 fit had 0.19% RANGE rows and every army majority-melee, so the training-support guard
+ * had to zero the scorer outside that support (guard-zero = ranged parity, no ranged tempo policy).
+ * The v2 oracle dataset is generated ACROSS cohorts (melee/mixed drafts + forced ranged/hybrid/pure
+ * mirrors) and these dims carry the context the class-conditional fit needs.
+ */
+export const WAIT_FEATURE_NAMES_V2_RAW: readonly string[] = [
+    ...WAIT_FEATURE_NAMES,
+    "ownRangedFrac", // own living RANGE stacks / own living
+    "enemyRangedFrac",
+    "ownMeleeFrac", // own living MELEE|MELEE_MAGIC stacks / own living (the guard's majority-melee signal)
+    "enemyMeleeFrac",
+    "ownFlyerFrac",
+    "enemyFlyerFrac",
+    "actShotsNorm", // acting unit's remaining range shots, min(shots/10, 1) — 0 for non-ranged
+    "actNearEnemyDist", // acting unit's normalized Chebyshev distance to its nearest living enemy
+] as const;
+
+/**
+ * V2 DEPLOYED structure: raw block + a FULL isRanged-interaction copy of it (xR_<name> = isRanged *
+ * <name>). A single linear model over this basis expresses "shared weights + a ranged-only delta
+ * block" — i.e. separate per-class weight blocks for the RANGE class — while staying one dot product
+ * in deployment. A fit that finds no ranged-specific structure simply leaves the xR_ block ~0.
+ */
+export const WAIT_FEATURE_NAMES_V2: readonly string[] = [
+    ...WAIT_FEATURE_NAMES_V2_RAW,
+    ...WAIT_FEATURE_NAMES_V2_RAW.map((name) => `xR_${name}`),
 ] as const;
 
 export interface IWaitWeights {
@@ -228,6 +259,84 @@ export function extractWaitFeatures(
     return f;
 }
 
+const IS_RANGED_IDX = WAIT_FEATURE_NAMES.indexOf("isRanged");
+
+/** V2 raw features = the exact v1 vector + the composition/acting-unit block (WAIT_FEATURE_NAMES_V2_RAW). */
+export function extractWaitFeaturesV2Raw(
+    unit: Unit,
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    incumbent: readonly GameAction[],
+): number[] {
+    const f = extractWaitFeatures(unit, unitsHolder, fightProperties, incumbent);
+    let ownCnt = 0;
+    let enemyCnt = 0;
+    let ownRanged = 0;
+    let enemyRanged = 0;
+    let ownMelee = 0;
+    let enemyMelee = 0;
+    let ownFly = 0;
+    let enemyFly = 0;
+    const cell = unit.getBaseCell();
+    let nearest = Infinity;
+    for (const u of unitsHolder.getAllUnits().values()) {
+        if (u.isDead()) {
+            continue;
+        }
+        const own = u.getTeam() === unit.getTeam();
+        const attackType = u.getAttackType();
+        const isRangedStack = attackType === RANGE ? 1 : 0;
+        const isMeleeStack = attackType === MELEE || attackType === MELEE_MAGIC ? 1 : 0;
+        const isFlyer = u.canFly() ? 1 : 0;
+        if (own) {
+            ownCnt += 1;
+            ownRanged += isRangedStack;
+            ownMelee += isMeleeStack;
+            ownFly += isFlyer;
+        } else {
+            enemyCnt += 1;
+            enemyRanged += isRangedStack;
+            enemyMelee += isMeleeStack;
+            enemyFly += isFlyer;
+            const other = u.getBaseCell();
+            const d = Math.max(Math.abs(cell.x - other.x), Math.abs(cell.y - other.y));
+            if (d < nearest) {
+                nearest = d;
+            }
+        }
+    }
+    f.push(
+        ownCnt ? ownRanged / ownCnt : 0,
+        enemyCnt ? enemyRanged / enemyCnt : 0,
+        ownCnt ? ownMelee / ownCnt : 0,
+        enemyCnt ? enemyMelee / enemyCnt : 0,
+        ownCnt ? ownFly / ownCnt : 0,
+        enemyCnt ? enemyFly / enemyCnt : 0,
+        unit.getAttackType() === RANGE ? Math.min(unit.getRangeShots() / 10, 1) : 0,
+        Number.isFinite(nearest) ? nearest / (GRID_SIZE - 1) : 0,
+    );
+    return f;
+}
+
+/** Deployed V2 basis: raw + xR_ interaction copy (raw[i] * isRanged). Pure column arithmetic. */
+export function expandWaitFeaturesV2(raw: readonly number[]): number[] {
+    const isRanged = raw[IS_RANGED_IDX];
+    const out = raw.slice();
+    for (const x of raw) {
+        out.push(isRanged ? x * isRanged : 0);
+    }
+    return out;
+}
+
+export function extractWaitFeaturesV2(
+    unit: Unit,
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    incumbent: readonly GameAction[],
+): number[] {
+    return expandWaitFeaturesV2(extractWaitFeaturesV2Raw(unit, unitsHolder, fightProperties, incumbent));
+}
+
 /**
  * The Gate-2 SHIP-verdict weights (2026-07-10): the logistic distillation of the Gate-1 wait oracle,
  * fit on 74,315 scored wait-eligible points from 5,000 LIVETWIN oracle games (seed 917001; held-out
@@ -313,6 +422,51 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
         }
     }
     return bakedSlot.weights;
+}
+
+/** Parse {b, w[WAIT_FEATURE_NAMES_V2.length]} — malformed/absent ⇒ null. */
+export function parseWaitWeightsV2(raw: string | undefined): IWaitWeights | null {
+    if (!raw) {
+        return null;
+    }
+    try {
+        const m = JSON.parse(raw);
+        if (
+            m &&
+            typeof m.b === "number" &&
+            Number.isFinite(m.b) &&
+            Array.isArray(m.w) &&
+            m.w.length === WAIT_FEATURE_NAMES_V2.length &&
+            m.w.every((x: unknown) => typeof x === "number" && Number.isFinite(x))
+        ) {
+            return { b: m.b, w: m.w as number[] };
+        }
+    } catch {
+        /* malformed -> null */
+    }
+    return null;
+}
+
+/**
+ * V07_WAIT_WEIGHTS_V2 — the Phase-B ENV CANDIDATE (baked defaults untouched):
+ *   - absent or malformed  -> null: v0.7 keeps its baked v1 scorer path exactly as shipped;
+ *   - ALL-ZERO             -> "disabled": the whole wait stage is off (parity arm for A/Bs);
+ *   - valid non-zero       -> the v2 weights: v0.7 runs the V2 scorer (v2 features, NO training-support
+ *     guard — the v2 fit's dataset covers ranged/mixed/hybrid cohorts, so the guard's OOD rationale
+ *     does not apply; eligibility mirror + policy-wait keep + cast/profile guards upstream all remain).
+ */
+const v2Slot: { raw: string | undefined | null; resolved: IWaitWeights | "disabled" | null } = {
+    raw: null,
+    resolved: null,
+};
+export function v07WaitWeightsV2(): IWaitWeights | "disabled" | null {
+    const raw = process.env.V07_WAIT_WEIGHTS_V2;
+    if (raw !== v2Slot.raw) {
+        v2Slot.raw = raw;
+        const parsed = parseWaitWeightsV2(raw);
+        v2Slot.resolved = parsed ? (parsed.b === 0 && parsed.w.every((x) => x === 0) ? "disabled" : parsed) : null;
+    }
+    return v2Slot.resolved;
 }
 
 /** Is `version` listed in the comma-separated env var (or its fallback default)? */
@@ -458,6 +612,36 @@ export function applyWaitScorerWeights(
         return incumbent; // outside the fit's training support — keep the incumbent hourglass behavior
     }
     const features = extractWaitFeatures(unit, context.unitsHolder, fightProperties, incumbent);
+    const score = waitScore(weights, features);
+    if (!Number.isFinite(score) || score <= 0) {
+        return incumbent;
+    }
+    return [{ type: "wait_turn", unitId: unit.getId() }];
+}
+
+/**
+ * The V2 scorer stage (env candidate, wired in versions/v0_7.ts when V07_WAIT_WEIGHTS_V2 resolves to
+ * weights). Identical eligibility contract to the v1 stage EXCEPT the training-support guard: v2's fit
+ * set spans melee/mixed drafts and forced ranged/hybrid/pure mirrors, so RANGE-unit and ranged-army
+ * decisions are inside support and the class-conditional weights arbitrate them directly.
+ */
+export function applyWaitScorerWeightsV2(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+    weights: IWaitWeights | null,
+): GameAction[] {
+    const fightProperties = context.fightProperties;
+    if (!weights || !fightProperties) {
+        return incumbent;
+    }
+    if (incumbent.some((a) => a.type === "wait_turn")) {
+        return incumbent; // keep policy waits — the oracle's degenerate {wait, wait} handling
+    }
+    if (!canWaitOnHourglassMirror(unit, fightProperties)) {
+        return incumbent; // not a wait-eligible decision point
+    }
+    const features = extractWaitFeaturesV2(unit, context.unitsHolder, fightProperties, incumbent);
     const score = waitScore(weights, features);
     if (!Number.isFinite(score) || score <= 0) {
         return incumbent;

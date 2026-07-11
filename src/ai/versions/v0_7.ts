@@ -17,7 +17,7 @@ import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_str
 import { routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
-import { applyWaitScorerWeights, v07BakedWaitWeights } from "./wait_scorer";
+import { applyWaitScorerWeights, applyWaitScorerWeightsV2, v07BakedWaitWeights, v07WaitWeightsV2 } from "./wait_scorer";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -127,6 +127,15 @@ export class StrategyV0_7 extends StrategyV0_6 {
         // rather than applying the scorer outside a known profile; guarded caster salvage ran before this seam.
         if (!profile || profile.meleeMagicAnchor) {
             return decision;
+        }
+        // Phase-B env candidate: V07_WAIT_WEIGHTS_V2 (valid, non-zero) swaps in the multi-cohort V2 scorer;
+        // all-zero disables the wait stage entirely; absent/malformed keeps the baked v1 path byte-identical.
+        const v2 = v07WaitWeightsV2();
+        if (v2 === "disabled") {
+            return decision;
+        }
+        if (v2) {
+            return applyWaitScorerWeightsV2(unit, context, decision, v2);
         }
         return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());
     }

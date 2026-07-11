@@ -9,6 +9,8 @@ import type { UnitsHolder } from "../units/units_holder";
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const RANGE = PBTypes.AttackVals.RANGE;
+const MAGIC = PBTypes.AttackVals.MAGIC;
+const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
 export const VALUE_FEATURE_NAMES = [
     "hpAdv", // normalized (ourHP - enemyHP)
@@ -33,6 +35,40 @@ export const VALUE_FEATURE_NAMES = [
     "spreadEnemy", // same for the enemy
     "centerDistOurs", // avg normalized Chebyshev distance of our stacks to the board center (narrowing safety)
     "centerDistEnemy", // same for the enemy
+] as const;
+
+/**
+ * V2 RAW (Phase-B multi-cohort refit, 2026-07-10): the 20 base features above + a CLASS/COMPOSITION
+ * block. The base 20 were fit on LIVETWIN MELEE drafts only; on ranged/mixed armies the leaf is
+ * out-of-distribution (rangedAdv is the lone class signal and it saturates in mirrors where both sides
+ * field the same counts). The extra dims describe WHAT each army is made of and how much shooting is
+ * left, so one model can value melee, ranged, hybrid and mixed boards. Extractor kept separate —
+ * extractValueFeatures stays byte-identical for the committed 20-dim leaf and the 41-dim wait scorer.
+ */
+export const VALUE_FEATURE_NAMES_V2_RAW = [
+    ...VALUE_FEATURE_NAMES,
+    "ownRangedFrac", // our RANGE stacks / our living stacks
+    "enemyRangedFrac",
+    "ownFlyerFrac", // canFly stacks / living stacks
+    "enemyFlyerFrac",
+    "ownCasterFrac", // MAGIC or MELEE_MAGIC stacks / living stacks
+    "enemyCasterFrac",
+    "rangedHpFracOurs", // HP share of our army sitting in RANGE stacks
+    "rangedHpFracEnemy",
+    "shotsAdv", // norm(our remaining range shots, enemy remaining range shots) over RANGE stacks
+    "xRangedDist", // ownRangedFrac * nearEnemyDistOurs — shooters value standoff distance
+] as const;
+
+/**
+ * V2 DEPLOYED basis: raw 30 + a RANGEDNESS-interaction copy (xRg_<name> = <name> * boardRangedness,
+ * boardRangedness = (ownRangedFrac + enemyRangedFrac) / 2). One linear model over this basis expresses
+ * "shared weights + a ranged-board delta block" — melee boards score through the shared block alone
+ * (rangedness ~ 0 zeroes the copy), shootout boards add the delta. A fit that finds no ranged-specific
+ * structure leaves the xRg_ block ~0, so the 30-dim raw model is this basis's special case.
+ */
+export const VALUE_FEATURE_NAMES_V2: readonly string[] = [
+    ...VALUE_FEATURE_NAMES_V2_RAW,
+    ...VALUE_FEATURE_NAMES_V2_RAW.map((name) => `xRg_${name}`),
 ] as const;
 
 export function extractValueFeatures(
@@ -161,4 +197,105 @@ export function extractValueFeatures(
         centerDist(ourCells),
         centerDist(enemyCells),
     ];
+}
+
+/** V2 raw = base 20 (identical to extractValueFeatures) + the class/composition block. Pure, no RNG. */
+export function extractValueFeaturesV2Raw(
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    team: TeamType,
+): number[] {
+    const f = extractValueFeatures(unitsHolder, fightProperties, team);
+    let ownCnt = 0;
+    let enemyCnt = 0;
+    let ownRanged = 0;
+    let enemyRanged = 0;
+    let ownFly = 0;
+    let enemyFly = 0;
+    let ownCaster = 0;
+    let enemyCaster = 0;
+    let ownHp = 0;
+    let enemyHp = 0;
+    let ownRangedHp = 0;
+    let enemyRangedHp = 0;
+    let ownShots = 0;
+    let enemyShots = 0;
+    for (const u of unitsHolder.getAllUnits().values()) {
+        if (u.isDead()) {
+            continue;
+        }
+        const own = u.getTeam() === team;
+        const attackType = u.getAttackType();
+        const isRanged = attackType === RANGE;
+        const isCaster = attackType === MAGIC || attackType === MELEE_MAGIC;
+        const hp = u.getCumulativeHp();
+        const shots = isRanged ? u.getRangeShots() : 0;
+        if (own) {
+            ownCnt += 1;
+            ownHp += hp;
+            if (isRanged) {
+                ownRanged += 1;
+                ownRangedHp += hp;
+                ownShots += shots;
+            }
+            if (u.canFly()) {
+                ownFly += 1;
+            }
+            if (isCaster) {
+                ownCaster += 1;
+            }
+        } else {
+            enemyCnt += 1;
+            enemyHp += hp;
+            if (isRanged) {
+                enemyRanged += 1;
+                enemyRangedHp += hp;
+                enemyShots += shots;
+            }
+            if (u.canFly()) {
+                enemyFly += 1;
+            }
+            if (isCaster) {
+                enemyCaster += 1;
+            }
+        }
+    }
+    const norm = (a: number, b: number): number => (a - b) / (a + b + 1);
+    const ownRangedFrac = ownCnt ? ownRanged / ownCnt : 0;
+    f.push(
+        ownRangedFrac,
+        enemyCnt ? enemyRanged / enemyCnt : 0,
+        ownCnt ? ownFly / ownCnt : 0,
+        enemyCnt ? enemyFly / enemyCnt : 0,
+        ownCnt ? ownCaster / ownCnt : 0,
+        enemyCnt ? enemyCaster / enemyCnt : 0,
+        ownHp > 0 ? ownRangedHp / ownHp : 0,
+        enemyHp > 0 ? enemyRangedHp / enemyHp : 0,
+        norm(ownShots, enemyShots),
+        ownRangedFrac * f[NEAR_ENEMY_DIST_OURS_IDX],
+    );
+    return f;
+}
+
+const NEAR_ENEMY_DIST_OURS_IDX = (VALUE_FEATURE_NAMES as readonly string[]).indexOf("nearEnemyDistOurs");
+const OWN_RANGED_FRAC_IDX = (VALUE_FEATURE_NAMES_V2_RAW as readonly string[]).indexOf("ownRangedFrac");
+const ENEMY_RANGED_FRAC_IDX = (VALUE_FEATURE_NAMES_V2_RAW as readonly string[]).indexOf("enemyRangedFrac");
+
+/** Deployed V2 basis expansion: raw 30 + xRg_ rangedness-interaction copy. Pure column arithmetic. */
+export function expandValueFeaturesV2(raw: readonly number[]): number[] {
+    const rangedness = (raw[OWN_RANGED_FRAC_IDX] + raw[ENEMY_RANGED_FRAC_IDX]) / 2;
+    const out = raw.slice();
+    for (const x of raw) {
+        out.push(rangedness ? x * rangedness : 0);
+    }
+    return out;
+}
+
+/** The deployed V2 leaf featurization (search_driver V07_VALUE_WEIGHTS_V2). */
+export function extractValueFeaturesV2(
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    team: TeamType,
+): number[] {
+    return expandValueFeaturesV2(extractValueFeaturesV2Raw(unitsHolder, fightProperties, team));
 }

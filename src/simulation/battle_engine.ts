@@ -49,12 +49,16 @@ import { appendFileSync } from "node:fs";
 import { LookaheadDriver, type ILookaheadDeps } from "./lookahead";
 import { SearchDriver } from "./search_driver";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
-import { extractValueFeatures } from "./value_features";
+import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
 // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
 // position features from the acting team's view; at game end each snapshot is labeled with whether that team
 // won and appended to the file. Off => zero overhead. Used to fit the lookahead's leaf value function.
+// VALUE_DATA_FEATURES=v2 (Phase-B refit): dump extractValueFeaturesV2Raw (30 dims) instead AND append the
+// match seed as a trailing column ([...f, label, seed]) so the fit can split held-out BY GAME instead of by
+// row (fit_value_v2.mjs expands the raw rows into the deployed rangedness-conditional basis itself).
 const VALUE_DATA_FILE = process.env.VALUE_DATA;
+const VALUE_DATA_V2 = process.env.VALUE_DATA_FEATURES === "v2";
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
@@ -707,7 +711,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const actingUnitId = currentActiveUnitId;
         if (VALUE_DATA_FILE) {
             valueSnaps.push({
-                f: extractValueFeatures(unitsHolder, fightProperties, unit.getTeam()),
+                f: VALUE_DATA_V2
+                    ? extractValueFeaturesV2Raw(unitsHolder, fightProperties, unit.getTeam())
+                    : extractValueFeatures(unitsHolder, fightProperties, unit.getTeam()),
                 team: unit.getTeam(),
             });
         }
@@ -941,7 +947,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // Label each position by whether the acting team ultimately won, then append as JSONL. One write per
         // game keeps concurrent-worker appends atomic enough for data gen (each line is a self-contained row).
         const rows = valueSnaps
-            .map((s) => `${JSON.stringify([...s.f, sideForTeam(s.team) === matchResult.winner ? 1 : 0])}`)
+            .map((s) => {
+                const row: number[] = [...s.f, sideForTeam(s.team) === matchResult.winner ? 1 : 0];
+                if (VALUE_DATA_V2) {
+                    row.push(config.seed); // game id for split-by-game held-out (fit_value_v2.mjs)
+                }
+                return JSON.stringify(row);
+            })
             .join("\n");
         try {
             appendFileSync(VALUE_DATA_FILE, rows + "\n");

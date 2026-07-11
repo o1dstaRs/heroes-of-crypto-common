@@ -14,12 +14,19 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { IDecisionContext } from "../../src/ai";
 import {
     applyWaitScorer,
+    applyWaitScorerWeightsV2,
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
+    expandWaitFeaturesV2,
     extractWaitFeatures,
+    extractWaitFeaturesV2Raw,
     incumbentRuleWaits,
     parseWaitWeights,
+    parseWaitWeightsV2,
+    v07WaitWeightsV2,
     WAIT_FEATURE_NAMES,
+    WAIT_FEATURE_NAMES_V2,
+    WAIT_FEATURE_NAMES_V2_RAW,
     waitScore,
     waitScorerInSupport,
 } from "../../src/ai/versions/wait_scorer";
@@ -49,6 +56,7 @@ const ENV_KEYS = [
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS_B",
     "V07_WAIT_GUARD",
+    "V07_WAIT_WEIGHTS_V2",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) {
@@ -363,5 +371,89 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
         const f = new Array(WAIT_FEATURE_NAMES.length).fill(0);
         f[0] = 0.25;
         expect(waitScore(weights!, f)).toBeCloseTo(1.0, 10);
+    });
+});
+
+describe("wait scorer V2 (Phase-B multi-cohort env candidate)", () => {
+    const zerosV2 = () => JSON.stringify({ b: 0, w: new Array(WAIT_FEATURE_NAMES_V2.length).fill(0) });
+    const biasOnlyV2 = (b: number) => JSON.stringify({ b, w: new Array(WAIT_FEATURE_NAMES_V2.length).fill(0) });
+
+    it("raw V2 features prefix the exact v1 vector and append the composition block", () => {
+        const { context, actor, charge } = buildBoard();
+        const v1 = extractWaitFeatures(actor, context.unitsHolder, fp(), charge);
+        const raw = extractWaitFeaturesV2Raw(actor, context.unitsHolder, fp(), charge);
+        expect(raw).toHaveLength(WAIT_FEATURE_NAMES_V2_RAW.length);
+        expect(raw.slice(0, WAIT_FEATURE_NAMES.length)).toEqual(v1);
+        const at = (name: string) => raw[WAIT_FEATURE_NAMES_V2_RAW.indexOf(name)];
+        // 2v2 all-melee board: composition is pure melee, actor has no shots, nearest enemy at Chebyshev 7
+        expect(at("ownRangedFrac")).toBe(0);
+        expect(at("enemyRangedFrac")).toBe(0);
+        expect(at("ownMeleeFrac")).toBe(1);
+        expect(at("enemyMeleeFrac")).toBe(1);
+        expect(at("actShotsNorm")).toBe(0);
+        expect(at("actNearEnemyDist")).toBeGreaterThan(0);
+    });
+
+    it("composition tracks a mixed army and a ranged actor's remaining shots", () => {
+        const mixed = buildBoard({ attackType: RANGE, rangeShots: 5 }, {});
+        const raw = extractWaitFeaturesV2Raw(mixed.actor, mixed.context.unitsHolder, fp(), mixed.charge);
+        const at = (name: string) => raw[WAIT_FEATURE_NAMES_V2_RAW.indexOf(name)];
+        expect(at("ownRangedFrac")).toBe(0.5);
+        expect(at("ownMeleeFrac")).toBe(0.5);
+        expect(at("actShotsNorm")).toBeCloseTo(0.5, 10);
+    });
+
+    it("expandWaitFeaturesV2: the xR_ block is the raw copy for a RANGE actor and all-zero otherwise", () => {
+        const rawLen = WAIT_FEATURE_NAMES_V2_RAW.length;
+        const rangedIdx = WAIT_FEATURE_NAMES.indexOf("isRanged");
+        const raw = new Array(rawLen).fill(0).map((_, i) => (i + 1) / 100);
+        raw[rangedIdx] = 1;
+        const x = expandWaitFeaturesV2(raw);
+        expect(x).toHaveLength(WAIT_FEATURE_NAMES_V2.length);
+        expect(x.slice(0, rawLen)).toEqual(raw);
+        expect(x.slice(rawLen)).toEqual(raw);
+        raw[rangedIdx] = 0;
+        expect(expandWaitFeaturesV2(raw).slice(rawLen)).toEqual(new Array(rawLen).fill(0));
+    });
+
+    it("parseWaitWeightsV2 requires the full 98-dim width", () => {
+        expect(
+            parseWaitWeightsV2(JSON.stringify({ b: 0.1, w: new Array(WAIT_FEATURE_NAMES.length).fill(0) })),
+        ).toBeNull();
+        expect(parseWaitWeightsV2("not json")).toBeNull();
+        expect(parseWaitWeightsV2(biasOnlyV2(0.1))).not.toBeNull();
+    });
+
+    it("v07WaitWeightsV2 resolution: absent -> null (v1 path), all-zero -> disabled, valid -> weights", () => {
+        setEnv({});
+        expect(v07WaitWeightsV2()).toBeNull();
+        setEnv({ V07_WAIT_WEIGHTS_V2: zerosV2() });
+        expect(v07WaitWeightsV2()).toBe("disabled");
+        setEnv({ V07_WAIT_WEIGHTS_V2: biasOnlyV2(0.25) });
+        const resolved = v07WaitWeightsV2();
+        expect(resolved).not.toBeNull();
+        expect(resolved).not.toBe("disabled");
+        setEnv({ V07_WAIT_WEIGHTS_V2: "garbage" });
+        expect(v07WaitWeightsV2()).toBeNull();
+    });
+
+    it("V2 stage fires for a RANGE actor at z > 0 — the v1 training-support guard does NOT apply", () => {
+        const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        const weights = parseWaitWeightsV2(biasOnlyV2(0.01));
+        expect(applyWaitScorerWeightsV2(ranged.actor, ranged.context, ranged.charge, weights)).toEqual([
+            { type: "wait_turn", unitId: ranged.actor.getId() },
+        ]);
+        const negative = parseWaitWeightsV2(biasOnlyV2(-0.01));
+        expect(applyWaitScorerWeightsV2(ranged.actor, ranged.context, ranged.charge, negative)).toBe(ranged.charge);
+    });
+
+    it("V2 stage keeps policy waits, wait-ineligible points and null weights byte-identical", () => {
+        const board = buildBoard();
+        const weights = parseWaitWeightsV2(biasOnlyV2(5));
+        const policyWait: GameAction[] = [{ type: "wait_turn", unitId: board.actor.getId() }];
+        expect(applyWaitScorerWeightsV2(board.actor, board.context, policyWait, weights)).toBe(policyWait);
+        expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, null)).toBe(board.charge);
+        fp().addAlreadyMadeTurn(LOWER, board.actor.getId());
+        expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, weights)).toBe(board.charge);
     });
 });
