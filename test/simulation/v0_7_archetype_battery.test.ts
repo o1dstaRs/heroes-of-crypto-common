@@ -41,7 +41,7 @@ import {
 } from "../../src/simulation/v0_7_archetype_battery";
 import type { IIntegrityStats, IPairClusterStats, IRevisionProvenance } from "../../src/simulation/v0_7_acceptance";
 
-const manifestPath = join(import.meta.dir, "../../src/simulation/manifests/v0_7_archetype_battery_v1.json");
+const manifestPath = join(import.meta.dir, "../../src/simulation/manifests/v0_7_archetype_battery_v2.json");
 
 const cleanRevision: IRevisionProvenance = {
     commit: "0123456789abcdef0123456789abcdef01234567",

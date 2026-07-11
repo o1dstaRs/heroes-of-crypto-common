@@ -1,0 +1,44 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-fixed-archetypes-v2",
+    "createdAt": "2026-07-11T01:24:34Z",
+    "candidate": "v0.7",
+    "opponents": ["v0.6", "v0.4"],
+    "gamesPerCell": 3000,
+    "cells": {
+        "mage_frontline": {
+            "v0.6": 3157030049,
+            "v0.4": 666050940
+        },
+        "mage_fireline": {
+            "v0.6": 3825646701,
+            "v0.4": 1099520195
+        },
+        "melee_magic_utility": {
+            "v0.6": 2408405250,
+            "v0.4": 3737168825
+        },
+        "melee_magic_brawler": {
+            "v0.6": 3416692966,
+            "v0.4": 1303943955
+        },
+        "aura_support": {
+            "v0.6": 2111753965,
+            "v0.4": 108881152
+        },
+        "aura_offense": {
+            "v0.6": 3373030354,
+            "v0.4": 3291609764
+        },
+        "ranged_precision": {
+            "v0.6": 1887638349,
+            "v0.4": 3146518596
+        },
+        "ranged_control": {
+            "v0.6": 570092928,
+            "v0.4": 2867343806
+        }
+    },
+    "freshSeedsDeclared": true,
+    "declaration": "Generated and committed after the v1 failure and before any v2 fixed-archetype outcome was evaluated; no v1 seed is reused."
+}
