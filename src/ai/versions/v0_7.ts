@@ -27,7 +27,7 @@ export const isAuraSaturatedArmy = (units: readonly Unit[]): boolean =>
     units.length > 0 && units.every((unit) => unit.getAuraRanges().some((range) => range > 0));
 
 export const isMeleeMagicAnchorArmy = (units: readonly Unit[]): boolean =>
-    units.filter((unit) => unit.getAttackType() === MELEE_MAGIC).length >= 4 &&
+    units.filter((unit) => unit.getAttackType() === MELEE_MAGIC).length >= 2 &&
     !units.some((unit) => unit.getSpells().some((spell) => SALVAGE_SPELLS.has(spell.getName())));
 
 const isPureRangedArmy = (units: readonly Unit[]): boolean =>
@@ -41,6 +41,11 @@ interface IV07ArmyProfile {
     auraSaturated: boolean;
     meleeMagicAnchor: boolean;
 }
+
+const UNPRIMED_ARMY_PROFILE: IV07ArmyProfile = Object.freeze({
+    auraSaturated: false,
+    meleeMagicAnchor: false,
+});
 
 /**
  * v0.7 — the shipped v0.7 program on top of the full v0.6 chain:
@@ -61,7 +66,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
     public override readonly version: string = "v0.7";
     private readonly archetypeAnchor = new StrategyV0_4();
     private readonly armyProfiles = new WeakMap<object, Map<number, IV07ArmyProfile>>();
-    private armyProfile(holder: object, team: number, units: readonly Unit[]): IV07ArmyProfile {
+    private primeArmyProfile(holder: object, team: number, units: readonly Unit[]): IV07ArmyProfile {
         let byTeam = this.armyProfiles.get(holder);
         if (!byTeam) {
             byTeam = new Map();
@@ -77,25 +82,29 @@ export class StrategyV0_7 extends StrategyV0_6 {
         }
         return profile;
     }
+    private armyProfile(holder: object, team: number): IV07ArmyProfile {
+        // A late AI takeover may first see the army after casualties. Do not infer a permanent initial-roster
+        // profile from survivors; placement primes normal simulation and persistent-bot fights.
+        return this.armyProfiles.get(holder)?.get(team) ?? UNPRIMED_ARMY_PROFILE;
+    }
     /** v0.6's learned fight policy is out-of-distribution when every stack emits an aura. */
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        const profile = this.armyProfile(
-            context.unitsHolder,
-            unit.getTeam(),
-            context.unitsHolder.getAllAllies(unit.getTeam()),
-        );
+        const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
         if (profile.auraSaturated) {
             return this.archetypeAnchor.decideTurn(unit, context);
         }
         return super.decideTurn(unit, context);
     }
     /**
-     * Pure ranged Area Throw mirrors need v0.4's cohesive formation. Keep v0.6 dispersion against
-     * Large Caliber: the fixed Tsar-Cannon cohort strongly benefits from it.
+     * Pure ranged Area Throw matches use the measured v0.4 placement/combat anchor. Keep v0.6 against
+     * Large Caliber: the fixed Tsar-Cannon cohort strongly benefits from that policy.
      */
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
-        this.armyProfile(context.unitsHolder, context.team, units);
-        if (shouldUseArchetypePlacementAnchor(units, context.unitsHolder.getAllEnemyUnits(context.team))) {
+        // Ranked takeover can ask the strategy to place only the stacks that are still unplaced. Classify
+        // and cache from the complete team in the holder so a partial request cannot become the army profile.
+        const allies = context.unitsHolder.getAllAllies(context.team);
+        this.primeArmyProfile(context.unitsHolder, context.team, allies);
+        if (shouldUseArchetypePlacementAnchor(allies, context.unitsHolder.getAllEnemyUnits(context.team))) {
             return this.archetypeAnchor.placeArmy(units, context);
         }
         return super.placeArmy(units, context);
@@ -110,25 +119,15 @@ export class StrategyV0_7 extends StrategyV0_6 {
     }
     /** v0.6's final-stage seam: apply the committed scorer only inside its measured decision domain. */
     protected override finalizeDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
-        // The distilled scorer was trained on melee-drafted/random armies, not the held-out range-specialist
-        // cohort. On that cohort, allowing it to delay ranged actors regressed 47.1% vs v0.6; anchoring only
-        // ranged actors then scored 58.9% on a fresh 6,000-game panel while retaining teammate wait gains.
-        if (unit.getAttackType() === RANGE) {
-            return decision;
-        }
         // Caster routing and inherited spellbooks have already compared the available spell with combat
         // alternatives. The wait model has no incumbent-action feature, so it cannot safely distinguish a
         // committed cast from a generic advance; preserve casts while leaving non-cast mage turns eligible.
         if (decision.some((action) => action.type === "cast_spell")) {
             return decision;
         }
-        // In a melee-magic-heavy army without Resurrection/Wind Flow, v0.7 has no supported caster
-        // improvement to contribute. The fixed brawler cohort attributes its regression entirely to
-        // scorer-added waits, so preserve the full v0.6 formation policy for every actor in that army.
-        if (
-            this.armyProfile(context.unitsHolder, unit.getTeam(), context.unitsHolder.getAllAllies(unit.getTeam()))
-                .meleeMagicAnchor
-        ) {
+        // The scorer fit contained roughly one melee-magic stack per six-stack army. At two or more without
+        // Resurrection/Wind Flow, v0.7 has no supported improvement to contribute, so preserve v0.6 exactly.
+        if (this.armyProfile(context.unitsHolder, unit.getTeam()).meleeMagicAnchor) {
             return decision;
         }
         return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());

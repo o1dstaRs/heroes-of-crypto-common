@@ -31,6 +31,8 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
+import { PlacementPositionType } from "../../src/grid/placement_properties";
+import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { Unit } from "../../src/units/unit";
@@ -65,6 +67,12 @@ afterEach(() => {
 });
 
 const zeroWeights = (): number[] => DISTILLED_WAIT_WEIGHTS_2026_07_10.w.map(() => 0);
+
+function anyAdjacent(cells: readonly { x: number; y: number }[]): boolean {
+    return cells.some((cell, index) =>
+        cells.slice(index + 1).some((other) => Math.max(Math.abs(cell.x - other.x), Math.abs(cell.y - other.y)) === 1),
+    );
+}
 
 class TestStrategyV0_7 extends StrategyV0_7 {
     public finalizeForTest(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
@@ -175,13 +183,102 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
         expect(isAuraSaturatedArmy(auraArmy)).toBe(true);
         expect(isAuraSaturatedArmy([...auraArmy, createTestUnit()])).toBe(false);
-        expect(isMeleeMagicAnchorArmy(brawlerArmy)).toBe(true);
+        expect(isMeleeMagicAnchorArmy(brawlerArmy.slice(0, 1))).toBe(false);
+        for (let density = 2; density <= brawlerArmy.length; density += 1) {
+            expect(isMeleeMagicAnchorArmy(brawlerArmy.slice(0, density))).toBe(true);
+        }
         expect(isMeleeMagicAnchorArmy(salvageArmy)).toBe(false);
         expect(shouldUseArchetypePlacementAnchor(rangedArmy, [areaThrow])).toBe(true);
         expect(shouldUseArchetypePlacementAnchor(rangedArmy, [largeCaliber])).toBe(false);
         expect(shouldUseArchetypePlacementAnchor([...rangedArmy.slice(0, 5), createTestUnit()], [areaThrow])).toBe(
             false,
         );
+    });
+
+    it("classifies partial placement requests from the complete team in the holder", () => {
+        const combat = createCombatTestContext();
+        const enemy = createTestUnit({ team: UPPER, abilities: ["Area Throw"] });
+        const ranged = Array.from({ length: 3 }, (_, index) =>
+            createTestUnit({ name: `Ranged ${index}`, team: LOWER, attackType: PBTypes.AttackVals.RANGE }),
+        );
+        const melee = createTestUnit({ name: "Melee ally", team: LOWER });
+        combat.unitsHolder.addUnit(enemy);
+        for (const unit of [...ranged, melee]) combat.unitsHolder.addUnit(unit);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5);
+
+        const placed = new StrategyV0_7().placeArmy(ranged, {
+            team: LOWER,
+            grid: combat.grid,
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            placement: zone,
+        });
+
+        expect(placed.size).toBe(ranged.length);
+        // The full team is mixed, so v0.6's Area Throw dispersion remains active. Classifying only the
+        // ranged subset would incorrectly choose the packed v0.4 pure-range anchor.
+        expect(anyAdjacent([...placed.values()])).toBe(false);
+    });
+
+    it("uses exact v0.4 placement only for a pure ranged army facing Area Throw", () => {
+        const placeAgainst = (ability: string, version: "v0.4" | "v0.6" | "v0.7") => {
+            const combat = createCombatTestContext();
+            const enemy = createTestUnit({ team: UPPER, abilities: [ability] });
+            const ranged = Array.from({ length: 4 }, (_, index) =>
+                createTestUnit({ name: `Ranged ${index}`, team: LOWER, attackType: PBTypes.AttackVals.RANGE }),
+            );
+            combat.unitsHolder.addUnit(enemy);
+            for (const unit of ranged) combat.unitsHolder.addUnit(unit);
+            return [
+                ...getAIStrategy(version)
+                    .placeArmy(ranged, {
+                        team: LOWER,
+                        grid: combat.grid,
+                        unitsHolder: combat.unitsHolder,
+                        pathHelper: new PathHelper(testGridSettings),
+                        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+                    })
+                    .values(),
+            ];
+        };
+
+        expect(placeAgainst("Area Throw", "v0.7")).toEqual(placeAgainst("Area Throw", "v0.4"));
+        expect(placeAgainst("Large Caliber", "v0.7")).toEqual(placeAgainst("Large Caliber", "v0.6"));
+    });
+
+    it("only primes the melee-magic profile from the complete placement-time army", () => {
+        const { actor, context, incumbent } = buildBoard(10, {
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+        });
+        for (let index = 0; index < 3; index += 1) {
+            placeUnit(
+                context.grid,
+                context.unitsHolder,
+                createTestUnit({
+                    name: `Melee Mage ${index}`,
+                    team: LOWER,
+                    attackType: PBTypes.AttackVals.MELEE_MAGIC,
+                }),
+                { x: 7 + index * 2, y: 3 },
+            );
+        }
+        context.fightProperties!.setTeamUnitsAlive(LOWER, 5);
+        const strategy = new TestStrategyV0_7();
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+
+        // Without placement, a late takeover does not infer an initial-roster profile from survivors.
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+        strategy.placeArmy([actor], {
+            team: LOWER,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            pathHelper: context.pathHelper,
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+        });
+
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toBe(incumbent);
     });
 
     it("keeps the incumbent when fight state is unavailable", () => {
@@ -366,7 +463,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
     });
 
-    it("anchors ranged actors even when an override would wait everywhere", () => {
+    it("anchors ranged actors by default but lets V07_WAIT_GUARD=off reproduce the scorer experiment", () => {
         const { actor, context } = buildBoard(10, {
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
@@ -377,6 +474,10 @@ describe("v0.7 strategy — baked wait scorer", () => {
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
 
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+        process.env.V07_WAIT_GUARD = "off";
+        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
     });
 
     it("preserves a committed cast while leaving non-cast mage turns scorer-eligible", () => {
