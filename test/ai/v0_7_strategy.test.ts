@@ -32,7 +32,13 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
-const ENV_KEYS = ["V07_WAIT_SCORER", "V07_WAIT_WEIGHTS", "V07_WAIT_WEIGHTS_B", "V07_WAIT_VERSIONS"] as const;
+const ENV_KEYS = [
+    "V07_WAIT_SCORER",
+    "V07_WAIT_WEIGHTS",
+    "V07_WAIT_WEIGHTS_B",
+    "V07_WAIT_VERSIONS",
+    "V07_WAIT_GUARD",
+] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 beforeEach(() => {
@@ -256,6 +262,49 @@ describe("v0.7 strategy — wait-scorer always on", () => {
         const incumbent = getAIStrategy("v0.6").decideTurn(actor, context);
         const expected = applyWaitScorerWeights(actor, context, incumbent, DISTILLED_WAIT_WEIGHTS_2026_07_10);
         expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(expected);
+    });
+
+    it("the baked scorer never converts a RANGE unit — the training-support guard (ranged-collapse fix)", () => {
+        const combat = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const actor = createTestUnit({
+            name: "Shooter",
+            team: LOWER,
+            speed: 4,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+        });
+        const ally = createTestUnit({
+            name: "Shooter Ally",
+            team: LOWER,
+            speed: 2,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+        });
+        const enemy = createTestUnit({ name: "Enemy", team: UPPER, speed: 3, amountAlive: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
+        fightProperties.setTeamUnitsAlive(LOWER, 2);
+        fightProperties.setTeamUnitsAlive(UPPER, 1);
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties,
+        };
+        const incumbent: GameAction[] = [{ type: "range_attack", attackerId: actor.getId(), targetId: enemy.getId() }];
+        expect(canWaitOnHourglassMirror(actor, fightProperties)).toBe(true);
+        // even a z=+1000-everywhere override cannot make the baked stage wait a ranged unit...
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
+        // ...unless the guard is explicitly lifted (the pre-fix behavior, kept for experiments)
+        process.env.V07_WAIT_GUARD = "off";
+        expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
     });
 
     it("a V07_WAIT_WEIGHTS override steers v0.7's act-vs-wait decision", () => {

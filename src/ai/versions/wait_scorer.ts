@@ -350,6 +350,64 @@ function waitWeightsForVersion(version: string): IWaitWeights | null {
     return null;
 }
 
+/**
+ * TRAINING-SUPPORT GUARD (2026-07-10 ranged-mirror collapse fix). The distilled weights were fit on
+ * 74,315 points from 5,000 LIVETWIN MELEE-DRAFT oracle games: MELEE 82.8% + MELEE_MAGIC 17.0% of the fit
+ * set, RANGE 0.19% (141 rows, a single creature) and pure MAGIC 0 rows — and every army was majority
+ * melee. Outside that support the linear model EXTRAPOLATES: in forced ranged mirrors 100% of RANGE-unit
+ * decision points sit outside the fit set's [p1,p99] envelope and the scorer converts 41% of them to
+ * waits (mechanism: losing the isMelee penalty, fmExposure saturating in shootouts, nearEnemyDistOurs
+ * OOD) — but waiting dodges nothing in a shootout and cedes first-volley focus-fire, collapsing v0.7 vs
+ * v0.6 to 25.0%/2.1% on ranged mirrors (measure_mirror_cohorts.ts) while the zero-scorer arm is exact
+ * 50.00% parity. The guard restricts the scorer to its training support; out-of-support decisions fall
+ * back to the incumbent (the v0.5/v0.6 strategic-hourglass rule already ran upstream — RANGE units were
+ * deliberately excluded from it, V05_HG_RANGED lineage).
+ *
+ * `V07_WAIT_GUARD` modes: "support" (default) = melee-attack-type acting unit AND majority
+ * melee-attack-type own army; "class" = the unit-class clause only; "off" = unguarded pre-fix behavior
+ * (for experiments — e.g. a future refit whose dataset actually covers ranged/mixed armies).
+ */
+export type WaitGuardMode = "support" | "class" | "off";
+
+export function waitGuardMode(): WaitGuardMode {
+    const raw = process.env.V07_WAIT_GUARD;
+    return raw === "off" || raw === "class" ? raw : "support";
+}
+
+const isMeleeAttackType = (unit: Unit): boolean => {
+    const attackType = unit.getAttackType();
+    return attackType === MELEE || attackType === MELEE_MAGIC;
+};
+
+/** Is this decision point inside the distilled weights' training support (see guard doc above)? */
+export function waitScorerInSupport(
+    unit: Unit,
+    unitsHolder: UnitsHolder,
+    mode: WaitGuardMode = waitGuardMode(),
+): boolean {
+    if (mode === "off") {
+        return true;
+    }
+    if (!isMeleeAttackType(unit)) {
+        return false;
+    }
+    if (mode === "class") {
+        return true;
+    }
+    let own = 0;
+    let melee = 0;
+    for (const u of unitsHolder.getAllUnits().values()) {
+        if (u.isDead() || u.getTeam() !== unit.getTeam()) {
+            continue;
+        }
+        own += 1;
+        if (isMeleeAttackType(u)) {
+            melee += 1;
+        }
+    }
+    return melee * 2 > own;
+}
+
 /** z = b + w·f for a decision point (exported for tests and the fit's sanity cross-check). */
 export function waitScore(weights: IWaitWeights, features: readonly number[]): number {
     let z = weights.b;
@@ -362,8 +420,9 @@ export function waitScore(weights: IWaitWeights, features: readonly number[]): n
 /**
  * The deployed Gate-2 scorer stage (wired at the end of StrategyV0_6.decideTurn). Returns the exact
  * `incumbent` reference unless the gate is on, weights are non-anchor, the point is wait-eligible under
- * the oracle's mirror predicate, the incumbent is not already a wait, and z > 0 — in which case the turn
- * becomes a lone hourglass wait (exactly the oracle's override action).
+ * the oracle's mirror predicate, the incumbent is not already a wait, the point is inside the
+ * training-support guard, and z > 0 — in which case the turn becomes a lone hourglass wait (exactly the
+ * oracle's override action).
  */
 export function applyWaitScorer(
     unit: Unit,
@@ -394,6 +453,9 @@ export function applyWaitScorerWeights(
     }
     if (!canWaitOnHourglassMirror(unit, fightProperties)) {
         return incumbent; // not a wait-eligible decision point
+    }
+    if (!waitScorerInSupport(unit, context.unitsHolder)) {
+        return incumbent; // outside the fit's training support — keep the incumbent hourglass behavior
     }
     const features = extractWaitFeatures(unit, context.unitsHolder, fightProperties, incumbent);
     const score = waitScore(weights, features);
