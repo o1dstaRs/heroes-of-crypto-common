@@ -11,7 +11,14 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION, type IDecisionContext } from "../../src/ai";
+import {
+    AI_VERSIONS,
+    DEFAULT_AI_VERSION,
+    getAIStrategy,
+    LATEST_AI_VERSION,
+    type IAIStrategy,
+    type IDecisionContext,
+} from "../../src/ai";
 import {
     isAuraSaturatedArmy,
     isMeleeMagicAnchorArmy,
@@ -123,6 +130,16 @@ function buildBoard(enemyAmountAlive = 1, actorOptions: Parameters<typeof create
             },
         ],
     };
+}
+
+function primeArmyProfile(strategy: Pick<IAIStrategy, "placeArmy">, context: IDecisionContext): void {
+    strategy.placeArmy(context.unitsHolder.getAllAllies(LOWER), {
+        team: LOWER,
+        grid: context.grid,
+        unitsHolder: context.unitsHolder,
+        pathHelper: context.pathHelper,
+        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+    });
 }
 
 describe("v0.7 registry", () => {
@@ -246,31 +263,29 @@ describe("v0.7 strategy — baked wait scorer", () => {
         expect(placeAgainst("Large Caliber", "v0.7")).toEqual(placeAgainst("Large Caliber", "v0.6"));
     });
 
-    it("only primes the melee-magic profile from the complete placement-time army", () => {
+    it("fails closed before profile priming and classifies a partial request from the complete army", () => {
         const { actor, context, incumbent } = buildBoard(10, {
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
         });
-        for (let index = 0; index < 3; index += 1) {
-            placeUnit(
-                context.grid,
-                context.unitsHolder,
-                createTestUnit({
-                    name: `Melee Mage ${index}`,
-                    team: LOWER,
-                    attackType: PBTypes.AttackVals.MELEE_MAGIC,
-                }),
-                { x: 7 + index * 2, y: 3 },
-            );
-        }
-        context.fightProperties!.setTeamUnitsAlive(LOWER, 5);
+        const secondMeleeMage = createTestUnit({
+            name: "Second Melee Mage",
+            team: LOWER,
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+        });
+        const excludedSalvageUnit = createTestUnit({
+            name: "Excluded Salvage Unit",
+            team: LOWER,
+            spells: ["System:Resurrection"],
+        });
+        placeUnit(context.grid, context.unitsHolder, secondMeleeMage, { x: 7, y: 3 });
+        placeUnit(context.grid, context.unitsHolder, excludedSalvageUnit, { x: 9, y: 3 });
+        context.fightProperties!.setTeamUnitsAlive(LOWER, 4);
         const strategy = new TestStrategyV0_7();
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
 
-        // Without placement, a late takeover does not infer an initial-roster profile from survivors.
-        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
-            { type: "wait_turn", unitId: actor.getId() },
-        ]);
-        strategy.placeArmy([actor], {
+        // Without placement, a late takeover does not infer a profile from survivors or run the scorer.
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toBe(incumbent);
+        strategy.placeArmy([actor, secondMeleeMage], {
             team: LOWER,
             grid: context.grid,
             unitsHolder: context.unitsHolder,
@@ -278,7 +293,11 @@ describe("v0.7 strategy — baked wait scorer", () => {
             placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
         });
 
-        expect(strategy.finalizeForTest(actor, context, incumbent)).toBe(incumbent);
+        // The omitted holder unit has Resurrection, so the complete army is salvage-supported and must not
+        // be anchored. Classifying only the two-unit placement subset would incorrectly preserve incumbent.
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
     });
 
     it("keeps the incumbent when fight state is unavailable", () => {
@@ -376,7 +395,9 @@ describe("v0.7 strategy — baked wait scorer", () => {
                 .decideTurn(actor, context)
                 .some((action) => action.type === "wait_turn"),
         ).toBe(false);
-        const actions = getAIStrategy("v0.7").decideTurn(actor, context);
+        const strategy = getAIStrategy("v0.7");
+        primeArmyProfile(strategy, context);
+        const actions = strategy.decideTurn(actor, context);
         expect(actions).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
 
         const engine = new GameActionEngine({
@@ -401,7 +422,9 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const { actor, context } = buildBoard();
         const incumbent = getAIStrategy("v0.6").decideTurn(actor, context);
         const expected = applyWaitScorerWeights(actor, context, incumbent, DISTILLED_WAIT_WEIGHTS_2026_07_10);
-        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(expected);
+        const strategy = getAIStrategy("v0.7");
+        primeArmyProfile(strategy, context);
+        expect(strategy.decideTurn(actor, context)).toEqual(expected);
     });
 
     it("the baked scorer never converts a RANGE unit — the training-support guard (ranged-collapse fix)", () => {
@@ -451,16 +474,14 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const { actor, context } = buildBoard();
         expect(canWaitOnHourglassMirror(actor, context.fightProperties!)).toBe(true);
         const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
+        const strategy = getAIStrategy("v0.7");
+        primeArmyProfile(strategy, context);
         // z = +1000 everywhere: every eligible non-wait decision becomes a wait (a policy wait stays a wait).
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
-        expect(
-            getAIStrategy("v0.7")
-                .decideTurn(actor, context)
-                .some((a) => a.type === "wait_turn"),
-        ).toBe(true);
+        expect(strategy.decideTurn(actor, context).some((a) => a.type === "wait_turn")).toBe(true);
         // z = -1000 everywhere: the scorer never fires; v0.7 returns exactly v0.6's decision.
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: -1_000, w: zeroWeights() });
-        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+        expect(strategy.decideTurn(actor, context)).toEqual(plainV06);
     });
 
     it("anchors ranged actors by default but lets V07_WAIT_GUARD=off reproduce the scorer experiment", () => {
@@ -472,12 +493,12 @@ describe("v0.7 strategy — baked wait scorer", () => {
         expect(plainV06.some((action) => action.type === "wait_turn")).toBe(false);
 
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        const strategy = getAIStrategy("v0.7");
+        primeArmyProfile(strategy, context);
 
-        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual(plainV06);
+        expect(strategy.decideTurn(actor, context)).toEqual(plainV06);
         process.env.V07_WAIT_GUARD = "off";
-        expect(getAIStrategy("v0.7").decideTurn(actor, context)).toEqual([
-            { type: "wait_turn", unitId: actor.getId() },
-        ]);
+        expect(strategy.decideTurn(actor, context)).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
     });
 
     it("preserves a committed cast while leaving non-cast mage turns scorer-eligible", () => {
@@ -494,6 +515,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
             },
         ];
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        primeArmyProfile(strategy, context);
 
         expect(strategy.finalizeForTest(actor, context, cast)).toBe(cast);
         expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([

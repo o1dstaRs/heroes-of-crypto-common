@@ -42,11 +42,6 @@ interface IV07ArmyProfile {
     meleeMagicAnchor: boolean;
 }
 
-const UNPRIMED_ARMY_PROFILE: IV07ArmyProfile = Object.freeze({
-    auraSaturated: false,
-    meleeMagicAnchor: false,
-});
-
 /**
  * v0.7 — the shipped v0.7 program on top of the full v0.6 chain:
  * - S1: the Q2 Gate-2 distilled act-vs-wait scorer is baked in for its supported non-ranged,
@@ -82,15 +77,15 @@ export class StrategyV0_7 extends StrategyV0_6 {
         }
         return profile;
     }
-    private armyProfile(holder: object, team: number): IV07ArmyProfile {
+    private armyProfile(holder: object, team: number): IV07ArmyProfile | undefined {
         // A late AI takeover may first see the army after casualties. Do not infer a permanent initial-roster
         // profile from survivors; placement primes normal simulation and persistent-bot fights.
-        return this.armyProfiles.get(holder)?.get(team) ?? UNPRIMED_ARMY_PROFILE;
+        return this.armyProfiles.get(holder)?.get(team);
     }
     /** v0.6's learned fight policy is out-of-distribution when every stack emits an aura. */
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
-        if (profile.auraSaturated) {
+        if (profile?.auraSaturated) {
             return this.archetypeAnchor.decideTurn(unit, context);
         }
         return super.decideTurn(unit, context);
@@ -127,7 +122,10 @@ export class StrategyV0_7 extends StrategyV0_6 {
         }
         // The scorer fit contained roughly one melee-magic stack per six-stack army. At two or more without
         // Resurrection/Wind Flow, v0.7 has no supported improvement to contribute, so preserve v0.6 exactly.
-        if (this.armyProfile(context.unitsHolder, unit.getTeam()).meleeMagicAnchor) {
+        const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
+        // A late takeover has no trustworthy initial-roster classifier input. Keep the incumbent v0.6 action
+        // rather than applying the scorer outside a known profile; guarded caster salvage ran before this seam.
+        if (!profile || profile.meleeMagicAnchor) {
             return decision;
         }
         return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());
