@@ -44,13 +44,13 @@ interface IV07ArmyProfile {
 
 /**
  * v0.7 — the shipped v0.7 program on top of the full v0.6 chain:
- * - S1: the Q2 Gate-2 distilled act-vs-wait scorer is baked in for its supported non-ranged,
- *   non-cast decision domain;
+ * - S1: the Q2 Gate-2 distilled act-vs-wait scorer is baked in for its supported melee-attack-type,
+ *   non-cast decision domain in majority-melee armies;
  * - S3: only the measured Resurrection + Wind Flow caster salvage is baked in, without Resurrection
  *   pre-emption. Castling and Wild Regeneration remain experimental-only;
- * - fixed-cohort safety: aura-saturated armies use the proven v0.4 aura policy, pure ranged armies
- *   keep v0.6 except for the Area Throw dispersion failure, and unsupported melee-mage-heavy armies
- *   preserve v0.6 decisions.
+ * - fixed-cohort safety: aura-saturated armies use the proven v0.4 aura policy, pure-ranged combat
+ *   stays on v0.6 while Area Throw matchups use v0.4 placement, and unsupported melee-mage-heavy
+ *   armies preserve v0.6 decisions.
  *
  * Weight resolution (wait_scorer.ts v07BakedWaitWeights): committed defaults, still overridable via
  * V07_WAIT_WEIGHTS for experiments; an ALL-ZERO override disables only the baked scorer. v0.6/v0.6s
@@ -91,8 +91,8 @@ export class StrategyV0_7 extends StrategyV0_6 {
         return super.decideTurn(unit, context);
     }
     /**
-     * Pure ranged Area Throw matches use the measured v0.4 placement/combat anchor. Keep v0.6 against
-     * Large Caliber: the fixed Tsar-Cannon cohort strongly benefits from that policy.
+     * Pure-ranged armies use the measured v0.4 placement anchor only against Area Throw; combat remains
+     * v0.6. Keep v0.6 placement against Large Caliber: the fixed Tsar-Cannon cohort benefits from it.
      */
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         // Ranked takeover can ask the strategy to place only the stacks that are still unplaced. Classify

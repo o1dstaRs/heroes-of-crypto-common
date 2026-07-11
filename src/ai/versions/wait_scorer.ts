@@ -345,9 +345,9 @@ export function extractWaitFeaturesV2(
  *   - LIVETWIN mixed 50/50 (2,000, seed 927002): +16.21pp ± 1.07
  *   - LIVETWIN random rosters (2,000, seed 927003): +8.78pp ± 1.13
  *   - transitivity anchor: (v0.6 + scorer) vs v0.4 81.10% vs plain v0.6's 73.17% (4,000 each, seed 957001)
- * NOT wired as a default — the scorer stays env-gated OFF (the anchor pattern). To arm it:
- *   V07_WAIT_SCORER=on V07_WAIT_WEIGHTS=$(json of this constant) [V07_WAIT_VERSIONS=v0.6]
- * Committed so a future bake/freeze-CEM starts from the verified artifact instead of a scratchpad file.
+ * v0.6/v0.6s remain env-gated (the anchor pattern); v0.7's resolver below uses this as its built-in
+ * guarded default. To arm it for a v0.6 experiment:
+ *   V07_WAIT_SCORER=on V07_WAIT_WEIGHTS=$(json of this constant) V07_WAIT_VERSIONS=v0.6
  */
 export const DISTILLED_WAIT_WEIGHTS_2026_07_10: IWaitWeights = {
     b: -0.61904,
