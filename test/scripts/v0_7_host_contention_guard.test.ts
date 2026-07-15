@@ -131,6 +131,7 @@ describe("v0.7 host contention assessment", () => {
                 comm: "zsh",
                 command: "zsh -lc echo scripts/run_v0_7_96h.sh",
             },
+            { pid: 14, pgid: 14, state: "?", comm: "WindowServer", command: "/System/Library/WindowServer" },
         ];
         const result = assessHostContention({
             processes,
@@ -172,6 +173,26 @@ describe("v0.7 host contention assessment", () => {
                 command: "/opt/homebrew/bin/bun src/simulation/run_match.ts",
             },
         ]);
+        const unknownState = parsePsSnapshot(" 22 22 ? bun bun src/simulation/run_match.ts\n");
+        expect(unknownState[0]?.state).toBe("?");
+        expect(
+            assessHostContention({
+                processes: unknownState,
+                cpuSamples: [snapshot(0, 0), snapshot(0, 100)],
+                minimumIdleCpus: 1,
+            }),
+        ).toMatchObject({
+            ok: false,
+            reasons: ["other-hoc-compute-process"],
+            blockers: [{ pid: 22, state: "?" }],
+        });
+        expect(() =>
+            assessHostContention({
+                processes: [{ pid: 23, pgid: 23, state: " ", comm: "bun", command: "bun worker.mjs" }],
+                cpuSamples: [snapshot(0, 0), snapshot(0, 100)],
+                minimumIdleCpus: 1,
+            }),
+        ).toThrow("state must be a non-empty token");
     });
 });
 

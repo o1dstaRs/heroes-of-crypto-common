@@ -151,8 +151,8 @@ const normalizeProcesses = (raw) => {
         if (typeof process.command !== "string" || process.command.length === 0) {
             throw new Error(`processes[${index}].command must be a non-empty string`);
         }
-        if (typeof state !== "string" || !/^[A-Za-z]/.test(state)) {
-            throw new Error(`processes[${index}].state must start with a letter`);
+        if (typeof state !== "string" || state.length === 0 || /\s/.test(state)) {
+            throw new Error(`processes[${index}].state must be a non-empty token`);
         }
         return {
             pid: finiteInteger(process.pid, `processes[${index}].pid`, 1),
