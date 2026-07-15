@@ -126,6 +126,23 @@ describe("v0.7 overnight selection", () => {
             ),
         ).toEqual(["qualified-overall", "qualified-utility", "qualified-circuit"]);
     });
+
+    it("orders a weighted deep arm after its same-envelope zero control", () => {
+        const h12Control = evidence("h12-w0", { integrityUtility: 0.88 });
+        const h12Weighted = evidence("h12-w2", { integrityUtility: 0.99, utilityDecisiveWinRate: 0.95 });
+        const h8Control = evidence("h8-w0", { integrityUtility: 0.87 });
+        const h8Weighted = evidence("h8-w4", { integrityUtility: 0.98, utilityDecisiveWinRate: 1 });
+        const controls = new Map([
+            [h12Weighted.profileId, h12Control.profileId],
+            [h8Weighted.profileId, h8Control.profileId],
+        ]);
+
+        expect(
+            chooseV07OvernightDeepEvidence([h8Weighted, h12Control, h8Control, h12Weighted], 3, controls).map(
+                ({ profileId }) => profileId,
+            ),
+        ).toEqual(["h12-w0", "h12-w2", "h8-w0"]);
+    });
 });
 
 describe("v0.7 overnight execution host", () => {

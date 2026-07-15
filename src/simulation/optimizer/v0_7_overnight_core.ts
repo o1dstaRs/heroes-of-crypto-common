@@ -422,13 +422,22 @@ export function compareV07OvernightCircuitEvidence(left: IV07OvernightEvidence, 
 export function chooseV07OvernightDeepEvidence<T extends IV07OvernightEvidence>(
     evidence: readonly T[],
     keep: number,
+    finishControlProfileIds: ReadonlyMap<string, string> = new Map(),
 ): T[] {
     if (!Number.isSafeInteger(keep) || keep < 1) throw new Error("Overnight deep keep must be a positive integer");
     if (!evidence.length) return [];
     const ranked = [...evidence].sort(compareV07OvernightEvidence);
+    const byProfileId = new Map(evidence.map((entry) => [entry.profileId, entry]));
     const selected: T[] = [];
     const add = (entry: T | undefined): void => {
-        if (entry && !selected.some((candidate) => candidate.profileId === entry.profileId)) selected.push(entry);
+        if (!entry || selected.some((candidate) => candidate.profileId === entry.profileId)) return;
+        const controlProfileId = finishControlProfileIds.get(entry.profileId);
+        const control = controlProfileId ? byProfileId.get(controlProfileId) : undefined;
+        if (controlProfileId && !control) return;
+        const additions = control && !selected.some(({ profileId }) => profileId === control.profileId) ? 2 : 1;
+        if (selected.length + additions > keep) return;
+        if (control) selected.push(control);
+        selected.push(entry);
     };
     add(ranked[0]);
     add(

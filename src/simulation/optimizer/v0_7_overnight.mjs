@@ -2,7 +2,7 @@
  * Research-only overnight follow-up to the d68490a v0.7+RAWS run.
  *
  * This driver deliberately searches a small, preregistered profile set around the late b9ce genome. It
- * targets the three observed blockers: melee_magic_utility strength, fire/ranged attrition integrity, and
+ * targets the observed all-cohort strength deficits, fire/ranged attrition integrity, and
  * headroom below the ranked server's 300ms per-decision circuit. It never edits source, bakes weights, commits,
  * pushes, or deploys. Use scripts/run_v0_7_96h.sh as the lifetime supervisor.
  */
@@ -45,9 +45,9 @@ const PACKAGE_ROOT = resolve(HERE, "../../..");
 const TRIAL = join(HERE, "v0_7_search_trial.ts");
 const DEFAULT_ANCHOR = join(PACKAGE_ROOT, "src/simulation/results/v0_7_96h_d68490a_outcome.json");
 const EXPECTED_ANCHOR_ID = "b9ce98a735b14c7e57a5b83b70b4bca6b2e45d6a23ce35dd27c2e5b914b1abaa";
-const MIN_DECISION_HEADROOM_MS = 35;
-const FOCUS_TEMPLATES = ["melee_magic_utility", "mage_fireline", "ranged_precision"];
+const MIN_DECISION_HEADROOM_MS = 75;
 const ALL_TEMPLATES = V07_96H_TEMPLATES.map(({ template }) => template);
+const SCOUT_DEEP_TEMPLATES = [...ALL_TEMPLATES];
 const activeChildren = new Set();
 
 const parsed = parseArgs({
@@ -94,16 +94,16 @@ if (!OUT && !parsed.values["describe-profiles"]) throw new Error("--out or V07_9
 
 const CONFIG = {
     schemaVersion: 1,
-    protocol: "v0.7-overnight-active-circuit-v5",
+    protocol: "v0.7-overnight-active-circuit-v6",
     workers: integer("V07_OVERNIGHT_WORKERS", 12),
     checkpointGames: evenGames("V07_OVERNIGHT_CHECKPOINT_GAMES", 32),
-    scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 32),
-    deepGames: evenGames("V07_OVERNIGHT_DEEP_GAMES", 128),
-    finalGames: evenGames("V07_OVERNIGHT_FINAL_GAMES", 256),
+    scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 64),
+    deepGames: evenGames("V07_OVERNIGHT_DEEP_GAMES", 512),
+    finalGames: evenGames("V07_OVERNIGHT_FINAL_GAMES", 2048),
     deepKeep: integer("V07_OVERNIGHT_DEEP_KEEP", 3),
     finalReserveHours: positive("V07_OVERNIGHT_FINAL_RESERVE_HOURS", 4),
     circuitBreakerMs: positive("V07_OVERNIGHT_CIRCUIT_MS", 275),
-    decisionDeadlineMs: positive("V07_OVERNIGHT_DECISION_DEADLINE_MS", 240),
+    decisionDeadlineMs: positive("V07_OVERNIGHT_DECISION_DEADLINE_MS", 200),
     maximumCircuitOpenGameRate: positive("V07_OVERNIGHT_MAX_CIRCUIT_OPEN_RATE", 0.01),
     maximumDrawOrArmageddonRate: positive("V07_OVERNIGHT_MAX_DRAW_ARM_RATE", 0.01),
     target: positive("V07_OVERNIGHT_TARGET", 0.9),
@@ -124,15 +124,28 @@ if (CONFIG.circuitBreakerMs - CONFIG.decisionDeadlineMs < MIN_DECISION_HEADROOM_
 
 if (parsed.values["describe-profiles"]) {
     const profiles = profilesFor(loadAnchor().genome);
+    const finishControls = finishControlProfileIds(profiles);
     process.stdout.write(
         `${canonicalJson({
             schemaVersion: 1,
             protocol: CONFIG.protocol,
+            scoutTemplates: SCOUT_DEEP_TEMPLATES,
+            deepTemplates: SCOUT_DEEP_TEMPLATES,
+            stageConfig: {
+                checkpointGames: CONFIG.checkpointGames,
+                scoutGamesPerTemplate: CONFIG.scoutGames,
+                deepGamesPerTemplate: CONFIG.deepGames,
+                finalGamesPerTemplate: CONFIG.finalGames,
+                deepKeep: CONFIG.deepKeep,
+                decisionDeadlineMs: CONFIG.decisionDeadlineMs,
+                circuitBreakerMs: CONFIG.circuitBreakerMs,
+            },
             profiles: profiles.map((candidate) => ({
                 id: candidate.id,
                 label: candidate.label,
                 activeChallengers: candidate.activeChallengers,
                 finishWeight: candidate.finishWeight,
+                finishControlProfileId: finishControls.get(candidate.id) ?? null,
                 ...(candidate.shortlist === undefined ? {} : { shortlist: candidate.shortlist }),
                 environment: profileSearchEnvironment(candidate),
             })),
@@ -310,107 +323,79 @@ function profile(label, anchorGenome, overrides, activeChallengers = true, short
 
 function profilesFor(anchorGenome) {
     const profiles = [
-        // The scout is deadline-bounded and sequential. Lead with the isolated finish-pressure experiment on
-        // the measured h16/shortlist-3 timing envelope, then cover the other sub-h24 controls. The h24
-        // references remain in the protocol, but run last because v4 observed 42-68% circuit-open games across
-        // the first six h24 profiles before host contention quarantined that run.
+        // Scout all eight templates on the three latency/strength bridge envelopes. Complete each isolated
+        // finish-weight trio before moving to the next envelope so an interrupted run retains paired evidence.
         profile(
-            "active-h16-r1-s3-finish-w0-c7-4-3",
+            "active-h12-r1-s3-finish-w0-c6-4-2",
             anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
             true,
             3,
         ),
         profile(
-            "active-h16-r1-s3-finish-w1-c7-4-3",
+            "active-h12-r1-s3-finish-w2-c6-4-2",
             anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
-            true,
-            3,
-            1,
-        ),
-        profile(
-            "active-h16-r1-s3-finish-w2-c7-4-3",
-            anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
             true,
             3,
             2,
         ),
         profile(
-            "active-h16-r1-s3-finish-w4-c7-4-3",
+            "active-h12-r1-s3-finish-w4-c6-4-2",
             anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
             true,
             3,
             4,
         ),
         profile(
-            "active-h16-r1-c7-4-3",
-            anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
-            true,
-        ),
-        profile(
-            "active-h16-r1-c4-3-2",
-            anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-        ),
-        profile(
-            "active-h16-r1-s4-c4-3-2",
-            anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            4,
-        ),
-        profile(
-            "active-h12-r1-c6-4-2",
-            anchorGenome,
-            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
-            true,
-        ),
-        profile(
-            "active-h12-r1-s4-c6-4-2",
-            anchorGenome,
-            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
-            true,
-            4,
-        ),
-        profile(
-            "active-h8-r1-c5-4-2",
-            anchorGenome,
-            { horizon: 8, rollouts: 1, maxMelee: 5, maxShots: 4, maxThrows: 2 },
-            true,
-        ),
-        profile(
-            "active-h8-r1-c4-3-2",
+            "active-h8-r1-s2-finish-w0-c4-3-2",
             anchorGenome,
             { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
             true,
+            2,
         ),
         profile(
-            "active-h4-r1-c4-3-2",
+            "active-h8-r1-s2-finish-w2-c4-3-2",
+            anchorGenome,
+            { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            true,
+            2,
+            2,
+        ),
+        profile(
+            "active-h8-r1-s2-finish-w4-c4-3-2",
+            anchorGenome,
+            { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            true,
+            2,
+            4,
+        ),
+        profile(
+            "active-h4-r1-s2-finish-w0-c4-3-2",
             anchorGenome,
             { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
             true,
+            2,
         ),
-        profile("b9ce-reference-h24-r4", anchorGenome, {}, false),
-        profile("b9ce-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, false),
-        profile("b9ce-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, false),
-        profile("active-h24-r4-c9-4-4", anchorGenome, {}, true),
-        profile("active-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, true),
-        profile("active-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, true),
-        profile("active-h24-r1-s3-c9-4-4", anchorGenome, { rollouts: 1 }, true, 3),
-        profile("active-h24-r1-s4-c9-4-4", anchorGenome, { rollouts: 1 }, true, 4),
         profile(
-            "active-h24-r1-c4-3-2",
+            "active-h4-r1-s2-finish-w2-c4-3-2",
             anchorGenome,
-            { horizon: 24, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
             true,
+            2,
+            2,
+        ),
+        profile(
+            "active-h4-r1-s2-finish-w4-c4-3-2",
+            anchorGenome,
+            { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            true,
+            2,
+            4,
         ),
     ];
-    if (profiles.length !== 21) throw new Error(`Expected 21 overnight profiles, found ${profiles.length}`);
+    if (profiles.length !== 9) throw new Error(`Expected 9 overnight profiles, found ${profiles.length}`);
     if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
         throw new Error("Overnight profile behaviors must be unique");
     }
@@ -418,6 +403,32 @@ function profilesFor(anchorGenome) {
         throw new Error("Overnight profile labels must be unique");
     }
     return profiles;
+}
+
+function finishBlockKey(candidate) {
+    const genome = { ...candidate.genome };
+    delete genome.label;
+    return canonicalJson({
+        genome,
+        activeChallengers: candidate.activeChallengers,
+        shortlist: candidate.shortlist ?? null,
+    });
+}
+
+function finishControlProfileIds(profiles) {
+    const zeroByBlock = new Map();
+    for (const candidate of profiles.filter(({ finishWeight }) => finishWeight === 0)) {
+        const key = finishBlockKey(candidate);
+        if (zeroByBlock.has(key)) throw new Error(`Duplicate finish control block for ${candidate.label}`);
+        zeroByBlock.set(key, candidate.id);
+    }
+    const controls = new Map();
+    for (const candidate of profiles.filter(({ finishWeight }) => finishWeight > 0)) {
+        const controlProfileId = zeroByBlock.get(finishBlockKey(candidate));
+        if (!controlProfileId) throw new Error(`Missing finish control for ${candidate.label}`);
+        controls.set(candidate.id, controlProfileId);
+    }
+    return controls;
 }
 
 function profileSearchEnvironment(candidate) {
@@ -823,13 +834,7 @@ function summarizeEvaluation(report, circuit) {
     const maximumDrawOrArmageddonRate = Math.max(
         ...report.templateMetrics.map((metric) => metric.drawOrArmageddonRate),
     );
-    const integrityUtility = Math.min(
-        utility,
-        fire?.decisiveWinRate ?? 0,
-        ranged?.decisiveWinRate ?? 0,
-        1 - (fire?.drawOrArmageddonRate ?? 1),
-        1 - (ranged?.drawOrArmageddonRate ?? 1),
-    );
+    const integrityUtility = Math.min(minimumTemplateRate, 1 - maximumDrawOrArmageddonRate);
     const candidateRejections = report.templateMetrics.reduce((sum, metric) => sum + metric.candidateRejections, 0);
     const missingRejectionCounts = report.templateMetrics.reduce(
         (sum, metric) => sum + metric.missingRejectionCounts,
@@ -1038,7 +1043,8 @@ async function evaluate(candidate, panelId, templates, cutoffMs) {
 }
 
 const compareEvidence = compareV07OvernightEvidence;
-const chooseDeep = (evidence) => chooseV07OvernightDeepEvidence(evidence, CONFIG.deepKeep);
+const chooseDeep = (evidence, profiles) =>
+    chooseV07OvernightDeepEvidence(evidence, CONFIG.deepKeep, finishControlProfileIds(profiles));
 
 function profileById(profiles, id) {
     const candidate = profiles.find((entry) => entry.id === id);
@@ -1065,10 +1071,10 @@ function rehydrateEvidenceList(references, panelId, templates, cutoffMs, profile
 }
 
 function rehydrateStateEvidence(profiles, researchCutoffMs) {
-    state.scout = rehydrateEvidenceList(state.scout, "scout", FOCUS_TEMPLATES, researchCutoffMs, profiles);
-    state.deep = rehydrateEvidenceList(state.deep, "deep", FOCUS_TEMPLATES, researchCutoffMs, profiles);
+    state.scout = rehydrateEvidenceList(state.scout, "scout", SCOUT_DEEP_TEMPLATES, researchCutoffMs, profiles);
+    state.deep = rehydrateEvidenceList(state.deep, "deep", SCOUT_DEEP_TEMPLATES, researchCutoffMs, profiles);
     const expectedDeepSelection = state.scout.length
-        ? chooseDeep(state.scout).map((reference) => reference.profileId)
+        ? chooseDeep(state.scout, profiles).map((reference) => reference.profileId)
         : [];
     if (state.phase !== "scout" && canonicalJson(state.deepSelection) !== canonicalJson(expectedDeepSelection)) {
         throw new Error("state.json deep selection does not match rehydrated scout evidence");
@@ -1278,7 +1284,7 @@ async function main() {
             if (state.scout.some((entry) => entry.profileId === candidate.id)) continue;
             if (Date.now() >= researchCutoffMs - 5 * 60_000) break;
             try {
-                state.scout.push(await evaluate(candidate, "scout", FOCUS_TEMPLATES, researchCutoffMs));
+                state.scout.push(await evaluate(candidate, "scout", SCOUT_DEEP_TEMPLATES, researchCutoffMs));
                 saveState();
             } catch (error) {
                 if (String(error).includes("evaluation window closed")) break;
@@ -1289,7 +1295,7 @@ async function main() {
             writeTerminal("final_incomplete_deadline", null, null, null, "No scout profile completed before reserve.");
             return;
         }
-        state.deepSelection = chooseDeep(state.scout).map((entry) => entry.profileId);
+        state.deepSelection = chooseDeep(state.scout, profiles).map((entry) => entry.profileId);
         state.phase = "deep";
         saveState();
     }
@@ -1300,7 +1306,7 @@ async function main() {
             if (Date.now() >= researchCutoffMs - 5 * 60_000) break;
             try {
                 state.deep.push(
-                    await evaluate(profileById(profiles, profileId), "deep", FOCUS_TEMPLATES, researchCutoffMs),
+                    await evaluate(profileById(profiles, profileId), "deep", SCOUT_DEEP_TEMPLATES, researchCutoffMs),
                 );
                 saveState();
             } catch (error) {

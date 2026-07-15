@@ -1,9 +1,10 @@
 # v0.7 overnight active/circuit follow-up
 
-This is a bounded, research-only follow-up to the `d68490a` 96-hour run. Protocol v5 starts from that run's late
+This is a bounded, research-only follow-up to the `d68490a` 96-hour run. Protocol v6 starts from that run's late
 `b9ce98a735b1` genome and tests whether a smaller search budget, an active-challenger filter, an opt-in
 immediate-leaf shortlist, and a late ranged-finish overlay can retain the melee-magic gain while reducing
-fire/ranged Armageddon dependence and preserving headroom below the ranked server's 300ms per-decision circuit.
+all-cohort deficits and fire/ranged Armageddon dependence while preserving headroom below the ranked server's
+300ms per-decision circuit.
 It cannot bake weights, change the v0.7 default, commit, push, or deploy.
 
 The driver is `src/simulation/optimizer/v0_7_overnight.mjs`; process lifetime remains owned by
@@ -12,33 +13,40 @@ the exact `b9ce98a735b1` genome. A different or missing anchor fails closed.
 
 ## Why this profile set
 
-The late b9ce replay cleared 90% point estimates in all eight templates, but its h24/r4 search had 927.3ms
-p95 turn latency and severe fire/ranged Armageddon dependence. Small paired exploratory probes established a
-real frontier:
+The late b9ce replay remains the explicit high-strength reference: it cleared 90% point estimates in all eight
+templates, but h24/r4 had 927.3ms p95 turn latency, every game opened the production circuit diagnostic, and
+ranged-precision draw/Armageddon was 85.156%. It is documented evidence only and consumes no v6 run budget.
 
-- h4/r1 with caps 4/3/2 reached 101.5ms p95 and only 0.327% of turns above 300ms, but melee-magic utility was
-  46.9% and ranged precision 65.9%;
-- h24/r1 with the full b9ce caps reached 301ms p95 and 5.05% of turns above 300ms, with 72.6% utility;
-- the active-challenger arm improved some stalled ranged outcomes but regressed other templates, so it is an
-  arm rather than a presumed champion.
+Protocol v5 completed cleanly on revision `4d6ae016d111` and selected active h4/r1 caps-4/3/2. Its final
+2,048-game panel was decisive in only 48.62%/52.55% of the two melee-mage templates, 71.09%/72.94% of the two
+aura templates, 68.06% fireline, and 73.58% ranged precision. Overall circuit-open games were 3.42% despite a
+168.5ms searched-turn p95; per-template rates reached 7.03%. The two h16 finish arms retained for deep evidence
+opened circuits in 13.28% and 13.80% of games. V5 therefore produced no qualified candidate and showed that
+three-template scout/deep selection can hide the final panel's melee-brawler and aura deficits.
 
-The 21-profile scout therefore includes passive-allowed b9ce h24/r4, h24/r2, and h24/r1 references; active-only
-h24 r4/r2/r1 arms; active h4, h8, h12, h16, and h24 capped variants; and active h12/h16/h24 shortlist arms.
+V6 is a nine-profile, three-envelope block search with complete finish-weight trios in this exact sequential
+order:
+
+1. active h12/r1, shortlist 3, caps 6/4/2, weights 0/2/4;
+2. active h8/r1, shortlist 2, caps 4/3/2, weights 0/2/4;
+3. active h4/r1, shortlist 2, caps 4/3/2, weights 0/2/4.
+
+H12 leads because the v5 h12/shortlist-4 scout had 0% circuit-open games and the strongest promising utility
+point estimate; shortlist 3 and the tighter deadline buy additional headroom. H8 is the middle strength/latency
+bridge, while h4 is the fallback envelope. H16 and every h24 arm are removed from executable v6 work because
+their larger-sample circuit evidence falsified the strict 1% gate. Completing each weight trio before advancing
+retains a paired comparison if the bounded scout is interrupted.
+This is not a clean horizon factorial: the h12 block uses shortlist 3 and caps 6/4/2, while h8 and h4 use
+shortlist 2 and caps 4/3/2. Comparisons are causal for finish weight only within one envelope.
+
 `SEARCH_SHORTLIST=K` scores every enumerated action once at the immediate post-action value leaf, retains the
 incumbent, then sends only the best `K-1` legal challengers through the configured full horizon. Unset preserves
 the original full-candidate search. The shortlist is experimental because the leaf may undervalue delayed
 spell, buff, debuff, aura, and resource effects; strength and integrity gates remain binding. The active filter
 only removes generated wait and defend challengers.
 
-Scout order is part of protocol v5 because the stage is sequential and bounded by the research cutoff. The four
-h16/r1, shortlist-3 finish-weight arms run first, followed by every other sub-h24 control; all nine h24 profiles
-run last. This preserves the complete preregistered profile set while ensuring an interrupted run first measures
-the known latency-viable envelope and its isolated overlay. The preceding v4 attempt was permanently quarantined
-for host contention after completing only its first six h24 profiles; those profiles opened circuits in 41.7% to
-67.7% of games, so their results are diagnostic only and cannot justify consuming the next run's early budget.
-
-Four otherwise identical active h16/r1, shortlist-3, caps-7/4/3 profiles isolate the late ranged-finish weight:
-`finish-w0`, `finish-w1`, `finish-w2`, and `finish-w4`. The zero arm retains the pre-overlay behavior. Every
+Three otherwise identical profiles per envelope isolate late ranged-finish weights `finish-w0`, `finish-w2`,
+and `finish-w4`. The zero arm retains the pre-overlay behavior. Every
 profile, including unrelated references, fingerprints an explicit finite nonnegative `finishWeight` (default
 zero), and every child receives its exact value through `SEARCH_LATE_RANGED_FINISH_WEIGHT`. This prevents an
 inherited shell value or a missing field from changing behavior without changing profile identity.
@@ -62,20 +70,25 @@ All stages use paired side swaps against v0.6, explicit per-turn audit rows, a 2
 and
 fresh immutable seeds.
 
-| Stage | Templates                           | Games/template | Purpose                                      |
-| ----- | ----------------------------------- | -------------: | -------------------------------------------- |
-| Scout | utility, fireline, ranged precision |             32 | map quality, attrition, and circuit frontier |
-| Deep  | up to three Pareto representatives  |            128 | fresh-seed confirmation                      |
-| Final | all eight fixed templates           |            256 | bounded research verdict                     |
+| Stage | Templates                       | Games/template | Purpose                                    |
+| ----- | ------------------------------- | -------------: | ------------------------------------------ |
+| Scout | all eight fixed templates       |             64 | all-cohort quality, integrity, and latency |
+| Deep  | all eight; up to three profiles |            512 | fresh-seed confirmation                    |
+| Final | all eight fixed templates       |          2,048 | powered bounded research verdict           |
 
-Deep selection preserves three distinct representatives when available: best circuit-aware integrity utility,
-best melee-magic utility, and lowest circuit-open game rate. The final profile is selected from completed deep
-evidence whenever at least one deep profile finishes; otherwise the best completed scout is used.
+Deep selection prioritizes the best all-eight circuit-aware integrity utility, best melee-magic utility, and
+lowest circuit-open game rate. A weighted arm is admitted only when its same-envelope weight-zero control fits
+inside the three-profile deep set, and that control runs first; specialty representatives that would leave an
+unmatched weighted arm are skipped. Integrity utility is the minimum of the weakest template decisive rate and
+one minus the worst template draw/Armageddon rate, so every mage, melee-mage, aura, and ranged template affects
+ranking. The final profile is selected from completed deep evidence whenever at least one deep profile finishes;
+otherwise the best completed scout is used.
 
 The circuit emulator is default-off (`SEARCH_CIRCUIT_BREAKER_MS` absent or non-positive). In this job it is set
-to 275ms and paired with a 240ms fail-closed work deadline. The deadline is checked between candidates, rollout
+to 275ms and paired with a 200ms fail-closed work deadline. The deadline is checked between candidates, rollout
 actions, and simulated turns. An incomplete comparison restores the snapshot and returns the exact incumbent,
-leaving 35ms for restoration and call-site overhead. Without that deadline, the first over-budget search result
+leaving 75ms for restoration and call-site overhead. V5's 240ms deadline still allowed a 3.42% final circuit-open
+rate, so v6 binds the lower default and profile contract explicitly. Without that deadline, the first over-budget search result
 still applies and all later search decisions in that match return the incumbent by reference. This remains a
 lower-bound timing model: the production wrapper's 300ms interval also includes overhead outside the driver's
 internal timer. The margin is mandatory qualification headroom, not a claim of exact timing equivalence.
@@ -96,8 +109,8 @@ These are research gates, not bake or deployment authorization.
 
 Initialization takes the same parent `flock` used by the 96-hour allocator. It expands every committed v0.7
 manifest and every sibling `seed-manifest.json`, then allocates scout, deep, and final streams in one locked
-transaction before any outcome is opened. Each panel reserves all eight template streams even when scout or
-deep evaluates only the three focus templates.
+transaction before any outcome is opened. Every scout, deep, and final profile evaluates all eight reserved
+template streams.
 
 The evaluator checkpoints complete paired 32-game subshards. Each checkpoint binds run, panel, revision,
 behavior environment, spec, cell hash, and audit-fragment hash. Turn rows carry seed and side identity;
@@ -183,12 +196,12 @@ nohup env \
   V07_96H_HOST_GUARD_CHECK_SECONDS=5 \
   V07_OVERNIGHT_WORKERS=12 \
   V07_OVERNIGHT_CHECKPOINT_GAMES=32 \
-  V07_OVERNIGHT_SCOUT_GAMES=32 \
-  V07_OVERNIGHT_DEEP_GAMES=128 \
-  V07_OVERNIGHT_FINAL_GAMES=256 \
+  V07_OVERNIGHT_SCOUT_GAMES=64 \
+  V07_OVERNIGHT_DEEP_GAMES=512 \
+  V07_OVERNIGHT_FINAL_GAMES=2048 \
   V07_OVERNIGHT_DEEP_KEEP=3 \
   V07_OVERNIGHT_FINAL_RESERVE_HOURS=4 \
-  V07_OVERNIGHT_DECISION_DEADLINE_MS=240 \
+  V07_OVERNIGHT_DECISION_DEADLINE_MS=200 \
   V07_OVERNIGHT_CIRCUIT_MS=275 \
   scripts/run_v0_7_96h.sh >/dev/null 2>&1 &
 printf 'launcher pid=%s out=%s\n' "$!" "$OUT"
