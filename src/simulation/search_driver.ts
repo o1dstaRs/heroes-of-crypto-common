@@ -28,6 +28,7 @@ import type { Unit } from "../units/unit";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
+import { IL_DATASET_VERSION, IL_ROW_TYPE, ilActionSignature, ilCandidateFeatureVector } from "./il_dataset";
 import type { ILookaheadDeps } from "./lookahead";
 import {
     canonicalPhaseBSeed,
@@ -121,6 +122,15 @@ import {
  * AUDIT (SEARCH_AUDIT=<jsonl path, or "1" for ./search_audit.jsonl>): one summary line per game with the
  * override/flip counters, per-class distributions and wall-clock cost; SEARCH_AUDIT_TURNS=1 adds one line
  * per searched turn. Lines are buffered per game and appended once (atomic enough across worker threads).
+ *
+ * IMITATION-LEARNING DATASET (SEARCH_IL_DATASET=<jsonl path>, search mode only, default OFF): one line
+ * per SEARCHED decision with the state feature vectors already computed elsewhere in the pipeline (the
+ * 41-dim wait-scorer vector + the 60-dim deployed V2 value basis), the full scored candidate set (kind,
+ * action class, semantic signature, F4 enumeration-time candidate features, mean rollout leaf value),
+ * the index the search finally chose (0 = incumbent kept) and the chosen action list verbatim. Row
+ * schema and downstream consumers (optimizer/extract_il.mjs -> optimizer/fit_il.mjs) live in
+ * ./il_dataset.ts; buffered per game and appended once in onMatchEnd, like the audit. Decisions
+ * abandoned by SEARCH_DECISION_DEADLINE_MS produce no row (no comparable scores exist for them).
  *
  * Q2 GATE-2 DATASET (Q2_DATASET=<jsonl path>, oracle mode only): one line per wait-eligible decision
  * point with the FULL wait-scorer feature vector (ai/versions/wait_scorer.ts WAIT_FEATURE_NAMES — the 20
@@ -346,6 +356,9 @@ export class SearchDriver {
     private readonly datasetFingerprint: string | null;
     private readonly datasetSeed: number | null;
     private readonly datasetRows: string[] = [];
+    /** SEARCH_IL_DATASET (search mode only): per-decision imitation-learning rows (see ./il_dataset.ts). */
+    private readonly ilPath: string | undefined;
+    private readonly ilRows: string[] = [];
     private readonly caps: {
         maxMoveDestinations: number;
         maxMeleePairs: number;
@@ -448,6 +461,7 @@ export class SearchDriver {
         this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
         this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
         this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
+        this.ilPath = this.mode === "search" ? process.env.SEARCH_IL_DATASET || undefined : undefined;
         if (this.datasetPath && this.datasetV2) {
             this.datasetFingerprint = requirePhaseBRunFingerprint(process.env.PHASE_B_RUN_FINGERPRINT);
             this.datasetSeed = canonicalPhaseBSeed(this.match.seed, "Q2 dataset seed");
@@ -539,8 +553,16 @@ export class SearchDriver {
             this.rolloutEnemyTeam = null;
         }
     }
-    /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the Q2 dataset. */
+    /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the datasets. */
     public onMatchEnd(winner?: string, endReason?: string): void {
+        if (this.ilPath && this.ilRows.length) {
+            try {
+                appendFileSync(this.ilPath, `${this.ilRows.join("\n")}\n`);
+            } catch {
+                /* best-effort dump */
+            }
+            this.ilRows.length = 0;
+        }
         if (this.datasetPath && this.datasetRows.length) {
             try {
                 appendFileSync(this.datasetPath, `${this.datasetRows.join("\n")}\n`);
@@ -632,6 +654,16 @@ export class SearchDriver {
         this.counters.candidatesTotal += candidates.length;
         bump(this.counters.searchedByIncumbentKind, incumbentKind);
 
+        // IL dataset state features are extracted on the LIVE pre-rollout state (scoreCandidates
+        // snapshot/restores around every rollout, so ordering is belt-and-braces — the same contract as
+        // the oracle's Q2 dump).
+        const ilState = this.ilPath
+            ? {
+                  wf: extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent),
+                  vf: extractValueFeaturesV2(this.deps.unitsHolder, this.deps.fightProperties, unit.getTeam()),
+              }
+            : undefined;
+
         const deadlineAt = this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs;
         let scoredCandidates: readonly IEnumeratedCandidate[];
         let means: number[];
@@ -686,6 +718,44 @@ export class SearchDriver {
             this.counters.overrides += 1;
             bump(this.counters.overridesByIncumbentKind, incumbentKind);
             bump(this.counters.overridesToKind, scoredCandidates[bestIdx].kind);
+        }
+        if (ilState) {
+            const chosenIdx = overridden ? bestIdx : 0;
+            this.ilRows.push(
+                JSON.stringify({
+                    t: IL_ROW_TYPE,
+                    v: IL_DATASET_VERSION,
+                    seed: this.match.seed ?? 0,
+                    green: this.match.greenVersion ?? "?",
+                    red: this.match.redVersion ?? "?",
+                    side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+                    lap: this.deps.fightProperties.getCurrentLap(),
+                    unit: unit.getName(),
+                    k: incumbentKind,
+                    ov: overridden ? 1 : 0,
+                    chosen: chosenIdx,
+                    nc: candidates.length,
+                    act: scoredCandidates[chosenIdx].actions,
+                    wf: ilState.wf.map((x) => Number(x.toFixed(5))),
+                    vf: ilState.vf.map((x) => Number(x.toFixed(5))),
+                    cands: scoredCandidates.map((cand, i) => ({
+                        kind: cand.kind,
+                        ck: classifyActions(cand.actions),
+                        sig: ilActionSignature(cand.actions),
+                        cf: ilCandidateFeatureVector(cand.features).map((x) => Number(x.toFixed(4))),
+                        m: means[i] === -Infinity ? null : Number(means[i].toFixed(5)),
+                    })),
+                    cfg: {
+                        gate: this.gate,
+                        horizon: this.horizon,
+                        rollouts: this.rollouts,
+                        leaf: this.leafKind(),
+                        shortlist: this.shortlist,
+                        includeMoves: this.includeMoves ? 1 : 0,
+                        oppModel: this.oppModel?.version ?? null,
+                    },
+                }),
+            );
         }
         const ms = performance.now() - t0;
         this.counters.msTotal += ms;

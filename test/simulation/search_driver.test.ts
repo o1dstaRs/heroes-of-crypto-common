@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -44,8 +44,9 @@ import {
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
+import { ilActionSignature, parseIlRow } from "../../src/simulation/il_dataset";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
-import { SearchDriver } from "../../src/simulation/search_driver";
+import { classifyActions, SearchDriver } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
 import { Unit } from "../../src/units/unit";
@@ -59,6 +60,7 @@ const SEARCH_ENV_KEYS = [
     "Q2_ORACLE",
     "Q2_DATASET",
     "Q2_DATASET_V2",
+    "SEARCH_IL_DATASET",
     "PHASE_B_RUN_FINGERPRINT",
     "SEARCH_VERSIONS",
     "SEARCH_GATE",
@@ -1251,6 +1253,61 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
             });
         }
         expect(rows.find((row) => row.incumbentWait === 1)?.delta).toBeNull();
+    });
+
+    it("SEARCH_IL_DATASET dumps one imitation row per searched decision (search mode only)", () => {
+        const dir = mkdtempSync(join(tmpdir(), "ild-"));
+        const ilPath = join(dir, "il.jsonl");
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "2",
+            SEARCH_GATE: "0",
+            SEARCH_IL_DATASET: ilPath,
+        });
+        const h = buildBattle(2040, "v0.6");
+        const unit = h.activeUnit()!;
+        const incumbent = h.decideActive();
+        const driver = h.makeDriver();
+        const decided = driver.chooseDecision(unit, "v0.6", incumbent);
+        driver.onMatchEnd("v0.6", "elimination");
+        const rows = readFileSync(ilPath, "utf8")
+            .trim()
+            .split("\n")
+            .map((line, index) =>
+                parseIlRow(JSON.parse(line), WAIT_FEATURE_NAMES.length, VALUE_FEATURE_NAMES_V2.length, `row ${index}`),
+            );
+        expect(rows).toHaveLength(1);
+        const row = rows[0];
+        expect(row.seed).toBe(2040);
+        expect(row.green).toBe("v0.6");
+        expect(row.k).toBe(classifyActions(incumbent));
+        expect(row.cands[0].kind).toBe("incumbent");
+        expect(row.cands[0].sig).toBe(ilActionSignature(incumbent));
+        // The dumped chosen index resolves to the exact turn the driver returned to the battle loop.
+        expect(row.cands[row.chosen].sig).toBe(ilActionSignature(decided));
+        expect(row.act.length).toBeGreaterThan(0);
+        expect(row.nc).toBeGreaterThanOrEqual(row.cands.length);
+        expect(row.cfg).toMatchObject({ gate: 0, horizon: 2, rollouts: 1, leaf: "learned", shortlist: null });
+        // The incumbent's mean leaf is comparable (finite) unless it was illegal in simulation.
+        expect(row.cands.some((c) => c.m !== null)).toBe(true);
+
+        // Oracle mode never writes IL rows — the knob is search-mode only.
+        const oraclePath = join(dir, "oracle-il.jsonl");
+        setEnv({
+            Q2_ORACLE: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_GATE: "0",
+            SEARCH_IL_DATASET: oraclePath,
+        });
+        const oracleBattle = buildBattle(2041, "v0.6");
+        const { unit: oracleUnit, incumbent: oracleIncumbent } = findOraclePoint(oracleBattle);
+        const oracleDriver = oracleBattle.makeDriver();
+        oracleDriver.chooseDecision(oracleUnit, "v0.6", oracleIncumbent);
+        oracleDriver.onMatchEnd("v0.6", "elimination");
+        expect(existsSync(oraclePath)).toBe(false);
     });
 
     it("writes the oracle audit summary with the wait-decision statistics", () => {
