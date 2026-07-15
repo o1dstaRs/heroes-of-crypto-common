@@ -62,8 +62,8 @@ import { LIVETWIN_PRESET } from "./livetwin";
  *   ranged    — ranged-preferring drafts (the cell where the Sniper3 rule must show).
  *
  * Pairing: games 2k/2k+1 share the offer board + combat seed and swap which pick seat arm A occupies, so
- * seat luck cancels; the pair is one statistical cluster (conservative x sqrt(2) design effect, same as
- * measure_picksim_oracle). Control cells run static-vs-static and must land EXACTLY 50.00% decisive.
+ * seat luck cancels; the pair is one statistical cluster for the ratio-estimator sandwich variance.
+ * Control cells run static-vs-static and must land EXACTLY 50.00% decisive.
  */
 
 export type DraftDistName = "heuristic" | "league" | "ranged";
@@ -333,6 +333,10 @@ export interface ISetupConditionalRecord {
     winnerSlot: "a" | "b" | "draw";
     laps: number;
     endReason: IMatchResult["endReason"];
+    decidedByArmageddon: boolean;
+    /** Engine-rejected strategy actions attributed after the A/B seat swap. Undefined means instrumentation missing. */
+    rejectedA?: number;
+    rejectedB?: number;
     aRangedStacks: number;
     bRangedStacks: number;
     aT2Overridden: boolean;
@@ -356,6 +360,56 @@ export function cellBaseSeed(baseSeed: number, cellIndex: number): number {
     h ^= h >>> 15;
     h = Math.imul(h, 0x27d4eb2f) >>> 0;
     return (h ^ (h >>> 13)) >>> 0;
+}
+
+export const SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE = 2;
+
+export interface ISetupConditionalSeedStream {
+    cellId: string;
+    baseSeed: number;
+    pairSeeds: number[];
+}
+
+/** Bind cell identity to disjoint paired-seed streams before any workers start. */
+export function validateSetupConditionalSeedStreams(
+    cells: readonly ISetupConditionalCell[],
+    gamesPerCell: number,
+    baseSeed: number,
+): ISetupConditionalSeedStream[] {
+    if (!cells.length) {
+        throw new Error("Setup-conditional battery must contain at least one cell");
+    }
+    if (!Number.isSafeInteger(gamesPerCell) || gamesPerCell < 2 || gamesPerCell % 2 !== 0) {
+        throw new Error(`gamesPerCell must be a positive even integer >= 2; got ${gamesPerCell}`);
+    }
+    if (!Number.isSafeInteger(baseSeed)) {
+        throw new Error(`baseSeed must be a safe integer; got ${baseSeed}`);
+    }
+    const ids = new Set<string>();
+    const seenSeeds = new Map<number, string>();
+    return cells.map((cell, cellIndex) => {
+        if (!cell.id.trim()) {
+            throw new Error(`Setup-conditional cell ${cellIndex} has an empty id`);
+        }
+        if (ids.has(cell.id)) {
+            throw new Error(`Duplicate setup-conditional cell ${cell.id}`);
+        }
+        ids.add(cell.id);
+        const seed = cellBaseSeed(baseSeed, cellIndex);
+        const pairSeeds: number[] = [];
+        for (let pair = 0; pair < gamesPerCell / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE; pair += 1) {
+            const derived = ((seed >>> 0) + pair * 0x9e3779b1) >>> 0;
+            const previous = seenSeeds.get(derived);
+            if (previous) {
+                throw new Error(
+                    `Setup-conditional seed ${derived} overlaps between ${previous} and ${cell.id} pair ${pair}`,
+                );
+            }
+            seenSeeds.set(derived, `${cell.id} pair ${pair}`);
+            pairSeeds.push(derived);
+        }
+        return { cellId: cell.id, baseSeed: seed, pairSeeds };
+    });
 }
 
 export function playSetupConditionalGame(
@@ -396,6 +450,8 @@ export function playSetupConditionalGame(
     const a = aIsLower ? lower : upper;
     const b = aIsLower ? upper : lower;
     const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLower ? "a" : "b";
+    const rejectedA = aIsLower ? result.rejectedGreen : result.rejectedRed;
+    const rejectedB = aIsLower ? result.rejectedRed : result.rejectedGreen;
     return {
         cellId: cell.id,
         game,
@@ -404,6 +460,9 @@ export function playSetupConditionalGame(
         winnerSlot,
         laps: result.laps,
         endReason: result.endReason,
+        decidedByArmageddon: result.attrition.decidedByArmageddon,
+        rejectedA,
+        rejectedB,
         aRangedStacks: a.rangedStacks,
         bRangedStacks: b.rangedStacks,
         aT2Overridden: a.t2Overridden,
@@ -415,54 +474,132 @@ export function playSetupConditionalGame(
 // Aggregation + gate
 // ---------------------------------------------------------------------------------------------------------
 
-/** Same-seed pairs re-draft in swapped seats; the conservative variance bound treats each pair as a cluster. */
-export const SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE = 2;
+/** Same-seed games re-draft in swapped seats, so each pair is the independent variance cluster. */
+export const SETUP_CONDITIONAL_CONFIDENCE_Z = 1.959963984540054;
+
+export interface ISetupConditionalPairMoments {
+    clusters: number;
+    sumWinSquared: number;
+    sumWinDecisive: number;
+    sumDecisiveSquared: number;
+}
+
+export interface ISetupConditionalClusterEstimate {
+    winRate: number;
+    gainPp: number;
+    standardErrorPp: number | null;
+    confidence95: { low: number; high: number } | null;
+    confidence95LowGainPp: number | null;
+}
+
+/** Ratio-estimator sandwich variance over the actual paired side-swap clusters. */
+export function pairedClusterEstimate(
+    winsA: number,
+    winsB: number,
+    moments: ISetupConditionalPairMoments,
+): ISetupConditionalClusterEstimate {
+    const decisive = winsA + winsB;
+    const winRate = decisive ? winsA / decisive : 0.5;
+    let standardError: number | null = null;
+    let confidence95: { low: number; high: number } | null = null;
+    if (moments.clusters >= 2 && decisive > 0) {
+        const residualSquares =
+            moments.sumWinSquared -
+            2 * winRate * moments.sumWinDecisive +
+            winRate * winRate * moments.sumDecisiveSquared;
+        const finiteSample = moments.clusters / (moments.clusters - 1);
+        standardError = Math.sqrt(Math.max(0, (finiteSample * residualSquares) / (decisive * decisive)));
+        confidence95 = {
+            low: Math.max(0, winRate - SETUP_CONDITIONAL_CONFIDENCE_Z * standardError),
+            high: Math.min(1, winRate + SETUP_CONDITIONAL_CONFIDENCE_Z * standardError),
+        };
+    }
+    return {
+        winRate,
+        gainPp: (winRate - 0.5) * 100,
+        standardErrorPp: standardError === null ? null : standardError * 100,
+        confidence95,
+        confidence95LowGainPp: confidence95 === null ? null : (confidence95.low - 0.5) * 100,
+    };
+}
 
 export interface ISetupConditionalCellSummary {
     id: string;
     draft: DraftDistName;
     rules: string;
     control: boolean;
+    baseSeed: number;
+    expectedGames: number;
     games: number;
+    winsA: number;
+    winsB: number;
     decisive: number;
     draws: number;
     winRateA: number;
-    /** Binomial SE inflated by the sqrt(2) pair-cluster design effect, in percentage points. */
-    clusteredSePp: number;
+    /** Actual paired side-swap cluster sandwich SE, in percentage points. */
+    clusteredSePp: number | null;
+    confidence95: { low: number; high: number } | null;
+    confidence95LowGainPp: number | null;
+    pairMoments: ISetupConditionalPairMoments;
     gainPp: number;
     avgLaps: number;
     endReasons: Record<string, number>;
+    armageddonDecided: number;
+    drawOrArmageddon: number;
+    drawOrArmageddonRate: number;
+    rejectedA: number;
+    rejectedB: number;
+    recordsMissingRejectionCounts: number;
     aRangedStacksPerGame: number;
     bRangedStacksPerGame: number;
     t2OverrideRate: number;
     augmentsOverrideRate: number;
+    controlInvariantPassed: boolean;
 }
 
 export interface ICellTally {
     cell: ISetupConditionalCell;
     baseSeed: number;
+    expectedGames?: number;
+    recordsByGame: Map<number, ISetupConditionalRecord>;
+    pairMoments: ISetupConditionalPairMoments;
+    controlPairsAudited: number;
     games: number;
     winsA: number;
     winsB: number;
     draws: number;
     laps: number;
     endReasons: Record<string, number>;
+    armageddonDecided: number;
+    drawOrArmageddon: number;
+    rejectedA: number;
+    rejectedB: number;
+    recordsMissingRejectionCounts: number;
     aRangedStacks: number;
     bRangedStacks: number;
     t2Overrides: number;
     augmentsOverrides: number;
 }
 
-export function emptyTally(cell: ISetupConditionalCell, baseSeed: number): ICellTally {
+export function emptyTally(cell: ISetupConditionalCell, baseSeed: number, expectedGames?: number): ICellTally {
     return {
         cell,
         baseSeed,
+        expectedGames,
+        recordsByGame: new Map(),
+        pairMoments: { clusters: 0, sumWinSquared: 0, sumWinDecisive: 0, sumDecisiveSquared: 0 },
+        controlPairsAudited: 0,
         games: 0,
         winsA: 0,
         winsB: 0,
         draws: 0,
         laps: 0,
         endReasons: {},
+        armageddonDecided: 0,
+        drawOrArmageddon: 0,
+        rejectedA: 0,
+        rejectedB: 0,
+        recordsMissingRejectionCounts: 0,
         aRangedStacks: 0,
         bRangedStacks: 0,
         t2Overrides: 0,
@@ -471,12 +608,91 @@ export function emptyTally(cell: ISetupConditionalCell, baseSeed: number): ICell
 }
 
 export function tallyRecord(tally: ICellTally, record: ISetupConditionalRecord): void {
+    if (record.cellId !== tally.cell.id) {
+        throw new Error(`Record cell ${record.cellId} does not match tally ${tally.cell.id}`);
+    }
+    if (!Number.isSafeInteger(record.game) || record.game < 0) {
+        throw new Error(`${tally.cell.id}: invalid game index ${record.game}`);
+    }
+    if (tally.expectedGames !== undefined && record.game >= tally.expectedGames) {
+        throw new Error(`${tally.cell.id}: game ${record.game} is outside [0, ${tally.expectedGames})`);
+    }
+    if (tally.recordsByGame.has(record.game)) {
+        throw new Error(`${tally.cell.id}: duplicate game ${record.game}`);
+    }
+    const expectedLower = record.game % 2 === 0;
+    if (record.aIsLower !== expectedLower) {
+        throw new Error(`${tally.cell.id}: game ${record.game} did not side-swap arm A`);
+    }
+    const expectedSeed = ((tally.baseSeed >>> 0) + Math.floor(record.game / 2) * 0x9e3779b1) >>> 0;
+    if (record.seed !== expectedSeed) {
+        throw new Error(`${tally.cell.id}: game ${record.game} seed ${record.seed} does not match ${expectedSeed}`);
+    }
+    if (tally.cell.control && (record.aT2Overridden || record.aAugmentsOverridden)) {
+        throw new Error(`${tally.cell.id}: control game ${record.game} changed setup`);
+    }
+
+    tally.recordsByGame.set(record.game, record);
+    const mate = tally.recordsByGame.get(record.game ^ 1);
+    if (mate) {
+        const even = record.game % 2 === 0 ? record : mate;
+        const odd = record.game % 2 === 0 ? mate : record;
+        if (even.seed !== odd.seed) {
+            throw new Error(`${tally.cell.id}: pair ${Math.floor(record.game / 2)} does not share a seed`);
+        }
+        let pairWins = 0;
+        let pairDecisive = 0;
+        for (const paired of [even, odd]) {
+            if (paired.winnerSlot !== "draw") {
+                pairDecisive += 1;
+                pairWins += Number(paired.winnerSlot === "a");
+            }
+        }
+        tally.pairMoments.clusters += 1;
+        tally.pairMoments.sumWinSquared += pairWins * pairWins;
+        tally.pairMoments.sumWinDecisive += pairWins * pairDecisive;
+        tally.pairMoments.sumDecisiveSquared += pairDecisive * pairDecisive;
+
+        if (tally.cell.control) {
+            const winnerSymmetric =
+                (even.winnerSlot === "draw" && odd.winnerSlot === "draw") ||
+                (even.winnerSlot !== "draw" && odd.winnerSlot !== "draw" && even.winnerSlot !== odd.winnerSlot);
+            const rejectionSymmetric =
+                even.rejectedA === undefined ||
+                even.rejectedB === undefined ||
+                odd.rejectedA === undefined ||
+                odd.rejectedB === undefined ||
+                (even.rejectedA === odd.rejectedB && even.rejectedB === odd.rejectedA);
+            if (
+                !winnerSymmetric ||
+                even.laps !== odd.laps ||
+                even.endReason !== odd.endReason ||
+                even.decidedByArmageddon !== odd.decidedByArmageddon ||
+                even.aRangedStacks !== odd.bRangedStacks ||
+                even.bRangedStacks !== odd.aRangedStacks ||
+                !rejectionSymmetric
+            ) {
+                throw new Error(
+                    `${tally.cell.id}: control pair ${Math.floor(record.game / 2)} is not an exact seat swap`,
+                );
+            }
+            tally.controlPairsAudited += 1;
+        }
+    }
+
     tally.games += 1;
     if (record.winnerSlot === "a") tally.winsA += 1;
     else if (record.winnerSlot === "b") tally.winsB += 1;
     else tally.draws += 1;
     tally.laps += record.laps;
     tally.endReasons[record.endReason] = (tally.endReasons[record.endReason] ?? 0) + 1;
+    tally.armageddonDecided += Number(record.decidedByArmageddon);
+    tally.drawOrArmageddon += Number(record.winnerSlot === "draw" || record.decidedByArmageddon);
+    if (record.rejectedA === undefined || record.rejectedB === undefined) {
+        tally.recordsMissingRejectionCounts += 1;
+    }
+    tally.rejectedA += record.rejectedA ?? 0;
+    tally.rejectedB += record.rejectedB ?? 0;
     tally.aRangedStacks += record.aRangedStacks;
     tally.bRangedStacks += record.bRangedStacks;
     tally.t2Overrides += Number(record.aT2Overridden);
@@ -484,93 +700,318 @@ export function tallyRecord(tally: ICellTally, record: ISetupConditionalRecord):
 }
 
 export function summarizeTally(tally: ICellTally): ISetupConditionalCellSummary {
+    const expectedGames = tally.expectedGames ?? tally.games;
+    if (!Number.isSafeInteger(expectedGames) || expectedGames < 2 || expectedGames % 2 !== 0) {
+        throw new Error(`${tally.cell.id}: expectedGames must be a positive even integer >= 2`);
+    }
+    if (tally.games !== expectedGames || tally.recordsByGame.size !== expectedGames) {
+        throw new Error(`${tally.cell.id}: collected ${tally.recordsByGame.size}/${expectedGames} unique games`);
+    }
+    if (tally.pairMoments.clusters !== expectedGames / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE) {
+        throw new Error(
+            `${tally.cell.id}: audited ${tally.pairMoments.clusters}/${expectedGames / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE} pairs`,
+        );
+    }
     const decisive = tally.winsA + tally.winsB;
-    const rate = decisive ? tally.winsA / decisive : 0.5;
-    const games = Math.max(1, tally.games);
-    const binomialSePp = decisive ? 100 * Math.sqrt((rate * (1 - rate)) / decisive) : Number.POSITIVE_INFINITY;
+    const estimate = pairedClusterEstimate(tally.winsA, tally.winsB, tally.pairMoments);
+    const games = tally.games;
+    const controlInvariantPassed =
+        !tally.cell.control ||
+        (decisive > 0 &&
+            tally.winsA === tally.winsB &&
+            tally.t2Overrides === 0 &&
+            tally.augmentsOverrides === 0 &&
+            tally.controlPairsAudited === expectedGames / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE);
     return {
         id: tally.cell.id,
         draft: tally.cell.draft,
         rules: tally.cell.rules,
         control: tally.cell.control,
+        baseSeed: tally.baseSeed,
+        expectedGames,
         games: tally.games,
+        winsA: tally.winsA,
+        winsB: tally.winsB,
         decisive,
         draws: tally.draws,
-        winRateA: rate,
-        clusteredSePp: Math.sqrt(SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE) * binomialSePp,
-        gainPp: (rate - 0.5) * 100,
+        winRateA: estimate.winRate,
+        clusteredSePp: estimate.standardErrorPp,
+        confidence95: estimate.confidence95,
+        confidence95LowGainPp: estimate.confidence95LowGainPp,
+        pairMoments: { ...tally.pairMoments },
+        gainPp: estimate.gainPp,
         avgLaps: tally.laps / games,
-        endReasons: tally.endReasons,
+        endReasons: { ...tally.endReasons },
+        armageddonDecided: tally.armageddonDecided,
+        drawOrArmageddon: tally.drawOrArmageddon,
+        drawOrArmageddonRate: tally.drawOrArmageddon / games,
+        rejectedA: tally.rejectedA,
+        rejectedB: tally.rejectedB,
+        recordsMissingRejectionCounts: tally.recordsMissingRejectionCounts,
         aRangedStacksPerGame: tally.aRangedStacks / games,
         bRangedStacksPerGame: tally.bRangedStacks / games,
         t2OverrideRate: tally.t2Overrides / games,
         augmentsOverrideRate: tally.augmentsOverrides / games,
+        controlInvariantPassed,
     };
 }
 
 export const SETUP_CONDITIONAL_GATE = {
-    /** Ship bar: pooled full-rule gain across the two live draft distributions. */
+    /** Acceptance runs use the preregistered powered default. Smaller runs remain useful diagnostics but cannot pass. */
+    gamesPerCell: 4000,
+    confidenceLevel: 0.95,
+    /** Ship bar: pooled full-rule paired-cluster lower bound across the two live draft distributions. */
     pooledMinPp: 1,
-    /** No full-rule cell may sit below this. */
+    /** No full-rule paired-cluster lower bound may sit below this. */
     cellFloorPp: -0.5,
-    /** The forced ranged-draft cell must clearly show the Sniper3 effect. */
+    /** The forced ranged-draft paired-cluster lower bound must clearly show the Sniper3 effect. */
     rangedCellMinPp: 3,
+    /** A setup candidate may not materially worsen attrition relative to its same-draft frozen control. */
+    maxMatchedDrawOrArmageddonExcessPp: 1,
+    maxRejectionsPerArm: 0,
     headlineCells: ["heuristic__all", "league__all"] as readonly string[],
     rangedCell: "ranged__all",
+    controlCells: ["heuristic__control", "league__control", "ranged__control"] as readonly string[],
 } as const;
 
 export interface ISetupConditionalGateVerdict {
     thresholds: typeof SETUP_CONDITIONAL_GATE;
     pooledGainPp: number;
-    pooledSePp: number;
-    worstHeadlineCell: { id: string; gainPp: number } | null;
+    pooledSePp: number | null;
+    pooledConfidence95LowGainPp: number | null;
+    worstHeadlineCell: { id: string; gainPp: number; confidence95LowGainPp: number | null } | null;
     rangedGainPp: number | null;
+    rangedConfidence95LowGainPp: number | null;
+    maximumDrawOrArmageddonRate: number;
+    maximumMatchedDrawOrArmageddonExcessPp: number | null;
+    matchedAttrition: Array<{
+        candidateId: string;
+        controlId: string;
+        candidateRate: number;
+        controlRate: number;
+        excessPp: number;
+    }>;
+    rejectedA: number;
+    rejectedB: number;
+    recordsMissingRejectionCounts: number;
+    checks: {
+        registeredCellsExact: boolean;
+        powered: boolean;
+        controlsExact: boolean;
+        integrity: boolean;
+        confidence: boolean;
+    };
     verdict: "PASS" | "FAIL";
     reason: string;
 }
 
 export function evaluateGate(cells: readonly ISetupConditionalCellSummary[]): ISetupConditionalGateVerdict {
-    const byId = new Map(cells.map((cell) => [cell.id, cell]));
+    const byId = new Map<string, ISetupConditionalCellSummary>();
+    for (const cell of cells) {
+        if (byId.has(cell.id)) {
+            throw new Error(`Duplicate setup-conditional cell ${cell.id}`);
+        }
+        if (
+            !Number.isSafeInteger(cell.games) ||
+            !Number.isSafeInteger(cell.winsA) ||
+            !Number.isSafeInteger(cell.winsB) ||
+            !Number.isSafeInteger(cell.draws) ||
+            cell.games < 0 ||
+            cell.winsA < 0 ||
+            cell.winsB < 0 ||
+            cell.draws < 0 ||
+            cell.winsA + cell.winsB + cell.draws !== cell.games ||
+            cell.decisive !== cell.winsA + cell.winsB ||
+            !Number.isSafeInteger(cell.expectedGames) ||
+            cell.expectedGames < 2 ||
+            cell.expectedGames % 2 !== 0 ||
+            !Number.isSafeInteger(cell.armageddonDecided) ||
+            !Number.isSafeInteger(cell.drawOrArmageddon) ||
+            !Number.isSafeInteger(cell.rejectedA) ||
+            !Number.isSafeInteger(cell.rejectedB) ||
+            !Number.isSafeInteger(cell.recordsMissingRejectionCounts) ||
+            cell.armageddonDecided < 0 ||
+            cell.armageddonDecided > cell.games ||
+            cell.drawOrArmageddon < cell.draws ||
+            cell.drawOrArmageddon < cell.armageddonDecided ||
+            cell.drawOrArmageddon > cell.games ||
+            cell.rejectedA < 0 ||
+            cell.rejectedB < 0 ||
+            cell.recordsMissingRejectionCounts < 0 ||
+            cell.recordsMissingRejectionCounts > cell.games ||
+            cell.drawOrArmageddonRate !== cell.drawOrArmageddon / cell.games ||
+            cell.pairMoments.clusters !== cell.games / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE ||
+            !Number.isFinite(cell.pairMoments.sumWinSquared) ||
+            !Number.isFinite(cell.pairMoments.sumWinDecisive) ||
+            !Number.isFinite(cell.pairMoments.sumDecisiveSquared) ||
+            cell.pairMoments.sumWinSquared < 0 ||
+            cell.pairMoments.sumWinDecisive < 0 ||
+            cell.pairMoments.sumDecisiveSquared < 0
+        ) {
+            throw new Error(`Malformed setup-conditional counts for ${cell.id}`);
+        }
+        byId.set(cell.id, cell);
+    }
+    const expectedCells = defaultCells();
+    const registeredCellsExact =
+        cells.length === expectedCells.length &&
+        expectedCells.every((expected) => {
+            const actual = byId.get(expected.id);
+            return (
+                actual?.draft === expected.draft &&
+                actual.rules === expected.rules &&
+                actual.control === expected.control
+            );
+        });
     const headline = SETUP_CONDITIONAL_GATE.headlineCells
         .map((id) => byId.get(id))
         .filter((cell): cell is ISetupConditionalCellSummary => !!cell);
-    let wins = 0;
-    let decisive = 0;
-    for (const cell of headline) {
-        wins += cell.winRateA * cell.decisive;
-        decisive += cell.decisive;
-    }
-    const pooledRate = decisive ? wins / decisive : 0.5;
-    const pooledGainPp = (pooledRate - 0.5) * 100;
-    const pooledSePp = decisive
-        ? Math.sqrt(SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE) * 100 * Math.sqrt((pooledRate * (1 - pooledRate)) / decisive)
-        : Number.POSITIVE_INFINITY;
+    const estimatesById = new Map(
+        cells.map((cell) => [cell.id, pairedClusterEstimate(cell.winsA, cell.winsB, cell.pairMoments)]),
+    );
+    const pooledMoments = headline.reduce<ISetupConditionalPairMoments>(
+        (sum, cell) => ({
+            clusters: sum.clusters + cell.pairMoments.clusters,
+            sumWinSquared: sum.sumWinSquared + cell.pairMoments.sumWinSquared,
+            sumWinDecisive: sum.sumWinDecisive + cell.pairMoments.sumWinDecisive,
+            sumDecisiveSquared: sum.sumDecisiveSquared + cell.pairMoments.sumDecisiveSquared,
+        }),
+        { clusters: 0, sumWinSquared: 0, sumWinDecisive: 0, sumDecisiveSquared: 0 },
+    );
+    const pooledEstimate = pairedClusterEstimate(
+        headline.reduce((sum, cell) => sum + cell.winsA, 0),
+        headline.reduce((sum, cell) => sum + cell.winsB, 0),
+        pooledMoments,
+    );
     const worstHeadlineCell = headline.length
-        ? headline.reduce((worst, cell) => (cell.gainPp < worst.gainPp ? cell : worst))
+        ? headline.reduce((worst, cell) =>
+              (estimatesById.get(cell.id)?.confidence95LowGainPp ?? -Infinity) <
+              (estimatesById.get(worst.id)?.confidence95LowGainPp ?? -Infinity)
+                  ? cell
+                  : worst,
+          )
         : null;
     const ranged = byId.get(SETUP_CONDITIONAL_GATE.rangedCell);
-    const rangedGainPp = ranged ? ranged.gainPp : null;
-    const pass =
+    const rangedEstimate = ranged ? estimatesById.get(ranged.id) : undefined;
+    const rangedGainPp = rangedEstimate?.gainPp ?? null;
+    const worstHeadlineEstimate = worstHeadlineCell ? estimatesById.get(worstHeadlineCell.id) : undefined;
+    const controls = SETUP_CONDITIONAL_GATE.controlCells
+        .map((id) => byId.get(id))
+        .filter((cell): cell is ISetupConditionalCellSummary => !!cell);
+    const powered =
+        registeredCellsExact &&
+        cells.every(
+            (cell) =>
+                cell.games === SETUP_CONDITIONAL_GATE.gamesPerCell &&
+                cell.expectedGames === SETUP_CONDITIONAL_GATE.gamesPerCell,
+        );
+    const controlsExact =
+        controls.length === SETUP_CONDITIONAL_GATE.controlCells.length &&
+        controls.every(
+            (cell) =>
+                cell.controlInvariantPassed &&
+                cell.decisive > 0 &&
+                cell.winsA === cell.winsB &&
+                estimatesById.get(cell.id)?.gainPp === 0 &&
+                cell.t2OverrideRate === 0 &&
+                cell.augmentsOverrideRate === 0,
+        );
+    const maximumDrawOrArmageddonRate = cells.reduce(
+        (maximum, cell) => Math.max(maximum, cell.drawOrArmageddonRate),
+        0,
+    );
+    const rejectedA = cells.reduce((sum, cell) => sum + cell.rejectedA, 0);
+    const rejectedB = cells.reduce((sum, cell) => sum + cell.rejectedB, 0);
+    const recordsMissingRejectionCounts = cells.reduce((sum, cell) => sum + cell.recordsMissingRejectionCounts, 0);
+    const attritionCandidateIds = [...SETUP_CONDITIONAL_GATE.headlineCells, SETUP_CONDITIONAL_GATE.rangedCell];
+    const matchedAttrition = attritionCandidateIds.flatMap((candidateId) => {
+        const candidate = byId.get(candidateId);
+        if (!candidate) return [];
+        const controlId = `${candidate.draft}__control`;
+        const control = byId.get(controlId);
+        if (!control) return [];
+        return [
+            {
+                candidateId,
+                controlId,
+                candidateRate: candidate.drawOrArmageddonRate,
+                controlRate: control.drawOrArmageddonRate,
+                excessPp: (candidate.drawOrArmageddonRate - control.drawOrArmageddonRate) * 100,
+            },
+        ];
+    });
+    const maximumMatchedDrawOrArmageddonExcessPp = matchedAttrition.length
+        ? Math.max(...matchedAttrition.map((match) => match.excessPp))
+        : null;
+    const attritionIntegrity =
+        matchedAttrition.length === attritionCandidateIds.length &&
+        matchedAttrition.every((match) => match.excessPp <= SETUP_CONDITIONAL_GATE.maxMatchedDrawOrArmageddonExcessPp);
+    const integrity =
+        registeredCellsExact &&
+        rejectedA <= SETUP_CONDITIONAL_GATE.maxRejectionsPerArm &&
+        rejectedB <= SETUP_CONDITIONAL_GATE.maxRejectionsPerArm &&
+        recordsMissingRejectionCounts === 0 &&
+        attritionIntegrity;
+    const confidence =
         headline.length === SETUP_CONDITIONAL_GATE.headlineCells.length &&
-        pooledGainPp >= SETUP_CONDITIONAL_GATE.pooledMinPp &&
-        (worstHeadlineCell?.gainPp ?? -Infinity) >= SETUP_CONDITIONAL_GATE.cellFloorPp &&
-        rangedGainPp !== null &&
-        rangedGainPp >= SETUP_CONDITIONAL_GATE.rangedCellMinPp;
+        pooledEstimate.confidence95LowGainPp !== null &&
+        pooledEstimate.confidence95LowGainPp >= SETUP_CONDITIONAL_GATE.pooledMinPp &&
+        worstHeadlineEstimate?.confidence95LowGainPp !== null &&
+        worstHeadlineEstimate?.confidence95LowGainPp !== undefined &&
+        worstHeadlineEstimate.confidence95LowGainPp >= SETUP_CONDITIONAL_GATE.cellFloorPp &&
+        rangedEstimate?.confidence95LowGainPp !== null &&
+        rangedEstimate?.confidence95LowGainPp !== undefined &&
+        rangedEstimate.confidence95LowGainPp >= SETUP_CONDITIONAL_GATE.rangedCellMinPp;
+    const pass = registeredCellsExact && powered && controlsExact && integrity && confidence;
+    const failedChecks = [
+        !registeredCellsExact && "registered cells/metadata",
+        !powered && `${SETUP_CONDITIONAL_GATE.gamesPerCell} games/cell`,
+        !controlsExact && "exact control invariants",
+        !integrity && "rejection/draw-or-Armageddon integrity",
+        !confidence && "paired-cluster lower-bound bars",
+    ].filter((value): value is string => !!value);
+    const pooledLowText =
+        pooledEstimate.confidence95LowGainPp === null ? "n/a" : `${pooledEstimate.confidence95LowGainPp.toFixed(2)}pp`;
+    const rangedLowText =
+        rangedEstimate?.confidence95LowGainPp === null || rangedEstimate?.confidence95LowGainPp === undefined
+            ? "n/a"
+            : `${rangedEstimate.confidence95LowGainPp.toFixed(2)}pp`;
+    const matchedExcessText =
+        maximumMatchedDrawOrArmageddonExcessPp === null
+            ? "n/a"
+            : `${maximumMatchedDrawOrArmageddonExcessPp.toFixed(2)}pp`;
     return {
         thresholds: SETUP_CONDITIONAL_GATE,
-        pooledGainPp,
-        pooledSePp,
-        worstHeadlineCell: worstHeadlineCell ? { id: worstHeadlineCell.id, gainPp: worstHeadlineCell.gainPp } : null,
+        pooledGainPp: pooledEstimate.gainPp,
+        pooledSePp: pooledEstimate.standardErrorPp,
+        pooledConfidence95LowGainPp: pooledEstimate.confidence95LowGainPp,
+        worstHeadlineCell: worstHeadlineCell
+            ? {
+                  id: worstHeadlineCell.id,
+                  gainPp: worstHeadlineEstimate!.gainPp,
+                  confidence95LowGainPp: worstHeadlineEstimate!.confidence95LowGainPp,
+              }
+            : null,
         rangedGainPp,
+        rangedConfidence95LowGainPp: rangedEstimate?.confidence95LowGainPp ?? null,
+        maximumDrawOrArmageddonRate,
+        maximumMatchedDrawOrArmageddonExcessPp,
+        matchedAttrition,
+        rejectedA,
+        rejectedB,
+        recordsMissingRejectionCounts,
+        checks: { registeredCellsExact, powered, controlsExact, integrity, confidence },
         verdict: pass ? "PASS" : "FAIL",
         reason: pass
-            ? `Pooled +${pooledGainPp.toFixed(2)}pp >= +${SETUP_CONDITIONAL_GATE.pooledMinPp}pp across both live ` +
-              `draft distributions, no headline cell below ${SETUP_CONDITIONAL_GATE.cellFloorPp}pp, ranged cell ` +
-              `+${(rangedGainPp ?? 0).toFixed(2)}pp >= +${SETUP_CONDITIONAL_GATE.rangedCellMinPp}pp.`
-            : `Bar: pooled >= +${SETUP_CONDITIONAL_GATE.pooledMinPp}pp (got ${pooledGainPp.toFixed(2)}), headline ` +
-              `floor ${SETUP_CONDITIONAL_GATE.cellFloorPp}pp (worst ${worstHeadlineCell ? `${worstHeadlineCell.id} ` : ""}` +
-              `${(worstHeadlineCell?.gainPp ?? NaN).toFixed?.(2) ?? "n/a"}), ranged >= ` +
-              `+${SETUP_CONDITIONAL_GATE.rangedCellMinPp}pp (got ${rangedGainPp?.toFixed(2) ?? "n/a"}).`,
+            ? `Paired 95% lower bounds clear pooled +${SETUP_CONDITIONAL_GATE.pooledMinPp}pp, headline floor ` +
+              `${SETUP_CONDITIONAL_GATE.cellFloorPp}pp, and ranged +${SETUP_CONDITIONAL_GATE.rangedCellMinPp}pp; ` +
+              `matched attrition excess is at most ${SETUP_CONDITIONAL_GATE.maxMatchedDrawOrArmageddonExcessPp}pp; ` +
+              "controls and rejection integrity are exact."
+            : `Fail-closed checks: ${failedChecks.join(", ")}. Pooled low ${pooledLowText}; ranged low ` +
+              `${rangedLowText}; max draw/Arm ` +
+              `${(maximumDrawOrArmageddonRate * 100).toFixed(2)}%; max matched excess ` +
+              `${matchedExcessText}; rejections A/B ${rejectedA}/${rejectedB}; ` +
+              `missing ${recordsMissingRejectionCounts}.`,
     };
 }
 
@@ -699,7 +1140,7 @@ if (!isMainThread && parentPort && (workerData as { setupConditional?: boolean }
 // ---------------------------------------------------------------------------------------------------------
 
 export interface IMeasureSetupConditionalSummary {
-    schemaVersion: 1;
+    schemaVersion: 2;
     kind: "conditional_setup_v1_ab";
     fightVersion: string;
     startedAt: string;
@@ -712,6 +1153,8 @@ export interface IMeasureSetupConditionalSummary {
         leagueGenomeSpec: string;
         gamesPerCell: number;
         baseSeed: number;
+        /** Stable identity used to prove that separately persisted panels are independent replications. */
+        replicationId: string;
         concurrency: number;
         totalGames: number;
         pairing: {
@@ -724,8 +1167,48 @@ export interface IMeasureSetupConditionalSummary {
     gate: ISetupConditionalGateVerdict;
 }
 
+/** Reject a relabelled rerun or any shared paired scenario across purportedly independent summaries. */
+export function validateIndependentSetupConditionalReplications(
+    summaries: readonly IMeasureSetupConditionalSummary[],
+): void {
+    const replicationIds = new Set<string>();
+    const seenSeeds = new Map<number, string>();
+    for (const summary of summaries) {
+        const replicationId = summary.config.replicationId.trim();
+        if (!replicationId) {
+            throw new Error("Setup-conditional replication id must not be empty");
+        }
+        if (replicationIds.has(replicationId)) {
+            throw new Error(`Duplicate setup-conditional replication id ${replicationId}`);
+        }
+        replicationIds.add(replicationId);
+        const cellIds = new Set<string>();
+        for (const cell of summary.cells) {
+            if (cellIds.has(cell.id)) {
+                throw new Error(`Duplicate setup-conditional cell ${cell.id} in replication ${replicationId}`);
+            }
+            cellIds.add(cell.id);
+            if (!Number.isSafeInteger(cell.expectedGames) || cell.expectedGames < 2 || cell.expectedGames % 2 !== 0) {
+                throw new Error(`${replicationId}/${cell.id}: expectedGames must be a positive even integer >= 2`);
+            }
+            for (let pair = 0; pair < cell.expectedGames / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE; pair += 1) {
+                const seed = ((cell.baseSeed >>> 0) + pair * 0x9e3779b1) >>> 0;
+                const label = `${replicationId}/${cell.id}/pair-${pair}`;
+                const previous = seenSeeds.get(seed);
+                if (previous) {
+                    throw new Error(
+                        `Setup-conditional replication seed ${seed} overlaps between ${previous} and ${label}`,
+                    );
+                }
+                seenSeeds.set(seed, label);
+            }
+        }
+    }
+}
+
 export interface IMeasureSetupConditionalOptions extends ISetupConditionalOptions {
     concurrency: number;
+    replicationId?: string;
     cells?: ISetupConditionalCell[];
     onProgress?: (completed: number, total: number) => void;
 }
@@ -739,14 +1222,20 @@ export async function runMeasureSetupConditional(
     if (!Number.isSafeInteger(options.baseSeed)) {
         throw new Error(`baseSeed must be a safe integer; got ${options.baseSeed}`);
     }
+    if (options.replicationId !== undefined && !options.replicationId.trim()) {
+        throw new Error("replicationId must not be empty when provided");
+    }
     const cells = options.cells ?? defaultCells();
+    const replicationId = options.replicationId?.trim() ?? `base-seed-${options.baseSeed >>> 0}`;
+    const seedStreams = validateSetupConditionalSeedStreams(cells, options.gamesPerCell, options.baseSeed);
+    const seedStreamByCell = new Map(seedStreams.map((stream) => [stream.cellId, stream]));
     const startedAt = new Date().toISOString();
     const startMs = Date.now();
     const tallies = new Map<string, ICellTally>();
     const jobs: IJob[] = [];
-    cells.forEach((cell, cellIndex) => {
-        const seed = cellBaseSeed(options.baseSeed, cellIndex);
-        tallies.set(cell.id, emptyTally(cell, seed));
+    cells.forEach((cell) => {
+        const seed = seedStreamByCell.get(cell.id)!.baseSeed;
+        tallies.set(cell.id, emptyTally(cell, seed, options.gamesPerCell));
         for (let game = 0; game < options.gamesPerCell; game += 1) {
             jobs.push({ cell, baseSeed: seed, game });
         }
@@ -755,7 +1244,7 @@ export async function runMeasureSetupConditional(
     const wallSeconds = (Date.now() - startMs) / 1000;
     const summaries = cells.map((cell) => summarizeTally(tallies.get(cell.id)!));
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         kind: "conditional_setup_v1_ab",
         fightVersion: options.fightVersion,
         startedAt,
@@ -768,6 +1257,7 @@ export async function runMeasureSetupConditional(
             leagueGenomeSpec: options.leagueGenomeSpec,
             gamesPerCell: options.gamesPerCell,
             baseSeed: options.baseSeed,
+            replicationId,
             concurrency: options.concurrency,
             totalGames: jobs.length,
             pairing: {
@@ -792,10 +1282,12 @@ function positiveInteger(value: string, flag: string): number {
 function printUsage(): void {
     console.log(
         "usage: bun src/simulation/measure_setup_conditional.ts [--games 4000] [--seed 1] [--concurrency 8] " +
-            "[--fight v0.7] [--league-genome league-r3-br-52752642] [--output sim-out/setup_conditional.summary.json]",
+            "[--replication-id id] [--fight v0.7] [--league-genome league-r3-br-52752642] " +
+            "[--output sim-out/setup_conditional.summary.json]",
     );
     console.log("  --games          games per cell; must be even (default 4000)");
     console.log("  --seed           base seed; every cell derives an independent stream (default 1)");
+    console.log("  --replication-id stable independent-panel identity (default base-seed-<seed>)");
     console.log("  --concurrency    worker threads (default min(8, cores))");
     console.log("  --fight          fight AI version on BOTH sides (default v0.7, the live default)");
     console.log("  --league-genome  draft genome spec/path for the league cells (draft_ship.parseDraftGenome)");
@@ -808,6 +1300,7 @@ export async function main(): Promise<void> {
         options: {
             games: { type: "string", default: "4000" },
             seed: { type: "string", default: "1" },
+            "replication-id": { type: "string" },
             concurrency: { type: "string", default: String(Math.min(8, Math.max(1, availableParallelism()))) },
             fight: { type: "string", default: "v0.7" },
             "league-genome": { type: "string", default: LEAGUE_ROUND3_DRAFT_SPEC },
@@ -832,6 +1325,10 @@ export async function main(): Promise<void> {
         throw new Error(`--seed must be a safe integer; got ${values.seed}`);
     }
     const concurrency = positiveInteger(values.concurrency, "--concurrency");
+    const replicationId = values["replication-id"];
+    if (replicationId !== undefined && !replicationId.trim()) {
+        throw new Error("--replication-id must not be empty");
+    }
     const leagueGenomeSpec = values["league-genome"];
     shippedLeagueGenome(leagueGenomeSpec); // fail fast on a bad spec before spawning workers
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -840,13 +1337,15 @@ export async function main(): Promise<void> {
     const total = cells.length * gamesPerCell;
     console.error(
         `CONDITIONAL_SETUP_V1 A/B: ${cells.length} cells x ${gamesPerCell} = ${total} games (seed ${baseSeed}, ` +
-            `concurrency ${concurrency}, LIVETWIN=1, fight ${values.fight} both sides, league ${leagueGenomeSpec})`,
+            `replication ${replicationId ?? `base-seed-${baseSeed >>> 0}`}, concurrency ${concurrency}, LIVETWIN=1, ` +
+            `fight ${values.fight} both sides, league ${leagueGenomeSpec})`,
     );
     const started = Date.now();
     let lastLogged = 0;
     const summary = await runMeasureSetupConditional({
         gamesPerCell,
         baseSeed,
+        replicationId,
         concurrency,
         fightVersion: values.fight,
         leagueGenomeSpec,
@@ -868,14 +1367,19 @@ export async function main(): Promise<void> {
         console.error(`Summary: ${outputPath}`);
     }
     for (const cell of summary.cells) {
+        const se = cell.clusteredSePp === null ? "n/a" : `${cell.clusteredSePp.toFixed(2)}pp`;
+        const low = cell.confidence95LowGainPp === null ? "n/a" : `${cell.confidence95LowGainPp.toFixed(2)}pp`;
         console.error(
-            `  ${cell.id}: A ${(cell.winRateA * 100).toFixed(2)}% +/- ${cell.clusteredSePp.toFixed(2)}pp ` +
+            `  ${cell.id}: A ${(cell.winRateA * 100).toFixed(2)}% +/- ${se} (95% low delta ${low}) ` +
                 `(${cell.decisive} decisive/${cell.games}), t2 override ${(cell.t2OverrideRate * 100).toFixed(1)}%, ` +
                 `augment override ${(cell.augmentsOverrideRate * 100).toFixed(1)}%, ` +
                 `rangedStacks A ${cell.aRangedStacksPerGame.toFixed(2)} / B ${cell.bRangedStacksPerGame.toFixed(2)}`,
         );
     }
     console.error(`GATE: ${summary.gate.verdict} — ${summary.gate.reason}`);
+    if (summary.gate.verdict !== "PASS") {
+        process.exitCode = 1;
+    }
 }
 
 if (isMainThread && (import.meta as unknown as { main?: boolean }).main) {
