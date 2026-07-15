@@ -1222,7 +1222,10 @@ export class FightProperties {
             fight_started: this.fightStarted,
             fight_finished: this.fightFinished,
             previous_turn_team: this.previousTurnTeam,
-            highest_speed_this_turn: this.highestSpeedThisTurn,
+            // Round: proto int field, but unit speed buffs (augments/synergies) make the highest speed
+            // fractional (e.g. 11.4) and serializeBinary asserts on non-integers — dropping the whole
+            // serialized fight for any consumer (e.g. the ranked journal's FIGHT_INITIALIZED snapshot).
+            highest_speed_this_turn: Math.round(this.highestSpeedThisTurn),
             already_made_turn: Array.from(this.alreadyMadeTurn),
             already_made_turn_by_team: new Map(
                 Array.from(this.alreadyMadeTurnByTeam).map(([key, value]) => [
@@ -1238,7 +1241,10 @@ export class FightProperties {
             morale_minus_queue: this.moraleMinusQueue.toArray(),
             current_turn_start: Math.round(this.currentTurnStart),
             current_turn_end: Math.round(this.currentTurnEnd),
-            current_lap_total_time_per_team: new Map(Array.from(this.currentLapTotalTimePerTeam)),
+            // Round values: same integer assert as above; the per-lap totals accumulate fractional ms.
+            current_lap_total_time_per_team: new Map(
+                Array.from(this.currentLapTotalTimePerTeam).map(([team, ms]) => [team, Math.round(ms)]),
+            ),
             up_next: this.upNextQueue.toArray(),
             steps_morale_multiplier: this.stepsMoraleMultiplier,
             has_additional_time_requested_per_team: new Map(Array.from(this.hasAdditionalTimeRequestedPerTeam)),
