@@ -436,6 +436,19 @@ describe("FightProperties", () => {
     });
 
     describe("serialization and stack power", () => {
+        it("serializes a fractional highest speed and fractional lap times (proto int fields)", () => {
+            // Regression guard: speed buffs (augments/synergies) make the highest speed fractional
+            // (e.g. 11.4) and per-lap time totals accumulate fractional ms; protobuf's serializer
+            // asserts on non-integer int fields, which used to throw here and silently drop the whole
+            // serialized fight (e.g. the ranked journal's FIGHT_INITIALIZED replay checkpoint).
+            const fightProperties = new FightProperties();
+            fightProperties.setHighestSpeedThisTurn(11.4);
+            fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000.25);
+
+            const restored = FightProperties.deserialize(fightProperties.serialize());
+            expect(restored.getHighestSpeedThisTurn()).toBe(11);
+        });
+
         it("roundtrips serialized fight state", () => {
             const fightProperties = new FightProperties();
 
