@@ -20,13 +20,16 @@ import {
     V07_CASTER_ROUTER_POLICY,
 } from "../../src/ai/versions/caster_router";
 import { StrategyV0_6 } from "../../src/ai/versions/v0_6";
-import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
+import { StrategyV0_4 } from "../../src/ai/versions/v0_4";
+import { isAuraSaturatedArmy, StrategyV0_7 } from "../../src/ai/versions/v0_7";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
+import { PlacementPositionType } from "../../src/grid/placement_properties";
+import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -93,6 +96,16 @@ function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
     combat.unitsHolder.addUnit(unit);
 }
 
+function primeV07AuraProfile(strategy: StrategyV0_7, combat: CombatTestContext): void {
+    strategy.placeArmy(combat.unitsHolder.getAllAllies(LOWER), {
+        team: LOWER,
+        grid: combat.grid,
+        unitsHolder: combat.unitsHolder,
+        pathHelper: new PathHelper(testGridSettings),
+        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+    });
+}
+
 const fallback = (unit: Unit): GameAction[] => [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
 const castSpell = (actions: GameAction[]): Extract<GameAction, { type: "cast_spell" }> | undefined => {
     const action = actions.find((candidate) => candidate.type === "cast_spell");
@@ -103,6 +116,8 @@ afterEach(() => {
     delete process.env.V06_CASTER_ROUTER;
     delete process.env.V06_CASTER_SPELLS;
     delete process.env.V06_RES_PREEMPT;
+    delete process.env.V07_AURA_CASTER_ROUTER;
+    delete process.env.V07_AURA_CASTER_SPELLS;
 });
 
 describe("v0.6 universal MELEE_MAGIC caster router", () => {
@@ -425,5 +440,94 @@ describe("v0.7 baked caster salvage", () => {
 
         process.env.V06_CASTER_SPELLS = "windflow";
         expect(routeUniversalCaster(angel, context, incumbent)).toBe(incumbent);
+    });
+
+    it("routes Wind Flow from the v0.4 incumbent only for an armed aura-saturated profile", () => {
+        const combat = createCombatTestContext();
+        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        valkyrie.setStackPower(5);
+        const auraAlly = createTestUnit({
+            team: LOWER,
+            attackType: MELEE,
+            auraEffects: ["Luck"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        const enemyFlyer = createTestUnit({
+            team: UPPER,
+            attackType: MELEE,
+            movementType: FLY,
+            speed: 8,
+            damageMax: 100,
+            amountAlive: 100,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, auraAlly, { x: 6, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
+        const context = contextFor(combat);
+        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LOWER))).toBe(true);
+        const anchor = new StrategyV0_4().decideTurn(valkyrie, context);
+
+        const control = new StrategyV0_7();
+        primeV07AuraProfile(control, combat);
+        expect(control.decideTurn(valkyrie, context)).toEqual(anchor);
+
+        process.env.V07_AURA_CASTER_ROUTER = "on";
+        process.env.V07_AURA_CASTER_SPELLS = "windflow";
+        const treatment = new StrategyV0_7();
+        primeV07AuraProfile(treatment, combat);
+        expect(castSpell(treatment.decideTurn(valkyrie, context))?.spellName).toBe("Wind Flow");
+
+        process.env.V07_AURA_CASTER_SPELLS = "invalid";
+        const malformed = new StrategyV0_7();
+        primeV07AuraProfile(malformed, combat);
+        expect(malformed.decideTurn(valkyrie, context)).toEqual(anchor);
+    });
+
+    it("keeps Resurrection outside the Wind-only aura arm and non-preempting in the combined arm", () => {
+        const combat = createCombatTestContext();
+        const angel = makeReal(LOWER, "Life", "Angel");
+        angel.setStackPower(5);
+        const auraAlly = createTestUnit({
+            team: LOWER,
+            name: "High-value aura ally",
+            amountAlive: 100,
+            maxHp: 100,
+            auraEffects: ["Luck"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeLarge(combat, angel, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, auraAlly, { x: 8, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 14 });
+        auraAlly.applyDamage(9_500, 0, new SceneLogMock());
+        const context = contextFor(combat);
+        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LOWER))).toBe(true);
+        const anchor = new StrategyV0_4().decideTurn(angel, context);
+
+        process.env.V07_AURA_CASTER_ROUTER = "on";
+        process.env.V07_AURA_CASTER_SPELLS = "windflow";
+        const windOnly = new StrategyV0_7();
+        primeV07AuraProfile(windOnly, combat);
+        expect(windOnly.decideTurn(angel, context)).toEqual(anchor);
+
+        process.env.V07_AURA_CASTER_SPELLS = "resurrection,windflow";
+        const combined = new StrategyV0_7();
+        primeV07AuraProfile(combined, combat);
+        const routed = combined.decideTurn(angel, context);
+        expect(
+            anchor.some(
+                (action) =>
+                    action.type === "wait_turn" ||
+                    action.type === "defend_turn" ||
+                    action.type === "melee_attack" ||
+                    action.type === "range_attack" ||
+                    action.type === "area_throw_attack" ||
+                    action.type === "obstacle_attack" ||
+                    action.type === "cast_spell",
+            ),
+        ).toBe(false);
+        expect(castSpell(routed)?.spellName).toBe("Resurrection");
     });
 });

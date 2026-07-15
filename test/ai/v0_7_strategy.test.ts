@@ -21,6 +21,7 @@ import {
 } from "../../src/ai";
 import {
     isAuraSaturatedArmy,
+    isDenseMeleeMagicArmy,
     isMeleeMagicAnchorArmy,
     shouldUseArchetypePlacementAnchor,
     StrategyV0_7,
@@ -54,6 +55,9 @@ const ENV_KEYS = [
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS",
     "V07_WAIT_GUARD",
+    "V07_DENSE_MM_SALVAGE_ISOLATION",
+    "V07_AURA_CASTER_ROUTER",
+    "V07_AURA_CASTER_SPELLS",
 ] as const;
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -201,10 +205,13 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
         expect(isAuraSaturatedArmy(auraArmy)).toBe(true);
         expect(isAuraSaturatedArmy([...auraArmy, createTestUnit()])).toBe(false);
+        expect(isDenseMeleeMagicArmy(brawlerArmy.slice(0, 1))).toBe(false);
         expect(isMeleeMagicAnchorArmy(brawlerArmy.slice(0, 1))).toBe(false);
         for (let density = 2; density <= brawlerArmy.length; density += 1) {
+            expect(isDenseMeleeMagicArmy(brawlerArmy.slice(0, density))).toBe(true);
             expect(isMeleeMagicAnchorArmy(brawlerArmy.slice(0, density))).toBe(true);
         }
+        expect(isDenseMeleeMagicArmy(salvageArmy)).toBe(true);
         expect(isMeleeMagicAnchorArmy(salvageArmy)).toBe(false);
         expect(shouldUseArchetypePlacementAnchor(rangedArmy, [areaThrow])).toBe(true);
         expect(shouldUseArchetypePlacementAnchor(rangedArmy, [largeCaliber])).toBe(false);
@@ -296,6 +303,39 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
         // The omitted holder unit has Resurrection, so the complete army is salvage-supported and must not
         // be anchored. Classifying only the two-unit placement subset would incorrectly preserve incumbent.
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+
+        process.env.V07_DENSE_MM_SALVAGE_ISOLATION = "1";
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toBe(incumbent);
+        const cast: GameAction[] = [
+            {
+                type: "cast_spell",
+                casterId: actor.getId(),
+                spellName: "Resurrection",
+                targetId: actor.getId(),
+            },
+        ];
+        expect(strategy.finalizeForTest(actor, context, cast)).toBe(cast);
+
+        // Only the exact experiment value is behavior-changing.
+        process.env.V07_DENSE_MM_SALVAGE_ISOLATION = "on";
+        expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
+            { type: "wait_turn", unitId: actor.getId() },
+        ]);
+    });
+
+    it("keeps a single melee-magic stack scorer-eligible under dense salvage isolation", () => {
+        const { actor, context, incumbent } = buildBoard(10, {
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+            spells: ["System:Wind Flow"],
+        });
+        const strategy = new TestStrategyV0_7();
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
+        process.env.V07_DENSE_MM_SALVAGE_ISOLATION = "1";
+        primeArmyProfile(strategy, context);
+
         expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
             { type: "wait_turn", unitId: actor.getId() },
         ]);

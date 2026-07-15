@@ -14,7 +14,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
-import { routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
+import { type ICasterRouterPolicy, routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
 import { revealConditionedPlacement } from "./v0_7_placement_reveal";
@@ -23,12 +23,19 @@ import { applyWaitScorerWeights, applyWaitScorerWeightsV2, v07BakedWaitWeights, 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const SALVAGE_SPELLS = new Set(["Resurrection", "Wind Flow"]);
+const V07_AURA_WIND_ROUTER_POLICY = Object.freeze({
+    spells: Object.freeze(["windflow"] as const),
+    resurrectionPreemptsCommitted: false,
+}) satisfies ICasterRouterPolicy;
 
 export const isAuraSaturatedArmy = (units: readonly Unit[]): boolean =>
     units.length > 0 && units.every((unit) => unit.getAuraRanges().some((range) => range > 0));
 
+export const isDenseMeleeMagicArmy = (units: readonly Unit[]): boolean =>
+    units.filter((unit) => unit.getAttackType() === MELEE_MAGIC).length >= 2;
+
 export const isMeleeMagicAnchorArmy = (units: readonly Unit[]): boolean =>
-    units.filter((unit) => unit.getAttackType() === MELEE_MAGIC).length >= 2 &&
+    isDenseMeleeMagicArmy(units) &&
     !units.some((unit) => unit.getSpells().some((spell) => SALVAGE_SPELLS.has(spell.getName())));
 
 const isPureRangedArmy = (units: readonly Unit[]): boolean =>
@@ -40,7 +47,25 @@ export const shouldUseArchetypePlacementAnchor = (units: readonly Unit[], enemie
 
 interface IV07ArmyProfile {
     auraSaturated: boolean;
+    denseMeleeMagic: boolean;
     meleeMagicAnchor: boolean;
+}
+
+const denseMeleeMagicIsolationEnabled = (): boolean => process.env.V07_DENSE_MM_SALVAGE_ISOLATION === "1";
+
+function auraCasterRouterPolicy(): ICasterRouterPolicy | undefined {
+    if (process.env.V07_AURA_CASTER_ROUTER !== "on") {
+        return undefined;
+    }
+    const scope = process.env.V07_AURA_CASTER_SPELLS ?? "resurrection,windflow";
+    if (scope === "windflow") {
+        return V07_AURA_WIND_ROUTER_POLICY;
+    }
+    if (scope === "resurrection,windflow") {
+        return V07_CASTER_ROUTER_POLICY;
+    }
+    // Unknown experiment scopes fail closed to the committed v0.4 aura policy.
+    return undefined;
 }
 
 /**
@@ -72,6 +97,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
         if (!profile) {
             profile = {
                 auraSaturated: isAuraSaturatedArmy(units),
+                denseMeleeMagic: isDenseMeleeMagicArmy(units),
                 meleeMagicAnchor: isMeleeMagicAnchorArmy(units),
             };
             byTeam.set(team, profile);
@@ -87,7 +113,9 @@ export class StrategyV0_7 extends StrategyV0_6 {
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
         if (profile?.auraSaturated) {
-            return this.archetypeAnchor.decideTurn(unit, context);
+            const incumbent = this.archetypeAnchor.decideTurn(unit, context);
+            const policy = auraCasterRouterPolicy();
+            return policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
         }
         return super.decideTurn(unit, context);
     }
@@ -134,7 +162,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
         const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
         // A late takeover has no trustworthy initial-roster classifier input. Keep the incumbent v0.6 action
         // rather than applying the scorer outside a known profile; guarded caster salvage ran before this seam.
-        if (!profile || profile.meleeMagicAnchor) {
+        if (!profile || profile.meleeMagicAnchor || (profile.denseMeleeMagic && denseMeleeMagicIsolationEnabled())) {
             return decision;
         }
         // Phase-B env candidate: V07_WAIT_WEIGHTS_V2 (valid, non-zero) swaps in the multi-cohort V2 scorer;

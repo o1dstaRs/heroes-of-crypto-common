@@ -195,6 +195,9 @@ afterEach(() => {
     delete process.env.SEARCH_GATE;
     delete process.env.SEARCH_VERSIONS;
     delete process.env.V07_SEARCH;
+    delete process.env.V07_DENSE_MM_SALVAGE_ISOLATION;
+    delete process.env.V07_AURA_CASTER_ROUTER;
+    delete process.env.V07_AURA_CASTER_SPELLS;
 });
 
 describe("v0.7 search trial CLI and seeds", () => {
@@ -709,9 +712,19 @@ describe("v0.7 search trial report", () => {
         const snapshot = snapshotV07SearchBehaviorEnvironment({
             HOME: "/secret",
             V07_SEARCH: "1",
+            V07_DENSE_MM_SALVAGE_ISOLATION: "1",
+            V07_AURA_CASTER_ROUTER: "on",
+            V07_AURA_CASTER_SPELLS: "windflow",
             SEARCH_GATE: "0.01",
             LIVETWIN: "1",
         });
-        expect(snapshot).toEqual({ LIVETWIN: "1", SEARCH_GATE: "0.01", V07_SEARCH: "1" });
+        expect(snapshot).toEqual({
+            LIVETWIN: "1",
+            SEARCH_GATE: "0.01",
+            V07_AURA_CASTER_ROUTER: "on",
+            V07_AURA_CASTER_SPELLS: "windflow",
+            V07_DENSE_MM_SALVAGE_ISOLATION: "1",
+            V07_SEARCH: "1",
+        });
     });
 });

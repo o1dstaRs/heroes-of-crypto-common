@@ -1,8 +1,8 @@
 /*
  * Research-only overnight follow-up to the d68490a v0.7+RAWS run.
  *
- * This driver deliberately searches a small, preregistered profile set around the late b9ce genome. It
- * targets the observed all-cohort strength deficits, fire/ranged attrition integrity, and
+ * This driver deliberately searches a small, preregistered policy factorial around the lowest-latency b9ce
+ * envelope. It targets the observed dense melee-magic and aura cohort deficits, fire/ranged attrition integrity, and
  * headroom below the ranked server's 300ms per-decision circuit. It never edits source, bakes weights, commits,
  * pushes, or deploys. Use scripts/run_v0_7_96h.sh as the lifetime supervisor.
  */
@@ -94,13 +94,13 @@ if (!OUT && !parsed.values["describe-profiles"]) throw new Error("--out or V07_9
 
 const CONFIG = {
     schemaVersion: 1,
-    protocol: "v0.7-overnight-active-circuit-v6",
+    protocol: "v0.7-overnight-policy-factorial-v7",
     workers: integer("V07_OVERNIGHT_WORKERS", 12),
     checkpointGames: evenGames("V07_OVERNIGHT_CHECKPOINT_GAMES", 32),
     scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 64),
     deepGames: evenGames("V07_OVERNIGHT_DEEP_GAMES", 512),
     finalGames: evenGames("V07_OVERNIGHT_FINAL_GAMES", 2048),
-    deepKeep: integer("V07_OVERNIGHT_DEEP_KEEP", 3),
+    deepKeep: integer("V07_OVERNIGHT_DEEP_KEEP", 6),
     finalReserveHours: positive("V07_OVERNIGHT_FINAL_RESERVE_HOURS", 4),
     circuitBreakerMs: positive("V07_OVERNIGHT_CIRCUIT_MS", 275),
     decisionDeadlineMs: positive("V07_OVERNIGHT_DECISION_DEADLINE_MS", 200),
@@ -145,6 +145,8 @@ if (parsed.values["describe-profiles"]) {
                 label: candidate.label,
                 activeChallengers: candidate.activeChallengers,
                 finishWeight: candidate.finishWeight,
+                denseMeleeMagicIsolation: candidate.denseMeleeMagicIsolation,
+                auraCasterSpells: candidate.auraCasterSpells,
                 finishControlProfileId: finishControls.get(candidate.id) ?? null,
                 ...(candidate.shortlist === undefined ? {} : { shortlist: candidate.shortlist }),
                 environment: profileSearchEnvironment(candidate),
@@ -304,98 +306,67 @@ function loadAnchor() {
     };
 }
 
-function profile(label, anchorGenome, overrides, activeChallengers = true, shortlist = null, finishWeight = 0) {
+function profile(label, anchorGenome, overrides, policy = {}) {
+    const activeChallengers = policy.activeChallengers ?? true;
+    const shortlist = policy.shortlist ?? null;
+    const finishWeight = policy.finishWeight ?? 0;
+    const denseMeleeMagicIsolation = policy.denseMeleeMagicIsolation ?? false;
+    const auraCasterSpells = policy.auraCasterSpells ?? "off";
     if (shortlist !== null && (!Number.isSafeInteger(shortlist) || shortlist < 2)) {
         throw new Error(`Invalid shortlist for ${label}`);
     }
     if (!Number.isFinite(finishWeight) || finishWeight < 0 || finishWeight > 16) {
         throw new Error(`Invalid late ranged finish weight for ${label}`);
     }
+    if (typeof denseMeleeMagicIsolation !== "boolean") {
+        throw new Error(`Invalid dense melee-magic policy for ${label}`);
+    }
+    if (!["off", "windflow", "resurrection,windflow"].includes(auraCasterSpells)) {
+        throw new Error(`Invalid aura caster scope for ${label}`);
+    }
     const genome = { ...anchorGenome, ...overrides, label };
     const behavior = {
         genome,
         activeChallengers,
         finishWeight,
+        denseMeleeMagicIsolation,
+        auraCasterSpells,
         ...(shortlist === null ? {} : { shortlist }),
     };
     return { id: fingerprintV0796h(behavior), label, ...behavior };
 }
 
 function profilesFor(anchorGenome) {
+    const envelope = { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 };
+    const base = { activeChallengers: true, shortlist: 2, finishWeight: 0 };
     const profiles = [
-        // Scout all eight templates on the three latency/strength bridge envelopes. Complete each isolated
-        // finish-weight trio before moving to the next envelope so an interrupted run retains paired evidence.
-        profile(
-            "active-h12-r1-s3-finish-w0-c6-4-2",
-            anchorGenome,
-            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
-            true,
-            3,
-        ),
-        profile(
-            "active-h12-r1-s3-finish-w2-c6-4-2",
-            anchorGenome,
-            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
-            true,
-            3,
-            2,
-        ),
-        profile(
-            "active-h12-r1-s3-finish-w4-c6-4-2",
-            anchorGenome,
-            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
-            true,
-            3,
-            4,
-        ),
-        profile(
-            "active-h8-r1-s2-finish-w0-c4-3-2",
-            anchorGenome,
-            { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-        ),
-        profile(
-            "active-h8-r1-s2-finish-w2-c4-3-2",
-            anchorGenome,
-            { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-            2,
-        ),
-        profile(
-            "active-h8-r1-s2-finish-w4-c4-3-2",
-            anchorGenome,
-            { horizon: 8, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-            4,
-        ),
-        profile(
-            "active-h4-r1-s2-finish-w0-c4-3-2",
-            anchorGenome,
-            { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-        ),
-        profile(
-            "active-h4-r1-s2-finish-w2-c4-3-2",
-            anchorGenome,
-            { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-            2,
-        ),
-        profile(
-            "active-h4-r1-s2-finish-w4-c4-3-2",
-            anchorGenome,
-            { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-            2,
-            4,
-        ),
+        // Full 2x3 factorial: dense salvage isolation off/on crossed with aura routing off/Wind/Res+Wind.
+        // Every arm uses the same lowest-latency search envelope so policy effects are not mixed with tuning.
+        profile("axis-control-h4-r1-s2-c4-3-2", anchorGenome, envelope, base),
+        profile("axis-dense-h4-r1-s2-c4-3-2", anchorGenome, envelope, {
+            ...base,
+            denseMeleeMagicIsolation: true,
+        }),
+        profile("axis-aura-wind-h4-r1-s2-c4-3-2", anchorGenome, envelope, {
+            ...base,
+            auraCasterSpells: "windflow",
+        }),
+        profile("axis-dense-aura-wind-h4-r1-s2-c4-3-2", anchorGenome, envelope, {
+            ...base,
+            denseMeleeMagicIsolation: true,
+            auraCasterSpells: "windflow",
+        }),
+        profile("axis-aura-res-wind-h4-r1-s2-c4-3-2", anchorGenome, envelope, {
+            ...base,
+            auraCasterSpells: "resurrection,windflow",
+        }),
+        profile("axis-dense-aura-res-wind-h4-r1-s2-c4-3-2", anchorGenome, envelope, {
+            ...base,
+            denseMeleeMagicIsolation: true,
+            auraCasterSpells: "resurrection,windflow",
+        }),
     ];
-    if (profiles.length !== 9) throw new Error(`Expected 9 overnight profiles, found ${profiles.length}`);
+    if (profiles.length !== 6) throw new Error(`Expected 6 overnight profiles, found ${profiles.length}`);
     if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
         throw new Error("Overnight profile behaviors must be unique");
     }
@@ -412,6 +383,8 @@ function finishBlockKey(candidate) {
         genome,
         activeChallengers: candidate.activeChallengers,
         shortlist: candidate.shortlist ?? null,
+        denseMeleeMagicIsolation: candidate.denseMeleeMagicIsolation,
+        auraCasterSpells: candidate.auraCasterSpells,
     });
 }
 
@@ -450,6 +423,13 @@ function profileSearchEnvironment(candidate) {
         SEARCH_DECISION_DEADLINE_MS: String(CONFIG.decisionDeadlineMs),
         SEARCH_CIRCUIT_BREAKER_MS: String(CONFIG.circuitBreakerMs),
         V07_VALUE_WEIGHTS_V2: JSON.stringify(candidate.genome.leaf),
+        ...(candidate.denseMeleeMagicIsolation ? { V07_DENSE_MM_SALVAGE_ISOLATION: "1" } : {}),
+        ...(candidate.auraCasterSpells === "off"
+            ? {}
+            : {
+                  V07_AURA_CASTER_ROUTER: "on",
+                  V07_AURA_CASTER_SPELLS: candidate.auraCasterSpells,
+              }),
     };
 }
 
@@ -825,6 +805,18 @@ function metricMap(report) {
     return new Map(report.templateMetrics.map((metric) => [metric.template, metric]));
 }
 
+function policyExposure(report, template) {
+    const cell = report.cells.find((entry) => entry.spec?.template === template);
+    const telemetry = cell?.telemetry?.candidate;
+    return {
+        decisions: telemetry?.decisions ?? 0,
+        waits: telemetry?.actionTypes?.wait_turn ?? 0,
+        casts: telemetry?.actionTypes?.cast_spell ?? 0,
+        resurrectionCasts: telemetry?.spells?.Resurrection ?? 0,
+        windFlowCasts: telemetry?.spells?.["Wind Flow"] ?? 0,
+    };
+}
+
 function summarizeEvaluation(report, circuit) {
     const metrics = metricMap(report);
     const utility = metrics.get("melee_magic_utility")?.decisiveWinRate ?? 0;
@@ -851,6 +843,11 @@ function summarizeEvaluation(report, circuit) {
         rangedDrawOrArmageddonRate: ranged?.drawOrArmageddonRate ?? null,
         candidateRejections,
         missingRejectionCounts,
+        policyExposure: {
+            meleeMagicUtility: policyExposure(report, "melee_magic_utility"),
+            auraSupport: policyExposure(report, "aura_support"),
+            auraOffense: policyExposure(report, "aura_offense"),
+        },
         circuitQualified: qualifiesV07OvernightCircuit(
             circuit,
             CONFIG.maximumCircuitOpenGameRate,
@@ -900,6 +897,7 @@ function validateEvaluation(candidate, panelId, templates, games, paths, cutoffM
         report.provenance?.revision?.worktreeClean !== true ||
         report.provenance?.revisionAtCompletion?.worktreeClean !== true ||
         report.templateMetrics?.length !== templates.length ||
+        report.cells?.length !== templates.length ||
         report.searchAudit?.auditGames !== templates.length * games ||
         report.searchAudit?.invalidJsonLines !== 0 ||
         report.searchAudit?.searchedTurnLatencyMs?.count !== report.searchAudit?.searchedTurns ||
