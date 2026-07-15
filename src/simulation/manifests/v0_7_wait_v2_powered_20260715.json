@@ -1,0 +1,86 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-wait-v2-powered-20260715",
+    "createdAt": "2026-07-15T15:30:00.000Z",
+    "candidate": "v0.7",
+    "opponent": "v0.6",
+    "gamesPerArm": 12000,
+    "arms": {
+        "control": "V07_WAIT_WEIGHTS_V2 absent (committed v1 scorer)",
+        "v2": "MULTICOHORT_WAIT_WEIGHTS_V2_2026_07_11"
+    },
+    "v2WeightsSha256": "e16d7ac967aacd3d37c2291e1fc7947571382bf1a302dc64264037039e00dfec",
+    "cells": [
+        {
+            "id": "mirror_melee_coevo",
+            "kind": "mirror",
+            "cohort": "melee_coevo",
+            "baseSeed": 819284410,
+            "primaryPool": false
+        },
+        {
+            "id": "mirror_hybrid",
+            "kind": "mirror",
+            "cohort": "hybrid",
+            "baseSeed": 2881327399,
+            "primaryPool": true
+        },
+        {
+            "id": "mirror_ranged_max_sniper3",
+            "kind": "mirror",
+            "cohort": "ranged_max_sniper3",
+            "baseSeed": 903810739,
+            "primaryPool": true
+        },
+        {
+            "id": "mirror_pure_ranged",
+            "kind": "mirror",
+            "cohort": "pure_ranged",
+            "baseSeed": 1535948976,
+            "primaryPool": true
+        },
+        {
+            "id": "draft_melee",
+            "kind": "draft",
+            "cohort": "melee",
+            "meleeDraftFraction": 1,
+            "baseSeed": 3175082463,
+            "primaryPool": false
+        },
+        {
+            "id": "draft_mixed",
+            "kind": "draft",
+            "cohort": "mixed",
+            "meleeDraftFraction": 0.5,
+            "baseSeed": 413096782,
+            "primaryPool": true
+        },
+        {
+            "id": "draft_random",
+            "kind": "draft",
+            "cohort": "random",
+            "meleeDraftFraction": 0,
+            "baseSeed": 455875959,
+            "primaryPool": true
+        }
+    ],
+    "scoring": "candidate win=1, draw=0.5, candidate loss=0",
+    "pairing": "games 2k/2k+1 share a scenario and swap sides; control and v2 use identical game indices",
+    "gates": {
+        "pooledPrimaryDelta95Lcb": 0,
+        "eachCellPointDeltaMin": 0,
+        "eachCellDelta95LcbMin": -0.005,
+        "pooledDrawOrArmageddonDelta95UcbMax": 0.0025,
+        "eachCellDrawOrArmageddonPointDeltaMax": 0.005,
+        "rangedMirrorV2ScoreMin": 0.5,
+        "candidateAndOpponentRejections": 0,
+        "releaseCellDrawOrArmageddonRateMax": 0.01
+    },
+    "freshSeedsDeclared": true,
+    "promotionEvidenceNotCollectedByThisHarness": [
+        "512-game diagnostic mechanism reconciliation",
+        "latency and per-decision circuit-breaker evidence",
+        "committed-default promotion battery"
+    ],
+    "declaration": "The 42,000 unique pair seeds behind 84,000 side-swapped games are preregistered before the powered A/B. They have zero internal collisions and zero collisions with the scenarios in prior committed manifests."
+}
