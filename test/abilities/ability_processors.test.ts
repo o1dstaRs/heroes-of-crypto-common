@@ -237,6 +237,7 @@ describe("ability processors", () => {
     it("runs lightning spin against adjacent enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Spinner",
             team: PBTypes.TeamVals.UPPER,
@@ -254,21 +255,14 @@ describe("ability processors", () => {
         placeUnit(grid, unitsHolder, enemyA, { x: 5, y: 6 });
         placeUnit(grid, unitsHolder, enemyB, { x: 6, y: 5 });
 
-        const result = processLightningSpinAbility(
-            attacker,
-            new SceneLogMock(),
-            unitsHolder,
-            1,
-            stats,
-            { x: 5, y: 5 },
-            true,
-        );
+        const result = processLightningSpinAbility(attacker, capture.log, unitsHolder, 1, stats, { x: 5, y: 5 }, true);
 
         expect(result.landed).toBe(true);
         expect(result.unitIdsDied.sort()).toEqual([enemyA.getId(), enemyB.getId()].sort());
         expect(stats.get()).toHaveLength(2);
         expect(enemyA.isDead()).toBe(true);
         expect(enemyB.isDead()).toBe(true);
+        expect(capture.lines.filter((line) => line.includes("💀2"))).toHaveLength(2);
     });
 
     it("processes ranged AOE abilities and evaluates affected units", () => {
@@ -334,6 +328,7 @@ describe("ability processors", () => {
     it("processes through-shot lanes and records secondary deaths", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Piercer",
             team: PBTypes.TeamVals.UPPER,
@@ -370,7 +365,7 @@ describe("ability processors", () => {
             rearTarget.getPosition(),
             unitsHolder,
             grid,
-            new SceneLogMock(),
+            capture.log,
             stats,
         );
 
@@ -382,6 +377,7 @@ describe("ability processors", () => {
         expect(frontTarget.getCumulativeHp()).toBeLessThan(frontTarget.getCumulativeMaxHp());
         expect(rearTarget.isDead()).toBe(true);
         expect(attacker.getRangeShots()).toBe(1);
+        expect(capture.lines.some((line) => line.includes("Rear") && line.includes("💀1"))).toBe(true);
     });
 
     it("applies double shot direct damage and rejected preconditions", () => {
@@ -535,6 +531,7 @@ describe("ability processors", () => {
     it("processes skewer strike against the next standing target", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Skewer",
             team: PBTypes.TeamVals.LOWER,
@@ -551,7 +548,7 @@ describe("ability processors", () => {
         placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, behind, { x: 5, y: 3 });
 
-        const result = processSkewerStrikeAbility(attacker, primary, new SceneLogMock(), unitsHolder, grid, stats);
+        const result = processSkewerStrikeAbility(attacker, primary, capture.log, unitsHolder, grid, stats);
 
         expect(result.unitIdsDied).toEqual([behind.getId()]);
         expect(result.increaseMorale).toBeGreaterThan(0);
@@ -566,6 +563,7 @@ describe("ability processors", () => {
         });
         expect(stats.get()).toHaveLength(1);
         expect(behind.isDead()).toBe(true);
+        expect(capture.lines.some((line) => line.includes("Behind") && line.includes("💀1"))).toBe(true);
 
         const noAbility = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.LOWER });
         expect(
@@ -577,6 +575,7 @@ describe("ability processors", () => {
     it("processes fire breath with magic resistance and heavy armor modifiers", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Dragon",
             team: PBTypes.TeamVals.LOWER,
@@ -601,15 +600,7 @@ describe("ability processors", () => {
         placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, behind, { x: 5, y: 3 });
 
-        const result = processFireBreathAbility(
-            attacker,
-            primary,
-            new SceneLogMock(),
-            unitsHolder,
-            grid,
-            "attk",
-            stats,
-        );
+        const result = processFireBreathAbility(attacker, primary, capture.log, unitsHolder, grid, "attk", stats);
 
         expect(result.unitIdsDied).toEqual([behind.getId()]);
         expect(result.increaseMorale).toBeGreaterThan(0);
@@ -618,6 +609,7 @@ describe("ability processors", () => {
         });
         expect(stats.get()).toHaveLength(1);
         expect(behind.isDead()).toBe(true);
+        expect(capture.lines.some((line) => line.includes("Armored") && line.includes("💀1"))).toBe(true);
     });
 
     it("processes standalone status and effect abilities deterministically", () => {
