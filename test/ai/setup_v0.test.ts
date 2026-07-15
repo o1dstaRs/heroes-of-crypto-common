@@ -16,7 +16,7 @@ describe("SetupPolicyV0", () => {
     });
 
     test("tier-2 artifact = highest measured win-rate from the offered set", () => {
-        // Titan Plate (71%) beats Pendant (36.6%) and Holy Cross (41.1%).
+        // Titan Plate (63.9%) beats Pendant (41.5%) and Holy Cross (46.1%).
         expect(
             policy.pickArtifactT2([
                 Tier2Artifact.PENDANT_OF_VITALITY,
@@ -24,7 +24,7 @@ describe("SetupPolicyV0", () => {
                 Tier2Artifact.HOLY_CROSS,
             ]),
         ).toBe(Tier2Artifact.TITAN_PLATE);
-        // Warlord's Edge (68%) beats Rime Charm (44.5%).
+        // Warlord's Edge (63.7%) beats Rime Charm (46.3%).
         expect(policy.pickArtifactT2([Tier2Artifact.RIME_CHARM, Tier2Artifact.WARLORDS_EDGE])).toBe(
             Tier2Artifact.WARLORDS_EDGE,
         );
@@ -78,13 +78,13 @@ describe("SetupPolicyV0", () => {
     });
 
     test("bundle: prefer the bundle with the stronger creatures + tier-1 artifact", () => {
-        // Bundle A: strong ranged + top T1 (Cursed Ward). Bundle B: weak melee + bottom T1 (Wounding Charm).
+        // Bundle A: strong ranged + top T1 (Cursed Ward). Bundle B: weak melee + bottom T1 (Broken Aegis).
         const orc = PBTypes.CreatureVals.ORC;
         const a: [number, number, number] = [orc, orc, 9 /* CURSED_WARD */];
         const b: [number, number, number] = [
             PBTypes.CreatureVals.SCAVENGER,
             PBTypes.CreatureVals.SCAVENGER,
-            8 /* WOUNDING_CHARM */,
+            12 /* BROKEN_AEGIS */,
         ];
         // Only assert it returns a valid index and is deterministic.
         const pick = policy.pickBundle([a, b]);

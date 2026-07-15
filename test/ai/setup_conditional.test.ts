@@ -97,18 +97,21 @@ describe("conditional setup v1 — sniper augment rule", () => {
 describe("conditional setup v1 — tier-2 rule", () => {
     test("ranged-heavy roster picks by the ranged cohort table (Farsight Quiver over the blind Titan pick)", () => {
         const offered = [Tier2Artifact.FARSIGHT_QUIVER, Tier2Artifact.TITAN_PLATE, Tier2Artifact.HOLY_CROSS];
-        // Static/blind policy prefers Titan Plate (71.0 in the blind table).
+        // Static/blind policy prefers Titan Plate (63.9 in the refreshed blind table; see setup_strategy.ts).
         expect(SETUP_POLICY_V0.pickArtifactT2(offered)).toBe(Tier2Artifact.TITAN_PLATE);
         // On a 2-3-ranged roster Farsight measured 88.8 vs Titan 67.2.
         expect(conditionalArtifactT2(offered, rosterWithRanged(2), ALL_RULES)).toBe(Tier2Artifact.FARSIGHT_QUIVER);
     });
 
-    test("melee roster picks by the melee cohort table (Tome of Amplification over the blind Titan pick)", () => {
-        const offered = [Tier2Artifact.TOME_OF_AMPLIFICATION, Tier2Artifact.TITAN_PLATE];
-        expect(SETUP_POLICY_V0.pickArtifactT2(offered)).toBe(Tier2Artifact.TITAN_PLATE);
-        expect(conditionalArtifactT2(offered, rosterWithRanged(0), ALL_RULES)).toBe(
-            Tier2Artifact.TOME_OF_AMPLIFICATION,
-        );
+    test("melee roster picks by the melee cohort table (Giant's Maul over the blind Rime Charm pick)", () => {
+        // Post the 2026-07-15 blind-table refresh (setup_strategy.ts), the blind and melee-cohort tables now
+        // AGREE that Tome of Amplification beats Titan Plate (the refresh's whole point — the blind table was
+        // stale pre-LIVETWIN/pre-augment-seeding-fix). Giant's Maul vs Rime Charm is a pair where the two
+        // tables still genuinely disagree: blind prefers Rime Charm (46.3 > 45.3), the melee cohort prefers
+        // Giant's Maul (44.2 > 42.0) — still a real conditional-vs-blind divergence to exercise here.
+        const offered = [Tier2Artifact.RIME_CHARM, Tier2Artifact.GIANTS_MAUL];
+        expect(SETUP_POLICY_V0.pickArtifactT2(offered)).toBe(Tier2Artifact.RIME_CHARM);
+        expect(conditionalArtifactT2(offered, rosterWithRanged(0), ALL_RULES)).toBe(Tier2Artifact.GIANTS_MAUL);
     });
 
     test("argmax follows the measured tables for arbitrary offers", () => {

@@ -97,8 +97,32 @@ describe("draft ship genome", () => {
         expect(leagueGenomeFingerprint(accepted)).toBe(
             "92ee7737d5d31f4c1ef94299cb31180c3f9e3eb50eea5c1b80647eb12beff9eb",
         );
-        expect(projectDraftGenomeForShipping(accepted)).toEqual(accepted);
-        expect(accepted.weights.slice(intrinsicEnd)).toEqual(LEAGUE_ANCHOR_GENOME.slice(intrinsicEnd));
+        // `projectDraftGenomeForShipping` re-pins every non-intrinsic head to the CURRENT `LEAGUE_ANCHOR_GENOME`
+        // (draft_ship.ts: `weights = [...LEAGUE_ANCHOR_GENOME]`, only the intrinsic slice is spliced in from
+        // the input genome) — so re-projecting the (frozen, point-in-time) accepted genome is idempotent ONLY
+        // as long as setup-v0's artifact tables haven't moved since acceptance. After the 2026-07-15 blind-table
+        // refresh (setup_strategy.ts TIER1/TIER2_ARTIFACT_WINRATE) it is no longer byte-identical to `accepted`
+        // — intrinsic (draft) weights still round-trip unchanged; the tail now re-projects onto the NEW anchor.
+        const projected = projectDraftGenomeForShipping(accepted);
+        expect(projected.weights.slice(0, intrinsicEnd)).toEqual(accepted.weights.slice(0, intrinsicEnd));
+        expect(projected.weights.slice(intrinsicEnd)).toEqual(LEAGUE_ANCHOR_GENOME.slice(intrinsicEnd));
+        // Frozen snapshot of the setup-v0 anchor tail AS IT WAS at this genome's acceptance (not a live
+        // `LEAGUE_ANCHOR_GENOME` reference): the accepted genome itself is a point-in-time file
+        // (draft_genomes/league_round3_br_52752642_projected.json) that stays reproducible even after
+        // setup-v0's tables are later refreshed — `accepted` is loaded straight off that JSON (never
+        // re-projected in `parseDraftGenome`'s league-r3 branch), so its OWN weights are untouched by the
+        // refresh; this assertion documents what the anchor equalled when the genome was accepted.
+        // prettier-ignore
+        const acceptanceTimeAnchorTail = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            61.1, 44.4, 53.2, 53.3, 47.1, 45.5, 45.4, 43.4, 62.4, 49.5, 44.3, 50.2,
+            68.3, 71, 41.1, 65.4, 43.1, 45.8, 36.6, 62.5, 36.8, 41.7, 44.5, 42,
+            19, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0,
+            1, 0, 0, 0, 0, 0, 0,
+            6, 5, 7,
+        ];
+        expect(accepted.weights.slice(intrinsicEnd)).toEqual(acceptanceTimeAnchorTail);
+        expect(acceptanceTimeAnchorTail).toHaveLength(LEAGUE_ANCHOR_GENOME.length - intrinsicEnd);
         expect(accepted.omniscientDraft).toBeUndefined();
         expect(parseDraftGenome("default").weights).not.toEqual(accepted.weights);
         expect(leagueRound3ProjectedGenome.acceptance.verdict).toBe("PASS");
