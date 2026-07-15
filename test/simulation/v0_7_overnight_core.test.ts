@@ -222,6 +222,97 @@ describe("v0.7 overnight circuit diagnostics", () => {
         expect(qualifiesV07OvernightCircuit(diagnostics, 0.01, 275)).toBeTrue();
     });
 
+    it("strictly reconciles shortlist and deadline work from turns into each game summary", () => {
+        const expected = new Map([["1|v0.7|v0.6", "mage"]]);
+        const turns = [
+            {
+                t: "turn",
+                seed: 1,
+                green: "v0.7",
+                red: "v0.6",
+                ms: 100,
+                nc: 5,
+                ns: 2,
+                inc: "wait",
+                chosen: "melee",
+                ov: 1,
+                d: 0.2,
+            },
+            {
+                t: "turn",
+                seed: 1,
+                green: "v0.7",
+                red: "v0.6",
+                ms: 240,
+                nc: 4,
+                ns: 0,
+                inc: "spell",
+                chosen: "spell",
+                ov: 0,
+                d: null,
+                deadlineFallback: 1,
+            },
+        ];
+        const game = {
+            t: "game",
+            seed: 1,
+            green: "v0.7",
+            red: "v0.6",
+            mode: "search",
+            searched: 2,
+            candidatesTotal: 9,
+            scoredCandidatesTotal: 2,
+            shortlist: 2,
+            decisionDeadlineMs: 240,
+            deadlineFallbacks: 1,
+            circuitBreakerMs: 275,
+            circuitOpened: false,
+            circuitSkipped: 0,
+        };
+        const work = { shortlist: 2, decisionDeadlineMs: 240 };
+
+        const diagnostics = summarizeV07OvernightCircuitAuditRows([...turns, game], expected, 275, work);
+        expect(diagnostics.work).toEqual({
+            enumeratedCandidatesTotal: 9,
+            scoredCandidatesTotal: 2,
+            deadlineFallbacks: 1,
+        });
+
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [...turns, { ...game, scoredCandidatesTotal: undefined }],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight circuit summary");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows([{ ...turns[0], ns: 3 }, turns[1], game], expected, 275, work),
+        ).toThrow("Invalid overnight search-work turn row");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [turns[0], { ...turns[1], chosen: "melee" }, game],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight search-work turn row");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows([...turns, { ...game, candidatesTotal: 8 }], expected, 275, work),
+        ).toThrow("Overnight search-work totals mismatch");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows([...turns, { ...game, shortlist: null }], expected, 275, work),
+        ).toThrow("Invalid overnight circuit summary");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [...turns, { ...game, decisionDeadlineMs: 239 }],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight circuit summary");
+    });
+
     it("rejects unsupported rows and string-coerced game identities", () => {
         const expected = new Map([["1|v0.7|v0.6", "mage"]]);
         const game = {

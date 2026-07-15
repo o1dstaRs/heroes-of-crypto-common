@@ -618,14 +618,49 @@ describe("v0.7 search trial report", () => {
         const summary = summarizeV07SearchAuditRows(
             [
                 ...[1, 2, 3, 4, 100].map((ms) => ({ t: "turn", ms })),
-                { t: "game", mode: "search", msTotal: 20, searched: 10, overrides: 0, overridesToKind: {} },
-                { t: "game", mode: "search", msTotal: 30, searched: 10, overrides: 1, overridesToKind: { wait: 1 } },
-                { t: "game", mode: "search", msTotal: 40, searched: 10, overrides: 3, overridesToKind: { melee: 3 } },
+                {
+                    t: "game",
+                    mode: "search",
+                    msTotal: 20,
+                    searched: 10,
+                    candidatesTotal: 40,
+                    scoredCandidatesTotal: 20,
+                    shortlist: 2,
+                    decisionDeadlineMs: 240,
+                    deadlineFallbacks: 1,
+                    overrides: 0,
+                    overridesToKind: {},
+                },
+                {
+                    t: "game",
+                    mode: "search",
+                    msTotal: 30,
+                    searched: 10,
+                    candidatesTotal: 50,
+                    scoredCandidatesTotal: 30,
+                    shortlist: 3,
+                    decisionDeadlineMs: 240,
+                    deadlineFallbacks: 2,
+                    overrides: 1,
+                    overridesToKind: { wait: 1 },
+                },
+                {
+                    t: "game",
+                    mode: "search",
+                    msTotal: 40,
+                    searched: 10,
+                    candidatesTotal: 30,
+                    scoredCandidatesTotal: 30,
+                    shortlist: null,
+                    overrides: 3,
+                    overridesToKind: { melee: 3 },
+                },
                 {
                     t: "game",
                     mode: "search",
                     msTotal: 200,
                     searched: 10,
+                    candidatesTotal: 80,
                     overrides: 10,
                     overridesToKind: { wait: 4, defend: 6 },
                 },
@@ -638,6 +673,12 @@ describe("v0.7 search trial report", () => {
         expect(summary.overridesPerGame).toEqual({ count: 4, p50: 1, p95: 10, p99: 10, max: 10 });
         expect(summary.overridesTotal).toBe(14);
         expect(summary.overridesPerSearchedTurn).toBe(0.35);
+        expect(summary.enumeratedCandidatesTotal).toBe(200);
+        expect(summary.scoredCandidatesTotal).toBe(160);
+        expect(summary.scoredCandidateRate).toBe(0.8);
+        expect(summary.shortlistCounts).toEqual({ "2": 1, "3": 1, off: 2 });
+        expect(summary.deadlineFallbacks).toBe(3);
+        expect(summary.decisionDeadlineCounts).toEqual({ "240": 2, off: 2 });
         expect(summary.overridesToKind).toEqual({ wait: 5, melee: 3, defend: 6 });
         expect(summary.invalidJsonLines).toBe(2);
     });

@@ -138,6 +138,12 @@ export interface IV07SearchAuditSummary {
     invalidJsonLines: number;
     auditGames: number;
     searchedTurns: number;
+    enumeratedCandidatesTotal: number;
+    scoredCandidatesTotal: number;
+    scoredCandidateRate: number | null;
+    shortlistCounts: Record<string, number>;
+    deadlineFallbacks: number;
+    decisionDeadlineCounts: Record<string, number>;
     searchedTurnLatencyMs: IQuantileSummary;
     matchSearchLatencyMs: IQuantileSummary;
     overridesPerGame: IQuantileSummary;
@@ -545,9 +551,14 @@ export function summarizeV07SearchAuditRows(
     const modeCounts: Record<string, number> = {};
     let auditGames = 0;
     let searchedTurns = 0;
+    let enumeratedCandidatesTotal = 0;
+    let scoredCandidatesTotal = 0;
+    let deadlineFallbacks = 0;
     let overridesTotal = 0;
     let validRows = 0;
     const seenGames = new Set<string>();
+    const shortlistCounts: Record<string, number> = {};
+    const decisionDeadlineCounts: Record<string, number> = {};
     for (const value of rows) {
         if (!value || typeof value !== "object") continue;
         const row = value as Record<string, unknown>;
@@ -569,6 +580,27 @@ export function summarizeV07SearchAuditRows(
         const searched = typeof row.searched === "number" && Number.isFinite(row.searched) ? row.searched : 0;
         const overrides = typeof row.overrides === "number" && Number.isFinite(row.overrides) ? row.overrides : 0;
         searchedTurns += searched;
+        if (typeof row.candidatesTotal === "number" && Number.isFinite(row.candidatesTotal)) {
+            enumeratedCandidatesTotal += row.candidatesTotal;
+        }
+        if (typeof row.scoredCandidatesTotal === "number" && Number.isFinite(row.scoredCandidatesTotal)) {
+            scoredCandidatesTotal += row.scoredCandidatesTotal;
+        } else if (typeof row.candidatesTotal === "number" && Number.isFinite(row.candidatesTotal)) {
+            scoredCandidatesTotal += row.candidatesTotal;
+        }
+        increment(
+            shortlistCounts,
+            row.shortlist === null || row.shortlist === undefined ? "off" : String(row.shortlist),
+        );
+        increment(
+            decisionDeadlineCounts,
+            row.decisionDeadlineMs === null || row.decisionDeadlineMs === undefined
+                ? "off"
+                : String(row.decisionDeadlineMs),
+        );
+        if (typeof row.deadlineFallbacks === "number" && Number.isFinite(row.deadlineFallbacks)) {
+            deadlineFallbacks += row.deadlineFallbacks;
+        }
         overridesTotal += overrides;
         overridesPerGame.push(overrides);
         if (row.overridesToKind && typeof row.overridesToKind === "object") {
@@ -584,6 +616,12 @@ export function summarizeV07SearchAuditRows(
         invalidJsonLines,
         auditGames,
         searchedTurns,
+        enumeratedCandidatesTotal,
+        scoredCandidatesTotal,
+        scoredCandidateRate: enumeratedCandidatesTotal ? scoredCandidatesTotal / enumeratedCandidatesTotal : null,
+        shortlistCounts,
+        deadlineFallbacks,
+        decisionDeadlineCounts,
         searchedTurnLatencyMs: quantiles(turnLatency),
         matchSearchLatencyMs: quantiles(matchLatency),
         overridesPerGame: quantiles(overridesPerGame),

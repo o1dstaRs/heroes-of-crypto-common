@@ -67,6 +67,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_SHORTLIST",
+    "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
@@ -400,6 +402,83 @@ describe("search driver — gating, hygiene, determinism", () => {
         return calls;
     };
 
+    it("shortlists by an immediate leaf while retaining the incumbent and stable top challengers", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_GATE: "0",
+            SEARCH_SHORTLIST: "3",
+        });
+        const harness = buildBattle(90, "v0.6");
+        const unit = harness.activeUnit()!;
+        const incumbent = harness.decideActive();
+        const id = unit.getId();
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "wait", actions: [{ type: "wait_turn", unitId: id }] },
+            { kind: "defend", actions: [{ type: "defend_turn", unitId: id }] },
+            { kind: "spell", actions: [{ type: "cast_spell", casterId: id, spellName: "test" }] },
+            { kind: "move", actions: [{ type: "move_unit", unitId: id, cells: [] }] },
+        ] as unknown as IEnumeratedCandidate[];
+        const calls: Array<{ kinds: string[]; mode: string; rollouts: number | undefined }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            counters: { candidatesTotal: number; scoredCandidatesTotal: number };
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+                rollouts?: number,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode, rollouts) => {
+            calls.push({ kinds: scored.map(({ kind }) => kind), mode, rollouts });
+            if (mode === "leaf") return [0.1, 0.8, 0.4, 0.8, -Infinity];
+            return scored.map(({ kind }) => (kind === "spell" ? 0.9 : kind === "wait" ? 0.7 : 0.1));
+        };
+
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toEqual(candidates[3].actions);
+        expect(calls).toEqual([
+            { kinds: ["incumbent", "wait", "defend", "spell", "move"], mode: "leaf", rollouts: 1 },
+            { kinds: ["incumbent", "wait", "spell"], mode: "turns", rollouts: 3 },
+        ]);
+        expect(driver.counters.candidatesTotal).toBe(5);
+        expect(driver.counters.scoredCandidatesTotal).toBe(3);
+    });
+
+    it("validates SEARCH_SHORTLIST only when search mode is enabled", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_SHORTLIST: "1" });
+        expect(() => buildBattle(89, "v0.6").makeDriver()).toThrow("SEARCH_SHORTLIST must be an integer >= 2");
+
+        setEnv({ SEARCH_SHORTLIST: "invalid" });
+        expect(buildBattle(88, "v0.6").makeDriver().enabled).toBe(false);
+    });
+
+    it("validates an opt-in decision deadline and requires circuit headroom", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_DECISION_DEADLINE_MS: "invalid" });
+        expect(() => buildBattle(87, "v0.6").makeDriver()).toThrow("SEARCH_DECISION_DEADLINE_MS must be positive");
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_DECISION_DEADLINE_MS: "275",
+            SEARCH_CIRCUIT_BREAKER_MS: "275",
+        });
+        expect(() => buildBattle(86, "v0.6").makeDriver()).toThrow(
+            "SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS",
+        );
+
+        setEnv({ SEARCH_DECISION_DEADLINE_MS: "invalid" });
+        expect(buildBattle(85, "v0.6").makeDriver().enabled).toBe(false);
+    });
+
     it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const learned = buildBattle(91, "v0.6").makeDriver() as unknown as {
@@ -625,6 +704,67 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(chosen.length).toBeGreaterThan(0);
         const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
         expect(after).toEqual(before);
+    });
+
+    it("the real shortlist pre-pass preserves live state and reduces full-horizon candidates", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "2",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const h = buildBattle(1313, "v0.6");
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent = h.decideActive();
+        const driver = h.makeDriver();
+        const counters = (
+            driver as unknown as {
+                counters: { candidatesTotal: number; scoredCandidatesTotal: number };
+            }
+        ).counters;
+        const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+
+        expect(driver.chooseDecision(unit!, "v0.6", incumbent).length).toBeGreaterThan(0);
+
+        const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        expect(after).toEqual(before);
+        expect(counters.candidatesTotal).toBeGreaterThan(counters.scoredCandidatesTotal);
+        expect(counters.scoredCandidatesTotal).toBe(2);
+    });
+
+    it("fails closed to the incumbent and restores state when the decision deadline expires", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "6",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_DECISION_DEADLINE_MS: "0.000001",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const h = buildBattle(1313, "v0.6");
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent = h.decideActive();
+        const driver = h.makeDriver();
+        const counters = (
+            driver as unknown as {
+                counters: { deadlineFallbacks: number; scoredCandidatesTotal: number };
+            }
+        ).counters;
+        const before = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+
+        expect(driver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
+
+        const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
+        expect(after).toEqual(before);
+        expect(counters.deadlineFallbacks).toBe(1);
+        expect(counters.scoredCandidatesTotal).toBe(0);
     });
 
     it("is deterministic: the same decision point yields the same choice twice", () => {

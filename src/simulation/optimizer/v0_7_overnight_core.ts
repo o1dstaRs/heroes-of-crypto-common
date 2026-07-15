@@ -54,6 +54,18 @@ export interface IV07OvernightCircuitMetric {
 
 export interface IV07OvernightCircuitDiagnostics extends IV07OvernightCircuitMetric {
     byTemplate: Record<string, IV07OvernightCircuitMetric>;
+    work: IV07OvernightSearchWorkDiagnostics;
+}
+
+export interface IV07OvernightSearchWorkConfig {
+    shortlist: number | null;
+    decisionDeadlineMs: number;
+}
+
+export interface IV07OvernightSearchWorkDiagnostics {
+    enumeratedCandidatesTotal: number;
+    scoredCandidatesTotal: number;
+    deadlineFallbacks: number;
 }
 
 interface IV07OvernightCircuitAccumulator {
@@ -125,15 +137,34 @@ export function summarizeV07OvernightCircuitAuditRows(
     rows: readonly unknown[],
     expectedTemplateByGameKey: ReadonlyMap<string, string>,
     circuitBreakerMs: number,
+    expectedWork?: IV07OvernightSearchWorkConfig,
 ): IV07OvernightCircuitDiagnostics {
     if (!Number.isFinite(circuitBreakerMs) || circuitBreakerMs <= 0) {
         throw new Error("Overnight circuit breaker must be positive");
+    }
+    if (
+        expectedWork &&
+        ((!Number.isSafeInteger(expectedWork.shortlist) && expectedWork.shortlist !== null) ||
+            (expectedWork.shortlist !== null && expectedWork.shortlist < 2) ||
+            !Number.isFinite(expectedWork.decisionDeadlineMs) ||
+            expectedWork.decisionDeadlineMs <= 0 ||
+            expectedWork.decisionDeadlineMs >= circuitBreakerMs)
+    ) {
+        throw new Error("Invalid overnight search-work configuration");
     }
     if (!expectedTemplateByGameKey.size) throw new Error("Overnight circuit audit must expect at least one game");
 
     const aggregate = circuitAccumulator();
     const templateAccumulators = new Map<string, IV07OvernightCircuitAccumulator>();
     const turnRowsByGameKey = new Map<string, number>();
+    const enumeratedCandidatesByGameKey = new Map<string, number>();
+    const scoredCandidatesByGameKey = new Map<string, number>();
+    const deadlineFallbacksByGameKey = new Map<string, number>();
+    const work: IV07OvernightSearchWorkDiagnostics = {
+        enumeratedCandidatesTotal: 0,
+        scoredCandidatesTotal: 0,
+        deadlineFallbacks: 0,
+    };
     for (const template of [...new Set(expectedTemplateByGameKey.values())].sort()) {
         templateAccumulators.set(template, circuitAccumulator());
     }
@@ -158,6 +189,38 @@ export function summarizeV07OvernightCircuitAuditRows(
                 throw new Error(`Invalid overnight turn latency for ${key}`);
             }
             turnRowsByGameKey.set(key, (turnRowsByGameKey.get(key) ?? 0) + 1);
+            if (expectedWork) {
+                const deadlineFallback = row.deadlineFallback === 1;
+                if (
+                    !Number.isSafeInteger(row.nc) ||
+                    (row.nc as number) < 2 ||
+                    !Number.isSafeInteger(row.ns) ||
+                    (row.ns as number) < 0 ||
+                    (row.ns as number) > (row.nc as number) ||
+                    (row.ov !== 0 && row.ov !== 1) ||
+                    typeof row.inc !== "string" ||
+                    typeof row.chosen !== "string" ||
+                    (row.deadlineFallback !== undefined && row.deadlineFallback !== 1) ||
+                    (deadlineFallback && (row.ns !== 0 || row.ov !== 0 || row.d !== null || row.chosen !== row.inc)) ||
+                    (!deadlineFallback &&
+                        ((row.ns as number) < 1 ||
+                            (expectedWork.shortlist === null
+                                ? row.ns !== row.nc
+                                : (row.nc as number) <= expectedWork.shortlist
+                                  ? row.ns !== row.nc
+                                  : (row.ns as number) > expectedWork.shortlist)))
+                ) {
+                    throw new Error(`Invalid overnight search-work turn row for ${key}`);
+                }
+                enumeratedCandidatesByGameKey.set(
+                    key,
+                    (enumeratedCandidatesByGameKey.get(key) ?? 0) + (row.nc as number),
+                );
+                scoredCandidatesByGameKey.set(key, (scoredCandidatesByGameKey.get(key) ?? 0) + (row.ns as number));
+                if (deadlineFallback) {
+                    deadlineFallbacksByGameKey.set(key, (deadlineFallbacksByGameKey.get(key) ?? 0) + 1);
+                }
+            }
             for (const accumulator of [aggregate, cohort]) {
                 accumulator.turnRows += 1;
                 accumulator.turnLatencyMs.push(row.ms);
@@ -175,7 +238,18 @@ export function summarizeV07OvernightCircuitAuditRows(
                 row.circuitBreakerMs !== circuitBreakerMs ||
                 typeof row.circuitOpened !== "boolean" ||
                 !Number.isSafeInteger(row.circuitSkipped) ||
-                (row.circuitSkipped as number) < 0
+                (row.circuitSkipped as number) < 0 ||
+                (expectedWork !== undefined &&
+                    (!Number.isSafeInteger(row.candidatesTotal) ||
+                        (row.candidatesTotal as number) < 0 ||
+                        !Number.isSafeInteger(row.scoredCandidatesTotal) ||
+                        (row.scoredCandidatesTotal as number) < 0 ||
+                        (row.scoredCandidatesTotal as number) > (row.candidatesTotal as number) ||
+                        !Number.isSafeInteger(row.deadlineFallbacks) ||
+                        (row.deadlineFallbacks as number) < 0 ||
+                        (row.deadlineFallbacks as number) > (row.searched as number) ||
+                        row.shortlist !== expectedWork.shortlist ||
+                        row.decisionDeadlineMs !== expectedWork.decisionDeadlineMs))
             ) {
                 throw new Error(`Invalid overnight circuit summary for ${key}`);
             }
@@ -185,6 +259,14 @@ export function summarizeV07OvernightCircuitAuditRows(
                     `Overnight searched-turn count mismatch for ${key}: observed ${observedTurns}, summary ${String(row.searched)}`,
                 );
             }
+            if (
+                expectedWork &&
+                ((enumeratedCandidatesByGameKey.get(key) ?? 0) !== row.candidatesTotal ||
+                    (scoredCandidatesByGameKey.get(key) ?? 0) !== row.scoredCandidatesTotal ||
+                    (deadlineFallbacksByGameKey.get(key) ?? 0) !== row.deadlineFallbacks)
+            ) {
+                throw new Error(`Overnight search-work totals mismatch for ${key}`);
+            }
             if (aggregate.currentOverBudget.has(key) && !row.circuitOpened) {
                 throw new Error(`Overnight over-budget game did not open its circuit: ${key}`);
             }
@@ -193,6 +275,11 @@ export function summarizeV07OvernightCircuitAuditRows(
                 if (accumulator.currentOverBudget.has(key)) accumulator.overBudgetGames.add(key);
                 if (row.circuitOpened) accumulator.circuitOpenGames += 1;
                 accumulator.circuitSkipped += row.circuitSkipped as number;
+            }
+            if (expectedWork) {
+                work.enumeratedCandidatesTotal += row.candidatesTotal as number;
+                work.scoredCandidatesTotal += row.scoredCandidatesTotal as number;
+                work.deadlineFallbacks += row.deadlineFallbacks as number;
             }
         }
     }
@@ -208,6 +295,7 @@ export function summarizeV07OvernightCircuitAuditRows(
                 circuitMetric(accumulator),
             ]),
         ),
+        work,
     };
 }
 

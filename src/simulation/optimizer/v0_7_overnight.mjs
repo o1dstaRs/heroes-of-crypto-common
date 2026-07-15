@@ -45,6 +45,7 @@ const PACKAGE_ROOT = resolve(HERE, "../../..");
 const TRIAL = join(HERE, "v0_7_search_trial.ts");
 const DEFAULT_ANCHOR = join(PACKAGE_ROOT, "src/simulation/results/v0_7_96h_d68490a_outcome.json");
 const EXPECTED_ANCHOR_ID = "b9ce98a735b14c7e57a5b83b70b4bca6b2e45d6a23ce35dd27c2e5b914b1abaa";
+const MIN_DECISION_HEADROOM_MS = 35;
 const FOCUS_TEMPLATES = ["melee_magic_utility", "mage_fireline", "ranged_precision"];
 const ALL_TEMPLATES = V07_96H_TEMPLATES.map(({ template }) => template);
 const activeChildren = new Set();
@@ -92,7 +93,7 @@ if (!OUT) throw new Error("--out or V07_96H_OUT is required");
 
 const CONFIG = {
     schemaVersion: 1,
-    protocol: "v0.7-overnight-active-circuit-v2",
+    protocol: "v0.7-overnight-active-circuit-v3",
     workers: integer("V07_OVERNIGHT_WORKERS", 12),
     checkpointGames: evenGames("V07_OVERNIGHT_CHECKPOINT_GAMES", 32),
     scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 32),
@@ -101,6 +102,7 @@ const CONFIG = {
     deepKeep: integer("V07_OVERNIGHT_DEEP_KEEP", 3),
     finalReserveHours: positive("V07_OVERNIGHT_FINAL_RESERVE_HOURS", 4),
     circuitBreakerMs: positive("V07_OVERNIGHT_CIRCUIT_MS", 275),
+    decisionDeadlineMs: positive("V07_OVERNIGHT_DECISION_DEADLINE_MS", 240),
     maximumCircuitOpenGameRate: positive("V07_OVERNIGHT_MAX_CIRCUIT_OPEN_RATE", 0.01),
     maximumDrawOrArmageddonRate: positive("V07_OVERNIGHT_MAX_DRAW_ARM_RATE", 0.01),
     target: positive("V07_OVERNIGHT_TARGET", 0.9),
@@ -112,6 +114,11 @@ if (CONFIG.maximumCircuitOpenGameRate > 1 || CONFIG.maximumDrawOrArmageddonRate 
 }
 if (CONFIG.circuitBreakerMs > 275) {
     throw new Error("V07_OVERNIGHT_CIRCUIT_MS must be <= 275 to preserve headroom below the live 300ms wrapper");
+}
+if (CONFIG.circuitBreakerMs - CONFIG.decisionDeadlineMs < MIN_DECISION_HEADROOM_MS) {
+    throw new Error(
+        `V07_OVERNIGHT_DECISION_DEADLINE_MS must leave at least ${MIN_DECISION_HEADROOM_MS}ms below V07_OVERNIGHT_CIRCUIT_MS`,
+    );
 }
 
 const RUN_PATH = join(OUT, "run.json");
@@ -264,10 +271,17 @@ function loadAnchor() {
     };
 }
 
-function profile(label, anchorGenome, overrides, activeChallengers = true) {
+function profile(label, anchorGenome, overrides, activeChallengers = true, shortlist = null) {
+    if (shortlist !== null && (!Number.isSafeInteger(shortlist) || shortlist < 2)) {
+        throw new Error(`Invalid shortlist for ${label}`);
+    }
     const genome = { ...anchorGenome, ...overrides, label };
-    const behavior = { genome, activeChallengers };
-    return { id: fingerprintV0796h(behavior), label, genome, activeChallengers };
+    const behavior = {
+        genome,
+        activeChallengers,
+        ...(shortlist === null ? {} : { shortlist }),
+    };
+    return { id: fingerprintV0796h(behavior), label, ...behavior };
 }
 
 function profilesFor(anchorGenome) {
@@ -278,6 +292,8 @@ function profilesFor(anchorGenome) {
         profile("active-h24-r4-c9-4-4", anchorGenome, {}, true),
         profile("active-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, true),
         profile("active-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, true),
+        profile("active-h24-r1-s3-c9-4-4", anchorGenome, { rollouts: 1 }, true, 3),
+        profile("active-h24-r1-s4-c9-4-4", anchorGenome, { rollouts: 1 }, true, 4),
         profile(
             "active-h24-r1-c4-3-2",
             anchorGenome,
@@ -291,16 +307,37 @@ function profilesFor(anchorGenome) {
             true,
         ),
         profile(
+            "active-h16-r1-s3-c7-4-3",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            true,
+            3,
+        ),
+        profile(
             "active-h16-r1-c4-3-2",
             anchorGenome,
             { horizon: 16, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
             true,
         ),
         profile(
+            "active-h16-r1-s4-c4-3-2",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            true,
+            4,
+        ),
+        profile(
             "active-h12-r1-c6-4-2",
             anchorGenome,
             { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
             true,
+        ),
+        profile(
+            "active-h12-r1-s4-c6-4-2",
+            anchorGenome,
+            { horizon: 12, rollouts: 1, maxMelee: 6, maxShots: 4, maxThrows: 2 },
+            true,
+            4,
         ),
         profile(
             "active-h8-r1-c5-4-2",
@@ -656,6 +693,8 @@ function cleanChildEnvironment(candidate) {
         SEARCH_MAX_SHOTS: String(candidate.genome.maxShots),
         SEARCH_MAX_THROWS: String(candidate.genome.maxThrows),
         SEARCH_ACTIVE_CHALLENGERS: candidate.activeChallengers ? "1" : "0",
+        ...(candidate.shortlist === undefined ? {} : { SEARCH_SHORTLIST: String(candidate.shortlist) }),
+        SEARCH_DECISION_DEADLINE_MS: String(CONFIG.decisionDeadlineMs),
         SEARCH_CIRCUIT_BREAKER_MS: String(CONFIG.circuitBreakerMs),
         V07_VALUE_WEIGHTS_V2: JSON.stringify(candidate.genome.leaf),
     });
@@ -685,7 +724,7 @@ function expectedAuditGames(templates, games, seeds) {
     return templateByGameKey;
 }
 
-function auditDiagnostics(path, expectedTemplateByGameKey) {
+function auditDiagnostics(path, expectedTemplateByGameKey, candidate) {
     let invalidJsonLines = 0;
     const rows = [];
     for (const line of readFileSync(path, "utf8").split("\n")) {
@@ -697,7 +736,10 @@ function auditDiagnostics(path, expectedTemplateByGameKey) {
         }
     }
     if (invalidJsonLines) throw new Error(`Overnight audit has ${invalidJsonLines} invalid JSON lines`);
-    return summarizeV07OvernightCircuitAuditRows(rows, expectedTemplateByGameKey, CONFIG.circuitBreakerMs);
+    return summarizeV07OvernightCircuitAuditRows(rows, expectedTemplateByGameKey, CONFIG.circuitBreakerMs, {
+        shortlist: candidate.shortlist ?? null,
+        decisionDeadlineMs: CONFIG.decisionDeadlineMs,
+    });
 }
 
 function metricMap(report) {
@@ -796,8 +838,24 @@ function validateEvaluation(candidate, panelId, templates, games, paths, cutoffM
     ) {
         throw new Error(`Overnight report protocol mismatch for ${panelId}/${candidate.label}`);
     }
-    const circuit = auditDiagnostics(paths.audit, expectedAuditGames(templates, games, seeds));
-    if (circuit.turnRows !== report.searchAudit.searchedTurns) {
+    const circuit = auditDiagnostics(paths.audit, expectedAuditGames(templates, games, seeds), candidate);
+    const expectedAuditGameCount = templates.length * games;
+    const expectedScoredRate = circuit.work.enumeratedCandidatesTotal
+        ? circuit.work.scoredCandidatesTotal / circuit.work.enumeratedCandidatesTotal
+        : null;
+    const shortlistKey = candidate.shortlist === undefined ? "off" : String(candidate.shortlist);
+    if (
+        circuit.turnRows !== report.searchAudit.searchedTurns ||
+        circuit.work.enumeratedCandidatesTotal !== report.searchAudit.enumeratedCandidatesTotal ||
+        circuit.work.scoredCandidatesTotal !== report.searchAudit.scoredCandidatesTotal ||
+        circuit.work.deadlineFallbacks !== report.searchAudit.deadlineFallbacks ||
+        report.searchAudit.scoredCandidateRate !== expectedScoredRate ||
+        canonicalJson(report.searchAudit.shortlistCounts) !==
+            canonicalJson({ [shortlistKey]: expectedAuditGameCount }) ||
+        canonicalJson(report.searchAudit.decisionDeadlineCounts) !==
+            canonicalJson({ [String(CONFIG.decisionDeadlineMs)]: expectedAuditGameCount }) ||
+        canonicalJson(report.searchAudit.modeCounts) !== canonicalJson({ search: expectedAuditGameCount })
+    ) {
         throw new Error(`Overnight turn audit mismatch for ${panelId}/${candidate.label}`);
     }
     const summary = summarizeEvaluation(report, circuit);

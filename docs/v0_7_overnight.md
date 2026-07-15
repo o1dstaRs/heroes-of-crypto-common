@@ -1,9 +1,10 @@
 # v0.7 overnight active/circuit follow-up
 
 This is a bounded, research-only follow-up to the `d68490a` 96-hour run. It starts from that run's late
-`b9ce98a735b1` genome and tests whether a smaller search budget plus an active-challenger filter can retain
-the melee-magic gain while reducing fire/ranged Armageddon dependence and preserving headroom below the ranked
-server's 300ms per-decision circuit. It cannot bake weights, change the v0.7 default, commit, push, or deploy.
+`b9ce98a735b1` genome and tests whether a smaller search budget, an active-challenger filter, and an opt-in
+immediate-leaf shortlist can retain the melee-magic gain while reducing fire/ranged Armageddon dependence and
+preserving headroom below the ranked server's 300ms per-decision circuit. It cannot bake weights, change the
+v0.7 default, commit, push, or deploy.
 
 The driver is `src/simulation/optimizer/v0_7_overnight.mjs`; process lifetime remains owned by
 `scripts/run_v0_7_96h.sh`. The committed `v0_7_96h_d68490a_outcome.json` is the default anchor and must contain
@@ -22,8 +23,12 @@ real frontier:
   arm rather than a presumed champion.
 
 The scout therefore includes passive-allowed b9ce h24/r4, h24/r2, and h24/r1 references; active-only h24
-r4/r2/r1 arms; and active h4, h8, h12, h16, and h24 capped variants. The incumbent is always retained. The
-active filter only removes generated wait and defend challengers.
+r4/r2/r1 arms; active h4, h8, h12, h16, and h24 capped variants; and active h12/h16/h24 shortlist arms.
+`SEARCH_SHORTLIST=K` scores every enumerated action once at the immediate post-action value leaf, retains the
+incumbent, then sends only the best `K-1` legal challengers through the configured full horizon. Unset preserves
+the original full-candidate search. The shortlist is experimental because the leaf may undervalue delayed
+spell, buff, debuff, aura, and resource effects; strength and integrity gates remain binding. The active filter
+only removes generated wait and defend challengers.
 
 ## Stages and gates
 
@@ -42,10 +47,12 @@ best melee-magic utility, and lowest circuit-open game rate. The final profile i
 evidence whenever at least one deep profile finishes; otherwise the best completed scout is used.
 
 The circuit emulator is default-off (`SEARCH_CIRCUIT_BREAKER_MS` absent or non-positive). In this job it is set
-to 275ms. The first over-budget search result still applies and all later search decisions in that match return
-the incumbent by reference, matching the live circuit's state transition. This is a lower-bound timing model:
-the production wrapper's 300ms interval also includes call-site overhead outside the driver's internal timer.
-The 25ms margin is mandatory qualification headroom, not a claim of exact timing equivalence.
+to 275ms and paired with a 240ms fail-closed work deadline. The deadline is checked between candidates, rollout
+actions, and simulated turns. An incomplete comparison restores the snapshot and returns the exact incumbent,
+leaving 35ms for restoration and call-site overhead. Without that deadline, the first over-budget search result
+still applies and all later search decisions in that match return the incumbent by reference. This remains a
+lower-bound timing model: the production wrapper's 300ms interval also includes overhead outside the driver's
+internal timer. The margin is mandatory qualification headroom, not a claim of exact timing equivalence.
 
 A research candidate qualifies only when the final panel has all of the following:
 
@@ -71,6 +78,8 @@ behavior environment, spec, cell hash, and audit-fragment hash. Turn rows carry 
 resume reconstructs the aggregate audit only from atomically completed fragments, rejects duplicate or missing
 game keys, and cannot double-count an interrupted shard. Child evaluators explicitly set
 `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0`, Bun's documented runtime transpiler-cache disable switch.
+Audit summaries expose enumerated and full-horizon candidate totals, their ratio, and the configured shortlist,
+so reduced latency cannot be admitted without disclosing how much search work was pruned.
 
 `run.json` freezes the Bun version and a hash-complete inventory of installed `package.json` manifests, and
 every restart enforces both before opening evidence. The immutable seed manifest contains enough validated
@@ -150,14 +159,17 @@ nohup env \
   V07_OVERNIGHT_FINAL_GAMES=256 \
   V07_OVERNIGHT_DEEP_KEEP=3 \
   V07_OVERNIGHT_FINAL_RESERVE_HOURS=4 \
+  V07_OVERNIGHT_DECISION_DEADLINE_MS=240 \
   V07_OVERNIGHT_CIRCUIT_MS=275 \
   scripts/run_v0_7_96h.sh >/dev/null 2>&1 &
 printf 'launcher pid=%s out=%s\n' "$!" "$OUT"
 ```
 
-Twelve workers use half of Zinc's 24 physical cores and avoid oversubscribing the latency experiment. The
-expected wall time is 8-12 hours: roughly 2-4 hours scout, 2-3 hours deep, and up to 4 hours final. The fixed
-12-hour deadline is never extended; completed shards remain valid evidence if the final is incomplete.
+Twelve workers use half of Zinc's 24 physical cores and avoid oversubscribing the latency experiment. The fixed
+12-hour deadline is an upper bound and is never extended. This driver executes one scout/deep/final funnel and
+exits as soon as it writes a terminal; it does not deliberately consume unused time or start another adaptive
+round. Actual wall time therefore depends on host speed and profile cost. Completed shards remain valid evidence
+if the final is incomplete.
 
 For the local 16-core M4 Max, retain 12 workers but set `V07_96H_HOST_GUARD_MIN_IDLE_CPUS=2`. This preserves a
 small inclusive idle-capacity floor after the optimizer's own load. Do not reuse a Zinc output or change the

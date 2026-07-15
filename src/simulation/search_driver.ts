@@ -56,6 +56,13 @@ import {
  * safe-frontier kiting both regressed); SEARCH_INCLUDE_MOVES=1 re-includes them for experiments only.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
+ * SEARCH_SHORTLIST=<K> is an opt-in research cost control: score every candidate once at the immediate
+ * post-action leaf, then run the configured horizon only for the incumbent plus the best K-1 legal
+ * challengers. K includes the incumbent and must be >=2. Unset keeps the original full-candidate search.
+ * SEARCH_DECISION_DEADLINE_MS=<positive ms> is an opt-in fail-closed work deadline. It is checked between
+ * candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle and returns
+ * the exact incumbent. When combined with the circuit breaker it must be strictly lower, leaving restore and
+ * call-site headroom.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then this match's driver returns each
  * later incumbent unchanged. The live wrapper also includes call-site overhead outside this internal timer.
@@ -126,10 +133,16 @@ const MAX_LAP_HORIZON_TURNS = 64;
 const MAX_REPLY_HORIZON_TURNS = 12;
 
 type SearchMode = "off" | "search" | "ablation" | "oracle";
-type HorizonMode = "turns" | "reply" | "lap";
+type HorizonMode = "leaf" | "turns" | "reply" | "lap";
 
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
+
+class SearchDecisionDeadlineExceeded extends Error {
+    public constructor() {
+        super("Search decision deadline exceeded");
+    }
+}
 
 /** Learned leaf weights (fit_value.mjs output) aligned to VALUE_FEATURE_NAMES. */
 interface ILearnedValue {
@@ -208,6 +221,10 @@ interface ISearchCounters {
     /** Decisions skipped because only the incumbent existed after filtering. */
     singleCandidate: number;
     candidatesTotal: number;
+    /** Candidates that reached the configured full rollout horizon after optional shortlisting. */
+    scoredCandidatesTotal: number;
+    /** Searches abandoned before every shortlisted candidate received a comparable full score. */
+    deadlineFallbacks: number;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -245,6 +262,8 @@ const emptyCounters = (): ISearchCounters => ({
     illegalIncumbent: 0,
     singleCandidate: 0,
     candidatesTotal: 0,
+    scoredCandidatesTotal: 0,
+    deadlineFallbacks: 0,
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -288,6 +307,8 @@ export class SearchDriver {
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly activeChallengers: boolean;
+    private readonly shortlist: number | null;
+    private readonly decisionDeadlineMs: number | null;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -339,11 +360,38 @@ export class SearchDriver {
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
         this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
+        const rawShortlist = process.env.SEARCH_SHORTLIST;
+        if (this.mode !== "search" || rawShortlist === undefined || rawShortlist === "") {
+            this.shortlist = null;
+        } else {
+            const shortlist = Number(rawShortlist);
+            if (!Number.isSafeInteger(shortlist) || shortlist < 2) {
+                throw new Error("SEARCH_SHORTLIST must be an integer >= 2");
+            }
+            this.shortlist = shortlist;
+        }
+        const rawDecisionDeadline = process.env.SEARCH_DECISION_DEADLINE_MS;
+        if (this.mode !== "search" || rawDecisionDeadline === undefined || rawDecisionDeadline === "") {
+            this.decisionDeadlineMs = null;
+        } else {
+            const decisionDeadlineMs = Number(rawDecisionDeadline);
+            if (!Number.isFinite(decisionDeadlineMs) || decisionDeadlineMs <= 0) {
+                throw new Error("SEARCH_DECISION_DEADLINE_MS must be positive");
+            }
+            this.decisionDeadlineMs = decisionDeadlineMs;
+        }
         const circuitBreakerMs = Number(process.env.SEARCH_CIRCUIT_BREAKER_MS);
         this.circuitBreakerMs =
             this.mode === "search" && Number.isFinite(circuitBreakerMs) && circuitBreakerMs > 0
                 ? circuitBreakerMs
                 : null;
+        if (
+            this.decisionDeadlineMs !== null &&
+            this.circuitBreakerMs !== null &&
+            this.decisionDeadlineMs >= this.circuitBreakerMs
+        ) {
+            throw new Error("SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS");
+        }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
             rawValueWeights === "material"
@@ -485,6 +533,10 @@ export class SearchDriver {
             illegalIncumbent: c.illegalIncumbent,
             singleCandidate: c.singleCandidate,
             candidatesTotal: c.candidatesTotal,
+            scoredCandidatesTotal: c.scoredCandidatesTotal,
+            shortlist: this.shortlist,
+            decisionDeadlineMs: this.decisionDeadlineMs,
+            deadlineFallbacks: c.deadlineFallbacks,
             rolloutTurnsTotal: c.rolloutTurnsTotal,
             msTotal: Math.round(c.msTotal * 10) / 10,
             circuitBreakerMs: this.circuitBreakerMs,
@@ -536,7 +588,40 @@ export class SearchDriver {
         this.counters.candidatesTotal += candidates.length;
         bump(this.counters.searchedByIncumbentKind, incumbentKind);
 
-        const means = this.scoreCandidates(unit, candidates, seedBase, "turns");
+        const deadlineAt = this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs;
+        let scoredCandidates: readonly IEnumeratedCandidate[];
+        let means: number[];
+        try {
+            scoredCandidates = this.shortlistCandidates(unit, candidates, seedBase, deadlineAt);
+            means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
+            this.counters.scoredCandidatesTotal += scoredCandidates.length;
+        } catch (error) {
+            if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
+            this.counters.deadlineFallbacks += 1;
+            const ms = performance.now() - t0;
+            this.counters.msTotal += ms;
+            if (this.auditPath && this.auditTurns) {
+                this.turnRows.push(
+                    JSON.stringify({
+                        t: "turn",
+                        seed: this.match.seed,
+                        green: this.match.greenVersion,
+                        red: this.match.redVersion,
+                        lap: this.deps.fightProperties.getCurrentLap(),
+                        unit: unit.getName(),
+                        nc: candidates.length,
+                        ns: 0,
+                        inc: incumbentKind,
+                        chosen: incumbentKind,
+                        ov: 0,
+                        d: null,
+                        ms: Math.round(ms * 10) / 10,
+                        deadlineFallback: 1,
+                    }),
+                );
+            }
+            return incumbent;
+        }
         let bestIdx = 0;
         for (let i = 1; i < means.length; i += 1) {
             if (means[i] > means[bestIdx]) {
@@ -556,7 +641,7 @@ export class SearchDriver {
         if (overridden) {
             this.counters.overrides += 1;
             bump(this.counters.overridesByIncumbentKind, incumbentKind);
-            bump(this.counters.overridesToKind, candidates[bestIdx].kind);
+            bump(this.counters.overridesToKind, scoredCandidates[bestIdx].kind);
         }
         const ms = performance.now() - t0;
         this.counters.msTotal += ms;
@@ -570,8 +655,9 @@ export class SearchDriver {
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     nc: candidates.length,
+                    ns: scoredCandidates.length,
                     inc: incumbentKind,
-                    chosen: overridden ? candidates[bestIdx].kind : incumbentKind,
+                    chosen: overridden ? scoredCandidates[bestIdx].kind : incumbentKind,
                     ov: overridden ? 1 : 0,
                     d:
                         means[bestIdx] === -Infinity || means[0] === -Infinity
@@ -581,7 +667,27 @@ export class SearchDriver {
                 }),
             );
         }
-        return overridden ? candidates[bestIdx].actions : incumbent;
+        return overridden ? scoredCandidates[bestIdx].actions : incumbent;
+    }
+    /** Immediate-leaf pre-pass used only when SEARCH_SHORTLIST is explicitly configured. */
+    private shortlistCandidates(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        seedBase: number,
+        deadlineAt: number | null,
+    ): readonly IEnumeratedCandidate[] {
+        if (this.shortlist === null || candidates.length <= this.shortlist) {
+            return candidates;
+        }
+        const scores = this.scoreCandidates(unit, candidates, seedBase, "leaf", 1, deadlineAt);
+        const challengers = scores
+            .map((score, index) => ({ score, index }))
+            .slice(1)
+            .filter(({ score }) => score !== -Infinity)
+            .sort((left, right) => right.score - left.score || left.index - right.index)
+            .slice(0, this.shortlist - 1)
+            .map(({ index }) => candidates[index]);
+        return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
     private static isWaitCandidate(c: IEnumeratedCandidate): boolean {
@@ -837,17 +943,23 @@ export class SearchDriver {
         candidates: readonly ISearchCandidate[],
         seedBase: number,
         horizonMode: HorizonMode,
+        rolloutCount = this.rollouts,
+        deadlineAt: number | null = null,
     ): number[] {
+        this.assertBeforeDecisionDeadline(deadlineAt);
         const snapshot = snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
         const savedStats = this.deps.captureDamageStats();
+        this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
         for (const cand of candidates) {
+            this.assertBeforeDecisionDeadline(deadlineAt);
             let sum = 0;
             let illegal = false;
-            for (let r = 0; r < this.rollouts; r += 1) {
+            for (let r = 0; r < rolloutCount; r += 1) {
+                this.assertBeforeDecisionDeadline(deadlineAt);
                 let score: number;
                 try {
-                    score = this.rollout(unit, cand, seedBase, r, horizonMode);
+                    score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt);
                 } finally {
                     restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
                     this.deps.restoreDamageStats(savedStats);
@@ -858,16 +970,29 @@ export class SearchDriver {
                 }
                 sum += score;
             }
-            means.push(illegal ? -Infinity : sum / this.rollouts);
+            means.push(illegal ? -Infinity : sum / rolloutCount);
         }
         return means;
+    }
+    private assertBeforeDecisionDeadline(deadlineAt: number | null): void {
+        if (deadlineAt !== null && performance.now() >= deadlineAt) {
+            throw new SearchDecisionDeadlineExceeded();
+        }
     }
     /**
      * One rollout: apply the candidate through the real engine, close the turn, then let BOTH sides play
      * their real policies forward to the horizon; return the leaf P(win) for the acting team.
      * Paired seeds: rollout r reseeds the private stream identically for every candidate.
      */
-    private rollout(unit: Unit, cand: ISearchCandidate, seedBase: number, r: number, horizonMode: HorizonMode): number {
+    private rollout(
+        unit: Unit,
+        cand: ISearchCandidate,
+        seedBase: number,
+        r: number,
+        horizonMode: HorizonMode,
+        deadlineAt: number | null = null,
+    ): number {
+        this.assertBeforeDecisionDeadline(deadlineAt);
         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));
         this.finishedSim = false;
         this.deps.setActiveUnitId(unit.getId());
@@ -879,10 +1004,12 @@ export class SearchDriver {
         // ply 0 — the candidate itself.
         let didSomething = false;
         for (const a of cand.actions) {
+            this.assertBeforeDecisionDeadline(deadlineAt);
             if (this.finishedSim) {
                 break;
             }
             const result = this.deps.engine.apply(a);
+            this.assertBeforeDecisionDeadline(deadlineAt);
             if (!result.completed && a.type !== "select_attack_type") {
                 if (!isIncumbent) {
                     return -Infinity; // enumerated candidates are legal by construction; a rejection is a bug
@@ -898,6 +1025,7 @@ export class SearchDriver {
             return -Infinity; // nothing landed: battle_engine's recovery would replace this turn anyway
         }
         if (!this.finishedSim && this.deps.getActiveUnitId() === unit.getId()) {
+            this.assertBeforeDecisionDeadline(deadlineAt);
             if (!didSomething) {
                 this.processEvents(this.deps.engine.apply({ type: "defend_turn", unitId: unit.getId() }).events);
             }
@@ -913,13 +1041,16 @@ export class SearchDriver {
         // roll forward — both sides play their real policies.
         const enemyTeam = otherTeam(actingTeam);
         const cap =
-            horizonMode === "lap"
-                ? MAX_LAP_HORIZON_TURNS
-                : horizonMode === "reply"
-                  ? MAX_REPLY_HORIZON_TURNS
-                  : this.horizon;
+            horizonMode === "leaf"
+                ? 0
+                : horizonMode === "lap"
+                  ? MAX_LAP_HORIZON_TURNS
+                  : horizonMode === "reply"
+                    ? MAX_REPLY_HORIZON_TURNS
+                    : this.horizon;
         let turns = 0;
         while (!this.finishedSim && turns < cap) {
+            this.assertBeforeDecisionDeadline(deadlineAt);
             if (horizonMode === "lap" && this.deps.fightProperties.getCurrentLap() > startLap) {
                 break; // the lap flipped — the hourglass queue has fully resolved
             }
@@ -942,7 +1073,10 @@ export class SearchDriver {
                 break; // the opponent has replied once — the shelved lookahead's horizon
             }
         }
-        return this.leafValue(actingTeam);
+        this.assertBeforeDecisionDeadline(deadlineAt);
+        const value = this.leafValue(actingTeam);
+        this.assertBeforeDecisionDeadline(deadlineAt);
+        return value;
     }
     /** Leaf eval as P(win) for `team`: learned logistic value when configured, else normalized material. */
     private leafValue(team: TeamType): number {
