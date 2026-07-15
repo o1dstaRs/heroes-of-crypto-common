@@ -27,6 +27,11 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import {
+    IL_CANDIDATE_FEATURE_NAMES,
+    ilActionSignature,
+    ilCandidateFeatureVector,
+} from "../../src/simulation/il_dataset";
 import { Spell } from "../../src/spells/spell";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -239,6 +244,83 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(shot.aimCell).toBeDefined();
             expect(shot.aimSide).toBeDefined();
         }
+    });
+
+    it("shots: an exact incumbent duplicate is enriched in place and omitted from challengers", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+        });
+        const ally = createTestUnit({ team: LOWER, name: "Focus", attackType: MELEE });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "Target",
+            attackType: RANGE,
+            rangeShots: 3,
+            damageMax: 4,
+            amountAlive: 5,
+        });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 10 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 11, y: 10 });
+
+        const generated = ofKind(enumerateCandidates(shooter, ctxFor(c, true), endTurn(shooter)).candidates, "shot")[0];
+        expect(generated).toBeDefined();
+        expect(generated.shotFeatures).toMatchObject({
+            friendlyFireDamage: 0,
+            targetIsRanged: 1,
+            targetCanCastSpells: 0,
+            targetNotYetActed: 1,
+            targetWoundedFraction: 0,
+            targetFocusFire: 0.5,
+        });
+        expect(generated.shotFeatures!.primaryTargetDamage).toBeGreaterThan(0);
+
+        const incumbent = generated.actions;
+        const { candidates } = enumerateCandidates(shooter, ctxFor(c, true), incumbent);
+        const anchor = candidates[0];
+        expect(anchor.kind).toBe("incumbent");
+        expect(anchor.actions).toBe(incumbent);
+        expect(anchor.targetId).toBe(target.getId());
+        expect(anchor.shotFeatures).toEqual(generated.shotFeatures);
+        expect(anchor.features.expectedDamage).toBe(generated.features.expectedDamage);
+        expect(anchor.features.expectedKill).toBe(generated.features.expectedKill);
+        expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(generated.features));
+        expect(ilCandidateFeatureVector(anchor.features)).toHaveLength(IL_CANDIDATE_FEATURE_NAMES.length);
+
+        // Candidate 0 keeps the exact action identity and the generator does not emit it again as a challenger.
+        const signatures = candidates.map((candidate) => ilActionSignature(candidate.actions));
+        expect(new Set(signatures).size).toBe(signatures.length);
+        expect(ofKind(candidates, "shot").some((candidate) => candidate.targetId === target.getId())).toBe(false);
+    });
+
+    it("shots: exposes friendly-fire damage separately without changing net expected damage", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const ally = createTestUnit({ team: LOWER, name: "Ally", attackType: MELEE, amountAlive: 20 });
+        const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, amountAlive: 20 });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 10 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 10, y: 9 });
+
+        const shots = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "shot");
+        const splash = shots.find((candidate) => (candidate.shotFeatures?.friendlyFireDamage ?? 0) > 0);
+        expect(splash).toBeDefined();
+        expect(splash!.shotFeatures!.enemyDamage).toBeGreaterThan(0);
+        expect(splash!.features.expectedDamage).toBe(
+            splash!.shotFeatures!.enemyDamage - splash!.shotFeatures!.friendlyFireDamage,
+        );
+
+        const incumbent = splash!.actions;
+        const anchor = enumerateCandidates(garg, ctxFor(c), incumbent).candidates[0];
+        expect(anchor.actions).toBe(incumbent);
+        expect(anchor.shotFeatures).toEqual(splash!.shotFeatures);
+        expect(anchor.features.expectedDamage).toBe(splash!.features.expectedDamage);
     });
 
     it("shots: a pinned shooter (adjacent enemy) gets NO shot candidates (engine would reject)", () => {

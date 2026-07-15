@@ -4,6 +4,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { GameAction } from "../../src/engine/actions";
 import {
     IL_CANDIDATE_FEATURE_NAMES,
+    IL_DATASET_VERSION,
     ilActionSignature,
     parseIlRow,
     validateIlCorpus,
@@ -87,6 +88,24 @@ const validate = (lines: string[], expectedGames = 1) =>
     });
 
 describe("IL dataset v2", () => {
+    it("keeps the hardened v2 candidate feature schema stable", () => {
+        expect(IL_DATASET_VERSION).toBe(2);
+        expect([...IL_CANDIDATE_FEATURE_NAMES]).toEqual([
+            "moraleDelta",
+            "luckDelta",
+            "enemiesNotYetActedFrac",
+            "alliesNotYetActedFrac",
+            "lap",
+            "hourglassSpent",
+            "spendsRangeShot",
+            "spendsSpellCharge",
+            "burnsResurrectionCharge",
+            "expectedDamage",
+            "expectedKill",
+        ]);
+        expect(features).toHaveLength(11);
+    });
+
     it("preserves attack-type selection as semantic identity", () => {
         expect(ilActionSignature([selectRange, shot])).toBe(`sel:${PBTypes.AttackVals.RANGE}|rg:e@-/-`);
         expect(ilActionSignature([selectRange, shot])).not.toBe(ilActionSignature([shot]));

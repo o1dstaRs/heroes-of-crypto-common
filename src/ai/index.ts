@@ -33,6 +33,7 @@ export type {
     ICandidateSet,
     IEnumeratedCandidate,
     IEnumerateOptions,
+    IShotCandidateFeatures,
 } from "./candidates";
 
 /**

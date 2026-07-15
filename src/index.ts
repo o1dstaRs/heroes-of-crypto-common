@@ -80,6 +80,7 @@ export type {
     ICandidateSet,
     IEnumeratedCandidate,
     IEnumerateOptions,
+    IShotCandidateFeatures,
 } from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";

@@ -113,6 +113,31 @@ export interface ICandidateFeatures {
     expectedKill: 0 | 1;
 }
 
+/**
+ * Shot-only observations that are useful to a same-class target/aim scorer. They deliberately stay outside
+ * `ICandidateFeatures`: the hardened IL v2 corpus has a fixed 11-value feature vector, and extending that
+ * serialized schema requires a separately versioned corpus. These values are deterministic views of signals
+ * the v0.5 shot scorer already reads; they do not affect candidate generation or live decisions.
+ */
+export interface IShotCandidateFeatures {
+    /** Expected effective damage to all enemies before friendly-fire is subtracted. */
+    enemyDamage: number;
+    /** Expected effective damage to allied stacks caught by the shot. */
+    friendlyFireDamage: number;
+    /** Expected effective damage dealt specifically to the aimed stack. */
+    primaryTargetDamage: number;
+    /** v0.5's target firepower proxy, normalized by 1,000. */
+    targetFirepower: number;
+    targetLevel: number;
+    targetIsRanged: 0 | 1;
+    targetCanCastSpells: 0 | 1;
+    targetNotYetActed: 0 | 1;
+    /** Fraction of the target stack already dead. */
+    targetWoundedFraction: number;
+    /** v0.5's focus-fire signal: adjacent allied stacks divided by two. */
+    targetFocusFire: number;
+}
+
 export interface IEnumeratedCandidate {
     kind: CandidateKind;
     /** Ordered engine actions implementing the candidate (same convention as IAIStrategy.decideTurn). */
@@ -125,6 +150,8 @@ export interface IEnumeratedCandidate {
     targetCell?: XY;
     /** Melee stand cell (the attackFrom base cell). */
     standCell?: XY;
+    /** Deterministic shot-only metadata; absent for non-shot candidates. */
+    shotFeatures?: IShotCandidateFeatures;
     features: ICandidateFeatures;
 }
 
@@ -328,11 +355,33 @@ class CandidateGenerator {
     private push(cand: IEnumeratedCandidate): boolean {
         const sig = this.signature(cand.actions);
         if (this.seen.has(sig)) {
+            this.enrichIncumbentShot(cand, sig);
             return false;
         }
         this.seen.add(sig);
         this.candidates.push(cand);
         return true;
+    }
+    /**
+     * Candidate 0 is intentionally retained when enumeration rediscovers the incumbent action. A duplicate
+     * generated shot nevertheless has information the raw incumbent action list cannot carry, so copy that
+     * observation onto the anchor without changing its kind, actions, identity, or position.
+     */
+    private enrichIncumbentShot(cand: IEnumeratedCandidate, sig = this.signature(cand.actions)): void {
+        const incumbent = this.candidates[0];
+        if (
+            cand.kind !== "shot" ||
+            !incumbent ||
+            incumbent.kind !== "incumbent" ||
+            this.signature(incumbent.actions) !== sig
+        ) {
+            return;
+        }
+        incumbent.targetId = cand.targetId;
+        incumbent.shotFeatures = cand.shotFeatures;
+        incumbent.features.spendsRangeShot = cand.features.spendsRangeShot;
+        incumbent.features.expectedDamage = cand.features.expectedDamage;
+        incumbent.features.expectedKill = cand.features.expectedKill;
     }
     // ---- wait / defend ---------------------------------------------------------------------------
     /** Hourglass — mirrors GameActionEngine.canWaitOnHourglass exactly. */
@@ -616,9 +665,18 @@ class CandidateGenerator {
         primaryTargetId: string | undefined,
         shots: number,
         isAOE: boolean,
-    ): { value: number; kill: 0 | 1 } {
+    ): {
+        value: number;
+        kill: 0 | 1;
+        enemyDamage: number;
+        friendlyFireDamage: number;
+        primaryTargetDamage: number;
+    } {
         let value = 0;
         let kill: 0 | 1 = 0;
+        let enemyDamage = 0;
+        let friendlyFireDamage = 0;
+        let primaryTargetDamage = 0;
         const counted = new Set<string>();
         const fightProperties = this.context.fightProperties;
         const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(this.unit.getTeam()) ?? 0;
@@ -679,15 +737,45 @@ class CandidateGenerator {
                 }
                 if (target.getTeam() === this.enemyTeam) {
                     value += effective;
+                    enemyDamage += effective;
                     if (primaryTargetId && target.getId() === primaryTargetId && effective >= hp) {
                         kill = 1;
                     }
+                    if (primaryTargetId && target.getId() === primaryTargetId) {
+                        primaryTargetDamage = effective;
+                    }
                 } else {
                     value -= effective;
+                    friendlyFireDamage += effective;
                 }
             }
         }
-        return { value, kill };
+        return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage };
+    }
+    /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */
+    private shotFeatures(
+        target: Unit,
+        damage: Pick<IShotCandidateFeatures, "enemyDamage" | "friendlyFireDamage" | "primaryTargetDamage">,
+    ): IShotCandidateFeatures {
+        const died = target.getAmountDied();
+        const alive = target.getAmountAlive();
+        const focus =
+            this.allies.filter((ally) =>
+                ally.getCells().some((ac) => target.getCells().some((tc) => isAdjacentCell(ac, tc))),
+            ).length / 2;
+        return {
+            ...damage,
+            targetFirepower: (Math.max(1, target.getRangeShots()) * Math.max(1, target.getAttackDamageMax())) / 1_000,
+            targetLevel: target.getLevel(),
+            targetIsRanged: target.getAttackType() === RANGE ? 1 : 0,
+            targetCanCastSpells: target.getCanCastSpells() ? 1 : 0,
+            targetNotYetActed:
+                this.context.fightProperties && !this.context.fightProperties.hasAlreadyMadeTurn(target.getId())
+                    ? 1
+                    : 0,
+            targetWoundedFraction: died + alive > 0 ? died / (died + alive) : 0,
+            targetFocusFire: focus,
+        };
     }
     /** Every enemy x visible edge; aims with identical hit sets (units + divisors) are deduped. */
     private addShots(): void {
@@ -712,6 +800,7 @@ class CandidateGenerator {
             aimSide: RangeAttackCellSide;
             value: number;
             kill: 0 | 1;
+            shotFeatures: IShotCandidateFeatures;
         }
         const found: IShot[] = [];
         const hitSetSeen = new Set<string>();
@@ -758,13 +847,14 @@ class CandidateGenerator {
                         continue;
                     }
                     hitSetSeen.add(hitSig);
-                    const { value, kill } = this.shotDamage(evaluation, enemy.getId(), shots, isAOE);
+                    const damage = this.shotDamage(evaluation, enemy.getId(), shots, isAOE);
                     found.push({
                         targetId: enemy.getId(),
                         aimCell: { x: cell.x, y: cell.y },
                         aimSide: side,
-                        value,
-                        kill,
+                        value: damage.value,
+                        kill: damage.kill,
+                        shotFeatures: this.shotFeatures(enemy, damage),
                     });
                 }
             }
@@ -775,22 +865,30 @@ class CandidateGenerator {
             kept = [...found].sort((a, b) => b.value - a.value).slice(0, cap);
             this.truncated.push("shot");
         }
+        const candidateOf = (s: IShot): IEnumeratedCandidate => ({
+            kind: "shot",
+            actions: [
+                ...prefix,
+                {
+                    type: "range_attack",
+                    attackerId: this.unit.getId(),
+                    targetId: s.targetId,
+                    aimCell: s.aimCell,
+                    aimSide: s.aimSide,
+                },
+            ],
+            targetId: s.targetId,
+            shotFeatures: s.shotFeatures,
+            features: this.features({ spendsRangeShot: 1, expectedDamage: s.value, expectedKill: s.kill }),
+        });
+        // Enrichment is independent of the challenger cap: even a capped-out duplicate is still the truthful
+        // observation of candidate 0's exact shot.
+        for (const s of found) {
+            const candidate = candidateOf(s);
+            this.enrichIncumbentShot(candidate);
+        }
         for (const s of kept) {
-            this.push({
-                kind: "shot",
-                actions: [
-                    ...prefix,
-                    {
-                        type: "range_attack",
-                        attackerId: this.unit.getId(),
-                        targetId: s.targetId,
-                        aimCell: s.aimCell,
-                        aimSide: s.aimSide,
-                    },
-                ],
-                targetId: s.targetId,
-                features: this.features({ spendsRangeShot: 1, expectedDamage: s.value, expectedKill: s.kill }),
-            });
+            this.push(candidateOf(s));
         }
     }
     // ---- area throw (Gargantuan) ------------------------------------------------------------------
