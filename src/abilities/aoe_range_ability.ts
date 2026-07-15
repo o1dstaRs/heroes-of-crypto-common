@@ -130,11 +130,12 @@ export function processRangeAOEAbility(
                     FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                     sceneLog,
                 );
+                const unitsKilled = Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive());
                 perUnitDamage.push({
                     unitId: unit.getId(),
                     position: unitPositionAtImpact,
                     amount: damageDealt,
-                    unitsDied: Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive()),
+                    unitsDied: unitsKilled,
                 });
 
                 damageStatisticHolder.add({
@@ -148,7 +149,8 @@ export function processRangeAOEAbility(
                     increaseMoraleTotal += pegasusLightEffect.getPower();
                 }
                 sceneLog.updateLog(
-                    `${attackerUnit.getName()} ${isAttack ? "🏹" : "resp"} ${unit.getName()} (${damageFromAttack})`,
+                    `${attackerUnit.getName()} ${isAttack ? "🏹" : "resp"} ${unit.getName()} (${damageFromAttack})` +
+                        HoCLib.killTag(unitsKilled),
                 );
                 maxDamage = Math.max(maxDamage, damageFromAttack);
 
