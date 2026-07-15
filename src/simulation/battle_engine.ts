@@ -578,6 +578,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             if (perk) {
                 fightProperties.setPerkPerTeam(team, perk);
             }
+            if (t1 || t2 || augments?.length) {
+                // Init the per-team setup maps FIRST (canAugment/applyAugments read them). This must precede
+                // setArtifactPerTeam: the team's first setDefaultPlacementPerTeam call initializes the
+                // artifact maps to NO_ARTIFACT, so ordering it after wiped any already-seeded artifact ids —
+                // every sim game that fielded artifacts AND augments silently lost its artifacts (found
+                // 2026-07-15; the live server seeds placement before artifacts, so this was sim-only). Units
+                // are already placed, so the default-placement value only affects budget accounting, not
+                // where units sit.
+                fightProperties.setDefaultPlacementPerTeam(team, DefaultPlacementLevel1.THREE_BY_THREE);
+            }
             if (t1) {
                 fightProperties.setArtifactPerTeam(team, ArtifactTier.TIER_1, t1);
             }
@@ -585,9 +595,6 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 fightProperties.setArtifactPerTeam(team, ArtifactTier.TIER_2, t2);
             }
             if (augments?.length) {
-                // Init the augment maps (canAugment/applyAugments read them); units are already placed so the
-                // default-placement value only affects budget accounting, not where units sit.
-                fightProperties.setDefaultPlacementPerTeam(team, DefaultPlacementLevel1.THREE_BY_THREE);
                 for (const a of augments) {
                     fightProperties.setAugmentPerTeam(team, { type: a.kind, value: a.value } as AugmentType);
                 }
