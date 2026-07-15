@@ -72,11 +72,11 @@ resume reconstructs the aggregate audit only from atomically completed fragments
 game keys, and cannot double-count an interrupted shard. Child evaluators explicitly set
 `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0`, Bun's documented runtime transpiler-cache disable switch.
 
-`run.json` freezes the Bun version and a hash-complete snapshot of every installed package, and every restart
-enforces both before opening evidence. The immutable seed manifest contains enough validated bootstrap identity
-to reconstruct the same `run.json` if initialization is interrupted between those two atomic writes. Persisted
-state never supplies ranking data directly: each report and turn audit is revalidated and rehashed first, and
-its report timestamps must be ordered and completed inside that stage's fixed cutoff.
+`run.json` freezes the Bun version and a hash-complete inventory of installed `package.json` manifests, and
+every restart enforces both before opening evidence. The immutable seed manifest contains enough validated
+bootstrap identity to reconstruct the same `run.json` if initialization is interrupted between those two
+atomic writes. Persisted state never supplies ranking data directly: each report and turn audit is revalidated
+and rehashed first, and its report timestamps must be ordered and completed inside that stage's fixed cutoff.
 
 `TERMINAL.json` is atomic, run-bound, and canonically self-hashed. It records all simultaneous cohort lower
 bounds together with the observed and certified 90% verdicts. Its terminal states are:
@@ -88,6 +88,36 @@ bounds together with the observed and certified 90% verdicts. Its terminal state
 Every terminal explicitly records `bake: false`, `deploy: false`, and `productionDefaultChange: false`.
 No qualified or no-qualified final verdict may be emitted after the persisted deadline; a late completion is
 terminalized as `final_incomplete_deadline` instead.
+
+## Host contention quarantine
+
+Latency evidence is decision-grade only on an isolated host. The overnight launch therefore explicitly enables
+the supervisor's host guard. Guard settings are immutable for one output: the first safe preflight persists the
+enabled flag, idle-CPU threshold, sample interval, check interval, and helper protocol. Every resume must provide
+the exact same settings. A guarded output cannot be resumed without its guard, and a previously unguarded output
+cannot have the guard added later; use a fresh output instead.
+
+Preflight and every cumulative five-second window require at least the configured number of idle CPU equivalents.
+The boundary is inclusive: exactly the configured count passes, while any lower value rejects. CPU counters are
+carried from one check to the next, so CPU work between process snapshots is still accounted for. CPU-count drift,
+counter regression, an unreadable baseline, `os.cpus()` failure, or `ps` failure fails closed. The process snapshot
+also rejects any non-zombie Bun/Node HoC simulation and any actual `run_v0_7_96h.sh` wrapper. A sleeping HoC job is
+intentionally forbidden because it can wake between checks. Inline shell command text is not treated as a live
+wrapper, and the current supervisor PID plus the optimizer's entire `setsid` process group are excluded.
+
+Before preflight or optimizer spawn, the supervisor atomically writes `SUPERVISOR_HOST_GUARD_ARMED`. If contention
+or a probe failure occurs, it first renames that sentinel to
+`SUPERVISOR_HOST_CONTENTION_QUARANTINE`, then stops and verifies disappearance of the complete optimizer process
+group. The heartbeat becomes `host-contention-quarantined` and the assessment is recorded in the marker and log.
+The quarantine marker wins over `TERMINAL.json` and deadline markers based on existence, even if its contents are
+damaged. It is permanent for that output. A stale armed sentinel after a crash or `SIGKILL` is promoted to the same
+permanent quarantine on the next invocation, so partial checkpoints from an unmonitored interval cannot resume or
+be accepted. The armed sentinel is removed only after a completed safe assessment and verified controlled stop.
+
+The probe itself is portable across macOS and Linux, using fresh-runtime `os.cpus()` counters and portable `ps`
+columns. The supervisor retains its existing fail-closed command requirements (`flock`, `setsid`, and a `realpath`
+with `-m` support); stock macOS does not provide all three, so compatible commands must already be on `PATH` before
+launch. Missing commands stop before the output is opened.
 
 ## Launch on Zinc
 
@@ -109,6 +139,10 @@ nohup env \
   V07_96H_OUT="$OUT" \
   V07_96H_HOURS=12 \
   V07_96H_OPTIMIZER=src/simulation/optimizer/v0_7_overnight.mjs \
+  V07_96H_HOST_GUARD=1 \
+  V07_96H_HOST_GUARD_MIN_IDLE_CPUS=8 \
+  V07_96H_HOST_GUARD_SAMPLE_MS=1000 \
+  V07_96H_HOST_GUARD_CHECK_SECONDS=5 \
   V07_OVERNIGHT_WORKERS=12 \
   V07_OVERNIGHT_CHECKPOINT_GAMES=32 \
   V07_OVERNIGHT_SCOUT_GAMES=32 \
@@ -125,10 +159,15 @@ Twelve workers use half of Zinc's 24 physical cores and avoid oversubscribing th
 expected wall time is 8-12 hours: roughly 2-4 hours scout, 2-3 hours deep, and up to 4 hours final. The fixed
 12-hour deadline is never extended; completed shards remain valid evidence if the final is incomplete.
 
+For the local 16-core M4 Max, retain 12 workers but set `V07_96H_HOST_GUARD_MIN_IDLE_CPUS=2`. This preserves a
+small inclusive idle-capacity floor after the optimizer's own load. Do not reuse a Zinc output or change the
+threshold after the first safe preflight.
+
 Status and stop semantics are unchanged from the 96-hour supervisor:
 
 ```bash
 cat "$OUT/supervisor.heartbeat"
+cat "$OUT/supervisor.host_guard.config"
 cat "$OUT/heartbeat"
 tail -n 100 "$OUT/supervisor.log"
 tail -n 100 "$OUT/optimizer.log"
@@ -138,3 +177,6 @@ test -f "$OUT/TERMINAL.json" && cat "$OUT/TERMINAL.json"
 # Stop the supervisor, which owns and otherwise restarts the optimizer.
 kill -TERM "$(cat "$OUT/supervisor.pid")"
 ```
+
+If `SUPERVISOR_HOST_CONTENTION_QUARANTINE` or a stale `SUPERVISOR_HOST_GUARD_ARMED` exists, that output is
+irrecoverable by design. Preserve it for audit and start a new output after the host is isolated.

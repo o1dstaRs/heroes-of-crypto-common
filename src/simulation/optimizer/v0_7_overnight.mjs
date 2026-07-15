@@ -32,6 +32,13 @@ import {
     V07_96H_PAIR_SEED_STEP,
     V07_96H_TEMPLATES,
 } from "./v0_7_96h_core.ts";
+import {
+    captureV07OvernightExecutionHost,
+    chooseV07OvernightDeepEvidence,
+    compareV07OvernightEvidence,
+    qualifiesV07OvernightCircuit,
+    summarizeV07OvernightCircuitAuditRows,
+} from "./v0_7_overnight_core.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, "../../..");
@@ -370,6 +377,7 @@ function initializationFingerprint(revision, anchor) {
         anchorId: anchor.genomeId,
         anchorArtifactSha256: anchor.artifactSha256,
         dependencySnapshotSha256: dependencies.sha256,
+        executionHost,
     });
 }
 
@@ -390,6 +398,7 @@ function validateSeedManifest(manifest, revision, anchor) {
         bootstrap.anchorId !== anchor.genomeId ||
         bootstrap.anchorArtifactSha256 !== anchor.artifactSha256 ||
         bootstrap.dependencySnapshotSha256 !== dependencies.sha256 ||
+        canonicalJson(bootstrap.executionHost) !== canonicalJson(executionHost) ||
         !Number.isFinite(Date.parse(bootstrap.createdAt)) ||
         !Number.isFinite(Date.parse(bootstrap.deadlineAt)) ||
         Date.parse(bootstrap.deadlineAt) <= Date.parse(bootstrap.createdAt) ||
@@ -492,6 +501,7 @@ function initializeRun() {
                 anchorId: anchor.genomeId,
                 anchorArtifactSha256: anchor.artifactSha256,
                 dependencySnapshotSha256: dependencies.sha256,
+                executionHost,
             },
             pairSeedStep: V07_96H_PAIR_SEED_STEP,
             priorManifests: prior.manifests,
@@ -519,6 +529,7 @@ function initializeRun() {
             bunVersion: process.versions.bun,
             dependencies,
         },
+        executionHost,
         config: CONFIG,
         anchor: { path: anchor.path, artifactSha256: anchor.artifactSha256, genomeId: anchor.genomeId },
         seedManifest: { path: "seed-manifest.json", sha256: sha256(manifestRaw) },
@@ -537,6 +548,7 @@ if (gitText(["status", "--porcelain", "--untracked-files=all"]) !== "") {
     throw new Error("Overnight research refuses a dirty source tree");
 }
 const dependencies = installedDependencySnapshot();
+const executionHost = captureV07OvernightExecutionHost();
 
 const allocationLock = join(dirname(OUT), ".v0_7_96h_seed_allocation.flock");
 if (!existsSync(RUN_PATH) && process.env.V07_OVERNIGHT_SEED_LOCK_HELD !== "1") {
@@ -577,6 +589,7 @@ if (
     run.code.sourceTreeSha256 !== sourceTreeSha256() ||
     run.code.bunVersion !== process.versions.bun ||
     canonicalJson(run.code.dependencies) !== canonicalJson(dependencies) ||
+    canonicalJson(run.executionHost) !== canonicalJson(executionHost) ||
     run.anchor.artifactSha256 !== anchor.artifactSha256 ||
     run.seedManifest.sha256 !== sha256(readFileSync(SEED_MANIFEST_PATH))
 ) {
@@ -658,95 +671,33 @@ function expectedBehaviorEnvironment(candidate, auditPath) {
     );
 }
 
-function expectedAuditGameKeys(templates, games, seeds) {
-    const keys = new Set();
+function expectedAuditGames(templates, games, seeds) {
+    const templateByGameKey = new Map();
     for (const template of templates) {
         for (let game = 0; game < games; game += 1) {
             const seed = (seeds[template] + Math.imul(Math.floor(game / 2), V07_96H_PAIR_SEED_STEP)) >>> 0;
             const candidateIsGreen = game % 2 === 0;
             const key = `${seed}|${candidateIsGreen ? "v0.7" : "v0.6"}|${candidateIsGreen ? "v0.6" : "v0.7"}`;
-            if (keys.has(key)) throw new Error(`Overnight expected audit key collision: ${key}`);
-            keys.add(key);
+            if (templateByGameKey.has(key)) throw new Error(`Overnight expected audit key collision: ${key}`);
+            templateByGameKey.set(key, template);
         }
     }
-    return keys;
+    return templateByGameKey;
 }
 
-function auditDiagnostics(path, expectedKeys) {
-    const gameKeys = new Set();
-    const overBudgetGames = new Set();
-    const currentOverBudget = new Set();
+function auditDiagnostics(path, expectedTemplateByGameKey) {
     let invalidJsonLines = 0;
-    let turnRows = 0;
-    let overBudgetTurns = 0;
-    let circuitOpenGames = 0;
-    let circuitSkipped = 0;
-    const turnLatency = [];
+    const rows = [];
     for (const line of readFileSync(path, "utf8").split("\n")) {
         if (!line.trim()) continue;
-        let row;
         try {
-            row = JSON.parse(line);
+            rows.push(JSON.parse(line));
         } catch {
             invalidJsonLines += 1;
-            continue;
-        }
-        const key = `${String(row.seed)}|${String(row.green)}|${String(row.red)}`;
-        if (!expectedKeys.has(key)) throw new Error(`Unexpected overnight audit game key: ${key}`);
-        if (row.t === "turn") {
-            if (gameKeys.has(key)) throw new Error(`Overnight turn row follows its game summary: ${key}`);
-            turnRows += 1;
-            if (typeof row.ms === "number" && Number.isFinite(row.ms)) {
-                turnLatency.push(row.ms);
-                if (row.ms > CONFIG.circuitBreakerMs) {
-                    overBudgetTurns += 1;
-                    currentOverBudget.add(key);
-                }
-            }
-        } else if (row.t === "game") {
-            if (gameKeys.has(key)) throw new Error(`Duplicate overnight audit game key: ${key}`);
-            if (
-                row.circuitBreakerMs !== CONFIG.circuitBreakerMs ||
-                typeof row.circuitOpened !== "boolean" ||
-                !Number.isSafeInteger(row.circuitSkipped) ||
-                row.circuitSkipped < 0
-            ) {
-                throw new Error(`Invalid overnight circuit summary for ${key}`);
-            }
-            gameKeys.add(key);
-            if (currentOverBudget.has(key)) overBudgetGames.add(key);
-            if (row.circuitOpened === true) circuitOpenGames += 1;
-            if (Number.isSafeInteger(row.circuitSkipped)) circuitSkipped += row.circuitSkipped;
         }
     }
-    const missingKeys = [...expectedKeys].filter((key) => !gameKeys.has(key));
-    if (invalidJsonLines || missingKeys.length) {
-        throw new Error(
-            `Overnight audit has ${invalidJsonLines} invalid lines and ${missingKeys.length} missing expected games`,
-        );
-    }
-    turnLatency.sort((left, right) => left - right);
-    const quantile = (p) =>
-        turnLatency.length
-            ? turnLatency[Math.min(turnLatency.length - 1, Math.ceil(p * turnLatency.length) - 1)]
-            : null;
-    return {
-        auditGames: gameKeys.size,
-        turnRows,
-        overBudgetTurns,
-        overBudgetTurnRate: turnRows ? overBudgetTurns / turnRows : 0,
-        overBudgetGames: overBudgetGames.size,
-        circuitOpenGames,
-        circuitOpenGameRate: gameKeys.size ? circuitOpenGames / gameKeys.size : 0,
-        circuitSkipped,
-        turnLatencyMs: {
-            count: turnLatency.length,
-            p50: quantile(0.5),
-            p95: quantile(0.95),
-            p99: quantile(0.99),
-            max: quantile(1),
-        },
-    };
+    if (invalidJsonLines) throw new Error(`Overnight audit has ${invalidJsonLines} invalid JSON lines`);
+    return summarizeV07OvernightCircuitAuditRows(rows, expectedTemplateByGameKey, CONFIG.circuitBreakerMs);
 }
 
 function metricMap(report) {
@@ -785,9 +736,11 @@ function summarizeEvaluation(report, circuit) {
         rangedDrawOrArmageddonRate: ranged?.drawOrArmageddonRate ?? null,
         candidateRejections,
         missingRejectionCounts,
-        circuitQualified:
-            circuit.circuitOpenGameRate <= CONFIG.maximumCircuitOpenGameRate &&
-            (circuit.turnLatencyMs.p95 ?? Infinity) <= CONFIG.circuitBreakerMs,
+        circuitQualified: qualifiesV07OvernightCircuit(
+            circuit,
+            CONFIG.maximumCircuitOpenGameRate,
+            CONFIG.circuitBreakerMs,
+        ),
         integrityQualified:
             maximumDrawOrArmageddonRate <= CONFIG.maximumDrawOrArmageddonRate &&
             candidateRejections === 0 &&
@@ -843,7 +796,7 @@ function validateEvaluation(candidate, panelId, templates, games, paths, cutoffM
     ) {
         throw new Error(`Overnight report protocol mismatch for ${panelId}/${candidate.label}`);
     }
-    const circuit = auditDiagnostics(paths.audit, expectedAuditGameKeys(templates, games, seeds));
+    const circuit = auditDiagnostics(paths.audit, expectedAuditGames(templates, games, seeds));
     if (circuit.turnRows !== report.searchAudit.searchedTurns) {
         throw new Error(`Overnight turn audit mismatch for ${panelId}/${candidate.label}`);
     }
@@ -952,34 +905,8 @@ async function evaluate(candidate, panelId, templates, cutoffMs) {
     return loadOrCreateEnvelope(candidate, panelId, templates, games, paths, cutoffMs).reference;
 }
 
-function compareEvidence(left, right) {
-    return (
-        Number(right.summary.circuitQualified) - Number(left.summary.circuitQualified) ||
-        right.summary.integrityUtility - left.summary.integrityUtility ||
-        right.summary.utilityDecisiveWinRate - left.summary.utilityDecisiveWinRate ||
-        left.circuit.circuitOpenGameRate - right.circuit.circuitOpenGameRate ||
-        right.summary.minimumTemplateRate - left.summary.minimumTemplateRate ||
-        left.summary.maximumDrawOrArmageddonRate - right.summary.maximumDrawOrArmageddonRate ||
-        left.profileId.localeCompare(right.profileId)
-    );
-}
-
-function chooseDeep(evidence) {
-    const ranked = [...evidence].sort(compareEvidence);
-    const selected = [];
-    const add = (entry) => {
-        if (entry && !selected.some((candidate) => candidate.profileId === entry.profileId)) selected.push(entry);
-    };
-    add(ranked[0]);
-    add(
-        [...evidence].sort(
-            (left, right) => right.summary.utilityDecisiveWinRate - left.summary.utilityDecisiveWinRate,
-        )[0],
-    );
-    add([...evidence].sort((left, right) => left.circuit.circuitOpenGameRate - right.circuit.circuitOpenGameRate)[0]);
-    for (const entry of ranked) add(entry);
-    return selected.slice(0, CONFIG.deepKeep);
-}
+const compareEvidence = compareV07OvernightEvidence;
+const chooseDeep = (evidence) => chooseV07OvernightDeepEvidence(evidence, CONFIG.deepKeep);
 
 function profileById(profiles, id) {
     const candidate = profiles.find((entry) => entry.id === id);
@@ -1086,6 +1013,7 @@ function writeTerminal(finalStatus, selected, finalReference = null, targetGate 
         completedAt: completedAt.toISOString(),
         deadlineAt: run.deadlineAt,
         code: run.code,
+        executionHost: run.executionHost,
         config: run.config,
         anchor: run.anchor,
         seedManifest: run.seedManifest,
@@ -1141,6 +1069,7 @@ async function main() {
             (["qualified_research_candidate", "no_qualified_candidate"].includes(terminal.finalStatus) &&
                 Date.parse(terminal.completedAt) > deadlineMs) ||
             canonicalJson(terminal.code) !== canonicalJson(run.code) ||
+            canonicalJson(terminal.executionHost) !== canonicalJson(run.executionHost) ||
             canonicalJson(terminal.config) !== canonicalJson(run.config) ||
             canonicalJson(terminal.anchor) !== canonicalJson(run.anchor) ||
             canonicalJson(terminal.seedManifest) !== canonicalJson(run.seedManifest) ||
