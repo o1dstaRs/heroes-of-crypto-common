@@ -11,8 +11,61 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getAIStrategy } from "../../src/ai";
+import { getAIStrategy, type IDecisionContext } from "../../src/ai";
+import { StrategyV0_5 } from "../../src/ai/versions/v0_5";
 import { DEFAULT_V05_W, V05_WEIGHT_KEYS, loadV05Weights } from "../../src/ai/versions/v0_5_weights";
+import { getSpellConfig } from "../../src/configuration/config_provider";
+import type { GameAction } from "../../src/engine/actions";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { PathHelper } from "../../src/grid/path_helper";
+import { Spell } from "../../src/spells/spell";
+import type { Unit } from "../../src/units/unit";
+import {
+    createCombatTestContext,
+    createTestUnit,
+    placeUnit,
+    testGridSettings,
+    type CombatTestContext,
+} from "../helpers/combat";
+
+const LOWER = PBTypes.TeamVals.LOWER;
+const UPPER = PBTypes.TeamVals.UPPER;
+
+const decisionContext = (combat: CombatTestContext): IDecisionContext => ({
+    grid: combat.grid,
+    matrix: combat.grid.getMatrix(),
+    unitsHolder: combat.unitsHolder,
+    pathHelper: new PathHelper(testGridSettings),
+    attackHandler: combat.attackHandler,
+});
+
+const applyCowardice = (unit: Unit): void => {
+    unit.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
+};
+
+const aoeRetarget = (
+    unit: Unit,
+    combat: CombatTestContext,
+    baseTarget: Unit,
+    baseAttackFrom: { x: number; y: number },
+    weightIndex: number,
+): Extract<GameAction, { type: "melee_attack" }> => {
+    const weights = new Array(DEFAULT_V05_W.length).fill(0);
+    weights[weightIndex] = 1;
+    const actions = new StrategyV0_5(weights)["aoeMeleeByPolicy"](unit, decisionContext(combat), [
+        {
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: baseTarget.getId(),
+            attackFrom: baseAttackFrom,
+        },
+    ]);
+    const attack = actions.find((action) => action.type === "melee_attack");
+    if (!attack || attack.type !== "melee_attack") {
+        throw new Error("Expected the AOE policy to retain a melee attack");
+    }
+    return attack;
+};
 
 describe("v0.5 — reinforcement-learned strategy", () => {
     afterEach(() => {
@@ -62,5 +115,51 @@ describe("v0.5 — reinforcement-learned strategy", () => {
     it("returns the committed default when no override is set", () => {
         delete process.env.V05_WEIGHTS;
         expect(loadV05Weights()).toEqual(DEFAULT_V05_W.slice());
+    });
+
+    it("aims Lightning Spin at a Cowardice-legal primary without giving up the legal surround", () => {
+        const combat = createCombatTestContext();
+        const spinner = createTestUnit({ team: LOWER, abilities: ["Lightning Spin"], maxHp: 10, speed: 3 });
+        const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
+        const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
+        const splash = createTestUnit({ team: UPPER, name: "Splash", maxHp: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, spinner, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, blocked, { x: 6, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, primary, { x: 7, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, splash, { x: 7, y: 7 });
+        applyCowardice(spinner);
+
+        const attack = aoeRetarget(spinner, combat, primary, { x: 8, y: 6 }, 33);
+
+        expect(blocked.getCumulativeHp()).toBeGreaterThan(spinner.getCumulativeHp());
+        expect(primary.getCumulativeHp()).toBeLessThanOrEqual(spinner.getCumulativeHp());
+        expect(attack.targetId).toBe(primary.getId());
+        expect(attack.targetId).not.toBe(blocked.getId());
+        expect(attack.attackFrom).toEqual({ x: 6, y: 6 });
+        expect(Math.max(Math.abs(splash.getBaseCell().x - 6), Math.abs(splash.getBaseCell().y - 6))).toBe(1);
+    });
+
+    it("aims Skewer through a Cowardice-legal primary while retaining its legal line splash", () => {
+        const combat = createCombatTestContext();
+        const pikeman = createTestUnit({ team: LOWER, abilities: ["Skewer Strike"], maxHp: 10, speed: 3 });
+        const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
+        const blockedSplash = createTestUnit({ team: UPPER, name: "Blocked Splash", amountAlive: 2, maxHp: 10 });
+        const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
+        const splash = createTestUnit({ team: UPPER, name: "Splash", maxHp: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, pikeman, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, blocked, { x: 7, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, blockedSplash, { x: 8, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, primary, { x: 6, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, splash, { x: 6, y: 8 });
+        applyCowardice(pikeman);
+
+        const attack = aoeRetarget(pikeman, combat, primary, { x: 5, y: 7 }, 41);
+
+        expect(blocked.getCumulativeHp()).toBeGreaterThan(pikeman.getCumulativeHp());
+        expect(primary.getCumulativeHp()).toBeLessThanOrEqual(pikeman.getCumulativeHp());
+        expect(attack.targetId).toBe(primary.getId());
+        expect(attack.targetId).not.toBe(blocked.getId());
+        expect(attack.attackFrom).toEqual({ x: 6, y: 6 });
+        expect(splash.getBaseCell()).toEqual({ x: 6, y: 8 });
     });
 });

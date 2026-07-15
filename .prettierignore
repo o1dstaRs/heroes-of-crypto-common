@@ -3,4 +3,6 @@ dist
 package-lock.json
 src/generated
 src/simulation/results/draft_league_round3_*.json
+src/simulation/results/v0_7_96h_d68490a_selection.json
+src/simulation/results/v0_7_96h_d68490a_terminal.json
 src/simulation/manifests/v0_7_96h_*_seeds.json

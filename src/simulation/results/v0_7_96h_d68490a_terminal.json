@@ -1,0 +1,2727 @@
+{
+  "schemaVersion": 1,
+  "status": "complete_research_only",
+  "runId": "dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+  "completedAt": "2026-07-15T06:18:49.473Z",
+  "deadlineAt": "2026-07-15T06:28:47.000Z",
+  "code": {
+    "revision": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+    "branch": "main",
+    "originMain": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+    "sourceTreeSha256": "b63af92f41b3a9d28a6001135879ffffee47e96aa61ac22fd40659bbbb097a1c",
+    "worktreeClean": true,
+    "bunVersion": "1.3.14",
+    "dependencies": {
+      "schemaVersion": 1,
+      "packages": [
+        {
+          "location": "node_modules/@eslint-community/eslint-utils",
+          "name": "@eslint-community/eslint-utils",
+          "version": "4.9.1",
+          "packageJsonSha256": "8bd084d739f6ad91bd4cbe7ff4ec39179da919037d6bc3d9a23897e584632bd9"
+        },
+        {
+          "location": "node_modules/@eslint-community/eslint-utils/node_modules/eslint-visitor-keys",
+          "name": "eslint-visitor-keys",
+          "version": "3.4.3",
+          "packageJsonSha256": "54feabdd2ef488414247dd4ecf71542549db02baced1153465c3ac2e5bf61a6c"
+        },
+        {
+          "location": "node_modules/@eslint-community/regexpp",
+          "name": "@eslint-community/regexpp",
+          "version": "4.12.2",
+          "packageJsonSha256": "63a3c5c082235b46ac213fe91d4b8869d16b0e90d8047f5fe50aefa2dd11d292"
+        },
+        {
+          "location": "node_modules/@eslint/config-array",
+          "name": "@eslint/config-array",
+          "version": "0.21.2",
+          "packageJsonSha256": "b42773cfa9a04f5cd7b0825ba8fe29a95aea7b1a1e31017b3628077f6ec1e020"
+        },
+        {
+          "location": "node_modules/@eslint/config-helpers",
+          "name": "@eslint/config-helpers",
+          "version": "0.4.2",
+          "packageJsonSha256": "9eeb5b6fc0a17a5552a53fe5c02d98854930acff99fa0cd75e26d6166365529d"
+        },
+        {
+          "location": "node_modules/@eslint/core",
+          "name": "@eslint/core",
+          "version": "0.17.0",
+          "packageJsonSha256": "65aa1d2127fd7d10d6041db32f47439d9aa6abc98f55aaed300b575e7bd71993"
+        },
+        {
+          "location": "node_modules/@eslint/eslintrc",
+          "name": "@eslint/eslintrc",
+          "version": "3.3.6",
+          "packageJsonSha256": "db540a7c2676ef19f7ccca7d50a03b93a62631cee246ec58c3c6e5f793259219"
+        },
+        {
+          "location": "node_modules/@eslint/eslintrc/node_modules/ignore",
+          "name": "ignore",
+          "version": "5.3.2",
+          "packageJsonSha256": "a9f40bd310889f21ed824bc19ce140714b7459d658f6708041af53e9855258a6"
+        },
+        {
+          "location": "node_modules/@eslint/js",
+          "name": "@eslint/js",
+          "version": "9.39.5",
+          "packageJsonSha256": "b7a13312c28d9e0d078055362e45545522c7ae9a67f6702e280e1cdcd25cfdc1"
+        },
+        {
+          "location": "node_modules/@eslint/object-schema",
+          "name": "@eslint/object-schema",
+          "version": "2.1.7",
+          "packageJsonSha256": "bda6acdfdddc3dbfacf8669e568d66754af7963c3c58935f9573cc32701dc26b"
+        },
+        {
+          "location": "node_modules/@eslint/plugin-kit",
+          "name": "@eslint/plugin-kit",
+          "version": "0.4.1",
+          "packageJsonSha256": "fe173d1b3cc381fce094f316e9d21296e83ea781ad7f2900fa2f4ee77c1c1af0"
+        },
+        {
+          "location": "node_modules/@humanfs/core",
+          "name": "@humanfs/core",
+          "version": "0.19.2",
+          "packageJsonSha256": "853dea133b11341a1706835191e591535cc470f1101e4070a453b6cc4847e659"
+        },
+        {
+          "location": "node_modules/@humanfs/node",
+          "name": "@humanfs/node",
+          "version": "0.16.8",
+          "packageJsonSha256": "bc1bac9440bc97611a0a8b233960780cff13d8aba4192f6b1ff6739ab6c9c9ed"
+        },
+        {
+          "location": "node_modules/@humanfs/types",
+          "name": "@humanfs/types",
+          "version": "0.15.0",
+          "packageJsonSha256": "1b849aa49814883fc0e70ca461c9faccb675ed1c801e784f1858e75e3b36eec5"
+        },
+        {
+          "location": "node_modules/@humanwhocodes/module-importer",
+          "name": "@humanwhocodes/module-importer",
+          "version": "1.0.1",
+          "packageJsonSha256": "8c22f2bce041e8f99fb983b622ed64efb8098e75d9b01e9cddc3254f5731045b"
+        },
+        {
+          "location": "node_modules/@humanwhocodes/retry",
+          "name": "@humanwhocodes/retry",
+          "version": "0.4.3",
+          "packageJsonSha256": "8e18a261a246f3e65a25664362cf367e18567ae214b1094b297fc1d056c48211"
+        },
+        {
+          "location": "node_modules/@nodelib/fs.scandir",
+          "name": "@nodelib/fs.scandir",
+          "version": "2.1.5",
+          "packageJsonSha256": "d2dd608ef7400bc51bfa744f658b6a32b679ac5c053ef6d21499b2b0db1ccaba"
+        },
+        {
+          "location": "node_modules/@nodelib/fs.stat",
+          "name": "@nodelib/fs.stat",
+          "version": "2.0.5",
+          "packageJsonSha256": "ad8601ad12a424f995579ffa7ae24042c44df9f89248b715dcd8ef56c54aacca"
+        },
+        {
+          "location": "node_modules/@nodelib/fs.walk",
+          "name": "@nodelib/fs.walk",
+          "version": "1.2.8",
+          "packageJsonSha256": "509382ca0b57206ef4ccec2738a6ba060094eb65bd2f4bee1462d941c72d4344"
+        },
+        {
+          "location": "node_modules/@protobufjs/aspromise",
+          "name": "@protobufjs/aspromise",
+          "version": "1.1.2",
+          "packageJsonSha256": "4a39ee1c94f6ee038d2944196aa6167785d3429a91727f828a1274262919e2d8"
+        },
+        {
+          "location": "node_modules/@protobufjs/base64",
+          "name": "@protobufjs/base64",
+          "version": "1.1.2",
+          "packageJsonSha256": "7ff6a89f566b95c0f21a5a9cb12df5718f0b06ef96d4186a92d650c0849fa2c5"
+        },
+        {
+          "location": "node_modules/@protobufjs/codegen",
+          "name": "@protobufjs/codegen",
+          "version": "2.0.5",
+          "packageJsonSha256": "818bf10387c19ab09b3814004ec672ab8d975302cdaf2dd65466bdb604764d65"
+        },
+        {
+          "location": "node_modules/@protobufjs/eventemitter",
+          "name": "@protobufjs/eventemitter",
+          "version": "1.1.1",
+          "packageJsonSha256": "d157d364fe4aee21cfd517abff35bca312ff51e6e6e90abdbec16225057e5914"
+        },
+        {
+          "location": "node_modules/@protobufjs/fetch",
+          "name": "@protobufjs/fetch",
+          "version": "1.1.1",
+          "packageJsonSha256": "52f997898a745acce5d68751883aad6296bcc2f152468ced0ed30e3c3c5a1c72"
+        },
+        {
+          "location": "node_modules/@protobufjs/float",
+          "name": "@protobufjs/float",
+          "version": "1.0.2",
+          "packageJsonSha256": "1cae4ded1bc97375a67fe4608f87ee59990734ea738fabb98e9061ab23669cdf"
+        },
+        {
+          "location": "node_modules/@protobufjs/path",
+          "name": "@protobufjs/path",
+          "version": "1.1.2",
+          "packageJsonSha256": "b19802dd696ceb8a4aa4839f35ab1c8312e97693d93485ff3c3e4f19cca183c4"
+        },
+        {
+          "location": "node_modules/@protobufjs/pool",
+          "name": "@protobufjs/pool",
+          "version": "1.1.0",
+          "packageJsonSha256": "7a33b609e770020fe1e09690cfebc23bbdd6e1306e3f0dd98ba5048966cb7fec"
+        },
+        {
+          "location": "node_modules/@protobufjs/utf8",
+          "name": "@protobufjs/utf8",
+          "version": "1.1.2",
+          "packageJsonSha256": "80fdb6b9f633023846b6cdf352ea795523abcf27affd4d54afd4b50a90a87411"
+        },
+        {
+          "location": "node_modules/@sindresorhus/merge-streams",
+          "name": "@sindresorhus/merge-streams",
+          "version": "4.0.0",
+          "packageJsonSha256": "da4b586ad279978d58e79f1f623e1cb99e883d808325528f2dbffa4c0aa4c5a4"
+        },
+        {
+          "location": "node_modules/@types/bun",
+          "name": "@types/bun",
+          "version": "1.3.14",
+          "packageJsonSha256": "51950bf538917baef310990f9fcf247c88c4f2f631ae5de34f853b318fee0eb1"
+        },
+        {
+          "location": "node_modules/@types/estree",
+          "name": "@types/estree",
+          "version": "1.0.9",
+          "packageJsonSha256": "3537a6a503f57901111d8a29df81962887653deb199b9a795c7fb50bbfdd1bdc"
+        },
+        {
+          "location": "node_modules/@types/google-protobuf",
+          "name": "@types/google-protobuf",
+          "version": "3.15.12",
+          "packageJsonSha256": "71566c799c58ba999a417e6988ee9c5f55c5839aac0f07863735cde55364cccb"
+        },
+        {
+          "location": "node_modules/@types/json-schema",
+          "name": "@types/json-schema",
+          "version": "7.0.15",
+          "packageJsonSha256": "6bf0cb0808cafc14023ae10d55d6a88228397dc54c16106d121f42ac88d64fc8"
+        },
+        {
+          "location": "node_modules/@types/node",
+          "name": "@types/node",
+          "version": "26.1.1",
+          "packageJsonSha256": "83e7472f5b94b43acde2e60b39cef9adc278a1f2a5d7cc4b4c677e29da3e0ab9"
+        },
+        {
+          "location": "node_modules/@types/uuid",
+          "name": "@types/uuid",
+          "version": "11.0.0",
+          "packageJsonSha256": "429b0f4b3b61a0762544782497b5420061801264ea6a97cf3188fcb07f675968"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/eslint-plugin",
+          "name": "@typescript-eslint/eslint-plugin",
+          "version": "8.63.0",
+          "packageJsonSha256": "ae2c300d55e6f3751273a1bec41199ac93b719b55399e002fb92c04ffad0ed4c"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/parser",
+          "name": "@typescript-eslint/parser",
+          "version": "8.63.0",
+          "packageJsonSha256": "cb1bb6f58bd29e476323e6b7308cbdca1b31a04025ceb4e5b7285d356a635acb"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/project-service",
+          "name": "@typescript-eslint/project-service",
+          "version": "8.63.0",
+          "packageJsonSha256": "b200402ff203c6b814dae0a81327d2d64c7e2c880a7188ba516edafd4d254c6b"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/scope-manager",
+          "name": "@typescript-eslint/scope-manager",
+          "version": "8.63.0",
+          "packageJsonSha256": "57276d6955def0253dd97413d33ed6bc2cf39fd59c5467cf14023372bb520d49"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/tsconfig-utils",
+          "name": "@typescript-eslint/tsconfig-utils",
+          "version": "8.63.0",
+          "packageJsonSha256": "7beacd6cca80cf2f36c4ab5bf566dc7e26208c7cc580fa3b5afb2b2696804961"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/type-utils",
+          "name": "@typescript-eslint/type-utils",
+          "version": "8.63.0",
+          "packageJsonSha256": "01e06ba2593ef2a53f745a93f4ab9c85ba73d22afffa8f993a66f1ab28295d39"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/types",
+          "name": "@typescript-eslint/types",
+          "version": "8.63.0",
+          "packageJsonSha256": "99e5caca40414f78ed08e51d57ec67393dd6c694aef6ac594197e4e3f74961a1"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/typescript-estree",
+          "name": "@typescript-eslint/typescript-estree",
+          "version": "8.63.0",
+          "packageJsonSha256": "05ec6e6383f3e06b3160ab2ac9c2c08dbd46b133404c48f77a4347bbd6f21c0c"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch",
+          "name": "minimatch",
+          "version": "10.2.5",
+          "packageJsonSha256": "4b3a08a7ad20dead8bbe4b4fe97a2746bded7c51d218ef3034eb4e330ad31f08"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch/node_modules/brace-expansion",
+          "name": "brace-expansion",
+          "version": "5.0.7",
+          "packageJsonSha256": "f792e76015d954c06e8ac42cfa5664820126b2ecce01c987fe59de65bea57ab4"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch/node_modules/brace-expansion/node_modules/balanced-match",
+          "name": "balanced-match",
+          "version": "4.0.4",
+          "packageJsonSha256": "c984e6ae5c41fac085a07a732b665b22e0a26f28b61c692ba18ff458a8ecc95a"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/utils",
+          "name": "@typescript-eslint/utils",
+          "version": "8.63.0",
+          "packageJsonSha256": "c5daa662b6f001103442699b3e9658b5a630e61ff98aa13a9cb02c3e30b61ac3"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/visitor-keys",
+          "name": "@typescript-eslint/visitor-keys",
+          "version": "8.63.0",
+          "packageJsonSha256": "1b72f9717f8325fdbbba40b8f7861502ab1cffdcd9e1e8672eedb9a13bde68ef"
+        },
+        {
+          "location": "node_modules/@typescript-eslint/visitor-keys/node_modules/eslint-visitor-keys",
+          "name": "eslint-visitor-keys",
+          "version": "5.0.1",
+          "packageJsonSha256": "13f8b0207958a2d504740826e8245bc2b023248136275550907a5569d8659242"
+        },
+        {
+          "location": "node_modules/acorn",
+          "name": "acorn",
+          "version": "8.17.0",
+          "packageJsonSha256": "fa3612cc9493702b7520947eec276d7b4a73001dafd68c4a9dcb58791a4145c6"
+        },
+        {
+          "location": "node_modules/acorn-jsx",
+          "name": "acorn-jsx",
+          "version": "5.3.2",
+          "packageJsonSha256": "5e123a5ee3b16fd10fe4b44ef70ff7885f05117fb9ae75f72a0d821f919d423d"
+        },
+        {
+          "location": "node_modules/adm-zip",
+          "name": "adm-zip",
+          "version": "0.5.10",
+          "packageJsonSha256": "759e3f1f65dadb25eb7570a73fd14dae441a4f02ca5c956652cbbb3b485168a7"
+        },
+        {
+          "location": "node_modules/ajv",
+          "name": "ajv",
+          "version": "6.15.0",
+          "packageJsonSha256": "be4fd09eb4658674ed5ffb9da2786d2056fd78429192a3619e0458f84fe0ca6b"
+        },
+        {
+          "location": "node_modules/ansi-escapes",
+          "name": "ansi-escapes",
+          "version": "7.3.0",
+          "packageJsonSha256": "9b6171ada3a60bc8c44e7bf7b491b4069832f62d83dc4829158dd070f1453df7"
+        },
+        {
+          "location": "node_modules/ansi-regex",
+          "name": "ansi-regex",
+          "version": "6.2.2",
+          "packageJsonSha256": "a58f1d6dbaca116f4aaa83906a0a992da2303a07ca920b2ce877573988eae352"
+        },
+        {
+          "location": "node_modules/ansi-styles",
+          "name": "ansi-styles",
+          "version": "4.3.0",
+          "packageJsonSha256": "d405f010681d53f77691015e98461f8484b2afe6a9edfdd2ddb27b1e8a8e883d"
+        },
+        {
+          "location": "node_modules/argparse",
+          "name": "argparse",
+          "version": "2.0.1",
+          "packageJsonSha256": "688bace28e14392b3a1c4137eb56bc48b684dbf5cb56278ed7056cd2ece07990"
+        },
+        {
+          "location": "node_modules/balanced-match",
+          "name": "balanced-match",
+          "version": "1.0.2",
+          "packageJsonSha256": "b30c328501dead1870b894ad604405b2284b571c1f12664cdc61d92a2e3397c2"
+        },
+        {
+          "location": "node_modules/brace-expansion",
+          "name": "brace-expansion",
+          "version": "1.1.16",
+          "packageJsonSha256": "bbf56eed01393281838b00ff373f3624f8b2de88433c2ea212d1d4592a33cd40"
+        },
+        {
+          "location": "node_modules/braces",
+          "name": "braces",
+          "version": "3.0.3",
+          "packageJsonSha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7"
+        },
+        {
+          "location": "node_modules/bun-types",
+          "name": "bun-types",
+          "version": "1.3.14",
+          "packageJsonSha256": "01e8dc24f53869ebf700a038510de8061a8325d10a85406711184e4b9fc76f43"
+        },
+        {
+          "location": "node_modules/callsites",
+          "name": "callsites",
+          "version": "3.1.0",
+          "packageJsonSha256": "9c27ea7f90c3a348c038fd6b3213848552ed1ec5dd38e0a06016af19d19e526a"
+        },
+        {
+          "location": "node_modules/chalk",
+          "name": "chalk",
+          "version": "4.1.2",
+          "packageJsonSha256": "9cd907d34a45cb73b5c8a459d5602a36ccd456794665c529a3a5b0f02e196f26"
+        },
+        {
+          "location": "node_modules/cli-cursor",
+          "name": "cli-cursor",
+          "version": "5.0.0",
+          "packageJsonSha256": "2a179764184139cb6ba0af717863004b7fb9e42832c73da4c9dead1139157a24"
+        },
+        {
+          "location": "node_modules/cli-truncate",
+          "name": "cli-truncate",
+          "version": "5.2.0",
+          "packageJsonSha256": "ef33f1858347a1c4159a8bcedf70991b7753130606ad54acf8fdbadbd0c99b3c"
+        },
+        {
+          "location": "node_modules/color-convert",
+          "name": "color-convert",
+          "version": "2.0.1",
+          "packageJsonSha256": "9471d21744ca3137410448da6b3bd7b30ee91d42edce3b82ebcbf84faef74fb4"
+        },
+        {
+          "location": "node_modules/color-name",
+          "name": "color-name",
+          "version": "1.1.4",
+          "packageJsonSha256": "4a557ea373907e4643badb89ff21b3f4b969d20631086d78eab2e03d05c2efa4"
+        },
+        {
+          "location": "node_modules/concat-map",
+          "name": "concat-map",
+          "version": "0.0.1",
+          "packageJsonSha256": "4fe5e8089b65ebfd55bb86f465ba896ba6a8e24b7b61de1e0f420f590616b118"
+        },
+        {
+          "location": "node_modules/copy-file",
+          "name": "copy-file",
+          "version": "11.1.0",
+          "packageJsonSha256": "b705528045fe4b479a71fd253250b2ed2395ba756102322138eca5e43c55fcce"
+        },
+        {
+          "location": "node_modules/cpy",
+          "name": "cpy",
+          "version": "13.2.2",
+          "packageJsonSha256": "e508a063628eb2e2c39f5a87d8a5b08bac3ea660ff2c7d15ef42e74c21aeaf94"
+        },
+        {
+          "location": "node_modules/cpy-cli",
+          "name": "cpy-cli",
+          "version": "7.0.0",
+          "packageJsonSha256": "2617cdf002d2fbdd46c24615fd4a1804813946d2cb33bfa5d820b1b09f97b122"
+        },
+        {
+          "location": "node_modules/cross-spawn",
+          "name": "cross-spawn",
+          "version": "7.0.6",
+          "packageJsonSha256": "2e106cd9b4ae4e34ead35218371a0d4e172da72515a4f8f97d69a2e1fe3dee82"
+        },
+        {
+          "location": "node_modules/debug",
+          "name": "debug",
+          "version": "4.4.3",
+          "packageJsonSha256": "ea8e33d63fe5f3a4c36609b6c3df8e2ef1f8b8ba2fc3a2e1e53cb27291f384af"
+        },
+        {
+          "location": "node_modules/deep-is",
+          "name": "deep-is",
+          "version": "0.1.4",
+          "packageJsonSha256": "5caed41b62144a29c30415d2d92293c8122b4adeb281bffd097cbfca0f70645d"
+        },
+        {
+          "location": "node_modules/denque",
+          "name": "denque",
+          "version": "2.1.0",
+          "packageJsonSha256": "b84d3e7e26500d9a9ebbe103b627bda007049fa7f0672ceae96533992cc2fc9c"
+        },
+        {
+          "location": "node_modules/detect-indent",
+          "name": "detect-indent",
+          "version": "7.0.2",
+          "packageJsonSha256": "08ed663782bc9e15e7395b078358eab18f352e125a5b006a1247798a2aabe8cf"
+        },
+        {
+          "location": "node_modules/detect-newline",
+          "name": "detect-newline",
+          "version": "4.0.1",
+          "packageJsonSha256": "e65500eebd452513a0f9f078820fd42259566c26ed6bda4ed43d543b7fe4126f"
+        },
+        {
+          "location": "node_modules/emoji-regex",
+          "name": "emoji-regex",
+          "version": "10.6.0",
+          "packageJsonSha256": "ad8b9ae5582e5b85ae571a30a733fd8f3fd7951530122efd4f93342fe0995b11"
+        },
+        {
+          "location": "node_modules/environment",
+          "name": "environment",
+          "version": "1.1.0",
+          "packageJsonSha256": "21d39c9bbec69736f2d038229064ce55597e1fae08368d8bee8053dc7c917587"
+        },
+        {
+          "location": "node_modules/escape-string-regexp",
+          "name": "escape-string-regexp",
+          "version": "4.0.0",
+          "packageJsonSha256": "63763f28aefa6c49e6e6599e44b7c9aa5afd6518ae04bcfa534ff3759ad428e8"
+        },
+        {
+          "location": "node_modules/eslint",
+          "name": "eslint",
+          "version": "9.39.5",
+          "packageJsonSha256": "361210aa42b55fd814c48a01e3724559ec6f0f3e1c021d0f8aa2e8b00276060e"
+        },
+        {
+          "location": "node_modules/eslint-scope",
+          "name": "eslint-scope",
+          "version": "8.4.0",
+          "packageJsonSha256": "5d0d647be190cc44954e520036832957f55dd4738536b9f85eaf479b4a279ab8"
+        },
+        {
+          "location": "node_modules/eslint-visitor-keys",
+          "name": "eslint-visitor-keys",
+          "version": "4.2.1",
+          "packageJsonSha256": "f479c384cbd48ab3d95ba3f02f332ee42320b408a09f1cb8f1d3da96273ed4d3"
+        },
+        {
+          "location": "node_modules/eslint/node_modules/ignore",
+          "name": "ignore",
+          "version": "5.3.2",
+          "packageJsonSha256": "a9f40bd310889f21ed824bc19ce140714b7459d658f6708041af53e9855258a6"
+        },
+        {
+          "location": "node_modules/espree",
+          "name": "espree",
+          "version": "10.4.0",
+          "packageJsonSha256": "76d68e5b8ac5aae00882165c4feae4a8a8825ccb4ea76ab8af0f02ba320fd250"
+        },
+        {
+          "location": "node_modules/esquery",
+          "name": "esquery",
+          "version": "1.7.0",
+          "packageJsonSha256": "e69c382432559247e50fd8886b0476d4066fd90a47d80e6e722db4d164dcf61c"
+        },
+        {
+          "location": "node_modules/esrecurse",
+          "name": "esrecurse",
+          "version": "4.3.0",
+          "packageJsonSha256": "3bc67cb54672ec6957b53947613c23599371bf9222dbbe97275d20516a561a20"
+        },
+        {
+          "location": "node_modules/estraverse",
+          "name": "estraverse",
+          "version": "5.3.0",
+          "packageJsonSha256": "133a5be160a0123ad20ab8f2bdaa9da2fd94ebf3403996bf4cb69606e6a84a65"
+        },
+        {
+          "location": "node_modules/esutils",
+          "name": "esutils",
+          "version": "2.0.3",
+          "packageJsonSha256": "af08fd13ef49c88af75c5f4ad02812216028ad848f8354fd97346e7ddc816c0e"
+        },
+        {
+          "location": "node_modules/eventemitter3",
+          "name": "eventemitter3",
+          "version": "5.0.4",
+          "packageJsonSha256": "0dd9bc32a77be8238fad41d58aa5b24ccdfee79d8bcf4cbee85f16e3d15c1658"
+        },
+        {
+          "location": "node_modules/fast-deep-equal",
+          "name": "fast-deep-equal",
+          "version": "3.1.3",
+          "packageJsonSha256": "a5c63940db0260739be9e2ac67f3aac268df4db5770420ee4e34e493152f97d2"
+        },
+        {
+          "location": "node_modules/fast-glob",
+          "name": "fast-glob",
+          "version": "3.3.3",
+          "packageJsonSha256": "be3e54394e824554b06a85529804f11c59b9f2fa7ca6d579fefe71a5d5cf78ee"
+        },
+        {
+          "location": "node_modules/fast-glob/node_modules/glob-parent",
+          "name": "glob-parent",
+          "version": "5.1.2",
+          "packageJsonSha256": "858af9aa27cfe6eea1cfd1abbda15ad0ccc87e66e88b3ad249fab8df6dd13192"
+        },
+        {
+          "location": "node_modules/fast-json-stable-stringify",
+          "name": "fast-json-stable-stringify",
+          "version": "2.1.0",
+          "packageJsonSha256": "c4907a6cf1a242f65589b9bb762b9330088aa4a940d382b470d3c47b5309ef44"
+        },
+        {
+          "location": "node_modules/fast-levenshtein",
+          "name": "fast-levenshtein",
+          "version": "2.0.6",
+          "packageJsonSha256": "80167ee3483f23228b48d5cf5c9db355bacf55922282eb132af83136b9c9213e"
+        },
+        {
+          "location": "node_modules/fastq",
+          "name": "fastq",
+          "version": "1.20.1",
+          "packageJsonSha256": "48ba805474fbb8fc71050262e9df530bcc41ae71dc39f916bb646ccf4767dbb8"
+        },
+        {
+          "location": "node_modules/fdir",
+          "name": "fdir",
+          "version": "6.5.0",
+          "packageJsonSha256": "aca49395d61ef383a09f74555c66ed45817ca2b5724e710a4dc9e0471b83d8f5"
+        },
+        {
+          "location": "node_modules/file-entry-cache",
+          "name": "file-entry-cache",
+          "version": "8.0.0",
+          "packageJsonSha256": "1d88b9fe323d9766712599c0ee134c56e02a472e1fa633f304bc7be8cdc4dcec"
+        },
+        {
+          "location": "node_modules/fill-range",
+          "name": "fill-range",
+          "version": "7.1.1",
+          "packageJsonSha256": "87f5c78f9b47d21f9ca62b60cff1d250a3b468eab320dd13c3f3ab2464a02735"
+        },
+        {
+          "location": "node_modules/find-up",
+          "name": "find-up",
+          "version": "5.0.0",
+          "packageJsonSha256": "d1de12b1501bb90cf2fe6ef2668eb9d56a3dadeccdcaf075db46287bcb2f43ea"
+        },
+        {
+          "location": "node_modules/flat-cache",
+          "name": "flat-cache",
+          "version": "4.0.1",
+          "packageJsonSha256": "8086a3cb7efb10e538f6d55d820c22c237d686454f8b0e6b144c4baf92ea7e1e"
+        },
+        {
+          "location": "node_modules/flatted",
+          "name": "flatted",
+          "version": "3.4.2",
+          "packageJsonSha256": "775e8274f97d48e44c4a100702841d39429d6e39d4b969bd03ced697ee1c0703"
+        },
+        {
+          "location": "node_modules/get-east-asian-width",
+          "name": "get-east-asian-width",
+          "version": "1.6.0",
+          "packageJsonSha256": "d263e50dd1a43aee9acda4d7f066e66b0d0bde1f2852ea6e7153750a5e3a3e52"
+        },
+        {
+          "location": "node_modules/git-hooks-list",
+          "name": "git-hooks-list",
+          "version": "4.2.1",
+          "packageJsonSha256": "52a16e92e7ab3084e9f06fac75792b47b89ba65569b480b66028541fc24cf49b"
+        },
+        {
+          "location": "node_modules/glob",
+          "name": "glob",
+          "version": "13.0.6",
+          "packageJsonSha256": "5a28ef9a1f5252feb47ffe288a6350fe99b18311462e6a9cdacbdd0bb4be6be9"
+        },
+        {
+          "location": "node_modules/glob-parent",
+          "name": "glob-parent",
+          "version": "6.0.2",
+          "packageJsonSha256": "1a0b9ff627b3ded5a3e8c7e7ab99eface3c79e92d7691a11e3eff8d78e0f8e24"
+        },
+        {
+          "location": "node_modules/glob/node_modules/minimatch",
+          "name": "minimatch",
+          "version": "10.2.5",
+          "packageJsonSha256": "4b3a08a7ad20dead8bbe4b4fe97a2746bded7c51d218ef3034eb4e330ad31f08"
+        },
+        {
+          "location": "node_modules/glob/node_modules/minimatch/node_modules/brace-expansion",
+          "name": "brace-expansion",
+          "version": "5.0.7",
+          "packageJsonSha256": "f792e76015d954c06e8ac42cfa5664820126b2ecce01c987fe59de65bea57ab4"
+        },
+        {
+          "location": "node_modules/glob/node_modules/minimatch/node_modules/brace-expansion/node_modules/balanced-match",
+          "name": "balanced-match",
+          "version": "4.0.4",
+          "packageJsonSha256": "c984e6ae5c41fac085a07a732b665b22e0a26f28b61c692ba18ff458a8ecc95a"
+        },
+        {
+          "location": "node_modules/globals",
+          "name": "globals",
+          "version": "14.0.0",
+          "packageJsonSha256": "7825cb9a75020bbeba926f89926588ccc21322d4e8be27a0c5c70fec340f6ec1"
+        },
+        {
+          "location": "node_modules/globby",
+          "name": "globby",
+          "version": "16.2.1",
+          "packageJsonSha256": "9f2f17f94c0c99250b47e0793a985f91c692fc10cbc0989dbd617be50c5606fc"
+        },
+        {
+          "location": "node_modules/google-protobuf",
+          "name": "google-protobuf",
+          "version": "4.0.2",
+          "packageJsonSha256": "15b51e85ce5451f600ce64b2fab5f6cba5482bd86f345cc69e0039fd26aeaa8d"
+        },
+        {
+          "location": "node_modules/graceful-fs",
+          "name": "graceful-fs",
+          "version": "4.2.11",
+          "packageJsonSha256": "5747d4ba6b17165c6ecac30ab3a331715f41c7ad546e1f1574dab1bdcb116181"
+        },
+        {
+          "location": "node_modules/has-flag",
+          "name": "has-flag",
+          "version": "4.0.0",
+          "packageJsonSha256": "3fef4b52efbeabeadfffd5994e90b1025eb24263286e34170675956637d368b1"
+        },
+        {
+          "location": "node_modules/ignore",
+          "name": "ignore",
+          "version": "7.0.6",
+          "packageJsonSha256": "fd74f1c93bc4772d79aba83d59b5ca5bc4c2cbc4617e910c59977dfc52414d7d"
+        },
+        {
+          "location": "node_modules/import-fresh",
+          "name": "import-fresh",
+          "version": "3.3.1",
+          "packageJsonSha256": "c71eb71fede603ba3191c01c55c9d5a3977dd5f8d91f24835aaffc9785c19534"
+        },
+        {
+          "location": "node_modules/imurmurhash",
+          "name": "imurmurhash",
+          "version": "0.1.4",
+          "packageJsonSha256": "aa3b07e7fa3d63aa96e401c3842b8cca1dd3247954baf92377094766e903c185"
+        },
+        {
+          "location": "node_modules/is-extglob",
+          "name": "is-extglob",
+          "version": "2.1.1",
+          "packageJsonSha256": "8031afcd87f448d75ba8a5dd2cde9c68f982a94f406ebae8e5fb7cf6dfdeede2"
+        },
+        {
+          "location": "node_modules/is-fullwidth-code-point",
+          "name": "is-fullwidth-code-point",
+          "version": "5.1.0",
+          "packageJsonSha256": "8d9afd3fcb2ab5b5ab62ca76a6924dfa025a90d934b9a8fe8ba0237a8beeec14"
+        },
+        {
+          "location": "node_modules/is-glob",
+          "name": "is-glob",
+          "version": "4.0.3",
+          "packageJsonSha256": "1cce62b80db12fc033d85250b5881b1a288476229abda8e1abd983724befd56f"
+        },
+        {
+          "location": "node_modules/is-number",
+          "name": "is-number",
+          "version": "7.0.0",
+          "packageJsonSha256": "51c133f4e41df982aef69027249ff9d7262645029f437d079adc7c83328fb620"
+        },
+        {
+          "location": "node_modules/is-path-inside",
+          "name": "is-path-inside",
+          "version": "4.0.0",
+          "packageJsonSha256": "a7a0d67c13c25e2c03fa9777bdca2f25ff37ac04834484ae588dfef20ed46403"
+        },
+        {
+          "location": "node_modules/is-plain-obj",
+          "name": "is-plain-obj",
+          "version": "4.1.0",
+          "packageJsonSha256": "ac84142050cd4d1854c489a3d61e0c991550195ae5ae37d9347b736424b09c59"
+        },
+        {
+          "location": "node_modules/isexe",
+          "name": "isexe",
+          "version": "2.0.0",
+          "packageJsonSha256": "395c2af9abeeaafe7391974c1eacfb2a2bdeef187f21c3f5582c49e0368e59bf"
+        },
+        {
+          "location": "node_modules/js-yaml",
+          "name": "js-yaml",
+          "version": "4.3.0",
+          "packageJsonSha256": "6921d84ff035bba63648df9de947b0da44c9b4355b94260df1176824d0495d81"
+        },
+        {
+          "location": "node_modules/json-buffer",
+          "name": "json-buffer",
+          "version": "3.0.1",
+          "packageJsonSha256": "67bd0213396ba4664a9f2fafa3d2d25864a29f4f3800e766ea17c2aa3f4dbef9"
+        },
+        {
+          "location": "node_modules/json-schema-traverse",
+          "name": "json-schema-traverse",
+          "version": "0.4.1",
+          "packageJsonSha256": "bdedf225125f10e80911bb94f9a3992f93835e3c70894b3d5081ed75f25c5126"
+        },
+        {
+          "location": "node_modules/json-stable-stringify-without-jsonify",
+          "name": "json-stable-stringify-without-jsonify",
+          "version": "1.0.1",
+          "packageJsonSha256": "49bfc3a3a94d19ccb890f71c39f41a2a56ae8cc54b45d6330d4e30dc59418ae7"
+        },
+        {
+          "location": "node_modules/junk",
+          "name": "junk",
+          "version": "4.0.1",
+          "packageJsonSha256": "d161bf749a7628d95cd3322d6bbb12533dab8fad6620694ae653fd40cca4f5ce"
+        },
+        {
+          "location": "node_modules/keyv",
+          "name": "keyv",
+          "version": "4.5.4",
+          "packageJsonSha256": "e8afd30f2f2a40ef5023928b50fdaed3a3338aa7e1c4e86205413afb05e8a099"
+        },
+        {
+          "location": "node_modules/levn",
+          "name": "levn",
+          "version": "0.4.1",
+          "packageJsonSha256": "0a25421ab66ec56def7407234858f52c1d593b2454155c06df1d7feaa324c8fe"
+        },
+        {
+          "location": "node_modules/lint-staged",
+          "name": "lint-staged",
+          "version": "17.0.8",
+          "packageJsonSha256": "55583667ffa0ade5a1c360355002a12aa61328bb46f9cea80f81b3024626111d"
+        },
+        {
+          "location": "node_modules/listr2",
+          "name": "listr2",
+          "version": "10.2.2",
+          "packageJsonSha256": "dd27d1e27f1297d0ba9c49c5fe5e333a18a569a782e2ba22c6e01806aead2cc1"
+        },
+        {
+          "location": "node_modules/locate-path",
+          "name": "locate-path",
+          "version": "6.0.0",
+          "packageJsonSha256": "f77d343dc6be5bc096137fb765753139e8d23971f5ad740b7a40bc8dc6a24f82"
+        },
+        {
+          "location": "node_modules/lodash.merge",
+          "name": "lodash.merge",
+          "version": "4.6.2",
+          "packageJsonSha256": "5aaf4c24df9052e680d0728754c249fb94c11aef2e76ec3f76320431915c92f1"
+        },
+        {
+          "location": "node_modules/log-update",
+          "name": "log-update",
+          "version": "6.1.0",
+          "packageJsonSha256": "fe6829ade2168c9b42c7be2a462a843f17e115718535e4099e187d24b4bef55a"
+        },
+        {
+          "location": "node_modules/log-update/node_modules/slice-ansi",
+          "name": "slice-ansi",
+          "version": "7.1.2",
+          "packageJsonSha256": "b85dac1c0e27f3a29594d7d3df95e522999cbb5f5d65d9b5573209b46b992505"
+        },
+        {
+          "location": "node_modules/log-update/node_modules/slice-ansi/node_modules/ansi-styles",
+          "name": "ansi-styles",
+          "version": "6.2.3",
+          "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+        },
+        {
+          "location": "node_modules/log-update/node_modules/wrap-ansi",
+          "name": "wrap-ansi",
+          "version": "9.0.2",
+          "packageJsonSha256": "aa6924e02b510b48b0ad87f09212b2532a3e86043ea51ff0413f70d5964a7e31"
+        },
+        {
+          "location": "node_modules/log-update/node_modules/wrap-ansi/node_modules/ansi-styles",
+          "name": "ansi-styles",
+          "version": "6.2.3",
+          "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+        },
+        {
+          "location": "node_modules/log-update/node_modules/wrap-ansi/node_modules/string-width",
+          "name": "string-width",
+          "version": "7.2.0",
+          "packageJsonSha256": "c136bc8e7e23b6de2ad6f083cf99c1c3769fe200224d7575351f29c9f6bed27e"
+        },
+        {
+          "location": "node_modules/long",
+          "name": "long",
+          "version": "5.3.2",
+          "packageJsonSha256": "982e554a35d140981c7962fbba77855563e5890de200f8dc0a249135e4d9acb8"
+        },
+        {
+          "location": "node_modules/lru-cache",
+          "name": "lru-cache",
+          "version": "11.5.2",
+          "packageJsonSha256": "c1a8f6f3a568f41be739be2ac46520312d1af6918f2c9f66ae53990a7c50b3cf"
+        },
+        {
+          "location": "node_modules/meow",
+          "name": "meow",
+          "version": "14.1.0",
+          "packageJsonSha256": "0b1191596e7ce37fab063dd4e4081079109b5cd88b81254464ab84217159d398"
+        },
+        {
+          "location": "node_modules/merge2",
+          "name": "merge2",
+          "version": "1.4.1",
+          "packageJsonSha256": "5424b2be337f1f0a1fa376fa67262bceaead62275d5f8df6ff82103e283cc358"
+        },
+        {
+          "location": "node_modules/micromatch",
+          "name": "micromatch",
+          "version": "4.0.8",
+          "packageJsonSha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b"
+        },
+        {
+          "location": "node_modules/micromatch/node_modules/picomatch",
+          "name": "picomatch",
+          "version": "2.3.2",
+          "packageJsonSha256": "63264d817e856a4bff57d4304f2b38d2964a4f6df520eb169e7bcdb619f13e9a"
+        },
+        {
+          "location": "node_modules/mimic-function",
+          "name": "mimic-function",
+          "version": "5.0.1",
+          "packageJsonSha256": "d49919b51c727d702ce72bbd44dd328b2d537abce907fc9fa529ec724cfe6467"
+        },
+        {
+          "location": "node_modules/minimatch",
+          "name": "minimatch",
+          "version": "3.1.5",
+          "packageJsonSha256": "eefa1c89527d52bbb2e8b053fe8ecf3e3ced399bdba82cf27e0e92edfd833938"
+        },
+        {
+          "location": "node_modules/minipass",
+          "name": "minipass",
+          "version": "7.1.3",
+          "packageJsonSha256": "b8ab116187d5e9375d494f17437eb862cbee4b329c21f15412c6a5170ec2f55c"
+        },
+        {
+          "location": "node_modules/ms",
+          "name": "ms",
+          "version": "2.1.3",
+          "packageJsonSha256": "1a6b4d9739790c0b94ab96c8cc0507e281c164c311ff4fbf5e57fb8d26290b40"
+        },
+        {
+          "location": "node_modules/natural-compare",
+          "name": "natural-compare",
+          "version": "1.4.0",
+          "packageJsonSha256": "3d99911ccfa0ca34ae0c68bfd32c038b952542e55db7c649c37b11dd1573f6af"
+        },
+        {
+          "location": "node_modules/onetime",
+          "name": "onetime",
+          "version": "7.0.0",
+          "packageJsonSha256": "3d35dab44fc94bfb6d7e85dfb65fc6c0c262dfd491dbb6c28527616c811cc4a7"
+        },
+        {
+          "location": "node_modules/optionator",
+          "name": "optionator",
+          "version": "0.9.4",
+          "packageJsonSha256": "8011d3db01182479d3881e788bacb5a9f603ca74bd564c4d26f713d5f5f571d1"
+        },
+        {
+          "location": "node_modules/p-event",
+          "name": "p-event",
+          "version": "6.0.1",
+          "packageJsonSha256": "0a07df5541399a698c760ddf545a4c45a81314083c934ebe54153ff58ab45486"
+        },
+        {
+          "location": "node_modules/p-filter",
+          "name": "p-filter",
+          "version": "4.1.0",
+          "packageJsonSha256": "f2f2fc27ed0ca368be176f4810ab101f7b8a8919f601142b7f6b35cf59255f5b"
+        },
+        {
+          "location": "node_modules/p-limit",
+          "name": "p-limit",
+          "version": "3.1.0",
+          "packageJsonSha256": "0de84d3e2ad5bc3a7bac54354fe6f049ce7b351d67fcc57eda6660f9fa2e83b5"
+        },
+        {
+          "location": "node_modules/p-locate",
+          "name": "p-locate",
+          "version": "5.0.0",
+          "packageJsonSha256": "3a3baffa53cfac8fd6281250dd824d56118f46ad258edb09d8aed1a15e0003d2"
+        },
+        {
+          "location": "node_modules/p-map",
+          "name": "p-map",
+          "version": "7.0.5",
+          "packageJsonSha256": "0f0878691c8061be2207af35c88800a65a1984ccc3a29f18ba87c99c640cd980"
+        },
+        {
+          "location": "node_modules/p-timeout",
+          "name": "p-timeout",
+          "version": "6.1.4",
+          "packageJsonSha256": "dbf7976ebd476c4c7b10765f1d063ddb130e66565aed4e02424d8b37638c3e6a"
+        },
+        {
+          "location": "node_modules/package-json-from-dist",
+          "name": "package-json-from-dist",
+          "version": "1.0.1",
+          "packageJsonSha256": "38fdaf168bc63a6422a7dbe7e41a7b52b02326edef8b14019e0333ef60b37b47"
+        },
+        {
+          "location": "node_modules/parent-module",
+          "name": "parent-module",
+          "version": "1.0.1",
+          "packageJsonSha256": "4c6c519739db25dabf32a8fe29b08e34fb763ca897f14b776a0e2e99fc40afed"
+        },
+        {
+          "location": "node_modules/path-exists",
+          "name": "path-exists",
+          "version": "4.0.0",
+          "packageJsonSha256": "5e258d1a0d185ae469fec34de2af18913421b94181ef61238efcfe0b00d1b2c3"
+        },
+        {
+          "location": "node_modules/path-key",
+          "name": "path-key",
+          "version": "3.1.1",
+          "packageJsonSha256": "25594dab72681c910d9cc919263a4daf27d77a75e0d2c26a4d958d6d6b798f86"
+        },
+        {
+          "location": "node_modules/path-scurry",
+          "name": "path-scurry",
+          "version": "2.0.2",
+          "packageJsonSha256": "fb54fe908dbe5f288bd1c5d7429f033c4f527f435c3d3a583ee0ce9e78992087"
+        },
+        {
+          "location": "node_modules/picomatch",
+          "name": "picomatch",
+          "version": "4.0.5",
+          "packageJsonSha256": "fb7766f5f9c724e13e075760a95d16f87cdb327143d153a913135fde267ec615"
+        },
+        {
+          "location": "node_modules/prelude-ls",
+          "name": "prelude-ls",
+          "version": "1.2.1",
+          "packageJsonSha256": "d943e3b5a7189692268bf64e3a068249696985a9c8728397fc8786b59a198b53"
+        },
+        {
+          "location": "node_modules/prettier",
+          "name": "prettier",
+          "version": "3.9.1",
+          "packageJsonSha256": "dfb57b78073f50961976f50cf60f0575c9b8c9c84750c0f64f8650d5beda3a52"
+        },
+        {
+          "location": "node_modules/protobufjs",
+          "name": "protobufjs",
+          "version": "7.6.5",
+          "packageJsonSha256": "893c7c89175f609c08fa04329c89cefb411faf5ad7da76213f64498485e81404"
+        },
+        {
+          "location": "node_modules/protoc-gen-js",
+          "name": "protoc-gen-js",
+          "version": "3.21.4-4",
+          "packageJsonSha256": "4f1a9ff2eb28164c9928af2c4cf10f71e22f1e3f1f99d5d8d0a0d4a28de89a72"
+        },
+        {
+          "location": "node_modules/protoc-gen-ts",
+          "name": "protoc-gen-ts",
+          "version": "0.8.7",
+          "packageJsonSha256": "11d9c3e1d526d7abc519267be0e532c7248e2bf9a1bcb8ed8e298b6fc65b7a09"
+        },
+        {
+          "location": "node_modules/punycode",
+          "name": "punycode",
+          "version": "2.3.1",
+          "packageJsonSha256": "e025033bd11110af671fb8eb62f0db8895073ccdca70b596aa94a27eb5bf9acb"
+        },
+        {
+          "location": "node_modules/queue-microtask",
+          "name": "queue-microtask",
+          "version": "1.2.3",
+          "packageJsonSha256": "e6d153dda4c9aee863e7d8cc59419d4eb94b9829277cda9289a40f96efb36c11"
+        },
+        {
+          "location": "node_modules/resolve-from",
+          "name": "resolve-from",
+          "version": "4.0.0",
+          "packageJsonSha256": "dd5b0fa6d310443ccf3e93e9eb6277bd7004c18f5263ca2ac2ebf52f3708f39f"
+        },
+        {
+          "location": "node_modules/restore-cursor",
+          "name": "restore-cursor",
+          "version": "5.1.0",
+          "packageJsonSha256": "ae7d335125f4bde47a744cfaa61a9a9416bdb543636aa80cf2f523aa139f0108"
+        },
+        {
+          "location": "node_modules/reusify",
+          "name": "reusify",
+          "version": "1.1.0",
+          "packageJsonSha256": "db69497e33cebb1296cd68a9202cc4df7b8d1dc895a423f2153e8c157068aa76"
+        },
+        {
+          "location": "node_modules/rfdc",
+          "name": "rfdc",
+          "version": "1.4.1",
+          "packageJsonSha256": "587604c366b2f0f40e660ef8496d0480dd0cd839cfc3e64b32f644a7a2a549cf"
+        },
+        {
+          "location": "node_modules/rimraf",
+          "name": "rimraf",
+          "version": "6.1.3",
+          "packageJsonSha256": "76521a33ba05c5a62f0f7f4900000e9827d9d7b0786a92a748f126ba33e4c806"
+        },
+        {
+          "location": "node_modules/run-parallel",
+          "name": "run-parallel",
+          "version": "1.2.0",
+          "packageJsonSha256": "a45d96ac517ff7b6612a6e9961b66fc3e6d74adb1eeba5242ae0d36f77a35b58"
+        },
+        {
+          "location": "node_modules/semver",
+          "name": "semver",
+          "version": "7.8.5",
+          "packageJsonSha256": "7c94cb7f2a53c27b20d76386ec144c062894dbcc909cfabd0f728c37874b1776"
+        },
+        {
+          "location": "node_modules/shebang-command",
+          "name": "shebang-command",
+          "version": "2.0.0",
+          "packageJsonSha256": "44de390ae5ed6c5f9758b8b9c90b93fa53977d5361731600429f1de08f4b3f30"
+        },
+        {
+          "location": "node_modules/shebang-regex",
+          "name": "shebang-regex",
+          "version": "3.0.0",
+          "packageJsonSha256": "b8018c6b8cc9900dfd1ac18a54956ba34c453fdc2da5e5fe555ee8f04133a1c5"
+        },
+        {
+          "location": "node_modules/signal-exit",
+          "name": "signal-exit",
+          "version": "4.1.0",
+          "packageJsonSha256": "cd1c6cfa95782e432dd2affaa88c3a6dda7f46c8088d91f3acc0fba79dce5075"
+        },
+        {
+          "location": "node_modules/slash",
+          "name": "slash",
+          "version": "5.1.0",
+          "packageJsonSha256": "1e4e4b502d4280d2c14ad936b541eb873d631bb6d9e0ee86fe8bb0e9e77b4786"
+        },
+        {
+          "location": "node_modules/slice-ansi",
+          "name": "slice-ansi",
+          "version": "8.0.0",
+          "packageJsonSha256": "43f7068d460c56fea23c6972cddf94151b5e854d64687b5ebcccf5c21604aa03"
+        },
+        {
+          "location": "node_modules/slice-ansi/node_modules/ansi-styles",
+          "name": "ansi-styles",
+          "version": "6.2.3",
+          "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+        },
+        {
+          "location": "node_modules/sort-object-keys",
+          "name": "sort-object-keys",
+          "version": "2.1.0",
+          "packageJsonSha256": "c0e2925c056cc300ee404fb664f77e87dad233385d3aaeace1596f5a11f0ae6a"
+        },
+        {
+          "location": "node_modules/sort-package-json",
+          "name": "sort-package-json",
+          "version": "3.7.1",
+          "packageJsonSha256": "4915c503e2e2775058b7ee41cf354265552498b3c1aaa80786c4745604a3f597"
+        },
+        {
+          "location": "node_modules/string-argv",
+          "name": "string-argv",
+          "version": "0.3.2",
+          "packageJsonSha256": "a9a1a3b04694db963232bb9cb059fd050781837d9143063009b1461e92b33e5a"
+        },
+        {
+          "location": "node_modules/string-width",
+          "name": "string-width",
+          "version": "8.2.2",
+          "packageJsonSha256": "26e7e6a32cdca3ae61b6cf02eadfcf6cf6f6133ba7779de57f9e99c261393da2"
+        },
+        {
+          "location": "node_modules/strip-ansi",
+          "name": "strip-ansi",
+          "version": "7.2.0",
+          "packageJsonSha256": "228b214dd06ca80ab3c36e2b890a8696a39cea65585f6d61498c922c615e18a0"
+        },
+        {
+          "location": "node_modules/strip-json-comments",
+          "name": "strip-json-comments",
+          "version": "3.1.1",
+          "packageJsonSha256": "92b83192db22eb46049920e4b750555193d10eafe609cf2adc4f14125c951ed4"
+        },
+        {
+          "location": "node_modules/supports-color",
+          "name": "supports-color",
+          "version": "7.2.0",
+          "packageJsonSha256": "d410a772f9f64b224482ec13815a4bbf1837c533e1be04b3687755c48b2efa1f"
+        },
+        {
+          "location": "node_modules/tinyexec",
+          "name": "tinyexec",
+          "version": "1.2.4",
+          "packageJsonSha256": "a930901b9a4b26370398ce8403a190cb8fdf822ab0e56cdb3d79b70a1973686e"
+        },
+        {
+          "location": "node_modules/tinyglobby",
+          "name": "tinyglobby",
+          "version": "0.2.17",
+          "packageJsonSha256": "bd2b2af3c9ba0580f1acfb22c55d0b6d29abf683af5cac8a2efe82fa7c943f23"
+        },
+        {
+          "location": "node_modules/to-regex-range",
+          "name": "to-regex-range",
+          "version": "5.0.1",
+          "packageJsonSha256": "766fc1bb34fffcd503c89f4194188ce059795c52fd0dc6753cd4b7dcfc3fe1ec"
+        },
+        {
+          "location": "node_modules/ts-api-utils",
+          "name": "ts-api-utils",
+          "version": "2.5.0",
+          "packageJsonSha256": "2c4e0f9e0ea7a0813a9f6ac4967d69f00a1d857f3fd9ce41f5eeba97a6ed72c4"
+        },
+        {
+          "location": "node_modules/ts-protoc-gen",
+          "name": "ts-protoc-gen",
+          "version": "0.15.0",
+          "packageJsonSha256": "ff908700c3d4fab9f2311af4e2058c709e2b6ee6d10a6abc1fa3da614373aada"
+        },
+        {
+          "location": "node_modules/ts-protoc-gen/node_modules/google-protobuf",
+          "name": "google-protobuf",
+          "version": "3.21.4",
+          "packageJsonSha256": "164e176dfce3a1aa0b560ccd0ceeddd3e7dab935867ab90e0b8e99d76dc3225f"
+        },
+        {
+          "location": "node_modules/type-check",
+          "name": "type-check",
+          "version": "0.4.0",
+          "packageJsonSha256": "f52058410cf8e57ed28dd462eece693ba490c619c70c17caef8af60b84dc4ed0"
+        },
+        {
+          "location": "node_modules/typescript",
+          "name": "typescript",
+          "version": "5.9.3",
+          "packageJsonSha256": "822ef7ca6452205657b6288b066481ecf508bfbf43455d715cf7d3ec457561e6"
+        },
+        {
+          "location": "node_modules/undici-types",
+          "name": "undici-types",
+          "version": "8.3.0",
+          "packageJsonSha256": "fe5de6d50b3e426af5bbe08b9d83b6b3c5106d639ec28e5b90c79bfb1d7cddab"
+        },
+        {
+          "location": "node_modules/unicorn-magic",
+          "name": "unicorn-magic",
+          "version": "0.4.0",
+          "packageJsonSha256": "7fa3352937fcd791b0380feec0c21de503b73fed3ce12f35ab9a3332d362569d"
+        },
+        {
+          "location": "node_modules/uri-js",
+          "name": "uri-js",
+          "version": "4.4.1",
+          "packageJsonSha256": "13f6722afc3b74de0487b56d3087df1954a156e93f341aebb6ca9c1471891d6b"
+        },
+        {
+          "location": "node_modules/uuid",
+          "name": "uuid",
+          "version": "11.1.1",
+          "packageJsonSha256": "e5ebc4600db1bfcb5c00d8cc3430d869bdbe229c8d46b4bfac06ab2dfc180c39"
+        },
+        {
+          "location": "node_modules/which",
+          "name": "which",
+          "version": "2.0.2",
+          "packageJsonSha256": "43010039ed5e89f7186960be682b3cb5cda5ab6cdfb06cbfd4f081cf0e7b4260"
+        },
+        {
+          "location": "node_modules/word-wrap",
+          "name": "word-wrap",
+          "version": "1.2.5",
+          "packageJsonSha256": "917ace72e6293d7bc27ce908ed87f59526c05438930afcdf04462845e103fb94"
+        },
+        {
+          "location": "node_modules/wrap-ansi",
+          "name": "wrap-ansi",
+          "version": "10.0.0",
+          "packageJsonSha256": "a369e8e3cd3e4abb3720d90e4317d6b3d8a96c2ccffe590c99b15366e90ae227"
+        },
+        {
+          "location": "node_modules/wrap-ansi/node_modules/ansi-styles",
+          "name": "ansi-styles",
+          "version": "6.2.3",
+          "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+        },
+        {
+          "location": "node_modules/yaml",
+          "name": "yaml",
+          "version": "2.9.0",
+          "packageJsonSha256": "20b8b197cbd10dad245d45e463dfe58e4c8c25a47e24bc4256ad9ab58bf35683"
+        },
+        {
+          "location": "node_modules/yocto-queue",
+          "name": "yocto-queue",
+          "version": "0.1.0",
+          "packageJsonSha256": "e94d571d03c65c94eab2216f4fde773918a152d5d36e5672e1f5c158ff6ac42d"
+        }
+      ],
+      "sha256": "fbbf2cb7068dcc4e5e3dd776ecc99bee4982e1dd924835808d3c2c9511f39f81"
+    }
+  },
+  "frozenCandidate": {
+    "schemaVersion": 1,
+    "status": "research_only_frozen",
+    "runId": "dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+    "frozenAt": "2026-07-13T18:18:47.729Z",
+    "code": {
+      "revision": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+      "branch": "main",
+      "originMain": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+      "sourceTreeSha256": "b63af92f41b3a9d28a6001135879ffffee47e96aa61ac22fd40659bbbb097a1c",
+      "worktreeClean": true,
+      "bunVersion": "1.3.14",
+      "dependencies": {
+        "schemaVersion": 1,
+        "packages": [
+          {
+            "location": "node_modules/@eslint-community/eslint-utils",
+            "name": "@eslint-community/eslint-utils",
+            "version": "4.9.1",
+            "packageJsonSha256": "8bd084d739f6ad91bd4cbe7ff4ec39179da919037d6bc3d9a23897e584632bd9"
+          },
+          {
+            "location": "node_modules/@eslint-community/eslint-utils/node_modules/eslint-visitor-keys",
+            "name": "eslint-visitor-keys",
+            "version": "3.4.3",
+            "packageJsonSha256": "54feabdd2ef488414247dd4ecf71542549db02baced1153465c3ac2e5bf61a6c"
+          },
+          {
+            "location": "node_modules/@eslint-community/regexpp",
+            "name": "@eslint-community/regexpp",
+            "version": "4.12.2",
+            "packageJsonSha256": "63a3c5c082235b46ac213fe91d4b8869d16b0e90d8047f5fe50aefa2dd11d292"
+          },
+          {
+            "location": "node_modules/@eslint/config-array",
+            "name": "@eslint/config-array",
+            "version": "0.21.2",
+            "packageJsonSha256": "b42773cfa9a04f5cd7b0825ba8fe29a95aea7b1a1e31017b3628077f6ec1e020"
+          },
+          {
+            "location": "node_modules/@eslint/config-helpers",
+            "name": "@eslint/config-helpers",
+            "version": "0.4.2",
+            "packageJsonSha256": "9eeb5b6fc0a17a5552a53fe5c02d98854930acff99fa0cd75e26d6166365529d"
+          },
+          {
+            "location": "node_modules/@eslint/core",
+            "name": "@eslint/core",
+            "version": "0.17.0",
+            "packageJsonSha256": "65aa1d2127fd7d10d6041db32f47439d9aa6abc98f55aaed300b575e7bd71993"
+          },
+          {
+            "location": "node_modules/@eslint/eslintrc",
+            "name": "@eslint/eslintrc",
+            "version": "3.3.6",
+            "packageJsonSha256": "db540a7c2676ef19f7ccca7d50a03b93a62631cee246ec58c3c6e5f793259219"
+          },
+          {
+            "location": "node_modules/@eslint/eslintrc/node_modules/ignore",
+            "name": "ignore",
+            "version": "5.3.2",
+            "packageJsonSha256": "a9f40bd310889f21ed824bc19ce140714b7459d658f6708041af53e9855258a6"
+          },
+          {
+            "location": "node_modules/@eslint/js",
+            "name": "@eslint/js",
+            "version": "9.39.5",
+            "packageJsonSha256": "b7a13312c28d9e0d078055362e45545522c7ae9a67f6702e280e1cdcd25cfdc1"
+          },
+          {
+            "location": "node_modules/@eslint/object-schema",
+            "name": "@eslint/object-schema",
+            "version": "2.1.7",
+            "packageJsonSha256": "bda6acdfdddc3dbfacf8669e568d66754af7963c3c58935f9573cc32701dc26b"
+          },
+          {
+            "location": "node_modules/@eslint/plugin-kit",
+            "name": "@eslint/plugin-kit",
+            "version": "0.4.1",
+            "packageJsonSha256": "fe173d1b3cc381fce094f316e9d21296e83ea781ad7f2900fa2f4ee77c1c1af0"
+          },
+          {
+            "location": "node_modules/@humanfs/core",
+            "name": "@humanfs/core",
+            "version": "0.19.2",
+            "packageJsonSha256": "853dea133b11341a1706835191e591535cc470f1101e4070a453b6cc4847e659"
+          },
+          {
+            "location": "node_modules/@humanfs/node",
+            "name": "@humanfs/node",
+            "version": "0.16.8",
+            "packageJsonSha256": "bc1bac9440bc97611a0a8b233960780cff13d8aba4192f6b1ff6739ab6c9c9ed"
+          },
+          {
+            "location": "node_modules/@humanfs/types",
+            "name": "@humanfs/types",
+            "version": "0.15.0",
+            "packageJsonSha256": "1b849aa49814883fc0e70ca461c9faccb675ed1c801e784f1858e75e3b36eec5"
+          },
+          {
+            "location": "node_modules/@humanwhocodes/module-importer",
+            "name": "@humanwhocodes/module-importer",
+            "version": "1.0.1",
+            "packageJsonSha256": "8c22f2bce041e8f99fb983b622ed64efb8098e75d9b01e9cddc3254f5731045b"
+          },
+          {
+            "location": "node_modules/@humanwhocodes/retry",
+            "name": "@humanwhocodes/retry",
+            "version": "0.4.3",
+            "packageJsonSha256": "8e18a261a246f3e65a25664362cf367e18567ae214b1094b297fc1d056c48211"
+          },
+          {
+            "location": "node_modules/@nodelib/fs.scandir",
+            "name": "@nodelib/fs.scandir",
+            "version": "2.1.5",
+            "packageJsonSha256": "d2dd608ef7400bc51bfa744f658b6a32b679ac5c053ef6d21499b2b0db1ccaba"
+          },
+          {
+            "location": "node_modules/@nodelib/fs.stat",
+            "name": "@nodelib/fs.stat",
+            "version": "2.0.5",
+            "packageJsonSha256": "ad8601ad12a424f995579ffa7ae24042c44df9f89248b715dcd8ef56c54aacca"
+          },
+          {
+            "location": "node_modules/@nodelib/fs.walk",
+            "name": "@nodelib/fs.walk",
+            "version": "1.2.8",
+            "packageJsonSha256": "509382ca0b57206ef4ccec2738a6ba060094eb65bd2f4bee1462d941c72d4344"
+          },
+          {
+            "location": "node_modules/@protobufjs/aspromise",
+            "name": "@protobufjs/aspromise",
+            "version": "1.1.2",
+            "packageJsonSha256": "4a39ee1c94f6ee038d2944196aa6167785d3429a91727f828a1274262919e2d8"
+          },
+          {
+            "location": "node_modules/@protobufjs/base64",
+            "name": "@protobufjs/base64",
+            "version": "1.1.2",
+            "packageJsonSha256": "7ff6a89f566b95c0f21a5a9cb12df5718f0b06ef96d4186a92d650c0849fa2c5"
+          },
+          {
+            "location": "node_modules/@protobufjs/codegen",
+            "name": "@protobufjs/codegen",
+            "version": "2.0.5",
+            "packageJsonSha256": "818bf10387c19ab09b3814004ec672ab8d975302cdaf2dd65466bdb604764d65"
+          },
+          {
+            "location": "node_modules/@protobufjs/eventemitter",
+            "name": "@protobufjs/eventemitter",
+            "version": "1.1.1",
+            "packageJsonSha256": "d157d364fe4aee21cfd517abff35bca312ff51e6e6e90abdbec16225057e5914"
+          },
+          {
+            "location": "node_modules/@protobufjs/fetch",
+            "name": "@protobufjs/fetch",
+            "version": "1.1.1",
+            "packageJsonSha256": "52f997898a745acce5d68751883aad6296bcc2f152468ced0ed30e3c3c5a1c72"
+          },
+          {
+            "location": "node_modules/@protobufjs/float",
+            "name": "@protobufjs/float",
+            "version": "1.0.2",
+            "packageJsonSha256": "1cae4ded1bc97375a67fe4608f87ee59990734ea738fabb98e9061ab23669cdf"
+          },
+          {
+            "location": "node_modules/@protobufjs/path",
+            "name": "@protobufjs/path",
+            "version": "1.1.2",
+            "packageJsonSha256": "b19802dd696ceb8a4aa4839f35ab1c8312e97693d93485ff3c3e4f19cca183c4"
+          },
+          {
+            "location": "node_modules/@protobufjs/pool",
+            "name": "@protobufjs/pool",
+            "version": "1.1.0",
+            "packageJsonSha256": "7a33b609e770020fe1e09690cfebc23bbdd6e1306e3f0dd98ba5048966cb7fec"
+          },
+          {
+            "location": "node_modules/@protobufjs/utf8",
+            "name": "@protobufjs/utf8",
+            "version": "1.1.2",
+            "packageJsonSha256": "80fdb6b9f633023846b6cdf352ea795523abcf27affd4d54afd4b50a90a87411"
+          },
+          {
+            "location": "node_modules/@sindresorhus/merge-streams",
+            "name": "@sindresorhus/merge-streams",
+            "version": "4.0.0",
+            "packageJsonSha256": "da4b586ad279978d58e79f1f623e1cb99e883d808325528f2dbffa4c0aa4c5a4"
+          },
+          {
+            "location": "node_modules/@types/bun",
+            "name": "@types/bun",
+            "version": "1.3.14",
+            "packageJsonSha256": "51950bf538917baef310990f9fcf247c88c4f2f631ae5de34f853b318fee0eb1"
+          },
+          {
+            "location": "node_modules/@types/estree",
+            "name": "@types/estree",
+            "version": "1.0.9",
+            "packageJsonSha256": "3537a6a503f57901111d8a29df81962887653deb199b9a795c7fb50bbfdd1bdc"
+          },
+          {
+            "location": "node_modules/@types/google-protobuf",
+            "name": "@types/google-protobuf",
+            "version": "3.15.12",
+            "packageJsonSha256": "71566c799c58ba999a417e6988ee9c5f55c5839aac0f07863735cde55364cccb"
+          },
+          {
+            "location": "node_modules/@types/json-schema",
+            "name": "@types/json-schema",
+            "version": "7.0.15",
+            "packageJsonSha256": "6bf0cb0808cafc14023ae10d55d6a88228397dc54c16106d121f42ac88d64fc8"
+          },
+          {
+            "location": "node_modules/@types/node",
+            "name": "@types/node",
+            "version": "26.1.1",
+            "packageJsonSha256": "83e7472f5b94b43acde2e60b39cef9adc278a1f2a5d7cc4b4c677e29da3e0ab9"
+          },
+          {
+            "location": "node_modules/@types/uuid",
+            "name": "@types/uuid",
+            "version": "11.0.0",
+            "packageJsonSha256": "429b0f4b3b61a0762544782497b5420061801264ea6a97cf3188fcb07f675968"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/eslint-plugin",
+            "name": "@typescript-eslint/eslint-plugin",
+            "version": "8.63.0",
+            "packageJsonSha256": "ae2c300d55e6f3751273a1bec41199ac93b719b55399e002fb92c04ffad0ed4c"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/parser",
+            "name": "@typescript-eslint/parser",
+            "version": "8.63.0",
+            "packageJsonSha256": "cb1bb6f58bd29e476323e6b7308cbdca1b31a04025ceb4e5b7285d356a635acb"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/project-service",
+            "name": "@typescript-eslint/project-service",
+            "version": "8.63.0",
+            "packageJsonSha256": "b200402ff203c6b814dae0a81327d2d64c7e2c880a7188ba516edafd4d254c6b"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/scope-manager",
+            "name": "@typescript-eslint/scope-manager",
+            "version": "8.63.0",
+            "packageJsonSha256": "57276d6955def0253dd97413d33ed6bc2cf39fd59c5467cf14023372bb520d49"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/tsconfig-utils",
+            "name": "@typescript-eslint/tsconfig-utils",
+            "version": "8.63.0",
+            "packageJsonSha256": "7beacd6cca80cf2f36c4ab5bf566dc7e26208c7cc580fa3b5afb2b2696804961"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/type-utils",
+            "name": "@typescript-eslint/type-utils",
+            "version": "8.63.0",
+            "packageJsonSha256": "01e06ba2593ef2a53f745a93f4ab9c85ba73d22afffa8f993a66f1ab28295d39"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/types",
+            "name": "@typescript-eslint/types",
+            "version": "8.63.0",
+            "packageJsonSha256": "99e5caca40414f78ed08e51d57ec67393dd6c694aef6ac594197e4e3f74961a1"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/typescript-estree",
+            "name": "@typescript-eslint/typescript-estree",
+            "version": "8.63.0",
+            "packageJsonSha256": "05ec6e6383f3e06b3160ab2ac9c2c08dbd46b133404c48f77a4347bbd6f21c0c"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch",
+            "name": "minimatch",
+            "version": "10.2.5",
+            "packageJsonSha256": "4b3a08a7ad20dead8bbe4b4fe97a2746bded7c51d218ef3034eb4e330ad31f08"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch/node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "5.0.7",
+            "packageJsonSha256": "f792e76015d954c06e8ac42cfa5664820126b2ecce01c987fe59de65bea57ab4"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch/node_modules/brace-expansion/node_modules/balanced-match",
+            "name": "balanced-match",
+            "version": "4.0.4",
+            "packageJsonSha256": "c984e6ae5c41fac085a07a732b665b22e0a26f28b61c692ba18ff458a8ecc95a"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/utils",
+            "name": "@typescript-eslint/utils",
+            "version": "8.63.0",
+            "packageJsonSha256": "c5daa662b6f001103442699b3e9658b5a630e61ff98aa13a9cb02c3e30b61ac3"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/visitor-keys",
+            "name": "@typescript-eslint/visitor-keys",
+            "version": "8.63.0",
+            "packageJsonSha256": "1b72f9717f8325fdbbba40b8f7861502ab1cffdcd9e1e8672eedb9a13bde68ef"
+          },
+          {
+            "location": "node_modules/@typescript-eslint/visitor-keys/node_modules/eslint-visitor-keys",
+            "name": "eslint-visitor-keys",
+            "version": "5.0.1",
+            "packageJsonSha256": "13f8b0207958a2d504740826e8245bc2b023248136275550907a5569d8659242"
+          },
+          {
+            "location": "node_modules/acorn",
+            "name": "acorn",
+            "version": "8.17.0",
+            "packageJsonSha256": "fa3612cc9493702b7520947eec276d7b4a73001dafd68c4a9dcb58791a4145c6"
+          },
+          {
+            "location": "node_modules/acorn-jsx",
+            "name": "acorn-jsx",
+            "version": "5.3.2",
+            "packageJsonSha256": "5e123a5ee3b16fd10fe4b44ef70ff7885f05117fb9ae75f72a0d821f919d423d"
+          },
+          {
+            "location": "node_modules/adm-zip",
+            "name": "adm-zip",
+            "version": "0.5.10",
+            "packageJsonSha256": "759e3f1f65dadb25eb7570a73fd14dae441a4f02ca5c956652cbbb3b485168a7"
+          },
+          {
+            "location": "node_modules/ajv",
+            "name": "ajv",
+            "version": "6.15.0",
+            "packageJsonSha256": "be4fd09eb4658674ed5ffb9da2786d2056fd78429192a3619e0458f84fe0ca6b"
+          },
+          {
+            "location": "node_modules/ansi-escapes",
+            "name": "ansi-escapes",
+            "version": "7.3.0",
+            "packageJsonSha256": "9b6171ada3a60bc8c44e7bf7b491b4069832f62d83dc4829158dd070f1453df7"
+          },
+          {
+            "location": "node_modules/ansi-regex",
+            "name": "ansi-regex",
+            "version": "6.2.2",
+            "packageJsonSha256": "a58f1d6dbaca116f4aaa83906a0a992da2303a07ca920b2ce877573988eae352"
+          },
+          {
+            "location": "node_modules/ansi-styles",
+            "name": "ansi-styles",
+            "version": "4.3.0",
+            "packageJsonSha256": "d405f010681d53f77691015e98461f8484b2afe6a9edfdd2ddb27b1e8a8e883d"
+          },
+          {
+            "location": "node_modules/argparse",
+            "name": "argparse",
+            "version": "2.0.1",
+            "packageJsonSha256": "688bace28e14392b3a1c4137eb56bc48b684dbf5cb56278ed7056cd2ece07990"
+          },
+          {
+            "location": "node_modules/balanced-match",
+            "name": "balanced-match",
+            "version": "1.0.2",
+            "packageJsonSha256": "b30c328501dead1870b894ad604405b2284b571c1f12664cdc61d92a2e3397c2"
+          },
+          {
+            "location": "node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "1.1.16",
+            "packageJsonSha256": "bbf56eed01393281838b00ff373f3624f8b2de88433c2ea212d1d4592a33cd40"
+          },
+          {
+            "location": "node_modules/braces",
+            "name": "braces",
+            "version": "3.0.3",
+            "packageJsonSha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7"
+          },
+          {
+            "location": "node_modules/bun-types",
+            "name": "bun-types",
+            "version": "1.3.14",
+            "packageJsonSha256": "01e8dc24f53869ebf700a038510de8061a8325d10a85406711184e4b9fc76f43"
+          },
+          {
+            "location": "node_modules/callsites",
+            "name": "callsites",
+            "version": "3.1.0",
+            "packageJsonSha256": "9c27ea7f90c3a348c038fd6b3213848552ed1ec5dd38e0a06016af19d19e526a"
+          },
+          {
+            "location": "node_modules/chalk",
+            "name": "chalk",
+            "version": "4.1.2",
+            "packageJsonSha256": "9cd907d34a45cb73b5c8a459d5602a36ccd456794665c529a3a5b0f02e196f26"
+          },
+          {
+            "location": "node_modules/cli-cursor",
+            "name": "cli-cursor",
+            "version": "5.0.0",
+            "packageJsonSha256": "2a179764184139cb6ba0af717863004b7fb9e42832c73da4c9dead1139157a24"
+          },
+          {
+            "location": "node_modules/cli-truncate",
+            "name": "cli-truncate",
+            "version": "5.2.0",
+            "packageJsonSha256": "ef33f1858347a1c4159a8bcedf70991b7753130606ad54acf8fdbadbd0c99b3c"
+          },
+          {
+            "location": "node_modules/color-convert",
+            "name": "color-convert",
+            "version": "2.0.1",
+            "packageJsonSha256": "9471d21744ca3137410448da6b3bd7b30ee91d42edce3b82ebcbf84faef74fb4"
+          },
+          {
+            "location": "node_modules/color-name",
+            "name": "color-name",
+            "version": "1.1.4",
+            "packageJsonSha256": "4a557ea373907e4643badb89ff21b3f4b969d20631086d78eab2e03d05c2efa4"
+          },
+          {
+            "location": "node_modules/concat-map",
+            "name": "concat-map",
+            "version": "0.0.1",
+            "packageJsonSha256": "4fe5e8089b65ebfd55bb86f465ba896ba6a8e24b7b61de1e0f420f590616b118"
+          },
+          {
+            "location": "node_modules/copy-file",
+            "name": "copy-file",
+            "version": "11.1.0",
+            "packageJsonSha256": "b705528045fe4b479a71fd253250b2ed2395ba756102322138eca5e43c55fcce"
+          },
+          {
+            "location": "node_modules/cpy",
+            "name": "cpy",
+            "version": "13.2.2",
+            "packageJsonSha256": "e508a063628eb2e2c39f5a87d8a5b08bac3ea660ff2c7d15ef42e74c21aeaf94"
+          },
+          {
+            "location": "node_modules/cpy-cli",
+            "name": "cpy-cli",
+            "version": "7.0.0",
+            "packageJsonSha256": "2617cdf002d2fbdd46c24615fd4a1804813946d2cb33bfa5d820b1b09f97b122"
+          },
+          {
+            "location": "node_modules/cross-spawn",
+            "name": "cross-spawn",
+            "version": "7.0.6",
+            "packageJsonSha256": "2e106cd9b4ae4e34ead35218371a0d4e172da72515a4f8f97d69a2e1fe3dee82"
+          },
+          {
+            "location": "node_modules/debug",
+            "name": "debug",
+            "version": "4.4.3",
+            "packageJsonSha256": "ea8e33d63fe5f3a4c36609b6c3df8e2ef1f8b8ba2fc3a2e1e53cb27291f384af"
+          },
+          {
+            "location": "node_modules/deep-is",
+            "name": "deep-is",
+            "version": "0.1.4",
+            "packageJsonSha256": "5caed41b62144a29c30415d2d92293c8122b4adeb281bffd097cbfca0f70645d"
+          },
+          {
+            "location": "node_modules/denque",
+            "name": "denque",
+            "version": "2.1.0",
+            "packageJsonSha256": "b84d3e7e26500d9a9ebbe103b627bda007049fa7f0672ceae96533992cc2fc9c"
+          },
+          {
+            "location": "node_modules/detect-indent",
+            "name": "detect-indent",
+            "version": "7.0.2",
+            "packageJsonSha256": "08ed663782bc9e15e7395b078358eab18f352e125a5b006a1247798a2aabe8cf"
+          },
+          {
+            "location": "node_modules/detect-newline",
+            "name": "detect-newline",
+            "version": "4.0.1",
+            "packageJsonSha256": "e65500eebd452513a0f9f078820fd42259566c26ed6bda4ed43d543b7fe4126f"
+          },
+          {
+            "location": "node_modules/emoji-regex",
+            "name": "emoji-regex",
+            "version": "10.6.0",
+            "packageJsonSha256": "ad8b9ae5582e5b85ae571a30a733fd8f3fd7951530122efd4f93342fe0995b11"
+          },
+          {
+            "location": "node_modules/environment",
+            "name": "environment",
+            "version": "1.1.0",
+            "packageJsonSha256": "21d39c9bbec69736f2d038229064ce55597e1fae08368d8bee8053dc7c917587"
+          },
+          {
+            "location": "node_modules/escape-string-regexp",
+            "name": "escape-string-regexp",
+            "version": "4.0.0",
+            "packageJsonSha256": "63763f28aefa6c49e6e6599e44b7c9aa5afd6518ae04bcfa534ff3759ad428e8"
+          },
+          {
+            "location": "node_modules/eslint",
+            "name": "eslint",
+            "version": "9.39.5",
+            "packageJsonSha256": "361210aa42b55fd814c48a01e3724559ec6f0f3e1c021d0f8aa2e8b00276060e"
+          },
+          {
+            "location": "node_modules/eslint-scope",
+            "name": "eslint-scope",
+            "version": "8.4.0",
+            "packageJsonSha256": "5d0d647be190cc44954e520036832957f55dd4738536b9f85eaf479b4a279ab8"
+          },
+          {
+            "location": "node_modules/eslint-visitor-keys",
+            "name": "eslint-visitor-keys",
+            "version": "4.2.1",
+            "packageJsonSha256": "f479c384cbd48ab3d95ba3f02f332ee42320b408a09f1cb8f1d3da96273ed4d3"
+          },
+          {
+            "location": "node_modules/eslint/node_modules/ignore",
+            "name": "ignore",
+            "version": "5.3.2",
+            "packageJsonSha256": "a9f40bd310889f21ed824bc19ce140714b7459d658f6708041af53e9855258a6"
+          },
+          {
+            "location": "node_modules/espree",
+            "name": "espree",
+            "version": "10.4.0",
+            "packageJsonSha256": "76d68e5b8ac5aae00882165c4feae4a8a8825ccb4ea76ab8af0f02ba320fd250"
+          },
+          {
+            "location": "node_modules/esquery",
+            "name": "esquery",
+            "version": "1.7.0",
+            "packageJsonSha256": "e69c382432559247e50fd8886b0476d4066fd90a47d80e6e722db4d164dcf61c"
+          },
+          {
+            "location": "node_modules/esrecurse",
+            "name": "esrecurse",
+            "version": "4.3.0",
+            "packageJsonSha256": "3bc67cb54672ec6957b53947613c23599371bf9222dbbe97275d20516a561a20"
+          },
+          {
+            "location": "node_modules/estraverse",
+            "name": "estraverse",
+            "version": "5.3.0",
+            "packageJsonSha256": "133a5be160a0123ad20ab8f2bdaa9da2fd94ebf3403996bf4cb69606e6a84a65"
+          },
+          {
+            "location": "node_modules/esutils",
+            "name": "esutils",
+            "version": "2.0.3",
+            "packageJsonSha256": "af08fd13ef49c88af75c5f4ad02812216028ad848f8354fd97346e7ddc816c0e"
+          },
+          {
+            "location": "node_modules/eventemitter3",
+            "name": "eventemitter3",
+            "version": "5.0.4",
+            "packageJsonSha256": "0dd9bc32a77be8238fad41d58aa5b24ccdfee79d8bcf4cbee85f16e3d15c1658"
+          },
+          {
+            "location": "node_modules/fast-deep-equal",
+            "name": "fast-deep-equal",
+            "version": "3.1.3",
+            "packageJsonSha256": "a5c63940db0260739be9e2ac67f3aac268df4db5770420ee4e34e493152f97d2"
+          },
+          {
+            "location": "node_modules/fast-glob",
+            "name": "fast-glob",
+            "version": "3.3.3",
+            "packageJsonSha256": "be3e54394e824554b06a85529804f11c59b9f2fa7ca6d579fefe71a5d5cf78ee"
+          },
+          {
+            "location": "node_modules/fast-glob/node_modules/glob-parent",
+            "name": "glob-parent",
+            "version": "5.1.2",
+            "packageJsonSha256": "858af9aa27cfe6eea1cfd1abbda15ad0ccc87e66e88b3ad249fab8df6dd13192"
+          },
+          {
+            "location": "node_modules/fast-json-stable-stringify",
+            "name": "fast-json-stable-stringify",
+            "version": "2.1.0",
+            "packageJsonSha256": "c4907a6cf1a242f65589b9bb762b9330088aa4a940d382b470d3c47b5309ef44"
+          },
+          {
+            "location": "node_modules/fast-levenshtein",
+            "name": "fast-levenshtein",
+            "version": "2.0.6",
+            "packageJsonSha256": "80167ee3483f23228b48d5cf5c9db355bacf55922282eb132af83136b9c9213e"
+          },
+          {
+            "location": "node_modules/fastq",
+            "name": "fastq",
+            "version": "1.20.1",
+            "packageJsonSha256": "48ba805474fbb8fc71050262e9df530bcc41ae71dc39f916bb646ccf4767dbb8"
+          },
+          {
+            "location": "node_modules/fdir",
+            "name": "fdir",
+            "version": "6.5.0",
+            "packageJsonSha256": "aca49395d61ef383a09f74555c66ed45817ca2b5724e710a4dc9e0471b83d8f5"
+          },
+          {
+            "location": "node_modules/file-entry-cache",
+            "name": "file-entry-cache",
+            "version": "8.0.0",
+            "packageJsonSha256": "1d88b9fe323d9766712599c0ee134c56e02a472e1fa633f304bc7be8cdc4dcec"
+          },
+          {
+            "location": "node_modules/fill-range",
+            "name": "fill-range",
+            "version": "7.1.1",
+            "packageJsonSha256": "87f5c78f9b47d21f9ca62b60cff1d250a3b468eab320dd13c3f3ab2464a02735"
+          },
+          {
+            "location": "node_modules/find-up",
+            "name": "find-up",
+            "version": "5.0.0",
+            "packageJsonSha256": "d1de12b1501bb90cf2fe6ef2668eb9d56a3dadeccdcaf075db46287bcb2f43ea"
+          },
+          {
+            "location": "node_modules/flat-cache",
+            "name": "flat-cache",
+            "version": "4.0.1",
+            "packageJsonSha256": "8086a3cb7efb10e538f6d55d820c22c237d686454f8b0e6b144c4baf92ea7e1e"
+          },
+          {
+            "location": "node_modules/flatted",
+            "name": "flatted",
+            "version": "3.4.2",
+            "packageJsonSha256": "775e8274f97d48e44c4a100702841d39429d6e39d4b969bd03ced697ee1c0703"
+          },
+          {
+            "location": "node_modules/get-east-asian-width",
+            "name": "get-east-asian-width",
+            "version": "1.6.0",
+            "packageJsonSha256": "d263e50dd1a43aee9acda4d7f066e66b0d0bde1f2852ea6e7153750a5e3a3e52"
+          },
+          {
+            "location": "node_modules/git-hooks-list",
+            "name": "git-hooks-list",
+            "version": "4.2.1",
+            "packageJsonSha256": "52a16e92e7ab3084e9f06fac75792b47b89ba65569b480b66028541fc24cf49b"
+          },
+          {
+            "location": "node_modules/glob",
+            "name": "glob",
+            "version": "13.0.6",
+            "packageJsonSha256": "5a28ef9a1f5252feb47ffe288a6350fe99b18311462e6a9cdacbdd0bb4be6be9"
+          },
+          {
+            "location": "node_modules/glob-parent",
+            "name": "glob-parent",
+            "version": "6.0.2",
+            "packageJsonSha256": "1a0b9ff627b3ded5a3e8c7e7ab99eface3c79e92d7691a11e3eff8d78e0f8e24"
+          },
+          {
+            "location": "node_modules/glob/node_modules/minimatch",
+            "name": "minimatch",
+            "version": "10.2.5",
+            "packageJsonSha256": "4b3a08a7ad20dead8bbe4b4fe97a2746bded7c51d218ef3034eb4e330ad31f08"
+          },
+          {
+            "location": "node_modules/glob/node_modules/minimatch/node_modules/brace-expansion",
+            "name": "brace-expansion",
+            "version": "5.0.7",
+            "packageJsonSha256": "f792e76015d954c06e8ac42cfa5664820126b2ecce01c987fe59de65bea57ab4"
+          },
+          {
+            "location": "node_modules/glob/node_modules/minimatch/node_modules/brace-expansion/node_modules/balanced-match",
+            "name": "balanced-match",
+            "version": "4.0.4",
+            "packageJsonSha256": "c984e6ae5c41fac085a07a732b665b22e0a26f28b61c692ba18ff458a8ecc95a"
+          },
+          {
+            "location": "node_modules/globals",
+            "name": "globals",
+            "version": "14.0.0",
+            "packageJsonSha256": "7825cb9a75020bbeba926f89926588ccc21322d4e8be27a0c5c70fec340f6ec1"
+          },
+          {
+            "location": "node_modules/globby",
+            "name": "globby",
+            "version": "16.2.1",
+            "packageJsonSha256": "9f2f17f94c0c99250b47e0793a985f91c692fc10cbc0989dbd617be50c5606fc"
+          },
+          {
+            "location": "node_modules/google-protobuf",
+            "name": "google-protobuf",
+            "version": "4.0.2",
+            "packageJsonSha256": "15b51e85ce5451f600ce64b2fab5f6cba5482bd86f345cc69e0039fd26aeaa8d"
+          },
+          {
+            "location": "node_modules/graceful-fs",
+            "name": "graceful-fs",
+            "version": "4.2.11",
+            "packageJsonSha256": "5747d4ba6b17165c6ecac30ab3a331715f41c7ad546e1f1574dab1bdcb116181"
+          },
+          {
+            "location": "node_modules/has-flag",
+            "name": "has-flag",
+            "version": "4.0.0",
+            "packageJsonSha256": "3fef4b52efbeabeadfffd5994e90b1025eb24263286e34170675956637d368b1"
+          },
+          {
+            "location": "node_modules/ignore",
+            "name": "ignore",
+            "version": "7.0.6",
+            "packageJsonSha256": "fd74f1c93bc4772d79aba83d59b5ca5bc4c2cbc4617e910c59977dfc52414d7d"
+          },
+          {
+            "location": "node_modules/import-fresh",
+            "name": "import-fresh",
+            "version": "3.3.1",
+            "packageJsonSha256": "c71eb71fede603ba3191c01c55c9d5a3977dd5f8d91f24835aaffc9785c19534"
+          },
+          {
+            "location": "node_modules/imurmurhash",
+            "name": "imurmurhash",
+            "version": "0.1.4",
+            "packageJsonSha256": "aa3b07e7fa3d63aa96e401c3842b8cca1dd3247954baf92377094766e903c185"
+          },
+          {
+            "location": "node_modules/is-extglob",
+            "name": "is-extglob",
+            "version": "2.1.1",
+            "packageJsonSha256": "8031afcd87f448d75ba8a5dd2cde9c68f982a94f406ebae8e5fb7cf6dfdeede2"
+          },
+          {
+            "location": "node_modules/is-fullwidth-code-point",
+            "name": "is-fullwidth-code-point",
+            "version": "5.1.0",
+            "packageJsonSha256": "8d9afd3fcb2ab5b5ab62ca76a6924dfa025a90d934b9a8fe8ba0237a8beeec14"
+          },
+          {
+            "location": "node_modules/is-glob",
+            "name": "is-glob",
+            "version": "4.0.3",
+            "packageJsonSha256": "1cce62b80db12fc033d85250b5881b1a288476229abda8e1abd983724befd56f"
+          },
+          {
+            "location": "node_modules/is-number",
+            "name": "is-number",
+            "version": "7.0.0",
+            "packageJsonSha256": "51c133f4e41df982aef69027249ff9d7262645029f437d079adc7c83328fb620"
+          },
+          {
+            "location": "node_modules/is-path-inside",
+            "name": "is-path-inside",
+            "version": "4.0.0",
+            "packageJsonSha256": "a7a0d67c13c25e2c03fa9777bdca2f25ff37ac04834484ae588dfef20ed46403"
+          },
+          {
+            "location": "node_modules/is-plain-obj",
+            "name": "is-plain-obj",
+            "version": "4.1.0",
+            "packageJsonSha256": "ac84142050cd4d1854c489a3d61e0c991550195ae5ae37d9347b736424b09c59"
+          },
+          {
+            "location": "node_modules/isexe",
+            "name": "isexe",
+            "version": "2.0.0",
+            "packageJsonSha256": "395c2af9abeeaafe7391974c1eacfb2a2bdeef187f21c3f5582c49e0368e59bf"
+          },
+          {
+            "location": "node_modules/js-yaml",
+            "name": "js-yaml",
+            "version": "4.3.0",
+            "packageJsonSha256": "6921d84ff035bba63648df9de947b0da44c9b4355b94260df1176824d0495d81"
+          },
+          {
+            "location": "node_modules/json-buffer",
+            "name": "json-buffer",
+            "version": "3.0.1",
+            "packageJsonSha256": "67bd0213396ba4664a9f2fafa3d2d25864a29f4f3800e766ea17c2aa3f4dbef9"
+          },
+          {
+            "location": "node_modules/json-schema-traverse",
+            "name": "json-schema-traverse",
+            "version": "0.4.1",
+            "packageJsonSha256": "bdedf225125f10e80911bb94f9a3992f93835e3c70894b3d5081ed75f25c5126"
+          },
+          {
+            "location": "node_modules/json-stable-stringify-without-jsonify",
+            "name": "json-stable-stringify-without-jsonify",
+            "version": "1.0.1",
+            "packageJsonSha256": "49bfc3a3a94d19ccb890f71c39f41a2a56ae8cc54b45d6330d4e30dc59418ae7"
+          },
+          {
+            "location": "node_modules/junk",
+            "name": "junk",
+            "version": "4.0.1",
+            "packageJsonSha256": "d161bf749a7628d95cd3322d6bbb12533dab8fad6620694ae653fd40cca4f5ce"
+          },
+          {
+            "location": "node_modules/keyv",
+            "name": "keyv",
+            "version": "4.5.4",
+            "packageJsonSha256": "e8afd30f2f2a40ef5023928b50fdaed3a3338aa7e1c4e86205413afb05e8a099"
+          },
+          {
+            "location": "node_modules/levn",
+            "name": "levn",
+            "version": "0.4.1",
+            "packageJsonSha256": "0a25421ab66ec56def7407234858f52c1d593b2454155c06df1d7feaa324c8fe"
+          },
+          {
+            "location": "node_modules/lint-staged",
+            "name": "lint-staged",
+            "version": "17.0.8",
+            "packageJsonSha256": "55583667ffa0ade5a1c360355002a12aa61328bb46f9cea80f81b3024626111d"
+          },
+          {
+            "location": "node_modules/listr2",
+            "name": "listr2",
+            "version": "10.2.2",
+            "packageJsonSha256": "dd27d1e27f1297d0ba9c49c5fe5e333a18a569a782e2ba22c6e01806aead2cc1"
+          },
+          {
+            "location": "node_modules/locate-path",
+            "name": "locate-path",
+            "version": "6.0.0",
+            "packageJsonSha256": "f77d343dc6be5bc096137fb765753139e8d23971f5ad740b7a40bc8dc6a24f82"
+          },
+          {
+            "location": "node_modules/lodash.merge",
+            "name": "lodash.merge",
+            "version": "4.6.2",
+            "packageJsonSha256": "5aaf4c24df9052e680d0728754c249fb94c11aef2e76ec3f76320431915c92f1"
+          },
+          {
+            "location": "node_modules/log-update",
+            "name": "log-update",
+            "version": "6.1.0",
+            "packageJsonSha256": "fe6829ade2168c9b42c7be2a462a843f17e115718535e4099e187d24b4bef55a"
+          },
+          {
+            "location": "node_modules/log-update/node_modules/slice-ansi",
+            "name": "slice-ansi",
+            "version": "7.1.2",
+            "packageJsonSha256": "b85dac1c0e27f3a29594d7d3df95e522999cbb5f5d65d9b5573209b46b992505"
+          },
+          {
+            "location": "node_modules/log-update/node_modules/slice-ansi/node_modules/ansi-styles",
+            "name": "ansi-styles",
+            "version": "6.2.3",
+            "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+          },
+          {
+            "location": "node_modules/log-update/node_modules/wrap-ansi",
+            "name": "wrap-ansi",
+            "version": "9.0.2",
+            "packageJsonSha256": "aa6924e02b510b48b0ad87f09212b2532a3e86043ea51ff0413f70d5964a7e31"
+          },
+          {
+            "location": "node_modules/log-update/node_modules/wrap-ansi/node_modules/ansi-styles",
+            "name": "ansi-styles",
+            "version": "6.2.3",
+            "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+          },
+          {
+            "location": "node_modules/log-update/node_modules/wrap-ansi/node_modules/string-width",
+            "name": "string-width",
+            "version": "7.2.0",
+            "packageJsonSha256": "c136bc8e7e23b6de2ad6f083cf99c1c3769fe200224d7575351f29c9f6bed27e"
+          },
+          {
+            "location": "node_modules/long",
+            "name": "long",
+            "version": "5.3.2",
+            "packageJsonSha256": "982e554a35d140981c7962fbba77855563e5890de200f8dc0a249135e4d9acb8"
+          },
+          {
+            "location": "node_modules/lru-cache",
+            "name": "lru-cache",
+            "version": "11.5.2",
+            "packageJsonSha256": "c1a8f6f3a568f41be739be2ac46520312d1af6918f2c9f66ae53990a7c50b3cf"
+          },
+          {
+            "location": "node_modules/meow",
+            "name": "meow",
+            "version": "14.1.0",
+            "packageJsonSha256": "0b1191596e7ce37fab063dd4e4081079109b5cd88b81254464ab84217159d398"
+          },
+          {
+            "location": "node_modules/merge2",
+            "name": "merge2",
+            "version": "1.4.1",
+            "packageJsonSha256": "5424b2be337f1f0a1fa376fa67262bceaead62275d5f8df6ff82103e283cc358"
+          },
+          {
+            "location": "node_modules/micromatch",
+            "name": "micromatch",
+            "version": "4.0.8",
+            "packageJsonSha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b"
+          },
+          {
+            "location": "node_modules/micromatch/node_modules/picomatch",
+            "name": "picomatch",
+            "version": "2.3.2",
+            "packageJsonSha256": "63264d817e856a4bff57d4304f2b38d2964a4f6df520eb169e7bcdb619f13e9a"
+          },
+          {
+            "location": "node_modules/mimic-function",
+            "name": "mimic-function",
+            "version": "5.0.1",
+            "packageJsonSha256": "d49919b51c727d702ce72bbd44dd328b2d537abce907fc9fa529ec724cfe6467"
+          },
+          {
+            "location": "node_modules/minimatch",
+            "name": "minimatch",
+            "version": "3.1.5",
+            "packageJsonSha256": "eefa1c89527d52bbb2e8b053fe8ecf3e3ced399bdba82cf27e0e92edfd833938"
+          },
+          {
+            "location": "node_modules/minipass",
+            "name": "minipass",
+            "version": "7.1.3",
+            "packageJsonSha256": "b8ab116187d5e9375d494f17437eb862cbee4b329c21f15412c6a5170ec2f55c"
+          },
+          {
+            "location": "node_modules/ms",
+            "name": "ms",
+            "version": "2.1.3",
+            "packageJsonSha256": "1a6b4d9739790c0b94ab96c8cc0507e281c164c311ff4fbf5e57fb8d26290b40"
+          },
+          {
+            "location": "node_modules/natural-compare",
+            "name": "natural-compare",
+            "version": "1.4.0",
+            "packageJsonSha256": "3d99911ccfa0ca34ae0c68bfd32c038b952542e55db7c649c37b11dd1573f6af"
+          },
+          {
+            "location": "node_modules/onetime",
+            "name": "onetime",
+            "version": "7.0.0",
+            "packageJsonSha256": "3d35dab44fc94bfb6d7e85dfb65fc6c0c262dfd491dbb6c28527616c811cc4a7"
+          },
+          {
+            "location": "node_modules/optionator",
+            "name": "optionator",
+            "version": "0.9.4",
+            "packageJsonSha256": "8011d3db01182479d3881e788bacb5a9f603ca74bd564c4d26f713d5f5f571d1"
+          },
+          {
+            "location": "node_modules/p-event",
+            "name": "p-event",
+            "version": "6.0.1",
+            "packageJsonSha256": "0a07df5541399a698c760ddf545a4c45a81314083c934ebe54153ff58ab45486"
+          },
+          {
+            "location": "node_modules/p-filter",
+            "name": "p-filter",
+            "version": "4.1.0",
+            "packageJsonSha256": "f2f2fc27ed0ca368be176f4810ab101f7b8a8919f601142b7f6b35cf59255f5b"
+          },
+          {
+            "location": "node_modules/p-limit",
+            "name": "p-limit",
+            "version": "3.1.0",
+            "packageJsonSha256": "0de84d3e2ad5bc3a7bac54354fe6f049ce7b351d67fcc57eda6660f9fa2e83b5"
+          },
+          {
+            "location": "node_modules/p-locate",
+            "name": "p-locate",
+            "version": "5.0.0",
+            "packageJsonSha256": "3a3baffa53cfac8fd6281250dd824d56118f46ad258edb09d8aed1a15e0003d2"
+          },
+          {
+            "location": "node_modules/p-map",
+            "name": "p-map",
+            "version": "7.0.5",
+            "packageJsonSha256": "0f0878691c8061be2207af35c88800a65a1984ccc3a29f18ba87c99c640cd980"
+          },
+          {
+            "location": "node_modules/p-timeout",
+            "name": "p-timeout",
+            "version": "6.1.4",
+            "packageJsonSha256": "dbf7976ebd476c4c7b10765f1d063ddb130e66565aed4e02424d8b37638c3e6a"
+          },
+          {
+            "location": "node_modules/package-json-from-dist",
+            "name": "package-json-from-dist",
+            "version": "1.0.1",
+            "packageJsonSha256": "38fdaf168bc63a6422a7dbe7e41a7b52b02326edef8b14019e0333ef60b37b47"
+          },
+          {
+            "location": "node_modules/parent-module",
+            "name": "parent-module",
+            "version": "1.0.1",
+            "packageJsonSha256": "4c6c519739db25dabf32a8fe29b08e34fb763ca897f14b776a0e2e99fc40afed"
+          },
+          {
+            "location": "node_modules/path-exists",
+            "name": "path-exists",
+            "version": "4.0.0",
+            "packageJsonSha256": "5e258d1a0d185ae469fec34de2af18913421b94181ef61238efcfe0b00d1b2c3"
+          },
+          {
+            "location": "node_modules/path-key",
+            "name": "path-key",
+            "version": "3.1.1",
+            "packageJsonSha256": "25594dab72681c910d9cc919263a4daf27d77a75e0d2c26a4d958d6d6b798f86"
+          },
+          {
+            "location": "node_modules/path-scurry",
+            "name": "path-scurry",
+            "version": "2.0.2",
+            "packageJsonSha256": "fb54fe908dbe5f288bd1c5d7429f033c4f527f435c3d3a583ee0ce9e78992087"
+          },
+          {
+            "location": "node_modules/picomatch",
+            "name": "picomatch",
+            "version": "4.0.5",
+            "packageJsonSha256": "fb7766f5f9c724e13e075760a95d16f87cdb327143d153a913135fde267ec615"
+          },
+          {
+            "location": "node_modules/prelude-ls",
+            "name": "prelude-ls",
+            "version": "1.2.1",
+            "packageJsonSha256": "d943e3b5a7189692268bf64e3a068249696985a9c8728397fc8786b59a198b53"
+          },
+          {
+            "location": "node_modules/prettier",
+            "name": "prettier",
+            "version": "3.9.1",
+            "packageJsonSha256": "dfb57b78073f50961976f50cf60f0575c9b8c9c84750c0f64f8650d5beda3a52"
+          },
+          {
+            "location": "node_modules/protobufjs",
+            "name": "protobufjs",
+            "version": "7.6.5",
+            "packageJsonSha256": "893c7c89175f609c08fa04329c89cefb411faf5ad7da76213f64498485e81404"
+          },
+          {
+            "location": "node_modules/protoc-gen-js",
+            "name": "protoc-gen-js",
+            "version": "3.21.4-4",
+            "packageJsonSha256": "4f1a9ff2eb28164c9928af2c4cf10f71e22f1e3f1f99d5d8d0a0d4a28de89a72"
+          },
+          {
+            "location": "node_modules/protoc-gen-ts",
+            "name": "protoc-gen-ts",
+            "version": "0.8.7",
+            "packageJsonSha256": "11d9c3e1d526d7abc519267be0e532c7248e2bf9a1bcb8ed8e298b6fc65b7a09"
+          },
+          {
+            "location": "node_modules/punycode",
+            "name": "punycode",
+            "version": "2.3.1",
+            "packageJsonSha256": "e025033bd11110af671fb8eb62f0db8895073ccdca70b596aa94a27eb5bf9acb"
+          },
+          {
+            "location": "node_modules/queue-microtask",
+            "name": "queue-microtask",
+            "version": "1.2.3",
+            "packageJsonSha256": "e6d153dda4c9aee863e7d8cc59419d4eb94b9829277cda9289a40f96efb36c11"
+          },
+          {
+            "location": "node_modules/resolve-from",
+            "name": "resolve-from",
+            "version": "4.0.0",
+            "packageJsonSha256": "dd5b0fa6d310443ccf3e93e9eb6277bd7004c18f5263ca2ac2ebf52f3708f39f"
+          },
+          {
+            "location": "node_modules/restore-cursor",
+            "name": "restore-cursor",
+            "version": "5.1.0",
+            "packageJsonSha256": "ae7d335125f4bde47a744cfaa61a9a9416bdb543636aa80cf2f523aa139f0108"
+          },
+          {
+            "location": "node_modules/reusify",
+            "name": "reusify",
+            "version": "1.1.0",
+            "packageJsonSha256": "db69497e33cebb1296cd68a9202cc4df7b8d1dc895a423f2153e8c157068aa76"
+          },
+          {
+            "location": "node_modules/rfdc",
+            "name": "rfdc",
+            "version": "1.4.1",
+            "packageJsonSha256": "587604c366b2f0f40e660ef8496d0480dd0cd839cfc3e64b32f644a7a2a549cf"
+          },
+          {
+            "location": "node_modules/rimraf",
+            "name": "rimraf",
+            "version": "6.1.3",
+            "packageJsonSha256": "76521a33ba05c5a62f0f7f4900000e9827d9d7b0786a92a748f126ba33e4c806"
+          },
+          {
+            "location": "node_modules/run-parallel",
+            "name": "run-parallel",
+            "version": "1.2.0",
+            "packageJsonSha256": "a45d96ac517ff7b6612a6e9961b66fc3e6d74adb1eeba5242ae0d36f77a35b58"
+          },
+          {
+            "location": "node_modules/semver",
+            "name": "semver",
+            "version": "7.8.5",
+            "packageJsonSha256": "7c94cb7f2a53c27b20d76386ec144c062894dbcc909cfabd0f728c37874b1776"
+          },
+          {
+            "location": "node_modules/shebang-command",
+            "name": "shebang-command",
+            "version": "2.0.0",
+            "packageJsonSha256": "44de390ae5ed6c5f9758b8b9c90b93fa53977d5361731600429f1de08f4b3f30"
+          },
+          {
+            "location": "node_modules/shebang-regex",
+            "name": "shebang-regex",
+            "version": "3.0.0",
+            "packageJsonSha256": "b8018c6b8cc9900dfd1ac18a54956ba34c453fdc2da5e5fe555ee8f04133a1c5"
+          },
+          {
+            "location": "node_modules/signal-exit",
+            "name": "signal-exit",
+            "version": "4.1.0",
+            "packageJsonSha256": "cd1c6cfa95782e432dd2affaa88c3a6dda7f46c8088d91f3acc0fba79dce5075"
+          },
+          {
+            "location": "node_modules/slash",
+            "name": "slash",
+            "version": "5.1.0",
+            "packageJsonSha256": "1e4e4b502d4280d2c14ad936b541eb873d631bb6d9e0ee86fe8bb0e9e77b4786"
+          },
+          {
+            "location": "node_modules/slice-ansi",
+            "name": "slice-ansi",
+            "version": "8.0.0",
+            "packageJsonSha256": "43f7068d460c56fea23c6972cddf94151b5e854d64687b5ebcccf5c21604aa03"
+          },
+          {
+            "location": "node_modules/slice-ansi/node_modules/ansi-styles",
+            "name": "ansi-styles",
+            "version": "6.2.3",
+            "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+          },
+          {
+            "location": "node_modules/sort-object-keys",
+            "name": "sort-object-keys",
+            "version": "2.1.0",
+            "packageJsonSha256": "c0e2925c056cc300ee404fb664f77e87dad233385d3aaeace1596f5a11f0ae6a"
+          },
+          {
+            "location": "node_modules/sort-package-json",
+            "name": "sort-package-json",
+            "version": "3.7.1",
+            "packageJsonSha256": "4915c503e2e2775058b7ee41cf354265552498b3c1aaa80786c4745604a3f597"
+          },
+          {
+            "location": "node_modules/string-argv",
+            "name": "string-argv",
+            "version": "0.3.2",
+            "packageJsonSha256": "a9a1a3b04694db963232bb9cb059fd050781837d9143063009b1461e92b33e5a"
+          },
+          {
+            "location": "node_modules/string-width",
+            "name": "string-width",
+            "version": "8.2.2",
+            "packageJsonSha256": "26e7e6a32cdca3ae61b6cf02eadfcf6cf6f6133ba7779de57f9e99c261393da2"
+          },
+          {
+            "location": "node_modules/strip-ansi",
+            "name": "strip-ansi",
+            "version": "7.2.0",
+            "packageJsonSha256": "228b214dd06ca80ab3c36e2b890a8696a39cea65585f6d61498c922c615e18a0"
+          },
+          {
+            "location": "node_modules/strip-json-comments",
+            "name": "strip-json-comments",
+            "version": "3.1.1",
+            "packageJsonSha256": "92b83192db22eb46049920e4b750555193d10eafe609cf2adc4f14125c951ed4"
+          },
+          {
+            "location": "node_modules/supports-color",
+            "name": "supports-color",
+            "version": "7.2.0",
+            "packageJsonSha256": "d410a772f9f64b224482ec13815a4bbf1837c533e1be04b3687755c48b2efa1f"
+          },
+          {
+            "location": "node_modules/tinyexec",
+            "name": "tinyexec",
+            "version": "1.2.4",
+            "packageJsonSha256": "a930901b9a4b26370398ce8403a190cb8fdf822ab0e56cdb3d79b70a1973686e"
+          },
+          {
+            "location": "node_modules/tinyglobby",
+            "name": "tinyglobby",
+            "version": "0.2.17",
+            "packageJsonSha256": "bd2b2af3c9ba0580f1acfb22c55d0b6d29abf683af5cac8a2efe82fa7c943f23"
+          },
+          {
+            "location": "node_modules/to-regex-range",
+            "name": "to-regex-range",
+            "version": "5.0.1",
+            "packageJsonSha256": "766fc1bb34fffcd503c89f4194188ce059795c52fd0dc6753cd4b7dcfc3fe1ec"
+          },
+          {
+            "location": "node_modules/ts-api-utils",
+            "name": "ts-api-utils",
+            "version": "2.5.0",
+            "packageJsonSha256": "2c4e0f9e0ea7a0813a9f6ac4967d69f00a1d857f3fd9ce41f5eeba97a6ed72c4"
+          },
+          {
+            "location": "node_modules/ts-protoc-gen",
+            "name": "ts-protoc-gen",
+            "version": "0.15.0",
+            "packageJsonSha256": "ff908700c3d4fab9f2311af4e2058c709e2b6ee6d10a6abc1fa3da614373aada"
+          },
+          {
+            "location": "node_modules/ts-protoc-gen/node_modules/google-protobuf",
+            "name": "google-protobuf",
+            "version": "3.21.4",
+            "packageJsonSha256": "164e176dfce3a1aa0b560ccd0ceeddd3e7dab935867ab90e0b8e99d76dc3225f"
+          },
+          {
+            "location": "node_modules/type-check",
+            "name": "type-check",
+            "version": "0.4.0",
+            "packageJsonSha256": "f52058410cf8e57ed28dd462eece693ba490c619c70c17caef8af60b84dc4ed0"
+          },
+          {
+            "location": "node_modules/typescript",
+            "name": "typescript",
+            "version": "5.9.3",
+            "packageJsonSha256": "822ef7ca6452205657b6288b066481ecf508bfbf43455d715cf7d3ec457561e6"
+          },
+          {
+            "location": "node_modules/undici-types",
+            "name": "undici-types",
+            "version": "8.3.0",
+            "packageJsonSha256": "fe5de6d50b3e426af5bbe08b9d83b6b3c5106d639ec28e5b90c79bfb1d7cddab"
+          },
+          {
+            "location": "node_modules/unicorn-magic",
+            "name": "unicorn-magic",
+            "version": "0.4.0",
+            "packageJsonSha256": "7fa3352937fcd791b0380feec0c21de503b73fed3ce12f35ab9a3332d362569d"
+          },
+          {
+            "location": "node_modules/uri-js",
+            "name": "uri-js",
+            "version": "4.4.1",
+            "packageJsonSha256": "13f6722afc3b74de0487b56d3087df1954a156e93f341aebb6ca9c1471891d6b"
+          },
+          {
+            "location": "node_modules/uuid",
+            "name": "uuid",
+            "version": "11.1.1",
+            "packageJsonSha256": "e5ebc4600db1bfcb5c00d8cc3430d869bdbe229c8d46b4bfac06ab2dfc180c39"
+          },
+          {
+            "location": "node_modules/which",
+            "name": "which",
+            "version": "2.0.2",
+            "packageJsonSha256": "43010039ed5e89f7186960be682b3cb5cda5ab6cdfb06cbfd4f081cf0e7b4260"
+          },
+          {
+            "location": "node_modules/word-wrap",
+            "name": "word-wrap",
+            "version": "1.2.5",
+            "packageJsonSha256": "917ace72e6293d7bc27ce908ed87f59526c05438930afcdf04462845e103fb94"
+          },
+          {
+            "location": "node_modules/wrap-ansi",
+            "name": "wrap-ansi",
+            "version": "10.0.0",
+            "packageJsonSha256": "a369e8e3cd3e4abb3720d90e4317d6b3d8a96c2ccffe590c99b15366e90ae227"
+          },
+          {
+            "location": "node_modules/wrap-ansi/node_modules/ansi-styles",
+            "name": "ansi-styles",
+            "version": "6.2.3",
+            "packageJsonSha256": "0cf1f46ceee4b380298db6e6a54f14d345abe09abd5f650cbc20c8ac2ab27744"
+          },
+          {
+            "location": "node_modules/yaml",
+            "name": "yaml",
+            "version": "2.9.0",
+            "packageJsonSha256": "20b8b197cbd10dad245d45e463dfe58e4c8c25a47e24bc4256ad9ab58bf35683"
+          },
+          {
+            "location": "node_modules/yocto-queue",
+            "name": "yocto-queue",
+            "version": "0.1.0",
+            "packageJsonSha256": "e94d571d03c65c94eab2216f4fde773918a152d5d36e5672e1f5c158ff6ac42d"
+          }
+        ],
+        "sha256": "fbbf2cb7068dcc4e5e3dd776ecc99bee4982e1dd924835808d3c2c9511f39f81"
+      }
+    },
+    "seedManifest": {
+      "path": "seed-manifest.json",
+      "sha256": "634407118ab78e1cccd4f09a6414bfba9d7cfc402ce372fd7baa96afd69aff23"
+    },
+    "genomeId": "d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c",
+    "genome": {
+      "includeMoves": false,
+      "maxMelee": 8,
+      "maxShots": 6,
+      "maxThrows": 4,
+      "label": "multicohort-60d",
+      "leafMode": "model",
+      "leaf": {
+        "b": 0.12085,
+        "w": [
+          3.86987,
+          2.93244,
+          1.81804,
+          -0.13392,
+          -1.07473,
+          1.00686,
+          0.17237,
+          0.00405,
+          -0.10434,
+          -1.71923,
+          -0.95201,
+          0.7672,
+          0.00009,
+          -0.24357,
+          -0.37844,
+          0.29021,
+          -0.14016,
+          0.19824,
+          0.08107,
+          -0.05474,
+          -0.0443,
+          0.01188,
+          0.12247,
+          -0.12216,
+          0.27926,
+          -0.30397,
+          0.0532,
+          -0.06169,
+          -0.08185,
+          0.01745,
+          0.80706,
+          -0.1135,
+          0.66729,
+          -0.14334,
+          -0.47378,
+          0.41186,
+          -0.02215,
+          -0.03767,
+          -0.06966,
+          0.16734,
+          0.15768,
+          -0.00967,
+          0.00006,
+          0.1581,
+          0.02515,
+          0.03954,
+          0.00281,
+          0.02284,
+          0.03988,
+          -0.00286,
+          -0.02536,
+          -0.00387,
+          0.04793,
+          -0.04506,
+          0.00626,
+          -0.01338,
+          0.02377,
+          -0.03594,
+          -0.09021,
+          0.0321
+        ]
+      },
+      "gate": 0.025,
+      "horizon": 20,
+      "rollouts": 3
+    },
+    "selectionBehaviorEnvironment": {
+      "SEARCH_AUDIT": "/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.audit.jsonl",
+      "SEARCH_GATE": "0.025",
+      "SEARCH_HORIZON": "20",
+      "SEARCH_INCLUDE_MOVES": "0",
+      "SEARCH_MAX_MELEE": "8",
+      "SEARCH_MAX_SHOTS": "6",
+      "SEARCH_MAX_THROWS": "4",
+      "SEARCH_ROLLOUTS": "3",
+      "SEARCH_VERSIONS": "v0.7",
+      "SIM_NO_ACTIONS": "1",
+      "V07_SEARCH": "1",
+      "V07_VALUE_WEIGHTS_V2": "{\"b\":0.12085,\"w\":[3.86987,2.93244,1.81804,-0.13392,-1.07473,1.00686,0.17237,0.00405,-0.10434,-1.71923,-0.95201,0.7672,0.00009,-0.24357,-0.37844,0.29021,-0.14016,0.19824,0.08107,-0.05474,-0.0443,0.01188,0.12247,-0.12216,0.27926,-0.30397,0.0532,-0.06169,-0.08185,0.01745,0.80706,-0.1135,0.66729,-0.14334,-0.47378,0.41186,-0.02215,-0.03767,-0.06966,0.16734,0.15768,-0.00967,0.00006,0.1581,0.02515,0.03954,0.00281,0.02284,0.03988,-0.00286,-0.02536,-0.00387,0.04793,-0.04506,0.00626,-0.01338,0.02377,-0.03594,-0.09021,0.0321]}"
+    },
+    "selectionEvidence": {
+      "panelId": "probe-ceiling",
+      "opponent": "v0.6",
+      "genomeId": "d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c",
+      "fitness": {
+        "valid": true,
+        "fitness": 0.7025477437151457,
+        "minimumTemplateRate": 0.8156312625250501,
+        "minimumTemplateLow": 0.7915477437151457,
+        "geometricMeanRate": 0.9461559335153851,
+        "maximumDrawOrArmageddonRate": 0.9,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      "evaluationPath": "evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json",
+      "evaluationSha256": "1eeccca4da71bc0625ee954c0ad86ae7b67cb67e97961bf43202705b4e438671",
+      "reportSha256": "332443374b9174aa557e4d1e584a263d02af58d921cf27ab7e8dabc07b32bde0",
+      "behaviorEnvironmentSha256": "7588ebde00e3d1104c78d3097157e325a01fee0faebb389e83d1ca391191f4fd",
+      "auditSha256": "472c3f7855865c22d8f221c7205c199b80c1e524fd3589b833bad78822a04a87"
+    },
+    "qualification": "Frozen before either final panel was opened.",
+    "candidateFingerprint": "46199f7915d14536f00a8792b94b56cdda20dfe147aa13e6c68dea60396f4795"
+  },
+  "finalStatus": "primary_incomplete_deadline",
+  "finalV06": {
+    "status": "not_evaluated_deadline",
+    "panelId": "final-v06",
+    "opponent": "v0.6",
+    "reason": "Evaluation window closed for final-v06",
+    "targetAssessment": null,
+    "integrityQualified": false,
+    "operationalQualified": false
+  },
+  "finalV04": {
+    "status": "not_evaluated_primary_incomplete",
+    "reason": "The primary v0.6 final panel did not complete before its deadline."
+  },
+  "promotions": 0,
+  "generations": 3,
+  "probeAssessment": {
+    "evaluatedAt": "2026-07-12T12:34:56.855Z",
+    "target": 0.9,
+    "probeTemplateUpperBelowTarget": true,
+    "interpretation": "The selected probe champion has a template-level 95% upper diagnostic below target; this does not bound later candidates or the search space."
+  },
+  "targetGate": {
+    "target": 0.9,
+    "achieved": false,
+    "observed90AllArchetypes": false,
+    "certified90AllArchetypes": false,
+    "strict90AllTemplates": false,
+    "integrityQualified": false,
+    "operationalQualified": false
+  },
+  "gateDecision": {
+    "bake": false,
+    "deploy": false,
+    "reason": "Simulation-only v0.7+RAWS research output; owner review and committed-default acceptance remain required."
+  },
+  "terminalSha256": "e33647f3d1bb30f9c3246192f57f6bae6322f4027f6583eb324e26528db7da20"
+}

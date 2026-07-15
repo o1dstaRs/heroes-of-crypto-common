@@ -1,0 +1,1940 @@
+{
+  "schemaVersion": 2,
+  "status": "research_only",
+  "runId": "dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+  "panelId": "probe-ceiling",
+  "opponent": "v0.6",
+  "genomeId": "d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c",
+  "genome": {
+    "includeMoves": false,
+    "maxMelee": 8,
+    "maxShots": 6,
+    "maxThrows": 4,
+    "label": "multicohort-60d",
+    "leafMode": "model",
+    "leaf": {
+      "b": 0.12085,
+      "w": [
+        3.86987,
+        2.93244,
+        1.81804,
+        -0.13392,
+        -1.07473,
+        1.00686,
+        0.17237,
+        0.00405,
+        -0.10434,
+        -1.71923,
+        -0.95201,
+        0.7672,
+        0.00009,
+        -0.24357,
+        -0.37844,
+        0.29021,
+        -0.14016,
+        0.19824,
+        0.08107,
+        -0.05474,
+        -0.0443,
+        0.01188,
+        0.12247,
+        -0.12216,
+        0.27926,
+        -0.30397,
+        0.0532,
+        -0.06169,
+        -0.08185,
+        0.01745,
+        0.80706,
+        -0.1135,
+        0.66729,
+        -0.14334,
+        -0.47378,
+        0.41186,
+        -0.02215,
+        -0.03767,
+        -0.06966,
+        0.16734,
+        0.15768,
+        -0.00967,
+        0.00006,
+        0.1581,
+        0.02515,
+        0.03954,
+        0.00281,
+        0.02284,
+        0.03988,
+        -0.00286,
+        -0.02536,
+        -0.00387,
+        0.04793,
+        -0.04506,
+        0.00626,
+        -0.01338,
+        0.02377,
+        -0.03594,
+        -0.09021,
+        0.0321
+      ]
+    },
+    "gate": 0.025,
+    "horizon": 20,
+    "rollouts": 3
+  },
+  "fitness": {
+    "valid": true,
+    "fitness": 0.7025477437151457,
+    "minimumTemplateRate": 0.8156312625250501,
+    "minimumTemplateLow": 0.7915477437151457,
+    "geometricMeanRate": 0.9461559335153851,
+    "maximumDrawOrArmageddonRate": 0.9,
+    "candidateRejections": 0,
+    "missingRejectionCounts": 0
+  },
+  "validation": {
+    "auditComplete": true,
+    "latencyWithinBudget": true,
+    "operationalEligible": true,
+    "behaviorEnvironmentSha256": "7588ebde00e3d1104c78d3097157e325a01fee0faebb389e83d1ca391191f4fd",
+    "reportSha256": "332443374b9174aa557e4d1e584a263d02af58d921cf27ab7e8dabc07b32bde0"
+  },
+  "auditSha256": "472c3f7855865c22d8f221c7205c199b80c1e524fd3589b833bad78822a04a87",
+  "report": {
+    "schemaVersion": 1,
+    "status": "research_only",
+    "qualification": "Experimental fixed-template evaluation with behavior-changing environment permitted and recorded; not official v0.7 evidence, acceptance, bake, or release authorization.",
+    "generatedAt": "2026-07-12T08:35:02.760Z",
+    "completedAt": "2026-07-12T12:34:56.499Z",
+    "elapsedSeconds": 14393.739,
+    "requested": {
+      "candidate": "v0.7",
+      "opponent": "v0.6",
+      "templates": [
+        "mage_frontline",
+        "mage_fireline",
+        "melee_magic_utility",
+        "melee_magic_brawler",
+        "aura_support",
+        "aura_offense",
+        "ranged_precision",
+        "ranged_control"
+      ],
+      "gamesPerTemplate": 1000,
+      "runId": "dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+      "panelId": "probe-ceiling",
+      "baseSeed": null,
+      "seeds": {
+        "mage_frontline": 3247274620,
+        "mage_fireline": 2280897664,
+        "melee_magic_utility": 1008303172,
+        "melee_magic_brawler": 3207973731,
+        "aura_support": 79945004,
+        "aura_offense": 3086033750,
+        "ranged_precision": 493504109,
+        "ranged_control": 3962832444
+      },
+      "concurrency": 10,
+      "auditPath": "/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.audit.jsonl",
+      "auditTurns": false,
+      "checkpointDir": "/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.cells",
+      "checkpointGames": 200
+    },
+    "behaviorEnvironment": {
+      "SEARCH_AUDIT": "/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.audit.jsonl",
+      "SEARCH_GATE": "0.025",
+      "SEARCH_HORIZON": "20",
+      "SEARCH_INCLUDE_MOVES": "0",
+      "SEARCH_MAX_MELEE": "8",
+      "SEARCH_MAX_SHOTS": "6",
+      "SEARCH_MAX_THROWS": "4",
+      "SEARCH_ROLLOUTS": "3",
+      "SEARCH_VERSIONS": "v0.7",
+      "SIM_NO_ACTIONS": "1",
+      "V07_SEARCH": "1",
+      "V07_VALUE_WEIGHTS_V2": "{\"b\":0.12085,\"w\":[3.86987,2.93244,1.81804,-0.13392,-1.07473,1.00686,0.17237,0.00405,-0.10434,-1.71923,-0.95201,0.7672,0.00009,-0.24357,-0.37844,0.29021,-0.14016,0.19824,0.08107,-0.05474,-0.0443,0.01188,0.12247,-0.12216,0.27926,-0.30397,0.0532,-0.06169,-0.08185,0.01745,0.80706,-0.1135,0.66729,-0.14334,-0.47378,0.41186,-0.02215,-0.03767,-0.06966,0.16734,0.15768,-0.00967,0.00006,0.1581,0.02515,0.03954,0.00281,0.02284,0.03988,-0.00286,-0.02536,-0.00387,0.04793,-0.04506,0.00626,-0.01338,0.02377,-0.03594,-0.09021,0.0321]}"
+    },
+    "provenance": {
+      "command": [
+        "/usr/local/bin/bun",
+        "/home/agent-zinc/hoc-common-v07-96h/src/simulation/optimizer/v0_7_search_trial.ts",
+        "--candidate=v0.7",
+        "--opponent=v0.6",
+        "--run-id=dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+        "--panel-id=probe-ceiling",
+        "--games=1000",
+        "--seeds-json={\"mage_frontline\":3247274620,\"mage_fireline\":2280897664,\"melee_magic_utility\":1008303172,\"melee_magic_brawler\":3207973731,\"aura_support\":79945004,\"aura_offense\":3086033750,\"ranged_precision\":493504109,\"ranged_control\":3962832444}",
+        "--concurrency=10",
+        "--output=/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.raw.6679.json",
+        "--audit=/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.audit.jsonl",
+        "--checkpoint-dir=/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.cells",
+        "--checkpoint-games=200"
+      ],
+      "cwd": "/home/agent-zinc/hoc-common-v07-96h",
+      "revision": {
+        "commit": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+        "commitDate": "2026-07-10T23:08:52-07:00",
+        "branch": "main",
+        "remote": "https://github.com/o1dstaRs/heroes-of-crypto-common.git",
+        "trackedClean": true,
+        "trackedDiffSha256": null,
+        "worktreeClean": true,
+        "statusPorcelainSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untrackedPaths": []
+      },
+      "revisionAtCompletion": {
+        "commit": "d68490a4c1afbf10101baa746b8388cd031b8dca",
+        "commitDate": "2026-07-10T23:08:52-07:00",
+        "branch": "main",
+        "remote": "https://github.com/o1dstaRs/heroes-of-crypto-common.git",
+        "trackedClean": true,
+        "trackedDiffSha256": null,
+        "worktreeClean": true,
+        "statusPorcelainSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untrackedPaths": []
+      },
+      "revisionStable": true
+    },
+    "completeEightTemplatePanel": true,
+    "cells": [
+      {
+        "spec": {
+          "archetype": "mage",
+          "template": "mage_frontline",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 3247274620,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 980,
+          "opponentWins": 18,
+          "draws": 2,
+          "candidateWinRate": 0.9819639278557114,
+          "deltaFromParityPp": 48.19639278557114,
+          "standardErrorPp": 0.4177866548996735,
+          "confidence95": {
+            "low": 0.9737754598874632,
+            "high": 0.9901523958239596
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1940,
+            "sumWinDecisive": 1958,
+            "sumDecisiveSquared": 1994
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 2,
+          "armageddonDecided": 8,
+          "drawOrArmageddon": 8,
+          "drawOrArmageddonRate": 0.008,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 489,
+          "candidateWinsAsRed": 491,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 35638,
+            "actionTypes": {
+              "wait_turn": 3765,
+              "melee_attack": 17633,
+              "cast_spell": 9753,
+              "move_unit": 11817,
+              "select_attack_type": 18,
+              "end_turn": 16
+            },
+            "spells": {
+              "Heal": 2533,
+              "Helping Hand": 1573,
+              "Courage": 1574,
+              "Spiritual Armor": 2097,
+              "Summon Wolves": 1353,
+              "Mass Heal": 576,
+              "Blessing": 47
+            },
+            "creatures": {
+              "Hydra": 5860,
+              "Berserker": 5556,
+              "Crusader": 4925,
+              "Healer": 5308,
+              "Squire": 5258,
+              "Satyr": 5183,
+              "Wolf": 3548
+            },
+            "creatureActions": {
+              "Hydra:wait_turn": 2043,
+              "Berserker:wait_turn": 942,
+              "Crusader:melee_attack": 4314,
+              "Healer:cast_spell": 5253,
+              "Squire:melee_attack": 3800,
+              "Satyr:cast_spell": 4500,
+              "Berserker:move_unit": 3029,
+              "Berserker:melee_attack": 4510,
+              "Wolf:move_unit": 2545,
+              "Wolf:melee_attack": 1541,
+              "Crusader:move_unit": 2620,
+              "Squire:move_unit": 2522,
+              "Hydra:melee_attack": 3396,
+              "Crusader:wait_turn": 379,
+              "Squire:wait_turn": 230,
+              "Hydra:move_unit": 420,
+              "Satyr:move_unit": 641,
+              "Wolf:wait_turn": 163,
+              "Healer:move_unit": 40,
+              "Satyr:melee_attack": 56,
+              "Healer:select_attack_type": 16,
+              "Healer:melee_attack": 16,
+              "Healer:wait_turn": 4,
+              "Crusader:end_turn": 14,
+              "Satyr:wait_turn": 4,
+              "Satyr:select_attack_type": 2,
+              "Berserker:end_turn": 1,
+              "Hydra:end_turn": 1
+            }
+          },
+          "opponent": {
+            "decisions": 21700,
+            "actionTypes": {
+              "move_unit": 9367,
+              "cast_spell": 9201,
+              "wait_turn": 758,
+              "melee_attack": 7155,
+              "select_attack_type": 206,
+              "end_turn": 5
+            },
+            "spells": {
+              "Heal": 1481,
+              "Summon Wolves": 1162,
+              "Spiritual Armor": 1955,
+              "Helping Hand": 969,
+              "Courage": 1950,
+              "Blessing": 1082,
+              "Mass Heal": 602
+            },
+            "creatures": {
+              "Hydra": 1522,
+              "Berserker": 2446,
+              "Crusader": 2656,
+              "Healer": 5360,
+              "Satyr": 4276,
+              "Squire": 3793,
+              "Wolf": 1647
+            },
+            "creatureActions": {
+              "Hydra:move_unit": 944,
+              "Berserker:move_unit": 2064,
+              "Crusader:move_unit": 2075,
+              "Healer:cast_spell": 5120,
+              "Satyr:cast_spell": 4081,
+              "Squire:move_unit": 2709,
+              "Wolf:move_unit": 1321,
+              "Hydra:wait_turn": 208,
+              "Berserker:melee_attack": 1413,
+              "Crusader:melee_attack": 1524,
+              "Squire:melee_attack": 2691,
+              "Squire:wait_turn": 72,
+              "Crusader:wait_turn": 166,
+              "Wolf:melee_attack": 841,
+              "Healer:select_attack_type": 169,
+              "Healer:move_unit": 116,
+              "Healer:melee_attack": 169,
+              "Hydra:melee_attack": 370,
+              "Satyr:move_unit": 138,
+              "Satyr:melee_attack": 147,
+              "Berserker:wait_turn": 120,
+              "Wolf:wait_turn": 133,
+              "Healer:wait_turn": 51,
+              "Satyr:select_attack_type": 37,
+              "Satyr:wait_turn": 8,
+              "Crusader:end_turn": 5
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "mage",
+          "template": "mage_fireline",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 2280897664,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 946,
+          "candidateWins": 940,
+          "opponentWins": 6,
+          "draws": 54,
+          "candidateWinRate": 0.9936575052854123,
+          "deltaFromParityPp": 49.36575052854123,
+          "standardErrorPp": 0.2574959463391259,
+          "confidence95": {
+            "low": 0.9886106774755149,
+            "high": 0.9987043330953097
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1822,
+            "sumWinDecisive": 1828,
+            "sumDecisiveSquared": 1840
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 54,
+          "armageddonDecided": 723,
+          "drawOrArmageddon": 723,
+          "drawOrArmageddonRate": 0.723,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 475,
+          "candidateWinsAsRed": 465,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 65231,
+            "actionTypes": {
+              "cast_spell": 13547,
+              "range_attack": 20293,
+              "wait_turn": 2928,
+              "melee_attack": 11927,
+              "move_unit": 22601,
+              "select_attack_type": 2401,
+              "end_turn": 10
+            },
+            "spells": {
+              "Blessing": 2931,
+              "Summon Wolves": 3373,
+              "Spiritual Armor": 1033,
+              "Courage": 1659,
+              "Mass Heal": 2914,
+              "Heal": 1497,
+              "Helping Hand": 140
+            },
+            "creatures": {
+              "Healer": 11648,
+              "Cyclops": 11823,
+              "Satyr": 8215,
+              "Centaur": 7676,
+              "Tsar Cannon": 11694,
+              "Arbalester": 8157,
+              "Wolf": 6018
+            },
+            "creatureActions": {
+              "Healer:cast_spell": 8375,
+              "Cyclops:range_attack": 8523,
+              "Satyr:cast_spell": 5172,
+              "Centaur:range_attack": 2962,
+              "Tsar Cannon:range_attack": 4436,
+              "Arbalester:range_attack": 4372,
+              "Wolf:wait_turn": 2779,
+              "Wolf:melee_attack": 1437,
+              "Tsar Cannon:move_unit": 7250,
+              "Centaur:move_unit": 3025,
+              "Satyr:move_unit": 2546,
+              "Arbalester:move_unit": 3021,
+              "Healer:move_unit": 2387,
+              "Centaur:melee_attack": 2994,
+              "Satyr:melee_attack": 1247,
+              "Cyclops:move_unit": 2175,
+              "Cyclops:melee_attack": 2801,
+              "Arbalester:melee_attack": 1584,
+              "Healer:select_attack_type": 1854,
+              "Healer:melee_attack": 1864,
+              "Wolf:move_unit": 2197,
+              "Satyr:select_attack_type": 547,
+              "Healer:wait_turn": 121,
+              "Tsar Cannon:end_turn": 8,
+              "Satyr:wait_turn": 27,
+              "Arbalester:wait_turn": 1,
+              "Arbalester:end_turn": 1,
+              "Healer:end_turn": 1
+            }
+          },
+          "opponent": {
+            "decisions": 42410,
+            "actionTypes": {
+              "cast_spell": 9070,
+              "range_attack": 14714,
+              "move_unit": 15604,
+              "melee_attack": 6116,
+              "wait_turn": 350,
+              "select_attack_type": 536,
+              "end_turn": 95
+            },
+            "spells": {
+              "Blessing": 1998,
+              "Summon Wolves": 1981,
+              "Spiritual Armor": 1991,
+              "Heal": 1925,
+              "Courage": 738,
+              "Mass Heal": 375,
+              "Helping Hand": 62
+            },
+            "creatures": {
+              "Healer": 7628,
+              "Satyr": 3905,
+              "Cyclops": 10817,
+              "Centaur": 4554,
+              "Tsar Cannon": 10921,
+              "Arbalester": 1688,
+              "Wolf": 2897
+            },
+            "creatureActions": {
+              "Healer:cast_spell": 6289,
+              "Satyr:cast_spell": 2781,
+              "Cyclops:range_attack": 6738,
+              "Centaur:range_attack": 2568,
+              "Tsar Cannon:range_attack": 3993,
+              "Arbalester:range_attack": 1415,
+              "Wolf:move_unit": 1978,
+              "Wolf:melee_attack": 838,
+              "Satyr:move_unit": 1110,
+              "Centaur:move_unit": 1379,
+              "Tsar Cannon:move_unit": 6833,
+              "Cyclops:move_unit": 3112,
+              "Cyclops:melee_attack": 3782,
+              "Healer:move_unit": 978,
+              "Satyr:wait_turn": 7,
+              "Healer:select_attack_type": 514,
+              "Healer:melee_attack": 519,
+              "Tsar Cannon:end_turn": 95,
+              "Wolf:wait_turn": 167,
+              "Arbalester:move_unit": 214,
+              "Centaur:melee_attack": 891,
+              "Arbalester:melee_attack": 63,
+              "Healer:wait_turn": 175,
+              "Satyr:select_attack_type": 22,
+              "Satyr:melee_attack": 23,
+              "Cyclops:wait_turn": 1
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "meleeMage",
+          "template": "melee_magic_utility",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 1008303172,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 814,
+          "opponentWins": 184,
+          "draws": 2,
+          "candidateWinRate": 0.8156312625250501,
+          "deltaFromParityPp": 31.563126252505015,
+          "standardErrorPp": 1.2287735386911252,
+          "confidence95": {
+            "low": 0.7915477437151457,
+            "high": 0.8397147813349546
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1476,
+            "sumWinDecisive": 1626,
+            "sumDecisiveSquared": 1994
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 2,
+          "armageddonDecided": 1,
+          "drawOrArmageddon": 2,
+          "drawOrArmageddonRate": 0.002,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 399,
+          "candidateWinsAsRed": 415,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 24769,
+            "actionTypes": {
+              "wait_turn": 5949,
+              "cast_spell": 1857,
+              "end_turn": 490,
+              "select_attack_type": 7258,
+              "melee_attack": 14807,
+              "move_unit": 9911
+            },
+            "spells": {
+              "Mass Riot": 1641,
+              "Wind Flow": 9,
+              "Resurrection": 76,
+              "Riot": 131
+            },
+            "creatures": {
+              "Angel": 2011,
+              "Harpy": 3915,
+              "Wolf Rider": 4307,
+              "Valkyrie": 3253,
+              "Ogre Mage": 5317,
+              "Peasant": 5966
+            },
+            "creatureActions": {
+              "Angel:wait_turn": 1254,
+              "Harpy:wait_turn": 1412,
+              "Wolf Rider:wait_turn": 1235,
+              "Valkyrie:wait_turn": 1062,
+              "Ogre Mage:cast_spell": 1772,
+              "Peasant:end_turn": 312,
+              "Harpy:select_attack_type": 2314,
+              "Harpy:melee_attack": 2314,
+              "Valkyrie:select_attack_type": 2009,
+              "Valkyrie:melee_attack": 2009,
+              "Peasant:melee_attack": 4715,
+              "Angel:select_attack_type": 446,
+              "Angel:melee_attack": 446,
+              "Wolf Rider:melee_attack": 2834,
+              "Valkyrie:move_unit": 1331,
+              "Ogre Mage:select_attack_type": 2489,
+              "Ogre Mage:melee_attack": 2489,
+              "Wolf Rider:move_unit": 1697,
+              "Ogre Mage:move_unit": 2027,
+              "Peasant:move_unit": 2762,
+              "Angel:move_unit": 400,
+              "Harpy:move_unit": 1694,
+              "Peasant:wait_turn": 745,
+              "Ogre Mage:wait_turn": 241,
+              "Valkyrie:end_turn": 12,
+              "Angel:end_turn": 140,
+              "Valkyrie:cast_spell": 9,
+              "Angel:cast_spell": 76,
+              "Wolf Rider:end_turn": 26
+            }
+          },
+          "opponent": {
+            "decisions": 24419,
+            "actionTypes": {
+              "wait_turn": 4473,
+              "cast_spell": 1241,
+              "end_turn": 1031,
+              "move_unit": 12931,
+              "select_attack_type": 8484,
+              "melee_attack": 14064
+            },
+            "spells": {
+              "Mass Riot": 1000,
+              "Riot": 241
+            },
+            "creatures": {
+              "Angel": 5983,
+              "Harpy": 2154,
+              "Valkyrie": 3242,
+              "Wolf Rider": 3769,
+              "Ogre Mage": 5200,
+              "Peasant": 4071
+            },
+            "creatureActions": {
+              "Angel:wait_turn": 1895,
+              "Harpy:wait_turn": 399,
+              "Valkyrie:wait_turn": 705,
+              "Wolf Rider:wait_turn": 932,
+              "Ogre Mage:cast_spell": 1241,
+              "Peasant:end_turn": 406,
+              "Angel:end_turn": 484,
+              "Harpy:move_unit": 1663,
+              "Valkyrie:select_attack_type": 2073,
+              "Valkyrie:melee_attack": 2073,
+              "Wolf Rider:move_unit": 1515,
+              "Angel:select_attack_type": 2592,
+              "Angel:move_unit": 2829,
+              "Angel:melee_attack": 2592,
+              "Ogre Mage:move_unit": 2536,
+              "Peasant:move_unit": 2540,
+              "Wolf Rider:melee_attack": 2421,
+              "Ogre Mage:select_attack_type": 2416,
+              "Ogre Mage:melee_attack": 2416,
+              "Peasant:melee_attack": 3159,
+              "Harpy:select_attack_type": 1403,
+              "Harpy:melee_attack": 1403,
+              "Valkyrie:move_unit": 1848,
+              "Ogre Mage:wait_turn": 272,
+              "Valkyrie:end_turn": 26,
+              "Wolf Rider:end_turn": 115,
+              "Peasant:wait_turn": 270
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "meleeMage",
+          "template": "melee_magic_brawler",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 3207973731,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 965,
+          "opponentWins": 34,
+          "draws": 1,
+          "candidateWinRate": 0.965965965965966,
+          "deltaFromParityPp": 46.5965965965966,
+          "standardErrorPp": 0.5640178617304826,
+          "confidence95": {
+            "low": 0.9549114190096756,
+            "high": 0.9770205129222563
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1895,
+            "sumWinDecisive": 1929,
+            "sumDecisiveSquared": 1997
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 1,
+          "armageddonDecided": 1,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 480,
+          "candidateWinsAsRed": 485,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 23695,
+            "actionTypes": {
+              "wait_turn": 4026,
+              "cast_spell": 3252,
+              "melee_attack": 15045,
+              "move_unit": 10539,
+              "select_attack_type": 8711,
+              "end_turn": 1
+            },
+            "spells": {
+              "Battle Roar": 1607,
+              "Mass Riot": 1609,
+              "Riot": 36
+            },
+            "creatures": {
+              "Harpy": 2969,
+              "Berserker": 4262,
+              "Behemoth": 3217,
+              "Ogre Mage": 4320,
+              "Squire": 4075,
+              "Troll": 4852
+            },
+            "creatureActions": {
+              "Harpy:wait_turn": 1049,
+              "Berserker:wait_turn": 1199,
+              "Behemoth:cast_spell": 1607,
+              "Ogre Mage:cast_spell": 1645,
+              "Squire:melee_attack": 3319,
+              "Troll:move_unit": 2006,
+              "Harpy:select_attack_type": 1920,
+              "Harpy:move_unit": 1560,
+              "Harpy:melee_attack": 1920,
+              "Berserker:move_unit": 2619,
+              "Berserker:melee_attack": 3015,
+              "Behemoth:select_attack_type": 1499,
+              "Behemoth:move_unit": 1150,
+              "Behemoth:melee_attack": 1499,
+              "Ogre Mage:select_attack_type": 2283,
+              "Ogre Mage:melee_attack": 2283,
+              "Troll:select_attack_type": 3009,
+              "Troll:melee_attack": 3009,
+              "Ogre Mage:move_unit": 1409,
+              "Squire:wait_turn": 628,
+              "Troll:wait_turn": 944,
+              "Squire:move_unit": 1795,
+              "Ogre Mage:wait_turn": 155,
+              "Behemoth:wait_turn": 51,
+              "Squire:end_turn": 1
+            }
+          },
+          "opponent": {
+            "decisions": 18903,
+            "actionTypes": {
+              "wait_turn": 2831,
+              "cast_spell": 2039,
+              "move_unit": 11225,
+              "select_attack_type": 6050,
+              "melee_attack": 8704
+            },
+            "spells": {
+              "Battle Roar": 1000,
+              "Mass Riot": 1000,
+              "Riot": 39
+            },
+            "creatures": {
+              "Harpy": 2336,
+              "Berserker": 3160,
+              "Behemoth": 3318,
+              "Ogre Mage": 3888,
+              "Squire": 2368,
+              "Troll": 3833
+            },
+            "creatureActions": {
+              "Harpy:wait_turn": 1004,
+              "Berserker:wait_turn": 1054,
+              "Behemoth:cast_spell": 1000,
+              "Ogre Mage:cast_spell": 1039,
+              "Squire:move_unit": 1923,
+              "Troll:move_unit": 2656,
+              "Harpy:select_attack_type": 580,
+              "Harpy:move_unit": 1154,
+              "Harpy:melee_attack": 580,
+              "Berserker:melee_attack": 1394,
+              "Berserker:move_unit": 1885,
+              "Behemoth:select_attack_type": 1760,
+              "Behemoth:move_unit": 1744,
+              "Behemoth:melee_attack": 1760,
+              "Ogre Mage:move_unit": 1863,
+              "Troll:select_attack_type": 1773,
+              "Troll:melee_attack": 1773,
+              "Ogre Mage:select_attack_type": 1937,
+              "Ogre Mage:melee_attack": 1937,
+              "Behemoth:wait_turn": 303,
+              "Squire:melee_attack": 1260,
+              "Squire:wait_turn": 107,
+              "Ogre Mage:wait_turn": 221,
+              "Troll:wait_turn": 142
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "aura",
+          "template": "aura_support",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 79945004,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 924,
+          "opponentWins": 75,
+          "draws": 1,
+          "candidateWinRate": 0.924924924924925,
+          "deltaFromParityPp": 42.492492492492495,
+          "standardErrorPp": 0.8123838972965375,
+          "confidence95": {
+            "low": 0.90900249312171,
+            "high": 0.9408473567281399
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1774,
+            "sumWinDecisive": 1847,
+            "sumDecisiveSquared": 1997
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 1,
+          "armageddonDecided": 1,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 456,
+          "candidateWinsAsRed": 468,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 21641,
+            "actionTypes": {
+              "melee_attack": 17845,
+              "move_unit": 2641,
+              "select_attack_type": 2305,
+              "wait_turn": 932,
+              "end_turn": 223
+            },
+            "spells": {},
+            "creatures": {
+              "Griffin": 2993,
+              "Valkyrie": 3058,
+              "Pegasus": 2917,
+              "White Tiger": 3513,
+              "Leprechaun": 4710,
+              "Peasant": 4450
+            },
+            "creatureActions": {
+              "Griffin:melee_attack": 2987,
+              "Valkyrie:move_unit": 532,
+              "Pegasus:melee_attack": 2749,
+              "White Tiger:melee_attack": 3315,
+              "Leprechaun:move_unit": 1486,
+              "Peasant:melee_attack": 3743,
+              "Valkyrie:select_attack_type": 2305,
+              "Valkyrie:melee_attack": 2305,
+              "Leprechaun:melee_attack": 2746,
+              "Peasant:move_unit": 440,
+              "Leprechaun:wait_turn": 369,
+              "Pegasus:move_unit": 105,
+              "Peasant:wait_turn": 205,
+              "Valkyrie:wait_turn": 221,
+              "Leprechaun:end_turn": 109,
+              "Pegasus:wait_turn": 47,
+              "White Tiger:wait_turn": 87,
+              "Peasant:end_turn": 62,
+              "White Tiger:move_unit": 75,
+              "White Tiger:end_turn": 36,
+              "Griffin:move_unit": 3,
+              "Griffin:wait_turn": 3,
+              "Pegasus:end_turn": 16
+            }
+          },
+          "opponent": {
+            "decisions": 20348,
+            "actionTypes": {
+              "move_unit": 12636,
+              "melee_attack": 11880,
+              "wait_turn": 3822,
+              "select_attack_type": 1513,
+              "end_turn": 377
+            },
+            "spells": {},
+            "creatures": {
+              "Griffin": 1955,
+              "Valkyrie": 3336,
+              "Pegasus": 1561,
+              "White Tiger": 4145,
+              "Leprechaun": 5120,
+              "Peasant": 4231
+            },
+            "creatureActions": {
+              "Griffin:move_unit": 1832,
+              "Griffin:melee_attack": 1903,
+              "Valkyrie:wait_turn": 890,
+              "Pegasus:move_unit": 1194,
+              "Pegasus:melee_attack": 1283,
+              "White Tiger:wait_turn": 815,
+              "Leprechaun:wait_turn": 1104,
+              "Peasant:wait_turn": 852,
+              "Valkyrie:move_unit": 2029,
+              "White Tiger:move_unit": 2412,
+              "Leprechaun:move_unit": 2719,
+              "Peasant:move_unit": 2450,
+              "Valkyrie:select_attack_type": 1513,
+              "Valkyrie:melee_attack": 1513,
+              "White Tiger:melee_attack": 2480,
+              "Leprechaun:melee_attack": 2379,
+              "Peasant:melee_attack": 2322,
+              "Leprechaun:end_turn": 113,
+              "Peasant:end_turn": 148,
+              "White Tiger:end_turn": 85,
+              "Pegasus:wait_turn": 128,
+              "Pegasus:end_turn": 28,
+              "Griffin:wait_turn": 33,
+              "Valkyrie:end_turn": 3
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "aura",
+          "template": "aura_offense",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 3086033750,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 991,
+          "opponentWins": 8,
+          "draws": 1,
+          "candidateWinRate": 0.991991991991992,
+          "deltaFromParityPp": 49.19919919919919,
+          "standardErrorPp": 0.28112953899681636,
+          "confidence95": {
+            "low": 0.9864819542777509,
+            "high": 0.997502029706233
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1973,
+            "sumWinDecisive": 1981,
+            "sumDecisiveSquared": 1997
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 1,
+          "armageddonDecided": 1,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 493,
+          "candidateWinsAsRed": 498,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 25994,
+            "actionTypes": {
+              "end_turn": 4632,
+              "wait_turn": 1857,
+              "move_unit": 3084,
+              "select_attack_type": 4135,
+              "melee_attack": 16421
+            },
+            "spells": {},
+            "creatures": {
+              "Angel": 3052,
+              "Wolf Rider": 4846,
+              "Valkyrie": 4310,
+              "White Tiger": 4353,
+              "Crusader": 4421,
+              "Leprechaun": 5012
+            },
+            "creatureActions": {
+              "Angel:end_turn": 1282,
+              "Wolf Rider:end_turn": 1157,
+              "Valkyrie:wait_turn": 1516,
+              "White Tiger:end_turn": 1098,
+              "Crusader:move_unit": 1178,
+              "Leprechaun:end_turn": 1061,
+              "Valkyrie:select_attack_type": 2558,
+              "Valkyrie:melee_attack": 2558,
+              "Leprechaun:melee_attack": 3120,
+              "Angel:move_unit": 186,
+              "Wolf Rider:move_unit": 621,
+              "White Tiger:melee_attack": 3071,
+              "Crusader:melee_attack": 3162,
+              "Angel:select_attack_type": 1577,
+              "Angel:melee_attack": 1577,
+              "Wolf Rider:melee_attack": 2933,
+              "Leprechaun:move_unit": 692,
+              "Valkyrie:move_unit": 236,
+              "Wolf Rider:wait_turn": 135,
+              "White Tiger:wait_turn": 13,
+              "Crusader:wait_turn": 47,
+              "Leprechaun:wait_turn": 139,
+              "White Tiger:move_unit": 171,
+              "Crusader:end_turn": 34,
+              "Angel:wait_turn": 7
+            }
+          },
+          "opponent": {
+            "decisions": 22728,
+            "actionTypes": {
+              "end_turn": 5451,
+              "wait_turn": 4591,
+              "move_unit": 9203,
+              "melee_attack": 9526,
+              "select_attack_type": 2585
+            },
+            "spells": {},
+            "creatures": {
+              "Angel": 6040,
+              "Valkyrie": 2172,
+              "Wolf Rider": 3240,
+              "White Tiger": 2720,
+              "Crusader": 5086,
+              "Leprechaun": 3470
+            },
+            "creatureActions": {
+              "Angel:end_turn": 1517,
+              "Valkyrie:wait_turn": 1000,
+              "Wolf Rider:end_turn": 1078,
+              "White Tiger:end_turn": 1044,
+              "Crusader:move_unit": 3057,
+              "Leprechaun:end_turn": 1343,
+              "Valkyrie:move_unit": 1024,
+              "Angel:wait_turn": 1734,
+              "White Tiger:move_unit": 1190,
+              "White Tiger:melee_attack": 1570,
+              "Crusader:wait_turn": 767,
+              "Leprechaun:melee_attack": 1440,
+              "Angel:select_attack_type": 2413,
+              "Angel:melee_attack": 2413,
+              "Crusader:melee_attack": 2383,
+              "Wolf Rider:move_unit": 751,
+              "Wolf Rider:melee_attack": 1548,
+              "Leprechaun:wait_turn": 438,
+              "Crusader:end_turn": 469,
+              "Leprechaun:move_unit": 1019,
+              "Angel:move_unit": 2162,
+              "Wolf Rider:wait_turn": 573,
+              "Valkyrie:select_attack_type": 172,
+              "Valkyrie:melee_attack": 172,
+              "White Tiger:wait_turn": 79
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "ranged",
+          "template": "ranged_precision",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 493504109,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 819,
+          "candidateWins": 751,
+          "opponentWins": 68,
+          "draws": 181,
+          "candidateWinRate": 0.9169719169719169,
+          "deltaFromParityPp": 41.69719169719169,
+          "standardErrorPp": 0.9611356988031344,
+          "confidence95": {
+            "low": 0.8981340034328181,
+            "high": 0.9358098305110157
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1315,
+            "sumWinDecisive": 1366,
+            "sumDecisiveSquared": 1489
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 181,
+          "armageddonDecided": 900,
+          "drawOrArmageddon": 900,
+          "drawOrArmageddonRate": 0.9,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 388,
+          "candidateWinsAsRed": 363,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 49642,
+            "actionTypes": {
+              "range_attack": 33109,
+              "melee_attack": 5330,
+              "move_unit": 13972,
+              "end_turn": 11
+            },
+            "spells": {},
+            "creatures": {
+              "Elf": 9639,
+              "Cyclops": 11914,
+              "Medusa": 8567,
+              "Centaur": 4261,
+              "Tsar Cannon": 12692,
+              "Arbalester": 2569
+            },
+            "creatureActions": {
+              "Elf:range_attack": 8972,
+              "Cyclops:range_attack": 7273,
+              "Medusa:range_attack": 8348,
+              "Centaur:range_attack": 2413,
+              "Tsar Cannon:range_attack": 4837,
+              "Arbalester:range_attack": 1266,
+              "Centaur:melee_attack": 754,
+              "Tsar Cannon:move_unit": 7845,
+              "Cyclops:melee_attack": 3965,
+              "Cyclops:move_unit": 3113,
+              "Elf:move_unit": 526,
+              "Centaur:move_unit": 1272,
+              "Arbalester:move_unit": 1108,
+              "Arbalester:melee_attack": 278,
+              "Elf:melee_attack": 215,
+              "Medusa:melee_attack": 118,
+              "Tsar Cannon:end_turn": 10,
+              "Medusa:move_unit": 108,
+              "Centaur:end_turn": 1
+            }
+          },
+          "opponent": {
+            "decisions": 36133,
+            "actionTypes": {
+              "range_attack": 22241,
+              "move_unit": 12106,
+              "melee_attack": 4081,
+              "end_turn": 39
+            },
+            "spells": {},
+            "creatures": {
+              "Cyclops": 9784,
+              "Elf": 4259,
+              "Centaur": 4050,
+              "Medusa": 4601,
+              "Tsar Cannon": 11709,
+              "Arbalester": 1730
+            },
+            "creatureActions": {
+              "Cyclops:range_attack": 6153,
+              "Elf:range_attack": 4110,
+              "Centaur:range_attack": 2128,
+              "Medusa:range_attack": 4563,
+              "Tsar Cannon:range_attack": 4000,
+              "Arbalester:range_attack": 1287,
+              "Centaur:move_unit": 1200,
+              "Centaur:melee_attack": 967,
+              "Tsar Cannon:move_unit": 7670,
+              "Cyclops:move_unit": 2736,
+              "Cyclops:melee_attack": 2931,
+              "Arbalester:move_unit": 367,
+              "Tsar Cannon:end_turn": 39,
+              "Elf:move_unit": 113,
+              "Medusa:move_unit": 20,
+              "Medusa:melee_attack": 19,
+              "Elf:melee_attack": 74,
+              "Arbalester:melee_attack": 90
+            }
+          }
+        }
+      },
+      {
+        "spec": {
+          "archetype": "ranged",
+          "template": "ranged_control",
+          "candidate": "v0.7",
+          "opponent": "v0.6",
+          "baseSeed": 3962832444,
+          "games": 1000
+        },
+        "outcomes": {
+          "method": "paired-side-swap cluster sandwich",
+          "confidenceLevel": 0.95,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 991,
+          "opponentWins": 7,
+          "draws": 2,
+          "candidateWinRate": 0.9929859719438878,
+          "deltaFromParityPp": 49.29859719438878,
+          "standardErrorPp": 0.26350107476141477,
+          "confidence95": {
+            "low": 0.9878214457796881,
+            "high": 0.9981504981080875
+          },
+          "moments": {
+            "clusters": 500,
+            "sumWinSquared": 1973,
+            "sumWinDecisive": 1980,
+            "sumDecisiveSquared": 1994
+          }
+        },
+        "integrity": {
+          "games": 1000,
+          "draws": 2,
+          "armageddonDecided": 23,
+          "drawOrArmageddon": 24,
+          "drawOrArmageddonRate": 0.024,
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "candidateGamesAsGreen": 500,
+          "candidateGamesAsRed": 500,
+          "candidateWinsAsGreen": 496,
+          "candidateWinsAsRed": 495,
+          "endReasons": {
+            "elimination": 1000
+          }
+        },
+        "telemetry": {
+          "candidate": {
+            "decisions": 37413,
+            "actionTypes": {
+              "range_attack": 30761,
+              "wait_turn": 489,
+              "end_turn": 390,
+              "move_unit": 4892,
+              "melee_attack": 1606
+            },
+            "spells": {},
+            "creatures": {
+              "Elf": 8093,
+              "Gargantuan": 8051,
+              "Orc": 6870,
+              "Beholder": 6912,
+              "Cyclops": 4341,
+              "Arbalester": 3146
+            },
+            "creatureActions": {
+              "Elf:range_attack": 7921,
+              "Gargantuan:range_attack": 7015,
+              "Orc:range_attack": 4173,
+              "Beholder:range_attack": 6715,
+              "Cyclops:range_attack": 3017,
+              "Arbalester:range_attack": 1920,
+              "Gargantuan:wait_turn": 31,
+              "Gargantuan:end_turn": 25,
+              "Cyclops:wait_turn": 239,
+              "Orc:move_unit": 2183,
+              "Cyclops:end_turn": 183,
+              "Arbalester:move_unit": 1092,
+              "Beholder:move_unit": 107,
+              "Gargantuan:move_unit": 715,
+              "Gargantuan:melee_attack": 535,
+              "Cyclops:move_unit": 723,
+              "Orc:melee_attack": 634,
+              "Orc:wait_turn": 101,
+              "Elf:move_unit": 72,
+              "Arbalester:melee_attack": 112,
+              "Arbalester:wait_turn": 30,
+              "Arbalester:end_turn": 23,
+              "Orc:end_turn": 82,
+              "Cyclops:melee_attack": 283,
+              "Elf:wait_turn": 47,
+              "Elf:end_turn": 40,
+              "Beholder:wait_turn": 41,
+              "Beholder:end_turn": 37,
+              "Elf:melee_attack": 20,
+              "Beholder:melee_attack": 22
+            }
+          },
+          "opponent": {
+            "decisions": 28182,
+            "actionTypes": {
+              "range_attack": 22862,
+              "move_unit": 3368,
+              "wait_turn": 418,
+              "melee_attack": 1678,
+              "end_turn": 296
+            },
+            "spells": {},
+            "creatures": {
+              "Beholder": 5220,
+              "Orc": 3728,
+              "Cyclops": 6641,
+              "Gargantuan": 7655,
+              "Elf": 3855,
+              "Arbalester": 1083
+            },
+            "creatureActions": {
+              "Beholder:range_attack": 4924,
+              "Orc:range_attack": 2655,
+              "Cyclops:range_attack": 5065,
+              "Gargantuan:range_attack": 5813,
+              "Elf:range_attack": 3688,
+              "Cyclops:move_unit": 1021,
+              "Gargantuan:move_unit": 869,
+              "Arbalester:range_attack": 717,
+              "Gargantuan:wait_turn": 132,
+              "Cyclops:melee_attack": 578,
+              "Gargantuan:melee_attack": 909,
+              "Orc:move_unit": 849,
+              "Elf:wait_turn": 30,
+              "Elf:end_turn": 19,
+              "Cyclops:wait_turn": 96,
+              "Cyclops:end_turn": 60,
+              "Gargantuan:end_turn": 109,
+              "Arbalester:move_unit": 322,
+              "Arbalester:melee_attack": 37,
+              "Beholder:move_unit": 193,
+              "Beholder:melee_attack": 25,
+              "Elf:move_unit": 114,
+              "Beholder:wait_turn": 52,
+              "Orc:wait_turn": 96,
+              "Beholder:end_turn": 33,
+              "Orc:melee_attack": 125,
+              "Arbalester:wait_turn": 12,
+              "Arbalester:end_turn": 9,
+              "Orc:end_turn": 66,
+              "Elf:melee_attack": 4
+            }
+          }
+        }
+      }
+    ],
+    "templateMetrics": [
+      {
+        "template": "mage_frontline",
+        "archetype": "mage",
+        "games": 1000,
+        "decisiveWinRate": 0.9819639278557114,
+        "confidence95Low": 0.9737754598874632,
+        "standardErrorPp": 0.4177866548996735,
+        "scoreRate": 0.981,
+        "drawOrArmageddonRate": 0.008,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "mage_fireline",
+        "archetype": "mage",
+        "games": 1000,
+        "decisiveWinRate": 0.9936575052854123,
+        "confidence95Low": 0.9886106774755149,
+        "standardErrorPp": 0.2574959463391259,
+        "scoreRate": 0.967,
+        "drawOrArmageddonRate": 0.723,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "melee_magic_utility",
+        "archetype": "meleeMage",
+        "games": 1000,
+        "decisiveWinRate": 0.8156312625250501,
+        "confidence95Low": 0.7915477437151457,
+        "standardErrorPp": 1.2287735386911252,
+        "scoreRate": 0.815,
+        "drawOrArmageddonRate": 0.002,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "melee_magic_brawler",
+        "archetype": "meleeMage",
+        "games": 1000,
+        "decisiveWinRate": 0.965965965965966,
+        "confidence95Low": 0.9549114190096756,
+        "standardErrorPp": 0.5640178617304826,
+        "scoreRate": 0.9655,
+        "drawOrArmageddonRate": 0.001,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "aura_support",
+        "archetype": "aura",
+        "games": 1000,
+        "decisiveWinRate": 0.924924924924925,
+        "confidence95Low": 0.90900249312171,
+        "standardErrorPp": 0.8123838972965375,
+        "scoreRate": 0.9245,
+        "drawOrArmageddonRate": 0.001,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "aura_offense",
+        "archetype": "aura",
+        "games": 1000,
+        "decisiveWinRate": 0.991991991991992,
+        "confidence95Low": 0.9864819542777509,
+        "standardErrorPp": 0.28112953899681636,
+        "scoreRate": 0.9915,
+        "drawOrArmageddonRate": 0.001,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "ranged_precision",
+        "archetype": "ranged",
+        "games": 1000,
+        "decisiveWinRate": 0.9169719169719169,
+        "confidence95Low": 0.8981340034328181,
+        "standardErrorPp": 0.9611356988031344,
+        "scoreRate": 0.8415,
+        "drawOrArmageddonRate": 0.9,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      },
+      {
+        "template": "ranged_control",
+        "archetype": "ranged",
+        "games": 1000,
+        "decisiveWinRate": 0.9929859719438878,
+        "confidence95Low": 0.9878214457796881,
+        "standardErrorPp": 0.26350107476141477,
+        "scoreRate": 0.992,
+        "drawOrArmageddonRate": 0.024,
+        "candidateRejections": 0,
+        "missingRejectionCounts": 0
+      }
+    ],
+    "templates": [
+      {
+        "template": "mage_frontline",
+        "archetype": "mage",
+        "seed": 3247274620,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 980,
+          "opponentWins": 18,
+          "draws": 2,
+          "decisiveWinRate": 0.9819639278557114,
+          "winPlusHalfDrawScore": 0.981,
+          "standardErrorPp": 0.4177866548996735,
+          "confidence95": {
+            "low": 0.9737754598874632,
+            "high": 0.9901523958239596
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 8,
+          "drawOrArmageddonRate": 0.008
+        }
+      },
+      {
+        "template": "mage_fireline",
+        "archetype": "mage",
+        "seed": 2280897664,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 946,
+          "candidateWins": 940,
+          "opponentWins": 6,
+          "draws": 54,
+          "decisiveWinRate": 0.9936575052854123,
+          "winPlusHalfDrawScore": 0.967,
+          "standardErrorPp": 0.2574959463391259,
+          "confidence95": {
+            "low": 0.9886106774755149,
+            "high": 0.9987043330953097
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 723,
+          "drawOrArmageddonRate": 0.723
+        }
+      },
+      {
+        "template": "melee_magic_utility",
+        "archetype": "meleeMage",
+        "seed": 1008303172,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 814,
+          "opponentWins": 184,
+          "draws": 2,
+          "decisiveWinRate": 0.8156312625250501,
+          "winPlusHalfDrawScore": 0.815,
+          "standardErrorPp": 1.2287735386911252,
+          "confidence95": {
+            "low": 0.7915477437151457,
+            "high": 0.8397147813349546
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 2,
+          "drawOrArmageddonRate": 0.002
+        }
+      },
+      {
+        "template": "melee_magic_brawler",
+        "archetype": "meleeMage",
+        "seed": 3207973731,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 965,
+          "opponentWins": 34,
+          "draws": 1,
+          "decisiveWinRate": 0.965965965965966,
+          "winPlusHalfDrawScore": 0.9655,
+          "standardErrorPp": 0.5640178617304826,
+          "confidence95": {
+            "low": 0.9549114190096756,
+            "high": 0.9770205129222563
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001
+        }
+      },
+      {
+        "template": "aura_support",
+        "archetype": "aura",
+        "seed": 79945004,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 924,
+          "opponentWins": 75,
+          "draws": 1,
+          "decisiveWinRate": 0.924924924924925,
+          "winPlusHalfDrawScore": 0.9245,
+          "standardErrorPp": 0.8123838972965375,
+          "confidence95": {
+            "low": 0.90900249312171,
+            "high": 0.9408473567281399
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001
+        }
+      },
+      {
+        "template": "aura_offense",
+        "archetype": "aura",
+        "seed": 3086033750,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 999,
+          "candidateWins": 991,
+          "opponentWins": 8,
+          "draws": 1,
+          "decisiveWinRate": 0.991991991991992,
+          "winPlusHalfDrawScore": 0.9915,
+          "standardErrorPp": 0.28112953899681636,
+          "confidence95": {
+            "low": 0.9864819542777509,
+            "high": 0.997502029706233
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 1,
+          "drawOrArmageddonRate": 0.001
+        }
+      },
+      {
+        "template": "ranged_precision",
+        "archetype": "ranged",
+        "seed": 493504109,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 819,
+          "candidateWins": 751,
+          "opponentWins": 68,
+          "draws": 181,
+          "decisiveWinRate": 0.9169719169719169,
+          "winPlusHalfDrawScore": 0.8415,
+          "standardErrorPp": 0.9611356988031344,
+          "confidence95": {
+            "low": 0.8981340034328181,
+            "high": 0.9358098305110157
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 900,
+          "drawOrArmageddonRate": 0.9
+        }
+      },
+      {
+        "template": "ranged_control",
+        "archetype": "ranged",
+        "seed": 3962832444,
+        "metrics": {
+          "cells": 1,
+          "games": 1000,
+          "pairClusters": 500,
+          "decisiveGames": 998,
+          "candidateWins": 991,
+          "opponentWins": 7,
+          "draws": 2,
+          "decisiveWinRate": 0.9929859719438878,
+          "winPlusHalfDrawScore": 0.992,
+          "standardErrorPp": 0.26350107476141477,
+          "confidence95": {
+            "low": 0.9878214457796881,
+            "high": 0.9981504981080875
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 24,
+          "drawOrArmageddonRate": 0.024
+        }
+      }
+    ],
+    "archetypes": [
+      {
+        "archetype": "mage",
+        "templates": [
+          "mage_frontline",
+          "mage_fireline"
+        ],
+        "metrics": {
+          "cells": 2,
+          "games": 2000,
+          "pairClusters": 1000,
+          "decisiveGames": 1944,
+          "candidateWins": 1920,
+          "opponentWins": 24,
+          "draws": 56,
+          "decisiveWinRate": 0.9876543209876543,
+          "winPlusHalfDrawScore": 0.974,
+          "standardErrorPp": 0.24895524828569385,
+          "confidence95": {
+            "low": 0.9827748877836324,
+            "high": 0.9925337541916761
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 731,
+          "drawOrArmageddonRate": 0.3655
+        },
+        "equalTemplate": {
+          "decisiveWinRate": 0.9878107165705619,
+          "standardErrorPp": 0.2453822790022442
+        }
+      },
+      {
+        "archetype": "meleeMage",
+        "templates": [
+          "melee_magic_utility",
+          "melee_magic_brawler"
+        ],
+        "metrics": {
+          "cells": 2,
+          "games": 2000,
+          "pairClusters": 1000,
+          "decisiveGames": 1997,
+          "candidateWins": 1779,
+          "opponentWins": 218,
+          "draws": 3,
+          "decisiveWinRate": 0.8908362543815723,
+          "winPlusHalfDrawScore": 0.89025,
+          "standardErrorPp": 0.7162201723257969,
+          "confidence95": {
+            "low": 0.876798596953976,
+            "high": 0.9048739118091687
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 3,
+          "drawOrArmageddonRate": 0.0015
+        },
+        "equalTemplate": {
+          "decisiveWinRate": 0.890798614245508,
+          "standardErrorPp": 0.6760178543756326
+        }
+      },
+      {
+        "archetype": "aura",
+        "templates": [
+          "aura_support",
+          "aura_offense"
+        ],
+        "metrics": {
+          "cells": 2,
+          "games": 2000,
+          "pairClusters": 1000,
+          "decisiveGames": 1998,
+          "candidateWins": 1915,
+          "opponentWins": 83,
+          "draws": 2,
+          "decisiveWinRate": 0.9584584584584585,
+          "winPlusHalfDrawScore": 0.958,
+          "standardErrorPp": 0.4425365071069483,
+          "confidence95": {
+            "low": 0.9497849023007208,
+            "high": 0.9671320146161961
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 2,
+          "drawOrArmageddonRate": 0.001
+        },
+        "equalTemplate": {
+          "decisiveWinRate": 0.9584584584584585,
+          "standardErrorPp": 0.42982595730227646
+        }
+      },
+      {
+        "archetype": "ranged",
+        "templates": [
+          "ranged_precision",
+          "ranged_control"
+        ],
+        "metrics": {
+          "cells": 2,
+          "games": 2000,
+          "pairClusters": 1000,
+          "decisiveGames": 1817,
+          "candidateWins": 1742,
+          "opponentWins": 75,
+          "draws": 183,
+          "decisiveWinRate": 0.9587231700605393,
+          "winPlusHalfDrawScore": 0.91675,
+          "standardErrorPp": 0.47246889405198333,
+          "confidence95": {
+            "low": 0.9494629498989657,
+            "high": 0.9679833902221129
+          },
+          "candidateRejections": 0,
+          "opponentRejections": 0,
+          "recordsMissingRejectionCounts": 0,
+          "drawOrArmageddon": 924,
+          "drawOrArmageddonRate": 0.462
+        },
+        "equalTemplate": {
+          "decisiveWinRate": 0.9549789444579024,
+          "standardErrorPp": 0.4983007746116321
+        }
+      }
+    ],
+    "allTemplates": {
+      "cells": 8,
+      "games": 8000,
+      "pairClusters": 4000,
+      "decisiveGames": 7756,
+      "candidateWins": 7356,
+      "opponentWins": 400,
+      "draws": 244,
+      "decisiveWinRate": 0.9484270242392986,
+      "winPlusHalfDrawScore": 0.93475,
+      "standardErrorPp": 0.25774361210109115,
+      "confidence95": {
+        "low": 0.9433753422696646,
+        "high": 0.9534787062089326
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "recordsMissingRejectionCounts": 0,
+      "drawOrArmageddon": 1660,
+      "drawOrArmageddonRate": 0.2075
+    },
+    "limitingTemplate": {
+      "template": "melee_magic_utility",
+      "decisiveWinRate": 0.8156312625250501
+    },
+    "limitingArchetype": {
+      "archetype": "meleeMage",
+      "decisiveWinRate": 0.890798614245508
+    },
+    "targetDiagnostics": {
+      "observed90AllArchetypes": false,
+      "certified90AllArchetypes": false,
+      "strict90AllTemplates": false,
+      "simultaneousArchetypeLowerBounds": {
+        "mage": 0.9816817899546849,
+        "meleeMage": 0.8739136792887627,
+        "aura": 0.9477226719924741,
+        "ranged": 0.9425328587313885
+      }
+    },
+    "searchAudit": {
+      "enabled": true,
+      "path": "/home/agent-zinc/hoc-common-v07-96h-runs/run-d68490a-20260711T062835Z/evaluations/probe-ceiling/v0.6/d8ab6a7d5fb8ed0eaef10ad919c1f12a5bd6e1bbdb43f7a09f9db72ff130344c.json.audit.jsonl",
+      "validRows": 8000,
+      "invalidJsonLines": 0,
+      "auditGames": 8000,
+      "searchedTurns": 284023,
+      "searchedTurnLatencyMs": {
+        "count": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "max": null
+      },
+      "matchSearchLatencyMs": {
+        "count": 8000,
+        "p50": 35498.1,
+        "p95": 95786.3,
+        "p99": 116923.3,
+        "max": 176993.5
+      },
+      "overridesPerGame": {
+        "count": 8000,
+        "p50": 6,
+        "p95": 22,
+        "p99": 31,
+        "max": 51
+      },
+      "overridesTotal": 62521,
+      "overridesPerSearchedTurn": 0.220126539047894,
+      "overridesToKind": {
+        "melee": 13382,
+        "wait": 14747,
+        "spell": 6029,
+        "defend": 12615,
+        "shot": 14798,
+        "area_throw": 950
+      },
+      "modeCounts": {
+        "search": 8000
+      }
+    },
+    "releaseInstruction": "NO_BAKE_NO_COMMIT_NO_DEPLOY_FROM_THIS_REPORT"
+  }
+}
