@@ -41,8 +41,8 @@ import { SETUP_POLICY_V0 } from "./setup_v0";
  * with free enemy vision regressed live; conditioning on the OWN roster is exempt from that trap but was
  * still cohort-tested per rule above.)
  *
- * Live default stays setup-v0: every entry point here returns setup-v0's choice unless the rule is
- * activated (explicit rules argument, or env V07_SETUP_CONDITIONAL for the wired-in call sites).
+ * The common-library default stays setup-v0: every entry point here returns setup-v0's choice unless the
+ * rule is activated. Ranked servers may supply an explicit accepted default while retaining an off switch.
  */
 
 export const SETUP_CONDITIONAL_VERSION = "conditional-setup-v1";
