@@ -17,8 +17,9 @@ import type { XY } from "../../utils/math";
 import type { IPlacementContext } from "../ai_strategy";
 
 /**
- * REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL=on, DEFAULT OFF — experimental, preregistered
- * A/B in scratchpad w5_placement/preregistration.md + preregistration_amendment1.md).
+ * REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL=on, DEFAULT OFF). The historical A/B references
+ * untracked scratchpad preregistration/result files, so its reported numbers are diagnostic, not admissible
+ * release evidence. Keep this experiment default-off until those artifacts and hashes are preserved.
  *
  * Unlike v0.6's baked splash dispersion (which inspects the ACTUAL enemy holder — information a live
  * seat may not fairly have), these heuristics act only on `IPlacementContext.revealedOpponentCreatures`
@@ -28,8 +29,8 @@ import type { IPlacementContext } from "../ai_strategy";
  *
  *  (PRECEDENCE GUARD) when the enemy actually fields splash AOE ("Area Throw"/"Large Caliber"), the
  *      reveal layer NO-OPS — the baked v0.6 dispersed placement always wins. A reveal-driven WIDE
- *      (2-cell-gap) dispersion was MEASURED at -14.10pp ±0.89 on the Gargantuan mirror (18k-game
- *      preregistered battery, 2026-07-15): the baked 1-cell gap is already the cohesion optimum, so
+ *      (2-cell-gap) dispersion was REPORTED at -14.10pp ±0.89 on the Gargantuan mirror (historical
+ *      18k-game battery, 2026-07-15): the baked 1-cell gap is already the cohesion optimum, so
  *      splash reveals add nothing and reveal layouts must never override the baked answer.
  *  (b) >= FLYER_SCREEN_THRESHOLD flyers revealed: SHOOTER SCREEN — shooters deep + cornered, one
  *      ground-melee bodyguard adjacent to each shooter (occupies flyer landing cells and punishes

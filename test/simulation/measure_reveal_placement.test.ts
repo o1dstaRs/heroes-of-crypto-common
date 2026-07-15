@@ -1,9 +1,9 @@
 /*
  * -----------------------------------------------------------------------------
- * measure_reveal_placement: the preregistered V07_PLACEMENT_REVEAL A/B harness. Verifies the registered
- * battery (seeds 82xxx710), the paired treated-seat design (identical armies + battle seed per pair, only
- * WHICH seat receives its legitimate reveals differs), reveal plumbing into IMatchConfig, and the
- * registered ship-bar arithmetic (pooled >= +1.0pp, no cell below -0.5pp).
+ * measure_reveal_placement: V07_PLACEMENT_REVEAL A/B harness. The historical preregistration is untracked;
+ * these tests verify the declared battery (seeds 82xxx710), paired treated-seat design (identical armies +
+ * battle seed per pair, only WHICH seat receives its legitimate reveals differs), reveal plumbing into
+ * IMatchConfig, and the declared ship-bar arithmetic (pooled >= +1.0pp, no cell below -0.5pp).
  * -----------------------------------------------------------------------------
  */
 import { describe, expect, it } from "bun:test";
@@ -21,6 +21,7 @@ import {
     policyForPair,
     revealCells,
     summarizeRevealCell,
+    validateRevealMeasurementEnvironment,
     type IRevealCellSummary,
 } from "../../src/simulation/measure_reveal_placement";
 
@@ -49,7 +50,21 @@ const stubResult = (config: IMatchConfig, winner: "green" | "red" | "draw"): IMa
 });
 
 describe("registered battery", () => {
-    it("pins the preregistered amendment-1 82xxx710 seeds and game counts", () => {
+    it("binds the reported gate to the exact registered environment", () => {
+        expect(validateRevealMeasurementEnvironment(false, { LIVETWIN: "1", V07_PLACEMENT_REVEAL: "on" })).toBe("on");
+        expect(validateRevealMeasurementEnvironment(true, { LIVETWIN: "1" })).toBe("off");
+        expect(() => validateRevealMeasurementEnvironment(false, { LIVETWIN: "1" })).toThrow(
+            "requires V07_PLACEMENT_REVEAL=on",
+        );
+        expect(() => validateRevealMeasurementEnvironment(true, { LIVETWIN: "1", V07_PLACEMENT_REVEAL: "on" })).toThrow(
+            "requires V07_PLACEMENT_REVEAL to be unset",
+        );
+        expect(() => validateRevealMeasurementEnvironment(false, { V07_PLACEMENT_REVEAL: "on" })).toThrow(
+            "requires LIVETWIN=1",
+        );
+    });
+
+    it("pins the declared amendment-1 82xxx710 seeds and game counts", () => {
         const byName = new Map(revealCells().map((cell) => [cell.name, cell]));
         expect(byName.get("drafted_fmr1")).toMatchObject({ seed: 82011710, games: 4000, policy: "champion" });
         expect(byName.get("drafted_fmr05")).toMatchObject({ seed: 82012710, games: 4000, policy: "mix" });

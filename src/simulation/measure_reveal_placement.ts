@@ -26,8 +26,9 @@ import { liveTwinSetup } from "./livetwin";
 import { buildArmyFromPick, runPickPhase, type PickPolicyName } from "./measure_picksim_oracle";
 
 /**
- * PREREGISTERED A/B — REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL).
- * Registration (seeds, cells, ship bar): scratchpad w5_placement/preregistration.md (2026-07-15).
+ * REGISTERED A/B HARNESS — REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL).
+ * The historical run referenced scratchpad w5_placement/preregistration.md (2026-07-15), but that artifact
+ * is not tracked. Treat its reported result as diagnostic until preregistration and raw/result hashes land.
  *
  * Question: does v0.7+reveal-conditioned placement beat today's v0.7 placement in FULL games, when the
  * placement may use ONLY what the seat legitimately learned during picks?
@@ -47,14 +48,14 @@ import { buildArmyFromPick, runPickPhase, type PickPolicyName } from "./measure_
  *    treated seat's reveal list is the full opponent roster (models a full-collision/SEE_ALL reveal),
  *    LiveTwin stacks + shipped SEE_NONE setup, no artifacts.
  *
- * ITERATION 1 (seeds 82001710..82005710, 18k games, 2026-07-15) — registered verdict FAIL: pooled
+ * ITERATION 1 (seeds 82001710..82005710, reported 18k games, 2026-07-15) — historical verdict FAIL: pooled
  * +1.78pp ±0.38 but the gap-2 wide-dispersion heuristic LOST -14.10pp ±0.89 on the Gargantuan mirror
  * (baked 1-cell gap is already the cohesion optimum); the flyer screen WON +20.76pp ±0.84; drafted
- * cells +0.79/+1.49/+0.44. AMENDMENT 1 (preregistration_amendment1.md): the splash heuristic is
+ * cells +0.79/+1.49/+0.44. AMENDMENT 1 (referenced but untracked): the splash heuristic is
  * replaced by a baked-dispersion precedence guard, charger_mirror isolates the corner shift, and
  * garg_null (bar-exempt) proves splash games are now exact no-ops. Fresh seeds 82011710..82016710.
  *
- * SHIP BAR (preregistered): pooled decisive delta over the in-bar cells >= +1.0pp AND no in-bar cell
+ * DECLARED SHIP BAR: pooled decisive delta over the in-bar cells >= +1.0pp AND no in-bar cell
  * below -0.5pp. PASS does NOT flip the default — that is an owner sign-off item. FAIL = the
  * heuristics stay env-gated experimental and the lever is recorded tapped.
  *
@@ -119,8 +120,8 @@ export const CHARGER_MIRROR_ROSTER: readonly { level: number; creatureName: stri
     { level: 4, creatureName: "Hydra" },
 ];
 
-/** The registered AMENDMENT-1 battery (fresh seeds preregistered BEFORE any run; do not reuse).
- * Iteration 1 (82001710..82005710) is burned and recorded in the module doc + preregistration.md. */
+/** The declared AMENDMENT-1 battery (reported fresh-before-run; timing is not independently verifiable).
+ * Iteration 1 (82001710..82005710) is treated as burned despite its missing external record. */
 export function revealCells(): IRevealCell[] {
     return [
         { name: "drafted_fmr1", kind: "drafted", seed: 82011710, games: 4000, policy: "champion" },
@@ -559,7 +560,7 @@ if (!isMainThread && parentPort && (workerData as { revealPlacement?: boolean } 
 export interface IMeasureRevealSummary {
     schemaVersion: 1;
     kind: "v07_reveal_placement_ab";
-    preregistration: "scratchpad w5_placement/preregistration.md (2026-07-15)";
+    preregistration: "UNVERIFIED: referenced scratchpad w5_placement/preregistration.md is not tracked";
     fightVersion: string;
     gate: "on" | "off";
     startedAt: string;
@@ -578,7 +579,27 @@ export interface IMeasureRevealOptions {
     onProgress?: (completed: number, total: number) => void;
 }
 
+export function validateRevealMeasurementEnvironment(
+    gateOff: boolean,
+    environment: NodeJS.ProcessEnv = process.env,
+): "on" | "off" {
+    if (environment.LIVETWIN !== "1") {
+        throw new Error("Reveal-placement measurement requires LIVETWIN=1");
+    }
+    if (gateOff) {
+        if (environment.V07_PLACEMENT_REVEAL !== undefined) {
+            throw new Error("Reveal-placement gate-off measurement requires V07_PLACEMENT_REVEAL to be unset");
+        }
+        return "off";
+    }
+    if (environment.V07_PLACEMENT_REVEAL !== "on") {
+        throw new Error("Reveal-placement gate-on measurement requires V07_PLACEMENT_REVEAL=on");
+    }
+    return "on";
+}
+
 export async function runMeasureRevealPlacement(options: IMeasureRevealOptions): Promise<IMeasureRevealSummary> {
+    const gate = validateRevealMeasurementEnvironment(options.gateOff === true);
     const startedAt = new Date().toISOString();
     const startMs = Date.now();
     const aggregates = new Map<RevealCellName, IRevealCellAggregate>();
@@ -598,9 +619,9 @@ export async function runMeasureRevealPlacement(options: IMeasureRevealOptions):
     return {
         schemaVersion: 1,
         kind: "v07_reveal_placement_ab",
-        preregistration: "scratchpad w5_placement/preregistration.md (2026-07-15)",
+        preregistration: "UNVERIFIED: referenced scratchpad w5_placement/preregistration.md is not tracked",
         fightVersion: options.fightVersion,
-        gate: options.gateOff ? "off" : "on",
+        gate,
         startedAt,
         wallSeconds,
         gamesPerSecond: wallSeconds > 0 ? jobs.length / wallSeconds : 0,
