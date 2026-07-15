@@ -18,7 +18,14 @@ import { type ICasterRouterPolicy, routeUniversalCasterWithPolicy, V07_CASTER_RO
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
 import { revealConditionedPlacement } from "./v0_7_placement_reveal";
-import { applyWaitScorerWeights, applyWaitScorerWeightsV2, v07BakedWaitWeights, v07WaitWeightsV2 } from "./wait_scorer";
+import {
+    applyWaitScorerWeights,
+    applyWaitScorerWeightsV2,
+    applyWaitScorerWeightsV3,
+    v07BakedWaitWeights,
+    v07WaitWeightsV2,
+    v07WaitWeightsV3,
+} from "./wait_scorer";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -164,6 +171,12 @@ export class StrategyV0_7 extends StrategyV0_6 {
         // rather than applying the scorer outside a known profile; guarded caster salvage ran before this seam.
         if (!profile || profile.meleeMagicAnchor || (profile.denseMeleeMagic && denseMeleeMagicIsolationEnabled())) {
             return decision;
+        }
+        // Action-aware V3 is research-only and initially owns RANGE actors only. Other classes continue
+        // through the existing V2/V1 resolver, and absent/malformed/all-zero V3 is an exact no-op.
+        const v3 = v07WaitWeightsV3();
+        if (v3 && unit.getAttackType() === RANGE) {
+            return applyWaitScorerWeightsV3(unit, context, decision, v3);
         }
         // Phase-B env candidate: V07_WAIT_WEIGHTS_V2 (valid, non-zero) swaps in the multi-cohort V2 scorer;
         // all-zero disables the wait stage entirely; absent/malformed keeps the baked v1 path byte-identical.

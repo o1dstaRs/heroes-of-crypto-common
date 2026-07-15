@@ -15,19 +15,27 @@ import type { IDecisionContext } from "../../src/ai";
 import {
     applyWaitScorer,
     applyWaitScorerWeightsV2,
+    applyWaitScorerWeightsV3,
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
     expandWaitFeaturesV2,
+    expandWaitFeaturesV3,
     extractWaitFeatures,
     extractWaitFeaturesV2Raw,
+    extractWaitFeaturesV3,
     incumbentRuleWaits,
     parseWaitWeights,
     parseWaitWeightsV2,
+    parseWaitWeightsV3,
     v07WaitWeightsV2,
+    v07WaitWeightsV3,
     WAIT_FEATURE_NAMES,
     WAIT_FEATURE_NAMES_V2,
     WAIT_FEATURE_NAMES_V2_RAW,
+    WAIT_FEATURE_NAMES_V3,
+    WAIT_INCUMBENT_KINDS,
     waitScore,
+    waitIncumbentKindOf,
     waitScorerInSupport,
 } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
@@ -57,6 +65,7 @@ const ENV_KEYS = [
     "V07_WAIT_VERSIONS_B",
     "V07_WAIT_GUARD",
     "V07_WAIT_WEIGHTS_V2",
+    "V07_WAIT_WEIGHTS_V3",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) {
@@ -455,5 +464,124 @@ describe("wait scorer V2 (Phase-B multi-cohort env candidate)", () => {
         expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, null)).toBe(board.charge);
         fp().addAlreadyMadeTurn(LOWER, board.actor.getId());
         expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, weights)).toBe(board.charge);
+    });
+});
+
+describe("wait scorer V3 (action-aware RANGE-only research candidate)", () => {
+    const zerosV3 = () => JSON.stringify({ b: 0, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });
+    const biasOnlyV3 = (b: number) => JSON.stringify({ b, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });
+
+    it("keeps the exact V2 prefix and encodes kind, RANGE-kind, and caster-kind blocks", () => {
+        const raw = new Array(WAIT_FEATURE_NAMES_V2_RAW.length).fill(0);
+        raw[WAIT_FEATURE_NAMES.indexOf("isRanged")] = 1;
+        raw[WAIT_FEATURE_NAMES.indexOf("isCaster")] = 1;
+        const v2 = expandWaitFeaturesV2(raw);
+        const v3 = expandWaitFeaturesV3(raw, "shot");
+        const kindCount = WAIT_INCUMBENT_KINDS.length;
+        const shot = WAIT_INCUMBENT_KINDS.indexOf("shot");
+
+        expect(v3).toHaveLength(WAIT_FEATURE_NAMES_V3.length);
+        expect(v3.slice(0, WAIT_FEATURE_NAMES_V2.length)).toEqual(v2);
+        expect(v3.slice(WAIT_FEATURE_NAMES_V2.length, WAIT_FEATURE_NAMES_V2.length + kindCount)).toEqual(
+            WAIT_INCUMBENT_KINDS.map((_, index) => (index === shot ? 1 : 0)),
+        );
+        expect(
+            v3.slice(WAIT_FEATURE_NAMES_V2.length + kindCount, WAIT_FEATURE_NAMES_V2.length + 2 * kindCount),
+        ).toEqual(WAIT_INCUMBENT_KINDS.map((_, index) => (index === shot ? 1 : 0)));
+        expect(v3.slice(WAIT_FEATURE_NAMES_V2.length + 2 * kindCount)).toEqual(
+            WAIT_INCUMBENT_KINDS.map((_, index) => (index === shot ? 1 : 0)),
+        );
+
+        const other = expandWaitFeaturesV3(raw, "future_action");
+        expect(other[WAIT_FEATURE_NAMES_V3.indexOf("incKind_other")]).toBe(1);
+    });
+
+    it("classifies every incumbent action family deterministically", () => {
+        const { actor, enemyA, charge } = buildBoard();
+        const id = actor.getId();
+        const targetId = enemyA.getId();
+        const cases: Array<[string, GameAction[]]> = [
+            ["shot", [{ type: "range_attack", attackerId: id, targetId }]],
+            ["melee", charge],
+            ["spell", [{ type: "cast_spell", casterId: id, spellName: "Wind Flow" }]],
+            ["area_throw", [{ type: "area_throw_attack", attackerId: id, targetCell: { x: 3, y: 10 } }]],
+            ["move", [{ type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] }]],
+            ["defend", [{ type: "defend_turn", unitId: id }]],
+            ["mine", [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }]],
+            ["idle", []],
+            ["other", [{ type: "select_attack_type", unitId: id, attackType: RANGE }]],
+        ];
+        for (const [kind, actions] of cases) {
+            expect(waitIncumbentKindOf(actions)).toBe(kind);
+        }
+    });
+
+    it("extracts the same V3 basis deployment uses", () => {
+        const board = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        const shot: GameAction[] = [
+            { type: "range_attack", attackerId: board.actor.getId(), targetId: board.enemyA.getId() },
+        ];
+        const actual = extractWaitFeaturesV3(board.actor, board.context.unitsHolder, fp(), shot);
+        const expected = expandWaitFeaturesV3(
+            extractWaitFeaturesV2Raw(board.actor, board.context.unitsHolder, fp(), shot),
+            "shot",
+        );
+        expect(actual).toEqual(expected);
+        expect(actual[WAIT_FEATURE_NAMES_V3.indexOf("incKind_shot")]).toBe(1);
+        expect(actual[WAIT_FEATURE_NAMES_V3.indexOf("xR_incKind_shot")]).toBe(1);
+        expect(actual[WAIT_FEATURE_NAMES_V3.indexOf("xC_incKind_shot")]).toBe(0);
+    });
+
+    it("is strictly default-off and accepts only a valid nonzero V3 payload", () => {
+        setEnv({});
+        expect(v07WaitWeightsV3()).toBeNull();
+        setEnv({ V07_WAIT_WEIGHTS_V3: "garbage" });
+        expect(v07WaitWeightsV3()).toBeNull();
+        setEnv({ V07_WAIT_WEIGHTS_V3: zerosV3() });
+        expect(v07WaitWeightsV3()).toBeNull();
+        expect(parseWaitWeightsV3(JSON.stringify({ b: 1, w: [1, 2] }))).toBeNull();
+        setEnv({ V07_WAIT_WEIGHTS_V3: biasOnlyV3(0.25) });
+        expect(v07WaitWeightsV3()).toEqual(parseWaitWeightsV3(biasOnlyV3(0.25)));
+    });
+
+    it("can arbitrate a RANGE shot but leaves non-RANGE actors byte-identical", () => {
+        const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        const shot: GameAction[] = [
+            { type: "range_attack", attackerId: ranged.actor.getId(), targetId: ranged.enemyA.getId() },
+        ];
+        const positive = parseWaitWeightsV3(biasOnlyV3(0.01));
+        expect(applyWaitScorerWeightsV3(ranged.actor, ranged.context, shot, positive)).toEqual([
+            { type: "wait_turn", unitId: ranged.actor.getId() },
+        ]);
+        const negative = parseWaitWeightsV3(biasOnlyV3(-0.01));
+        expect(applyWaitScorerWeightsV3(ranged.actor, ranged.context, shot, negative)).toBe(shot);
+
+        const melee = buildBoard();
+        expect(applyWaitScorerWeightsV3(melee.actor, melee.context, melee.charge, positive)).toBe(melee.charge);
+        const mage = buildBoard({ attackType: PBTypes.AttackVals.MAGIC });
+        expect(applyWaitScorerWeightsV3(mage.actor, mage.context, mage.charge, positive)).toBe(mage.charge);
+        const meleeMage = buildBoard({ attackType: MELEE_MAGIC });
+        expect(applyWaitScorerWeightsV3(meleeMage.actor, meleeMage.context, meleeMage.charge, positive)).toBe(
+            meleeMage.charge,
+        );
+    });
+
+    it("protects casts, melee attacks, Area Throw, policy waits, and ineligible RANGE turns", () => {
+        const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
+        const id = ranged.actor.getId();
+        const positive = parseWaitWeightsV3(biasOnlyV3(5));
+        const protectedActions: GameAction[][] = [
+            ranged.charge,
+            [{ type: "cast_spell", casterId: id, spellName: "Wind Flow" }],
+            [{ type: "area_throw_attack", attackerId: id, targetCell: { x: 3, y: 10 } }],
+            [{ type: "wait_turn", unitId: id }],
+        ];
+        for (const actions of protectedActions) {
+            expect(applyWaitScorerWeightsV3(ranged.actor, ranged.context, actions, positive)).toBe(actions);
+        }
+
+        const shot: GameAction[] = [{ type: "range_attack", attackerId: id, targetId: ranged.enemyA.getId() }];
+        fp().addAlreadyMadeTurn(LOWER, id);
+        expect(applyWaitScorerWeightsV3(ranged.actor, ranged.context, shot, positive)).toBe(shot);
     });
 });

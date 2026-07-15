@@ -19,7 +19,12 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
-import { canWaitOnHourglassMirror, extractWaitFeatures, extractWaitFeaturesV2Raw } from "../ai/versions/wait_scorer";
+import {
+    canWaitOnHourglassMirror,
+    extractWaitFeatures,
+    extractWaitFeaturesV2Raw,
+    waitIncumbentKindOf,
+} from "../ai/versions/wait_scorer";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -210,8 +215,8 @@ const envNum = (name: string, fallback: number, min: number): number => {
 
 /** Classify an arbitrary decided action list into the candidate-kind vocabulary (for audit buckets). */
 export function classifyActions(actions: readonly GameAction[]): string {
-    for (const a of actions) {
-        switch (a.type) {
+    for (const action of actions) {
+        switch (action.type) {
             case "melee_attack":
                 return "melee";
             case "range_attack":
@@ -230,7 +235,7 @@ export function classifyActions(actions: readonly GameAction[]): string {
                 break;
         }
     }
-    if (actions.some((a) => a.type === "move_unit")) {
+    if (actions.some((action) => action.type === "move_unit")) {
         return "move";
     }
     return "idle";
@@ -980,7 +985,7 @@ export class SearchDriver {
                     redVersion: this.match.redVersion!,
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
-                    incumbentKind: classifyActions(incumbent),
+                    incumbentKind: waitIncumbentKindOf(incumbent),
                     incumbentWait: row.iw,
                     incumbentIllegal: row.ii,
                     waitRejected: row.rej,

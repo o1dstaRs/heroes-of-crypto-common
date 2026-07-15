@@ -32,6 +32,7 @@ import {
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
     extractWaitFeatures,
     v07BakedWaitWeights,
+    WAIT_FEATURE_NAMES_V3,
     waitScore,
 } from "../../src/ai/versions/wait_scorer";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -52,6 +53,7 @@ const ENV_KEYS = [
     "V07_WAIT_SCORER",
     "V07_WAIT_WEIGHTS",
     "V07_WAIT_WEIGHTS_V2",
+    "V07_WAIT_WEIGHTS_V3",
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS",
     "V07_WAIT_GUARD",
@@ -98,11 +100,15 @@ interface Board {
     incumbent: GameAction[];
 }
 
-function buildBoard(enemyAmountAlive = 1, actorOptions: Parameters<typeof createTestUnit>[0] = {}): Board {
+function buildBoard(
+    enemyAmountAlive = 1,
+    actorOptions: Parameters<typeof createTestUnit>[0] = {},
+    allyOptions: Parameters<typeof createTestUnit>[0] = {},
+): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4, ...actorOptions });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2 });
+    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2, ...allyOptions });
     const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3, amountAlive: enemyAmountAlive });
     const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5, amountAlive: enemyAmountAlive });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
@@ -562,6 +568,70 @@ describe("v0.7 strategy — baked wait scorer", () => {
         expect(strategy.finalizeForTest(actor, context, incumbent)).toEqual([
             { type: "wait_turn", unitId: actor.getId() },
         ]);
+    });
+
+    it("keeps V3 default-off and limits an armed candidate to unprotected RANGE actions", () => {
+        const ranged = buildBoard(10, { attackType: PBTypes.AttackVals.RANGE, rangeShots: 5 });
+        const strategy = new TestStrategyV0_7();
+        primeArmyProfile(strategy, ranged.context);
+        const shot: GameAction[] = [
+            {
+                type: "range_attack",
+                attackerId: ranged.actor.getId(),
+                targetId: ranged.context.unitsHolder.getAllEnemyUnits(LOWER)[0].getId(),
+            },
+        ];
+        const positiveV3 = JSON.stringify({ b: 5, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });
+        const zeroV3 = JSON.stringify({ b: 0, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });
+
+        expect(strategy.finalizeForTest(ranged.actor, ranged.context, shot)).toBe(shot);
+        process.env.V07_WAIT_WEIGHTS_V3 = "malformed";
+        expect(strategy.finalizeForTest(ranged.actor, ranged.context, shot)).toBe(shot);
+        process.env.V07_WAIT_WEIGHTS_V3 = zeroV3;
+        expect(strategy.finalizeForTest(ranged.actor, ranged.context, shot)).toBe(shot);
+        process.env.V07_WAIT_WEIGHTS_V3 = positiveV3;
+        expect(strategy.finalizeForTest(ranged.actor, ranged.context, shot)).toEqual([
+            { type: "wait_turn", unitId: ranged.actor.getId() },
+        ]);
+
+        const protectedActions: GameAction[][] = [
+            ranged.incumbent,
+            [{ type: "cast_spell", casterId: ranged.actor.getId(), spellName: "Wind Flow" }],
+            [
+                {
+                    type: "area_throw_attack",
+                    attackerId: ranged.actor.getId(),
+                    targetCell: { x: 3, y: 10 },
+                },
+            ],
+        ];
+        for (const incumbent of protectedActions) {
+            expect(strategy.finalizeForTest(ranged.actor, ranged.context, incumbent)).toBe(incumbent);
+        }
+    });
+
+    it("an armed V3 leaves melee, mage, and aura policy paths unchanged", () => {
+        const positiveV3 = JSON.stringify({ b: 5, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });
+        const compareFinalized = (actorOptions: Parameters<typeof createTestUnit>[0]) => {
+            const board = buildBoard(10, actorOptions);
+            const strategy = new TestStrategyV0_7();
+            primeArmyProfile(strategy, board.context);
+            const baseline = strategy.finalizeForTest(board.actor, board.context, board.incumbent);
+            process.env.V07_WAIT_WEIGHTS_V3 = positiveV3;
+            expect(strategy.finalizeForTest(board.actor, board.context, board.incumbent)).toEqual(baseline);
+            delete process.env.V07_WAIT_WEIGHTS_V3;
+        };
+        compareFinalized({});
+        compareFinalized({ attackType: PBTypes.AttackVals.MAGIC });
+        compareFinalized({ attackType: PBTypes.AttackVals.MELEE_MAGIC });
+
+        const auraOptions = { auraEffects: ["Luck"], auraRanges: [2], auraIsBuff: [true] };
+        const aura = buildBoard(10, auraOptions, auraOptions);
+        const auraStrategy = new StrategyV0_7();
+        primeArmyProfile(auraStrategy, aura.context);
+        const baseline = auraStrategy.decideTurn(aura.actor, aura.context);
+        process.env.V07_WAIT_WEIGHTS_V3 = positiveV3;
+        expect(auraStrategy.decideTurn(aura.actor, aura.context)).toEqual(baseline);
     });
 
     it("ALL-ZERO weights reproduce v0.6 on a non-caster board", () => {

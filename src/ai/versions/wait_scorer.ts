@@ -113,6 +113,36 @@ export const WAIT_FEATURE_NAMES_V2: readonly string[] = [
     ...WAIT_FEATURE_NAMES_V2_RAW.map((name) => `xR_${name}`),
 ] as const;
 
+/**
+ * Incumbent action families available to the action-aware V3 research scorer. `mine` is the engine's
+ * obstacle attack, while `idle` is an empty/end-turn-only decision. Unknown or auxiliary-only action
+ * lists fail into `other` instead of being mistaken for an idle turn.
+ */
+export const WAIT_INCUMBENT_KINDS = [
+    "shot",
+    "melee",
+    "spell",
+    "area_throw",
+    "move",
+    "defend",
+    "mine",
+    "idle",
+    "other",
+] as const;
+
+export type WaitIncumbentKind = (typeof WAIT_INCUMBENT_KINDS)[number];
+
+/**
+ * V3 keeps the complete deployed V2 basis as an immutable prefix, then appends incumbent-kind one-hots
+ * and RANGE/caster interaction copies. V1/V2 feature order and weight widths therefore remain unchanged.
+ */
+export const WAIT_FEATURE_NAMES_V3: readonly string[] = [
+    ...WAIT_FEATURE_NAMES_V2,
+    ...WAIT_INCUMBENT_KINDS.map((kind) => `incKind_${kind}`),
+    ...WAIT_INCUMBENT_KINDS.map((kind) => `xR_incKind_${kind}`),
+    ...WAIT_INCUMBENT_KINDS.map((kind) => `xC_incKind_${kind}`),
+] as const;
+
 export interface IWaitWeights {
     b: number;
     w: number[];
@@ -260,6 +290,7 @@ export function extractWaitFeatures(
 }
 
 const IS_RANGED_IDX = WAIT_FEATURE_NAMES.indexOf("isRanged");
+const IS_CASTER_IDX = WAIT_FEATURE_NAMES.indexOf("isCaster");
 
 /** V2 raw features = the exact v1 vector + the composition/acting-unit block (WAIT_FEATURE_NAMES_V2_RAW). */
 export function extractWaitFeaturesV2Raw(
@@ -335,6 +366,63 @@ export function extractWaitFeaturesV2(
     incumbent: readonly GameAction[],
 ): number[] {
     return expandWaitFeaturesV2(extractWaitFeaturesV2Raw(unit, unitsHolder, fightProperties, incumbent));
+}
+
+export function normalizeWaitIncumbentKind(kind: string): WaitIncumbentKind {
+    return (WAIT_INCUMBENT_KINDS as readonly string[]).includes(kind) ? (kind as WaitIncumbentKind) : "other";
+}
+
+/** Classify the final incumbent action list using the same vocabulary recorded by the Phase-B driver. */
+export function waitIncumbentKindOf(actions: readonly GameAction[]): WaitIncumbentKind | "wait" {
+    for (const action of actions) {
+        switch (action.type) {
+            case "range_attack":
+                return "shot";
+            case "melee_attack":
+                return "melee";
+            case "cast_spell":
+                return "spell";
+            case "area_throw_attack":
+                return "area_throw";
+            case "defend_turn":
+                return "defend";
+            case "obstacle_attack":
+                return "mine";
+            case "wait_turn":
+                return "wait";
+            default:
+                break;
+        }
+    }
+    if (actions.some((action) => action.type === "move_unit")) {
+        return "move";
+    }
+    if (!actions.length || actions.every((action) => action.type === "end_turn")) {
+        return "idle";
+    }
+    return "other";
+}
+
+/** Expand a Phase-B raw V2 row plus its recorded incumbent kind into the deployed V3 basis. */
+export function expandWaitFeaturesV3(raw: readonly number[], incumbentKind: string): number[] {
+    const v2 = expandWaitFeaturesV2(raw);
+    const kind = normalizeWaitIncumbentKind(incumbentKind);
+    const oneHot = WAIT_INCUMBENT_KINDS.map((candidate) => (candidate === kind ? 1 : 0));
+    const isRanged = raw[IS_RANGED_IDX] ?? 0;
+    const isCaster = raw[IS_CASTER_IDX] ?? 0;
+    return [...v2, ...oneHot, ...oneHot.map((value) => value * isRanged), ...oneHot.map((value) => value * isCaster)];
+}
+
+export function extractWaitFeaturesV3(
+    unit: Unit,
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    incumbent: readonly GameAction[],
+): number[] {
+    return expandWaitFeaturesV3(
+        extractWaitFeaturesV2Raw(unit, unitsHolder, fightProperties, incumbent),
+        waitIncumbentKindOf(incumbent),
+    );
 }
 
 /**
@@ -467,6 +555,47 @@ export function v07WaitWeightsV2(): IWaitWeights | "disabled" | null {
         v2Slot.resolved = parsed ? (parsed.b === 0 && parsed.w.every((x) => x === 0) ? "disabled" : parsed) : null;
     }
     return v2Slot.resolved;
+}
+
+/** Parse {b, w[WAIT_FEATURE_NAMES_V3.length]} -- malformed/absent => null. */
+export function parseWaitWeightsV3(raw: string | undefined): IWaitWeights | null {
+    if (!raw) {
+        return null;
+    }
+    try {
+        const model = JSON.parse(raw);
+        if (
+            model &&
+            typeof model.b === "number" &&
+            Number.isFinite(model.b) &&
+            Array.isArray(model.w) &&
+            model.w.length === WAIT_FEATURE_NAMES_V3.length &&
+            model.w.every((value: unknown) => typeof value === "number" && Number.isFinite(value))
+        ) {
+            return { b: model.b, w: model.w as number[] };
+        }
+    } catch {
+        /* malformed -> null */
+    }
+    return null;
+}
+
+/**
+ * Research-only V3 resolver. There is deliberately no built-in fallback candidate: absent, malformed,
+ * or all-zero input leaves the existing V2/V1 resolution untouched.
+ */
+const v3Slot: { raw: string | undefined | null; weights: IWaitWeights | null } = {
+    raw: null,
+    weights: null,
+};
+export function v07WaitWeightsV3(): IWaitWeights | null {
+    const raw = process.env.V07_WAIT_WEIGHTS_V3;
+    if (raw !== v3Slot.raw) {
+        v3Slot.raw = raw;
+        const parsed = parseWaitWeightsV3(raw);
+        v3Slot.weights = parsed && (parsed.b !== 0 || parsed.w.some((value) => value !== 0)) ? parsed : null;
+    }
+    return v3Slot.weights;
 }
 
 /**
@@ -677,6 +806,45 @@ export function applyWaitScorerWeightsV2(
         return incumbent; // not a wait-eligible decision point
     }
     const features = extractWaitFeaturesV2(unit, context.unitsHolder, fightProperties, incumbent);
+    const score = waitScore(weights, features);
+    if (!Number.isFinite(score) || score <= 0) {
+        return incumbent;
+    }
+    return [{ type: "wait_turn", unitId: unit.getId() }];
+}
+
+const WAIT_V3_PROTECTED_KINDS: ReadonlySet<string> = new Set(["wait", "melee", "spell", "area_throw"]);
+
+/** Whether the initial RANGE-only V3 runtime is allowed to replace this incumbent action family. */
+export function waitV3CanReplaceIncumbentKind(kind: string): boolean {
+    return !WAIT_V3_PROTECTED_KINDS.has(kind) && !WAIT_V3_PROTECTED_KINDS.has(normalizeWaitIncumbentKind(kind));
+}
+
+/**
+ * Action-aware V3 research stage. Its initial deployment domain is deliberately RANGE-only; mage rows
+ * have not earned a runtime gate yet. Committed casts, melee attacks, and Area Throw actions remain
+ * protected even when the acting stack is ranged.
+ */
+export function applyWaitScorerWeightsV3(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+    weights: IWaitWeights | null,
+): GameAction[] {
+    const fightProperties = context.fightProperties;
+    if (!weights || !fightProperties || unit.getAttackType() !== RANGE) {
+        return incumbent;
+    }
+    if (incumbent.some((action) => action.type === "wait_turn")) {
+        return incumbent;
+    }
+    if (!waitV3CanReplaceIncumbentKind(waitIncumbentKindOf(incumbent))) {
+        return incumbent;
+    }
+    if (!canWaitOnHourglassMirror(unit, fightProperties)) {
+        return incumbent;
+    }
+    const features = extractWaitFeaturesV3(unit, context.unitsHolder, fightProperties, incumbent);
     const score = waitScore(weights, features);
     if (!Number.isFinite(score) || score <= 0) {
         return incumbent;

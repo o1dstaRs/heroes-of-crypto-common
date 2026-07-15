@@ -1,16 +1,17 @@
 // Phase-B MULTI-COHORT refit of the WAIT-SCORER (Q2 Gate-2 v2): distills the Gate-1 act-vs-wait
-// lap-rollout oracle into V07_WAIT_WEIGHTS_V2 with UNIT-CLASS-CONDITIONAL structure.
+// lap-rollout oracle into V07_WAIT_WEIGHTS_V2/V3 with class- and incumbent-action-aware structures.
 //
 // The v1 distilled weights were fit on LIVETWIN MELEE-draft oracle games (RANGE 0.19% of rows) and had
 // to be guarded to melee support (guard-zero = ranged parity, no ranged tempo policy). This trainer
 // consumes self-describing Q2_DATASET_V2=1 dumps (search_driver oracle mode; rows carry a shared run
-// fingerprint and WAIT_FEATURE_NAMES_V2_RAW, 49 dims) generated ACROSS cohorts, and fits three structures:
+// fingerprint and WAIT_FEATURE_NAMES_V2_RAW, 49 dims) generated ACROSS cohorts, and fits four structures:
 //   A: linear over the 49 raw dims (padded to the 98-dim deployed basis with a zero xR_ block)
 //   B: the full 98-dim deployed basis (raw + isRanged interaction copy = shared + ranged-delta blocks)
 //   C: delta regression over the 98-dim basis (experimental tail-discrimination candidate)
+//   D: action-aware V3 delta regression (V2 + incumbent-kind, RANGE-kind, and caster-kind blocks)
 // Held-out split is BY GAME SEED within each cohort. Reports per-cohort AND per-unit-class held-out
 // acc/AUC vs baselines (always-act, incumbent rule, the v1 distilled weights, v1+deployed-guard).
-// Prints V07_WAIT_WEIGHTS_V2 JSON (98 dims) for numerically stable candidates only.
+// Prints V2 JSON for numerically stable fits and V3 JSON only after the held-out RANGE release gates pass.
 //
 // Usage: bun fit_wait_v2.mjs fingerprint=<64hex> melee=q2d.jsonl mixed=... [...] epochs=400 lr=0.5 l2=0.0001
 import { readFileSync } from "node:fs";
@@ -20,10 +21,14 @@ import {
     WAIT_FEATURE_NAMES,
     WAIT_FEATURE_NAMES_V2,
     WAIT_FEATURE_NAMES_V2_RAW,
+    WAIT_FEATURE_NAMES_V3,
     expandWaitFeaturesV2,
+    expandWaitFeaturesV3,
+    waitV3CanReplaceIncumbentKind,
 } from "../../ai/versions/wait_scorer";
 import { parsePhaseBFitterArgs, parsePhaseBQ2Row } from "../phase_b_dataset";
 import { phaseBModelStabilityIssue } from "./model_stability";
+import { evaluateWaitV3HeldoutGates } from "./wait_v3_gates";
 
 const parsedArgs = parsePhaseBFitterArgs(process.argv.slice(2), {
     epochs: 400,
@@ -36,6 +41,7 @@ const RAW = [...WAIT_FEATURE_NAMES_V2_RAW];
 const D_RAW = RAW.length; // 49
 const D1 = WAIT_FEATURE_NAMES.length; // 41
 const D2 = WAIT_FEATURE_NAMES_V2.length; // 98
+const D3 = WAIT_FEATURE_NAMES_V3.length; // 125
 const idx = (name) => {
     const i = RAW.indexOf(name);
     if (i < 0) throw new Error(`feature ${name} missing`);
@@ -47,7 +53,7 @@ const IS_MELEE = idx("isMelee");
 const IS_RANGED = idx("isRanged");
 const OWN_MELEE_FRAC = idx("ownMeleeFrac");
 
-/** rows: { f: raw49, x: expanded98, y, d, s, cohort } (fit set excludes all degenerate candidates). */
+/** Rows retain raw49, V2/V3 expansions, and incumbent kind; the fit excludes all degenerate candidates. */
 const rows = [];
 let kept = 0;
 let illegal = 0;
@@ -74,10 +80,12 @@ for (const { cohort, path } of files) {
         rows.push({
             f: r.features,
             x: expandWaitFeaturesV2(r.features),
+            x3: expandWaitFeaturesV3(r.features, r.incumbentKind),
             y: r.label,
             d: r.delta,
             s: r.seed,
             cohort,
+            incumbentKind: r.incumbentKind,
         });
         n += 1;
     }
@@ -236,7 +244,9 @@ function fitRidge(set, dims, featOf, epochs, lr, l2) {
 for (const r of rows) r.dc = typeof r.d === "number" ? 10 * Math.max(-0.3, Math.min(0.3, r.d)) : 0;
 const trainD = train.filter((r) => typeof r.d === "number");
 
-console.log(`\nfitting A (linear ${D_RAW}), B (class-conditional ${D2}), C (delta regression ${D2})...`);
+console.log(
+    `\nfitting A (linear ${D_RAW}), B (class-conditional ${D2}), C (delta regression ${D2}), D (action-aware V3 ${D3})...`,
+);
 const t0 = Date.now();
 const fitA = fitLogistic(train, D_RAW, (r) => r.f, EPOCHS, LR, L2);
 console.log(`A done in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
@@ -246,6 +256,9 @@ console.log(`B done in ${((Date.now() - t1) / 1000).toFixed(0)}s`);
 const t2 = Date.now();
 const fitC = fitRidge(trainD, D2, (r) => r.x, EPOCHS, LR, L2);
 console.log(`C done in ${((Date.now() - t2) / 1000).toFixed(0)}s`);
+const t3 = Date.now();
+const fitD = fitRidge(trainD, D3, (r) => r.x3, EPOCHS, LR, L2);
+console.log(`D done in ${((Date.now() - t3) / 1000).toFixed(0)}s`);
 for (const [tag, model] of [
     ["fit A", fitA],
     ["fit B", fitB],
@@ -258,6 +271,17 @@ for (const [tag, model] of [
 const fitC100 = { b: fitC.b * 100, w: fitC.w.map((x) => x * 100) };
 let cRejection = phaseBModelStabilityIssue("fit C x100", fitC100);
 if (cRejection) console.log(`C REJECTED before evaluation: ${cRejection}`);
+const fitD100 = { b: fitD.b * 100, w: fitD.w.map((x) => x * 100) };
+const roundedModel = (model) => ({
+    b: Number(model.b.toFixed(5)),
+    w: model.w.map((value) => Number(value.toFixed(5))),
+});
+const fitDDeployed = roundedModel(fitD100);
+let dRejection = phaseBModelStabilityIssue("fit D x100", fitD100);
+if (!dRejection && fitDDeployed.b === 0 && fitDDeployed.w.every((value) => value === 0)) {
+    dRejection = "fit D rounds to an all-zero deployment anchor";
+}
+if (dRejection) console.log(`D REJECTED before evaluation: ${dRejection}`);
 
 const BIG = 50;
 const v1 = DISTILLED_WAIT_WEIGHTS_2026_07_10;
@@ -283,6 +307,11 @@ const scoreC = (r) => {
     for (let i = 0; i < D2; i++) z += fitC.w[i] * r.x[i];
     return z;
 };
+const scoreD = (r) => {
+    let z = fitDDeployed.b;
+    for (let i = 0; i < D3; i++) z += fitDDeployed.w[i] * r.x3[i];
+    return z;
+};
 const models = [
     ["baseline: always-act", () => -BIG],
     ["baseline: incumbent v0.5 rule", (r) => (r.f[INC_RULE] >= 0.5 ? BIG : -BIG)],
@@ -294,6 +323,8 @@ const models = [
 ];
 const C_LABEL = "C: delta regression 98";
 if (!cRejection) models.push([C_LABEL, scoreC]);
+const D_LABEL = "D: action-aware V3 delta regression 125";
+if (!dRejection) models.push([D_LABEL, scoreD]);
 
 const classes = [
     ["MELEE-class", (r) => r.f[IS_MELEE] >= 0.5],
@@ -320,16 +351,64 @@ for (const [label, score] of models) {
         for (const [cohort, result] of byCohort) console.log(`  cohort ${cohort}:`, JSON.stringify(result));
         for (const [classLabel, result] of byClass) console.log(`  ${classLabel}:`, JSON.stringify(result));
     } catch (error) {
-        if (label !== C_LABEL) throw error;
-        cRejection = `fit C held-out evaluation failed: ${error instanceof Error ? error.message : String(error)}`;
+        const message = error instanceof Error ? error.message : String(error);
+        if (label === C_LABEL) {
+            cRejection = `fit C held-out evaluation failed: ${message}`;
+        } else if (label === D_LABEL) {
+            dRejection = `fit D held-out evaluation failed: ${message}`;
+        } else {
+            throw error;
+        }
         console.log(`\n--- ${label} ---`);
-        console.log(`  REJECTED: ${cRejection}`);
+        console.log(`  REJECTED: ${label === C_LABEL ? cRejection : dRejection}`);
     }
+}
+
+console.log("\n=== V3 held-out RANGE research gates ===");
+if (!dRejection) {
+    const gate = evaluateWaitV3HeldoutGates(
+        test.map((r) => ({
+            seed: r.s,
+            incumbentKind: r.incumbentKind,
+            isRanged: r.f[IS_RANGED] >= 0.5,
+            delta: r.d,
+            fired: waitV3CanReplaceIncumbentKind(r.incumbentKind) && scoreD(r) > 0,
+        })),
+    );
+    console.log(
+        JSON.stringify({
+            rangeRows: gate.rangeRows,
+            rangeSeeds: gate.rangeSeeds,
+            positiveDeltaCapture:
+                gate.rangePositiveDeltaCapture === null
+                    ? null
+                    : `${(100 * gate.rangePositiveDeltaCapture).toFixed(2)}%`,
+            firedRows: gate.rangeFiredRows,
+            firedSeeds: gate.rangeFiredSeeds,
+            firedDelta: Number(gate.rangeFiredDelta.toFixed(6)),
+            firedMeanDelta: gate.rangeFiredMeanDelta === null ? null : Number(gate.rangeFiredMeanDelta.toFixed(6)),
+            actionBuckets: gate.actionBuckets
+                .filter((bucket) => bucket.firedRows > 0)
+                .map((bucket) => ({
+                    kind: bucket.kind,
+                    firedRows: bucket.firedRows,
+                    firedDelta: Number(bucket.firedDelta.toFixed(6)),
+                })),
+        }),
+    );
+    if (!gate.pass) {
+        dRejection = gate.reasons.join("; ");
+        console.log(`V3 GATE: REJECTED - ${dRejection}`);
+    } else {
+        console.log("V3 GATE: PASS");
+    }
+} else {
+    console.log(`V3 GATE: REJECTED - ${dRejection}`);
 }
 
 // Deployed-basis JSON for both: A padded with a zero xR_ block to the 98-dim basis.
 const padA = { b: fitA.b, w: [...fitA.w, ...new Array(D2 - D_RAW).fill(0)] };
-const round = (m) => JSON.stringify({ b: Number(m.b.toFixed(5)), w: m.w.map((x) => Number(x.toFixed(5))) });
+const round = (model) => JSON.stringify(roundedModel(model));
 console.log("\nV07_WAIT_WEIGHTS_V2 JSON (A, linear49 padded):", round(padA));
 console.log("\nV07_WAIT_WEIGHTS_V2 JSON (B, class-conditional 98):", round(fitB));
 if (cRejection) {
@@ -337,8 +416,23 @@ if (cRejection) {
 } else {
     console.log("\nV07_WAIT_WEIGHTS_V2 JSON (C, delta regression 98, x100):", round(fitC100));
 }
+if (dRejection) {
+    console.log("\nV07_WAIT_WEIGHTS_V3 JSON (D): REJECTED -", dRejection);
+} else {
+    console.log(
+        "\nV07_WAIT_WEIGHTS_V3 JSON (D, action-aware delta regression 125, x100):",
+        JSON.stringify(fitDDeployed),
+    );
+}
 console.log("\n=== B weights by name ===");
 console.log("bias:", fitB.b.toFixed(4));
 WAIT_FEATURE_NAMES_V2.forEach((n, i) => {
     if (Math.abs(fitB.w[i]) >= 0.05) console.log(`  ${n}: ${fitB.w[i].toFixed(4)}`);
 });
+if (!dRejection) {
+    console.log("\n=== D weights by name ===");
+    console.log("bias:", fitDDeployed.b.toFixed(4));
+    WAIT_FEATURE_NAMES_V3.forEach((name, index) => {
+        if (Math.abs(fitDDeployed.w[index]) >= 0.05) console.log(`  ${name}: ${fitDDeployed.w[index].toFixed(4)}`);
+    });
+}
