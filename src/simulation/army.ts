@@ -156,6 +156,8 @@ interface ICatalogEntry {
     size: number;
     /** creatures.json attack_type — "MELEE" | "RANGE" | "MELEE_MAGIC" | "MAGIC". */
     attackType: string;
+    /** creatures.json movement_type — "WALK" | "FLY" (canFly cohort filter; same field creature_score.ts reads). */
+    movementType?: string;
     /** creatures.json exp — the creature's experience cost (drives the live exp-budget stack sizing). */
     exp?: number;
 }
@@ -181,7 +183,7 @@ function getCatalog(): ICatalogEntry[] {
     }
     const json = CREATURES_JSON as unknown as Record<
         string,
-        Record<string, { level?: number; size?: number; attack_type?: string; exp?: number }>
+        Record<string, { level?: number; size?: number; attack_type?: string; movement_type?: string; exp?: number }>
     >;
     const entries: ICatalogEntry[] = [];
     for (const faction of Object.keys(json)) {
@@ -203,6 +205,7 @@ function getCatalog(): ICatalogEntry[] {
                     level: cfg.level,
                     size: cfg.size,
                     attackType: cfg.attack_type ?? "MELEE",
+                    movementType: cfg.movement_type,
                     exp: typeof cfg.exp === "number" && cfg.exp > 0 ? cfg.exp : undefined,
                 });
             }
@@ -253,10 +256,22 @@ function forcedByLevel(): Record<number, string> {
  * armies. Applied by rejection sampling (rebuild until the RANGE count is in range), so it stays fully
  * deterministic for a given seed — the retries consume the same rng stream. Off by default (no env set),
  * so existing runs are unaffected.
+ *
+ * ROSTER_FLYER_MIN / ROSTER_FLYER_MAX (canFly, movement_type "FLY") and ROSTER_CASTER_MIN /
+ * ROSTER_CASTER_MAX (attack_type "MAGIC" or "MELEE_MAGIC" — the same isCaster definition
+ * value_features.ts's extractValueFeaturesV2Raw already uses) extend the identical rejection-sampling
+ * pattern to two more own-composition dimensions (2026-07-15, W11 flyer/caster cohort probes), e.g.
+ * `ROSTER_FLYER_MIN=2` for flyer-heavy armies or `ROSTER_CASTER_MIN=2` for caster-heavy armies. All three
+ * constraints are independent and may be combined; none is active unless its env is set.
  */
-function rangedConstraint(): { min: number; max: number } | undefined {
-    const min = process.env.ROSTER_RANGED_MIN;
-    const max = process.env.ROSTER_RANGED_MAX;
+interface IRosterCountConstraint {
+    min: number;
+    max: number;
+}
+
+function countConstraint(envMin: string, envMax: string): IRosterCountConstraint | undefined {
+    const min = process.env[envMin];
+    const max = process.env[envMax];
     if (min === undefined && max === undefined) {
         return undefined;
     }
@@ -266,6 +281,15 @@ function rangedConstraint(): { min: number; max: number } | undefined {
     };
 }
 
+const rangedConstraint = (): IRosterCountConstraint | undefined =>
+    countConstraint("ROSTER_RANGED_MIN", "ROSTER_RANGED_MAX");
+const flyerConstraint = (): IRosterCountConstraint | undefined =>
+    countConstraint("ROSTER_FLYER_MIN", "ROSTER_FLYER_MAX");
+const casterConstraint = (): IRosterCountConstraint | undefined =>
+    countConstraint("ROSTER_CASTER_MIN", "ROSTER_CASTER_MAX");
+
+const isCasterAttackType = (attackType: string): boolean => attackType === "MAGIC" || attackType === "MELEE_MAGIC";
+
 export function buildRoster(
     rng: () => number,
     composition: readonly IRosterComposition[] = DEFAULT_ROSTER_COMPOSITION,
@@ -274,9 +298,11 @@ export function buildRoster(
     amountMode: StackAmountMode = "levelTable",
 ): IArmyUnitSpec[] {
     const forced = forcedByLevel();
-    const buildOnce = (): { roster: IArmyUnitSpec[]; ranged: number } => {
+    const buildOnce = (): { roster: IArmyUnitSpec[]; ranged: number; flyer: number; caster: number } => {
         const roster: IArmyUnitSpec[] = [];
         let ranged = 0;
+        let flyer = 0;
+        let caster = 0;
         for (const { level, count } of composition) {
             const pool = creaturesByLevel(level, factionFilter);
             if (!pool.length) {
@@ -293,6 +319,12 @@ export function buildRoster(
                 if (pick.attackType === "RANGE") {
                     ranged += 1;
                 }
+                if (pick.movementType === "FLY") {
+                    flyer += 1;
+                }
+                if (isCasterAttackType(pick.attackType)) {
+                    caster += 1;
+                }
                 roster.push({
                     faction: pick.faction,
                     creatureName: pick.creatureName,
@@ -302,21 +334,27 @@ export function buildRoster(
                 });
             }
         }
-        return { roster, ranged };
+        return { roster, ranged, flyer, caster };
     };
 
-    const constraint = rangedConstraint();
-    if (!constraint) {
+    const ranged = rangedConstraint();
+    const flyer = flyerConstraint();
+    const caster = casterConstraint();
+    if (!ranged && !flyer && !caster) {
         return buildOnce().roster;
     }
-    // Rejection-sample until the RANGE-stack count lands in [min, max]. Deterministic per seed; the retry
-    // budget is a safety valve (feasibility is high — every level has ranged creatures), and we keep the
-    // build closest to the window if it's ever exhausted.
+    // Rejection-sample until every active dimension's count lands in its [min, max] window. Deterministic
+    // per seed; the retry budget is a safety valve (feasibility is high), and we keep the build closest to
+    // the combined window if it's ever exhausted.
+    const totalDistance = (build: { ranged: number; flyer: number; caster: number }): number =>
+        (ranged ? rangeDistance(build.ranged, ranged) : 0) +
+        (flyer ? rangeDistance(build.flyer, flyer) : 0) +
+        (caster ? rangeDistance(build.caster, caster) : 0);
     let best = buildOnce();
-    let bestDist = rangeDistance(best.ranged, constraint);
+    let bestDist = totalDistance(best);
     for (let attempt = 0; attempt < 2000 && bestDist > 0; attempt += 1) {
         const next = buildOnce();
-        const dist = rangeDistance(next.ranged, constraint);
+        const dist = totalDistance(next);
         if (dist < bestDist) {
             best = next;
             bestDist = dist;
