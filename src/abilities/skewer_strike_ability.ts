@@ -141,7 +141,8 @@ export function processSkewerStrikeAbility(
         });
 
         sceneLog.updateLog(
-            `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${nextStandingTarget.getName()} (${damageFromAttack})`,
+            `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${nextStandingTarget.getName()} (${damageFromAttack})` +
+                HoCLib.killTag(Math.max(0, amountBefore - amountAfter)),
         );
 
         if (nextStandingTarget.isDead()) {

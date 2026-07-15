@@ -13,6 +13,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
+import * as HoCLib from "../utils/lib";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -120,16 +121,18 @@ export function processFireBreathAbility(
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
+        const unitsKilled = Math.max(0, amountAliveBefore - nextStandingTarget.getAmountAlive());
         secondaryDamage?.push({
             source: "fire_breath",
             unitId: nextStandingTarget.getId(),
             position: positionAtImpact,
             amount: fireBreathAttackDamage,
-            unitsDied: Math.max(0, amountAliveBefore - nextStandingTarget.getAmountAlive()),
+            unitsDied: unitsKilled,
         });
 
         sceneLog.updateLog(
-            `${fromUnit.getName()} ${attackTypeString} ${nextStandingTarget.getName()} (${fireBreathAttackDamage})`,
+            `${fromUnit.getName()} ${attackTypeString} ${nextStandingTarget.getName()} (${fireBreathAttackDamage})` +
+                HoCLib.killTag(unitsKilled),
         );
 
         if (nextStandingTarget.isDead()) {
