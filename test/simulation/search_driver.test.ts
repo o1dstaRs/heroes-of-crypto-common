@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
+import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumeratedCandidate } from "../../src/ai";
 import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -66,6 +66,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_ROLLOUTS",
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
+    "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
@@ -370,6 +372,34 @@ function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrate
 }
 
 describe("search driver — gating, hygiene, determinism", () => {
+    const captureCandidates = (
+        driver: SearchDriver,
+        consumer: "search" | "ablate" = "search",
+    ): IEnumeratedCandidate[][] => {
+        const calls: IEnumeratedCandidate[][] = [];
+        const intercepted = driver as unknown as {
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seedBase: number,
+                t0: number,
+            ): GameAction[];
+            ablate(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seedBase: number,
+                t0: number,
+            ): GameAction[];
+        };
+        intercepted[consumer] = (_unit, candidates, incumbent) => {
+            calls.push(candidates);
+            return incumbent;
+        };
+        return calls;
+    };
+
     it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const learned = buildBattle(91, "v0.6").makeDriver() as unknown as {
@@ -448,6 +478,115 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.appliesTo("v0.6s")).toBe(true);
         expect(driver.appliesTo("v0.6")).toBe(false);
         expect(driver.appliesTo("v0.5")).toBe(false);
+    });
+
+    it("keeps wait and defend challengers when SEARCH_ACTIVE_CHALLENGERS is default-off", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
+        const h = buildBattle(203, "v0.6");
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver);
+
+        expect(driver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
+        expect(calls).toHaveLength(1);
+        expect(calls[0][0].kind).toBe("incumbent");
+        expect(calls[0].map((candidate) => candidate.kind)).toEqual(expect.arrayContaining(["wait", "defend"]));
+    });
+
+    it("SEARCH_ACTIVE_CHALLENGERS removes wait/defend challengers but never the incumbent anchor", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ACTIVE_CHALLENGERS: "1" });
+        const h = buildBattle(204, "v0.6");
+        h.playTurns(10);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const activeIncumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const passiveIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver);
+
+        expect(driver.chooseDecision(unit!, "v0.6", activeIncumbent)).toBe(activeIncumbent);
+        expect(driver.chooseDecision(unit!, "v0.6", passiveIncumbent)).toBe(passiveIncumbent);
+        expect(calls).toHaveLength(2);
+        expect(calls[0][0]).toMatchObject({ kind: "incumbent", actions: activeIncumbent });
+        expect(calls[1][0]).toMatchObject({ kind: "incumbent", actions: passiveIncumbent });
+        for (const candidates of calls) {
+            expect(candidates.slice(1).map((candidate) => candidate.kind)).not.toContain("wait");
+            expect(candidates.slice(1).map((candidate) => candidate.kind)).not.toContain("defend");
+        }
+    });
+
+    it("SEARCH_ACTIVE_CHALLENGERS does not filter Q2 ablation candidates", () => {
+        setEnv({ Q2_WAIT_ABLATION: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ACTIVE_CHALLENGERS: "1" });
+        const h = buildBattle(205, "v0.6");
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver, "ablate");
+
+        expect(driver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].map((candidate) => candidate.kind)).toEqual(expect.arrayContaining(["wait", "defend"]));
+    });
+
+    it("keeps searching subsequent decisions when SEARCH_CIRCUIT_BREAKER_MS is absent", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
+        const h = buildBattle(204, "v0.6");
+        h.playTurns(10);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const firstIncumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const secondIncumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver);
+
+        expect(driver.chooseDecision(unit!, "v0.6", firstIncumbent)).toBe(firstIncumbent);
+        expect(driver.chooseDecision(unit!, "v0.6", secondIncumbent)).toBe(secondIncumbent);
+        expect(calls).toHaveLength(2);
+    });
+
+    it("opens a tiny SEARCH_CIRCUIT_BREAKER_MS after the first result, skips later searches, and audits it", () => {
+        const auditPath = join(mkdtempSync(join(tmpdir(), "search-circuit-")), "audit.jsonl");
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.000001",
+            SEARCH_AUDIT: auditPath,
+        });
+        const h = buildBattle(204, "v0.6");
+        h.playTurns(10);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const firstIncumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const secondIncumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const thirdIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit!.getId() }];
+        const firstResult: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        let searchCalls = 0;
+        const intercepted = driver as unknown as {
+            search(): GameAction[];
+        };
+        intercepted.search = () => {
+            searchCalls += 1;
+            return firstResult;
+        };
+
+        expect(driver.chooseDecision(unit!, "v0.6", firstIncumbent)).toBe(firstResult);
+        expect(driver.chooseDecision(unit!, "v0.6", secondIncumbent)).toBe(secondIncumbent);
+        expect(driver.chooseDecision(unit!, "v0.6", thirdIncumbent)).toBe(thirdIncumbent);
+        expect(searchCalls).toBe(1);
+
+        driver.onMatchEnd("v0.6", "elimination");
+        const summary = JSON.parse(readFileSync(auditPath, "utf8").trim());
+        expect(summary).toMatchObject({
+            mode: "search",
+            decisions: 1,
+            circuitBreakerMs: 0.000001,
+            circuitOpened: true,
+            circuitSkipped: 2,
+        });
     });
 
     it("a search does not consume (advance) the tournament's seeded RNG stream", () => {

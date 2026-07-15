@@ -54,6 +54,11 @@ import {
  * Candidate 0 is always the incumbent policy decision (the anchor). Plain MOVE (kite/retreat-cell)
  * candidates are EXCLUDED by default — that candidate class is ledger-dead twice (crude hold and
  * safe-frontier kiting both regressed); SEARCH_INCLUDE_MOVES=1 re-includes them for experiments only.
+ * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
+ * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
+ * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
+ * outer per-match circuit: the first over-budget result still applies, then this match's driver returns each
+ * later incumbent unchanged. The live wrapper also includes call-site overhead outside this internal timer.
  *
  * SCORING: each candidate is played through the REAL engine on the live battle state (battle_snapshot
  * save/restore around every rollout), then the game rolls forward — both sides playing their real
@@ -205,6 +210,7 @@ interface ISearchCounters {
     candidatesTotal: number;
     rolloutTurnsTotal: number;
     msTotal: number;
+    circuitSkipped: number;
     searchedByIncumbentKind: Record<string, number>;
     overridesByIncumbentKind: Record<string, number>;
     overridesToKind: Record<string, number>;
@@ -241,6 +247,7 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     rolloutTurnsTotal: 0,
     msTotal: 0,
+    circuitSkipped: 0,
     searchedByIncumbentKind: {},
     overridesByIncumbentKind: {},
     overridesToKind: {},
@@ -280,6 +287,8 @@ export class SearchDriver {
     private readonly horizon: number;
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
+    private readonly activeChallengers: boolean;
+    private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
      * (raw 30 + rangedness-interaction block); a valid vector wins over the v1/default 20-dim leaf. */
@@ -306,6 +315,7 @@ export class SearchDriver {
     private readonly counters = emptyCounters();
     private readonly turnRows: string[] = [];
     private finishedSim = false;
+    private circuitOpen = false;
     public constructor(deps: ILookaheadDeps, match: ISearchMatchInfo = {}) {
         this.deps = deps;
         this.match = match;
@@ -328,6 +338,12 @@ export class SearchDriver {
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
+        this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
+        const circuitBreakerMs = Number(process.env.SEARCH_CIRCUIT_BREAKER_MS);
+        this.circuitBreakerMs =
+            this.mode === "search" && Number.isFinite(circuitBreakerMs) && circuitBreakerMs > 0
+                ? circuitBreakerMs
+                : null;
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
             rawValueWeights === "material"
@@ -386,6 +402,10 @@ export class SearchDriver {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
+        if (this.circuitOpen) {
+            this.counters.circuitSkipped += 1;
+            return incumbent;
+        }
         const t0 = performance.now();
         this.counters.decisions += 1;
         const savedSource = getDeterministicRandomSource();
@@ -409,9 +429,11 @@ export class SearchDriver {
                 fightProperties: this.deps.fightProperties,
             };
             const set = enumerateCandidates(unit, context, incumbent, this.caps);
-            const candidates = set.candidates.filter(
-                (c) => c.kind === "incumbent" || this.includeMoves || c.kind !== "move",
-            );
+            const candidates = set.candidates.filter((candidate) => {
+                if (candidate.kind === "incumbent") return true;
+                if (!this.includeMoves && candidate.kind === "move") return false;
+                return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
+            });
             if (this.mode === "ablation") {
                 return this.ablate(unit, candidates, incumbent, seedBase, t0);
             }
@@ -421,6 +443,9 @@ export class SearchDriver {
             }
             return this.search(unit, candidates, incumbent, seedBase, t0);
         } finally {
+            if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
+                this.circuitOpen = true;
+            }
             setDeterministicRandomSource(savedSource);
             this.deps.setActiveUnitId(savedActive);
             this.finishedSim = false;
@@ -462,6 +487,9 @@ export class SearchDriver {
             candidatesTotal: c.candidatesTotal,
             rolloutTurnsTotal: c.rolloutTurnsTotal,
             msTotal: Math.round(c.msTotal * 10) / 10,
+            circuitBreakerMs: this.circuitBreakerMs,
+            circuitOpened: this.circuitOpen,
+            circuitSkipped: c.circuitSkipped,
             searchedByIncumbentKind: c.searchedByIncumbentKind,
             overridesByIncumbentKind: c.overridesByIncumbentKind,
             overridesToKind: c.overridesToKind,
@@ -536,6 +564,9 @@ export class SearchDriver {
             this.turnRows.push(
                 JSON.stringify({
                     t: "turn",
+                    seed: this.match.seed,
+                    green: this.match.greenVersion,
+                    red: this.match.redVersion,
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     nc: candidates.length,
@@ -616,6 +647,9 @@ export class SearchDriver {
             this.turnRows.push(
                 JSON.stringify({
                     t: "q2",
+                    seed: this.match.seed,
+                    green: this.match.greenVersion,
+                    red: this.match.redVersion,
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     nc: candidates.length,
@@ -781,6 +815,9 @@ export class SearchDriver {
             this.turnRows.push(
                 JSON.stringify({
                     t: "q2o",
+                    seed: this.match.seed,
+                    green: this.match.greenVersion,
+                    red: this.match.redVersion,
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     inc: incumbentKind,

@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it } from "bun:test";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -144,6 +144,53 @@ function cell(
     };
 }
 
+function auditGameKey(row: Record<string, unknown>): string {
+    return `${String(row.seed)}|${String(row.green)}|${String(row.red)}`;
+}
+
+function auditRows(spec: IV07ArchetypeCellSpec, turnsPerGame = 2): Record<string, unknown>[] {
+    return Array.from({ length: spec.games }, (_, game) => {
+        const seed = (spec.baseSeed + Math.imul(Math.floor(game / 2), 0x9e3779b1)) >>> 0;
+        const candidateIsGreen = game % 2 === 0;
+        const identity = {
+            seed,
+            green: candidateIsGreen ? spec.candidate : spec.opponent,
+            red: candidateIsGreen ? spec.opponent : spec.candidate,
+        };
+        return [
+            ...Array.from({ length: turnsPerGame }, (_, turn) => ({
+                t: "turn",
+                ...identity,
+                lap: turn + 1,
+                ms: 10 + game * turnsPerGame + turn,
+            })),
+            {
+                t: "game",
+                mode: "search",
+                ...identity,
+                msTotal: 100 + game,
+                searched: turnsPerGame,
+                overrides: 0,
+                overridesToKind: {},
+            },
+        ];
+    }).flat();
+}
+
+function appendAuditRows(spec: IV07ArchetypeCellSpec, turnsPerGame = 2): Record<string, unknown>[] {
+    const rows = auditRows(spec, turnsPerGame);
+    appendFileSync(process.env.SEARCH_AUDIT!, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`);
+    return rows;
+}
+
+function readAuditRows(path: string): Record<string, unknown>[] {
+    return readFileSync(path, "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+}
+
 afterEach(() => {
     delete process.env.SEARCH_GATE;
     delete process.env.SEARCH_VERSIONS;
@@ -239,6 +286,45 @@ describe("v0.7 search trial CLI and seeds", () => {
 });
 
 describe("v0.7 search trial report", () => {
+    it("preserves per-turn audit rows when a non-checkpointed trial completes", async () => {
+        const directory = mkdtempSync(join(tmpdir(), "hoc-v07-trial-audit-turns-"));
+        const auditPath = join(directory, "audit.jsonl");
+        const trial = {
+            ...options(["mage_frontline"]),
+            auditPath,
+            auditTurns: true,
+            outputPath: join(directory, "report.json"),
+        };
+        let calls = 0;
+        process.env.V07_SEARCH = "1";
+        process.env.SEARCH_VERSIONS = "v0.7";
+        try {
+            const report = await runV07SearchTrial(trial, {
+                now: () => new Date("2026-07-11T00:00:00Z"),
+                revision: () => revision,
+                runCell: async (spec: IV07ArchetypeCellSpec) => {
+                    calls += 1;
+                    expect(process.env.SEARCH_AUDIT_TURNS).toBe("1");
+                    appendAuditRows(spec);
+                    return cell(spec, [2, 2, 0]);
+                },
+                command: () => ["bun", "trial", "--audit-turns"],
+                cwd: () => "/tmp/common",
+            });
+
+            const rows = readAuditRows(auditPath);
+            expect(calls).toBe(1);
+            expect(report.cells).toHaveLength(1);
+            expect(report.cells[0].outcomes.games).toBe(4);
+            expect(report.searchAudit).toMatchObject({ auditGames: 4, searchedTurns: 8, invalidJsonLines: 0 });
+            expect(rows).toHaveLength(12);
+            expect(rows.filter(({ t }) => t === "turn")).toHaveLength(8);
+            expect(rows.filter(({ t }) => t === "game")).toHaveLength(4);
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
+    });
+
     it("runs through the injected evaluator and resumes revision-bound template checkpoints", async () => {
         const directory = mkdtempSync(join(tmpdir(), "hoc-v07-trial-checkpoint-"));
         const trial = {
@@ -339,6 +425,96 @@ describe("v0.7 search trial report", () => {
             expect(calls).toHaveLength(3);
             expect(calls[2]).toEqual(shards[0].spec);
             expect(repaired.searchAudit).toMatchObject({ auditGames: 8, invalidJsonLines: 0 });
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
+    });
+
+    it("checkpoints complete audit-turn games atomically and resumes without duplicate rows", async () => {
+        const directory = mkdtempSync(join(tmpdir(), "hoc-v07-trial-audit-turn-checkpoints-"));
+        const checkpointDir = join(directory, "cells");
+        const auditPath = join(directory, "audit.jsonl");
+        const trial = {
+            ...options(["mage_frontline"]),
+            gamesPerTemplate: 8,
+            concurrency: 4,
+            outputPath: join(directory, "report.json"),
+            auditPath,
+            auditTurns: true,
+            checkpointDir,
+            checkpointGames: 4,
+        };
+        const parentSpec = buildV07SearchTrialCellSpecs(trial)[0];
+        const shards = buildV07SearchTrialCellShards(trial, parentSpec);
+        const calls: IV07ArchetypeCellSpec[] = [];
+        process.env.V07_SEARCH = "1";
+        process.env.SEARCH_VERSIONS = "v0.7";
+        const dependencies = {
+            now: () => new Date("2026-07-11T00:00:00Z"),
+            revision: () => revision,
+            runCell: async (spec: IV07ArchetypeCellSpec) => {
+                calls.push(spec);
+                expect(process.env.SEARCH_AUDIT_TURNS).toBe("1");
+                appendAuditRows(spec);
+                return cell(spec, [2, 2, 0]);
+            },
+            command: () => ["bun", "trial", "--audit-turns"],
+            cwd: () => "/tmp/common",
+        };
+        try {
+            const first = await runV07SearchTrial(trial, dependencies);
+            const firstAggregate = readFileSync(auditPath, "utf8");
+            const fragmentPaths = [
+                join(checkpointDir, "mage_frontline", "games-000000-000004.audit.jsonl"),
+                join(checkpointDir, "mage_frontline", "games-000004-000008.audit.jsonl"),
+            ];
+            const fragmentRows = fragmentPaths.map(readAuditRows);
+
+            expect(calls).toHaveLength(2);
+            expect(first.searchAudit).toMatchObject({ auditGames: 8, searchedTurns: 16, invalidJsonLines: 0 });
+            for (const rows of fragmentRows) {
+                expect(rows).toHaveLength(12);
+                for (let offset = 0; offset < rows.length; offset += 3) {
+                    const game = rows.slice(offset, offset + 3);
+                    expect(game.map(({ t }) => t)).toEqual(["turn", "turn", "game"]);
+                    expect(new Set(game.map(auditGameKey)).size).toBe(1);
+                }
+            }
+
+            const actualGameKeys = fragmentRows.flatMap((rows) =>
+                rows.filter(({ t }) => t === "game").map(auditGameKey),
+            );
+            const expectedGameKeys = auditRows(parentSpec, 0).map(auditGameKey);
+            expect(new Set(actualGameKeys).size).toBe(8);
+            expect([...actualGameKeys].sort()).toEqual([...expectedGameKeys].sort());
+            expect(readdirSync(join(checkpointDir, "mage_frontline")).filter((name) => name.includes(".tmp-"))).toEqual(
+                [],
+            );
+
+            const firstIdentity = fragmentRows[0][0];
+            appendFileSync(
+                auditPath,
+                `${JSON.stringify({
+                    t: "turn",
+                    seed: firstIdentity.seed,
+                    green: firstIdentity.green,
+                    red: firstIdentity.red,
+                    lap: 999,
+                    ms: 999_999,
+                })}\n`,
+            );
+            const resumed = await runV07SearchTrial(trial, {
+                ...dependencies,
+                runCell: async () => {
+                    throw new Error("checkpoint was not resumed");
+                },
+            });
+
+            expect(calls).toHaveLength(2);
+            expect(readFileSync(auditPath, "utf8")).toBe(firstAggregate);
+            expect(resumed.searchAudit).toMatchObject({ auditGames: 8, searchedTurns: 16, invalidJsonLines: 0 });
+            expect(readAuditRows(auditPath).filter(({ t }) => t === "turn")).toHaveLength(16);
+            expect(shards.map(({ spec }) => spec)).toEqual(calls);
         } finally {
             rmSync(directory, { recursive: true, force: true });
         }

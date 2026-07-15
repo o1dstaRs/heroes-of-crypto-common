@@ -300,10 +300,6 @@ export function validateV07SearchTrialOptions(options: IV07SearchTrialOptions): 
     ) {
         throw new Error("checkpoint-games must be an even integer >= 2");
     }
-    if (options.auditTurns && options.checkpointDir) {
-        throw new Error("audit-turns cannot be combined with checkpoint-dir because turn rows have no cell identity");
-    }
-
     const derived = new Map<number, string>();
     for (const template of options.templates) {
         const seed =
@@ -944,7 +940,8 @@ function canonicalAuditFragment(
     const expected = expectedAuditGames(spec);
     if (!expected.length) return { content: "", games: 0 };
     const expectedKeys = new Set(expected.map(({ key }) => key));
-    const rows = new Map<string, Record<string, unknown>>();
+    const rows = new Map<string, Record<string, unknown>[]>();
+    const pending = new Map<string, Record<string, unknown>[]>();
     let invalidLines = 0;
     for (const line of content.split("\n")) {
         if (!line.trim()) continue;
@@ -957,9 +954,16 @@ function canonicalAuditFragment(
         }
         if (!value || typeof value !== "object") continue;
         const row = value as Record<string, unknown>;
-        if (row.t !== "game") continue;
         const key = auditGameKey(row.seed, row.green, row.red);
-        if (expectedKeys.has(key) && !rows.has(key)) rows.set(key, row);
+        if (!expectedKeys.has(key) || rows.has(key)) continue;
+        if (row.t === "game") {
+            rows.set(key, [...(pending.get(key) ?? []), row]);
+            pending.delete(key);
+        } else if (row.t === "turn" || row.t === "q2" || row.t === "q2o") {
+            const gameRows = pending.get(key) ?? [];
+            gameRows.push(row);
+            pending.set(key, gameRows);
+        }
     }
     const missing = expected.filter(({ key }) => !rows.has(key));
     if ((rejectInvalidLines && invalidLines) || missing.length) {
@@ -967,8 +971,8 @@ function canonicalAuditFragment(
             `${spec.template} shard audit is incomplete: ${missing.length} missing games, ${invalidLines} invalid lines`,
         );
     }
-    const lines = expected.map(({ key }) => JSON.stringify(rows.get(key)));
-    return { content: `${lines.join("\n")}\n`, games: lines.length };
+    const lines = expected.flatMap(({ key }) => rows.get(key)!.map((row) => JSON.stringify(row)));
+    return { content: `${lines.join("\n")}\n`, games: rows.size };
 }
 
 let quarantineSequence = 0;
@@ -1128,7 +1132,9 @@ export async function runV07SearchTrial(
                 for (const [shardIndex, shard] of shards.entries()) {
                     let checkpoint = checkpoints.get(shard.id);
                     const resumed = checkpoint !== undefined;
-                    if (resumed) {
+                    // Narrow on `checkpoint` directly (not the `resumed` alias) so TS knows it is defined
+                    // at the push below — the else branch reassigns it to a non-undefined checkpoint bundle.
+                    if (checkpoint !== undefined) {
                         resumedShards += 1;
                     } else {
                         const cell = await deps.runCell(shard.spec, Math.min(cellWorkers, shard.spec.games));
