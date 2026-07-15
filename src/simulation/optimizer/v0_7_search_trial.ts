@@ -1128,7 +1128,9 @@ export async function runV07SearchTrial(
                 for (const [shardIndex, shard] of shards.entries()) {
                     let checkpoint = checkpoints.get(shard.id);
                     const resumed = checkpoint !== undefined;
-                    if (resumed) {
+                    // Narrow on `checkpoint` directly (not the `resumed` alias) so TS knows it is defined
+                    // at the push below — the else branch reassigns it to a non-undefined checkpoint bundle.
+                    if (checkpoint !== undefined) {
                         resumedShards += 1;
                     } else {
                         const cell = await deps.runCell(shard.spec, Math.min(cellWorkers, shard.spec.games));
