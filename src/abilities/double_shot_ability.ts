@@ -153,6 +153,8 @@ export function processDoubleShotAbility(
         damageForAnimation.amount = damageFromAttack;
         damageForAnimation.unitPosition = toUnit.getPosition();
         damageForAnimation.unitIsSmall = toUnit.isSmallSize();
+        // Snapshot losses BEFORE applyDamage — calculatePossibleLosses reads current hp/amount_alive.
+        const unitsKilled = toUnit.calculatePossibleLosses(damageFromAttack);
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: toUnit.applyDamage(
@@ -167,7 +169,9 @@ export function processDoubleShotAbility(
         if (pegasusLightEffect) {
             moraleIncrease += pegasusLightEffect.getPower();
         }
-        sceneLog.updateLog(`${fromUnit.getName()} 🏹 ${toUnit.getName()} (${damageFromAttack})`);
+        sceneLog.updateLog(
+            `${fromUnit.getName()} 🏹 ${toUnit.getName()} (${damageFromAttack})` + HoCLib.killTag(unitsKilled),
+        );
     }
 
     return {
