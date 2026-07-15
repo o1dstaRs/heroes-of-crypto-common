@@ -169,8 +169,8 @@ const integer = (value: unknown, context: string, minimum = 0): number => {
     return parsed;
 };
 const binary = (value: unknown, context: string): 0 | 1 => {
-    if (value !== 0 && value !== 1) fail(context, "expected 0 or 1");
-    return value;
+    if (value === 0 || value === 1) return value;
+    return fail(context, "expected 0 or 1");
 };
 const canonicalSeed = (value: unknown, context: string): number => {
     const parsed = finite(value, context);
@@ -180,10 +180,31 @@ const canonicalSeed = (value: unknown, context: string): number => {
     return parsed >>> 0;
 };
 const features = (value: unknown, width: number, context: string): number[] => {
-    if (!Array.isArray(value) || value.length !== width) {
-        fail(context, `feature width ${Array.isArray(value) ? value.length : "non-array"} != ${width}`);
+    const values: unknown[] = Array.isArray(value) ? value : fail(context, `feature width non-array != ${width}`);
+    if (values.length !== width) {
+        fail(context, `feature width ${values.length} != ${width}`);
     }
-    return value.map((feature, index) => finite(feature, `${context}[${index}]`));
+    return values.map((feature, index) => finite(feature, `${context}[${index}]`));
+};
+
+const leaf = (value: unknown, context: string): IIlSearchConfig["leaf"] => {
+    if (value === "learned_v2" || value === "learned" || value === "material") return value;
+    return fail(context, "unsupported leaf");
+};
+
+const side = (value: unknown, context: string): IIlRow["side"] => {
+    if (value === "green" || value === "red") return value;
+    return fail(context, "expected green or red");
+};
+
+const winner = (value: unknown, context: string): IIlGameRow["winner"] => {
+    if (value === "green" || value === "red" || value === "draw") return value;
+    return fail(context, "expected green, red, or draw");
+};
+
+const endReason = (value: unknown, context: string): IIlGameRow["endReason"] => {
+    if (value === "elimination" || value === "turn_cap" || value === "stuck") return value;
+    return fail(context, "unsupported match end reason");
 };
 
 function parseConfig(value: unknown, context: string): IIlSearchConfig {
@@ -192,16 +213,14 @@ function parseConfig(value: unknown, context: string): IIlSearchConfig {
     if (gate < 0) fail(`${context}.gate`, "expected a non-negative number");
     const horizon = integer(cfg.horizon, `${context}.horizon`, 1);
     const rollouts = integer(cfg.rollouts, `${context}.rollouts`, 1);
-    if (cfg.leaf !== "learned_v2" && cfg.leaf !== "learned" && cfg.leaf !== "material") {
-        fail(`${context}.leaf`, "unsupported leaf");
-    }
+    const parsedLeaf = leaf(cfg.leaf, `${context}.leaf`);
     const shortlist = cfg.shortlist === null ? null : integer(cfg.shortlist, `${context}.shortlist`, 2);
     const oppModel = cfg.oppModel === null ? null : string(cfg.oppModel, `${context}.oppModel`);
     return {
         gate,
         horizon,
         rollouts,
-        leaf: cfg.leaf,
+        leaf: parsedLeaf,
         shortlist,
         includeMoves: binary(cfg.includeMoves, `${context}.includeMoves`),
         oppModel,
@@ -223,10 +242,13 @@ export function parseIlRow(
     const runFingerprint = requireIlRunFingerprint(row.runFingerprint, `${context}.runFingerprint`);
     const expected = requireIlRunFingerprint(expectedFingerprint, `${context}.expectedFingerprint`);
     if (runFingerprint !== expected) fail(context, `run fingerprint ${runFingerprint} does not match ${expected}`);
-    if (row.side !== "green" && row.side !== "red") fail(`${context}.side`, "expected green or red");
+    const parsedSide = side(row.side, `${context}.side`);
     const ov = binary(row.ov, `${context}.ov`);
-    if (!Array.isArray(row.cands) || row.cands.length < 2) fail(`${context}.cands`, "expected >= 2 candidates");
-    const cands = row.cands.map((value, index): IIlCandidateRow => {
+    const candidateRows: unknown[] = Array.isArray(row.cands)
+        ? row.cands
+        : fail(`${context}.cands`, "expected >= 2 candidates");
+    if (candidateRows.length < 2) fail(`${context}.cands`, "expected >= 2 candidates");
+    const cands = candidateRows.map((value, index): IIlCandidateRow => {
         const candidate = record(value, `${context}.cands[${index}]`);
         const mean = candidate.m === null ? null : finite(candidate.m, `${context}.cands[${index}].m`);
         return {
@@ -245,12 +267,13 @@ export function parseIlRow(
     const incumbentKind = string(row.k, `${context}.k`);
     if (incumbentKind !== cands[0].ck) fail(context, "k must equal cands[0].ck");
     if (!Array.isArray(row.act) || row.act.length === 0) fail(`${context}.act`, "expected the chosen action list");
-    let chosenSignature: string;
-    try {
-        chosenSignature = ilActionSignature(row.act as GameAction[]);
-    } catch {
-        fail(`${context}.act`, "cannot derive the chosen action signature");
-    }
+    const chosenSignature = (() => {
+        try {
+            return ilActionSignature(row.act as GameAction[]);
+        } catch {
+            return fail(`${context}.act`, "cannot derive the chosen action signature");
+        }
+    })();
     if (chosenSignature !== cands[chosen].sig) fail(context, "act signature must equal the chosen candidate signature");
     const cfg = parseConfig(row.cfg, `${context}.cfg`);
     const nc = integer(row.nc, `${context}.nc`, cands.length);
@@ -265,7 +288,7 @@ export function parseIlRow(
         seed: canonicalSeed(row.seed, `${context}.seed`),
         green: string(row.green, `${context}.green`),
         red: string(row.red, `${context}.red`),
-        side: row.side,
+        side: parsedSide,
         lap: integer(row.lap, `${context}.lap`),
         unit: string(row.unit, `${context}.unit`),
         k: incumbentKind,
@@ -288,12 +311,8 @@ export function parseIlGameRow(value: unknown, expectedFingerprint: string, cont
     const runFingerprint = requireIlRunFingerprint(row.runFingerprint, `${context}.runFingerprint`);
     const expected = requireIlRunFingerprint(expectedFingerprint, `${context}.expectedFingerprint`);
     if (runFingerprint !== expected) fail(context, `run fingerprint ${runFingerprint} does not match ${expected}`);
-    if (row.winner !== "green" && row.winner !== "red" && row.winner !== "draw") {
-        fail(`${context}.winner`, "expected green, red, or draw");
-    }
-    if (row.endReason !== "elimination" && row.endReason !== "turn_cap" && row.endReason !== "stuck") {
-        fail(`${context}.endReason`, "unsupported match end reason");
-    }
+    const parsedWinner = winner(row.winner, `${context}.winner`);
+    const parsedEndReason = endReason(row.endReason, `${context}.endReason`);
     return {
         t: IL_GAME_ROW_TYPE,
         v: IL_DATASET_VERSION,
@@ -302,8 +321,8 @@ export function parseIlGameRow(value: unknown, expectedFingerprint: string, cont
         seed: canonicalSeed(row.seed, `${context}.seed`),
         green: string(row.green, `${context}.green`),
         red: string(row.red, `${context}.red`),
-        winner: row.winner,
-        endReason: row.endReason,
+        winner: parsedWinner,
+        endReason: parsedEndReason,
         rows: integer(row.rows, `${context}.rows`),
         decisions: integer(row.decisions, `${context}.decisions`),
         searched: integer(row.searched, `${context}.searched`),
@@ -412,6 +431,6 @@ export function validateIlCorpus(
     ) {
         fail(options.cohort, "completed game seeds do not match the expected mirrored tournament panel");
     }
-    if (!configJson) fail(options.cohort, "corpus has no completed game configuration");
-    return { decisions, games, config: JSON.parse(configJson) as IIlSearchConfig };
+    const completedConfig = configJson ?? fail(options.cohort, "corpus has no completed game configuration");
+    return { decisions, games, config: JSON.parse(completedConfig) as IIlSearchConfig };
 }
