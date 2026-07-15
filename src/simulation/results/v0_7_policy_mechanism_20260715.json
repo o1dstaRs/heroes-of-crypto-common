@@ -1,0 +1,151 @@
+{
+    "schemaVersion": 1,
+    "status": "research_only",
+    "qualification": "No-search fixed-template mechanism screen; not acceptance, bake, release, or all-cohort evidence.",
+    "revision": "b375ebfb22b2d8c1032d2f19d956eac7d6ed6290",
+    "revisionStable": true,
+    "baseSeed": 1784112100,
+    "gamesPerTemplate": 64,
+    "templates": ["melee_magic_utility", "aura_support", "aura_offense"],
+    "profiles": [
+        {
+            "profile": "control",
+            "behaviorEnvironment": { "SIM_NO_ACTIONS": "1" },
+            "reportSha256": "b5b9b6970d2f74a77a70d823fe52a3e78e60e3b775ec99401d5cea5da428b07b",
+            "cells": [
+                {
+                    "template": "melee_magic_utility",
+                    "decisiveWinRate": 0.5,
+                    "waits": 409,
+                    "casts": 105,
+                    "resurrectionCasts": 29,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_support",
+                    "decisiveWinRate": 0.671875,
+                    "waits": 41,
+                    "casts": 0,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_offense",
+                    "decisiveWinRate": 0.703125,
+                    "waits": 126,
+                    "casts": 0,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 0
+                }
+            ]
+        },
+        {
+            "profile": "dense",
+            "behaviorEnvironment": { "SIM_NO_ACTIONS": "1", "V07_DENSE_MM_SALVAGE_ISOLATION": "1" },
+            "reportSha256": "86c0c8e26810c1f98ce0b17aa95f7941922d22fe6183bf641fa1b5b3c0f2f0a3",
+            "cells": [
+                {
+                    "template": "melee_magic_utility",
+                    "decisiveWinRate": 0.5,
+                    "waits": 373,
+                    "casts": 106,
+                    "resurrectionCasts": 29,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_support",
+                    "decisiveWinRate": 0.671875,
+                    "waits": 41,
+                    "casts": 0,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_offense",
+                    "decisiveWinRate": 0.703125,
+                    "waits": 126,
+                    "casts": 0,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 0
+                }
+            ]
+        },
+        {
+            "profile": "aura-wind",
+            "behaviorEnvironment": {
+                "SIM_NO_ACTIONS": "1",
+                "V07_AURA_CASTER_ROUTER": "on",
+                "V07_AURA_CASTER_SPELLS": "windflow"
+            },
+            "reportSha256": "49adcc37869d98514a3783a76e490414ac724ed95b4b27391a24ba7514e8e65f",
+            "cells": [
+                {
+                    "template": "melee_magic_utility",
+                    "decisiveWinRate": 0.5,
+                    "waits": 409,
+                    "casts": 105,
+                    "resurrectionCasts": 29,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_support",
+                    "decisiveWinRate": 0.65625,
+                    "waits": 58,
+                    "casts": 6,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 6
+                },
+                {
+                    "template": "aura_offense",
+                    "decisiveWinRate": 0.703125,
+                    "waits": 126,
+                    "casts": 0,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 0
+                }
+            ]
+        },
+        {
+            "profile": "aura-res-wind",
+            "behaviorEnvironment": {
+                "SIM_NO_ACTIONS": "1",
+                "V07_AURA_CASTER_ROUTER": "on",
+                "V07_AURA_CASTER_SPELLS": "resurrection,windflow"
+            },
+            "reportSha256": "b71b0d4870017f7d657dfbdad54b7a7ffc9eb23c03e36b849a1247ec44aa79da",
+            "cells": [
+                {
+                    "template": "melee_magic_utility",
+                    "decisiveWinRate": 0.5,
+                    "waits": 409,
+                    "casts": 105,
+                    "resurrectionCasts": 29,
+                    "windFlowCasts": 0
+                },
+                {
+                    "template": "aura_support",
+                    "decisiveWinRate": 0.65625,
+                    "waits": 58,
+                    "casts": 6,
+                    "resurrectionCasts": 0,
+                    "windFlowCasts": 6
+                },
+                {
+                    "template": "aura_offense",
+                    "decisiveWinRate": 0.734375,
+                    "waits": 125,
+                    "casts": 12,
+                    "resurrectionCasts": 12,
+                    "windFlowCasts": 0
+                }
+            ]
+        }
+    ],
+    "screeningDecision": {
+        "denseIsolationExercised": true,
+        "auraWindExercised": true,
+        "auraResurrectionExercised": true,
+        "advanceToAllEightFactorial": true,
+        "productionDefaultChange": false
+    }
+}
