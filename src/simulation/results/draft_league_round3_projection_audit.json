@@ -1,0 +1,304 @@
+{
+  "currentMainRevision": "b909e521e96d9cad993e78a77c4a9c6a1e114bc4",
+  "source": {
+    "id": "br-52752642d16db7f4",
+    "schemaVersion": 1,
+    "dimension": 95,
+    "fingerprint": "52752642d16db7f4a7ae9017495d629733e53fdfc00b92969da08fbfd66d524e",
+    "artifactFingerprint": "52752642d16db7f4a7ae9017495d629733e53fdfc00b92969da08fbfd66d524e"
+  },
+  "projection": {
+    "id": "br-52752642d16db7f4",
+    "schemaVersion": 1,
+    "dimension": 95,
+    "fingerprint": "92ee7737d5d31f4c1ef94299cb31180c3f9e3eb50eea5c1b80647eb12beff9eb",
+    "omniscientDraft": false,
+    "preservedIntrinsicIndices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "differsFromAnchor": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "nonIntrinsicResetVerified": true,
+    "reparseVerified": true
+  },
+  "schema": {
+    "dimension": 95,
+    "layout": {
+      "draftIntrinsic": {
+        "offset": 0,
+        "length": 15,
+        "endExclusive": 15
+      },
+      "draftInteractions": {
+        "offset": 15,
+        "length": 18,
+        "endExclusive": 33
+      },
+      "tier1": {
+        "offset": 33,
+        "length": 12,
+        "endExclusive": 45
+      },
+      "tier2": {
+        "offset": 45,
+        "length": 12,
+        "endExclusive": 57
+      },
+      "augments": {
+        "offset": 57,
+        "length": 28,
+        "endExclusive": 85
+      },
+      "placement": {
+        "offset": 85,
+        "length": 7,
+        "endExclusive": 92
+      },
+      "perks": {
+        "offset": 92,
+        "length": 3,
+        "endExclusive": 95
+      }
+    },
+    "keys": [
+      "draft.intrinsic.0",
+      "draft.intrinsic.1",
+      "draft.intrinsic.2",
+      "draft.intrinsic.3",
+      "draft.intrinsic.4",
+      "draft.intrinsic.5",
+      "draft.intrinsic.6",
+      "draft.intrinsic.7",
+      "draft.intrinsic.8",
+      "draft.intrinsic.9",
+      "draft.intrinsic.10",
+      "draft.intrinsic.canFly",
+      "draft.intrinsic.hp",
+      "draft.intrinsic.armor",
+      "draft.intrinsic.speed",
+      "draft.ranged.ownRanged",
+      "draft.ranged.ownFlyer",
+      "draft.ranged.ownGroundMelee",
+      "draft.ranged.opponentRanged",
+      "draft.ranged.opponentFlyer",
+      "draft.ranged.opponentGroundMelee",
+      "draft.flyer.ownRanged",
+      "draft.flyer.ownFlyer",
+      "draft.flyer.ownGroundMelee",
+      "draft.flyer.opponentRanged",
+      "draft.flyer.opponentFlyer",
+      "draft.flyer.opponentGroundMelee",
+      "draft.groundMelee.ownRanged",
+      "draft.groundMelee.ownFlyer",
+      "draft.groundMelee.ownGroundMelee",
+      "draft.groundMelee.opponentRanged",
+      "draft.groundMelee.opponentFlyer",
+      "draft.groundMelee.opponentGroundMelee",
+      "tier1.1",
+      "tier1.2",
+      "tier1.3",
+      "tier1.4",
+      "tier1.5",
+      "tier1.6",
+      "tier1.7",
+      "tier1.8",
+      "tier1.9",
+      "tier1.10",
+      "tier1.11",
+      "tier1.12",
+      "tier2.1",
+      "tier2.2",
+      "tier2.3",
+      "tier2.4",
+      "tier2.5",
+      "tier2.6",
+      "tier2.7",
+      "tier2.8",
+      "tier2.9",
+      "tier2.10",
+      "tier2.11",
+      "tier2.12",
+      "augment.Armor.bias",
+      "augment.Armor.ownRanged",
+      "augment.Armor.ownFlyer",
+      "augment.Armor.ownGroundMelee",
+      "augment.Armor.opponentRanged",
+      "augment.Armor.opponentFlyer",
+      "augment.Armor.opponentGroundMelee",
+      "augment.Might.bias",
+      "augment.Might.ownRanged",
+      "augment.Might.ownFlyer",
+      "augment.Might.ownGroundMelee",
+      "augment.Might.opponentRanged",
+      "augment.Might.opponentFlyer",
+      "augment.Might.opponentGroundMelee",
+      "augment.Sniper.bias",
+      "augment.Sniper.ownRanged",
+      "augment.Sniper.ownFlyer",
+      "augment.Sniper.ownGroundMelee",
+      "augment.Sniper.opponentRanged",
+      "augment.Sniper.opponentFlyer",
+      "augment.Sniper.opponentGroundMelee",
+      "augment.Movement.bias",
+      "augment.Movement.ownRanged",
+      "augment.Movement.ownFlyer",
+      "augment.Movement.ownGroundMelee",
+      "augment.Movement.opponentRanged",
+      "augment.Movement.opponentFlyer",
+      "augment.Movement.opponentGroundMelee",
+      "placement.adaptive.bias",
+      "placement.adaptive.ownRanged",
+      "placement.adaptive.ownFlyer",
+      "placement.adaptive.ownGroundMelee",
+      "placement.adaptive.opponentRanged",
+      "placement.adaptive.opponentFlyer",
+      "placement.adaptive.opponentGroundMelee",
+      "perk.threeReveals",
+      "perk.seeAll",
+      "perk.seeNone"
+    ]
+  },
+  "intrinsic": [
+    {
+      "index": 0,
+      "key": "draft.intrinsic.0",
+      "source": 56.20841751738197,
+      "projected": 56.20841751738197
+    },
+    {
+      "index": 1,
+      "key": "draft.intrinsic.1",
+      "source": 0.7240282610925166,
+      "projected": 0.7240282610925166
+    },
+    {
+      "index": 2,
+      "key": "draft.intrinsic.2",
+      "source": -170.17466904079168,
+      "projected": -170.17466904079168
+    },
+    {
+      "index": 3,
+      "key": "draft.intrinsic.3",
+      "source": -3.1460916361369393,
+      "projected": -3.1460916361369393
+    },
+    {
+      "index": 4,
+      "key": "draft.intrinsic.4",
+      "source": 2.473058455038395,
+      "projected": 2.473058455038395
+    },
+    {
+      "index": 5,
+      "key": "draft.intrinsic.5",
+      "source": 11.569568486798202,
+      "projected": 11.569568486798202
+    },
+    {
+      "index": 6,
+      "key": "draft.intrinsic.6",
+      "source": -7.527809454371409,
+      "projected": -7.527809454371409
+    },
+    {
+      "index": 7,
+      "key": "draft.intrinsic.7",
+      "source": -54.94404864001062,
+      "projected": -54.94404864001062
+    },
+    {
+      "index": 8,
+      "key": "draft.intrinsic.8",
+      "source": -28.423622921893518,
+      "projected": -28.423622921893518
+    },
+    {
+      "index": 9,
+      "key": "draft.intrinsic.9",
+      "source": 14.94555080692527,
+      "projected": 14.94555080692527
+    },
+    {
+      "index": 10,
+      "key": "draft.intrinsic.10",
+      "source": 2.719295715708249,
+      "projected": 2.719295715708249
+    },
+    {
+      "index": 11,
+      "key": "draft.intrinsic.canFly",
+      "source": 0.3257037158113236,
+      "projected": 0.3257037158113236
+    },
+    {
+      "index": 12,
+      "key": "draft.intrinsic.hp",
+      "source": 0.2746406262310415,
+      "projected": 0.2746406262310415
+    },
+    {
+      "index": 13,
+      "key": "draft.intrinsic.armor",
+      "source": -3.9020330774880474,
+      "projected": -3.9020330774880474
+    },
+    {
+      "index": 14,
+      "key": "draft.intrinsic.speed",
+      "source": -11.582250843139251,
+      "projected": -11.582250843139251
+    }
+  ],
+  "diagnostic": {
+    "equalSourceProjectedIndices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      92,
+      93,
+      94
+    ]
+  }
+}

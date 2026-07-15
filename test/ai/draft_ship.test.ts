@@ -9,7 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,10 +19,12 @@ import { afterEach, describe, expect, it } from "bun:test";
 import {
     draftGenomeCreatureScore,
     embedIntrinsicDraftWeights,
+    LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
     projectDraftGenomeForShipping,
 } from "../../src/ai/setup/draft_ship";
 import { DRAFT_ANCHOR_W, DRAFT_FEATURE_DIM, scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
+import leagueRound3ProjectedGenome from "../../src/ai/setup/draft_genomes/league_round3_br_52752642_projected.json";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
     createLeagueGenome,
@@ -29,6 +32,7 @@ import {
     LEAGUE_GENOME_DIM,
     LEAGUE_GENOME_LAYOUT,
 } from "../../src/simulation/league_genome";
+import { leagueGenomeFingerprint } from "../../src/simulation/optimizer/league_cycle_core";
 
 const temporaryDirectories: string[] = [];
 
@@ -73,6 +77,49 @@ describe("draft ship genome", () => {
         expect(() => parseDraftGenome(JSON.stringify({ id: 7, weights: LEAGUE_ANCHOR_GENOME }))).toThrow(
             "id must be a non-empty string",
         );
+    });
+
+    it("exposes the accepted League round-3 projection as an explicit opt-in", () => {
+        const accepted = parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC);
+        const intrinsicEnd = LEAGUE_GENOME_LAYOUT.draftIntrinsic.offset + LEAGUE_GENOME_LAYOUT.draftIntrinsic.length;
+        const resultSha256 = (name: string): string =>
+            createHash("sha256")
+                .update(readFileSync(new URL(`../../src/simulation/results/${name}`, import.meta.url)))
+                .digest("hex");
+        const acceptance = JSON.parse(
+            readFileSync(
+                new URL("../../src/simulation/results/draft_league_round3_v0_7_acceptance.json", import.meta.url),
+                "utf8",
+            ),
+        ) as { verdict: string; gates: { passed: boolean }[]; report: { options: { baseSeed: number } } };
+
+        expect(accepted.id).toBe("br-52752642d16db7f4");
+        expect(leagueGenomeFingerprint(accepted)).toBe(
+            "92ee7737d5d31f4c1ef94299cb31180c3f9e3eb50eea5c1b80647eb12beff9eb",
+        );
+        expect(projectDraftGenomeForShipping(accepted)).toEqual(accepted);
+        expect(accepted.weights.slice(intrinsicEnd)).toEqual(LEAGUE_ANCHOR_GENOME.slice(intrinsicEnd));
+        expect(accepted.omniscientDraft).toBeUndefined();
+        expect(parseDraftGenome("default").weights).not.toEqual(accepted.weights);
+        expect(leagueRound3ProjectedGenome.acceptance.verdict).toBe("PASS");
+        expect(resultSha256("draft_league_round3_v0_7_acceptance.json")).toBe(
+            leagueRound3ProjectedGenome.acceptance.reportSha256,
+        );
+        expect(resultSha256("draft_league_round3_seed_audit.json")).toBe(
+            leagueRound3ProjectedGenome.acceptance.seedAuditSha256,
+        );
+        expect(resultSha256("draft_league_round3_projection_audit.json")).toBe(
+            leagueRound3ProjectedGenome.projection.auditSha256,
+        );
+        expect(acceptance.verdict).toBe("PASS");
+        expect(acceptance.gates.every(({ passed }) => passed)).toBe(true);
+        expect(acceptance.report.options.baseSeed).toBe(leagueRound3ProjectedGenome.acceptance.baseSeed);
+        expect(leagueRound3ProjectedGenome.authority).toEqual({
+            acceptedForOptIn: true,
+            defaultChanged: false,
+            productionEnabled: false,
+            deployAuthorization: false,
+        });
     });
 
     it("projects exactly the intrinsic head and freezes every non-consumed head", () => {

@@ -1,0 +1,63 @@
+{
+    "schemaVersion": 1,
+    "artifactKind": "projected_draft_genome",
+    "status": "accepted_opt_in",
+    "id": "br-52752642d16db7f4",
+    "omniscientDraft": false,
+    "source": {
+        "revision": "2b84e8bde5a135519b54b12ff23456f8bdcc2dc6",
+        "runFingerprint": "7a7229a05de4671c4b70b1c45bd9203b21b5f886e1469d48fefbf921b9a33a61",
+        "round": 3,
+        "genomeFingerprint": "52752642d16db7f4a7ae9017495d629733e53fdfc00b92969da08fbfd66d524e",
+        "roundResultSha256": "9e0e718b3a4f9beea14dff02c544c831536ba090ada5a156be1287683f758321",
+        "finalMatrixReportSha256": "945df6994355a4229001a1e847746dc605e0d74a945fcbdd5e86b9111c90aa7c"
+    },
+    "projection": {
+        "revision": "b909e521e96d9cad993e78a77c4a9c6a1e114bc4",
+        "genomeFingerprint": "92ee7737d5d31f4c1ef94299cb31180c3f9e3eb50eea5c1b80647eb12beff9eb",
+        "sourceArtifactSha256": "40b9f397025b87cb67d232d4cbbcae70b375e5b3a7dd9b3e517d2ec6005233b5",
+        "auditSha256": "11fc3afa85020c47bcc2d2c3f0fc1fd663c1038cde96a5fd0c4e34548b5fcda2",
+        "preservedWeightRangeInclusive": [0, 14],
+        "resetWeightRangeInclusive": [15, 94]
+    },
+    "acceptance": {
+        "revision": "b909e521e96d9cad993e78a77c4a9c6a1e114bc4",
+        "reportSha256": "7c74919450567b5d448c0d817a3b720eb83cacc8986e93f19fc48cea3d783349",
+        "seedAuditSha256": "15db9049139655666e1ef605a326afdc010ee5f46e84007db164e5f7ddaef3a8",
+        "baseSeed": 1930765607,
+        "fightVersion": "v0.7",
+        "gamesPerOpponent": 4000,
+        "totalGames": 8000,
+        "gates": [
+            {
+                "opponent": "untrained-heuristic",
+                "requiredClusteredLowerBound": 0.55,
+                "decisiveWinRate": 0.6414664981036663,
+                "clusteredLowerBound": 0.6112530643666991,
+                "passed": true
+            },
+            {
+                "opponent": "shipped-default-draft",
+                "requiredClusteredLowerBound": 0.47,
+                "decisiveWinRate": 0.512639029322548,
+                "clusteredLowerBound": 0.48166954110570037,
+                "passed": true
+            }
+        ],
+        "verdict": "PASS"
+    },
+    "authority": {
+        "acceptedForOptIn": true,
+        "defaultChanged": false,
+        "productionEnabled": false,
+        "deployAuthorization": false
+    },
+    "weights": [
+        56.20841751738197, 0.7240282610925166, -170.17466904079168, -3.1460916361369393, 2.473058455038395,
+        11.569568486798202, -7.527809454371409, -54.94404864001062, -28.423622921893518, 14.94555080692527,
+        2.719295715708249, 0.3257037158113236, 0.2746406262310415, -3.9020330774880474, -11.582250843139251, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 61.1, 44.4, 53.2, 53.3, 47.1, 45.5, 45.4, 43.4, 62.4, 49.5, 44.3,
+        50.2, 68.3, 71, 41.1, 65.4, 43.1, 45.8, 36.6, 62.5, 36.8, 41.7, 44.5, 42, 19, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0,
+        0, 0, 7, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 6, 5, 7
+    ]
+}

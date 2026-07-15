@@ -1,0 +1,584 @@
+{
+  "generatedAt": "2026-07-15T03:49:19.625Z",
+  "proposed": {
+    "domain": "hoc-draft-ship-v1|b909e521e96d9cad993e78a77c4a9c6a1e114bc4|52752642d16db7f4a7ae9017495d629733e53fdfc00b92969da08fbfd66d524e",
+    "domainSha256": "73152527c080ce54684e6a5a5fa914e8b4c1441c1a1de9a6e6f20ad9486ea999",
+    "derivation": "uint32 from first 8 SHA-256 hex digits (big-endian textual parse)",
+    "baseSeed": 1930765607,
+    "gamesPerOpponent": 4000,
+    "offerBoards": 1000,
+    "pairSeedStep": 2654435761
+  },
+  "recoveredLedger": {
+    "explicitBaseSeeds": [
+      1,
+      910911,
+      920911,
+      921822,
+      922733,
+      1000004,
+      2000007,
+      148847436,
+      148848347,
+      387276918,
+      388197828,
+      388198739,
+      388276921,
+      774553835,
+      775474745,
+      775475656,
+      775553838,
+      1013904227,
+      1014825137,
+      1014826048,
+      1014904230,
+      1015904233,
+      1401181144,
+      1402102054,
+      1402102965,
+      1402181147,
+      1597334676,
+      1597729242,
+      1597731915,
+      1666947062,
+      1789378971,
+      1789379882,
+      2027808453,
+      2028729363,
+      2028730274,
+      2028808456,
+      2029808459,
+      2415085370,
+      2416006280,
+      2416007191,
+      2416085373,
+      2654435762,
+      2655356672,
+      2655357583,
+      2655435765,
+      2656435768,
+      2769414578,
+      2803283197,
+      2803284108,
+      3041712679,
+      3042633589,
+      3042634500,
+      3042712682,
+      3238141223,
+      3428989596,
+      3429910506,
+      3429911417,
+      3429989599,
+      3668339988,
+      3669260898,
+      3669261809,
+      3669339991,
+      3670339994,
+      4055616905,
+      4056537815,
+      4056538726,
+      4056616908
+    ],
+    "streamCount": 70,
+    "uniquePriorPairSeeds": 23554,
+    "streams": [
+      {
+        "family": "powered-league",
+        "label": "league-round-1-selection",
+        "baseSeed": 1,
+        "boards": 500,
+        "evidence": "round best/result; 2000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-round-2-selection",
+        "baseSeed": 2654435762,
+        "boards": 500,
+        "evidence": "round best/result; 2000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-round-3-selection",
+        "baseSeed": 1013904227,
+        "boards": 500,
+        "evidence": "round best/result; 2000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-round-1-heldout",
+        "baseSeed": 1597334676,
+        "boards": 1250,
+        "evidence": "round validation/result; 5000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-round-2-heldout",
+        "baseSeed": 3238141223,
+        "boards": 1250,
+        "evidence": "round validation/result; 5000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-round-3-heldout",
+        "baseSeed": 1666947062,
+        "boards": 1250,
+        "evidence": "round validation/result; 5000 games per opponent"
+      },
+      {
+        "family": "powered-league",
+        "label": "league-final-matrix",
+        "baseSeed": 2769414578,
+        "boards": 1250,
+        "evidence": "matrix panel/rows; 5000 games per cell"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-910911-pass0-gen0",
+        "baseSeed": 910911,
+        "boards": 2000,
+        "evidence": "draft_keepalive header; interrupted before a completed generation, conservatively included"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen0",
+        "baseSeed": 920911,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen1",
+        "baseSeed": 2655356672,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen2",
+        "baseSeed": 1014825137,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen3",
+        "baseSeed": 3669260898,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen4",
+        "baseSeed": 2028729363,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen5",
+        "baseSeed": 388197828,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen6",
+        "baseSeed": 3042633589,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen7",
+        "baseSeed": 1402102054,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen8",
+        "baseSeed": 4056537815,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen9",
+        "baseSeed": 2416006280,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen10",
+        "baseSeed": 775474745,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen11",
+        "baseSeed": 3429910506,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen12",
+        "baseSeed": 1789378971,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen13",
+        "baseSeed": 148847436,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-pass0-gen14",
+        "baseSeed": 2803283197,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-920911-validation",
+        "baseSeed": 1597729242,
+        "boards": 3000,
+        "evidence": "draft_keepalive validation; 6000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen0",
+        "baseSeed": 921822,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen1",
+        "baseSeed": 2655357583,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen2",
+        "baseSeed": 1014826048,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen3",
+        "baseSeed": 3669261809,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen4",
+        "baseSeed": 2028730274,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen5",
+        "baseSeed": 388198739,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen6",
+        "baseSeed": 3042634500,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen7",
+        "baseSeed": 1402102965,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen8",
+        "baseSeed": 4056538726,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen9",
+        "baseSeed": 2416007191,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen10",
+        "baseSeed": 775475656,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen11",
+        "baseSeed": 3429911417,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen12",
+        "baseSeed": 1789379882,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen13",
+        "baseSeed": 148848347,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-pass0-gen14",
+        "baseSeed": 2803284108,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-921822-validation",
+        "baseSeed": 1597731915,
+        "boards": 3000,
+        "evidence": "draft_keepalive validation; 6000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-922733-pass0-gen0",
+        "baseSeed": 922733,
+        "boards": 2000,
+        "evidence": "draft_keepalive completed generation; 4000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen0",
+        "baseSeed": 1,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen1",
+        "baseSeed": 2654435762,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen2",
+        "baseSeed": 1013904227,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen3",
+        "baseSeed": 3668339988,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen4",
+        "baseSeed": 2027808453,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen5",
+        "baseSeed": 387276918,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen6",
+        "baseSeed": 3041712679,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen7",
+        "baseSeed": 1401181144,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen8",
+        "baseSeed": 4055616905,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen9",
+        "baseSeed": 2415085370,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen10",
+        "baseSeed": 774553835,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass0-gen11",
+        "baseSeed": 3428989596,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen0",
+        "baseSeed": 1000004,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen1",
+        "baseSeed": 2655435765,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen2",
+        "baseSeed": 1014904230,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen3",
+        "baseSeed": 3669339991,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen4",
+        "baseSeed": 2028808456,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen5",
+        "baseSeed": 388276921,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen6",
+        "baseSeed": 3042712682,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen7",
+        "baseSeed": 1402181147,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen8",
+        "baseSeed": 4056616908,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen9",
+        "baseSeed": 2416085373,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen10",
+        "baseSeed": 775553838,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass1-gen11",
+        "baseSeed": 3429989599,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass2-gen0",
+        "baseSeed": 2000007,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass2-gen1",
+        "baseSeed": 2656435768,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass2-gen2",
+        "baseSeed": 1015904233,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass2-gen3",
+        "baseSeed": 3670339994,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      },
+      {
+        "family": "legacy-cem-draft",
+        "label": "draft-base-1-pass2-gen4",
+        "baseSeed": 2029808459,
+        "boards": 1500,
+        "evidence": "cem_draft_v1_exploit trace; 3000 games"
+      }
+    ]
+  },
+  "checks": {
+    "proposedBaseNotExplicitlyReused": true,
+    "pairSeedCollisionCount": 0,
+    "collisions": [],
+    "exactLiteralSearch": "No occurrence of 1930765607 in local workspaces/temp or zinc draft/league sim-out and rl_state roots"
+  },
+  "caveat": "cem_draft_prod has no trace/config seed provenance. Its code default is seed 1 and its pass/gen shape is covered by the recorded seed-1 stream only if CEM_SEED was not overridden. All recorded/recoverable seeds are covered."
+}

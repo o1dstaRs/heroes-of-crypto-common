@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "status": "measurement_only",
+  "candidateId": "br-52752642d16db7f4",
+  "verdict": "PASS",
+  "gates": [
+    {
+      "opponentId": "untrained-heuristic",
+      "gate": 0.55,
+      "decisiveWinRate": 0.6414664981036663,
+      "clusteredLowerBound": 0.6112530643666991,
+      "passed": true
+    },
+    {
+      "opponentId": "shipped-default-draft",
+      "gate": 0.47,
+      "decisiveWinRate": 0.512639029322548,
+      "clusteredLowerBound": 0.48166954110570037,
+      "passed": true
+    }
+  ],
+  "report": {
+    "schemaVersion": 1,
+    "status": "measurement_only",
+    "generatedAt": "2026-07-15T04:14:21.460Z",
+    "candidateId": "br-52752642d16db7f4",
+    "totalGames": 8000,
+    "options": {
+      "gamesPerOpponent": 4000,
+      "baseSeed": 1930765607,
+      "concurrency": 12,
+      "fightVersion": "v0.7",
+      "maxLaps": 60,
+      "mapTypes": [
+        1
+      ],
+      "freezePerk": true,
+      "aggregate": "worst-case",
+      "softminTemperature": 0.025,
+      "confidenceZ": 1.96
+    },
+    "opponents": [
+      {
+        "opponentId": "untrained-heuristic",
+        "prior": 0.5,
+        "games": 4000,
+        "wins": 2537,
+        "losses": 1418,
+        "draws": 45,
+        "decisiveGames": 3955,
+        "offerBoards": 1000,
+        "decisiveWinRate": 0.6414664981036663,
+        "clusteredLowerBound": 0.6112530643666991
+      },
+      {
+        "opponentId": "shipped-default-draft",
+        "prior": 0.5,
+        "games": 4000,
+        "wins": 2028,
+        "losses": 1928,
+        "draws": 44,
+        "decisiveGames": 3956,
+        "offerBoards": 1000,
+        "decisiveWinRate": 0.512639029322548,
+        "clusteredLowerBound": 0.48166954110570037
+      }
+    ],
+    "aggregate": {
+      "method": "worst-case",
+      "fitness": 0.48166954110570037,
+      "worstCaseLowerBound": 0.48166954110570037,
+      "worstCaseOpponent": "shipped-default-draft",
+      "softminLowerBound": 0.49885838157383494,
+      "adversarialMixture": [
+        {
+          "opponentId": "untrained-heuristic",
+          "weight": 0.005577946995319817
+        },
+        {
+          "opponentId": "shipped-default-draft",
+          "weight": 0.9944220530046801
+        }
+      ]
+    },
+    "limitations": [
+      "The built-in anchor/melee pool is a bootstrap smoke pool, not a powered acceptance panel; provide accumulated champions and exploiters with --pool.",
+      "The deployable placement head may enable adaptive dispersion only after a legitimate AOE reveal; otherwise it uses the tight template. Placement-zone expansion and stack splitting are not yet engine action-space choices.",
+      "Each offer board costs four games: both pick-seat assignments and a fixed-setup battle-side mirror for each assignment.",
+      "SEE_NONE remains frozen by default; use --unfreeze-perk only for an explicit reveal-value experiment.",
+      "No training or bake verdict is inferred from this report; acceptance still requires fresh-seed powered evaluation."
+    ],
+    "provenance": {
+      "pickPhase": "common/picks/pick_sim",
+      "stackAmounts": "LiveTwin expBudget",
+      "setup": "genome heads; synergies frozen at setup-v0",
+      "fightVector": "v0.7 for both sides",
+      "uncertainty": "cluster-robust lower bound over four-game offer boards",
+      "nashQualification": "softmin is an entropy-regularized adversarial response over the configured pool; a full Nash equilibrium requires a complete entrant-by-entrant payoff matrix"
+    }
+  }
+}
