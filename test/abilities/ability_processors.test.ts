@@ -52,6 +52,20 @@ import {
     placeUnit,
 } from "../helpers/combat";
 
+const capturingSceneLog = () => {
+    const lines: string[] = [];
+    return {
+        lines,
+        log: {
+            getLog: () => lines.join("\n"),
+            updateLog: (line?: string) => {
+                if (line) lines.push(line);
+            },
+            hasBeenUpdated: () => lines.length > 0,
+        },
+    };
+};
+
 describe("ability processors", () => {
     let restoreRandom: (() => void) | undefined;
 
@@ -260,6 +274,7 @@ describe("ability processors", () => {
     it("processes ranged AOE abilities and evaluates affected units", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Thrower",
             team: PBTypes.TeamVals.UPPER,
@@ -302,7 +317,7 @@ describe("ability processors", () => {
             1,
             unitsHolder,
             grid,
-            new SceneLogMock(),
+            capture.log,
             stats,
             true,
         );
@@ -312,6 +327,8 @@ describe("ability processors", () => {
         expect(result.unitIdsDied).toEqual([]);
         expect(attacker.getRangeShots()).toBe(1);
         expect(stats.get()).toHaveLength(2);
+        expect(capture.lines).toHaveLength(2);
+        expect(capture.lines.every((line) => line.includes("💀1"))).toBe(true);
     });
 
     it("processes through-shot lanes and records secondary deaths", () => {
@@ -435,14 +452,7 @@ describe("ability processors", () => {
 
     it("logs the Double Shot second attack with the range icon, not the literal 'attk'", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const lines: string[] = [];
-        const capturingLog = {
-            getLog: () => lines.join("\n"),
-            updateLog: (line?: string) => {
-                if (line) lines.push(line);
-            },
-            hasBeenUpdated: () => true,
-        };
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Repeater",
             team: PBTypes.TeamVals.UPPER,
@@ -454,7 +464,7 @@ describe("ability processors", () => {
             rangeShots: 2,
             stackPower: 100,
         });
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 2, maxHp: 20 });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 2, maxHp: 5 });
         placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, target, { x: 7, y: 7 });
 
@@ -462,7 +472,7 @@ describe("ability processors", () => {
             attacker,
             target,
             [],
-            capturingLog,
+            capture.log,
             unitsHolder,
             grid,
             1,
@@ -472,10 +482,11 @@ describe("ability processors", () => {
             false,
         );
 
-        const hitLine = lines.find((l) => l.includes(target.getName()) && l.includes("("));
+        const hitLine = capture.lines.find((line) => line.includes(target.getName()) && line.includes("("));
         expect(hitLine).toBeDefined();
         // The second (Double Shot) strike must read like the first: 🏹 for a ranged hit, never " attk ".
         expect(hitLine).toContain("🏹");
+        expect(hitLine).toContain("💀2");
         expect(hitLine).not.toContain(" attk ");
     });
 
@@ -777,6 +788,7 @@ describe("ability processors", () => {
 
     it("processes double punch damage, miss branch, and lucky strike", () => {
         const sceneLog = new SceneLogMock();
+        const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Brawler",
             team: PBTypes.TeamVals.UPPER,
@@ -791,7 +803,7 @@ describe("ability processors", () => {
             name: "Target",
             team: PBTypes.TeamVals.LOWER,
             amountAlive: 3,
-            maxHp: 30,
+            maxHp: 3,
         });
         const dodger = createTestUnit({
             name: "Dodger",
@@ -802,13 +814,14 @@ describe("ability processors", () => {
         });
         const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.UPPER });
 
-        const result = processDoublePunchAbility(attacker, target, sceneLog);
+        const result = processDoublePunchAbility(attacker, target, capture.log);
         const missed = processDoublePunchAbility(attacker, dodger, sceneLog);
         const skipped = processDoublePunchAbility(plain, target, sceneLog);
 
         expect(result.applied).toBe(true);
         expect(result.missed).toBe(false);
         expect(result.damage).toBeGreaterThan(0);
+        expect(capture.lines.some((line) => line.includes("💀3"))).toBe(true);
         expect(missed.applied).toBe(true);
         expect(missed.missed).toBe(true);
         expect(skipped.applied).toBe(false);
