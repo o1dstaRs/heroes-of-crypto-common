@@ -170,6 +170,139 @@ export function expandV0796hPriorSeedSeries(series: readonly IV0796hPriorSeedSer
     return [...seen.keys()];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Validate and expand every pair seed reserved by a persisted 96-hour run manifest. */
+export function expandV0796hPriorSeedPanels(manifest: unknown): number[] {
+    if (!isRecord(manifest) || manifest.schemaVersion !== 1) {
+        throw new Error("Prior 96h seed manifest must use schemaVersion 1");
+    }
+    if (manifest.pairSeedStep !== V07_96H_PAIR_SEED_STEP) {
+        throw new Error(`Prior 96h seed manifest must use pairSeedStep ${V07_96H_PAIR_SEED_STEP}`);
+    }
+    if (!isRecord(manifest.panels) || Object.keys(manifest.panels).length === 0) {
+        throw new Error("Prior 96h seed manifest must contain nonempty panels");
+    }
+    const allocatedDerivedScenarioSeeds = manifest.allocatedDerivedScenarioSeeds;
+    if (
+        typeof allocatedDerivedScenarioSeeds !== "number" ||
+        !Number.isSafeInteger(allocatedDerivedScenarioSeeds) ||
+        allocatedDerivedScenarioSeeds < 1
+    ) {
+        throw new Error("Prior 96h seed manifest must declare a positive allocatedDerivedScenarioSeeds count");
+    }
+
+    const expectedTemplates = V07_96H_TEMPLATES.map(({ template }) => template).sort();
+    const seen = new Map<number, string>();
+    for (const [panelId, value] of Object.entries(manifest.panels)) {
+        if (!isRecord(value) || value.id !== panelId) {
+            throw new Error(`Prior 96h seed panel ${panelId} must contain its matching id`);
+        }
+        const gamesPerTemplate = value.gamesPerTemplate;
+        if (
+            typeof gamesPerTemplate !== "number" ||
+            !Number.isSafeInteger(gamesPerTemplate) ||
+            gamesPerTemplate < 2 ||
+            gamesPerTemplate % 2
+        ) {
+            throw new Error(`Prior 96h seed panel ${panelId} gamesPerTemplate must be an even integer >= 2`);
+        }
+        if (!isRecord(value.seeds)) {
+            throw new Error(`Prior 96h seed panel ${panelId} must contain fixed-template seeds`);
+        }
+        const actualTemplates = Object.keys(value.seeds).sort();
+        if (canonicalV0796hJson(actualTemplates) !== canonicalV0796hJson(expectedTemplates)) {
+            throw new Error(`Prior 96h seed panel ${panelId} must contain exactly the eight fixed-template seeds`);
+        }
+
+        for (const template of expectedTemplates) {
+            const base = value.seeds[template];
+            if (typeof base !== "number" || !Number.isSafeInteger(base) || base < 0 || base > 0xffffffff) {
+                throw new Error(`Prior 96h seed panel ${panelId}.${template} base must be a uint32`);
+            }
+            for (let pair = 0; pair < gamesPerTemplate / 2; pair += 1) {
+                const seed = (base + Math.imul(pair, V07_96H_PAIR_SEED_STEP)) >>> 0;
+                const label = `${panelId}:${template}:${pair}`;
+                const previous = seen.get(seed);
+                if (previous) throw new Error(`Prior 96h seed collision: ${previous} and ${label}`);
+                seen.set(seed, label);
+            }
+        }
+    }
+
+    if (seen.size !== allocatedDerivedScenarioSeeds) {
+        throw new Error(
+            `Prior 96h seed manifest count mismatch: expanded ${seen.size}, declared ${allocatedDerivedScenarioSeeds}`,
+        );
+    }
+    return [...seen.keys()];
+}
+
+function expandV0796hPairSeedStream(base: unknown, games: unknown, label: string): number[] {
+    if (typeof base !== "number" || !Number.isSafeInteger(base) || base < 0 || base > 0xffffffff) {
+        throw new Error(`${label} base must be a uint32`);
+    }
+    if (typeof games !== "number" || !Number.isSafeInteger(games) || games < 2 || games % 2) {
+        throw new Error(`${label} games must be an even integer >= 2`);
+    }
+    return Array.from({ length: games / 2 }, (_, pair) => (base + Math.imul(pair, V07_96H_PAIR_SEED_STEP)) >>> 0);
+}
+
+/** Expand every supported seed reservation shape used by committed v0.7 manifests. */
+export function expandV0796hPriorSeedManifest(manifest: unknown): number[] {
+    if (!isRecord(manifest)) throw new Error("Prior seed manifest must be an object");
+    const seeds: number[] = [];
+
+    if (manifest.seedSeries !== undefined) {
+        if (manifest.pairSeedStep !== V07_96H_PAIR_SEED_STEP || !Array.isArray(manifest.seedSeries)) {
+            throw new Error("Invalid compact prior-seed manifest");
+        }
+        const expanded = expandV0796hPriorSeedSeries(manifest.seedSeries as IV0796hPriorSeedSeries[]);
+        if (
+            typeof manifest.expectedDerivedScenarioSeeds === "number" &&
+            Number.isInteger(manifest.expectedDerivedScenarioSeeds) &&
+            expanded.length !== manifest.expectedDerivedScenarioSeeds
+        ) {
+            throw new Error("Prior-seed manifest count mismatch");
+        }
+        seeds.push(...expanded);
+    }
+    if (manifest.panels !== undefined) seeds.push(...expandV0796hPriorSeedPanels(manifest));
+
+    if (typeof manifest.gamesPerCell === "number" && Number.isInteger(manifest.gamesPerCell) && manifest.cells) {
+        const visit = (value: unknown, label: string): void => {
+            if (typeof value === "number" && Number.isInteger(value)) {
+                seeds.push(...expandV0796hPairSeedStream(value, manifest.gamesPerCell, label));
+            } else if (value !== null && typeof value === "object") {
+                for (const [key, entry] of Object.entries(value)) visit(entry, `${label}.${key}`);
+            }
+        };
+        visit(manifest.cells, "cells");
+    }
+    if (isRecord(manifest.headline) && Array.isArray(manifest.headline.seeds)) {
+        for (const [index, seed] of manifest.headline.seeds.entries()) {
+            seeds.push(...expandV0796hPairSeedStream(seed, manifest.headline.gamesPerSeed, `headline.seeds.${index}`));
+        }
+    }
+    if (isRecord(manifest.cohorts) && isRecord(manifest.cohorts.seeds)) {
+        for (const [cohort, cohortSeeds] of Object.entries(manifest.cohorts.seeds)) {
+            if (!Array.isArray(cohortSeeds)) throw new Error(`cohorts.seeds.${cohort} must be an array`);
+            for (const [index, seed] of cohortSeeds.entries()) {
+                seeds.push(
+                    ...expandV0796hPairSeedStream(
+                        seed,
+                        manifest.cohorts.gamesPerSeed,
+                        `cohorts.seeds.${cohort}.${index}`,
+                    ),
+                );
+            }
+        }
+    }
+    return seeds;
+}
+
 /** Prove that every side-swap pair seed is unique across all immutable panels in this run. */
 export function assertV0796hPanelsDisjoint(panels: readonly IV0796hSeedPanel[]): void {
     const seen = new Map<number, string>();

@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only",
+  "runId": "03cd2ee1158bd044d07bc468dc3712614278fc78da2678b19e5d6c0fedcd1ee5",
+  "bootstrap": {
+    "protocolFingerprint": "a7418a0b9e83415c4317057bcbe6f2eef12d257baf187535f546f5d82dc416c8",
+    "createdAt": "2026-07-11T06:13:34.950Z",
+    "deadlineAt": "2026-07-11T07:13:34.000Z"
+  },
+  "pairSeedStep": 2654435761,
+  "priorManifests": [
+    {
+      "path": "src/simulation/manifests/v0_7_acceptance_archetype_final.json",
+      "sha256": "777aeb139da54950f4578a08b15159e1a71b97ff74d9a6090b5d4c16c29be000"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_acceptance_archetype_final_v2.json",
+      "sha256": "1ccbb285f00afa07e54c707cf04984465b45ccc2fd6c4a005120ada73c708237"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v1.json",
+      "sha256": "f3a53e3753c43a4f0b845d510023cd1fd75680d5333170337480ba5ebf7180d2"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v2.json",
+      "sha256": "9216510443d094df3d0f9742655d9f3b996e6be4fcaa1e9eb44e830923ff2bc9"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v3.json",
+      "sha256": "0f203545017e88206fcd5446c2867a26df158d1b6c8a48ae17a10dcf9b672298"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v4.json",
+      "sha256": "a0f3e71d0ae473699227b4ccc5ee278bae02b38a2461ecc7c13eabc263acc284"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_cross_archetype_v1.json",
+      "sha256": "45eb5666a8deaf6b0de395bf8e6f69db313154f0630dcc8291d62e78a434e657"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_prior_zinc_seed_denylist.json",
+      "sha256": "2ab6ebbe7162edd7a1700f19a91ab6942b6ddbb8e4f16ebd0758e34f9faa1004"
+    },
+    {
+      "path": "/home/agent-zinc/hoc-common-v07-96h-runs/smoke-d68490a/seed-manifest.json",
+      "sha256": "7eac42c7ba2810fd3f48e9c0ee0e86b1893d04aea7933a48cd3d17f1512939d0",
+      "kind": "prior_96h_run"
+    }
+  ],
+  "priorDerivedScenarioSeeds": 282672,
+  "allocatedDerivedScenarioSeeds": 72,
+  "panels": {
+    "probe-scout": {
+      "id": "probe-scout",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 2450519388,
+        "mage_fireline": 708668483,
+        "melee_magic_utility": 905086757,
+        "melee_magic_brawler": 3682614053,
+        "aura_support": 644364154,
+        "aura_offense": 3285278899,
+        "ranged_precision": 665792255,
+        "ranged_control": 1980385162
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-mid": {
+      "id": "probe-mid",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 605066390,
+        "mage_fireline": 3513286809,
+        "melee_magic_utility": 4246804571,
+        "melee_magic_brawler": 2424767339,
+        "aura_support": 2913707880,
+        "aura_offense": 3901767026,
+        "ranged_precision": 2588570378,
+        "ranged_control": 2892638591
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-deep": {
+      "id": "probe-deep",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 471233923,
+        "mage_fireline": 3533593874,
+        "melee_magic_utility": 3569785338,
+        "melee_magic_brawler": 4009563740,
+        "aura_support": 3017644150,
+        "aura_offense": 638028693,
+        "ranged_precision": 147002147,
+        "ranged_control": 314253901
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-ceiling": {
+      "id": "probe-ceiling",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 816907959,
+        "mage_fireline": 2740331257,
+        "melee_magic_utility": 3348479548,
+        "melee_magic_brawler": 3190274699,
+        "aura_support": 58613018,
+        "aura_offense": 1171699146,
+        "ranged_precision": 1593053016,
+        "ranged_control": 3467513902
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-scout": {
+      "id": "g0-scout",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 3760886943,
+        "mage_fireline": 2052413304,
+        "melee_magic_utility": 3777348338,
+        "melee_magic_brawler": 3703954669,
+        "aura_support": 2352445552,
+        "aura_offense": 1375538836,
+        "ranged_precision": 2526417858,
+        "ranged_control": 468291623
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-mid": {
+      "id": "g0-mid",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 2097120066,
+        "mage_fireline": 3127263855,
+        "melee_magic_utility": 2308662614,
+        "melee_magic_brawler": 484006595,
+        "aura_support": 1883454677,
+        "aura_offense": 3311711330,
+        "ranged_precision": 1400312257,
+        "ranged_control": 992480443
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-deep": {
+      "id": "g0-deep",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 130057017,
+        "mage_fireline": 1967250225,
+        "melee_magic_utility": 996103349,
+        "melee_magic_brawler": 1369872283,
+        "aura_support": 2025421705,
+        "aura_offense": 2476886630,
+        "ranged_precision": 1576692890,
+        "ranged_control": 1646749490
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "final-v06": {
+      "id": "final-v06",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 1452481423,
+        "mage_fireline": 262474775,
+        "melee_magic_utility": 3140505436,
+        "melee_magic_brawler": 4210349903,
+        "aura_support": 1840335414,
+        "aura_offense": 2038422888,
+        "ranged_precision": 2444349731,
+        "ranged_control": 3898659223
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "final-v04": {
+      "id": "final-v04",
+      "gamesPerTemplate": 2,
+      "seeds": {
+        "mage_frontline": 2496459140,
+        "mage_fireline": 3197870160,
+        "melee_magic_utility": 521317934,
+        "melee_magic_brawler": 195363855,
+        "aura_support": 1315367403,
+        "aura_offense": 1439644298,
+        "ranged_precision": 1833364869,
+        "ranged_control": 3313917889
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    }
+  },
+  "declaration": "All train/selection/final pair streams were allocated before outcomes and are mutually disjoint and disjoint from committed v0.7 and sibling 96h manifests parsed above."
+}

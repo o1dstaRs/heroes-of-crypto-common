@@ -2,3 +2,5 @@ node_modules
 dist
 package-lock.json
 src/generated
+src/simulation/results/draft_league_round3_*.json
+src/simulation/manifests/v0_7_96h_*_seeds.json

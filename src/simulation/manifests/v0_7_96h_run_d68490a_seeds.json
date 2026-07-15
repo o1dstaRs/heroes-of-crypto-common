@@ -1,0 +1,4812 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only",
+  "runId": "dd420df1314ccb95eadd6285a6124a725ec08125009aa60d7690dda1b90f2942",
+  "bootstrap": {
+    "protocolFingerprint": "b0fe6507995413b700c8b684b338e6b47fb786a2512e6a87ab9c3a7ea12dd87c",
+    "createdAt": "2026-07-11T06:28:47.266Z",
+    "deadlineAt": "2026-07-15T06:28:47.000Z"
+  },
+  "pairSeedStep": 2654435761,
+  "priorManifests": [
+    {
+      "path": "src/simulation/manifests/v0_7_acceptance_archetype_final.json",
+      "sha256": "777aeb139da54950f4578a08b15159e1a71b97ff74d9a6090b5d4c16c29be000"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_acceptance_archetype_final_v2.json",
+      "sha256": "1ccbb285f00afa07e54c707cf04984465b45ccc2fd6c4a005120ada73c708237"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v1.json",
+      "sha256": "f3a53e3753c43a4f0b845d510023cd1fd75680d5333170337480ba5ebf7180d2"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v2.json",
+      "sha256": "9216510443d094df3d0f9742655d9f3b996e6be4fcaa1e9eb44e830923ff2bc9"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v3.json",
+      "sha256": "0f203545017e88206fcd5446c2867a26df158d1b6c8a48ae17a10dcf9b672298"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_archetype_battery_v4.json",
+      "sha256": "a0f3e71d0ae473699227b4ccc5ee278bae02b38a2461ecc7c13eabc263acc284"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_cross_archetype_v1.json",
+      "sha256": "45eb5666a8deaf6b0de395bf8e6f69db313154f0630dcc8291d62e78a434e657"
+    },
+    {
+      "path": "src/simulation/manifests/v0_7_prior_zinc_seed_denylist.json",
+      "sha256": "2ab6ebbe7162edd7a1700f19a91ab6942b6ddbb8e4f16ebd0758e34f9faa1004"
+    },
+    {
+      "path": "/home/agent-zinc/hoc-common-v07-96h-runs/smoke-d68490a-fast/seed-manifest.json",
+      "sha256": "d878906fe884092764e137f1b4e52b35c93edec62d3be387efcc31dc0119c0d6",
+      "kind": "prior_96h_run"
+    },
+    {
+      "path": "/home/agent-zinc/hoc-common-v07-96h-runs/smoke-d68490a/seed-manifest.json",
+      "sha256": "7eac42c7ba2810fd3f48e9c0ee0e86b1893d04aea7933a48cd3d17f1512939d0",
+      "kind": "prior_96h_run"
+    }
+  ],
+  "priorDerivedScenarioSeeds": 282744,
+  "allocatedDerivedScenarioSeeds": 147360,
+  "panels": {
+    "probe-scout": {
+      "id": "probe-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 386585164,
+        "mage_fireline": 1955955948,
+        "melee_magic_utility": 2249906308,
+        "melee_magic_brawler": 3663730882,
+        "aura_support": 4184250346,
+        "aura_offense": 1096725823,
+        "ranged_precision": 1137890726,
+        "ranged_control": 3507734133
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-mid": {
+      "id": "probe-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 61758052,
+        "mage_fireline": 2588305051,
+        "melee_magic_utility": 300073817,
+        "melee_magic_brawler": 66823884,
+        "aura_support": 1349267281,
+        "aura_offense": 1467794766,
+        "ranged_precision": 595159706,
+        "ranged_control": 1742239064
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-deep": {
+      "id": "probe-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3012631775,
+        "mage_fireline": 1342287441,
+        "melee_magic_utility": 4288253650,
+        "melee_magic_brawler": 2815691306,
+        "aura_support": 2196299892,
+        "aura_offense": 4164886455,
+        "ranged_precision": 3332726836,
+        "ranged_control": 2726655053
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "probe-ceiling": {
+      "id": "probe-ceiling",
+      "gamesPerTemplate": 1000,
+      "seeds": {
+        "mage_frontline": 3247274620,
+        "mage_fireline": 2280897664,
+        "melee_magic_utility": 1008303172,
+        "melee_magic_brawler": 3207973731,
+        "aura_support": 79945004,
+        "aura_offense": 3086033750,
+        "ranged_precision": 493504109,
+        "ranged_control": 3962832444
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-scout": {
+      "id": "g0-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1358658796,
+        "mage_fireline": 1582588220,
+        "melee_magic_utility": 3623145228,
+        "melee_magic_brawler": 395416998,
+        "aura_support": 1022258612,
+        "aura_offense": 2708420480,
+        "ranged_precision": 3058987178,
+        "ranged_control": 2108660886
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-mid": {
+      "id": "g0-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1968377182,
+        "mage_fireline": 2860477703,
+        "melee_magic_utility": 540693412,
+        "melee_magic_brawler": 792131195,
+        "aura_support": 3318508449,
+        "aura_offense": 1625280690,
+        "ranged_precision": 1505065506,
+        "ranged_control": 552007457
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g0-deep": {
+      "id": "g0-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3544060192,
+        "mage_fireline": 1792065990,
+        "melee_magic_utility": 4105414553,
+        "melee_magic_brawler": 1880064065,
+        "aura_support": 884021781,
+        "aura_offense": 3378282644,
+        "ranged_precision": 641204720,
+        "ranged_control": 171980848
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g1-scout": {
+      "id": "g1-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3830913316,
+        "mage_fireline": 4015085955,
+        "melee_magic_utility": 2331516022,
+        "melee_magic_brawler": 2107432600,
+        "aura_support": 3642297254,
+        "aura_offense": 1965289281,
+        "ranged_precision": 316441275,
+        "ranged_control": 4122702876
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g1-mid": {
+      "id": "g1-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3719738385,
+        "mage_fireline": 2940633195,
+        "melee_magic_utility": 153575822,
+        "melee_magic_brawler": 2253230892,
+        "aura_support": 1009090336,
+        "aura_offense": 3059841051,
+        "ranged_precision": 942187424,
+        "ranged_control": 3270041433
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g1-deep": {
+      "id": "g1-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 302244614,
+        "mage_fireline": 3017471033,
+        "melee_magic_utility": 3147726447,
+        "melee_magic_brawler": 4187285122,
+        "aura_support": 4043843373,
+        "aura_offense": 3366234301,
+        "ranged_precision": 913597580,
+        "ranged_control": 4036380106
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g2-scout": {
+      "id": "g2-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3768285070,
+        "mage_fireline": 1461656748,
+        "melee_magic_utility": 2449677973,
+        "melee_magic_brawler": 1721812304,
+        "aura_support": 2282766578,
+        "aura_offense": 2486470579,
+        "ranged_precision": 1066566595,
+        "ranged_control": 1887450753
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g2-mid": {
+      "id": "g2-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2107517639,
+        "mage_fireline": 2805564645,
+        "melee_magic_utility": 1462270034,
+        "melee_magic_brawler": 1966176604,
+        "aura_support": 3984725797,
+        "aura_offense": 3283622603,
+        "ranged_precision": 615847234,
+        "ranged_control": 722772208
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g2-deep": {
+      "id": "g2-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3522478873,
+        "mage_fireline": 500960546,
+        "melee_magic_utility": 1290148852,
+        "melee_magic_brawler": 3374180140,
+        "aura_support": 1777817063,
+        "aura_offense": 1038055253,
+        "ranged_precision": 2698894253,
+        "ranged_control": 3838761785
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g3-scout": {
+      "id": "g3-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3160130073,
+        "mage_fireline": 3560292302,
+        "melee_magic_utility": 843326433,
+        "melee_magic_brawler": 2518166115,
+        "aura_support": 3492523563,
+        "aura_offense": 241128547,
+        "ranged_precision": 4287461162,
+        "ranged_control": 336313992
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g3-mid": {
+      "id": "g3-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1043412720,
+        "mage_fireline": 2571153364,
+        "melee_magic_utility": 989914107,
+        "melee_magic_brawler": 392667607,
+        "aura_support": 2372347617,
+        "aura_offense": 166731376,
+        "ranged_precision": 545420864,
+        "ranged_control": 1363676662
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g3-deep": {
+      "id": "g3-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 541754780,
+        "mage_fireline": 1000846068,
+        "melee_magic_utility": 1879904956,
+        "melee_magic_brawler": 2292254536,
+        "aura_support": 262920411,
+        "aura_offense": 298945725,
+        "ranged_precision": 2710323427,
+        "ranged_control": 2548296763
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g4-scout": {
+      "id": "g4-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3850639488,
+        "mage_fireline": 3676095387,
+        "melee_magic_utility": 3745234593,
+        "melee_magic_brawler": 835920429,
+        "aura_support": 2935267449,
+        "aura_offense": 2046728100,
+        "ranged_precision": 2488147029,
+        "ranged_control": 644345121
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g4-mid": {
+      "id": "g4-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2581495322,
+        "mage_fireline": 4269697892,
+        "melee_magic_utility": 519950458,
+        "melee_magic_brawler": 406486413,
+        "aura_support": 455359795,
+        "aura_offense": 2512707067,
+        "ranged_precision": 1888922253,
+        "ranged_control": 351113688
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g4-deep": {
+      "id": "g4-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2998297702,
+        "mage_fireline": 931846360,
+        "melee_magic_utility": 3137930418,
+        "melee_magic_brawler": 2054583171,
+        "aura_support": 1030453393,
+        "aura_offense": 1702244666,
+        "ranged_precision": 3166294193,
+        "ranged_control": 3481692839
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g5-scout": {
+      "id": "g5-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 4121865964,
+        "mage_fireline": 418483624,
+        "melee_magic_utility": 4194388575,
+        "melee_magic_brawler": 327622624,
+        "aura_support": 1489471711,
+        "aura_offense": 3835714925,
+        "ranged_precision": 2258254641,
+        "ranged_control": 620648906
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g5-mid": {
+      "id": "g5-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1534748883,
+        "mage_fireline": 1141588026,
+        "melee_magic_utility": 3123895008,
+        "melee_magic_brawler": 4182235840,
+        "aura_support": 3436379330,
+        "aura_offense": 3420766758,
+        "ranged_precision": 1913284445,
+        "ranged_control": 2711308496
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g5-deep": {
+      "id": "g5-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1092229719,
+        "mage_fireline": 2697389623,
+        "melee_magic_utility": 3549797284,
+        "melee_magic_brawler": 3614464025,
+        "aura_support": 1521067690,
+        "aura_offense": 3255731725,
+        "ranged_precision": 3534678185,
+        "ranged_control": 2136778192
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g6-scout": {
+      "id": "g6-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3127795781,
+        "mage_fireline": 394903680,
+        "melee_magic_utility": 794726982,
+        "melee_magic_brawler": 1604480225,
+        "aura_support": 2120161908,
+        "aura_offense": 2224120395,
+        "ranged_precision": 1561517643,
+        "ranged_control": 778487549
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g6-mid": {
+      "id": "g6-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 83720902,
+        "mage_fireline": 2176651792,
+        "melee_magic_utility": 108121265,
+        "melee_magic_brawler": 3312604436,
+        "aura_support": 1574830082,
+        "aura_offense": 3793563769,
+        "ranged_precision": 3446776237,
+        "ranged_control": 2161955943
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g6-deep": {
+      "id": "g6-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2508045290,
+        "mage_fireline": 3573006900,
+        "melee_magic_utility": 3156063308,
+        "melee_magic_brawler": 3060300416,
+        "aura_support": 4210100382,
+        "aura_offense": 550236438,
+        "ranged_precision": 4189216498,
+        "ranged_control": 3042994932
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g7-scout": {
+      "id": "g7-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2738764555,
+        "mage_fireline": 662326097,
+        "melee_magic_utility": 3489587933,
+        "melee_magic_brawler": 2923077919,
+        "aura_support": 47241355,
+        "aura_offense": 3064617798,
+        "ranged_precision": 2700676227,
+        "ranged_control": 690415517
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g7-mid": {
+      "id": "g7-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1234539310,
+        "mage_fireline": 97685540,
+        "melee_magic_utility": 775776284,
+        "melee_magic_brawler": 350525066,
+        "aura_support": 127904687,
+        "aura_offense": 1003170750,
+        "ranged_precision": 1741139700,
+        "ranged_control": 315764725
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g7-deep": {
+      "id": "g7-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 931807324,
+        "mage_fireline": 2413675915,
+        "melee_magic_utility": 1829391530,
+        "melee_magic_brawler": 1272362398,
+        "aura_support": 4028081061,
+        "aura_offense": 2396794346,
+        "ranged_precision": 1064949493,
+        "ranged_control": 3069012733
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g8-scout": {
+      "id": "g8-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 88984416,
+        "mage_fireline": 1776772890,
+        "melee_magic_utility": 2828839141,
+        "melee_magic_brawler": 1091616600,
+        "aura_support": 4138947057,
+        "aura_offense": 995569690,
+        "ranged_precision": 512061680,
+        "ranged_control": 873887839
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g8-mid": {
+      "id": "g8-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 547410250,
+        "mage_fireline": 3986940183,
+        "melee_magic_utility": 4107790317,
+        "melee_magic_brawler": 3046083749,
+        "aura_support": 2863721385,
+        "aura_offense": 3670694446,
+        "ranged_precision": 3593087256,
+        "ranged_control": 1030063938
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g8-deep": {
+      "id": "g8-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 4244538747,
+        "mage_fireline": 3612003154,
+        "melee_magic_utility": 4266571530,
+        "melee_magic_brawler": 3511074715,
+        "aura_support": 3288061304,
+        "aura_offense": 1800110431,
+        "ranged_precision": 305147310,
+        "ranged_control": 904323190
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g9-scout": {
+      "id": "g9-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 844176914,
+        "mage_fireline": 3345412495,
+        "melee_magic_utility": 827060798,
+        "melee_magic_brawler": 2409802151,
+        "aura_support": 176125220,
+        "aura_offense": 2940025041,
+        "ranged_precision": 3257765463,
+        "ranged_control": 367471822
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g9-mid": {
+      "id": "g9-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2562619330,
+        "mage_fireline": 2343572302,
+        "melee_magic_utility": 1554853003,
+        "melee_magic_brawler": 2152151736,
+        "aura_support": 1961942671,
+        "aura_offense": 1280205385,
+        "ranged_precision": 2703653580,
+        "ranged_control": 2023122769
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g9-deep": {
+      "id": "g9-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2890603240,
+        "mage_fireline": 728325227,
+        "melee_magic_utility": 4192261825,
+        "melee_magic_brawler": 1976536058,
+        "aura_support": 1718686093,
+        "aura_offense": 3695862247,
+        "ranged_precision": 2115556435,
+        "ranged_control": 2915554012
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g10-scout": {
+      "id": "g10-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 135700420,
+        "mage_fireline": 1140627830,
+        "melee_magic_utility": 1593635497,
+        "melee_magic_brawler": 537418556,
+        "aura_support": 3232018,
+        "aura_offense": 2340502868,
+        "ranged_precision": 985025394,
+        "ranged_control": 4129358538
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g10-mid": {
+      "id": "g10-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2805867824,
+        "mage_fireline": 2921796742,
+        "melee_magic_utility": 538812883,
+        "melee_magic_brawler": 4229803694,
+        "aura_support": 3808657136,
+        "aura_offense": 200806489,
+        "ranged_precision": 992750204,
+        "ranged_control": 567908296
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g10-deep": {
+      "id": "g10-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 261262487,
+        "mage_fireline": 2886177750,
+        "melee_magic_utility": 2829758281,
+        "melee_magic_brawler": 3988063551,
+        "aura_support": 1544799489,
+        "aura_offense": 2668791566,
+        "ranged_precision": 845649147,
+        "ranged_control": 1461660982
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g11-scout": {
+      "id": "g11-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 4144930298,
+        "mage_fireline": 1298809228,
+        "melee_magic_utility": 84923859,
+        "melee_magic_brawler": 3256222581,
+        "aura_support": 936826652,
+        "aura_offense": 2860570799,
+        "ranged_precision": 986420329,
+        "ranged_control": 469308923
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g11-mid": {
+      "id": "g11-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 941577712,
+        "mage_fireline": 1654023245,
+        "melee_magic_utility": 2330403649,
+        "melee_magic_brawler": 2432180571,
+        "aura_support": 2113484127,
+        "aura_offense": 503003283,
+        "ranged_precision": 1064807393,
+        "ranged_control": 2568402465
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g11-deep": {
+      "id": "g11-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2968990648,
+        "mage_fireline": 3795311517,
+        "melee_magic_utility": 964361588,
+        "melee_magic_brawler": 3237579528,
+        "aura_support": 1677468242,
+        "aura_offense": 2771404916,
+        "ranged_precision": 1380739256,
+        "ranged_control": 1834096687
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g12-scout": {
+      "id": "g12-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3487406738,
+        "mage_fireline": 3806969182,
+        "melee_magic_utility": 2543861723,
+        "melee_magic_brawler": 4028109490,
+        "aura_support": 3179275735,
+        "aura_offense": 2322076181,
+        "ranged_precision": 3785105356,
+        "ranged_control": 1230670793
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g12-mid": {
+      "id": "g12-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2482532180,
+        "mage_fireline": 2662586667,
+        "melee_magic_utility": 2941747247,
+        "melee_magic_brawler": 1288976625,
+        "aura_support": 2021287573,
+        "aura_offense": 3490207028,
+        "ranged_precision": 767219823,
+        "ranged_control": 2637540616
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g12-deep": {
+      "id": "g12-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1252059165,
+        "mage_fireline": 3891204574,
+        "melee_magic_utility": 2339217687,
+        "melee_magic_brawler": 523997951,
+        "aura_support": 3097172332,
+        "aura_offense": 2329518350,
+        "ranged_precision": 2360704344,
+        "ranged_control": 1251316844
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g13-scout": {
+      "id": "g13-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2448206797,
+        "mage_fireline": 2679444950,
+        "melee_magic_utility": 2119242373,
+        "melee_magic_brawler": 2065262269,
+        "aura_support": 3461660885,
+        "aura_offense": 956395261,
+        "ranged_precision": 2228757453,
+        "ranged_control": 4234603243
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g13-mid": {
+      "id": "g13-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2571039927,
+        "mage_fireline": 4222733312,
+        "melee_magic_utility": 728937416,
+        "melee_magic_brawler": 4269401823,
+        "aura_support": 1494443041,
+        "aura_offense": 2174717759,
+        "ranged_precision": 996321744,
+        "ranged_control": 643163632
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g13-deep": {
+      "id": "g13-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2462681448,
+        "mage_fireline": 2678084861,
+        "melee_magic_utility": 1148027471,
+        "melee_magic_brawler": 2993041491,
+        "aura_support": 3882086419,
+        "aura_offense": 1581891926,
+        "ranged_precision": 1746589404,
+        "ranged_control": 590270029
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g14-scout": {
+      "id": "g14-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2327671886,
+        "mage_fireline": 3156889064,
+        "melee_magic_utility": 258956126,
+        "melee_magic_brawler": 1627153547,
+        "aura_support": 1984318735,
+        "aura_offense": 2570009253,
+        "ranged_precision": 1417139501,
+        "ranged_control": 3084192237
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g14-mid": {
+      "id": "g14-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1072157539,
+        "mage_fireline": 3336881736,
+        "melee_magic_utility": 1032412747,
+        "melee_magic_brawler": 319299607,
+        "aura_support": 2089549639,
+        "aura_offense": 2641271123,
+        "ranged_precision": 487953069,
+        "ranged_control": 2389168599
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g14-deep": {
+      "id": "g14-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2529345838,
+        "mage_fireline": 3130898462,
+        "melee_magic_utility": 12175644,
+        "melee_magic_brawler": 1684250112,
+        "aura_support": 151479945,
+        "aura_offense": 374323156,
+        "ranged_precision": 3777179620,
+        "ranged_control": 20536264
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g15-scout": {
+      "id": "g15-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3866808606,
+        "mage_fireline": 3424358406,
+        "melee_magic_utility": 2994335940,
+        "melee_magic_brawler": 2903739028,
+        "aura_support": 477064512,
+        "aura_offense": 603931272,
+        "ranged_precision": 304879194,
+        "ranged_control": 3955360827
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g15-mid": {
+      "id": "g15-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 976806563,
+        "mage_fireline": 2915240966,
+        "melee_magic_utility": 2243184749,
+        "melee_magic_brawler": 3831102932,
+        "aura_support": 137643722,
+        "aura_offense": 3776742142,
+        "ranged_precision": 1132545284,
+        "ranged_control": 1618023647
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g15-deep": {
+      "id": "g15-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2244686761,
+        "mage_fireline": 1565035328,
+        "melee_magic_utility": 286307316,
+        "melee_magic_brawler": 2776214078,
+        "aura_support": 1892440951,
+        "aura_offense": 2648215884,
+        "ranged_precision": 1348267585,
+        "ranged_control": 1287719641
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g16-scout": {
+      "id": "g16-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3960285127,
+        "mage_fireline": 227089624,
+        "melee_magic_utility": 344833407,
+        "melee_magic_brawler": 508526899,
+        "aura_support": 2232500976,
+        "aura_offense": 3533864112,
+        "ranged_precision": 2719015199,
+        "ranged_control": 2341782306
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g16-mid": {
+      "id": "g16-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 486190032,
+        "mage_fireline": 2985286606,
+        "melee_magic_utility": 146138884,
+        "melee_magic_brawler": 2414757754,
+        "aura_support": 3000879986,
+        "aura_offense": 766062254,
+        "ranged_precision": 562529140,
+        "ranged_control": 4049311656
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g16-deep": {
+      "id": "g16-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 127483756,
+        "mage_fireline": 4090458072,
+        "melee_magic_utility": 3895138272,
+        "melee_magic_brawler": 3547752111,
+        "aura_support": 3440190961,
+        "aura_offense": 1165895516,
+        "ranged_precision": 771358976,
+        "ranged_control": 2059509892
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g17-scout": {
+      "id": "g17-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 925492243,
+        "mage_fireline": 1711418462,
+        "melee_magic_utility": 521288002,
+        "melee_magic_brawler": 458189541,
+        "aura_support": 3776957871,
+        "aura_offense": 1835155358,
+        "ranged_precision": 858231887,
+        "ranged_control": 1982773315
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g17-mid": {
+      "id": "g17-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2665692497,
+        "mage_fireline": 161937919,
+        "melee_magic_utility": 1126033156,
+        "melee_magic_brawler": 4068878936,
+        "aura_support": 1102026088,
+        "aura_offense": 3646736446,
+        "ranged_precision": 1396769528,
+        "ranged_control": 2354955418
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g17-deep": {
+      "id": "g17-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 546719557,
+        "mage_fireline": 2231311833,
+        "melee_magic_utility": 1125430360,
+        "melee_magic_brawler": 1893572299,
+        "aura_support": 3732069987,
+        "aura_offense": 3061483384,
+        "ranged_precision": 2352620734,
+        "ranged_control": 1603649431
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g18-scout": {
+      "id": "g18-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2247863697,
+        "mage_fireline": 2002625523,
+        "melee_magic_utility": 1559554229,
+        "melee_magic_brawler": 1400244117,
+        "aura_support": 2851953713,
+        "aura_offense": 1635002828,
+        "ranged_precision": 3867182216,
+        "ranged_control": 1212376366
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g18-mid": {
+      "id": "g18-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2100239499,
+        "mage_fireline": 358815316,
+        "melee_magic_utility": 921854823,
+        "melee_magic_brawler": 3399106060,
+        "aura_support": 3044526002,
+        "aura_offense": 890427236,
+        "ranged_precision": 1385961484,
+        "ranged_control": 1259010476
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g18-deep": {
+      "id": "g18-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2802045073,
+        "mage_fireline": 2429764459,
+        "melee_magic_utility": 754272617,
+        "melee_magic_brawler": 4041913844,
+        "aura_support": 2958859805,
+        "aura_offense": 2992362915,
+        "ranged_precision": 4199691211,
+        "ranged_control": 3461503903
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g19-scout": {
+      "id": "g19-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3883189,
+        "mage_fireline": 2331079580,
+        "melee_magic_utility": 3984998842,
+        "melee_magic_brawler": 3884528145,
+        "aura_support": 1644575652,
+        "aura_offense": 3561959931,
+        "ranged_precision": 1469219920,
+        "ranged_control": 3811254321
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g19-mid": {
+      "id": "g19-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3660009521,
+        "mage_fireline": 686590472,
+        "melee_magic_utility": 1322099816,
+        "melee_magic_brawler": 27122853,
+        "aura_support": 3418410288,
+        "aura_offense": 954567389,
+        "ranged_precision": 1831411893,
+        "ranged_control": 1750309260
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g19-deep": {
+      "id": "g19-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 809591264,
+        "mage_fireline": 1225053410,
+        "melee_magic_utility": 2123104585,
+        "melee_magic_brawler": 1816532316,
+        "aura_support": 318961706,
+        "aura_offense": 1003764440,
+        "ranged_precision": 1911601436,
+        "ranged_control": 3716227107
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g20-scout": {
+      "id": "g20-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1870153436,
+        "mage_fireline": 3449871940,
+        "melee_magic_utility": 1801078465,
+        "melee_magic_brawler": 1110549593,
+        "aura_support": 1359456978,
+        "aura_offense": 907873006,
+        "ranged_precision": 3259435506,
+        "ranged_control": 2065061826
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g20-mid": {
+      "id": "g20-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3026364645,
+        "mage_fireline": 1237149844,
+        "melee_magic_utility": 2215690030,
+        "melee_magic_brawler": 1986713723,
+        "aura_support": 3326910479,
+        "aura_offense": 3117771381,
+        "ranged_precision": 2312370852,
+        "ranged_control": 304580349
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g20-deep": {
+      "id": "g20-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2977524250,
+        "mage_fireline": 711949314,
+        "melee_magic_utility": 640989034,
+        "melee_magic_brawler": 154908745,
+        "aura_support": 1749188176,
+        "aura_offense": 1698534629,
+        "ranged_precision": 3957221967,
+        "ranged_control": 3046834275
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g21-scout": {
+      "id": "g21-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 497406625,
+        "mage_fireline": 3874807238,
+        "melee_magic_utility": 2920691466,
+        "melee_magic_brawler": 3599166367,
+        "aura_support": 3197337351,
+        "aura_offense": 3256475401,
+        "ranged_precision": 3756825977,
+        "ranged_control": 3058009239
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g21-mid": {
+      "id": "g21-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1925737038,
+        "mage_fireline": 2694720369,
+        "melee_magic_utility": 2862163842,
+        "melee_magic_brawler": 2193611114,
+        "aura_support": 3019816190,
+        "aura_offense": 370089887,
+        "ranged_precision": 1217568477,
+        "ranged_control": 2876766533
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g21-deep": {
+      "id": "g21-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2540321470,
+        "mage_fireline": 2120067721,
+        "melee_magic_utility": 646353358,
+        "melee_magic_brawler": 2652245797,
+        "aura_support": 2457662965,
+        "aura_offense": 653005826,
+        "ranged_precision": 4239915412,
+        "ranged_control": 2962086247
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g22-scout": {
+      "id": "g22-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3633304401,
+        "mage_fireline": 2645933427,
+        "melee_magic_utility": 1530061361,
+        "melee_magic_brawler": 283628264,
+        "aura_support": 304512430,
+        "aura_offense": 168507021,
+        "ranged_precision": 4167371845,
+        "ranged_control": 2890406628
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g22-mid": {
+      "id": "g22-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2598239634,
+        "mage_fireline": 541808525,
+        "melee_magic_utility": 252827910,
+        "melee_magic_brawler": 501257333,
+        "aura_support": 683361959,
+        "aura_offense": 280567745,
+        "ranged_precision": 3606819865,
+        "ranged_control": 1095431871
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g22-deep": {
+      "id": "g22-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 397354457,
+        "mage_fireline": 3593667222,
+        "melee_magic_utility": 1724351655,
+        "melee_magic_brawler": 2172301949,
+        "aura_support": 2551604952,
+        "aura_offense": 2627576371,
+        "ranged_precision": 1403731652,
+        "ranged_control": 3406167869
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g23-scout": {
+      "id": "g23-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2332882014,
+        "mage_fireline": 3128117110,
+        "melee_magic_utility": 1605516085,
+        "melee_magic_brawler": 3976672748,
+        "aura_support": 3533908830,
+        "aura_offense": 2487664908,
+        "ranged_precision": 322823268,
+        "ranged_control": 3240408260
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g23-mid": {
+      "id": "g23-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 721503487,
+        "mage_fireline": 2512814321,
+        "melee_magic_utility": 614008211,
+        "melee_magic_brawler": 2455777715,
+        "aura_support": 3431562716,
+        "aura_offense": 1818086216,
+        "ranged_precision": 608650027,
+        "ranged_control": 1059229423
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g23-deep": {
+      "id": "g23-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3350267833,
+        "mage_fireline": 1899490112,
+        "melee_magic_utility": 670236019,
+        "melee_magic_brawler": 2123617929,
+        "aura_support": 1434553983,
+        "aura_offense": 3575740082,
+        "ranged_precision": 2851268911,
+        "ranged_control": 89170242
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g24-scout": {
+      "id": "g24-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 4055717547,
+        "mage_fireline": 2282736152,
+        "melee_magic_utility": 3211540167,
+        "melee_magic_brawler": 2726465057,
+        "aura_support": 2458083314,
+        "aura_offense": 2551491367,
+        "ranged_precision": 2499984015,
+        "ranged_control": 3341677410
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g24-mid": {
+      "id": "g24-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3042482957,
+        "mage_fireline": 170390210,
+        "melee_magic_utility": 1143225046,
+        "melee_magic_brawler": 1278929450,
+        "aura_support": 1580636436,
+        "aura_offense": 889967298,
+        "ranged_precision": 2611616137,
+        "ranged_control": 3773246694
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g24-deep": {
+      "id": "g24-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2184947906,
+        "mage_fireline": 2063389825,
+        "melee_magic_utility": 2725445784,
+        "melee_magic_brawler": 2413368807,
+        "aura_support": 1327493305,
+        "aura_offense": 851002006,
+        "ranged_precision": 1706180819,
+        "ranged_control": 871352125
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g25-scout": {
+      "id": "g25-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1686968564,
+        "mage_fireline": 3587445867,
+        "melee_magic_utility": 1097270967,
+        "melee_magic_brawler": 4023570054,
+        "aura_support": 2073245536,
+        "aura_offense": 2843018163,
+        "ranged_precision": 923446785,
+        "ranged_control": 1799629514
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g25-mid": {
+      "id": "g25-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2551565559,
+        "mage_fireline": 1299620709,
+        "melee_magic_utility": 28940456,
+        "melee_magic_brawler": 1973299366,
+        "aura_support": 3816765670,
+        "aura_offense": 1517732447,
+        "ranged_precision": 1117114722,
+        "ranged_control": 984780611
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g25-deep": {
+      "id": "g25-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 937600101,
+        "mage_fireline": 3937771292,
+        "melee_magic_utility": 2532902142,
+        "melee_magic_brawler": 2427793949,
+        "aura_support": 1807158630,
+        "aura_offense": 3126013105,
+        "ranged_precision": 1911318256,
+        "ranged_control": 2503089413
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g26-scout": {
+      "id": "g26-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 754406498,
+        "mage_fireline": 4096023487,
+        "melee_magic_utility": 2950193486,
+        "melee_magic_brawler": 1698936020,
+        "aura_support": 3854563195,
+        "aura_offense": 135653488,
+        "ranged_precision": 2835925424,
+        "ranged_control": 4080209123
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g26-mid": {
+      "id": "g26-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 342895007,
+        "mage_fireline": 3415706993,
+        "melee_magic_utility": 471182498,
+        "melee_magic_brawler": 2273268585,
+        "aura_support": 1676758960,
+        "aura_offense": 2658500375,
+        "ranged_precision": 2141509181,
+        "ranged_control": 248460251
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g26-deep": {
+      "id": "g26-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3800413625,
+        "mage_fireline": 4035159278,
+        "melee_magic_utility": 374067294,
+        "melee_magic_brawler": 2569481026,
+        "aura_support": 4130567466,
+        "aura_offense": 1489243510,
+        "ranged_precision": 967374600,
+        "ranged_control": 3560283897
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g27-scout": {
+      "id": "g27-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 508061139,
+        "mage_fireline": 2771357024,
+        "melee_magic_utility": 585137144,
+        "melee_magic_brawler": 362591019,
+        "aura_support": 1002130000,
+        "aura_offense": 2604635364,
+        "ranged_precision": 2600887734,
+        "ranged_control": 2259204952
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g27-mid": {
+      "id": "g27-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 536676116,
+        "mage_fireline": 79337096,
+        "melee_magic_utility": 2419745470,
+        "melee_magic_brawler": 107061972,
+        "aura_support": 967685006,
+        "aura_offense": 2853761292,
+        "ranged_precision": 80028628,
+        "ranged_control": 1780573784
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g27-deep": {
+      "id": "g27-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 511716156,
+        "mage_fireline": 1459484418,
+        "melee_magic_utility": 503013190,
+        "melee_magic_brawler": 2826572954,
+        "aura_support": 2957431031,
+        "aura_offense": 1850226507,
+        "ranged_precision": 3719715208,
+        "ranged_control": 4072184801
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g28-scout": {
+      "id": "g28-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 186310534,
+        "mage_fireline": 3750712590,
+        "melee_magic_utility": 1239890895,
+        "melee_magic_brawler": 181909511,
+        "aura_support": 2328622152,
+        "aura_offense": 2176921685,
+        "ranged_precision": 2790246010,
+        "ranged_control": 534106301
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g28-mid": {
+      "id": "g28-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1228926465,
+        "mage_fireline": 3630990400,
+        "melee_magic_utility": 973905647,
+        "melee_magic_brawler": 1363079541,
+        "aura_support": 1181736235,
+        "aura_offense": 736730566,
+        "ranged_precision": 332853069,
+        "ranged_control": 4027260719
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g28-deep": {
+      "id": "g28-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2871675556,
+        "mage_fireline": 770384625,
+        "melee_magic_utility": 693545337,
+        "melee_magic_brawler": 2427782832,
+        "aura_support": 3265865309,
+        "aura_offense": 1869064551,
+        "ranged_precision": 930559379,
+        "ranged_control": 3590206408
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g29-scout": {
+      "id": "g29-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1624647983,
+        "mage_fireline": 1292936857,
+        "melee_magic_utility": 1860241355,
+        "melee_magic_brawler": 1526592792,
+        "aura_support": 3376885347,
+        "aura_offense": 1981602722,
+        "ranged_precision": 1015810903,
+        "ranged_control": 769885348
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g29-mid": {
+      "id": "g29-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 726226767,
+        "mage_fireline": 1569658157,
+        "melee_magic_utility": 1068311046,
+        "melee_magic_brawler": 1767988344,
+        "aura_support": 4059465887,
+        "aura_offense": 2499763346,
+        "ranged_precision": 3485292674,
+        "ranged_control": 1935033184
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g29-deep": {
+      "id": "g29-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2463885012,
+        "mage_fireline": 1603091451,
+        "melee_magic_utility": 125231938,
+        "melee_magic_brawler": 3505461530,
+        "aura_support": 1961198535,
+        "aura_offense": 719414123,
+        "ranged_precision": 2806394684,
+        "ranged_control": 2415855612
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g30-scout": {
+      "id": "g30-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3895874218,
+        "mage_fireline": 4130262082,
+        "melee_magic_utility": 3423578716,
+        "melee_magic_brawler": 3147921062,
+        "aura_support": 1033028563,
+        "aura_offense": 1534277414,
+        "ranged_precision": 1833039909,
+        "ranged_control": 1395348250
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g30-mid": {
+      "id": "g30-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3045107619,
+        "mage_fireline": 1709460544,
+        "melee_magic_utility": 2014163735,
+        "melee_magic_brawler": 1045228066,
+        "aura_support": 553276326,
+        "aura_offense": 928641689,
+        "ranged_precision": 4276566296,
+        "ranged_control": 3875844405
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g30-deep": {
+      "id": "g30-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3224871966,
+        "mage_fireline": 761695218,
+        "melee_magic_utility": 2390942403,
+        "melee_magic_brawler": 2969805786,
+        "aura_support": 182665280,
+        "aura_offense": 1867724706,
+        "ranged_precision": 940442860,
+        "ranged_control": 2955118540
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g31-scout": {
+      "id": "g31-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 899557447,
+        "mage_fireline": 3858352874,
+        "melee_magic_utility": 1940687950,
+        "melee_magic_brawler": 3462617159,
+        "aura_support": 3880181979,
+        "aura_offense": 2500073702,
+        "ranged_precision": 1797920266,
+        "ranged_control": 2745153356
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g31-mid": {
+      "id": "g31-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 4161387394,
+        "mage_fireline": 1055041641,
+        "melee_magic_utility": 3120766214,
+        "melee_magic_brawler": 2743314075,
+        "aura_support": 198842075,
+        "aura_offense": 3478656998,
+        "ranged_precision": 1466807681,
+        "ranged_control": 243389259
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g31-deep": {
+      "id": "g31-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3938210240,
+        "mage_fireline": 1784344734,
+        "melee_magic_utility": 3903391115,
+        "melee_magic_brawler": 355368421,
+        "aura_support": 4247222575,
+        "aura_offense": 3737953190,
+        "ranged_precision": 3725961647,
+        "ranged_control": 2091952672
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g32-scout": {
+      "id": "g32-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2875759909,
+        "mage_fireline": 1625414537,
+        "melee_magic_utility": 2748648021,
+        "melee_magic_brawler": 780645852,
+        "aura_support": 2387802880,
+        "aura_offense": 3434742188,
+        "ranged_precision": 514437704,
+        "ranged_control": 672211565
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g32-mid": {
+      "id": "g32-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3607220333,
+        "mage_fireline": 4185412414,
+        "melee_magic_utility": 536716726,
+        "melee_magic_brawler": 1593614241,
+        "aura_support": 1667578657,
+        "aura_offense": 2118638334,
+        "ranged_precision": 3764905720,
+        "ranged_control": 1199419639
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g32-deep": {
+      "id": "g32-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 562638579,
+        "mage_fireline": 3516181115,
+        "melee_magic_utility": 1874655834,
+        "melee_magic_brawler": 2423360160,
+        "aura_support": 309527640,
+        "aura_offense": 3399373804,
+        "ranged_precision": 3434401203,
+        "ranged_control": 2228892374
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g33-scout": {
+      "id": "g33-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1694730470,
+        "mage_fireline": 3448236634,
+        "melee_magic_utility": 3377866283,
+        "melee_magic_brawler": 3119051459,
+        "aura_support": 3401773108,
+        "aura_offense": 3149973672,
+        "ranged_precision": 3519637380,
+        "ranged_control": 2997717676
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g33-mid": {
+      "id": "g33-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3550312247,
+        "mage_fireline": 426341515,
+        "melee_magic_utility": 254077716,
+        "melee_magic_brawler": 4205660999,
+        "aura_support": 1432529109,
+        "aura_offense": 684776637,
+        "ranged_precision": 3197191705,
+        "ranged_control": 1273372852
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g33-deep": {
+      "id": "g33-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1342476843,
+        "mage_fireline": 3317616305,
+        "melee_magic_utility": 1832371411,
+        "melee_magic_brawler": 1646667147,
+        "aura_support": 238318977,
+        "aura_offense": 3633982475,
+        "ranged_precision": 2445016372,
+        "ranged_control": 3484997043
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g34-scout": {
+      "id": "g34-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2263733756,
+        "mage_fireline": 1779598831,
+        "melee_magic_utility": 3386002611,
+        "melee_magic_brawler": 310979635,
+        "aura_support": 2646676509,
+        "aura_offense": 4223834394,
+        "ranged_precision": 3552792018,
+        "ranged_control": 143381180
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g34-mid": {
+      "id": "g34-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2643398012,
+        "mage_fireline": 3977360990,
+        "melee_magic_utility": 3248740714,
+        "melee_magic_brawler": 2007888430,
+        "aura_support": 2983558226,
+        "aura_offense": 1016814191,
+        "ranged_precision": 1079382273,
+        "ranged_control": 1084173117
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g34-deep": {
+      "id": "g34-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1500074792,
+        "mage_fireline": 1710443060,
+        "melee_magic_utility": 921778068,
+        "melee_magic_brawler": 3792791259,
+        "aura_support": 3877211973,
+        "aura_offense": 710086793,
+        "ranged_precision": 4208796261,
+        "ranged_control": 2102459897
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g35-scout": {
+      "id": "g35-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2358806161,
+        "mage_fireline": 1323360464,
+        "melee_magic_utility": 2982186024,
+        "melee_magic_brawler": 2096026769,
+        "aura_support": 4009226059,
+        "aura_offense": 4127300019,
+        "ranged_precision": 4283663106,
+        "ranged_control": 2526078367
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g35-mid": {
+      "id": "g35-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3490729064,
+        "mage_fireline": 132224933,
+        "melee_magic_utility": 671727300,
+        "melee_magic_brawler": 1011012880,
+        "aura_support": 729707705,
+        "aura_offense": 3730946481,
+        "ranged_precision": 2197276672,
+        "ranged_control": 542523552
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g35-deep": {
+      "id": "g35-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 625683328,
+        "mage_fireline": 305254861,
+        "melee_magic_utility": 2469235971,
+        "melee_magic_brawler": 3822955710,
+        "aura_support": 3433157793,
+        "aura_offense": 1088989646,
+        "ranged_precision": 3652366140,
+        "ranged_control": 3390026872
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g36-scout": {
+      "id": "g36-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 541988049,
+        "mage_fireline": 3443316960,
+        "melee_magic_utility": 483584197,
+        "melee_magic_brawler": 2532977004,
+        "aura_support": 3322402150,
+        "aura_offense": 794404400,
+        "ranged_precision": 829398358,
+        "ranged_control": 4001089126
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g36-mid": {
+      "id": "g36-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1890868469,
+        "mage_fireline": 1427600768,
+        "melee_magic_utility": 587890937,
+        "melee_magic_brawler": 3348637670,
+        "aura_support": 3847419853,
+        "aura_offense": 3427829860,
+        "ranged_precision": 2322953680,
+        "ranged_control": 1642418342
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g36-deep": {
+      "id": "g36-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2312500399,
+        "mage_fireline": 832330271,
+        "melee_magic_utility": 2144114555,
+        "melee_magic_brawler": 2940356819,
+        "aura_support": 620146063,
+        "aura_offense": 2663188344,
+        "ranged_precision": 2357100055,
+        "ranged_control": 3324816246
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g37-scout": {
+      "id": "g37-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3060914549,
+        "mage_fireline": 3390698883,
+        "melee_magic_utility": 1349201658,
+        "melee_magic_brawler": 563959553,
+        "aura_support": 4232541897,
+        "aura_offense": 2247165044,
+        "ranged_precision": 2951900327,
+        "ranged_control": 1120355786
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g37-mid": {
+      "id": "g37-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 697677839,
+        "mage_fireline": 448187428,
+        "melee_magic_utility": 3361068424,
+        "melee_magic_brawler": 3917570402,
+        "aura_support": 3396373105,
+        "aura_offense": 2661489003,
+        "ranged_precision": 3149608481,
+        "ranged_control": 3992055771
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g37-deep": {
+      "id": "g37-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2011845069,
+        "mage_fireline": 3736682649,
+        "melee_magic_utility": 2087665293,
+        "melee_magic_brawler": 1939553853,
+        "aura_support": 422814311,
+        "aura_offense": 208184274,
+        "ranged_precision": 3164677367,
+        "ranged_control": 1811059666
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g38-scout": {
+      "id": "g38-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 486149935,
+        "mage_fireline": 1344741971,
+        "melee_magic_utility": 2692316306,
+        "melee_magic_brawler": 826803810,
+        "aura_support": 3441203245,
+        "aura_offense": 628472536,
+        "ranged_precision": 3632066447,
+        "ranged_control": 4001811871
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g38-mid": {
+      "id": "g38-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 619726689,
+        "mage_fireline": 4238369019,
+        "melee_magic_utility": 1153324054,
+        "melee_magic_brawler": 1619900139,
+        "aura_support": 3470507,
+        "aura_offense": 3068723723,
+        "ranged_precision": 120160510,
+        "ranged_control": 863710055
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g38-deep": {
+      "id": "g38-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 134658029,
+        "mage_fireline": 2290982246,
+        "melee_magic_utility": 681622202,
+        "melee_magic_brawler": 1171420954,
+        "aura_support": 3319528641,
+        "aura_offense": 2252300449,
+        "ranged_precision": 2607683554,
+        "ranged_control": 403774082
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g39-scout": {
+      "id": "g39-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3690929805,
+        "mage_fireline": 2079434393,
+        "melee_magic_utility": 833747867,
+        "melee_magic_brawler": 2194975347,
+        "aura_support": 24990713,
+        "aura_offense": 787797182,
+        "ranged_precision": 3427713212,
+        "ranged_control": 2010859809
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g39-mid": {
+      "id": "g39-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 249769846,
+        "mage_fireline": 3429428362,
+        "melee_magic_utility": 1245532710,
+        "melee_magic_brawler": 2866811197,
+        "aura_support": 2849834577,
+        "aura_offense": 401429132,
+        "ranged_precision": 2970404561,
+        "ranged_control": 3737618463
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g39-deep": {
+      "id": "g39-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2471214698,
+        "mage_fireline": 1824057712,
+        "melee_magic_utility": 2631698087,
+        "melee_magic_brawler": 2013919182,
+        "aura_support": 415634386,
+        "aura_offense": 3489444788,
+        "ranged_precision": 3439219632,
+        "ranged_control": 3640196597
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g40-scout": {
+      "id": "g40-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 855996824,
+        "mage_fireline": 2951455334,
+        "melee_magic_utility": 1705701700,
+        "melee_magic_brawler": 673294099,
+        "aura_support": 1604084882,
+        "aura_offense": 1368107817,
+        "ranged_precision": 3206571131,
+        "ranged_control": 3680282242
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g40-mid": {
+      "id": "g40-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 4246076343,
+        "mage_fireline": 2503150166,
+        "melee_magic_utility": 3869245306,
+        "melee_magic_brawler": 2417545398,
+        "aura_support": 3777967399,
+        "aura_offense": 167261324,
+        "ranged_precision": 362395646,
+        "ranged_control": 1273796820
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g40-deep": {
+      "id": "g40-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1881676599,
+        "mage_fireline": 1393567600,
+        "melee_magic_utility": 1236805711,
+        "melee_magic_brawler": 1203139658,
+        "aura_support": 1814859777,
+        "aura_offense": 2380561707,
+        "ranged_precision": 2801437637,
+        "ranged_control": 783745981
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g41-scout": {
+      "id": "g41-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2822215696,
+        "mage_fireline": 3284812369,
+        "melee_magic_utility": 1677538364,
+        "melee_magic_brawler": 1004990605,
+        "aura_support": 267930007,
+        "aura_offense": 1653624259,
+        "ranged_precision": 396761449,
+        "ranged_control": 812962078
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g41-mid": {
+      "id": "g41-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2456804052,
+        "mage_fireline": 368913039,
+        "melee_magic_utility": 3978369147,
+        "melee_magic_brawler": 2990475544,
+        "aura_support": 2496396269,
+        "aura_offense": 1516226007,
+        "ranged_precision": 2070144281,
+        "ranged_control": 2220784960
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g41-deep": {
+      "id": "g41-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3797745518,
+        "mage_fireline": 2560263503,
+        "melee_magic_utility": 1839192643,
+        "melee_magic_brawler": 1145960864,
+        "aura_support": 2913246762,
+        "aura_offense": 97828165,
+        "ranged_precision": 3483806837,
+        "ranged_control": 1759476670
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g42-scout": {
+      "id": "g42-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2761405023,
+        "mage_fireline": 1449992362,
+        "melee_magic_utility": 3730992169,
+        "melee_magic_brawler": 1118342585,
+        "aura_support": 677947409,
+        "aura_offense": 2943319652,
+        "ranged_precision": 4122696333,
+        "ranged_control": 1503271381
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g42-mid": {
+      "id": "g42-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2555510102,
+        "mage_fireline": 1589154159,
+        "melee_magic_utility": 2028411197,
+        "melee_magic_brawler": 1158211117,
+        "aura_support": 3046968635,
+        "aura_offense": 3669653570,
+        "ranged_precision": 2452124661,
+        "ranged_control": 4059895873
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g42-deep": {
+      "id": "g42-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3648129696,
+        "mage_fireline": 3902012914,
+        "melee_magic_utility": 399763,
+        "melee_magic_brawler": 2868282580,
+        "aura_support": 1220235020,
+        "aura_offense": 1279918496,
+        "ranged_precision": 2339728480,
+        "ranged_control": 869839473
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g43-scout": {
+      "id": "g43-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2840231559,
+        "mage_fireline": 941114322,
+        "melee_magic_utility": 3840904925,
+        "melee_magic_brawler": 3501023824,
+        "aura_support": 504931231,
+        "aura_offense": 4173691472,
+        "ranged_precision": 4245604645,
+        "ranged_control": 1722979272
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g43-mid": {
+      "id": "g43-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 561192176,
+        "mage_fireline": 2722786780,
+        "melee_magic_utility": 515229926,
+        "melee_magic_brawler": 2463120818,
+        "aura_support": 3397482102,
+        "aura_offense": 3887308088,
+        "ranged_precision": 1780743807,
+        "ranged_control": 1163019463
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g43-deep": {
+      "id": "g43-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3543923236,
+        "mage_fireline": 3814902558,
+        "melee_magic_utility": 1810600101,
+        "melee_magic_brawler": 3712139074,
+        "aura_support": 1223658859,
+        "aura_offense": 357260067,
+        "ranged_precision": 3355835384,
+        "ranged_control": 2723897649
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g44-scout": {
+      "id": "g44-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2867600847,
+        "mage_fireline": 1752963284,
+        "melee_magic_utility": 1100106925,
+        "melee_magic_brawler": 355928423,
+        "aura_support": 4245447364,
+        "aura_offense": 2404541871,
+        "ranged_precision": 1774352566,
+        "ranged_control": 4037704224
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g44-mid": {
+      "id": "g44-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1691797782,
+        "mage_fireline": 4230101346,
+        "melee_magic_utility": 3428793219,
+        "melee_magic_brawler": 2002834914,
+        "aura_support": 218627721,
+        "aura_offense": 2395966817,
+        "ranged_precision": 2405159286,
+        "ranged_control": 940570805
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g44-deep": {
+      "id": "g44-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1965153574,
+        "mage_fireline": 1232848863,
+        "melee_magic_utility": 4177340854,
+        "melee_magic_brawler": 4264455080,
+        "aura_support": 923791500,
+        "aura_offense": 358081167,
+        "ranged_precision": 4091024944,
+        "ranged_control": 3215062706
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g45-scout": {
+      "id": "g45-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2814983362,
+        "mage_fireline": 3710961210,
+        "melee_magic_utility": 2044775199,
+        "melee_magic_brawler": 3286798109,
+        "aura_support": 2927734220,
+        "aura_offense": 3493135943,
+        "ranged_precision": 3394925785,
+        "ranged_control": 3991279152
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g45-mid": {
+      "id": "g45-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 661620401,
+        "mage_fireline": 1480944186,
+        "melee_magic_utility": 4223572427,
+        "melee_magic_brawler": 1576624167,
+        "aura_support": 2797356298,
+        "aura_offense": 2440669174,
+        "ranged_precision": 3252782054,
+        "ranged_control": 2267210362
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g45-deep": {
+      "id": "g45-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 515078066,
+        "mage_fireline": 3085256850,
+        "melee_magic_utility": 3779575039,
+        "melee_magic_brawler": 1798545990,
+        "aura_support": 418123695,
+        "aura_offense": 2418213051,
+        "ranged_precision": 3115093544,
+        "ranged_control": 468201964
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g46-scout": {
+      "id": "g46-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1542801288,
+        "mage_fireline": 3696187261,
+        "melee_magic_utility": 1900683203,
+        "melee_magic_brawler": 1672224462,
+        "aura_support": 1983328406,
+        "aura_offense": 1781322280,
+        "ranged_precision": 3637318021,
+        "ranged_control": 955364399
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g46-mid": {
+      "id": "g46-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2436586076,
+        "mage_fireline": 3398521485,
+        "melee_magic_utility": 3271373462,
+        "melee_magic_brawler": 521972840,
+        "aura_support": 1509284913,
+        "aura_offense": 2696539099,
+        "ranged_precision": 2468249993,
+        "ranged_control": 1348108841
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g46-deep": {
+      "id": "g46-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 872663698,
+        "mage_fireline": 1966543816,
+        "melee_magic_utility": 74126789,
+        "melee_magic_brawler": 3882818304,
+        "aura_support": 151697537,
+        "aura_offense": 80509423,
+        "ranged_precision": 1662364443,
+        "ranged_control": 1930897759
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g47-scout": {
+      "id": "g47-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2719129983,
+        "mage_fireline": 3685173285,
+        "melee_magic_utility": 1554513202,
+        "melee_magic_brawler": 614497038,
+        "aura_support": 4202284538,
+        "aura_offense": 1752451093,
+        "ranged_precision": 1758503360,
+        "ranged_control": 3494609807
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g47-mid": {
+      "id": "g47-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 475525293,
+        "mage_fireline": 2742068768,
+        "melee_magic_utility": 959848306,
+        "melee_magic_brawler": 3429379822,
+        "aura_support": 441073404,
+        "aura_offense": 3384137365,
+        "ranged_precision": 3661616793,
+        "ranged_control": 3420573563
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g47-deep": {
+      "id": "g47-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3880753146,
+        "mage_fireline": 1427197719,
+        "melee_magic_utility": 3221275777,
+        "melee_magic_brawler": 3870488968,
+        "aura_support": 3033618818,
+        "aura_offense": 1401514036,
+        "ranged_precision": 1557444382,
+        "ranged_control": 1078154864
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g48-scout": {
+      "id": "g48-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 167406238,
+        "mage_fireline": 2903751766,
+        "melee_magic_utility": 678205045,
+        "melee_magic_brawler": 759370365,
+        "aura_support": 416506976,
+        "aura_offense": 13035551,
+        "ranged_precision": 1717491525,
+        "ranged_control": 2917246191
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g48-mid": {
+      "id": "g48-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2350956578,
+        "mage_fireline": 2334388154,
+        "melee_magic_utility": 3356514327,
+        "melee_magic_brawler": 328682476,
+        "aura_support": 3908442532,
+        "aura_offense": 2068039168,
+        "ranged_precision": 1836828043,
+        "ranged_control": 2029445847
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g48-deep": {
+      "id": "g48-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 4287197585,
+        "mage_fireline": 3143297974,
+        "melee_magic_utility": 3161642831,
+        "melee_magic_brawler": 4177366595,
+        "aura_support": 3490281033,
+        "aura_offense": 120487720,
+        "ranged_precision": 2368255767,
+        "ranged_control": 3852153814
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g49-scout": {
+      "id": "g49-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 472455381,
+        "mage_fireline": 502035231,
+        "melee_magic_utility": 2483837503,
+        "melee_magic_brawler": 540442554,
+        "aura_support": 752425188,
+        "aura_offense": 3710784290,
+        "ranged_precision": 2413493264,
+        "ranged_control": 2836920528
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g49-mid": {
+      "id": "g49-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1649565345,
+        "mage_fireline": 1470235626,
+        "melee_magic_utility": 130743511,
+        "melee_magic_brawler": 188630191,
+        "aura_support": 246434452,
+        "aura_offense": 4065881545,
+        "ranged_precision": 2396403400,
+        "ranged_control": 3765273487
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g49-deep": {
+      "id": "g49-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2691236950,
+        "mage_fireline": 922863276,
+        "melee_magic_utility": 2153232110,
+        "melee_magic_brawler": 28388618,
+        "aura_support": 110968,
+        "aura_offense": 1172143564,
+        "ranged_precision": 1376985679,
+        "ranged_control": 3478190420
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g50-scout": {
+      "id": "g50-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1004808701,
+        "mage_fireline": 2929850481,
+        "melee_magic_utility": 3886286586,
+        "melee_magic_brawler": 2920055565,
+        "aura_support": 1593366602,
+        "aura_offense": 517615063,
+        "ranged_precision": 4085631632,
+        "ranged_control": 28753736
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g50-mid": {
+      "id": "g50-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3942194019,
+        "mage_fireline": 3539251687,
+        "melee_magic_utility": 429827149,
+        "melee_magic_brawler": 985494035,
+        "aura_support": 2431428722,
+        "aura_offense": 134741512,
+        "ranged_precision": 2147096055,
+        "ranged_control": 1779348734
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g50-deep": {
+      "id": "g50-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2356162526,
+        "mage_fireline": 3960188694,
+        "melee_magic_utility": 1344401340,
+        "melee_magic_brawler": 3743906009,
+        "aura_support": 1768478390,
+        "aura_offense": 2090363723,
+        "ranged_precision": 2655987347,
+        "ranged_control": 3647920515
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g51-scout": {
+      "id": "g51-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3439947898,
+        "mage_fireline": 2394030677,
+        "melee_magic_utility": 1274327999,
+        "melee_magic_brawler": 4108306975,
+        "aura_support": 1946326105,
+        "aura_offense": 81825210,
+        "ranged_precision": 1211938271,
+        "ranged_control": 835858601
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g51-mid": {
+      "id": "g51-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2747308282,
+        "mage_fireline": 2121361626,
+        "melee_magic_utility": 3951091207,
+        "melee_magic_brawler": 2022776009,
+        "aura_support": 309545627,
+        "aura_offense": 4263664099,
+        "ranged_precision": 4007551797,
+        "ranged_control": 293077155
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g51-deep": {
+      "id": "g51-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1986864051,
+        "mage_fireline": 2234860777,
+        "melee_magic_utility": 106442477,
+        "melee_magic_brawler": 1223697692,
+        "aura_support": 3379097923,
+        "aura_offense": 1318342616,
+        "ranged_precision": 965668196,
+        "ranged_control": 2668840314
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g52-scout": {
+      "id": "g52-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1596157374,
+        "mage_fireline": 2650001292,
+        "melee_magic_utility": 2420654909,
+        "melee_magic_brawler": 2114627014,
+        "aura_support": 1246669530,
+        "aura_offense": 2588475328,
+        "ranged_precision": 2846052494,
+        "ranged_control": 2388846554
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g52-mid": {
+      "id": "g52-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2380450943,
+        "mage_fireline": 2519475231,
+        "melee_magic_utility": 1299737501,
+        "melee_magic_brawler": 1840000632,
+        "aura_support": 1961848342,
+        "aura_offense": 531210561,
+        "ranged_precision": 3719065715,
+        "ranged_control": 1219949364
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g52-deep": {
+      "id": "g52-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 440633230,
+        "mage_fireline": 590232171,
+        "melee_magic_utility": 3638622155,
+        "melee_magic_brawler": 2017279407,
+        "aura_support": 756873300,
+        "aura_offense": 2368863432,
+        "ranged_precision": 2899086732,
+        "ranged_control": 2753241892
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g53-scout": {
+      "id": "g53-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3486110764,
+        "mage_fireline": 1594312330,
+        "melee_magic_utility": 3346587930,
+        "melee_magic_brawler": 948482217,
+        "aura_support": 2383018156,
+        "aura_offense": 4276596104,
+        "ranged_precision": 2064001475,
+        "ranged_control": 1935264294
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g53-mid": {
+      "id": "g53-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1167786031,
+        "mage_fireline": 879205062,
+        "melee_magic_utility": 835651811,
+        "melee_magic_brawler": 914560562,
+        "aura_support": 901611727,
+        "aura_offense": 2531381719,
+        "ranged_precision": 453023075,
+        "ranged_control": 1914092333
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g53-deep": {
+      "id": "g53-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3284714253,
+        "mage_fireline": 910821949,
+        "melee_magic_utility": 2223548553,
+        "melee_magic_brawler": 3349892219,
+        "aura_support": 2926491617,
+        "aura_offense": 1907930443,
+        "ranged_precision": 2007947406,
+        "ranged_control": 2332653780
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g54-scout": {
+      "id": "g54-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 891691206,
+        "mage_fireline": 1079689848,
+        "melee_magic_utility": 1855256544,
+        "melee_magic_brawler": 2601020152,
+        "aura_support": 226715559,
+        "aura_offense": 3150823677,
+        "ranged_precision": 700559516,
+        "ranged_control": 893592524
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g54-mid": {
+      "id": "g54-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2472498518,
+        "mage_fireline": 4040681952,
+        "melee_magic_utility": 997914205,
+        "melee_magic_brawler": 1611585692,
+        "aura_support": 1879282534,
+        "aura_offense": 749560087,
+        "ranged_precision": 1700880284,
+        "ranged_control": 1656166025
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g54-deep": {
+      "id": "g54-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2618060885,
+        "mage_fireline": 3823447858,
+        "melee_magic_utility": 643352924,
+        "melee_magic_brawler": 1278941983,
+        "aura_support": 2380262209,
+        "aura_offense": 3608036927,
+        "ranged_precision": 1502496097,
+        "ranged_control": 4528292
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g55-scout": {
+      "id": "g55-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 3105337961,
+        "mage_fireline": 1098739567,
+        "melee_magic_utility": 3960010004,
+        "melee_magic_brawler": 230130526,
+        "aura_support": 1894955888,
+        "aura_offense": 577247288,
+        "ranged_precision": 2242673169,
+        "ranged_control": 2863595203
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g55-mid": {
+      "id": "g55-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 305688449,
+        "mage_fireline": 2202722268,
+        "melee_magic_utility": 952749252,
+        "melee_magic_brawler": 1745640907,
+        "aura_support": 1695855994,
+        "aura_offense": 2731573863,
+        "ranged_precision": 1189644192,
+        "ranged_control": 931379592
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g55-deep": {
+      "id": "g55-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2696400700,
+        "mage_fireline": 2530599748,
+        "melee_magic_utility": 889083134,
+        "melee_magic_brawler": 879648663,
+        "aura_support": 2547731494,
+        "aura_offense": 115620224,
+        "ranged_precision": 964360250,
+        "ranged_control": 3822065248
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g56-scout": {
+      "id": "g56-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1761433393,
+        "mage_fireline": 3116700958,
+        "melee_magic_utility": 2271054300,
+        "melee_magic_brawler": 3653893432,
+        "aura_support": 2279349782,
+        "aura_offense": 724582968,
+        "ranged_precision": 369238271,
+        "ranged_control": 444867753
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g56-mid": {
+      "id": "g56-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3173572107,
+        "mage_fireline": 2870897386,
+        "melee_magic_utility": 1736128416,
+        "melee_magic_brawler": 390511132,
+        "aura_support": 1111795212,
+        "aura_offense": 1556577244,
+        "ranged_precision": 2041550830,
+        "ranged_control": 3200301988
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g56-deep": {
+      "id": "g56-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 87069966,
+        "mage_fireline": 2163627185,
+        "melee_magic_utility": 3113364956,
+        "melee_magic_brawler": 2502157392,
+        "aura_support": 763161983,
+        "aura_offense": 3319706633,
+        "ranged_precision": 1788891319,
+        "ranged_control": 3753255570
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g57-scout": {
+      "id": "g57-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 98682789,
+        "mage_fireline": 1617239958,
+        "melee_magic_utility": 2731984683,
+        "melee_magic_brawler": 1299025709,
+        "aura_support": 2658504591,
+        "aura_offense": 1891749699,
+        "ranged_precision": 880620446,
+        "ranged_control": 1417609598
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g57-mid": {
+      "id": "g57-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2403148072,
+        "mage_fireline": 2295822851,
+        "melee_magic_utility": 1200665951,
+        "melee_magic_brawler": 779651817,
+        "aura_support": 4228365372,
+        "aura_offense": 4143775484,
+        "ranged_precision": 1771016515,
+        "ranged_control": 2951243059
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g57-deep": {
+      "id": "g57-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2829917964,
+        "mage_fireline": 2053011643,
+        "melee_magic_utility": 1541341562,
+        "melee_magic_brawler": 227219070,
+        "aura_support": 3985222501,
+        "aura_offense": 3447302543,
+        "ranged_precision": 2362641038,
+        "ranged_control": 3675588243
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g58-scout": {
+      "id": "g58-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2171951122,
+        "mage_fireline": 3007032556,
+        "melee_magic_utility": 1142634618,
+        "melee_magic_brawler": 1497767564,
+        "aura_support": 2997313411,
+        "aura_offense": 3625221780,
+        "ranged_precision": 2159027708,
+        "ranged_control": 2776732480
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g58-mid": {
+      "id": "g58-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1429510205,
+        "mage_fireline": 3240444072,
+        "melee_magic_utility": 3512840263,
+        "melee_magic_brawler": 1741587245,
+        "aura_support": 3779849335,
+        "aura_offense": 3546202732,
+        "ranged_precision": 2447199504,
+        "ranged_control": 1026873478
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g58-deep": {
+      "id": "g58-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 501409571,
+        "mage_fireline": 3011105080,
+        "melee_magic_utility": 1208916908,
+        "melee_magic_brawler": 1435303076,
+        "aura_support": 2232247206,
+        "aura_offense": 1517538870,
+        "ranged_precision": 589120540,
+        "ranged_control": 3961799983
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g59-scout": {
+      "id": "g59-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1206424849,
+        "mage_fireline": 3725427319,
+        "melee_magic_utility": 4288097807,
+        "melee_magic_brawler": 1405298417,
+        "aura_support": 1431668329,
+        "aura_offense": 3339841512,
+        "ranged_precision": 2004482444,
+        "ranged_control": 4060133656
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g59-mid": {
+      "id": "g59-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 3865472192,
+        "mage_fireline": 2294518479,
+        "melee_magic_utility": 4133210855,
+        "melee_magic_brawler": 3465940509,
+        "aura_support": 1558601867,
+        "aura_offense": 992766645,
+        "ranged_precision": 4007402527,
+        "ranged_control": 1563546976
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g59-deep": {
+      "id": "g59-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2296476657,
+        "mage_fireline": 1428805796,
+        "melee_magic_utility": 3836411741,
+        "melee_magic_brawler": 355266514,
+        "aura_support": 1982065471,
+        "aura_offense": 210789081,
+        "ranged_precision": 1930026865,
+        "ranged_control": 3155886824
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g60-scout": {
+      "id": "g60-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2931085972,
+        "mage_fireline": 3124741377,
+        "melee_magic_utility": 4267811775,
+        "melee_magic_brawler": 124965055,
+        "aura_support": 3313789129,
+        "aura_offense": 3877947193,
+        "ranged_precision": 2784340925,
+        "ranged_control": 2500856671
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g60-mid": {
+      "id": "g60-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1353617760,
+        "mage_fireline": 168984950,
+        "melee_magic_utility": 3342599854,
+        "melee_magic_brawler": 931077994,
+        "aura_support": 2718860609,
+        "aura_offense": 814692855,
+        "ranged_precision": 2001727465,
+        "ranged_control": 1122780109
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g60-deep": {
+      "id": "g60-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 2207925070,
+        "mage_fireline": 2203537663,
+        "melee_magic_utility": 4131593927,
+        "melee_magic_brawler": 2857335623,
+        "aura_support": 1503952667,
+        "aura_offense": 212512024,
+        "ranged_precision": 1519690961,
+        "ranged_control": 169031360
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g61-scout": {
+      "id": "g61-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 2691419261,
+        "mage_fireline": 2084772801,
+        "melee_magic_utility": 3893055645,
+        "melee_magic_brawler": 1465946240,
+        "aura_support": 1140513915,
+        "aura_offense": 3979972403,
+        "ranged_precision": 282955293,
+        "ranged_control": 963358906
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g61-mid": {
+      "id": "g61-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 1057715899,
+        "mage_fireline": 282326334,
+        "melee_magic_utility": 4015553827,
+        "melee_magic_brawler": 1921102224,
+        "aura_support": 3389910490,
+        "aura_offense": 646694551,
+        "ranged_precision": 1748870013,
+        "ranged_control": 24861241
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g61-deep": {
+      "id": "g61-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 1673875218,
+        "mage_fireline": 522268869,
+        "melee_magic_utility": 3621038406,
+        "melee_magic_brawler": 2008679236,
+        "aura_support": 3937118345,
+        "aura_offense": 1702421747,
+        "ranged_precision": 284797200,
+        "ranged_control": 1269619234
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g62-scout": {
+      "id": "g62-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 1031469417,
+        "mage_fireline": 1895373938,
+        "melee_magic_utility": 13343768,
+        "melee_magic_brawler": 1868354219,
+        "aura_support": 543972428,
+        "aura_offense": 2583737797,
+        "ranged_precision": 1260652087,
+        "ranged_control": 821487381
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g62-mid": {
+      "id": "g62-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2091263679,
+        "mage_fireline": 3066201017,
+        "melee_magic_utility": 3924316910,
+        "melee_magic_brawler": 2805154512,
+        "aura_support": 2958134638,
+        "aura_offense": 2633809024,
+        "ranged_precision": 1617969581,
+        "ranged_control": 1549843839
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g62-deep": {
+      "id": "g62-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 153843527,
+        "mage_fireline": 1861465730,
+        "melee_magic_utility": 3441082920,
+        "melee_magic_brawler": 2884426845,
+        "aura_support": 2835690704,
+        "aura_offense": 906107870,
+        "ranged_precision": 1697323287,
+        "ranged_control": 1638308405
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g63-scout": {
+      "id": "g63-scout",
+      "gamesPerTemplate": 16,
+      "seeds": {
+        "mage_frontline": 453483916,
+        "mage_fireline": 101740592,
+        "melee_magic_utility": 1856219521,
+        "melee_magic_brawler": 1328868928,
+        "aura_support": 1944610967,
+        "aura_offense": 1941851026,
+        "ranged_precision": 4283047848,
+        "ranged_control": 1602225881
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g63-mid": {
+      "id": "g63-mid",
+      "gamesPerTemplate": 64,
+      "seeds": {
+        "mage_frontline": 2319307963,
+        "mage_fireline": 3069623317,
+        "melee_magic_utility": 2526961320,
+        "melee_magic_brawler": 133702608,
+        "aura_support": 260433493,
+        "aura_offense": 557241307,
+        "ranged_precision": 454017793,
+        "ranged_control": 862152806
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "g63-deep": {
+      "id": "g63-deep",
+      "gamesPerTemplate": 256,
+      "seeds": {
+        "mage_frontline": 3856019873,
+        "mage_fireline": 2003077966,
+        "melee_magic_utility": 1234599452,
+        "melee_magic_brawler": 3623877080,
+        "aura_support": 3496283239,
+        "aura_offense": 2024212060,
+        "ranged_precision": 2254059471,
+        "ranged_control": 3264515401
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "final-v06": {
+      "id": "final-v06",
+      "gamesPerTemplate": 12000,
+      "seeds": {
+        "mage_frontline": 3711886776,
+        "mage_fireline": 3765289266,
+        "melee_magic_utility": 3636237311,
+        "melee_magic_brawler": 2166234923,
+        "aura_support": 1941408349,
+        "aura_offense": 1011530408,
+        "ranged_precision": 3083252211,
+        "ranged_control": 3200532693
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    },
+    "final-v04": {
+      "id": "final-v04",
+      "gamesPerTemplate": 2000,
+      "seeds": {
+        "mage_frontline": 2635026140,
+        "mage_fireline": 70120507,
+        "melee_magic_utility": 61642608,
+        "melee_magic_brawler": 4103733063,
+        "aura_support": 3998180925,
+        "aura_offense": 529420539,
+        "ranged_precision": 3108852186,
+        "ranged_control": 1687205385
+      },
+      "nonces": {
+        "mage_frontline": 0,
+        "mage_fireline": 0,
+        "melee_magic_utility": 0,
+        "melee_magic_brawler": 0,
+        "aura_support": 0,
+        "aura_offense": 0,
+        "ranged_precision": 0,
+        "ranged_control": 0
+      }
+    }
+  },
+  "declaration": "All train/selection/final pair streams were allocated before outcomes and are mutually disjoint and disjoint from committed v0.7 and sibling 96h manifests parsed above."
+}

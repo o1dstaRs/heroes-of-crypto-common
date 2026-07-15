@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import {
     assertV0796hPanelsDisjoint,
@@ -15,6 +15,8 @@ import {
     decodeV0796hGenome,
     deriveV0796hSeed,
     encodeV0796hGenome,
+    expandV0796hPriorSeedManifest,
+    expandV0796hPriorSeedPanels,
     expandV0796hPriorSeedSeries,
     fingerprintV0796hGenome,
     refitV0796hDistribution,
@@ -22,6 +24,7 @@ import {
     scoreV0796hTrial,
     shouldPromoteV0796h,
     V07_96H_GENOME_DIM,
+    V07_96H_PAIR_SEED_STEP,
     V07_96H_TEMPLATES,
     v0796hProbeGenomes,
     type IV0796hPriorSeedSeries,
@@ -78,6 +81,31 @@ describe("v0.7 96-hour optimizer core", () => {
                 { id: "right", baseSeed: 1, streams: 1, streamStride: 0, gamesPerStream: 2 },
             ]),
         ).toThrow("Prior seed series collision");
+    });
+
+    it("rejects malformed 96-hour panel manifests and incorrect declared counts", () => {
+        const panel = buildV0796hSeedPanel("prior-run", "selection", 2);
+        const manifest = {
+            schemaVersion: 1,
+            pairSeedStep: V07_96H_PAIR_SEED_STEP,
+            allocatedDerivedScenarioSeeds: 8,
+            panels: { selection: panel },
+        };
+        expect(expandV0796hPriorSeedPanels(manifest)).toHaveLength(8);
+        expect(() => expandV0796hPriorSeedPanels({ ...manifest, schemaVersion: 2 })).toThrow("schemaVersion 1");
+        expect(() => expandV0796hPriorSeedPanels({ ...manifest, allocatedDerivedScenarioSeeds: 9 })).toThrow(
+            "count mismatch",
+        );
+    });
+
+    it("reserves every unique pair seed from the committed d68490a runs", () => {
+        const directory = new URL("../../src/simulation/manifests/", import.meta.url);
+        const names = readdirSync(directory).filter((name) => /^v0_7.*\.json$/.test(name));
+        const seeds = names.flatMap((name) =>
+            expandV0796hPriorSeedManifest(JSON.parse(readFileSync(new URL(name, directory), "utf8"))),
+        );
+        expect(seeds).toHaveLength(430_104);
+        expect(new Set(seeds).size).toBe(seeds.length);
     });
 
     it("round-trips bounded model genomes and samples deterministically", () => {

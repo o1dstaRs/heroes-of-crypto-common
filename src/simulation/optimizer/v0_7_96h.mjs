@@ -34,7 +34,7 @@ import { parseArgs } from "node:util";
 import {
     canonicalV0796hJson,
     createV0796hDistribution,
-    expandV0796hPriorSeedSeries,
+    expandV0796hPriorSeedManifest,
     fingerprintV0796h,
     fingerprintV0796hGenome,
     refitV0796hDistribution,
@@ -305,18 +305,6 @@ function allocatePanel(runId, id, gamesPerTemplate, used) {
     return { id, gamesPerTemplate, seeds, nonces };
 }
 
-function addSeedStream(used, base, games, label = "seed stream") {
-    if (!Number.isSafeInteger(base) || base < 0 || base > 0xffffffff) {
-        throw new Error(`${label} base must be a uint32`);
-    }
-    if (!Number.isSafeInteger(games) || games < 2 || games % 2 !== 0) {
-        throw new Error(`${label} games must be an even integer >= 2`);
-    }
-    for (let pair = 0; pair < games / 2; pair += 1) {
-        used.add((base + Math.imul(pair, PAIR_SEED_STEP)) >>> 0);
-    }
-}
-
 function priorSeedState() {
     const directory = join(PACKAGE_ROOT, "src", "simulation", "manifests");
     const used = new Set();
@@ -328,34 +316,7 @@ function priorSeedState() {
         const raw = readFileSync(path, "utf8");
         const manifest = JSON.parse(raw);
         manifests.push({ path: relative(PACKAGE_ROOT, path), sha256: sha256(raw) });
-        if (manifest.seedSeries !== undefined) {
-            if (manifest.pairSeedStep !== PAIR_SEED_STEP || !Array.isArray(manifest.seedSeries)) {
-                throw new Error(`Invalid compact prior-seed manifest: ${path}`);
-            }
-            const seeds = expandV0796hPriorSeedSeries(manifest.seedSeries);
-            if (
-                Number.isInteger(manifest.expectedDerivedScenarioSeeds) &&
-                seeds.length !== manifest.expectedDerivedScenarioSeeds
-            ) {
-                throw new Error(`Prior-seed manifest count mismatch: ${path}`);
-            }
-            for (const seed of seeds) used.add(seed);
-        }
-        if (Number.isInteger(manifest.gamesPerCell) && manifest.cells) {
-            const visit = (value) => {
-                if (Number.isInteger(value)) addSeedStream(used, value, manifest.gamesPerCell);
-                else if (value && typeof value === "object") Object.values(value).forEach(visit);
-            };
-            visit(manifest.cells);
-        }
-        if (manifest.headline?.seeds && Number.isInteger(manifest.headline.gamesPerSeed)) {
-            for (const seed of manifest.headline.seeds) addSeedStream(used, seed, manifest.headline.gamesPerSeed);
-        }
-        if (manifest.cohorts?.seeds && Number.isInteger(manifest.cohorts.gamesPerSeed)) {
-            for (const seeds of Object.values(manifest.cohorts.seeds)) {
-                for (const seed of seeds) addSeedStream(used, seed, manifest.cohorts.gamesPerSeed);
-            }
-        }
+        for (const seed of expandV0796hPriorSeedManifest(manifest)) used.add(seed);
     }
     const runParent = dirname(OUT);
     for (const entry of readdirSync(runParent, { withFileTypes: true })) {
@@ -365,29 +326,7 @@ function priorSeedState() {
         try {
             const raw = readFileSync(path, "utf8");
             const manifest = JSON.parse(raw);
-            if (
-                manifest.schemaVersion !== 1 ||
-                manifest.pairSeedStep !== PAIR_SEED_STEP ||
-                !manifest.panels ||
-                typeof manifest.panels !== "object" ||
-                Array.isArray(manifest.panels) ||
-                !Object.keys(manifest.panels).length
-            ) {
-                throw new Error("schemaVersion 1 with nonempty panels is required");
-            }
-            for (const [panelId, panel] of Object.entries(manifest.panels)) {
-                const expectedTemplates = V07_96H_TEMPLATES.map(({ template }) => template).sort();
-                const actualTemplates =
-                    panel?.seeds && typeof panel.seeds === "object" && !Array.isArray(panel.seeds)
-                        ? Object.keys(panel.seeds).sort()
-                        : [];
-                if (canonicalV0796hJson(actualTemplates) !== canonicalV0796hJson(expectedTemplates)) {
-                    throw new Error(`${panelId} does not contain exactly the eight fixed-template seeds`);
-                }
-                for (const [template, seed] of Object.entries(panel.seeds)) {
-                    addSeedStream(used, seed, panel.gamesPerTemplate, `${panelId}.${template}`);
-                }
-            }
+            for (const seed of expandV0796hPriorSeedManifest(manifest)) used.add(seed);
             manifests.push({ path: resolve(path), sha256: sha256(raw), kind: "prior_96h_run" });
         } catch (error) {
             throw new Error(`Cannot validate prior 96h seed manifest ${path}: ${String(error)}`);
