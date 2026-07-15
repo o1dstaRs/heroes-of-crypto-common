@@ -44,7 +44,7 @@ import {
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
-import { ilActionSignature, parseIlRow } from "../../src/simulation/il_dataset";
+import { ilActionSignature, parseIlGameRow, parseIlRow } from "../../src/simulation/il_dataset";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { classifyActions, SearchDriver } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
@@ -61,6 +61,8 @@ const SEARCH_ENV_KEYS = [
     "Q2_DATASET",
     "Q2_DATASET_V2",
     "SEARCH_IL_DATASET",
+    "SEARCH_IL_RUN_FINGERPRINT",
+    "SEARCH_IL_COHORT",
     "PHASE_B_RUN_FINGERPRINT",
     "SEARCH_VERSIONS",
     "SEARCH_GATE",
@@ -1258,29 +1260,36 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
     it("SEARCH_IL_DATASET dumps one imitation row per searched decision (search mode only)", () => {
         const dir = mkdtempSync(join(tmpdir(), "ild-"));
         const ilPath = join(dir, "il.jsonl");
+        const fingerprint = "d".repeat(64);
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.6",
             SEARCH_ROLLOUTS: "1",
             SEARCH_HORIZON: "2",
             SEARCH_GATE: "0",
+            SEARCH_SHORTLIST: "2",
             SEARCH_IL_DATASET: ilPath,
+            SEARCH_IL_RUN_FINGERPRINT: fingerprint,
+            SEARCH_IL_COHORT: "smoke",
         });
         const h = buildBattle(2040, "v0.6");
         const unit = h.activeUnit()!;
         const incumbent = h.decideActive();
         const driver = h.makeDriver();
         const decided = driver.chooseDecision(unit, "v0.6", incumbent);
-        driver.onMatchEnd("v0.6", "elimination");
-        const rows = readFileSync(ilPath, "utf8")
-            .trim()
-            .split("\n")
-            .map((line, index) =>
-                parseIlRow(JSON.parse(line), WAIT_FEATURE_NAMES.length, VALUE_FEATURE_NAMES_V2.length, `row ${index}`),
-            );
-        expect(rows).toHaveLength(1);
-        const row = rows[0];
+        driver.onMatchEnd("green", "elimination");
+        const lines = readFileSync(ilPath, "utf8").trim().split("\n");
+        expect(lines).toHaveLength(2);
+        const row = parseIlRow(
+            JSON.parse(lines[0]),
+            WAIT_FEATURE_NAMES.length,
+            VALUE_FEATURE_NAMES_V2.length,
+            fingerprint,
+        );
+        const game = parseIlGameRow(JSON.parse(lines[1]), fingerprint);
         expect(row.seed).toBe(2040);
+        expect(row.cohort).toBe("smoke");
+        expect(row.decision).toBe(0);
         expect(row.green).toBe("v0.6");
         expect(row.k).toBe(classifyActions(incumbent));
         expect(row.cands[0].kind).toBe("incumbent");
@@ -1288,10 +1297,28 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         // The dumped chosen index resolves to the exact turn the driver returned to the battle loop.
         expect(row.cands[row.chosen].sig).toBe(ilActionSignature(decided));
         expect(row.act.length).toBeGreaterThan(0);
+        expect(row.cands).toHaveLength(2);
         expect(row.nc).toBeGreaterThanOrEqual(row.cands.length);
-        expect(row.cfg).toMatchObject({ gate: 0, horizon: 2, rollouts: 1, leaf: "learned", shortlist: null });
+        expect(row.cfg).toMatchObject({ gate: 0, horizon: 2, rollouts: 1, leaf: "learned", shortlist: 2 });
         // The incumbent's mean leaf is comparable (finite) unless it was illegal in simulation.
         expect(row.cands.some((c) => c.m !== null)).toBe(true);
+        expect(game).toMatchObject({
+            rows: 1,
+            decisions: 1,
+            searched: 1,
+            singleCandidate: 0,
+            deadlineFallbacks: 0,
+            circuitOpened: 0,
+            circuitSkipped: 0,
+            cfg: { shortlist: 2 },
+        });
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_IL_DATASET: join(dir, "missing-provenance.jsonl"),
+        });
+        expect(() => buildBattle(2042, "v0.6").makeDriver()).toThrow("SEARCH_IL_RUN_FINGERPRINT");
 
         // Oracle mode never writes IL rows — the knob is search-mode only.
         const oraclePath = join(dir, "oracle-il.jsonl");

@@ -28,7 +28,15 @@ import type { Unit } from "../units/unit";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
-import { IL_DATASET_VERSION, IL_ROW_TYPE, ilActionSignature, ilCandidateFeatureVector } from "./il_dataset";
+import {
+    IL_DATASET_VERSION,
+    IL_GAME_ROW_TYPE,
+    IL_ROW_TYPE,
+    ilActionSignature,
+    ilCandidateFeatureVector,
+    requireIlRunFingerprint,
+    type IIlSearchConfig,
+} from "./il_dataset";
 import type { ILookaheadDeps } from "./lookahead";
 import {
     canonicalPhaseBSeed,
@@ -358,6 +366,8 @@ export class SearchDriver {
     private readonly datasetRows: string[] = [];
     /** SEARCH_IL_DATASET (search mode only): per-decision imitation-learning rows (see ./il_dataset.ts). */
     private readonly ilPath: string | undefined;
+    private readonly ilRunFingerprint: string | null;
+    private readonly ilCohort: string | null;
     private readonly ilRows: string[] = [];
     private readonly caps: {
         maxMoveDestinations: number;
@@ -462,6 +472,26 @@ export class SearchDriver {
         this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
         this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
         this.ilPath = this.mode === "search" ? process.env.SEARCH_IL_DATASET || undefined : undefined;
+        if (this.ilPath) {
+            this.ilRunFingerprint = requireIlRunFingerprint(process.env.SEARCH_IL_RUN_FINGERPRINT);
+            this.ilCohort = process.env.SEARCH_IL_COHORT?.trim() || null;
+            if (!this.ilCohort) {
+                throw new Error("SEARCH_IL_COHORT is required with SEARCH_IL_DATASET");
+            }
+            if (
+                !Number.isSafeInteger(this.match.seed) ||
+                this.match.seed! < -0x80000000 ||
+                this.match.seed! > 0xffffffff
+            ) {
+                throw new Error("SEARCH_IL_DATASET requires a signed int32 or uint32 match seed");
+            }
+            if (!this.match.greenVersion?.trim() || !this.match.redVersion?.trim()) {
+                throw new Error("SEARCH_IL_DATASET requires green and red strategy versions");
+            }
+        } else {
+            this.ilRunFingerprint = null;
+            this.ilCohort = null;
+        }
         if (this.datasetPath && this.datasetV2) {
             this.datasetFingerprint = requirePhaseBRunFingerprint(process.env.PHASE_B_RUN_FINGERPRINT);
             this.datasetSeed = canonicalPhaseBSeed(this.match.seed, "Q2 dataset seed");
@@ -555,12 +585,34 @@ export class SearchDriver {
     }
     /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the datasets. */
     public onMatchEnd(winner?: string, endReason?: string): void {
-        if (this.ilPath && this.ilRows.length) {
-            try {
-                appendFileSync(this.ilPath, `${this.ilRows.join("\n")}\n`);
-            } catch {
-                /* best-effort dump */
+        if (this.ilPath) {
+            if (winner !== "green" && winner !== "red" && winner !== "draw") {
+                throw new Error("SEARCH_IL_DATASET requires a valid match winner");
             }
+            if (endReason !== "elimination" && endReason !== "turn_cap" && endReason !== "stuck") {
+                throw new Error("SEARCH_IL_DATASET requires a valid match end reason");
+            }
+            const c = this.counters;
+            const footer = JSON.stringify({
+                t: IL_GAME_ROW_TYPE,
+                v: IL_DATASET_VERSION,
+                runFingerprint: this.ilRunFingerprint!,
+                cohort: this.ilCohort!,
+                seed: this.match.seed!,
+                green: this.match.greenVersion!,
+                red: this.match.redVersion!,
+                winner,
+                endReason,
+                rows: this.ilRows.length,
+                decisions: c.decisions,
+                searched: c.searched,
+                singleCandidate: c.singleCandidate,
+                deadlineFallbacks: c.deadlineFallbacks,
+                circuitOpened: this.circuitOpen ? 1 : 0,
+                circuitSkipped: c.circuitSkipped,
+                cfg: this.ilConfig(),
+            });
+            appendFileSync(this.ilPath, `${[...this.ilRows, footer].join("\n")}\n`);
             this.ilRows.length = 0;
         }
         if (this.datasetPath && this.datasetRows.length) {
@@ -725,9 +777,12 @@ export class SearchDriver {
                 JSON.stringify({
                     t: IL_ROW_TYPE,
                     v: IL_DATASET_VERSION,
-                    seed: this.match.seed ?? 0,
-                    green: this.match.greenVersion ?? "?",
-                    red: this.match.redVersion ?? "?",
+                    runFingerprint: this.ilRunFingerprint!,
+                    cohort: this.ilCohort!,
+                    decision: this.ilRows.length,
+                    seed: this.match.seed!,
+                    green: this.match.greenVersion!,
+                    red: this.match.redVersion!,
                     side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
@@ -745,15 +800,7 @@ export class SearchDriver {
                         cf: ilCandidateFeatureVector(cand.features).map((x) => Number(x.toFixed(4))),
                         m: means[i] === -Infinity ? null : Number(means[i].toFixed(5)),
                     })),
-                    cfg: {
-                        gate: this.gate,
-                        horizon: this.horizon,
-                        rollouts: this.rollouts,
-                        leaf: this.leafKind(),
-                        shortlist: this.shortlist,
-                        includeMoves: this.includeMoves ? 1 : 0,
-                        oppModel: this.oppModel?.version ?? null,
-                    },
+                    cfg: this.ilConfig(),
                 }),
             );
         }
@@ -903,6 +950,17 @@ export class SearchDriver {
     }
     private leafKind(): PhaseBLeafKind {
         return this.learnedV2 ? "learned_v2" : this.learned ? "learned" : "material";
+    }
+    private ilConfig(): IIlSearchConfig {
+        return {
+            gate: this.gate,
+            horizon: this.horizon,
+            rollouts: this.rollouts,
+            leaf: this.leafKind(),
+            shortlist: this.shortlist,
+            includeMoves: this.includeMoves ? 1 : 0,
+            oppModel: this.oppModel?.version ?? null,
+        };
     }
     /** Buffer one Q2 Gate-2 dataset row (Q2_DATASET, oracle mode) for this decision point. */
     private pushDatasetRow(

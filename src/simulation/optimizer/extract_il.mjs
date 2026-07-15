@@ -1,85 +1,122 @@
-// IMITATION-LEARNING EXTRACTION (docs/imitation_pipeline.md, step 2): SEARCH_IL_DATASET dumps ->
-// fit-ready training rows + dataset stats. One input file per cohort; one output line per SEARCHED
-// decision: {c: cohort, s: seed, side, lap, unit, cls: search's chosen action class, chosen: index,
-// agree: 1 iff the incumbent v0.7 policy already played the search's choice (semantic-signature
-// equality, so a serialization twin of the incumbent counts as agreement), wf: the 41-dim wait-scorer
-// state vector, cands: [{ck, sig, cf}] (F4 enumeration-time candidate features, IL_CANDIDATE_FEATURE_NAMES
-// order), m: per-candidate mean rollout leaf values (null = illegal in simulation).
-// The 60-dim value basis stays in the raw dump only — reread it there if a fit ever needs it.
+// SEARCH_IL_DATASET v2 dumps -> complete, provenance-bound fit rows.
 //
-// Usage: bun src/simulation/optimizer/extract_il.mjs out=<rows.jsonl> <cohort>=<dump.ild.jsonl> [...]
+// Usage: bun src/simulation/optimizer/extract_il.mjs out=<rows.jsonl> fingerprint=<64hex>
+//        <cohort>=<dump.ild.jsonl> games.<cohort>=<n> base.<cohort>=<seed> [...]
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { WAIT_FEATURE_NAMES } from "../../ai/versions/wait_scorer";
-import { parseIlRow } from "../il_dataset";
+import { requireIlRunFingerprint, validateIlCorpus } from "../il_dataset";
 import { VALUE_FEATURE_NAMES_V2 } from "../value_features";
+import { deriveTeacherConfidence } from "./il_fit_core.mjs";
 
-const files = [];
+const paths = new Map();
+const expectedGames = new Map();
+const baseSeeds = new Map();
 let outPath = null;
+let runFingerprint = null;
+const put = (map, key, value, label) => {
+    if (!key || map.has(key)) throw new Error(`Duplicate or empty ${label}: ${key}`);
+    map.set(key, value);
+};
 for (const arg of process.argv.slice(2)) {
     const eq = arg.indexOf("=");
     if (eq < 0) throw new Error(`Arguments must be key=value; got ${arg}`);
     const key = arg.slice(0, eq);
     const value = arg.slice(eq + 1);
+    if (!value) throw new Error(`Argument ${key} requires a value`);
     if (key === "out") {
         if (outPath) throw new Error("Duplicate out=");
         outPath = value;
-        continue;
+    } else if (key === "fingerprint") {
+        if (runFingerprint) throw new Error("Duplicate fingerprint=");
+        runFingerprint = requireIlRunFingerprint(value, "fingerprint");
+    } else if (key.startsWith("games.")) {
+        put(expectedGames, key.slice("games.".length), Number(value), "games cohort");
+    } else if (key.startsWith("base.")) {
+        put(baseSeeds, key.slice("base.".length), Number(value), "base cohort");
+    } else {
+        put(paths, key, value, "dataset cohort");
     }
-    if (!key || !value) throw new Error(`Dataset arguments must be <cohort>=<path>; got ${arg}`);
-    if (files.some((f) => f.cohort === key)) throw new Error(`Duplicate cohort: ${key}`);
-    files.push({ cohort: key, path: value });
 }
-if (!outPath || !files.length) {
-    throw new Error("Usage: extract_il.mjs out=<rows.jsonl> <cohort>=<dump.ild.jsonl> [...]");
+if (!outPath || !runFingerprint || !paths.size) {
+    throw new Error(
+        "Usage: extract_il.mjs out=<rows.jsonl> fingerprint=<64hex> " +
+            "<cohort>=<dump> games.<cohort>=<n> base.<cohort>=<seed> [...]",
+    );
+}
+for (const cohort of paths.keys()) {
+    if (!expectedGames.has(cohort) || !baseSeeds.has(cohort)) {
+        throw new Error(`${cohort}: games.${cohort}= and base.${cohort}= are required`);
+    }
+}
+for (const cohort of [...expectedGames.keys(), ...baseSeeds.keys()]) {
+    if (!paths.has(cohort)) throw new Error(`${cohort}: count/seed metadata has no dataset path`);
 }
 
-const WF = WAIT_FEATURE_NAMES.length; // 41
-const VF = VALUE_FEATURE_NAMES_V2.length; // 60
-
+const WF = WAIT_FEATURE_NAMES.length;
+const VF = VALUE_FEATURE_NAMES_V2.length;
 const quantile = (sorted, q) =>
     sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null;
 const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(2)}%` : "n/a");
-
-const outLines = [];
-const pooled = { decisions: 0, agree: 0, byClass: new Map(), agreeByClass: new Map(), byIncClass: new Map() };
 const bump = (map, key, by = 1) => map.set(key, (map.get(key) ?? 0) + by);
 
-console.log(`extract_il: wf=${WF} dims, vf=${VF} dims (validated per row)`);
-for (const { cohort, path } of files) {
-    const seeds = new Set();
+const outLines = [];
+const gamesByCohort = {};
+const pooled = {
+    decisions: 0,
+    agree: 0,
+    weight: 0,
+    forced: 0,
+    byClass: new Map(),
+    agreeByClass: new Map(),
+    byIncClass: new Map(),
+};
+let sharedConfig = null;
+console.log(`extract_il v2: fingerprint=${runFingerprint} wf=${WF} vf=${VF}`);
+for (const [cohort, path] of paths) {
+    const corpus = validateIlCorpus(readFileSync(path, "utf8").split("\n"), {
+        wfWidth: WF,
+        vfWidth: VF,
+        runFingerprint,
+        cohort,
+        expectedGames: expectedGames.get(cohort),
+        baseSeed: baseSeeds.get(cohort),
+    });
+    const config = JSON.stringify(corpus.config);
+    if (sharedConfig !== null && sharedConfig !== config) throw new Error(`${cohort}: search configuration drifted`);
+    sharedConfig = config;
+    gamesByCohort[cohort] = corpus.games.length;
     const nCands = [];
-    let decisions = 0;
     let overrides = 0;
     let agree = 0;
-    let badLines = 0;
-    const lines = readFileSync(path, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        let row;
-        try {
-            row = parseIlRow(JSON.parse(line), WF, VF, `${cohort}:${i + 1}`);
-        } catch (error) {
-            // A concurrency-torn or truncated line is dropped and counted, never silently kept.
-            badLines += 1;
-            if (badLines <= 3) console.error(`  DROP ${cohort}:${i + 1}: ${error.message ?? error}`);
-            continue;
-        }
-        seeds.add(row.seed);
+    let weight = 0;
+    let forced = 0;
+    for (const row of corpus.decisions) {
         nCands.push(row.cands.length);
-        decisions += 1;
         if (row.ov === 1) overrides += 1;
         const cls = row.cands[row.chosen].ck;
         const agreed = row.cands[row.chosen].sig === row.cands[0].sig ? 1 : 0;
+        const teacher = deriveTeacherConfidence(
+            row.cands.map((candidate) => candidate.m),
+            row.cands.map((candidate) => candidate.sig),
+            row.chosen,
+            row.cfg.gate,
+        );
         agree += agreed;
+        weight += teacher.weight;
+        if (teacher.forced) forced += 1;
         pooled.decisions += 1;
         pooled.agree += agreed;
+        pooled.weight += teacher.weight;
+        if (teacher.forced) pooled.forced += 1;
         bump(pooled.byClass, cls);
         if (agreed) bump(pooled.agreeByClass, cls);
         bump(pooled.byIncClass, row.k);
         outLines.push(
             JSON.stringify({
+                t: "ilx",
+                v: 2,
+                runFingerprint,
                 c: cohort,
                 s: row.seed,
                 side: row.side,
@@ -87,35 +124,51 @@ for (const { cohort, path } of files) {
                 unit: row.unit,
                 cls,
                 chosen: row.chosen,
+                targetSig: teacher.targetSignature,
                 agree: agreed,
+                teacherMargin: teacher.margin,
+                teacherWeight: teacher.weight,
+                teacherForced: teacher.forced ? 1 : 0,
                 wf: row.wf,
-                cands: row.cands.map((cand) => ({ ck: cand.ck, sig: cand.sig, cf: cand.cf })),
-                m: row.cands.map((cand) => cand.m),
+                cands: row.cands.map((candidate) => ({ ck: candidate.ck, sig: candidate.sig, cf: candidate.cf })),
+                m: row.cands.map((candidate) => candidate.m),
             }),
         );
     }
-    if (!decisions) throw new Error(`${cohort}: no valid decisions in ${path}`);
-    nCands.sort((a, b) => a - b);
-    const meanCands = nCands.reduce((a, b) => a + b, 0) / nCands.length;
+    if (!corpus.decisions.length) throw new Error(`${cohort}: complete corpus has no scored decisions`);
+    nCands.sort((left, right) => left - right);
+    const meanCands = nCands.reduce((sum, count) => sum + count, 0) / nCands.length;
     console.log(
-        `${cohort}: ${decisions} decisions from ${seeds.size} games (${path})` +
-            ` | overrides ${pct(overrides, decisions)} | v0.7-agreement ${pct(agree, decisions)}` +
-            ` | candidates mean ${meanCands.toFixed(1)} p50 ${quantile(nCands, 0.5)} p95 ${quantile(nCands, 0.95)}` +
-            ` max ${nCands[nCands.length - 1]} | dropped lines ${badLines}`,
+        `${cohort}: ${corpus.decisions.length} decisions / ${corpus.games.length} complete games (${path})` +
+            ` | overrides ${pct(overrides, corpus.decisions.length)} | agreement ${pct(agree, corpus.decisions.length)}` +
+            ` | teacher weight ${(weight / corpus.decisions.length).toFixed(3)} | forced ${forced}` +
+            ` | candidates mean ${meanCands.toFixed(1)} p50 ${quantile(nCands, 0.5)}` +
+            ` p95 ${quantile(nCands, 0.95)} max ${nCands[nCands.length - 1]}`,
     );
 }
 
-writeFileSync(outPath, `${outLines.join("\n")}\n`);
-console.log(`\nwrote ${outLines.length} training rows -> ${outPath}`);
-console.log(`pooled v0.7-policy agreement (imitation headroom baseline): ${pct(pooled.agree, pooled.decisions)}`);
-console.log("class balance of the search's CHOSEN action (cls) with per-class agreement:");
-for (const [cls, n] of [...pooled.byClass.entries()].sort((a, b) => b[1] - a[1])) {
+const completion = JSON.stringify({
+    t: "ilx_complete",
+    v: 2,
+    runFingerprint,
+    decisions: outLines.length,
+    gamesByCohort,
+    config: JSON.parse(sharedConfig),
+});
+writeFileSync(outPath, `${[...outLines, completion].join("\n")}\n`);
+console.log(`\nwrote ${outLines.length} training rows plus completion footer -> ${outPath}`);
+console.log(`pooled policy agreement: ${pct(pooled.agree, pooled.decisions)}`);
+console.log(
+    `mean teacher weight: ${(pooled.weight / pooled.decisions).toFixed(3)} | forced-only rows: ${pooled.forced}`,
+);
+console.log("class balance of the search's chosen action with per-class agreement:");
+for (const [cls, count] of [...pooled.byClass.entries()].sort((left, right) => right[1] - left[1])) {
     console.log(
-        `  ${cls.padEnd(12)} ${String(n).padStart(8)}  (${pct(n, pooled.decisions)} of decisions,` +
-            ` agreement ${pct(pooled.agreeByClass.get(cls) ?? 0, n)})`,
+        `  ${cls.padEnd(12)} ${String(count).padStart(8)}  (${pct(count, pooled.decisions)} of decisions,` +
+            ` agreement ${pct(pooled.agreeByClass.get(cls) ?? 0, count)})`,
     );
 }
-console.log("class balance of the INCUMBENT v0.7 decision (k):");
-for (const [cls, n] of [...pooled.byIncClass.entries()].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${cls.padEnd(12)} ${String(n).padStart(8)}  (${pct(n, pooled.decisions)})`);
+console.log("class balance of the incumbent decision:");
+for (const [cls, count] of [...pooled.byIncClass.entries()].sort((left, right) => right[1] - left[1])) {
+    console.log(`  ${cls.padEnd(12)} ${String(count).padStart(8)}  (${pct(count, pooled.decisions)})`);
 }
