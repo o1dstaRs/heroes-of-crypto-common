@@ -534,6 +534,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!enemies.length) {
             return decision;
         }
+        // Cowardice bars attacking a stack with MORE cumulative HP than us — the engine rejects such a strike
+        // (cause "cowardice"). Only the PRIMARY/aimed target is checked; splashing stronger stacks is fine, so
+        // this guards the AIM below (spin's primary, each directional aim), not the hit-set. A Cowardice-blocked
+        // aim was the sole residual sim-rejection cause (16/50k, Thunderbird/Hydra AOE).
+        const cowardlyVs = (e: Unit): boolean =>
+            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         const footprintAt = (cell: XY): XY[] => this.footprintForCell(unit, cell, context);
         const adjEnemies = (cell: XY): Unit[] => {
             const fp = footprintAt(cell);
@@ -611,14 +617,18 @@ export class StrategyV0_5 extends StrategyV0_4 {
         for (const s of stands) {
             if (spin) {
                 const hitSet = adjEnemies(s.cell);
-                if (hitSet.length) {
-                    cands.push({ cell: s.cell, route: s.route, target: hitSet[0], hitSet });
+                // Primary = first adjacent enemy we're actually allowed to aim at (Cowardice-legal). Splash still
+                // hits the whole ring; we only need the AIMED stack to be one Cowardice permits.
+                const primary = hitSet.find((e) => !cowardlyVs(e));
+                if (primary) {
+                    cands.push({ cell: s.cell, route: s.route, target: primary, hitSet });
                 }
                 continue;
             }
             const fp = footprintAt(s.cell);
             for (const e of enemies) {
-                if (!e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc)))) {
+                // Skip aims Cowardice bars (stronger stack) or that aren't adjacent to the footprint.
+                if (cowardlyVs(e) || !e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc)))) {
                     continue;
                 }
                 cands.push({
