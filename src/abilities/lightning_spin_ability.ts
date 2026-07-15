@@ -161,6 +161,7 @@ export function processLightningSpinAbility(
                 amount: damageFromAttack,
                 unitsDied: Math.max(0, amountAliveBefore - enemy.getAmountAlive()),
             });
+            const unitsKilled = Math.max(0, amountAliveBefore - enemy.getAmountAlive());
             enemyIdDamageFromAttack.set(enemy.getId(), damageFromAttack);
             const pegasusLightEffect = enemy.getEffect("Pegasus Light");
             if (pegasusLightEffect) {
@@ -168,7 +169,8 @@ export function processLightningSpinAbility(
             }
 
             sceneLog.updateLog(
-                `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${enemy.getName()} (${damageFromAttack})`,
+                `${fromUnit.getName()} ${isAttack ? "⚔️" : "resp"} ${enemy.getName()} (${damageFromAttack})` +
+                    HoCLib.killTag(unitsKilled),
             );
 
             if (enemy.isDead()) {
