@@ -131,6 +131,12 @@ export interface IMatchConfig {
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
     redSynergies?: ISetupSynergy[];
+    /** Creature ids of RED stacks legitimately revealed to GREEN during the pick phase (collisions/perk
+     * reveals — pick_sim getKnownOpponentCreatures). Forwarded into GREEN's placement context; consumed
+     * only by the env-gated reveal-conditioned placement (V07_PLACEMENT_REVEAL). Absent = today's behavior. */
+    greenRevealedCreatures?: readonly number[];
+    /** Creature ids of GREEN stacks legitimately revealed to RED. Same contract, RED's placement context. */
+    redRevealedCreatures?: readonly number[];
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
 }
@@ -516,8 +522,20 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             grid,
             unitsHolder,
             pathHelper,
+            config.greenRevealedCreatures,
         ),
-        red: placeArmy(redUnits, RED_TEAM, redZone, redStrategy, redRoster, engine, grid, unitsHolder, pathHelper),
+        red: placeArmy(
+            redUnits,
+            RED_TEAM,
+            redZone,
+            redStrategy,
+            redRoster,
+            engine,
+            grid,
+            unitsHolder,
+            pathHelper,
+            config.redRevealedCreatures,
+        ),
     };
 
     // --- army-wide setup (optional): perk budget, artifacts (both tiers), augments, synergies ---
@@ -1011,12 +1029,20 @@ function placeArmy(
     grid: Grid,
     unitsHolder: UnitsHolder,
     pathHelper: PathHelper,
+    revealedOpponentCreatures?: readonly number[],
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
     const occupied = new Set<number>();
 
-    const desired = strategy.placeArmy(units, { team, grid, unitsHolder, pathHelper, placement: zone });
+    const desired = strategy.placeArmy(units, {
+        team,
+        grid,
+        unitsHolder,
+        pathHelper,
+        placement: zone,
+        ...(revealedOpponentCreatures?.length ? { revealedOpponentCreatures } : {}),
+    });
 
     const tryPlaceAt = (unit: Unit, base: XY): boolean => {
         const cells = footprintCells(unit, base);

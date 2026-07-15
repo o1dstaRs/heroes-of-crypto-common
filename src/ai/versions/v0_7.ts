@@ -17,6 +17,7 @@ import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_str
 import { routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
+import { revealConditionedPlacement } from "./v0_7_placement_reveal";
 import { applyWaitScorerWeights, applyWaitScorerWeightsV2, v07BakedWaitWeights, v07WaitWeightsV2 } from "./wait_scorer";
 
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -101,6 +102,14 @@ export class StrategyV0_7 extends StrategyV0_6 {
         this.primeArmyProfile(context.unitsHolder, context.team, allies);
         if (shouldUseArchetypePlacementAnchor(allies, context.unitsHolder.getAllEnemyUnits(context.team))) {
             return this.archetypeAnchor.placeArmy(units, context);
+        }
+        // Env-gated experiment (V07_PLACEMENT_REVEAL=on, default OFF): reveal-conditioned deployment
+        // driven ONLY by context.revealedOpponentCreatures — what this seat legitimately learned during
+        // picks. The measured archetype anchors above keep precedence; gate off / no reveals / no
+        // relevant threat leaves today's placement byte-identical (see v0_7_placement_reveal.ts).
+        const revealPlaced = revealConditionedPlacement(units, context);
+        if (revealPlaced) {
+            return revealPlaced;
         }
         return super.placeArmy(units, context);
     }

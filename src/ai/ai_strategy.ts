@@ -37,6 +37,14 @@ export interface IPlacementContext {
     pathHelper: PathHelper;
     /** The legal deployment rectangle for this team (cells the strategy may place onto). */
     placement: IPlacement;
+    /**
+     * Optional: creature ids of OPPONENT stacks this team LEGITIMATELY learned during the pick phase
+     * (perk reveals + pick collisions — pick_sim's getKnownOpponentCreatures; live equivalent: the
+     * server session's knownOpponentCreatureIdsByPlayer). Absent/empty = the seat knows nothing it
+     * could fairly act on. Consumed only by the env-gated reveal-conditioned placement experiment
+     * (V07_PLACEMENT_REVEAL=on, default off); absent keeps every strategy byte-identical.
+     */
+    revealedOpponentCreatures?: readonly number[];
 }
 
 export interface IDecisionContext {
