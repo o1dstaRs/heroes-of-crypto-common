@@ -1,6 +1,6 @@
 # v0.7 overnight active/circuit follow-up
 
-This is a bounded, research-only follow-up to the `d68490a` 96-hour run. Protocol v4 starts from that run's late
+This is a bounded, research-only follow-up to the `d68490a` 96-hour run. Protocol v5 starts from that run's late
 `b9ce98a735b1` genome and tests whether a smaller search budget, an active-challenger filter, an opt-in
 immediate-leaf shortlist, and a late ranged-finish overlay can retain the melee-magic gain while reducing
 fire/ranged Armageddon dependence and preserving headroom below the ranked server's 300ms per-decision circuit.
@@ -29,6 +29,13 @@ incumbent, then sends only the best `K-1` legal challengers through the configur
 the original full-candidate search. The shortlist is experimental because the leaf may undervalue delayed
 spell, buff, debuff, aura, and resource effects; strength and integrity gates remain binding. The active filter
 only removes generated wait and defend challengers.
+
+Scout order is part of protocol v5 because the stage is sequential and bounded by the research cutoff. The four
+h16/r1, shortlist-3 finish-weight arms run first, followed by every other sub-h24 control; all nine h24 profiles
+run last. This preserves the complete preregistered profile set while ensuring an interrupted run first measures
+the known latency-viable envelope and its isolated overlay. The preceding v4 attempt was permanently quarantined
+for host contention after completing only its first six h24 profiles; those profiles opened circuits in 41.7% to
+67.7% of games, so their results are diagnostic only and cannot justify consuming the next run's early budget.
 
 Four otherwise identical active h16/r1, shortlist-3, caps-7/4/3 profiles isolate the late ranged-finish weight:
 `finish-w0`, `finish-w1`, `finish-w2`, and `finish-w4`. The zero arm retains the pre-overlay behavior. Every

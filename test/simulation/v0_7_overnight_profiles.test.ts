@@ -38,9 +38,9 @@ if (described.status !== 0) {
 const contract = JSON.parse(described.stdout) as ProfileContract;
 
 describe("v0.7 overnight profile contract", () => {
-    it("binds 21 unique protocol-v4 identities to an explicit nonnegative finish weight", () => {
+    it("binds 21 unique protocol-v5 identities to an explicit nonnegative finish weight", () => {
         expect(contract.schemaVersion).toBe(1);
-        expect(contract.protocol).toBe("v0.7-overnight-active-circuit-v4");
+        expect(contract.protocol).toBe("v0.7-overnight-active-circuit-v5");
         expect(contract.profiles).toHaveLength(21);
         expect(new Set(contract.profiles.map(({ id }) => id)).size).toBe(21);
         expect(new Set(contract.profiles.map(({ label }) => label)).size).toBe(21);
@@ -50,6 +50,37 @@ describe("v0.7 overnight profile contract", () => {
             expect(profile.finishWeight).toBeGreaterThanOrEqual(0);
             expect(profile.environment.SEARCH_LATE_RANGED_FINISH_WEIGHT).toBe(String(profile.finishWeight));
         }
+    });
+
+    it("runs the h16 finish sweep first, all sub-h24 controls next, and h24 references last", () => {
+        expect(contract.profiles.map(({ label }) => label)).toEqual([
+            "active-h16-r1-s3-finish-w0-c7-4-3",
+            "active-h16-r1-s3-finish-w1-c7-4-3",
+            "active-h16-r1-s3-finish-w2-c7-4-3",
+            "active-h16-r1-s3-finish-w4-c7-4-3",
+            "active-h16-r1-c7-4-3",
+            "active-h16-r1-c4-3-2",
+            "active-h16-r1-s4-c4-3-2",
+            "active-h12-r1-c6-4-2",
+            "active-h12-r1-s4-c6-4-2",
+            "active-h8-r1-c5-4-2",
+            "active-h8-r1-c4-3-2",
+            "active-h4-r1-c4-3-2",
+            "b9ce-reference-h24-r4",
+            "b9ce-h24-r2-c9-4-4",
+            "b9ce-h24-r1-c9-4-4",
+            "active-h24-r4-c9-4-4",
+            "active-h24-r2-c9-4-4",
+            "active-h24-r1-c9-4-4",
+            "active-h24-r1-s3-c9-4-4",
+            "active-h24-r1-s4-c9-4-4",
+            "active-h24-r1-c4-3-2",
+        ]);
+        expect(contract.profiles.slice(0, 4).map(({ finishWeight }) => finishWeight)).toEqual([0, 1, 2, 4]);
+        expect(contract.profiles.slice(0, 12).every(({ environment }) => environment.SEARCH_HORIZON !== "24")).toBe(
+            true,
+        );
+        expect(contract.profiles.slice(12).every(({ environment }) => environment.SEARCH_HORIZON === "24")).toBe(true);
     });
 
     it("isolates weights 0, 1, 2, and 4 on the h16/r1/shortlist-3 arm", () => {

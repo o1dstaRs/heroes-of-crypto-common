@@ -94,7 +94,7 @@ if (!OUT && !parsed.values["describe-profiles"]) throw new Error("--out or V07_9
 
 const CONFIG = {
     schemaVersion: 1,
-    protocol: "v0.7-overnight-active-circuit-v4",
+    protocol: "v0.7-overnight-active-circuit-v5",
     workers: integer("V07_OVERNIGHT_WORKERS", 12),
     checkpointGames: evenGames("V07_OVERNIGHT_CHECKPOINT_GAMES", 32),
     scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 32),
@@ -310,26 +310,10 @@ function profile(label, anchorGenome, overrides, activeChallengers = true, short
 
 function profilesFor(anchorGenome) {
     const profiles = [
-        profile("b9ce-reference-h24-r4", anchorGenome, {}, false),
-        profile("b9ce-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, false),
-        profile("b9ce-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, false),
-        profile("active-h24-r4-c9-4-4", anchorGenome, {}, true),
-        profile("active-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, true),
-        profile("active-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, true),
-        profile("active-h24-r1-s3-c9-4-4", anchorGenome, { rollouts: 1 }, true, 3),
-        profile("active-h24-r1-s4-c9-4-4", anchorGenome, { rollouts: 1 }, true, 4),
-        profile(
-            "active-h24-r1-c4-3-2",
-            anchorGenome,
-            { horizon: 24, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
-            true,
-        ),
-        profile(
-            "active-h16-r1-c7-4-3",
-            anchorGenome,
-            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
-            true,
-        ),
+        // The scout is deadline-bounded and sequential. Lead with the isolated finish-pressure experiment on
+        // the measured h16/shortlist-3 timing envelope, then cover the other sub-h24 controls. The h24
+        // references remain in the protocol, but run last because v4 observed 42-68% circuit-open games across
+        // the first six h24 profiles before host contention quarantined that run.
         profile(
             "active-h16-r1-s3-finish-w0-c7-4-3",
             anchorGenome,
@@ -360,6 +344,12 @@ function profilesFor(anchorGenome) {
             true,
             3,
             4,
+        ),
+        profile(
+            "active-h16-r1-c7-4-3",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            true,
         ),
         profile(
             "active-h16-r1-c4-3-2",
@@ -403,6 +393,20 @@ function profilesFor(anchorGenome) {
             "active-h4-r1-c4-3-2",
             anchorGenome,
             { horizon: 4, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
+            true,
+        ),
+        profile("b9ce-reference-h24-r4", anchorGenome, {}, false),
+        profile("b9ce-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, false),
+        profile("b9ce-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, false),
+        profile("active-h24-r4-c9-4-4", anchorGenome, {}, true),
+        profile("active-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, true),
+        profile("active-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, true),
+        profile("active-h24-r1-s3-c9-4-4", anchorGenome, { rollouts: 1 }, true, 3),
+        profile("active-h24-r1-s4-c9-4-4", anchorGenome, { rollouts: 1 }, true, 4),
+        profile(
+            "active-h24-r1-c4-3-2",
+            anchorGenome,
+            { horizon: 24, rollouts: 1, maxMelee: 4, maxShots: 3, maxThrows: 2 },
             true,
         ),
     ];
