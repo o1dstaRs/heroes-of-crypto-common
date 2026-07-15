@@ -9,6 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, expect, test } from "bun:test";
 
 import {
@@ -19,6 +23,8 @@ import {
 } from "../../src/ai/ai";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
+import { v07ArchetypeTemplate } from "../../src/simulation/v0_7_archetype_battery";
+import { captureFinishPressureState } from "../../src/simulation/v0_7_finish_pressure";
 import type { UnitsHolder } from "../../src/units/units_holder";
 
 const ENV_KEYS = [
@@ -29,6 +35,9 @@ const ENV_KEYS = [
     "SEARCH_GATE",
     "SEARCH_HORIZON",
     "SEARCH_ROLLOUTS",
+    "SEARCH_LATE_RANGED_FINISH_WEIGHT",
+    "SEARCH_SHORTLIST",
+    "SEARCH_AUDIT",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
@@ -91,4 +100,58 @@ test("an impossible override gate leaves the complete seeded match byte-identica
     const searched = runMatch(structuredClone(config));
 
     expect(searched).toEqual(baseline);
+}, 30_000);
+
+test("the battle engine captures the post-start finish baseline before the first decision", () => {
+    clearSearchEnv();
+    const auditPath = join(mkdtempSync(join(tmpdir(), "search-finish-baseline-")), "audit.jsonl");
+    Object.assign(process.env, {
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.7",
+        SEARCH_GATE: "99",
+        SEARCH_HORIZON: "1",
+        SEARCH_ROLLOUTS: "1",
+        SEARCH_SHORTLIST: "2",
+        SEARCH_LATE_RANGED_FINISH_WEIGHT: "1",
+        SEARCH_AUDIT: auditPath,
+    });
+
+    let firstDecisionRangedness: number | null = null;
+    runMatch({
+        greenVersion: "v0.7",
+        redVersion: "v0.6",
+        roster: v07ArchetypeTemplate("mage_fireline").roster,
+        seed: 123,
+        maxLaps: 4,
+        decisionObserver: ({ context }) => {
+            firstDecisionRangedness ??= captureFinishPressureState(context.unitsHolder).initialBoardRangedness;
+        },
+    });
+
+    const summary = JSON.parse(readFileSync(auditPath, "utf8").trim());
+    expect(summary).toMatchObject({
+        mode: "search",
+        lateRangedFinishWeight: 1,
+        initialBoardRangedness: firstDecisionRangedness,
+    });
+    expect(firstDecisionRangedness).toBeGreaterThan(0);
+    expect(firstDecisionRangedness).toBeLessThan(1);
+    expect(summary.finishPressureLeaves).toBeGreaterThan(0);
+
+    const ineligibleAuditPath = join(mkdtempSync(join(tmpdir(), "search-finish-ineligible-")), "audit.jsonl");
+    process.env.SEARCH_AUDIT = ineligibleAuditPath;
+    runMatch({
+        greenVersion: "v0.7",
+        redVersion: "v0.6",
+        roster: v07ArchetypeTemplate("mage_frontline").roster,
+        seed: 124,
+        maxLaps: 4,
+    });
+    expect(JSON.parse(readFileSync(ineligibleAuditPath, "utf8"))).toMatchObject({
+        lateRangedFinishWeight: 1,
+        initialBoardRangedness: 0,
+        finishPressureLeaves: 0,
+        finishPressureNonzeroLeaves: 0,
+        finishPressureLogitSum: 0,
+    });
 }, 30_000);

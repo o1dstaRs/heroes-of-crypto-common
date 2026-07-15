@@ -265,17 +265,26 @@ describe("v0.7 overnight circuit diagnostics", () => {
             shortlist: 2,
             decisionDeadlineMs: 240,
             deadlineFallbacks: 1,
+            lateRangedFinishWeight: 2,
+            initialBoardRangedness: 0.5,
+            finishPressureLeaves: 10,
+            finishPressureNonzeroLeaves: 2,
+            finishPressureLogitSum: 1.25,
             circuitBreakerMs: 275,
             circuitOpened: false,
             circuitSkipped: 0,
         };
-        const work = { shortlist: 2, decisionDeadlineMs: 240 };
+        const work = { shortlist: 2, decisionDeadlineMs: 240, lateRangedFinishWeight: 2 };
 
         const diagnostics = summarizeV07OvernightCircuitAuditRows([...turns, game], expected, 275, work);
         expect(diagnostics.work).toEqual({
             enumeratedCandidatesTotal: 9,
             scoredCandidatesTotal: 2,
             deadlineFallbacks: 1,
+            finishPressureEligibleGames: 1,
+            finishPressureLeaves: 10,
+            finishPressureNonzeroLeaves: 2,
+            finishPressureLogitSum: 1.25,
         });
 
         expect(() =>
@@ -306,6 +315,38 @@ describe("v0.7 overnight circuit diagnostics", () => {
         expect(() =>
             summarizeV07OvernightCircuitAuditRows(
                 [...turns, { ...game, decisionDeadlineMs: 239 }],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight circuit summary");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [...turns, { ...game, lateRangedFinishWeight: 1 }],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight circuit summary");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [...turns, { ...game, finishPressureLogitSum: 21 }],
+                expected,
+                275,
+                work,
+            ),
+        ).toThrow("Invalid overnight circuit summary");
+        expect(() =>
+            summarizeV07OvernightCircuitAuditRows(
+                [
+                    ...turns,
+                    {
+                        ...game,
+                        initialBoardRangedness: 0,
+                        finishPressureNonzeroLeaves: 1,
+                        finishPressureLogitSum: 0.5,
+                    },
+                ],
                 expected,
                 275,
                 work,

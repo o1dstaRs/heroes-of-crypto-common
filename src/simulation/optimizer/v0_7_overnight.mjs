@@ -57,11 +57,12 @@ const parsed = parseArgs({
     options: {
         out: { type: "string" },
         "initialize-only": { type: "boolean", default: false },
+        "describe-profiles": { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
     },
 });
 if (parsed.values.help) {
-    process.stdout.write("usage: bun src/simulation/optimizer/v0_7_overnight.mjs --out=DIR\n");
+    process.stdout.write("usage: bun src/simulation/optimizer/v0_7_overnight.mjs [--out=DIR] [--describe-profiles]\n");
     process.exit(0);
 }
 
@@ -89,11 +90,11 @@ if (outArgument && outEnvironment && outArgument !== outEnvironment) {
     throw new Error(`--out and V07_96H_OUT disagree: ${outArgument} != ${outEnvironment}`);
 }
 const OUT = outArgument ?? outEnvironment;
-if (!OUT) throw new Error("--out or V07_96H_OUT is required");
+if (!OUT && !parsed.values["describe-profiles"]) throw new Error("--out or V07_96H_OUT is required");
 
 const CONFIG = {
     schemaVersion: 1,
-    protocol: "v0.7-overnight-active-circuit-v3",
+    protocol: "v0.7-overnight-active-circuit-v4",
     workers: integer("V07_OVERNIGHT_WORKERS", 12),
     checkpointGames: evenGames("V07_OVERNIGHT_CHECKPOINT_GAMES", 32),
     scoutGames: evenGames("V07_OVERNIGHT_SCOUT_GAMES", 32),
@@ -119,6 +120,25 @@ if (CONFIG.circuitBreakerMs - CONFIG.decisionDeadlineMs < MIN_DECISION_HEADROOM_
     throw new Error(
         `V07_OVERNIGHT_DECISION_DEADLINE_MS must leave at least ${MIN_DECISION_HEADROOM_MS}ms below V07_OVERNIGHT_CIRCUIT_MS`,
     );
+}
+
+if (parsed.values["describe-profiles"]) {
+    const profiles = profilesFor(loadAnchor().genome);
+    process.stdout.write(
+        `${canonicalJson({
+            schemaVersion: 1,
+            protocol: CONFIG.protocol,
+            profiles: profiles.map((candidate) => ({
+                id: candidate.id,
+                label: candidate.label,
+                activeChallengers: candidate.activeChallengers,
+                finishWeight: candidate.finishWeight,
+                ...(candidate.shortlist === undefined ? {} : { shortlist: candidate.shortlist }),
+                environment: profileSearchEnvironment(candidate),
+            })),
+        })}\n`,
+    );
+    process.exit(0);
 }
 
 const RUN_PATH = join(OUT, "run.json");
@@ -271,21 +291,25 @@ function loadAnchor() {
     };
 }
 
-function profile(label, anchorGenome, overrides, activeChallengers = true, shortlist = null) {
+function profile(label, anchorGenome, overrides, activeChallengers = true, shortlist = null, finishWeight = 0) {
     if (shortlist !== null && (!Number.isSafeInteger(shortlist) || shortlist < 2)) {
         throw new Error(`Invalid shortlist for ${label}`);
+    }
+    if (!Number.isFinite(finishWeight) || finishWeight < 0 || finishWeight > 16) {
+        throw new Error(`Invalid late ranged finish weight for ${label}`);
     }
     const genome = { ...anchorGenome, ...overrides, label };
     const behavior = {
         genome,
         activeChallengers,
+        finishWeight,
         ...(shortlist === null ? {} : { shortlist }),
     };
     return { id: fingerprintV0796h(behavior), label, ...behavior };
 }
 
 function profilesFor(anchorGenome) {
-    return [
+    const profiles = [
         profile("b9ce-reference-h24-r4", anchorGenome, {}, false),
         profile("b9ce-h24-r2-c9-4-4", anchorGenome, { rollouts: 2 }, false),
         profile("b9ce-h24-r1-c9-4-4", anchorGenome, { rollouts: 1 }, false),
@@ -307,11 +331,35 @@ function profilesFor(anchorGenome) {
             true,
         ),
         profile(
-            "active-h16-r1-s3-c7-4-3",
+            "active-h16-r1-s3-finish-w0-c7-4-3",
             anchorGenome,
             { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
             true,
             3,
+        ),
+        profile(
+            "active-h16-r1-s3-finish-w1-c7-4-3",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            true,
+            3,
+            1,
+        ),
+        profile(
+            "active-h16-r1-s3-finish-w2-c7-4-3",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            true,
+            3,
+            2,
+        ),
+        profile(
+            "active-h16-r1-s3-finish-w4-c7-4-3",
+            anchorGenome,
+            { horizon: 16, rollouts: 1, maxMelee: 7, maxShots: 4, maxThrows: 3 },
+            true,
+            3,
+            4,
         ),
         profile(
             "active-h16-r1-c4-3-2",
@@ -358,6 +406,36 @@ function profilesFor(anchorGenome) {
             true,
         ),
     ];
+    if (profiles.length !== 21) throw new Error(`Expected 21 overnight profiles, found ${profiles.length}`);
+    if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
+        throw new Error("Overnight profile behaviors must be unique");
+    }
+    if (new Set(profiles.map(({ label }) => label)).size !== profiles.length) {
+        throw new Error("Overnight profile labels must be unique");
+    }
+    return profiles;
+}
+
+function profileSearchEnvironment(candidate) {
+    return {
+        SIM_NO_ACTIONS: "1",
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.7",
+        SEARCH_GATE: String(candidate.genome.gate),
+        SEARCH_HORIZON: String(candidate.genome.horizon),
+        SEARCH_ROLLOUTS: String(candidate.genome.rollouts),
+        SEARCH_INCLUDE_MOVES: "0",
+        SEARCH_MAX_MOVES: "1",
+        SEARCH_MAX_MELEE: String(candidate.genome.maxMelee),
+        SEARCH_MAX_SHOTS: String(candidate.genome.maxShots),
+        SEARCH_MAX_THROWS: String(candidate.genome.maxThrows),
+        SEARCH_ACTIVE_CHALLENGERS: candidate.activeChallengers ? "1" : "0",
+        SEARCH_LATE_RANGED_FINISH_WEIGHT: String(candidate.finishWeight),
+        ...(candidate.shortlist === undefined ? {} : { SEARCH_SHORTLIST: String(candidate.shortlist) }),
+        SEARCH_DECISION_DEADLINE_MS: String(CONFIG.decisionDeadlineMs),
+        SEARCH_CIRCUIT_BREAKER_MS: String(CONFIG.circuitBreakerMs),
+        V07_VALUE_WEIGHTS_V2: JSON.stringify(candidate.genome.leaf),
+    };
 }
 
 function priorSeedState() {
@@ -681,22 +759,7 @@ function cleanChildEnvironment(candidate) {
         // Keep every profile on the source and environment observed by this process. This is the documented
         // Bun switch for disabling the runtime transpiler cache.
         BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        SIM_NO_ACTIONS: "1",
-        V07_SEARCH: "1",
-        SEARCH_VERSIONS: "v0.7",
-        SEARCH_GATE: String(candidate.genome.gate),
-        SEARCH_HORIZON: String(candidate.genome.horizon),
-        SEARCH_ROLLOUTS: String(candidate.genome.rollouts),
-        SEARCH_INCLUDE_MOVES: "0",
-        SEARCH_MAX_MOVES: "1",
-        SEARCH_MAX_MELEE: String(candidate.genome.maxMelee),
-        SEARCH_MAX_SHOTS: String(candidate.genome.maxShots),
-        SEARCH_MAX_THROWS: String(candidate.genome.maxThrows),
-        SEARCH_ACTIVE_CHALLENGERS: candidate.activeChallengers ? "1" : "0",
-        ...(candidate.shortlist === undefined ? {} : { SEARCH_SHORTLIST: String(candidate.shortlist) }),
-        SEARCH_DECISION_DEADLINE_MS: String(CONFIG.decisionDeadlineMs),
-        SEARCH_CIRCUIT_BREAKER_MS: String(CONFIG.circuitBreakerMs),
-        V07_VALUE_WEIGHTS_V2: JSON.stringify(candidate.genome.leaf),
+        ...profileSearchEnvironment(candidate),
     });
     return environment;
 }
@@ -739,6 +802,7 @@ function auditDiagnostics(path, expectedTemplateByGameKey, candidate) {
     return summarizeV07OvernightCircuitAuditRows(rows, expectedTemplateByGameKey, CONFIG.circuitBreakerMs, {
         shortlist: candidate.shortlist ?? null,
         decisionDeadlineMs: CONFIG.decisionDeadlineMs,
+        lateRangedFinishWeight: candidate.finishWeight,
     });
 }
 
@@ -849,11 +913,17 @@ function validateEvaluation(candidate, panelId, templates, games, paths, cutoffM
         circuit.work.enumeratedCandidatesTotal !== report.searchAudit.enumeratedCandidatesTotal ||
         circuit.work.scoredCandidatesTotal !== report.searchAudit.scoredCandidatesTotal ||
         circuit.work.deadlineFallbacks !== report.searchAudit.deadlineFallbacks ||
+        circuit.work.finishPressureEligibleGames !== report.searchAudit.finishPressureEligibleGames ||
+        circuit.work.finishPressureLeaves !== report.searchAudit.finishPressureLeaves ||
+        circuit.work.finishPressureNonzeroLeaves !== report.searchAudit.finishPressureNonzeroLeaves ||
+        circuit.work.finishPressureLogitSum !== report.searchAudit.finishPressureLogitSum ||
         report.searchAudit.scoredCandidateRate !== expectedScoredRate ||
         canonicalJson(report.searchAudit.shortlistCounts) !==
             canonicalJson({ [shortlistKey]: expectedAuditGameCount }) ||
         canonicalJson(report.searchAudit.decisionDeadlineCounts) !==
             canonicalJson({ [String(CONFIG.decisionDeadlineMs)]: expectedAuditGameCount }) ||
+        canonicalJson(report.searchAudit.lateRangedFinishWeightCounts) !==
+            canonicalJson({ [String(candidate.finishWeight)]: expectedAuditGameCount }) ||
         canonicalJson(report.searchAudit.modeCounts) !== canonicalJson({ search: expectedAuditGameCount })
     ) {
         throw new Error(`Overnight turn audit mismatch for ${panelId}/${candidate.label}`);

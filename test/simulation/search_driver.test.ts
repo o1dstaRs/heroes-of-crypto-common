@@ -70,6 +70,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
+    "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
@@ -479,6 +480,74 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(buildBattle(85, "v0.6").makeDriver().enabled).toBe(false);
     });
 
+    it("validates the opt-in late ranged finish weight only in search mode", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_LATE_RANGED_FINISH_WEIGHT: "invalid" });
+        expect(() => buildBattle(84, "v0.6").makeDriver()).toThrow(
+            "SEARCH_LATE_RANGED_FINISH_WEIGHT must be between 0 and 16",
+        );
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_LATE_RANGED_FINISH_WEIGHT: "17" });
+        expect(() => buildBattle(83, "v0.6").makeDriver()).toThrow(
+            "SEARCH_LATE_RANGED_FINISH_WEIGHT must be between 0 and 16",
+        );
+
+        setEnv({ SEARCH_LATE_RANGED_FINISH_WEIGHT: "invalid" });
+        expect(buildBattle(82, "v0.6").makeDriver().enabled).toBe(false);
+    });
+
+    it("keeps weight zero exact and raises late leaves on an injured ranged board", () => {
+        const auditPath = join(mkdtempSync(join(tmpdir(), "search-finish-pressure-")), "audit.jsonl");
+        const harness = buildBattle(81, "v0.6");
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
+        const unset = harness.makeDriver();
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_LATE_RANGED_FINISH_WEIGHT: "0" });
+        const explicitZero = harness.makeDriver();
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_LATE_RANGED_FINISH_WEIGHT: "2",
+            SEARCH_AUDIT: auditPath,
+        });
+        const weighted = harness.makeDriver();
+        weighted.onFightReady();
+
+        const actingTeam = harness.activeUnit()!.getTeam();
+        const enemy = [...harness.unitsHolder.getAllUnits().values()].find((unit) => unit.getTeam() !== actingTeam)!;
+        enemy.applyDamage(Math.max(1, Math.floor(enemy.getCumulativeHp() / 2)), 0, new SceneLogMock());
+        while (harness.fightProperties.getCurrentLap() < 12) {
+            harness.fightProperties.flipLap();
+        }
+
+        const leaf = (driver: SearchDriver): number =>
+            (driver as unknown as { leafValue(team: TeamType): number }).leafValue(actingTeam);
+        const unsetValue = leaf(unset);
+        expect(leaf(explicitZero)).toBe(unsetValue);
+        expect(leaf(weighted)).toBeGreaterThan(unsetValue);
+
+        const weightedState = weighted as unknown as {
+            counters: {
+                decisions: number;
+                finishPressureLeaves: number;
+                finishPressureNonzeroLeaves: number;
+                finishPressureLogitSum: number;
+            };
+        };
+        expect(weightedState.counters).toMatchObject({
+            finishPressureLeaves: 1,
+            finishPressureNonzeroLeaves: 1,
+        });
+        expect(weightedState.counters.finishPressureLogitSum).toBeGreaterThan(0);
+
+        weightedState.counters.decisions = 1;
+        weighted.onMatchEnd("v0.6", "turn_cap");
+        expect(JSON.parse(readFileSync(auditPath, "utf8"))).toMatchObject({
+            lateRangedFinishWeight: 2,
+            finishPressureLeaves: 1,
+            finishPressureNonzeroLeaves: 1,
+        });
+    });
+
     it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const learned = buildBattle(91, "v0.6").makeDriver() as unknown as {
@@ -662,6 +731,11 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(summary).toMatchObject({
             mode: "search",
             decisions: 1,
+            lateRangedFinishWeight: 0,
+            initialBoardRangedness: 0,
+            finishPressureLeaves: 0,
+            finishPressureNonzeroLeaves: 0,
+            finishPressureLogitSum: 0,
             circuitBreakerMs: 0.000001,
             circuitOpened: true,
             circuitSkipped: 2,

@@ -144,6 +144,11 @@ export interface IV07SearchAuditSummary {
     shortlistCounts: Record<string, number>;
     deadlineFallbacks: number;
     decisionDeadlineCounts: Record<string, number>;
+    lateRangedFinishWeightCounts: Record<string, number>;
+    finishPressureEligibleGames: number;
+    finishPressureLeaves: number;
+    finishPressureNonzeroLeaves: number;
+    finishPressureLogitSum: number;
     searchedTurnLatencyMs: IQuantileSummary;
     matchSearchLatencyMs: IQuantileSummary;
     overridesPerGame: IQuantileSummary;
@@ -554,11 +559,16 @@ export function summarizeV07SearchAuditRows(
     let enumeratedCandidatesTotal = 0;
     let scoredCandidatesTotal = 0;
     let deadlineFallbacks = 0;
+    let finishPressureEligibleGames = 0;
+    let finishPressureLeaves = 0;
+    let finishPressureNonzeroLeaves = 0;
+    let finishPressureLogitSum = 0;
     let overridesTotal = 0;
     let validRows = 0;
     const seenGames = new Set<string>();
     const shortlistCounts: Record<string, number> = {};
     const decisionDeadlineCounts: Record<string, number> = {};
+    const lateRangedFinishWeightCounts: Record<string, number> = {};
     for (const value of rows) {
         if (!value || typeof value !== "object") continue;
         const row = value as Record<string, unknown>;
@@ -598,6 +608,41 @@ export function summarizeV07SearchAuditRows(
                 ? "off"
                 : String(row.decisionDeadlineMs),
         );
+        const finishWeight =
+            typeof row.lateRangedFinishWeight === "number" && Number.isFinite(row.lateRangedFinishWeight)
+                ? row.lateRangedFinishWeight
+                : null;
+        increment(lateRangedFinishWeightCounts, finishWeight === null ? "off" : String(finishWeight));
+        if (
+            finishWeight !== null &&
+            finishWeight > 0 &&
+            typeof row.initialBoardRangedness === "number" &&
+            Number.isFinite(row.initialBoardRangedness) &&
+            row.initialBoardRangedness > 0
+        ) {
+            finishPressureEligibleGames += 1;
+        }
+        if (
+            typeof row.finishPressureLeaves === "number" &&
+            Number.isFinite(row.finishPressureLeaves) &&
+            row.finishPressureLeaves >= 0
+        ) {
+            finishPressureLeaves += row.finishPressureLeaves;
+        }
+        if (
+            typeof row.finishPressureNonzeroLeaves === "number" &&
+            Number.isFinite(row.finishPressureNonzeroLeaves) &&
+            row.finishPressureNonzeroLeaves >= 0
+        ) {
+            finishPressureNonzeroLeaves += row.finishPressureNonzeroLeaves;
+        }
+        if (
+            typeof row.finishPressureLogitSum === "number" &&
+            Number.isFinite(row.finishPressureLogitSum) &&
+            row.finishPressureLogitSum >= 0
+        ) {
+            finishPressureLogitSum += row.finishPressureLogitSum;
+        }
         if (typeof row.deadlineFallbacks === "number" && Number.isFinite(row.deadlineFallbacks)) {
             deadlineFallbacks += row.deadlineFallbacks;
         }
@@ -622,6 +667,11 @@ export function summarizeV07SearchAuditRows(
         shortlistCounts,
         deadlineFallbacks,
         decisionDeadlineCounts,
+        lateRangedFinishWeightCounts,
+        finishPressureEligibleGames,
+        finishPressureLeaves,
+        finishPressureNonzeroLeaves,
+        finishPressureLogitSum,
         searchedTurnLatencyMs: quantiles(turnLatency),
         matchSearchLatencyMs: quantiles(matchLatency),
         overridesPerGame: quantiles(overridesPerGame),

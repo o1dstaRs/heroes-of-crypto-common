@@ -1,10 +1,10 @@
 # v0.7 overnight active/circuit follow-up
 
-This is a bounded, research-only follow-up to the `d68490a` 96-hour run. It starts from that run's late
-`b9ce98a735b1` genome and tests whether a smaller search budget, an active-challenger filter, and an opt-in
-immediate-leaf shortlist can retain the melee-magic gain while reducing fire/ranged Armageddon dependence and
-preserving headroom below the ranked server's 300ms per-decision circuit. It cannot bake weights, change the
-v0.7 default, commit, push, or deploy.
+This is a bounded, research-only follow-up to the `d68490a` 96-hour run. Protocol v4 starts from that run's late
+`b9ce98a735b1` genome and tests whether a smaller search budget, an active-challenger filter, an opt-in
+immediate-leaf shortlist, and a late ranged-finish overlay can retain the melee-magic gain while reducing
+fire/ranged Armageddon dependence and preserving headroom below the ranked server's 300ms per-decision circuit.
+It cannot bake weights, change the v0.7 default, commit, push, or deploy.
 
 The driver is `src/simulation/optimizer/v0_7_overnight.mjs`; process lifetime remains owned by
 `scripts/run_v0_7_96h.sh`. The committed `v0_7_96h_d68490a_outcome.json` is the default anchor and must contain
@@ -22,13 +22,32 @@ real frontier:
 - the active-challenger arm improved some stalled ranged outcomes but regressed other templates, so it is an
   arm rather than a presumed champion.
 
-The scout therefore includes passive-allowed b9ce h24/r4, h24/r2, and h24/r1 references; active-only h24
-r4/r2/r1 arms; active h4, h8, h12, h16, and h24 capped variants; and active h12/h16/h24 shortlist arms.
+The 21-profile scout therefore includes passive-allowed b9ce h24/r4, h24/r2, and h24/r1 references; active-only
+h24 r4/r2/r1 arms; active h4, h8, h12, h16, and h24 capped variants; and active h12/h16/h24 shortlist arms.
 `SEARCH_SHORTLIST=K` scores every enumerated action once at the immediate post-action value leaf, retains the
 incumbent, then sends only the best `K-1` legal challengers through the configured full horizon. Unset preserves
 the original full-candidate search. The shortlist is experimental because the leaf may undervalue delayed
 spell, buff, debuff, aura, and resource effects; strength and integrity gates remain binding. The active filter
 only removes generated wait and defend challengers.
+
+Four otherwise identical active h16/r1, shortlist-3, caps-7/4/3 profiles isolate the late ranged-finish weight:
+`finish-w0`, `finish-w1`, `finish-w2`, and `finish-w4`. The zero arm retains the pre-overlay behavior. Every
+profile, including unrelated references, fingerprints an explicit finite nonnegative `finishWeight` (default
+zero), and every child receives its exact value through `SEARCH_LATE_RANGED_FINISH_WEIGHT`. This prevents an
+inherited shell value or a missing field from changing behavior without changing profile identity.
+
+The overlay adds `finishWeight * initialBoardRangedness * armageddonProximity * enemyOriginalHpDepletion` to the
+candidate logit. `initialBoardRangedness` is fixed at battle initialization from original, non-summoned stacks;
+it is the fraction of their starting cumulative HP across both teams carried by stacks whose attack type is
+`RANGE`.
+`enemyOriginalHpDepletion = 1 - clamp(current cumulative HP of the perspective's original enemy stacks / their
+starting cumulative HP, 0, 1)`, so summons cannot manufacture finish pressure.
+`armageddonProximity = clamp((lap - 3) / (12 - 3), 0, 1)`: it is exactly zero through lap 3, then increases
+linearly to one on the first Armageddon lap, lap 12. A board with no original `RANGE` stack therefore gets an
+exact zero overlay at every weight, preserving the mage-frontline, melee-mage, and aura cohorts while the
+isolated arms test ranged finishing. Ineligible boards and laps through 3 take a fast path before the
+per-original-unit HP scan; their finish-pressure leaf counters and logit sum remain exactly zero. This is an
+experimental search feature, not a production default.
 
 ## Stages and gates
 
@@ -77,7 +96,8 @@ The evaluator checkpoints complete paired 32-game subshards. Each checkpoint bin
 behavior environment, spec, cell hash, and audit-fragment hash. Turn rows carry seed and side identity;
 resume reconstructs the aggregate audit only from atomically completed fragments, rejects duplicate or missing
 game keys, and cannot double-count an interrupted shard. Child evaluators explicitly set
-`BUN_RUNTIME_TRANSPILER_CACHE_PATH=0`, Bun's documented runtime transpiler-cache disable switch.
+`BUN_RUNTIME_TRANSPILER_CACHE_PATH=0`, Bun's documented runtime transpiler-cache disable switch, and always set
+the profile's exact `SEARCH_LATE_RANGED_FINISH_WEIGHT` (including `0`).
 Audit summaries expose enumerated and full-horizon candidate totals, their ratio, and the configured shortlist,
 so reduced latency cannot be admitted without disclosing how much search work was pruned.
 
@@ -86,6 +106,8 @@ every restart enforces both before opening evidence. The immutable seed manifest
 bootstrap identity to reconstruct the same `run.json` if initialization is interrupted between those two
 atomic writes. Persisted state never supplies ranking data directly: each report and turn audit is revalidated
 and rehashed first, and its report timestamps must be ordered and completed inside that stage's fixed cutoff.
+`bun src/simulation/optimizer/v0_7_overnight.mjs --describe-profiles` is a read-only contract view of all profile
+IDs, labels, finish weights, and exact search environments; it does not open an output or start simulations.
 
 `TERMINAL.json` is atomic, run-bound, and canonically self-hashed. It records all simultaneous cohort lower
 bounds together with the observed and certified 90% verdicts. Its terminal states are:

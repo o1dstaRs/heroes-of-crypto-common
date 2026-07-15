@@ -60,12 +60,17 @@ export interface IV07OvernightCircuitDiagnostics extends IV07OvernightCircuitMet
 export interface IV07OvernightSearchWorkConfig {
     shortlist: number | null;
     decisionDeadlineMs: number;
+    lateRangedFinishWeight: number;
 }
 
 export interface IV07OvernightSearchWorkDiagnostics {
     enumeratedCandidatesTotal: number;
     scoredCandidatesTotal: number;
     deadlineFallbacks: number;
+    finishPressureEligibleGames: number;
+    finishPressureLeaves: number;
+    finishPressureNonzeroLeaves: number;
+    finishPressureLogitSum: number;
 }
 
 interface IV07OvernightCircuitAccumulator {
@@ -148,7 +153,10 @@ export function summarizeV07OvernightCircuitAuditRows(
             (expectedWork.shortlist !== null && expectedWork.shortlist < 2) ||
             !Number.isFinite(expectedWork.decisionDeadlineMs) ||
             expectedWork.decisionDeadlineMs <= 0 ||
-            expectedWork.decisionDeadlineMs >= circuitBreakerMs)
+            expectedWork.decisionDeadlineMs >= circuitBreakerMs ||
+            !Number.isFinite(expectedWork.lateRangedFinishWeight) ||
+            expectedWork.lateRangedFinishWeight < 0 ||
+            expectedWork.lateRangedFinishWeight > 16)
     ) {
         throw new Error("Invalid overnight search-work configuration");
     }
@@ -164,6 +172,10 @@ export function summarizeV07OvernightCircuitAuditRows(
         enumeratedCandidatesTotal: 0,
         scoredCandidatesTotal: 0,
         deadlineFallbacks: 0,
+        finishPressureEligibleGames: 0,
+        finishPressureLeaves: 0,
+        finishPressureNonzeroLeaves: 0,
+        finishPressureLogitSum: 0,
     };
     for (const template of [...new Set(expectedTemplateByGameKey.values())].sort()) {
         templateAccumulators.set(template, circuitAccumulator());
@@ -249,7 +261,28 @@ export function summarizeV07OvernightCircuitAuditRows(
                         (row.deadlineFallbacks as number) < 0 ||
                         (row.deadlineFallbacks as number) > (row.searched as number) ||
                         row.shortlist !== expectedWork.shortlist ||
-                        row.decisionDeadlineMs !== expectedWork.decisionDeadlineMs))
+                        row.decisionDeadlineMs !== expectedWork.decisionDeadlineMs ||
+                        row.lateRangedFinishWeight !== expectedWork.lateRangedFinishWeight ||
+                        typeof row.initialBoardRangedness !== "number" ||
+                        !Number.isFinite(row.initialBoardRangedness) ||
+                        row.initialBoardRangedness < 0 ||
+                        row.initialBoardRangedness > 1 ||
+                        !Number.isSafeInteger(row.finishPressureLeaves) ||
+                        (row.finishPressureLeaves as number) < 0 ||
+                        !Number.isSafeInteger(row.finishPressureNonzeroLeaves) ||
+                        (row.finishPressureNonzeroLeaves as number) < 0 ||
+                        (row.finishPressureNonzeroLeaves as number) > (row.finishPressureLeaves as number) ||
+                        typeof row.finishPressureLogitSum !== "number" ||
+                        !Number.isFinite(row.finishPressureLogitSum) ||
+                        row.finishPressureLogitSum < 0 ||
+                        row.finishPressureLogitSum >
+                            (row.finishPressureLeaves as number) * expectedWork.lateRangedFinishWeight + 1e-6 ||
+                        (expectedWork.lateRangedFinishWeight === 0 &&
+                            (row.finishPressureLeaves !== 0 ||
+                                row.finishPressureNonzeroLeaves !== 0 ||
+                                row.finishPressureLogitSum !== 0)) ||
+                        (row.initialBoardRangedness === 0 &&
+                            (row.finishPressureNonzeroLeaves !== 0 || row.finishPressureLogitSum !== 0))))
             ) {
                 throw new Error(`Invalid overnight circuit summary for ${key}`);
             }
@@ -280,6 +313,12 @@ export function summarizeV07OvernightCircuitAuditRows(
                 work.enumeratedCandidatesTotal += row.candidatesTotal as number;
                 work.scoredCandidatesTotal += row.scoredCandidatesTotal as number;
                 work.deadlineFallbacks += row.deadlineFallbacks as number;
+                if (expectedWork.lateRangedFinishWeight > 0 && (row.initialBoardRangedness as number) > 0) {
+                    work.finishPressureEligibleGames += 1;
+                }
+                work.finishPressureLeaves += row.finishPressureLeaves as number;
+                work.finishPressureNonzeroLeaves += row.finishPressureNonzeroLeaves as number;
+                work.finishPressureLogitSum += row.finishPressureLogitSum as number;
             }
         }
     }

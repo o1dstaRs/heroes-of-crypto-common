@@ -37,6 +37,12 @@ import {
     requirePhaseBRunFingerprint,
 } from "./phase_b_dataset";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
+import {
+    captureFinishPressureState,
+    finishPressureForSide,
+    finishPressureProximity,
+    type FinishPressureState,
+} from "./v0_7_finish_pressure";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
 import {
     extractValueFeatures,
@@ -63,6 +69,9 @@ import {
  * candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle and returns
  * the exact incumbent. When combined with the circuit breaker it must be strictly lower, leaving restore and
  * call-site headroom.
+ * SEARCH_LATE_RANGED_FINISH_WEIGHT=<0..16> is a default-zero research overlay on the leaf logit. It rewards
+ * late damage to the enemy's original army in proportion to the post-setup board's HP-weighted rangedness,
+ * ramping from zero through lap 3 to full strength at the first Armageddon lap. Summons are excluded.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then this match's driver returns each
  * later incumbent unchanged. The live wrapper also includes call-site overhead outside this internal timer.
@@ -225,6 +234,12 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** Leaf evaluations that reached the eligible late ranged finish calculation. */
+    finishPressureLeaves: number;
+    /** Enabled leaf evaluations whose bounded finish-pressure feature was positive. */
+    finishPressureNonzeroLeaves: number;
+    /** Sum of the finish-pressure logit adjustment over enabled leaf evaluations. */
+    finishPressureLogitSum: number;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -264,6 +279,9 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    finishPressureLeaves: 0,
+    finishPressureNonzeroLeaves: 0,
+    finishPressureLogitSum: 0,
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -309,6 +327,7 @@ export class SearchDriver {
     private readonly activeChallengers: boolean;
     private readonly shortlist: number | null;
     private readonly decisionDeadlineMs: number | null;
+    private readonly lateRangedFinishWeight: number;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -335,6 +354,7 @@ export class SearchDriver {
     };
     private readonly counters = emptyCounters();
     private readonly turnRows: string[] = [];
+    private finishPressureState: FinishPressureState | null = null;
     private finishedSim = false;
     private circuitOpen = false;
     public constructor(deps: ILookaheadDeps, match: ISearchMatchInfo = {}) {
@@ -392,6 +412,16 @@ export class SearchDriver {
         ) {
             throw new Error("SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS");
         }
+        const rawFinishWeight = process.env.SEARCH_LATE_RANGED_FINISH_WEIGHT;
+        if (this.mode !== "search" || rawFinishWeight === undefined || rawFinishWeight === "") {
+            this.lateRangedFinishWeight = 0;
+        } else {
+            const finishWeight = Number(rawFinishWeight);
+            if (!Number.isFinite(finishWeight) || finishWeight < 0 || finishWeight > 16) {
+                throw new Error("SEARCH_LATE_RANGED_FINISH_WEIGHT must be between 0 and 16");
+            }
+            this.lateRangedFinishWeight = finishWeight;
+        }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
             rawValueWeights === "material"
@@ -441,6 +471,12 @@ export class SearchDriver {
     public appliesTo(version: string): boolean {
         return this.enabled && this.versions.has(version);
     }
+    /** Capture the immutable post-setup armies before either side takes a combat turn. */
+    public onFightReady(): void {
+        if (this.lateRangedFinishWeight > 0 && this.finishPressureState === null) {
+            this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
+        }
+    }
     /**
      * Replace the strategy's single decision with the best-by-rollout candidate (search mode), arbitrate
      * act-vs-wait by lap rollout (oracle mode), or log the Q2 wait-horizon ablation and return the
@@ -449,6 +485,9 @@ export class SearchDriver {
     public chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[] {
         if (!this.appliesTo(version)) {
             return incumbent;
+        }
+        if (this.lateRangedFinishWeight > 0) {
+            this.onFightReady();
         }
         if (this.circuitOpen) {
             this.counters.circuitSkipped += 1;
@@ -537,6 +576,11 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            lateRangedFinishWeight: this.lateRangedFinishWeight,
+            initialBoardRangedness: this.finishPressureState?.initialBoardRangedness ?? 0,
+            finishPressureLeaves: c.finishPressureLeaves,
+            finishPressureNonzeroLeaves: c.finishPressureNonzeroLeaves,
+            finishPressureLogitSum: Number(c.finishPressureLogitSum.toFixed(6)),
             rolloutTurnsTotal: c.rolloutTurnsTotal,
             msTotal: Math.round(c.msTotal * 10) / 10,
             circuitBreakerMs: this.circuitBreakerMs,
@@ -1089,6 +1133,9 @@ export class SearchDriver {
             for (let i = 0; i < f.length; i += 1) {
                 z += model.w[i] * f[i];
             }
+            if (this.lateRangedFinishWeight > 0) {
+                z += this.finishPressureLogitAdjustment(team);
+            }
             return 1 / (1 + Math.exp(-z));
         }
         let ours = 0;
@@ -1103,7 +1150,31 @@ export class SearchDriver {
                 enemy += u.getCumulativeHp();
             }
         }
-        return 0.5 * (1 + (ours - enemy) / (ours + enemy + 1));
+        const material = 0.5 * (1 + (ours - enemy) / (ours + enemy + 1));
+        if (this.lateRangedFinishWeight === 0) {
+            return material;
+        }
+        const z = Math.log(material / (1 - material)) + this.finishPressureLogitAdjustment(team);
+        return 1 / (1 + Math.exp(-z));
+    }
+    private finishPressureLogitAdjustment(team: TeamType): number {
+        if (this.lateRangedFinishWeight === 0) {
+            return 0;
+        }
+        this.onFightReady();
+        const state = this.finishPressureState;
+        const currentLap = this.deps.fightProperties.getCurrentLap();
+        if (!state || state.initialBoardRangedness === 0 || finishPressureProximity(currentLap) === 0) {
+            return 0;
+        }
+        const feature = finishPressureForSide(state, this.deps.unitsHolder, team, currentLap);
+        const adjustment = this.lateRangedFinishWeight * feature;
+        this.counters.finishPressureLeaves += 1;
+        if (feature > 0) {
+            this.counters.finishPressureNonzeroLeaves += 1;
+        }
+        this.counters.finishPressureLogitSum += adjustment;
+        return adjustment;
     }
     // ---- simulated turn plumbing (mirrors lookahead.ts / battle_engine's loop, minus recording) ----
     private simPlayTurn(unit: Unit): void {

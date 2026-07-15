@@ -628,6 +628,11 @@ describe("v0.7 search trial report", () => {
                     shortlist: 2,
                     decisionDeadlineMs: 240,
                     deadlineFallbacks: 1,
+                    lateRangedFinishWeight: 0,
+                    initialBoardRangedness: 0,
+                    finishPressureLeaves: 0,
+                    finishPressureNonzeroLeaves: 0,
+                    finishPressureLogitSum: 0,
                     overrides: 0,
                     overridesToKind: {},
                 },
@@ -641,6 +646,11 @@ describe("v0.7 search trial report", () => {
                     shortlist: 3,
                     decisionDeadlineMs: 240,
                     deadlineFallbacks: 2,
+                    lateRangedFinishWeight: 1,
+                    initialBoardRangedness: 0,
+                    finishPressureLeaves: 10,
+                    finishPressureNonzeroLeaves: 0,
+                    finishPressureLogitSum: 0,
                     overrides: 1,
                     overridesToKind: { wait: 1 },
                 },
@@ -652,6 +662,11 @@ describe("v0.7 search trial report", () => {
                     candidatesTotal: 30,
                     scoredCandidatesTotal: 30,
                     shortlist: null,
+                    lateRangedFinishWeight: 2,
+                    initialBoardRangedness: 0.5,
+                    finishPressureLeaves: 20,
+                    finishPressureNonzeroLeaves: 8,
+                    finishPressureLogitSum: 3.5,
                     overrides: 3,
                     overridesToKind: { melee: 3 },
                 },
@@ -679,6 +694,11 @@ describe("v0.7 search trial report", () => {
         expect(summary.shortlistCounts).toEqual({ "2": 1, "3": 1, off: 2 });
         expect(summary.deadlineFallbacks).toBe(3);
         expect(summary.decisionDeadlineCounts).toEqual({ "240": 2, off: 2 });
+        expect(summary.lateRangedFinishWeightCounts).toEqual({ "0": 1, "1": 1, "2": 1, off: 1 });
+        expect(summary.finishPressureEligibleGames).toBe(1);
+        expect(summary.finishPressureLeaves).toBe(30);
+        expect(summary.finishPressureNonzeroLeaves).toBe(8);
+        expect(summary.finishPressureLogitSum).toBe(3.5);
         expect(summary.overridesToKind).toEqual({ wait: 5, melee: 3, defend: 6 });
         expect(summary.invalidJsonLines).toBe(2);
     });

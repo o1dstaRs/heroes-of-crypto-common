@@ -668,6 +668,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     const startResult = engine.apply({ type: "start_fight" });
     applyEvents(startResult.events);
+    search.onFightReady();
 
     const advance = (): void => {
         const maxAttempts = unitsHolder.getAllUnits().size + 2;
