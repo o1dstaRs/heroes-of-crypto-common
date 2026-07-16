@@ -31,6 +31,7 @@ import {
     readPureRangedTerminalManifest,
     selectPureRangedTerminalWeight,
     validatePureRangedTerminalManifest,
+    validatePureRangedTerminalExactDirectoryEntries,
     validatePureRangedTerminalRawArmSet,
     type IPureRangedTerminalComparison,
     type IPureRangedTerminalManifest,
@@ -347,6 +348,18 @@ describe("pure-ranged terminal analysis primitives", () => {
                 sealedSha256,
             ),
         ).toThrow("does not match sealed bytes/hash");
+    });
+
+    it("rejects dot-prefixed extras in exact evidence directories", () => {
+        const directory = mkdtempSync(join(tmpdir(), "hoc-pure-terminal-exact-dir-"));
+        temporaryDirectories.push(directory);
+        writeFileSync(join(directory, "expected.jsonl"), "{}\n");
+        expect(() => validatePureRangedTerminalExactDirectoryEntries(directory, ["expected.jsonl"])).not.toThrow();
+
+        writeFileSync(join(directory, ".unregistered"), "unexpected\n");
+        expect(() => validatePureRangedTerminalExactDirectoryEntries(directory, ["expected.jsonl"])).toThrow(
+            "expected exactly",
+        );
     });
 
     it("fails an external evidence-root audit on any derived scenario collision", () => {

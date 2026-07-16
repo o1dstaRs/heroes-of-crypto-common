@@ -1144,15 +1144,15 @@ function exactFileSet(path: string, games: number, suffix: string): void {
     const expected = new Set(
         Array.from({ length: games }, (_, game) => `${game.toString().padStart(5, "0")}${suffix}`),
     );
-    const actual = existsSync(path) ? readdirSync(path).filter((name) => !name.startsWith(".")) : [];
+    const actual = existsSync(path) ? readdirSync(path) : [];
     if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
         throw new Error(`${path}: expected exactly ${expected.size} ${suffix} files; got ${actual.length}`);
     }
 }
 
-function exactNamedEntries(path: string, expectedNames: readonly string[]): void {
+export function validatePureRangedTerminalExactDirectoryEntries(path: string, expectedNames: readonly string[]): void {
     const expected = new Set(expectedNames);
-    const actual = existsSync(path) ? readdirSync(path).filter((name) => !name.startsWith(".")) : [];
+    const actual = existsSync(path) ? readdirSync(path) : [];
     if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
         throw new Error(
             `${path}: expected exactly [${[...expected].sort().join(", ")}]; got [${actual.sort().join(", ")}]`,
@@ -1409,11 +1409,11 @@ function validateRawMarker(
         throw new Error(`${phase} raw completion marker failed validation`);
     }
     validatePureRangedTerminalRawArmSet(report.arms, expectedArms, report.games);
-    exactNamedEntries(
+    validatePureRangedTerminalExactDirectoryEntries(
         join(runDir, "raw", phase),
         expectedArms.map(({ id }) => id),
     );
-    exactNamedEntries(
+    validatePureRangedTerminalExactDirectoryEntries(
         join(runDir, "sealed", phase),
         expectedArms.flatMap(({ id }) => [`${id}.games.jsonl`, `${id}.audit.jsonl`]),
     );
@@ -1428,7 +1428,7 @@ function validateRawMarker(
         if (reported.gamesPath !== relative(runDir, gamesPath) || reported.auditPath !== relative(runDir, auditPath)) {
             throw new Error(`${phase}/${expected.id}: sealed artifact path drifted`);
         }
-        exactNamedEntries(rawRoot, ["games", "audit"]);
+        validatePureRangedTerminalExactDirectoryEntries(rawRoot, ["games", "audit"]);
         exactFileSet(join(rawRoot, "games"), expected.games, ".json");
         exactFileSet(join(rawRoot, "audit"), expected.games, ".jsonl");
 

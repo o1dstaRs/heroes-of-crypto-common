@@ -946,11 +946,22 @@ async function executeCohort(
     let completed = cohort.games - pending.length;
     await new Promise<void>((resolvePromise, rejectPromise) => {
         let stopped = false;
+        const terminateWorkers = async (): Promise<void> => {
+            await Promise.all([...workers].map(async (worker) => void (await worker.terminate())));
+        };
         const fail = (error: unknown): void => {
             if (stopped) return;
             stopped = true;
-            for (const worker of workers) void worker.terminate();
-            rejectPromise(error instanceof Error ? error : new Error(String(error)));
+            const failure = error instanceof Error ? error : new Error(String(error));
+            void terminateWorkers().then(
+                () => rejectPromise(failure),
+                () => rejectPromise(failure),
+            );
+        };
+        const finish = (): void => {
+            if (stopped) return;
+            stopped = true;
+            void terminateWorkers().then(resolvePromise, rejectPromise);
         };
         const next = (worker: Worker): void => {
             if (stopped) return;
@@ -977,6 +988,7 @@ async function executeCohort(
             });
             workers.add(worker);
             worker.on("message", (message: { type: string; artifact?: IWaitV3StageAGameArtifact; error?: string }) => {
+                if (stopped) return;
                 if (message.type === "ready") {
                     next(worker);
                     return;
@@ -996,7 +1008,8 @@ async function executeCohort(
                 if (completed % 100 === 0 || completed === cohort.games) {
                     console.log(`${cohort.id}: ${completed}/${cohort.games} complete`);
                 }
-                next(worker);
+                if (completed === cohort.games) finish();
+                else next(worker);
             });
             worker.on("error", fail);
             worker.on("exit", (code) => {
