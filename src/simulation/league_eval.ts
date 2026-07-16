@@ -379,6 +379,8 @@ function withFightEnvironment<T>(
         V06_CASTER_ROUTER: "off",
         V06_AREA_THROW: "off",
         V06_RIDER_EV: "off",
+        // W17: empty = the shipped V07_CASTER_ROUTER_POLICY exactly (extra caster tokens force-disabled).
+        V07_CASTER_EXTRA: "",
         V06_DISPERSE_TEAM:
             lowerPlacement === "adaptive" && upperPlacement === "adaptive"
                 ? "both"

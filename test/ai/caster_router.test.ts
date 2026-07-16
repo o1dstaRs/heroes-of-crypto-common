@@ -118,6 +118,8 @@ afterEach(() => {
     delete process.env.V06_RES_PREEMPT;
     delete process.env.V07_AURA_CASTER_ROUTER;
     delete process.env.V07_AURA_CASTER_SPELLS;
+    delete process.env.V07_CASTER_EXTRA;
+    delete process.env.V07_CASTER_EXTRA_VERSIONS;
 });
 
 describe("v0.6 universal MELEE_MAGIC caster router", () => {
@@ -482,6 +484,143 @@ describe("v0.7 baked caster salvage", () => {
         const malformed = new StrategyV0_7();
         primeV07AuraProfile(malformed, combat);
         expect(malformed.decideTurn(valkyrie, context)).toEqual(anchor);
+    });
+
+    it("W17 summonwolves: replaces a Satyr self-buff cast only when the token is routed", () => {
+        const combat = createCombatTestContext();
+        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        satyr.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
+        const context = contextFor(combat);
+        const buffIncumbent: GameAction[] = [{ type: "cast_spell", casterId: satyr.getId(), spellName: "Courage" }];
+        const mustNotEnumerate = (): never => {
+            throw new Error("a policy without summonwolves must not enumerate for a MAGIC caster");
+        };
+
+        // Shipped v0.7 policy: MAGIC casters stay untouched, enumeration stays dormant.
+        expect(
+            routeUniversalCasterWithPolicy(satyr, context, buffIncumbent, V07_CASTER_ROUTER_POLICY, mustNotEnumerate),
+        ).toBe(buffIncumbent);
+
+        const withToken = {
+            spells: ["resurrection", "windflow", "summonwolves"],
+            resurrectionPreemptsCommitted: false,
+        } as const;
+        const routed = routeUniversalCasterWithPolicy(satyr, context, buffIncumbent, withToken);
+        const cast = castSpell(routed);
+        expect(cast?.spellName).toBe("Summon Wolves");
+        expect(cast?.targetCell).toBeDefined();
+
+        // An existing Summon Wolves cast and a committed combat action are preserved verbatim.
+        expect(routeUniversalCasterWithPolicy(satyr, context, routed, withToken)).toBe(routed);
+        const attack: GameAction[] = [
+            {
+                type: "melee_attack",
+                attackerId: satyr.getId(),
+                targetId: enemy.getId(),
+                attackFrom: satyr.getBaseCell(),
+            },
+        ];
+        expect(routeUniversalCasterWithPolicy(satyr, context, attack, withToken)).toBe(attack);
+    });
+
+    it("W17 summonwolves: v0.6 env path routes it only when explicitly scoped, never by default", () => {
+        const combat = createCombatTestContext();
+        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        satyr.setStackPower(5);
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
+        const context = contextFor(combat);
+        const buffIncumbent: GameAction[] = [{ type: "cast_spell", casterId: satyr.getId(), spellName: "Courage" }];
+
+        process.env.V06_CASTER_ROUTER = "on";
+        expect(routeUniversalCaster(satyr, context, buffIncumbent)).toBe(buffIncumbent);
+
+        process.env.V06_CASTER_SPELLS = "summonwolves";
+        expect(castSpell(routeUniversalCaster(satyr, context, buffIncumbent))?.spellName).toBe("Summon Wolves");
+    });
+
+    it("W17 reswiden: lowers the reserve bar and treats a wait incumbent as replaceable", () => {
+        const combat = createCombatTestContext();
+        const angel = makeReal(LOWER, "Life", "Angel");
+        angel.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, name: "Half-depleted ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeLarge(combat, angel, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
+        // Reserve = floor(100/2) * 175 = 8,750 HP. 5,000 missing HP fails the shipped full-reserve
+        // bar but clears the widened 50%-weighted bar (4,375).
+        ally.applyDamage(5_000, 0, new SceneLogMock());
+        const context = contextFor(combat);
+        const widened = {
+            spells: ["resurrection", "windflow", "reswiden"],
+            resurrectionPreemptsCommitted: false,
+        } as const;
+
+        const idle = fallback(angel);
+        expect(routeUniversalCasterWithPolicy(angel, context, idle, V07_CASTER_ROUTER_POLICY)).toBe(idle);
+        expect(castSpell(routeUniversalCasterWithPolicy(angel, context, idle, widened))?.spellName).toBe(
+            "Resurrection",
+        );
+
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: angel.getId() }];
+        expect(routeUniversalCasterWithPolicy(angel, context, wait, V07_CASTER_ROUTER_POLICY)).toBe(wait);
+        expect(castSpell(routeUniversalCasterWithPolicy(angel, context, wait, widened))?.spellName).toBe(
+            "Resurrection",
+        );
+
+        // Real combat actions stay committed — the widening deliberately excludes melee pre-emption.
+        const attack: GameAction[] = [
+            {
+                type: "melee_attack",
+                attackerId: angel.getId(),
+                targetId: enemy.getId(),
+                attackFrom: angel.getBaseCell(),
+            },
+        ];
+        expect(routeUniversalCasterWithPolicy(angel, context, attack, widened)).toBe(attack);
+
+        // "reswait" only lifts the wait commitment; the full-reserve bar still rejects this 5,000-HP cast.
+        const waitOnly = {
+            spells: ["resurrection", "windflow", "reswait"],
+            resurrectionPreemptsCommitted: false,
+        } as const;
+        expect(routeUniversalCasterWithPolicy(angel, context, wait, waitOnly)).toBe(wait);
+        ally.applyDamage(4_500, 0, new SceneLogMock());
+        expect(castSpell(routeUniversalCasterWithPolicy(angel, context, wait, waitOnly))?.spellName).toBe(
+            "Resurrection",
+        );
+    });
+
+    it("W17 V07_CASTER_EXTRA: scopes by version and fails closed on unknown tokens", () => {
+        const combat = createCombatTestContext();
+        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        satyr.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 10 });
+        const context = contextFor(combat);
+
+        const control = new StrategyV0_7().decideTurn(satyr, context);
+        expect(castSpell(control)?.spellName).toBe("Courage");
+
+        process.env.V07_CASTER_EXTRA = "summonwolves";
+        process.env.V07_CASTER_EXTRA_VERSIONS = "v0.7s";
+        expect(new StrategyV0_7().decideTurn(satyr, context)).toEqual(control);
+
+        process.env.V07_CASTER_EXTRA_VERSIONS = "v0.7";
+        expect(castSpell(new StrategyV0_7().decideTurn(satyr, context))?.spellName).toBe("Summon Wolves");
+
+        process.env.V07_CASTER_EXTRA = "bogus";
+        expect(new StrategyV0_7().decideTurn(satyr, context)).toEqual(control);
     });
 
     it("keeps Resurrection outside the Wind-only aura arm and non-preempting in the combined arm", () => {

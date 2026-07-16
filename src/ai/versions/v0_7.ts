@@ -14,7 +14,12 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
-import { type ICasterRouterPolicy, routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
+import {
+    type CasterRouterSpell,
+    type ICasterRouterPolicy,
+    routeUniversalCasterWithPolicy,
+    V07_CASTER_ROUTER_POLICY,
+} from "./caster_router";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
 import { revealConditionedPlacement } from "./v0_7_placement_reveal";
@@ -59,6 +64,44 @@ interface IV07ArmyProfile {
 }
 
 const denseMeleeMagicIsolationEnabled = (): boolean => process.env.V07_DENSE_MM_SALVAGE_ISOLATION === "1";
+
+/**
+ * W17 gaps #2/#3 (V07_CASTER_EXTRA, default OFF): extra caster-router tokens layered onto the shipped S3
+ * salvage policy — "summonwolves" (Satyr Summon Wolves over a lower-EV self-buff), "reswait" (Angel
+ * Resurrection may replace a wait) and "reswiden" (reswait + halved reserve bar), comma list, each
+ * ablating independently. `V07_CASTER_EXTRA_VERSIONS`
+ * (comma list) scopes by strategy version for seat-scoped A/B mirrors (the V06_MELEE_DIMS_VERSIONS pattern:
+ * set "v0.7s" so a v0.7s-vs-v0.7 battery carries the tokens on exactly one seat); unset = every v0.7-family
+ * caller, the eventual live-flip semantics. Gate unset, scope mismatch, or no recognized token returns the
+ * exact shipped V07_CASTER_ROUTER_POLICY object — byte-identical shipped behavior.
+ */
+const EXTRA_CASTER_TOKENS: readonly CasterRouterSpell[] = ["summonwolves", "reswait", "reswiden"];
+
+function casterPolicyWithExtras(version: string): ICasterRouterPolicy {
+    const raw = process.env.V07_CASTER_EXTRA;
+    if (!raw) {
+        return V07_CASTER_ROUTER_POLICY;
+    }
+    const scope = process.env.V07_CASTER_EXTRA_VERSIONS;
+    if (scope) {
+        const allowed = scope
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+        if (!allowed.includes(version)) {
+            return V07_CASTER_ROUTER_POLICY;
+        }
+    }
+    const requested = new Set(raw.split(",").map((token) => token.trim().toLowerCase()));
+    const extras = EXTRA_CASTER_TOKENS.filter((token) => requested.has(token));
+    if (!extras.length) {
+        return V07_CASTER_ROUTER_POLICY;
+    }
+    return {
+        spells: [...V07_CASTER_ROUTER_POLICY.spells, ...extras],
+        resurrectionPreemptsCommitted: V07_CASTER_ROUTER_POLICY.resurrectionPreemptsCommitted,
+    };
+}
 
 function auraCasterRouterPolicy(): ICasterRouterPolicy | undefined {
     if (process.env.V07_AURA_CASTER_ROUTER !== "on") {
@@ -148,13 +191,14 @@ export class StrategyV0_7 extends StrategyV0_6 {
         }
         return super.placeArmy(units, context);
     }
-    /** S3: bake only the measured non-pre-empting Resurrection + Wind Flow salvage. */
+    /** S3: bake only the measured non-pre-empting Resurrection + Wind Flow salvage. W17's experimental
+     * extra tokens (V07_CASTER_EXTRA, default OFF) layer onto that policy without touching it. */
     protected override routeCasterDecision(
         unit: Unit,
         context: IDecisionContext,
         decision: GameAction[],
     ): GameAction[] {
-        return routeUniversalCasterWithPolicy(unit, context, decision, V07_CASTER_ROUTER_POLICY);
+        return routeUniversalCasterWithPolicy(unit, context, decision, casterPolicyWithExtras(this.version));
     }
     /** v0.6's final-stage seam: apply the committed scorer only inside its measured decision domain. */
     protected override finalizeDecision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
