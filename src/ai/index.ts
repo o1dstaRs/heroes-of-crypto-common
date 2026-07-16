@@ -18,6 +18,7 @@ import { STRATEGY_V0_5 } from "./versions/v0_5";
 import { STRATEGY_V0_6 } from "./versions/v0_6";
 import { STRATEGY_V0_6S } from "./versions/v0_6s";
 import { STRATEGY_V0_7 } from "./versions/v0_7";
+import { STRATEGY_V0_7S } from "./versions/v0_7s";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
@@ -52,6 +53,9 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // experiment alias, never a LATEST/DEFAULT candidate.
     STRATEGY_V0_6S,
     STRATEGY_V0_6,
+    // v0.7s is the equivalent measurement alias for seat-scoped rollout-search A/Bs. Keep it before v0.7
+    // so registering the alias cannot change LATEST_AI_VERSION; DEFAULT_AI_VERSION is explicit below.
+    STRATEGY_V0_7S,
     // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts). Registered LAST:
     // LATEST_AI_VERSION resolves to v0.7.
     STRATEGY_V0_7,
