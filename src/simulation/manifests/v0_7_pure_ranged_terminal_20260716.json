@@ -1,0 +1,133 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-pure-ranged-terminal-20260716",
+    "createdAt": "2026-07-16T02:55:05Z",
+    "status": "preregistered_research_only_no_bake",
+    "candidate": "v0.7",
+    "opponent": "v0.6",
+    "panelScope": "Historical fixed-template mechanism panel only; this is not current-ranked setup evidence.",
+    "pairing": "Each scenario seed is shared by both side swaps and every compared weight arm.",
+    "pairSeedStep": 2654435761,
+    "scenarioReservation": {
+        "uniqueScenarioSeeds": 2262,
+        "armExecutionsExcludedFromUniqueCount": true,
+        "scout": {
+            "baseSeed": 87113710,
+            "gamesPerArm": 512,
+            "pairSeeds": 256
+        },
+        "confirmation": {
+            "baseSeed": 87123710,
+            "gamesPerArm": 4000,
+            "pairSeeds": 2000,
+            "identityPairOffset": 2000,
+            "identityPairSeeds": {
+                "mage_frontline": 379067854,
+                "mage_fireline": 3033503615,
+                "melee_magic_utility": 1392972080,
+                "melee_magic_brawler": 4047407841,
+                "aura_support": 2406876306,
+                "aura_offense": 766344771
+            },
+            "identityGamesPerTemplatePerArm": 2
+        }
+    },
+    "arms": {
+        "scoutWeights": [0, 0.5, 1],
+        "confirmationWeights": "control 0 plus the single deterministic scout selection",
+        "selectionOrder": "highest paired draw-half score gain, then lower weight"
+    },
+    "mechanismPanel": {
+        "template": "ranged_precision",
+        "roster": ["Arbalester", "Centaur", "Elf", "Medusa", "Cyclops", "Tsar Cannon"],
+        "amountMode": "expBudget",
+        "setup": "LiveTwin SEE_NONE with shipped perk and augments on both seats",
+        "grid": "NORMAL",
+        "originalStacksMustAllBeRange": true
+    },
+    "searchEnvelope": {
+        "mode": "search",
+        "versions": "v0.7",
+        "gate": 0.01,
+        "horizon": 4,
+        "rollouts": 1,
+        "shortlist": 3,
+        "includeMoves": false,
+        "maxMoves": 1,
+        "maxMelee": 4,
+        "maxShots": 6,
+        "maxThrows": 2,
+        "activeChallengers": false,
+        "decisionDeadlineMs": 200,
+        "circuitBreakerMs": 275,
+        "lateRangedFinishWeight": 0,
+        "opponentModel": null,
+        "valueLeaf": "committed_default_20d",
+        "valueLeafSha256": "65231716bbbfe45c35f328ecc7f08caee35d4e8132767f9f6eac48a5cd9c10d2"
+    },
+    "identityControlEnvelope": {
+        "inheritsSearchPolicy": true,
+        "decisionDeadlineMs": null,
+        "circuitBreakerMs": null,
+        "reason": "Remove wall-clock jitter from exact ineligible-template action-hash controls."
+    },
+    "scoutGates": {
+        "pairedDrawHalfScoreGainMin": 0.03,
+        "pairedDrawHalfScoreGain95LcbExclusiveMin": 0,
+        "drawOrArmageddonDeltaMax": -0.05,
+        "drawOrArmageddonDelta95UcbExclusiveMax": 0,
+        "candidateAndOpponentRejections": 0,
+        "eligibleGamesMin": 1,
+        "eligibleLeavesMin": 1,
+        "nonzeroEligibleLeavesMin": 1,
+        "candidateActionHashChangedGamesMin": 1,
+        "deadlineFallbacks": 0,
+        "circuitOpenGameRateMax": 0.01,
+        "searchedTurnLatencyP95MsMax": 200
+    },
+    "confirmationGates": {
+        "repeatEveryScoutGate": true,
+        "selectedDecisiveWinRate95LcbExclusiveMin": 0.5,
+        "selectedDrawOrArmageddonRateMax": 0.9,
+        "eligibleRangedCandidateActionHashChangedGamesMin": 1,
+        "ineligibleTemplateActionHashIdentity": "exact for both side swaps against weight 0",
+        "ineligibleTemplates": [
+            "mage_frontline",
+            "mage_fireline",
+            "melee_magic_utility",
+            "melee_magic_brawler",
+            "aura_support",
+            "aura_offense"
+        ]
+    },
+    "completion": {
+        "scoutRawMarker": "SCOUT_RAW_COMPLETE",
+        "scoutAnalysisMarker": "SCOUT_ANALYSIS_COMPLETE",
+        "scoutPassLine": "PURE RANGED TERMINAL SCOUT GATE: PASS",
+        "confirmationRawMarker": "CONFIRMATION_RAW_COMPLETE",
+        "confirmationAnalysisMarker": "CONFIRMATION_ANALYSIS_COMPLETE",
+        "confirmationPassLine": "PURE RANGED TERMINAL CONFIRMATION GATE: PASS",
+        "rawAndAuditExactCompleteness": true,
+        "hashEverySealedArtifact": true,
+        "automaticBake": false,
+        "automaticDeploy": false
+    },
+    "freshSeedAudit": {
+        "auditedAt": "2026-07-16T02:55:05Z",
+        "plannedUniqueScenarioSeeds": 2262,
+        "internalCollisions": 0,
+        "localNumericTokens": 207169,
+        "localCollisions": 0,
+        "zincNumericTokens": 56486,
+        "zincCollisions": 0,
+        "localRoots": ["/Users/zolotukhin/Workplace"],
+        "zincRoots": ["/home/agent-zinc/hoc-common/docs", "/home/agent-zinc/hoc-common-v07-dbe9356"],
+        "declaration": "All 2262 unique derived uint32 scenario seeds, not repeated arm executions, were compared as exact 7-10 digit numeric tokens before preregistration. No overlap was found locally or on Zinc."
+    },
+    "authority": {
+        "defaultWeight": 0,
+        "bake": false,
+        "deploy": false,
+        "instruction": "NO_BAKE_NO_DEFAULT_CHANGE_NO_DEPLOY_FROM_THIS_HARNESS"
+    }
+}
