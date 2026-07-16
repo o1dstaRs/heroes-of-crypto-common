@@ -1,0 +1,218 @@
+{
+    "schemaVersion": 1,
+    "attestationId": "v0.7-composed-seed-scan-v9d-20260716",
+    "authoritativeLineage": {
+        "accepted": {
+            "label": "v9d",
+            "reason": "Final same-cutoff local and Zinc scans replayed byte-identically under a continuous guard checkpoint."
+        },
+        "abandoned": [
+            {
+                "label": "v7",
+                "reason": "Invalid because active mutable CEM files changed the Zinc summary even though the canonical seed set replayed byte-identically."
+            },
+            {
+                "label": "v7b",
+                "reason": "Stopped and abandoned."
+            },
+            {
+                "label": "v8",
+                "reason": "Invalid because the broad CEM directory exclusion lost 12527 historical unique seeds."
+            },
+            {
+                "label": "v9",
+                "reason": "Provisional and unused."
+            },
+            {
+                "label": "v9b",
+                "reason": "Provisional and unused."
+            },
+            {
+                "label": "v9c",
+                "reason": "Abandoned because monitor continuity failed with a 105689 ms gap, exceeding the 90000 ms maximum, before the scans."
+            }
+        ]
+    },
+    "archivedEvidence": [
+        {
+            "path": "docs/evidence/v0_7_composed_guard_20260716/contract.json",
+            "bytes": 4501,
+            "sha256": "c739e0b22aea08119acb0cf9fab127b09e5450b8be3a444488aa4b67f8acf01f"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_guard_20260716/initial-source.json",
+            "bytes": 70637,
+            "sha256": "464330738be52b9f55ed4f18e4a1e7dc0d17832f83dde1b062dd8950684c786d"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/local-config.json",
+            "bytes": 12671,
+            "sha256": "a412abb0806cf19310e5e6b465ae44567cc179c1dfd2d9a7490254d44e263099"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/local-summary.json",
+            "bytes": 16823,
+            "sha256": "df4db29132b2b1311100b099ab32caeb2b8dcd75d99434b90f2d66c9c6c890e9"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/local-stdout.json",
+            "bytes": 16910,
+            "sha256": "8315e5a937507da7d6dc4b099606e8f3732955209908b332a3a6853d2113597a"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/zinc-config.json",
+            "bytes": 20798,
+            "sha256": "ffb7bfea014f6f67bbd9ba27467d226bffd8a288de1da6c66c55a6473d6de635"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/zinc-summary.json",
+            "bytes": 22538,
+            "sha256": "824ede893e242fd31cd9e3fd37603f613314283643655e5dc02228a880a3552c"
+        },
+        {
+            "path": "docs/evidence/v0_7_composed_seed_scan_v9d_20260716/zinc-stdout.json",
+            "bytes": 22625,
+            "sha256": "fc856be21e03d47b7f347e34d478c3fc1ea44f1d145ab72ef1e409e77e63aaf2"
+        }
+    ],
+    "checkpoint": {
+        "path": "/Users/zolotukhin/Workplace/hoc-v07-composed-guard-20260716-v9d/checkpoint-post-replay",
+        "ledgerPath": "/Users/zolotukhin/Workplace/hoc-v07-composed-guard-20260716-v9d/checkpoint-post-replay/ledger.json",
+        "ledgerSha256": "36e7fc926f95fbfb49c368540a03f5361519d4359bbbac8276024120246e9916",
+        "entryCount": 36,
+        "first": {
+            "sequence": 0,
+            "phase": "initial",
+            "path": "artifacts/0000-initial.json",
+            "sha256": "2caaf9c9acde56bea73ab39d2cf44bbded85f252d2363d7637436c95d35aff3d",
+            "checkedAt": "2026-07-16T09:14:44.280Z",
+            "snapshotSha256": "91b391797a076fddfe9369236f08e1332e3a2457704c55309939bbb8f05762a1"
+        },
+        "last": {
+            "sequence": 35,
+            "phase": "periodic",
+            "path": "artifacts/0035-periodic.json",
+            "sha256": "a8ec92476a1c779b1eba784436e4fc0c1f274c03b2f584c01c8e1f688140ff02",
+            "checkedAt": "2026-07-16T09:41:48.438Z",
+            "snapshotSha256": "5d1082aee02fa9477f8ae98db45d6471364b975ce330f7eeef01782df8d1d7d7"
+        }
+    },
+    "cutoff": "2026-07-16T09:18:00Z",
+    "replayVerification": {
+        "local": {
+            "byteIdentical": {
+                "seedSet": true,
+                "summary": true,
+                "stdout": true,
+                "stderr": true
+            },
+            "first": {
+                "seedSetBytes": 14123694,
+                "seedSetSha256": "d49f37783b36bf5d9c566dfc0adc112e6900b33f4dbd150504e3d2221db6fd15",
+                "summarySha256": "df4db29132b2b1311100b099ab32caeb2b8dcd75d99434b90f2d66c9c6c890e9",
+                "stdoutSha256": "8315e5a937507da7d6dc4b099606e8f3732955209908b332a3a6853d2113597a",
+                "stderrBytes": 0,
+                "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "replay": {
+                "seedSetBytes": 14123694,
+                "seedSetSha256": "d49f37783b36bf5d9c566dfc0adc112e6900b33f4dbd150504e3d2221db6fd15",
+                "summarySha256": "df4db29132b2b1311100b099ab32caeb2b8dcd75d99434b90f2d66c9c6c890e9",
+                "stdoutSha256": "8315e5a937507da7d6dc4b099606e8f3732955209908b332a3a6853d2113597a",
+                "stderrBytes": 0,
+                "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+        },
+        "zinc": {
+            "byteIdentical": {
+                "seedSet": true,
+                "summary": true,
+                "stdout": true,
+                "stderr": true
+            },
+            "first": {
+                "seedSetBytes": 111483949,
+                "seedSetSha256": "69e59d11e06d1ed16f4c617d9d09513a0c9b246884264839c8c872dcce32ac7f",
+                "summarySha256": "824ede893e242fd31cd9e3fd37603f613314283643655e5dc02228a880a3552c",
+                "stdoutSha256": "fc856be21e03d47b7f347e34d478c3fc1ea44f1d145ab72ef1e409e77e63aaf2",
+                "stderrBytes": 0,
+                "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "replay": {
+                "seedSetBytes": 111483949,
+                "seedSetSha256": "69e59d11e06d1ed16f4c617d9d09513a0c9b246884264839c8c872dcce32ac7f",
+                "summarySha256": "824ede893e242fd31cd9e3fd37603f613314283643655e5dc02228a880a3552c",
+                "stdoutSha256": "fc856be21e03d47b7f347e34d478c3fc1ea44f1d145ab72ef1e409e77e63aaf2",
+                "stderrBytes": 0,
+                "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+        }
+    },
+    "scanPolicy": "structured_seed_ancestor_v8_component_safe_path_prefix_plus_repeated_bound_file_snapshot_and_protocol_typed_tournament_optimizer_census_and_league_expansion_plus_signed_historical_streaming_text_fallback",
+    "scanner": {
+        "sourceSha256": "b7794026a3070f8122cfb9e52e5742da1ee322a44386c10eee4912dbb56b80ac",
+        "localConfigSha256": "a412abb0806cf19310e5e6b465ae44567cc179c1dfd2d9a7490254d44e263099",
+        "zincConfigSha256": "ffb7bfea014f6f67bbd9ba27467d226bffd8a288de1da6c66c55a6473d6de635",
+        "executedConfigPaths": {
+            "local": "/tmp/v07_composed_seed_scan_local_v9d.json",
+            "zinc": "/tmp/v07_composed_seed_scan_zinc_v9d.json"
+        }
+    },
+    "scans": {
+        "local": {
+            "files": 103447,
+            "textFiles": 98769,
+            "structuredFiles": 42520,
+            "expandedManifests": 147,
+            "expandedInlineTournamentPanels": 3201,
+            "expandedInlineLeaguePanels": 48,
+            "expandedRecoveredLedgerStreams": 770,
+            "expandedTournamentSeeds": 2090304,
+            "expandedDerivedScheduleSeeds": 0,
+            "expandedDerivedProtocolSeeds": 35668,
+            "expandedInlineLeagueSeeds": 189000,
+            "expandedRecoveredLedgerSeeds": 1534500,
+            "matchedSeedTokens": 16795649,
+            "uniqueSeeds": 1317167,
+            "corpusSeedSetSha256": "d49f37783b36bf5d9c566dfc0adc112e6900b33f4dbd150504e3d2221db6fd15",
+            "corpusFileSnapshotSha256": "104b668d98dcbe50490fb7888c38a745c471c1ff569c0ece1087747704bb855e",
+            "excluded": [
+                "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+                "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/v0_7_composed_ranked_ladder.ts"
+            ],
+            "excludedPathPrefixes": []
+        },
+        "zinc": {
+            "files": 54493,
+            "textFiles": 53667,
+            "structuredFiles": 8582,
+            "expandedManifests": 35,
+            "expandedInlineTournamentPanels": 4817,
+            "expandedInlineLeaguePanels": 29,
+            "expandedRecoveredLedgerStreams": 70,
+            "expandedTournamentSeeds": 418810,
+            "expandedDerivedScheduleSeeds": 9895724,
+            "expandedDerivedProtocolSeeds": 0,
+            "expandedInlineLeagueSeeds": 97048,
+            "expandedRecoveredLedgerSeeds": 139500,
+            "matchedSeedTokens": 13533236,
+            "uniqueSeeds": 10380486,
+            "corpusSeedSetSha256": "69e59d11e06d1ed16f4c617d9d09513a0c9b246884264839c8c872dcce32ac7f",
+            "corpusFileSnapshotSha256": "2bb760b2df55724c80c01044572c991543e80a23cf84039b86949702b95b7c4d",
+            "excluded": [
+                "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+                "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/v0_7_composed_ranked_ladder.ts",
+                "/home/agent-zinc/hoc-common/rl_state/fight58_keepalive.log",
+                "/home/agent-zinc/hoc-common/sim-out/cem/best.json",
+                "/home/agent-zinc/hoc-common/sim-out/cem/log.md",
+                "/home/agent-zinc/hoc-common/sim-out/cem/state.json",
+                "/home/agent-zinc/hoc-common/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+                "/home/agent-zinc/hoc-common/src/simulation/v0_7_composed_ranked_ladder.ts"
+            ],
+            "excludedPathPrefixes": [
+                "/home/agent-zinc/hoc-common/sim-out/cem/best-",
+                "/home/agent-zinc/hoc-common/sim-out/cem/eval_3550186_"
+            ]
+        }
+    }
+}

@@ -32,6 +32,7 @@ import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
+    getKnownOpponentCreatures,
     getVisibleCreatureChoices,
     isPickSimComplete,
     transitionPickSim,
@@ -176,6 +177,10 @@ const catalogById = (): Map<number, ICatalogRef> => {
 };
 
 export interface IConditionalArmy {
+    /** Persisted creature-id order. Ranked createRoster materializes stacks in this order. */
+    creatureIds: number[];
+    /** Opponent creatures legitimately revealed during this team's pick. */
+    revealedOpponentCreatures: number[];
     roster: IArmyUnitSpec[];
     perk: number;
     augments: ISetupAugment[];
@@ -194,6 +199,11 @@ interface ITeamSetupOutcome {
     creaturesAtT2: number[];
 }
 
+interface IConditionalPickDriverOptions {
+    conditionalTeams: ReadonlySet<PickTeam>;
+    preservePickOrder: boolean;
+}
+
 /**
  * Drive one complete pick with a single draft policy on both seats; the per-team setup arm decides the T2
  * pick mid-draft (with the creatures known at that phase, as live) and augments/synergies at the end.
@@ -204,6 +214,35 @@ export function runConditionalPickGame(
     conditionalTeam: PickTeam | undefined,
     rules: ReadonlySet<ConditionalSetupRule>,
     genome?: ILeagueGenome,
+): { lower: IConditionalArmy; upper: IConditionalArmy } {
+    return runConditionalPickGameWithOptions(seed, draft, rules, genome, {
+        conditionalTeams: conditionalTeam === undefined ? new Set() : new Set([conditionalTeam]),
+        preservePickOrder: false,
+    });
+}
+
+/**
+ * Ranked-composed pick path: round-1 accepted draft plus CONDITIONAL_SETUP_V1 for both seats. Unlike the
+ * historical setup A/B helper above, this preserves the pick service's persisted creature order because the
+ * authoritative server's createRoster() iterates that array directly and same-size placement is order-sensitive.
+ */
+export function runRankedConditionalPickGame(
+    seed: number,
+    rules: ReadonlySet<ConditionalSetupRule>,
+    genome: ILeagueGenome,
+): { lower: IConditionalArmy; upper: IConditionalArmy } {
+    return runConditionalPickGameWithOptions(seed, "league", rules, genome, {
+        conditionalTeams: new Set([LOWER, UPPER]),
+        preservePickOrder: true,
+    });
+}
+
+function runConditionalPickGameWithOptions(
+    seed: number,
+    draft: DraftDistName,
+    rules: ReadonlySet<ConditionalSetupRule>,
+    genome: ILeagueGenome | undefined,
+    options: IConditionalPickDriverOptions,
 ): { lower: IConditionalArmy; upper: IConditionalArmy } {
     const rng = makeRng(seed >>> 0);
     const rngInt: PickRandomInt = (maxExclusive) => Math.floor(rng() * maxExclusive);
@@ -249,10 +288,9 @@ export function runConditionalPickGame(
                     continue;
                 }
                 const staticPick = SETUP_POLICY_V0.pickArtifactT2(own.tier2Offers);
-                const artifactId =
-                    team === conditionalTeam
-                        ? conditionalArtifactT2(own.tier2Offers, own.creatures, rules)
-                        : staticPick;
+                const artifactId = options.conditionalTeams.has(team)
+                    ? conditionalArtifactT2(own.tier2Offers, own.creatures, rules)
+                    : staticPick;
                 setupOutcome.set(team, {
                     tier2Artifact: artifactId,
                     t2Overridden: artifactId !== staticPick,
@@ -278,7 +316,9 @@ export function runConditionalPickGame(
             }
             return { id, index, ref };
         });
-        refs.sort((a, b) => a.ref.level - b.ref.level || a.index - b.index);
+        if (!options.preservePickOrder) {
+            refs.sort((a, b) => a.ref.level - b.ref.level || a.index - b.index);
+        }
         const roster = refs.map(({ ref }) => ({
             faction: ref.faction,
             creatureName: ref.creatureName,
@@ -293,12 +333,14 @@ export function runConditionalPickGame(
         }));
         const budget = getUpgradePoints(own.perk);
         const staticAugments = SETUP_POLICY_V0.pickAugments(budget);
-        const augments = team === conditionalTeam ? conditionalAugments(budget, own.creatures, rules) : staticAugments;
-        const synergies =
-            team === conditionalTeam
-                ? conditionalSynergies(own.creatures)
-                : SETUP_POLICY_V0.pickSynergies(own.creatures);
+        const conditional = options.conditionalTeams.has(team);
+        const augments = conditional ? conditionalAugments(budget, own.creatures, rules) : staticAugments;
+        const synergies = conditional
+            ? conditionalSynergies(own.creatures)
+            : SETUP_POLICY_V0.pickSynergies(own.creatures);
         return {
+            creatureIds: [...own.creatures],
+            revealedOpponentCreatures: getKnownOpponentCreatures(state, team),
             roster,
             perk: own.perk,
             augments,
@@ -306,8 +348,8 @@ export function runConditionalPickGame(
             tier1Artifact: own.tier1Artifact,
             tier2Artifact: outcome.tier2Artifact,
             rangedStacks: ownComposition(own.creatures).ranged,
-            t2Overridden: team === conditionalTeam && outcome.t2Overridden,
-            augmentsOverridden: team === conditionalTeam && JSON.stringify(augments) !== JSON.stringify(staticAugments),
+            t2Overridden: conditional && outcome.t2Overridden,
+            augmentsOverridden: conditional && JSON.stringify(augments) !== JSON.stringify(staticAugments),
         };
     };
 

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "guardId": "v0.7-composed-zinc-20260716-0918-v9d",
+  "sealBefore": "2026-07-17T09:15:00Z",
+  "remote": {
+    "host": "puffalo.tailbe7bef.ts.net",
+    "user": "agent-zinc",
+    "port": 2222
+  },
+  "limits": {
+    "maxIteration": 64,
+    "maxPass": 8,
+    "maxGeneration": 12,
+    "seed0Base": 970000,
+    "iterationStep": 911,
+    "trainingPassStep": 1000003,
+    "trainingGenerationStep": 7919,
+    "trainingGames": 3000,
+    "validationOffsets": [
+      11,
+      17,
+      19,
+      23,
+      29
+    ],
+    "validationGames": 2500
+  },
+  "paths": {
+    "commonRoot": "/home/agent-zinc/hoc-common",
+    "keepaliveScript": "/home/agent-zinc/hoc-common/rl_state/keepalive_fight58b.sh",
+    "cemScript": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+    "concurrentTournament": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+    "runTournament": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+    "tournament": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+    "tournamentWorker": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+    "log": "/home/agent-zinc/hoc-common/rl_state/fight58_keepalive.log",
+    "state": "/home/agent-zinc/hoc-common/sim-out/cem/state.json"
+  },
+  "requiredFileSha256": {
+    "/home/agent-zinc/hoc-common/rl_state/keepalive_fight58b.sh": "21b4601e92e92d67bed83877ef0e70d254916ee56b2f116b3f8a95e6d6b3e83a",
+    "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6",
+    "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e",
+    "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e",
+    "/home/agent-zinc/hoc-common/src/simulation/tournament.ts": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de",
+    "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba",
+    "/tmp/v0_7_composed_seed_scan_v9d.ts": "b7794026a3070f8122cfb9e52e5742da1ee322a44386c10eee4912dbb56b80ac",
+    "/tmp/v07_composed_seed_scan_zinc_v9d.json": "ffb7bfea014f6f67bbd9ba27467d226bffd8a288de1da6c66c55a6473d6de635"
+  },
+  "approvedReadOnlyScanner": {
+    "cwd": "/home/agent-zinc/hoc-common-v07-overnight",
+    "sourcePath": "/tmp/v0_7_composed_seed_scan_v9d.ts",
+    "configPath": "/tmp/v07_composed_seed_scan_zinc_v9d.json",
+    "cutoff": "2026-07-16T09:18:00Z",
+    "seedSetOutput": "/tmp/v07-composed-zinc-seeds-structured-v9d.txt",
+    "summaryOutput": "/tmp/v07-composed-zinc-seed-scan-summary-v9d.json",
+    "excludedRelativeSuffixes": [
+      "src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+      "src/simulation/v0_7_composed_ranked_ladder.ts"
+    ],
+    "excluded": [
+      "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+      "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/v0_7_composed_ranked_ladder.ts",
+      "/home/agent-zinc/hoc-common/rl_state/fight58_keepalive.log",
+      "/home/agent-zinc/hoc-common/sim-out/cem/best.json",
+      "/home/agent-zinc/hoc-common/sim-out/cem/log.md",
+      "/home/agent-zinc/hoc-common/sim-out/cem/state.json",
+      "/home/agent-zinc/hoc-common/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+      "/home/agent-zinc/hoc-common/src/simulation/v0_7_composed_ranked_ladder.ts"
+    ],
+    "excludedPathPrefixes": [
+      "/home/agent-zinc/hoc-common/sim-out/cem/best-",
+      "/home/agent-zinc/hoc-common/sim-out/cem/eval_3550186_"
+    ]
+  },
+  "requiredCemEnvironment": {
+    "BASE_VERSION": "v0.4",
+    "CEM_BATCH": "44",
+    "CEM_CORES": "44",
+    "CEM_DIM": "58",
+    "CEM_EVAL_TIMEOUT_MS": "1200000",
+    "CEM_GAMES": "3000",
+    "CEM_HOURS": "6",
+    "CEM_POP": "40",
+    "CEM_ELITE": "8",
+    "CEM_VAL_GAMES": "2500",
+    "FIGHT_MELEE_ROSTERS": "0.5",
+    "OPT_VERSION": "v0.6",
+    "OPT_WEIGHTS_ENV": "V06_WEIGHTS"
+  },
+  "forbiddenCemEnvironment": [
+    "CEM_GENS",
+    "CEM_MAPS"
+  ],
+  "initialObservation": {
+    "capturedAt": "2026-07-16T09:14:44.280Z",
+    "keepalivePid": 3550182,
+    "cemPid": 3550186,
+    "keepaliveStartTicks": "129200284",
+    "cemStartTicks": "129200286",
+    "snapshotSha256": "91b391797a076fddfe9369236f08e1332e3a2457704c55309939bbb8f05762a1"
+  }
+}

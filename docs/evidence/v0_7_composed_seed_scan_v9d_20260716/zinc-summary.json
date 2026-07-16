@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 1,
+  "scanPolicy": "structured_seed_ancestor_v8_component_safe_path_prefix_plus_repeated_bound_file_snapshot_and_protocol_typed_tournament_optimizer_census_and_league_expansion_plus_signed_historical_streaming_text_fallback",
+  "cutoff": "2026-07-16T09:18:00Z",
+  "commonRoot": "/home/agent-zinc/hoc-common-v07-overnight",
+  "priorManifestExpanderPath": "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/optimizer/v0_7_96h_core.ts",
+  "priorManifestExpanderSha256": "7a9d62e04b973383316f41c5863cba62ecd6b28fa0400f76542fd26d37d04352",
+  "roots": [
+    "/home/agent-zinc/hoc-common/docs",
+    "/home/agent-zinc/hoc-common/sim-out",
+    "/home/agent-zinc/hoc-common/rl_state",
+    "/home/agent-zinc/hoc-common-v07-dbe9356",
+    "/home/agent-zinc/hoc-common-v07-96h-runs",
+    "/home/agent-zinc/hoc-common-v0_7/rl_state",
+    "/home/agent-zinc/hoc-common-v07/rl_state",
+    "/home/agent-zinc/hoc-common-v07/smoke-out",
+    "/home/agent-zinc/hoc-common-v07/raws_2x2_invalid_88008c1_target_memory",
+    "/home/agent-zinc/hoc-common-v0_7/v07_validation",
+    "/home/agent-zinc/hoc-common-v07-final-68a2582/sim-out",
+    "/home/agent-zinc/hoc-common-v07-48ef649/sim-out",
+    "/home/agent-zinc/hoc-common-league-2b84e8b/sim-out",
+    "/home/agent-zinc/rl-sweep.sh",
+    "/home/agent-zinc/vgen.sh",
+    "/home/agent-zinc/lae.sh",
+    "/home/agent-zinc/gate.sh",
+    "/home/agent-zinc/hoc-common",
+    "/home/agent-zinc/hoc-common-league-2b84e8b",
+    "/home/agent-zinc/hoc-common-v07",
+    "/home/agent-zinc/hoc-common-v07-48ef649",
+    "/home/agent-zinc/hoc-common-v07-96h",
+    "/home/agent-zinc/hoc-common-v07-final-68a2582",
+    "/home/agent-zinc/hoc-common-v07-final-68a2582-full-v2.bundle",
+    "/home/agent-zinc/hoc-common-v07-final-68a2582-full.bundle",
+    "/home/agent-zinc/hoc-common-v07-final-68a2582.bundle",
+    "/home/agent-zinc/hoc-common-v07-final-efac683.bundle",
+    "/home/agent-zinc/hoc-common-v07-overnight",
+    "/home/agent-zinc/hoc-common-v0_7"
+  ],
+  "rootDiscovery": [
+    {
+      "parent": "/home/agent-zinc",
+      "namePrefix": "hoc-common"
+    }
+  ],
+  "excluded": [
+    "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+    "/home/agent-zinc/hoc-common-v07-overnight/src/simulation/v0_7_composed_ranked_ladder.ts",
+    "/home/agent-zinc/hoc-common/rl_state/fight58_keepalive.log",
+    "/home/agent-zinc/hoc-common/sim-out/cem/best.json",
+    "/home/agent-zinc/hoc-common/sim-out/cem/log.md",
+    "/home/agent-zinc/hoc-common/sim-out/cem/state.json",
+    "/home/agent-zinc/hoc-common/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+    "/home/agent-zinc/hoc-common/src/simulation/v0_7_composed_ranked_ladder.ts"
+  ],
+  "excludedPathPrefixes": [
+    "/home/agent-zinc/hoc-common/sim-out/cem/best-",
+    "/home/agent-zinc/hoc-common/sim-out/cem/eval_3550186_"
+  ],
+  "excludedRelativeSuffixes": [
+    "src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+    "src/simulation/v0_7_composed_ranked_ladder.ts"
+  ],
+  "files": 54493,
+  "textFiles": 53667,
+  "structuredFiles": 8582,
+  "expandedManifests": 35,
+  "tournamentSeries": [
+    {
+      "id": "zinc-deleted-rl-sweep-base1",
+      "baseSeed": 1,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 15000,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-vgen-seeds2-through40-base1-covered-by-rl-sweep",
+      "baseSeed": 2,
+      "streams": 39,
+      "streamStride": 1,
+      "gamesPerStream": 300,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-ttest-424242",
+      "baseSeed": 424242,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 500,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-validate-12500003",
+      "baseSeed": 12500003,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 600,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-validate-12500009",
+      "baseSeed": 12500009,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 600,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-validate-12500017",
+      "baseSeed": 12500017,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 600,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-validate-12500029",
+      "baseSeed": 12500029,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 600,
+      "pairSeedStep": 2654435761
+    },
+    {
+      "id": "zinc-deleted-validate-12500037",
+      "baseSeed": 12500037,
+      "streams": 1,
+      "streamStride": 0,
+      "gamesPerStream": 600,
+      "pairSeedStep": 2654435761
+    }
+  ],
+  "derivedTournamentSchedules": [
+    {
+      "id": "zinc-fight-cem-730911-conservative",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_cem.sh",
+          "sha256": "a6b8ed394fb5774da7f3947be18b84e09063ef78c43dd4a566ceec4d3b3a3d8f"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive.log",
+          "sha256": "e085eb1b7b9655c98ea6e030827a77e3d5aa1096ba5ad19cb733615d1437d0b9"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+          "sha256": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+          "sha256": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+          "sha256": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        730911
+      ],
+      "passes": 3,
+      "generations": 12,
+      "passStart": 1,
+      "generationStart": 1,
+      "passStep": 1000003,
+      "generationStep": 7919,
+      "trainingGames": 3000,
+      "validation": {
+        "derivation": "offsets",
+        "values": [
+          11,
+          17,
+          19,
+          23,
+          29,
+          31,
+          37,
+          41
+        ]
+      },
+      "validationGames": 5000
+    },
+    {
+      "id": "zinc-fight-cem-731822",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_cem.sh",
+          "sha256": "a6b8ed394fb5774da7f3947be18b84e09063ef78c43dd4a566ceec4d3b3a3d8f"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive.log",
+          "sha256": "e085eb1b7b9655c98ea6e030827a77e3d5aa1096ba5ad19cb733615d1437d0b9"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+          "sha256": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+          "sha256": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+          "sha256": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        731822
+      ],
+      "passes": 3,
+      "generations": 12,
+      "passStart": 1,
+      "generationStart": 1,
+      "passStep": 1000003,
+      "generationStep": 7919,
+      "trainingGames": 3000,
+      "validation": {
+        "derivation": "offsets",
+        "values": [
+          11,
+          17,
+          19,
+          23,
+          29,
+          31,
+          37,
+          41
+        ]
+      },
+      "validationGames": 2500
+    },
+    {
+      "id": "zinc-historical-fightrc-cem-940911",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_fightrc.sh",
+          "sha256": "566fd348d436377a882b5f24cacd04aceff8a8ab6f7b1cd8746af16334e5b947"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/fightrc_keepalive.log",
+          "sha256": "fb47b434b3aee9ad142714dea8167f4756066a441585a5646c5d15841c3f6784"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+          "sha256": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+          "sha256": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+          "sha256": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        940911
+      ],
+      "passes": 3,
+      "generations": 12,
+      "passStart": 1,
+      "generationStart": 1,
+      "passStep": 1000003,
+      "generationStep": 7919,
+      "trainingGames": 3000,
+      "validation": {
+        "derivation": "offsets",
+        "values": [
+          11,
+          17,
+          19,
+          23,
+          29
+        ]
+      },
+      "validationGames": 2500
+    },
+    {
+      "id": "zinc-active-fight58b-preregistered-reservation-envelope-iterations-1-through-64-passes-1-through-8",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_fight58b.sh",
+          "sha256": "21b4601e92e92d67bed83877ef0e70d254916ee56b2f116b3f8a95e6d6b3e83a"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+          "sha256": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+          "sha256": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+          "sha256": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        970911,
+        971822,
+        972733,
+        973644,
+        974555,
+        975466,
+        976377,
+        977288,
+        978199,
+        979110,
+        980021,
+        980932,
+        981843,
+        982754,
+        983665,
+        984576,
+        985487,
+        986398,
+        987309,
+        988220,
+        989131,
+        990042,
+        990953,
+        991864,
+        992775,
+        993686,
+        994597,
+        995508,
+        996419,
+        997330,
+        998241,
+        999152,
+        1000063,
+        1000974,
+        1001885,
+        1002796,
+        1003707,
+        1004618,
+        1005529,
+        1006440,
+        1007351,
+        1008262,
+        1009173,
+        1010084,
+        1010995,
+        1011906,
+        1012817,
+        1013728,
+        1014639,
+        1015550,
+        1016461,
+        1017372,
+        1018283,
+        1019194,
+        1020105,
+        1021016,
+        1021927,
+        1022838,
+        1023749,
+        1024660,
+        1025571,
+        1026482,
+        1027393,
+        1028304
+      ],
+      "passes": 8,
+      "generations": 12,
+      "passStart": 1,
+      "generationStart": 1,
+      "passStep": 1000003,
+      "generationStep": 7919,
+      "trainingGames": 3000,
+      "validation": {
+        "derivation": "offsets",
+        "values": [
+          11,
+          17,
+          19,
+          23,
+          29
+        ]
+      },
+      "validationGames": 2500
+    },
+    {
+      "id": "zinc-onecem-555001",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/onecem.sh",
+          "sha256": "462e9f74379c43b096d5877fb04241d691802cd78645c2d09c2bde5fea85ee1b"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem.mjs",
+          "sha256": "1a94c2602eba44804c35119da5685419c4a5572fe66d3abac1589763f07b06b6"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/run_tournament.ts",
+          "sha256": "d0d6eb634ae72fd86e24b7559d37f9a426a35cea21ab566bccec0824e1b3636e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament.ts",
+          "sha256": "0924620e039d65524be9bcc812fa583b6b4eafb16d65c1628460d0dd2398f0de"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        555001
+      ],
+      "passes": 1,
+      "generations": 12,
+      "passStart": 1,
+      "generationStart": 1,
+      "passStep": 1000003,
+      "generationStep": 7919,
+      "trainingGames": 3000,
+      "validation": {
+        "derivation": "offsets",
+        "values": [
+          11,
+          17,
+          19,
+          23,
+          29
+        ]
+      },
+      "validationGames": 2500
+    },
+    {
+      "id": "zinc-custom-cem-seed1-conservative-superset",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_draft.mjs",
+          "sha256": "c1645ea2374b435176cd7a73191350cca8f1a6b858e5661b02ee59ca7c2612e5"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_setup.mjs",
+          "sha256": "02c1672cbe10decb94b7918b8715cb931c79400b6341f684570e64e9b449b359"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_setupca.mjs",
+          "sha256": "1cad15c6140c1041644c42b5a7a49707f2c70c250411e1ff6296fe7eb4217bbd"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_augca.mjs",
+          "sha256": "9e8fc4ff6946d619473ff3a3ca293e3b7830dae3e062fbacc097a967f8f660a0"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_synergy.mjs",
+          "sha256": "d5e2310b54d68dd02bdfe90c860eed5fb8371a5226f27e488958e48a69bcb633"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_draft_eval.ts",
+          "sha256": "1ddbbe773c0c09fd3ee087ded50cdd2effab4d777f205cc700c3b2a719e66727"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_setup_eval.ts",
+          "sha256": "d11cc7b499b5e390fd002ad8dfe29136cb740f6385857085a4be0aa9f2c87aef"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_setupca_eval.ts",
+          "sha256": "5499cbd4f87243c7e02f171d66d1f9b7e668a622bcf9e93003bc193f79359711"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_augca_eval.ts",
+          "sha256": "7864ed657b09c5c223655e14bf3a17b1d3bc4a8ee9c8101a3733437a66d4358a"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_synergy_eval.ts",
+          "sha256": "6d8e13b31e63af7ea2e93dad8956a0e84e47e68f6a0916ed5f3f2d02a81ceaba"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/sim-out/cem_draft_v1_exploit/trace.log",
+          "sha256": "377cba5e830f7d8b9fe3331281c3be2b48f9a067e9c10003a5def7bf12b7034b"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/sim-out/cem_setupca/trace.log",
+          "sha256": "7d61630df68e2c91c94629e380cd8b2e2895bc8e18c6b4f76a521925e9b93401"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/sim-out/cem_augca/trace.log",
+          "sha256": "5ab254f1b419deb0815851565ca676d8bc72ebaf4e9eedb5d158376d9bdaeff4"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/sim-out/cem_synergy/trace.log",
+          "sha256": "877cc72290d95ec2ede41871e2c20a81016ef1a896b7d113441fa7d180c634da"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        1
+      ],
+      "passes": 14,
+      "generations": 12,
+      "passStart": 0,
+      "generationStart": 0,
+      "passStep": 1000003,
+      "generationStep": 2654435761,
+      "trainingGames": 4000,
+      "validation": {
+        "derivation": "xor",
+        "values": [
+          1597334677
+        ]
+      },
+      "validationGames": 8000
+    },
+    {
+      "id": "zinc-draft-cem-starts",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_draft.sh",
+          "sha256": "813601ba6e4ee5679a44bb11412fdc9409902e40636ac746d705d924698fac84"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/draft_keepalive.log",
+          "sha256": "7c39d22e645725fa26990d80eb5f1ece7a09ed27c35fc502aa8ccb55aaa4c291"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_draft.mjs",
+          "sha256": "c1645ea2374b435176cd7a73191350cca8f1a6b858e5661b02ee59ca7c2612e5"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_draft_eval.ts",
+          "sha256": "1ddbbe773c0c09fd3ee087ded50cdd2effab4d777f205cc700c3b2a719e66727"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        910911,
+        920911,
+        921822,
+        922733
+      ],
+      "passes": 1,
+      "generations": 15,
+      "passStart": 0,
+      "generationStart": 0,
+      "passStep": 1000003,
+      "generationStep": 2654435761,
+      "trainingGames": 4000,
+      "validation": {
+        "derivation": "xor",
+        "values": [
+          1597334677
+        ]
+      },
+      "validationGames": 6000
+    },
+    {
+      "id": "zinc-setup-cem-820911",
+      "sourceEvidence": [
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/keepalive_setup.sh",
+          "sha256": "2a34961e664d26890c390ecc18dcb657786517a243b576c7224d4a3982b5f145"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/rl_state/setup_keepalive.log",
+          "sha256": "981678affc816b706c7946409ded3d41deb877d4874b3686b1ef33fdc213e7eb"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/optimizer/cem_setup.mjs",
+          "sha256": "02c1672cbe10decb94b7918b8715cb931c79400b6341f684570e64e9b449b359"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/cem_setup_eval.ts",
+          "sha256": "d11cc7b499b5e390fd002ad8dfe29136cb740f6385857085a4be0aa9f2c87aef"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/concurrent_tournament.ts",
+          "sha256": "396030e57c91b056770dd6565c02953d9acdb7f428cc2a047a06c96f5f4de35e"
+        },
+        {
+          "path": "/home/agent-zinc/hoc-common/src/simulation/tournament_worker.ts",
+          "sha256": "56ae0c1d735622dfeeb6c53e3c492370b596669466285d2ec0b16c1e25dff3ba"
+        }
+      ],
+      "seed0s": [
+        820911
+      ],
+      "passes": 1,
+      "generations": 15,
+      "passStart": 0,
+      "generationStart": 0,
+      "passStep": 1000003,
+      "generationStep": 2654435761,
+      "trainingGames": 4000,
+      "validation": {
+        "derivation": "xor",
+        "values": [
+          1597334677
+        ]
+      },
+      "validationGames": 6000
+    }
+  ],
+  "derivedTournamentSchedulesSha256": "dc496f82d8866b7f3b5d0dbe527cf6883afcf9e99aa438199f5dd73e63c1dde5",
+  "derivedProtocolSchedules": [],
+  "derivedProtocolSchedulesSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "derivedProtocolSeedSetSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expandedInlineTournamentPanels": 4817,
+  "expandedInlineLeaguePanels": 29,
+  "expandedRecoveredLedgerStreams": 70,
+  "expandedTournamentSeeds": 418810,
+  "expandedDerivedScheduleSeeds": 9895724,
+  "expandedDerivedProtocolSeeds": 0,
+  "expandedInlineLeagueSeeds": 97048,
+  "expandedRecoveredLedgerSeeds": 139500,
+  "matchedSeedTokens": 13533236,
+  "uniqueSeeds": 10380486,
+  "corpusFileSnapshotSha256": "2bb760b2df55724c80c01044572c991543e80a23cf84039b86949702b95b7c4d",
+  "corpusSeedSetSha256": "69e59d11e06d1ed16f4c617d9d09513a0c9b246884264839c8c872dcce32ac7f",
+  "knownReservedChecks": {
+    "386585164": true,
+    "1955955948": true
+  }
+}

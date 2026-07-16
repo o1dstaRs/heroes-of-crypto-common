@@ -1,0 +1,74 @@
+=== 01:12:57 iteration 1 seed 730911 START ===
+[cem] start panel (default) over 5 held-out seeds: 72.07%
+=== 01:17:49 iter 1 seed 730911 START ===
+[cem] start panel (default) over 8 held-out seeds: 72.26%
+[cem] pass 1 gen 1/12: best-cand 72.71% | traj 71.89% | global-best(panel) 72.26%
+[cem] pass 1 gen 2/12: best-cand 71.56% | traj 70.49% | global-best(panel) 72.26%
+=== 02:18:41 iter 1 seed 730911 START ===
+[cem] start panel (default) over 8 held-out seeds: 72.20%
+[cem] pass 1 gen 1/12: best-cand 72.71% | traj 72.36% | global-best(panel) 72.20%
+[cem] pass 1 gen 2/12: best-cand 71.59% | traj 69.96% | global-best(panel) 72.20%
+[cem] pass 1 gen 3/12: best-cand 72.54% | traj 72.18% | global-best(panel) 72.20%
+[cem] pass 1 gen 4/12: best-cand 72.38% | traj 72.83% | global-best(panel) 72.20%
+[cem] pass 1 gen 5/12: best-cand 71.12% | traj 72.91% | global-best(panel) 72.20%
+[cem] pass 1 gen 6/12: best-cand 72.00% | traj 70.56% | global-best(panel) 72.20%
+[cem] pass 1 gen 7/12: best-cand 72.16% | traj 72.35% | global-best(panel) 72.20%
+[cem] pass 1 gen 8/12: best-cand 71.49% | traj 71.82% | global-best(panel) 72.20%
+[cem] pass 1 gen 9/12: best-cand 71.82% | traj 72.78% | global-best(panel) 72.20%
+[cem] pass 1 gen 10/12: best-cand 72.15% | traj 70.42% | global-best(panel) 72.20%
+[cem] pass 1 gen 11/12: best-cand 71.88% | traj 72.82% | global-best(panel) 72.20%
+[cem] pass 1 gen 12/12: best-cand 72.29% | traj 73.40% | global-best(panel) 72.20%
+[cem] pass 1 IMPROVED -> panel 72.29% (new global best).
+[cem] pass 2 gen 1/12: best-cand 72.08% | traj 71.15% | global-best(panel) 72.29%
+[cem] pass 2 gen 2/12: best-cand 71.85% | traj 68.58% | global-best(panel) 72.29%
+[cem] pass 2 gen 3/12: best-cand 72.76% | traj 71.50% | global-best(panel) 72.29%
+[cem] pass 2 gen 4/12: best-cand 72.90% | traj 72.70% | global-best(panel) 72.29%
+[cem] pass 2 gen 5/12: best-cand 72.12% | traj 73.24% | global-best(panel) 72.29%
+[cem] pass 2 gen 6/12: best-cand 71.68% | traj 70.77% | global-best(panel) 72.29%
+[cem] pass 2 gen 7/12: best-cand 71.37% | traj 72.87% | global-best(panel) 72.29%
+[cem] pass 2 gen 8/12: best-cand 72.67% | traj 71.10% | global-best(panel) 72.29%
+[cem] pass 2 gen 9/12: best-cand 72.33% | traj 72.90% | global-best(panel) 72.29%
+[cem] pass 2 gen 10/12: best-cand 72.45% | traj 69.27% | global-best(panel) 72.29%
+[cem] pass 2 gen 11/12: best-cand 71.84% | traj 72.87% | global-best(panel) 72.29%
+[cem] pass 2 gen 12/12: best-cand 71.84% | traj 72.58% | global-best(panel) 72.29%
+[cem] pass 2 panel 71.71% <= global best 72.29% — restart from best.
+[cem] pass 3 gen 1/12: best-cand 71.08% | traj 72.17% | global-best(panel) 72.29%
+[cem] pass 3 gen 2/12: best-cand 72.59% | traj 69.40% | global-best(panel) 72.29%
+[cem] pass 3 gen 3/12: best-cand 70.89% | traj 72.17% | global-best(panel) 72.29%
+[cem] pass 3 gen 4/12: best-cand 72.55% | traj 71.55% | global-best(panel) 72.29%
+[cem] pass 3 gen 5/12: best-cand 71.79% | traj 72.91% | global-best(panel) 72.29%
+[cem] pass 3 gen 6/12: best-cand 71.96% | traj 71.18% | global-best(panel) 72.29%
+[cem] pass 3 gen 7/12: best-cand 71.45% | traj 71.99% | global-best(panel) 72.29%
+[cem] pass 3 gen 8/12: best-cand 71.78% | traj 70.65% | global-best(panel) 72.29%
+[cem] pass 3 gen 9/12: best-cand 73.44% | traj 72.80% | global-best(panel) 72.29%
+[cem] pass 3 gen 10/12: best-cand 71.30% | traj 68.99% | global-best(panel) 72.29%
+[cem] pass 3 gen 11/12: best-cand 70.74% | traj 72.81% | global-best(panel) 72.29%
+[cem] pass 3 gen 12/12: best-cand 72.89% | traj 71.85% | global-best(panel) 72.29%
+[cem] pass 3 panel 71.72% <= global best 72.29% — restart from best.
+
+[cem] DONE after 3 pass(es). global best panel 72.29% (pass 1).
+[cem] best weights: [1.584, -0.683, 0.248, 1.279, 2.137, 5.715, 1.544, 0.625, -1.290, 1.368, 0.122, 2.544, 3.028, 2.158, -0.021, 1.978, 4.309, 5.354, -1.162, 0.368, -1.756, 0.874, -2.157, -1.960, -1.409, 2.876, -0.242, -0.210, 1.143, -0.893, -0.455, -0.190, -1.889, 2.390, -1.155, 1.226, -0.794, 2.628, 0.246, -0.071, 4.238, 2.112, -0.534, 0.228, 0.096, 0.949, 1.384, -0.897, 1.305, -0.325, -2.732, 0.389, 1.445, -0.162, 0.669, 1.080]
+[cem] saved to /home/agent-zinc/hoc-common/sim-out/cem/best.json.
+=== 10:28:18 iter 1 DONE ===
+=== 10:28:18 iter 2 seed 731822 START ===
+[cem] start panel (default) over 8 held-out seeds: 71.76%
+[cem] pass 1 gen 1/12: best-cand 70.07% | traj 72.31% | global-best(panel) 71.76%
+[cem] pass 1 gen 2/12: best-cand 72.39% | traj 71.04% | global-best(panel) 71.76%
+[cem] pass 1 gen 3/12: best-cand 73.47% | traj 72.04% | global-best(panel) 71.76%
+[cem] pass 1 gen 4/12: best-cand 72.40% | traj 72.58% | global-best(panel) 71.76%
+[cem] pass 1 gen 5/12: best-cand 71.90% | traj 70.78% | global-best(panel) 71.76%
+[cem] pass 1 gen 6/12: best-cand 73.24% | traj 71.83% | global-best(panel) 71.76%
+[cem] pass 1 gen 7/12: best-cand 73.01% | traj 72.39% | global-best(panel) 71.76%
+[cem] pass 1 gen 8/12: best-cand 73.26% | traj 72.36% | global-best(panel) 71.76%
+[cem] pass 1 gen 9/12: best-cand 73.46% | traj 72.31% | global-best(panel) 71.76%
+[cem] pass 1 gen 10/12: best-cand 73.06% | traj 71.43% | global-best(panel) 71.76%
+[cem] pass 1 gen 11/12: best-cand 73.42% | traj 72.00% | global-best(panel) 71.76%
+[cem] pass 1 gen 12/12: best-cand 72.82% | traj 72.55% | global-best(panel) 71.76%
+[cem] pass 1 IMPROVED -> panel 71.92% (new global best).
+[cem] pass 2 gen 1/12: best-cand 72.02% | traj 70.68% | global-best(panel) 71.92%
+[cem] pass 2 gen 2/12: best-cand 72.12% | traj 70.03% | global-best(panel) 71.92%
+[cem] pass 2 gen 3/12: best-cand 72.24% | traj 70.17% | global-best(panel) 71.92%
+[cem] pass 2 gen 4/12: best-cand 72.97% | traj 71.35% | global-best(panel) 71.92%
+[cem] pass 2 gen 5/12: best-cand 71.83% | traj 69.78% | global-best(panel) 71.92%
+[cem] pass 2 gen 6/12: best-cand 71.92% | traj 72.50% | global-best(panel) 71.92%
+[cem] pass 2 gen 7/12: best-cand 72.67% | traj 73.22% | global-best(panel) 71.92%

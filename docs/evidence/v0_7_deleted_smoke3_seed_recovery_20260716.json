@@ -1,0 +1,67 @@
+{
+    "schemaVersion": 1,
+    "artifactKind": "v0.7_deleted_smoke3_seed_schedule_recovery",
+    "status": "denylist_recovery_only",
+    "missingArtifacts": [
+        {
+            "path": "/private/tmp/hoc-v07-96h-smoke3.Pd1vVL/seed-manifest.json",
+            "sha256": "0efa30bdc40cd4c3dc5289197cf322f46842f390be1e7318e2dee280ce9fddc1"
+        },
+        {
+            "path": "/private/tmp/hoc-v07-96h-deadline.wujsoN/seed-manifest.json",
+            "sha256": "0efa30bdc40cd4c3dc5289197cf322f46842f390be1e7318e2dee280ce9fddc1"
+        }
+    ],
+    "duplicateProof": {
+        "referenceManifestPath": "/private/tmp/hoc-overnight-terminal.ok4AKk/seed-manifest.json",
+        "referenceManifestSha256": "cd5ebe570f6b4d087449fedbee0235800661d68e1f64a2109d2c1682e1d81a20",
+        "observation": "The reference manifest records both missing paths with the same SHA-256 above."
+    },
+    "provisionalCorpusProof": {
+        "cutoff": "2026-07-16T05:56:26Z",
+        "canonicalSeedSetSha256": "21d1efdd6c1fc6b250fa6f0a66a386777bca26ddbfb2cdc2a616478a73acef5c",
+        "uniqueSeeds": 1228623,
+        "allRecoveredSeedsPresent": true
+    },
+    "schedule": {
+        "runId": "43bda657e9c6e2edc6246f9bdbf45ab0186af8961e2ba61b69b565bb0c66ad40",
+        "derivation": "sha256(runId|panelId|template|nonce), first uint32 big-endian",
+        "panelIds": [
+            "probe-scout",
+            "probe-mid",
+            "probe-deep",
+            "probe-ceiling",
+            "g0-scout",
+            "g0-mid",
+            "g0-deep",
+            "final-v06",
+            "final-v04"
+        ],
+        "templates": [
+            "mage_frontline",
+            "mage_fireline",
+            "melee_magic_utility",
+            "melee_magic_brawler",
+            "aura_support",
+            "aura_offense",
+            "ranged_precision",
+            "ranged_control"
+        ],
+        "nonce": 0,
+        "gamesPerTemplate": 2,
+        "pairSeedStep": 2654435761,
+        "baseSeedsPanelMajorTemplateMinor": [
+            2610471030, 1328708179, 79486422, 1780585517, 813240872, 2872858754, 3267684585, 2682424893, 579295970,
+            3335741741, 1609251945, 2926792093, 3309588032, 1823750833, 2257291061, 12739245, 796055440, 1108029713,
+            1692980138, 1838149180, 1120204046, 1534898776, 3141126223, 4175769291, 1560998955, 2170279211, 3845760804,
+            277447671, 157792978, 1992338309, 893269823, 99612511, 2796576437, 1373726591, 1919174965, 1833244044,
+            2181286871, 1313514739, 718384927, 2700584961, 799140042, 28066836, 794895002, 2040659081, 322617161,
+            4191442373, 2255881303, 2993179523, 1555623567, 2787569207, 3693810144, 304811150, 2744040717, 4143297969,
+            3149570749, 336547182, 1296174631, 595769819, 3193730655, 4265300840, 3900434392, 1112948426, 2155284500,
+            3233112222, 462940341, 3907280312, 3314882679, 1402975608, 163624147, 2629247050, 550229863, 3346868468
+        ],
+        "uniqueSeeds": 72,
+        "sortedSeedSetSha256": "8ab25eea9334b6765acecef1db2e5209cf19a81111451811e749da7e9b91b06f"
+    },
+    "declaration": "The missing deadline artifact was a byte-identical copy, so it does not add a second schedule. This recovered 72-seed schedule is denylisted once and makes no outcome claim."
+}

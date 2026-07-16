@@ -1,0 +1,330 @@
+{
+  "cutoff": "2026-07-16T09:18:00Z",
+  "commonRoot": "/Users/zolotukhin/Workplace/heroes-of-crypto-common",
+  "priorManifestExpanderPath": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/optimizer/v0_7_96h_core.ts",
+  "priorManifestExpanderSha256": "7a9d62e04b973383316f41c5863cba62ecd6b28fa0400f76542fd26d37d04352",
+  "roots": [
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/results",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/scratchpad",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/sim-out",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/sim-out",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/src/simulation/winrate_v07_v06_tmp.ts",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-runs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-policy-mechanism-20260715T1322Z",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-local/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-local/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-local/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v5-20260715T091603Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v5-20260715T091603Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v5-20260715T091603Z/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v6-20260715T095825Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v6-20260715T095825Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-v6-20260715T095825Z/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-policy-v7-20260715T132105Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-policy-v7-20260715T132105Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-policy-v7-20260715T132105Z/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-analyzer-20260715T160352Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-analyzer-20260715T160352Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-analyzer-20260715T160352Z/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-powered-20260715T153204Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-powered-20260715T153204Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-v2-powered-20260715T153204Z/src/simulation/results",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-wait-v3-stage-a-20260716T031711Z/docs",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-wait-v3-stage-a-20260716T031711Z/src/simulation/manifests",
+    "/Users/zolotukhin/Workplace/hoc-common-v07-wait-v3-stage-a-20260716T031711Z/src/simulation/results",
+    "/private/tmp/hoc-overnight-out.4eU5Kr/seed-manifest.json",
+    "/private/tmp/hoc-overnight-terminal.ok4AKk/seed-manifest.json",
+    "/private/tmp/hoc-seed-review.AcHIzI/run/seed-manifest.json",
+    "/private/tmp/hoc-v07-root-isolated-20260714T2050/run/seed-manifest.json",
+    "/private/tmp/hoc-v07-salvage.gCtumV/seed-manifest.json",
+    "/private/tmp/hoc-v07-seed-smoke-20260714T2048-root/seed-manifest.json",
+    "/private/tmp/hoc-v07-smoke-seeds-review/smoke-d68490a-fast.seed-manifest.json",
+    "/private/tmp/hoc-v07-smoke-seeds-review/smoke-d68490a.seed-manifest.json",
+    "/private/tmp/claude-501/-Users-zolotukhin-Workplace-heroes-of-crypto-client/97dc6934-787d-4d45-8d5a-941c60d20f1f/scratchpad"
+  ],
+  "excluded": [
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+    "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/v0_7_composed_ranked_ladder.ts"
+  ],
+  "excludedRelativeSuffixes": [
+    "src/simulation/manifests/v0_7_composed_ranked_ladder_20260716.json",
+    "src/simulation/v0_7_composed_ranked_ladder.ts"
+  ],
+  "rootDiscovery": [
+    {
+      "parent": "/private/tmp",
+      "namePrefix": "hoc"
+    }
+  ],
+  "knownReserved": [
+    386585164,
+    1955955948
+  ],
+  "tournamentSeries": [
+    {
+      "id": "user-reported-v0.7-v0.6-100k-four-cohort",
+      "baseSeed": 100000,
+      "streams": 4,
+      "streamStride": 1000000,
+      "gamesPerStream": 25000,
+      "pairSeedStep": 2654435761
+    }
+  ],
+  "derivedProtocolSchedules": [
+    {
+      "id": "local-w13-heuristic-smoke",
+      "derivation": "unpaired_game_identity_xor",
+      "baseSeeds": [
+        1
+      ],
+      "gamesPerBase": 100,
+      "rootStep": 2654435761,
+      "xorMask": 2246822507,
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/measure_round1_misplay_census.ts",
+          "sha256": "6bf1fe1144ae667101540de3b99cbdb7efac645fcea64743883cd523d9a8f63c"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/v0_7_plan.html",
+          "sha256": "6f0f475688b96467859ab39eae7acd03294562fb82e8a2ba622c75be4a6fb3bd"
+        }
+      ]
+    },
+    {
+      "id": "local-w13-heuristic-full",
+      "derivation": "unpaired_game_identity_xor",
+      "baseSeeds": [
+        86007710,
+        86009710
+      ],
+      "gamesPerBase": 2000,
+      "rootStep": 2654435761,
+      "xorMask": 2246822507,
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/measure_round1_misplay_census.ts",
+          "sha256": "6bf1fe1144ae667101540de3b99cbdb7efac645fcea64743883cd523d9a8f63c"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/v0_7_plan.html",
+          "sha256": "6f0f475688b96467859ab39eae7acd03294562fb82e8a2ba622c75be4a6fb3bd"
+        }
+      ]
+    },
+    {
+      "id": "local-w13-round1-smoke",
+      "derivation": "unpaired_game_round1_census",
+      "baseSeeds": [
+        1
+      ],
+      "gamesPerBase": 200,
+      "rootStep": 2654435761,
+      "pickLabel": "round1-census-pick",
+      "battleLabel": "round1-census-battle",
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/measure_round1_misplay_census.ts",
+          "sha256": "6bf1fe1144ae667101540de3b99cbdb7efac645fcea64743883cd523d9a8f63c"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/army.ts",
+          "sha256": "77a1d4d05cf642a6ee5956d433cc22130df3704adbd131ff31960ed354333a51"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/v0_7_plan.html",
+          "sha256": "6f0f475688b96467859ab39eae7acd03294562fb82e8a2ba622c75be4a6fb3bd"
+        }
+      ]
+    },
+    {
+      "id": "local-w13-round1-full-including-superseded",
+      "derivation": "unpaired_game_round1_census",
+      "baseSeeds": [
+        86006710,
+        86008710,
+        86031710
+      ],
+      "gamesPerBase": 2000,
+      "rootStep": 2654435761,
+      "pickLabel": "round1-census-pick",
+      "battleLabel": "round1-census-battle",
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/measure_round1_misplay_census.ts",
+          "sha256": "6bf1fe1144ae667101540de3b99cbdb7efac645fcea64743883cd523d9a8f63c"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/army.ts",
+          "sha256": "77a1d4d05cf642a6ee5956d433cc22130df3704adbd131ff31960ed354333a51"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/v0_7_plan.html",
+          "sha256": "6f0f475688b96467859ab39eae7acd03294562fb82e8a2ba622c75be4a6fb3bd"
+        }
+      ]
+    },
+    {
+      "id": "local-w13-distribution-including-superseded",
+      "derivation": "unpaired_game_identity_xor",
+      "baseSeeds": [
+        86004710,
+        86030710
+      ],
+      "gamesPerBase": 2000,
+      "rootStep": 2654435761,
+      "xorMask": 2246822507,
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/measure_round1_draft_distribution.ts",
+          "sha256": "5acb53830f247b7b720df90da09b7fd7bfce56a0fd13fcf464fef19b4dc73c11"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/v0_7_plan.html",
+          "sha256": "6f0f475688b96467859ab39eae7acd03294562fb82e8a2ba622c75be4a6fb3bd"
+        }
+      ]
+    },
+    {
+      "id": "local-deleted-draft-ship-league-smoke-999002710",
+      "derivation": "league_offer_boards",
+      "baseSeeds": [
+        999002710
+      ],
+      "boardsPerBase": 200,
+      "rootStep": 2654435761,
+      "pickLabel": "league-pick",
+      "battleLabel": "league-battle",
+      "battleAssignments": [
+        0,
+        1
+      ],
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/draft_ship_eval.ts",
+          "sha256": "04b32bf0950021b14437fc00e7445e6fdfd8f193e5b94247b3557bb2e5aee884"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/league_eval.ts",
+          "sha256": "9d46aa12ad7d31d44b68cd1c6912529a5b4902a5d93efab2c517b9857e0400a8"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-runs/run-v2-powered-20260715T153204Z/launch.stdout",
+          "sha256": "f7a6940dd8d7ba63b818c96c705ee52c505e765e3c8ae4ca1ac1dd21c68ed82b"
+        }
+      ]
+    },
+    {
+      "id": "local-policy-mechanism-template-derived-roots",
+      "derivation": "paired_tournament_roots",
+      "baseSeeds": [
+        2364343476,
+        2312943595,
+        937564906
+      ],
+      "gamesPerBase": 64,
+      "rootStep": 2654435761,
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/optimizer/v0_7_search_trial.ts",
+          "sha256": "1a3051698419640fd79cca09bc463930baf92cae475c2220b39625bc5bb187b2"
+        },
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/src/simulation/results/v0_7_policy_mechanism_20260715.json",
+          "sha256": "89466c9ce3947af1189058ecd85286468af947b7e7a239032b313acbc0ed9b38"
+        }
+      ]
+    },
+    {
+      "id": "local-recovered-deleted-smoke3-and-byte-identical-deadline-manifest",
+      "derivation": "paired_tournament_roots",
+      "baseSeeds": [
+        2610471030,
+        1328708179,
+        79486422,
+        1780585517,
+        813240872,
+        2872858754,
+        3267684585,
+        2682424893,
+        579295970,
+        3335741741,
+        1609251945,
+        2926792093,
+        3309588032,
+        1823750833,
+        2257291061,
+        12739245,
+        796055440,
+        1108029713,
+        1692980138,
+        1838149180,
+        1120204046,
+        1534898776,
+        3141126223,
+        4175769291,
+        1560998955,
+        2170279211,
+        3845760804,
+        277447671,
+        157792978,
+        1992338309,
+        893269823,
+        99612511,
+        2796576437,
+        1373726591,
+        1919174965,
+        1833244044,
+        2181286871,
+        1313514739,
+        718384927,
+        2700584961,
+        799140042,
+        28066836,
+        794895002,
+        2040659081,
+        322617161,
+        4191442373,
+        2255881303,
+        2993179523,
+        1555623567,
+        2787569207,
+        3693810144,
+        304811150,
+        2744040717,
+        4143297969,
+        3149570749,
+        336547182,
+        1296174631,
+        595769819,
+        3193730655,
+        4265300840,
+        3900434392,
+        1112948426,
+        2155284500,
+        3233112222,
+        462940341,
+        3907280312,
+        3314882679,
+        1402975608,
+        163624147,
+        2629247050,
+        550229863,
+        3346868468
+      ],
+      "gamesPerBase": 2,
+      "rootStep": 2654435761,
+      "sourceEvidence": [
+        {
+          "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-common/docs/evidence/v0_7_deleted_smoke3_seed_recovery_20260716.json",
+          "sha256": "3c6dc096e2b760a4cd0e3dcc411ea2b67f50de8817b9ad26bf162d7591639e8a"
+        }
+      ]
+    }
+  ],
+  "seedSetOutput": "/tmp/v07-composed-local-seeds-structured-v9d.txt",
+  "summaryOutput": "/tmp/v07-composed-local-seed-scan-summary-v9d.json",
+  "excludedPathPrefixes": []
+}
