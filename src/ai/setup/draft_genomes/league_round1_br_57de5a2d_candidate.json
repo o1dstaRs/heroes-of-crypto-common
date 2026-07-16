@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "artifactKind": "projected_draft_genome",
-    "status": "research_candidate",
+    "status": "accepted_opt_in",
     "id": "br-57de5a2dab8b27b5",
     "omniscientDraft": false,
     "source": {
@@ -19,12 +19,41 @@
         "resetWeightRangeInclusive": [15, 94]
     },
     "acceptance": {
-        "status": "not_evaluated",
-        "reason": "A fresh preregistered two-seed panel with durable offer-board records and a clean setup-interaction non-regression result is still required."
+        "status": "PASS",
+        "revision": "20c93231a0876af5a20ed20bb5244263181083ac",
+        "reportSha256": "58082185be50f8231c2310f84546d39558985a7cb4777b8a721b70f67a994b13",
+        "preregistrationSha256": "f7c0a081d9afd0dd4de306982ddea8de7f984f51d589044cf893c38806c2d795",
+        "baseSeeds": [86001710, 86002710],
+        "fightVersion": "v0.7",
+        "gamesPerOpponentPerSeed": 4000,
+        "totalGames": 16000,
+        "pooledGates": [
+            {
+                "opponent": "untrained-heuristic",
+                "requiredClusteredLowerBound": 0.55,
+                "decisiveWinRate": 0.8450207730076797,
+                "clusteredLowerBound": 0.8285004339503472,
+                "passed": true
+            },
+            {
+                "opponent": "shipped-default-draft",
+                "requiredClusteredLowerBound": 0.47,
+                "decisiveWinRate": 0.6044813695871097,
+                "clusteredLowerBound": 0.5828709851953332,
+                "passed": true
+            }
+        ],
+        "setupInteraction": {
+            "gainPp": 0.06323244245847182,
+            "confidence95LowGainPp": -0.10589590034127405,
+            "nonRegressionFloorPp": -0.5,
+            "passed": true
+        }
     },
     "authority": {
-        "researchOnly": true,
-        "acceptedForRankedOptIn": false,
+        "researchOnly": false,
+        "acceptedForRankedOptIn": true,
+        "eligibleForDefaultReview": true,
         "defaultChanged": false,
         "productionEnabled": false,
         "deployAuthorization": false
