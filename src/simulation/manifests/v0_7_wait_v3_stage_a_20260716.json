@@ -1,0 +1,90 @@
+{
+    "schemaVersion": 1,
+    "manifestId": "v0.7-wait-v3-stage-a-20260716",
+    "createdAt": "2026-07-16T02:10:00.000Z",
+    "status": "research_only_no_bake",
+    "candidate": "v0.7",
+    "opponent": "v0.6",
+    "pairedSideSwap": true,
+    "pairSeedStep": 2654435761,
+    "oracle": {
+        "mode": "Q2_ORACLE",
+        "versions": "v0.7",
+        "gate": 0.01,
+        "rollouts": 3,
+        "horizon": "lap",
+        "leaf": "material"
+    },
+    "incumbent": {
+        "v2WeightsSha256": "e16d7ac967aacd3d37c2291e1fc7947571382bf1a302dc64264037039e00dfec",
+        "v3SentinelSha256": "eaf709158ce18831f0c3558c0793d7477580d15dece8d11e9b0785120df13e02",
+        "v3Sentinel": "valid nonzero {b:-1,w:[125 zeros]}; active on the RANGE-owned V3 seam and guaranteed never to fire"
+    },
+    "cohorts": [
+        {
+            "id": "ranged_max",
+            "kind": "mirror",
+            "roster": "ranged_max_sniper3",
+            "setup": "ranged_max_sniper3",
+            "games": 4000,
+            "baseSeed": 2403834848
+        },
+        {
+            "id": "pure_ranged",
+            "kind": "mirror",
+            "roster": "pure_ranged_exact",
+            "setup": "melee_coevo",
+            "games": 4000,
+            "baseSeed": 3575244398
+        },
+        {
+            "id": "hybrid",
+            "kind": "mirror",
+            "roster": "hybrid",
+            "setup": "hybrid",
+            "games": 2000,
+            "baseSeed": 372222176
+        },
+        {
+            "id": "random_draft",
+            "kind": "draft",
+            "roster": "independent_random_exp_budget",
+            "setup": "livetwin",
+            "games": 2000,
+            "baseSeed": 3566425037
+        }
+    ],
+    "heldoutGates": {
+        "rangeSeedsMin": 256,
+        "rangeFiredSeedsMin": 32,
+        "positiveDeltaCaptureMin": 0.1,
+        "rangeFiredDelta": "positive",
+        "eachFiredActionBucketDelta": "nonnegative"
+    },
+    "completion": {
+        "rawMarker": "RAW_COMPLETE",
+        "fitMarker": "FIT_COMPLETE",
+        "requireLiteralFitterLine": "V3 GATE: PASS",
+        "modelWidth": 125,
+        "modelMustBeNonzero": true,
+        "automaticBake": false,
+        "automaticDeploy": false
+    },
+    "freshSeedAudit": {
+        "auditedAt": "2026-07-16T02:03:00.000Z",
+        "plannedScenarioSeeds": 6000,
+        "internalCollisions": 0,
+        "localNumericTokens": 140172,
+        "localCollisions": 0,
+        "zincNumericTokens": 57655,
+        "zincCollisions": 0,
+        "localRoots": [
+            "docs",
+            "src/simulation/manifests",
+            "scratchpad",
+            "/Users/zolotukhin/Workplace/hoc-common-v07-overnight-runs"
+        ],
+        "zincRoots": ["/home/agent-zinc/hoc-common/docs", "/home/agent-zinc/hoc-common-v07-dbe9356"],
+        "declaration": "All 6000 derived uint32 scenario seeds, not only the four bases, were compared as exact 7-10 digit numeric tokens before preregistration. No overlap was found in the local or Zinc evidence roots."
+    }
+}

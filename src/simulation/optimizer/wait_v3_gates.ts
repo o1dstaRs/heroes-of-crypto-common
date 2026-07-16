@@ -16,8 +16,8 @@ import {
 } from "../../ai/versions/wait_scorer";
 
 export const WAIT_V3_MIN_RANGE_POSITIVE_DELTA_CAPTURE = 0.1;
-export const WAIT_V3_MIN_RANGE_HELDOUT_SEEDS = 32;
-export const WAIT_V3_MIN_RANGE_FIRED_SEEDS = 8;
+export const WAIT_V3_MIN_RANGE_HELDOUT_SEEDS = 256;
+export const WAIT_V3_MIN_RANGE_FIRED_SEEDS = 32;
 
 export interface IWaitV3HeldoutObservation {
     seed: number;

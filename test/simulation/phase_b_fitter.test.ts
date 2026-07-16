@@ -176,7 +176,8 @@ describe("Phase-B fitter validation", () => {
 
     it("requires >=10% RANGE positive-delta capture and positive net fired delta", () => {
         expect(WAIT_V3_MIN_RANGE_POSITIVE_DELTA_CAPTURE).toBe(0.1);
-        expect(WAIT_V3_MIN_RANGE_FIRED_SEEDS).toBe(8);
+        expect(WAIT_V3_MIN_RANGE_HELDOUT_SEEDS).toBe(256);
+        expect(WAIT_V3_MIN_RANGE_FIRED_SEEDS).toBe(32);
         const lowCapture = evaluateWaitV3HeldoutGates([
             { seed: 1, incumbentKind: "shot", isRanged: true, delta: 0.05, fired: true },
             { seed: 2, incumbentKind: "move", isRanged: true, delta: 0.95, fired: false },
