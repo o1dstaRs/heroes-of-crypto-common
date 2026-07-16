@@ -23,6 +23,7 @@ import {
     auditPureRangedTerminalSeedRoots,
     estimatePureRangedTerminalDelta,
     findPureRangedTerminalSeedCollisions,
+    hasPureRangedTerminalCommand,
     isPureRangedTerminalCausalActionChange,
     plannedPureRangedTerminalSeeds,
     probePureRangedTerminalWorkerEnvironment,
@@ -370,6 +371,16 @@ describe("pure-ranged terminal analysis primitives", () => {
         expect(() => auditPureRangedTerminalSeedRoots(manifest, [directory])).toThrow(
             "fresh-seed collision(s): 87113710",
         );
+    });
+
+    it("treats a throwing optional-command probe as unavailable", () => {
+        expect(
+            hasPureRangedTerminalCommand("rg", () => {
+                throw new Error("Executable not found in $PATH");
+            }),
+        ).toBe(false);
+        expect(hasPureRangedTerminalCommand("rg", () => ({ status: null, error: new Error("ENOENT") }))).toBe(false);
+        expect(hasPureRangedTerminalCommand("rg", () => ({ status: 0 }))).toBe(true);
     });
 
     it("binds analysis provenance to exact raw-report file bytes", () => {

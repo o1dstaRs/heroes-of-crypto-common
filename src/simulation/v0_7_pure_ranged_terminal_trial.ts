@@ -626,13 +626,27 @@ export function findPureRangedTerminalSeedCollisions(
     return [...new Set([...numericTokens].filter((token) => planned.has(token)))].sort((left, right) => left - right);
 }
 
+type PureRangedTerminalCommandProbe = (command: string, args: string[]) => { error?: Error; status: number | null };
+
+export function hasPureRangedTerminalCommand(
+    command: string,
+    probe: PureRangedTerminalCommandProbe = (executable, args) => spawnSync(executable, args, { stdio: "ignore" }),
+): boolean {
+    try {
+        const result = probe(command, ["--version"]);
+        return result.error === undefined && result.status === 0;
+    } catch {
+        return false;
+    }
+}
+
 export function auditPureRangedTerminalSeedRoots(
     manifest: IPureRangedTerminalManifest,
     roots: readonly string[],
 ): IPureRangedTerminalSeedAudit {
     const existingRoots = roots.map((root) => resolve(root)).filter(existsSync);
     if (!existingRoots.length) throw new Error("Pure-ranged terminal seed audit has no existing roots");
-    const hasRipgrep = spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
+    const hasRipgrep = hasPureRangedTerminalCommand("rg");
     const command = hasRipgrep ? "rg" : "grep";
     const args = hasRipgrep
         ? [
