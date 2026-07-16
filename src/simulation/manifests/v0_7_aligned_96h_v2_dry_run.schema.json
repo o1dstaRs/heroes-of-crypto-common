@@ -1,0 +1,113 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://heroesofcrypto.io/schemas/v0_7_aligned_96h_v2_dry_run.schema.json",
+    "title": "v0.7 aligned 96-hour v2 dry-run configuration",
+    "description": "Inert configuration only. This schema does not allocate seeds or authorize an experiment, bake, or deployment.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "status",
+        "candidate",
+        "candidateBase",
+        "opponent",
+        "cells",
+        "seats",
+        "profile",
+        "compute",
+        "panels",
+        "objective",
+        "finalHypotheses",
+        "automaticBake",
+        "automaticDeploy",
+        "seedPolicy"
+    ],
+    "properties": {
+        "schemaVersion": { "const": 1 },
+        "status": { "const": "research_only_no_bake" },
+        "candidate": { "const": "v0.7s" },
+        "candidateBase": { "const": "v0.7" },
+        "opponent": { "const": "v0.6" },
+        "cells": {
+            "type": "array",
+            "prefixItems": [
+                { "const": "ranked_mage" },
+                { "const": "ranked_melee_mage" },
+                { "const": "ranked_aura" },
+                { "const": "ranked_ranged" },
+                { "const": "fixed_mage_frontline" },
+                { "const": "fixed_mage_fireline" },
+                { "const": "fixed_melee_magic_utility" },
+                { "const": "fixed_melee_magic_brawler" },
+                { "const": "fixed_aura_support" },
+                { "const": "fixed_aura_offense" },
+                { "const": "fixed_ranged_precision" },
+                { "const": "fixed_ranged_control" }
+            ],
+            "items": false,
+            "minItems": 12,
+            "maxItems": 12
+        },
+        "seats": {
+            "type": "array",
+            "prefixItems": [{ "const": "candidate_green" }, { "const": "candidate_red" }],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["decisionDeadlineMs", "circuitBreakerMs"],
+            "properties": {
+                "decisionDeadlineMs": { "const": 200 },
+                "circuitBreakerMs": { "const": 275 }
+            }
+        },
+        "compute": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "totalHours",
+                "finalReserveHours",
+                "hostLogicalCpus",
+                "workers",
+                "reservedLogicalCpus",
+                "evaluationParallelism",
+                "workersPerTrial"
+            ],
+            "properties": {
+                "totalHours": { "const": 96 },
+                "finalReserveHours": { "type": "integer", "minimum": 24, "maximum": 95 },
+                "hostLogicalCpus": { "type": "integer", "minimum": 1 },
+                "workers": { "type": "integer", "minimum": 1 },
+                "reservedLogicalCpus": { "type": "integer", "minimum": 1 },
+                "evaluationParallelism": { "type": "integer", "minimum": 1 },
+                "workersPerTrial": { "type": "integer", "minimum": 1 }
+            }
+        },
+        "panels": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["confirmGamesPerCellSeat", "finalGamesPerCellSeat"],
+            "properties": {
+                "confirmGamesPerCellSeat": { "type": "integer", "minimum": 1000 },
+                "finalGamesPerCellSeat": { "type": "integer", "minimum": 2000 }
+            }
+        },
+        "objective": { "const": "equal_cell_equal_seat_max_min" },
+        "finalHypotheses": { "const": 24 },
+        "automaticBake": { "const": false },
+        "automaticDeploy": { "const": false },
+        "seedPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "externalDenysetRequired", "finalRevealOnlyAfterImmutableFreeze"],
+            "properties": {
+                "state": { "const": "unallocated_dry_run" },
+                "externalDenysetRequired": { "const": true },
+                "finalRevealOnlyAfterImmutableFreeze": { "const": true }
+            }
+        }
+    }
+}
