@@ -47,8 +47,9 @@ import {
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
 
-// Bun can serialize teardown when all 40 production workers finish together on Zinc.
-// Keep cleanup bounded, but include that host-observed tail in the measured batch time.
+const WORKER_GRACEFUL_STOP_TIMEOUT_MS = 10_000;
+// Bun can serialize forced teardown when all 40 production workers finish together on Zinc.
+// Keep cleanup bounded, but derive completion from exit events rather than terminate() promises.
 const WORKER_TERMINATION_TIMEOUT_MS = 60_000;
 
 export interface IV07AlignedV2WorkerAttestation {
@@ -188,22 +189,40 @@ export async function evaluateV07AlignedV2Shard(
     let poolStarted = false;
     let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
     let cleanupPromise: Promise<void> | null = null;
+    let cleanupExitCheck: (() => void) | null = null;
 
     return new Promise<IV07AlignedV2ShardEvaluation>((resolvePromise, rejectPromise) => {
         const cleanup = (): Promise<void> => {
             if (cleanupPromise) return cleanupPromise;
             if (deadlineTimer !== null) clearTimeout(deadlineTimer);
             deadlineTimer = null;
-            const activeWorkers = [...workers];
             cleanupPromise = new Promise<void>((resolveCleanup, rejectCleanup) => {
-                const timeout = setTimeout(
-                    () => rejectCleanup(new Error("aligned v2 worker termination exceeded 10000ms")),
-                    WORKER_TERMINATION_TIMEOUT_MS,
-                );
-                void Promise.allSettled(activeWorkers.map((worker) => worker.terminate())).then(() => {
-                    clearTimeout(timeout);
+                let forceTimeout: ReturnType<typeof setTimeout> | null = null;
+                const gracefulTimeout = setTimeout(() => {
+                    forceTimeout = setTimeout(() => {
+                        cleanupExitCheck = null;
+                        rejectCleanup(
+                            new Error(
+                                `aligned v2 worker termination exceeded ${WORKER_TERMINATION_TIMEOUT_MS}ms (${workers.size} survivor(s))`,
+                            ),
+                        );
+                    }, WORKER_TERMINATION_TIMEOUT_MS);
+                    for (const worker of workers) void worker.terminate();
+                }, WORKER_GRACEFUL_STOP_TIMEOUT_MS);
+                cleanupExitCheck = () => {
+                    if (workers.size > 0) return;
+                    clearTimeout(gracefulTimeout);
+                    if (forceTimeout !== null) clearTimeout(forceTimeout);
+                    cleanupExitCheck = null;
                     resolveCleanup();
-                });
+                };
+                for (const worker of workers) {
+                    if (!stoppingWorkers.has(worker)) {
+                        stoppingWorkers.add(worker);
+                        worker.postMessage({ type: "stop" });
+                    }
+                }
+                cleanupExitCheck();
             });
             return cleanupPromise;
         };
@@ -401,6 +420,7 @@ export async function evaluateV07AlignedV2Shard(
             worker.on("error", fail);
             worker.on("exit", (code) => {
                 workers.delete(worker);
+                cleanupExitCheck?.();
                 if (!settled && (code !== 0 || !stoppingWorkers.has(worker))) {
                     fail(new Error(`aligned v2 worker exited unexpectedly with code ${code}`));
                     return;
