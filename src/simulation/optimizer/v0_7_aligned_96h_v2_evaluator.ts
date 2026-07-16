@@ -346,13 +346,22 @@ export async function evaluateV07AlignedV2Shard(
             worker.on(
                 "message",
                 (message: {
-                    type: "ready" | "result" | "error";
+                    type: "ready" | "result" | "error" | "stopped";
                     attestation?: IV07AlignedV2WorkerAttestation;
                     taskKey?: string;
                     record?: IV07AlignedV2BattleRecord;
                     observation?: IV07AlignedV2GameObservation;
                     error?: string;
                 }) => {
+                    if (message.type === "stopped") {
+                        if (!stoppingWorkers.has(worker)) {
+                            fail(new Error("aligned v2 worker stopped without a parent request"));
+                            return;
+                        }
+                        workers.delete(worker);
+                        cleanupExitCheck?.();
+                        return;
+                    }
                     if (settled) return;
                     if (message.type === "error") {
                         fail(new Error(message.error ?? "aligned v2 worker failed without an error message"));

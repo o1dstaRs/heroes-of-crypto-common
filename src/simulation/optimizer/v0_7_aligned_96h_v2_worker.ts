@@ -101,6 +101,7 @@ let auditByteOffset = 0;
 let busy = false;
 parentPort.on("message", (message: { type: "evaluate"; task: unknown } | { type: "stop" }) => {
     if (message.type === "stop") {
+        parentPort!.postMessage({ type: "stopped" });
         parentPort!.close();
         process.exit(0);
         return;
