@@ -940,7 +940,6 @@ function validateBatchManifest(
     );
     if (
         refs.length < request.geometry.concurrentShards ||
-        refs.length % request.geometry.concurrentShards !== 0 ||
         refs.reduce((sum, entry) => sum + entry.games, 0) !== V07_ALIGNED_V2_THROUGHPUT_GAMES_PER_BATCH ||
         refs.reduce((sum, entry) => sum + entry.workerAttestations, 0) !== value.workerAttestations
     ) {

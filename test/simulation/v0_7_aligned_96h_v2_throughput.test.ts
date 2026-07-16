@@ -98,12 +98,13 @@ function createReplayFixture(): {
     const root = mkdtempSync(join(tmpdir(), "aligned-v2-throughput-replay-"));
     const sourceBytes = readFileSync(SOURCE_MANIFEST);
     const { receipt, plan } = buildV07AlignedV2ThroughputSeedReceipt(sourceBytes);
+    const concurrentShards = Math.min(3, availableParallelism());
     const geometry = {
         logicalCpus: availableParallelism(),
-        reservedCpus: availableParallelism() > 1 ? 1 : 0,
+        reservedCpus: 0,
         workersPerShard: 1,
-        concurrentShards: 1,
-        maxScenarioPairsPerShard: 384,
+        concurrentShards,
+        maxScenarioPairsPerShard: 17,
         shardTimeoutMinutes: 1,
     };
     const request = buildV07AlignedV2ThroughputRequest({ geometry, provenance: provenance(), receipt, plan });
@@ -165,6 +166,8 @@ function createReplayFixture(): {
             ...unsigned,
             batchSha256: fingerprintV07AlignedV2(unsigned),
         };
+        expect(shardRefs).toHaveLength(23);
+        if (concurrentShards > 1) expect(shardRefs.length % concurrentShards).not.toBe(0);
         writeCanonical(join(directory, "batch.json"), batch);
         batchManifests.push(batch);
     }
