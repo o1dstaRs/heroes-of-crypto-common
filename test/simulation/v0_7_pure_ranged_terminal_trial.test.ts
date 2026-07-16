@@ -23,7 +23,9 @@ import {
     estimatePureRangedTerminalDelta,
     findPureRangedTerminalSeedCollisions,
     plannedPureRangedTerminalSeeds,
+    probePureRangedTerminalWorkerEnvironment,
     pureRangedTerminalEnvironment,
+    pureRangedTerminalRawReportSha256,
     readPureRangedTerminalManifest,
     selectPureRangedTerminalWeight,
     validatePureRangedTerminalManifest,
@@ -179,6 +181,59 @@ describe("pure-ranged terminal execution isolation", () => {
         expect(environment.SEARCH_SHORTLIST).toBe("3");
     });
 
+    it("installs the frozen profile before static worker policy imports despite a poisoned parent", async () => {
+        const { manifest } = readPureRangedTerminalManifest();
+        const poison = {
+            AUGCA_NOVISION: "1",
+            FORCE_CREATURES: "Arbalester,Arbalester,Arbalester,Arbalester,Arbalester,Arbalester",
+            ROSTER_RANGED_MIN: "6",
+            ROSTER_RANGED_MAX: "6",
+            V04_FRONTMOVE: "off",
+            V05_AURAFLY: "off",
+            V06_KITE: "on",
+            V07_DENSE_MM_SALVAGE_ISOLATION: "1",
+            SEARCH_HORIZON: "99",
+            SIM_NO_ACTIONS: "1",
+        } as const;
+        const saved = Object.fromEntries(Object.keys(poison).map((key) => [key, process.env[key]]));
+        Object.assign(process.env, poison);
+        try {
+            const evidence = await probePureRangedTerminalWorkerEnvironment(
+                manifest,
+                0.5,
+                "ranged_performance",
+                process.env,
+            );
+            expect(evidence.importTimeBehaviorEnvironment).toEqual(evidence.runtimeBehaviorEnvironment);
+            expect(evidence.importTimeBehaviorEnvironment).toMatchObject({
+                LIVETWIN: "1",
+                V07_SEARCH: "1",
+                SEARCH_HORIZON: "4",
+                SEARCH_ROLLOUTS: "1",
+                SEARCH_SHORTLIST: "3",
+                SEARCH_PURE_RANGED_TERMINAL_WEIGHT: "0.5",
+            });
+            for (const key of [
+                "AUGCA_NOVISION",
+                "FORCE_CREATURES",
+                "ROSTER_RANGED_MIN",
+                "ROSTER_RANGED_MAX",
+                "V04_FRONTMOVE",
+                "V05_AURAFLY",
+                "V06_KITE",
+                "V07_DENSE_MM_SALVAGE_ISOLATION",
+                "SIM_NO_ACTIONS",
+            ]) {
+                expect(evidence.importTimeBehaviorEnvironment[key]).toBeUndefined();
+            }
+        } finally {
+            for (const [key, value] of Object.entries(saved)) {
+                if (value === undefined) delete process.env[key];
+                else process.env[key] = value;
+            }
+        }
+    }, 30_000);
+
     it("rejects unregistered research weights", () => {
         const { manifest } = readPureRangedTerminalManifest();
         expect(() => pureRangedTerminalEnvironment(manifest, 2, "ranged_performance", {})).toThrow(
@@ -209,6 +264,26 @@ describe("pure-ranged terminal analysis primitives", () => {
         writeFileSync(join(directory, "evidence.txt"), "historical seed 87113710\n");
         expect(() => auditPureRangedTerminalSeedRoots(manifest, [directory])).toThrow(
             "fresh-seed collision(s): 87113710",
+        );
+    });
+
+    it("binds analysis provenance to exact raw-report file bytes", () => {
+        const directory = mkdtempSync(join(tmpdir(), "hoc-pure-terminal-raw-hash-"));
+        temporaryDirectories.push(directory);
+        const path = join(directory, "scout-raw-report.json");
+        const first = '{\n  "verdict": "PASS"\n}\n';
+        writeFileSync(path, first);
+        expect(pureRangedTerminalRawReportSha256(directory, "scout")).toBe(
+            new Bun.CryptoHasher("sha256").update(first).digest("hex"),
+        );
+
+        const whitespaceChanged = '{"verdict":"PASS"}\n';
+        writeFileSync(path, whitespaceChanged);
+        expect(pureRangedTerminalRawReportSha256(directory, "scout")).toBe(
+            new Bun.CryptoHasher("sha256").update(whitespaceChanged).digest("hex"),
+        );
+        expect(new Bun.CryptoHasher("sha256").update(first).digest("hex")).not.toBe(
+            new Bun.CryptoHasher("sha256").update(whitespaceChanged).digest("hex"),
         );
     });
 });

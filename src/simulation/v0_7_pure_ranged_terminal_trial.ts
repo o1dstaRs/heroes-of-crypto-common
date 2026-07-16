@@ -366,8 +366,16 @@ const OWNED_PROTOCOL_BASENAMES = new Set([
 ]);
 const BEHAVIOR_PREFIXES = ["V04_", "V05_", "V06_", "V07_", "SEARCH_", "Q2_", "CEM_"] as const;
 const BEHAVIOR_EXACT = new Set([
+    "AUGCA_NOVISION",
     "FIGHT_MELEE_ROSTERS",
+    "FORCE_CREATURES",
     "LIVETWIN",
+    "ROSTER_CASTER_MAX",
+    "ROSTER_CASTER_MIN",
+    "ROSTER_FLYER_MAX",
+    "ROSTER_FLYER_MIN",
+    "ROSTER_RANGED_MAX",
+    "ROSTER_RANGED_MIN",
     "SIM_NO_ACTIONS",
     "VALUE_DATA",
     "VALUE_DATA_FEATURES",
@@ -892,8 +900,42 @@ interface IPureRangedTerminalWorkerEnvelope {
     environment: Record<string, string>;
 }
 
+interface IPureRangedTerminalWorkerEnvironmentProbe {
+    marker: "v0.7-pure-ranged-terminal-worker-environment-probe";
+    environment: Record<string, string>;
+}
+
+export interface IPureRangedTerminalWorkerEnvironmentEvidence {
+    importTimeBehaviorEnvironment: Record<string, string>;
+    runtimeBehaviorEnvironment: Record<string, string>;
+}
+
+function effectiveBehaviorEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(environment)
+            .filter((entry): entry is [string, string] => isBehaviorKey(entry[0]) && entry[1] !== undefined)
+            .sort(([left], [right]) => left.localeCompare(right)),
+    );
+}
+
+function stringEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    );
+}
+
+// WorkerOptions.env is installed by the runtime before this entry module and all of its static policy imports.
+const IMPORT_TIME_BEHAVIOR_ENVIRONMENT = effectiveBehaviorEnvironment(process.env);
+
 if (!isMainThread && parentPort) {
-    const envelope = workerData as IPureRangedTerminalWorkerEnvelope;
+    const envelope = workerData as IPureRangedTerminalWorkerEnvelope | IPureRangedTerminalWorkerEnvironmentProbe;
+    if (envelope.marker === "v0.7-pure-ranged-terminal-worker-environment-probe") {
+        parentPort.postMessage({
+            importTimeBehaviorEnvironment: IMPORT_TIME_BEHAVIOR_ENVIRONMENT,
+            runtimeBehaviorEnvironment: effectiveBehaviorEnvironment(process.env),
+        } satisfies IPureRangedTerminalWorkerEnvironmentEvidence);
+        parentPort.close();
+    }
     if (envelope.marker === "v0.7-pure-ranged-terminal-worker") {
         for (const key of Object.keys(process.env)) {
             if (isBehaviorKey(key)) delete process.env[key];
@@ -921,6 +963,33 @@ if (!isMainThread && parentPort) {
         });
         port.postMessage({ type: "ready" });
     }
+}
+
+/** Prove that a worker starts with the frozen profile before this module's static policy imports execute. */
+export async function probePureRangedTerminalWorkerEnvironment(
+    manifest: IPureRangedTerminalManifest,
+    weight: number,
+    timingEnvelope: IPureRangedTerminalArm["timingEnvelope"],
+    source: NodeJS.ProcessEnv,
+): Promise<IPureRangedTerminalWorkerEnvironmentEvidence> {
+    const environment = stringEnvironment(pureRangedTerminalEnvironment(manifest, weight, timingEnvelope, source));
+    return new Promise<IPureRangedTerminalWorkerEnvironmentEvidence>((resolvePromise, rejectPromise) => {
+        const worker = new Worker(new URL(import.meta.url), {
+            workerData: {
+                marker: "v0.7-pure-ranged-terminal-worker-environment-probe",
+                environment,
+            } satisfies IPureRangedTerminalWorkerEnvironmentProbe,
+            env: environment,
+        });
+        worker.once("message", (message: IPureRangedTerminalWorkerEnvironmentEvidence) => {
+            resolvePromise(message);
+            void worker.terminate();
+        });
+        worker.once("error", rejectPromise);
+        worker.once("exit", (code) => {
+            if (code !== 0) rejectPromise(new Error(`Pure-ranged terminal environment probe exited ${code}`));
+        });
+    });
 }
 
 function parseAudit(
@@ -1089,6 +1158,7 @@ async function executeArm(
     }
     if (!pending.length) return;
     const environment = pureRangedTerminalEnvironment(manifest, arm.weight, arm.timingEnvelope);
+    const workerEnvironment = stringEnvironment(environment);
     const workerCount = Math.min(concurrency, pending.length);
     let cursor = 0;
     let completed = arm.games - pending.length;
@@ -1115,12 +1185,10 @@ async function executeArm(
                     arm,
                     runDir,
                     runFingerprint: run.runFingerprint,
-                    environment: Object.fromEntries(
-                        Object.entries(environment).filter(
-                            (entry): entry is [string, string] => entry[1] !== undefined,
-                        ),
-                    ),
+                    environment: workerEnvironment,
                 } satisfies IPureRangedTerminalWorkerEnvelope,
+                // Unlike a worker-body cleanup, this is installed before static battle/strategy imports.
+                env: workerEnvironment,
             });
             workers.add(worker);
             worker.on(
@@ -1287,6 +1355,11 @@ function validateRawMarker(
         }
     }
     return report;
+}
+
+/** Hash the exact pretty-printed report bytes bound by the raw completion marker. */
+export function pureRangedTerminalRawReportSha256(runDir: string, phase: PureRangedTerminalPhase): string {
+    return sha256(readFileSync(join(runDir, `${phase}-raw-report.json`)));
 }
 
 function quantile(values: readonly number[], probability: number): number | null {
@@ -1510,7 +1583,7 @@ function analyzeScout(
     run: IPureRangedTerminalRunManifest,
     manifest: IPureRangedTerminalManifest,
 ): IPureRangedTerminalScoutReport {
-    const raw = validateRawMarker(runDir, "scout", run, manifest);
+    validateRawMarker(runDir, "scout", run, manifest);
     const controlArm = arms.find(({ weight }) => weight === 0)!;
     const control = loadArm(runDir, controlArm, run, manifest);
     const comparisons = arms
@@ -1526,7 +1599,7 @@ function analyzeScout(
         generatedAt: new Date().toISOString(),
         runFingerprint: run.runFingerprint,
         protocolSha256: run.protocol.sha256,
-        rawReportSha256: sha256(stableJson(raw)),
+        rawReportSha256: pureRangedTerminalRawReportSha256(runDir, "scout"),
         comparisons,
         selectedWeight,
         gateLine: verdict === "PASS" ? manifest.completion.scoutPassLine : "PURE RANGED TERMINAL SCOUT GATE: FAIL",
@@ -1607,7 +1680,7 @@ function analyzeConfirmation(
     manifest: IPureRangedTerminalManifest,
     selectedWeight: number,
 ): IPureRangedTerminalConfirmationReport {
-    const raw = validateRawMarker(runDir, "confirmation", run, manifest);
+    validateRawMarker(runDir, "confirmation", run, manifest);
     const controlArm = arms.find(({ weight, template }) => weight === 0 && template === PURE_RANGED_TERMINAL_TEMPLATE)!;
     const selectedArm = arms.find(
         ({ weight, template }) => weight === selectedWeight && template === PURE_RANGED_TERMINAL_TEMPLATE,
@@ -1645,7 +1718,7 @@ function analyzeConfirmation(
         generatedAt: new Date().toISOString(),
         runFingerprint: run.runFingerprint,
         protocolSha256: run.protocol.sha256,
-        rawReportSha256: sha256(stableJson(raw)),
+        rawReportSha256: pureRangedTerminalRawReportSha256(runDir, "confirmation"),
         selectedWeight,
         comparison,
         identityChecks: identities,
