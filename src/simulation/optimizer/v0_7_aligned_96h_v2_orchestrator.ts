@@ -1220,6 +1220,37 @@ function validateResolvedEventEvidence(
     }
 }
 
+/** Validate only one newly appended event against its externally persisted evidence. */
+export function validateV07AlignedV2AppendedEventEvidence(
+    definition: IV07AlignedV2OrchestratorDefinition,
+    stateAfter: IV07AlignedV2OrchestratorState,
+    event: IV07AlignedV2OrchestratorEvent,
+    resolvers: IV07AlignedV2OrchestratorReplayResolvers,
+): void {
+    validateDefinitionWithoutSeedPlans(definition);
+    if (
+        stateAfter.nextSequence !== event.sequence + 1 ||
+        stateAfter.eventHeadSha256 !== event.eventSha256 ||
+        stateAfter.lastNowMs !== event.nowMs
+    ) {
+        throw new Error("aligned v2 appended evidence validation requires the exact post-event state");
+    }
+    if (!resolvers.seedCommitment) {
+        throw new Error("aligned v2 appended evidence validation requires a seed-commitment resolver");
+    }
+    validateResolvedSeedCommitment(definition, resolvers.seedCommitment);
+    if (
+        ["train_recorded", "confirmation_recorded", "final_recorded"].includes(event.eventType) &&
+        !resolvers.evidence
+    ) {
+        throw new Error("aligned v2 appended evidence validation requires an evidence resolver");
+    }
+    if (event.eventType === "final_plan_revealed" && !resolvers.seedPlans) {
+        throw new Error("aligned v2 appended evidence validation requires a final seed-reveal resolver");
+    }
+    validateResolvedEventEvidence(definition, stateAfter, event, resolvers);
+}
+
 function makeEvent(
     definition: IV07AlignedV2OrchestratorDefinition,
     state: IV07AlignedV2OrchestratorState,

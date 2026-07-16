@@ -53,7 +53,7 @@ import {
     validateV07AlignedV2OrchestratorDefinition,
 } from "./v0_7_aligned_96h_v2_orchestrator";
 import {
-    applyAndPersistV07AlignedV2OrchestratorCommand,
+    applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded,
     initializeV07AlignedV2OrchestratorPersistence,
     loadV07AlignedV2PersistedOrchestrator,
     type IV07AlignedV2PersistedOrchestrator,
@@ -99,6 +99,7 @@ import {
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const HOUR_MS = 60 * 60 * 1000;
+const REPLAY_HEARTBEAT_INTERVAL_MS = 30_000;
 const COMMITMENT_PATH = "seed-allocation/commitment.json";
 const FINAL_REVEAL_PATH = "seed-allocation/final-reveal.json";
 
@@ -650,6 +651,7 @@ function persistedShardInventory(
 class V07AlignedV2RunnerHeartbeatWriter {
     private current: IV07AlignedV2RunnerHeartbeat | null = null;
     private readonly completed: Map<string, number>;
+    private persistedGamesTotal: number;
     public constructor(
         private readonly path: string,
         private readonly runFingerprint: string,
@@ -657,14 +659,24 @@ class V07AlignedV2RunnerHeartbeatWriter {
         countGames: boolean,
     ) {
         this.completed = persistedShardInventory(artifactRoot, runFingerprint, countGames);
+        this.persistedGamesTotal = 0;
+        for (const games of this.completed.values()) {
+            const nextTotal = this.persistedGamesTotal + games;
+            if (!Number.isSafeInteger(nextTotal)) {
+                throw new Error("runner heartbeat persisted game inventory exceeds the safe integer range");
+            }
+            this.persistedGamesTotal = nextTotal;
+        }
         if (existsSync(path)) {
             this.current = validateV07AlignedV2RunnerHeartbeat(
                 readCanonicalJson<unknown>(path, "aligned v2 runner heartbeat"),
                 runFingerprint,
                 path,
             );
-            const completedGames = [...this.completed.values()].reduce((sum, games) => sum + games, 0);
-            if (this.current.completedShards > this.completed.size || this.current.completedGames > completedGames) {
+            if (
+                this.current.completedShards > this.completed.size ||
+                this.current.completedGames > this.persistedGamesTotal
+            ) {
                 throw new Error("aligned v2 runner heartbeat progress exceeds the persisted shard inventory");
             }
         }
@@ -676,11 +688,18 @@ class V07AlignedV2RunnerHeartbeatWriter {
         if (existing !== undefined && existing !== games) {
             throw new Error(`runner heartbeat persisted shard ${shardSha256} changed its game count`);
         }
+        if (existing === undefined) {
+            const nextTotal = this.persistedGamesTotal + games;
+            if (!Number.isSafeInteger(nextTotal)) {
+                throw new Error("runner heartbeat persisted game total exceeds the safe integer range");
+            }
+            this.persistedGamesTotal = nextTotal;
+        }
         this.completed.set(shardSha256, games);
     }
     public persistedProgress(): { persistedGames: number; persistedShards: number } {
         return {
-            persistedGames: [...this.completed.values()].reduce((sum, games) => sum + games, 0),
+            persistedGames: this.persistedGamesTotal,
             persistedShards: this.completed.size,
         };
     }
@@ -1911,23 +1930,36 @@ function applyCommand(
     definition: IV07AlignedV2OrchestratorDefinition,
     resolvers: IV07AlignedV2OrchestratorReplayResolvers,
     heartbeat: V07AlignedV2RunnerHeartbeatWriter,
+    replayHeartbeat: IRunnerReplayHeartbeatContext,
     command: IV07AlignedV2OrchestratorCommand,
 ): IV07AlignedV2PersistedOrchestrator {
-    heartbeat.write({
+    const before = heartbeat.write({
         phase: `${ledger.state.phase}:${command.type}:before`,
         eventHeadSha256: ledger.current.eventHeadSha256,
     });
-    const next = applyAndPersistV07AlignedV2OrchestratorCommand(
-        ledger.directory,
+    replayHeartbeat.phase = `${ledger.state.phase}:${command.type}:evidence-replay`;
+    replayHeartbeat.eventHeadSha256 = ledger.current.eventHeadSha256;
+    replayHeartbeat.lastPublishedAtMs = before.updatedAtMs;
+    const next = applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+        ledger,
         definition,
         command,
         resolvers,
     ).orchestration;
-    heartbeat.write({
+    const after = heartbeat.write({
         phase: `${next.state.phase}:${command.type}:after`,
         eventHeadSha256: next.current.eventHeadSha256,
     });
+    replayHeartbeat.phase = `${next.state.phase}:idle`;
+    replayHeartbeat.eventHeadSha256 = next.current.eventHeadSha256;
+    replayHeartbeat.lastPublishedAtMs = after.updatedAtMs;
     return next;
+}
+
+interface IRunnerReplayHeartbeatContext {
+    phase: string;
+    eventHeadSha256: string | null;
+    lastPublishedAtMs: number;
 }
 
 function commandNow(state: IV07AlignedV2OrchestratorState, nowMs: number): number {
@@ -1940,6 +1972,7 @@ function maybeDeadline(
     definition: IV07AlignedV2OrchestratorDefinition,
     resolvers: IV07AlignedV2OrchestratorReplayResolvers,
     heartbeat: V07AlignedV2RunnerHeartbeatWriter,
+    replayHeartbeat: IRunnerReplayHeartbeatContext,
     nowMs: number,
 ): IV07AlignedV2PersistedOrchestrator {
     const { phase } = ledger.state;
@@ -1952,7 +1985,7 @@ function maybeDeadline(
                 ? definition.schedule.finalDeadlineAtMs
                 : null;
     if (deadline === null || nowMs < deadline) return ledger;
-    return applyCommand(ledger, definition, resolvers, heartbeat, {
+    return applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
         type: "tick",
         commandId: `deadline:${phase}`,
         nowMs: commandNow(ledger.state, nowMs),
@@ -1986,7 +2019,12 @@ export async function runV07AlignedV2Runner(
         artifactRoot,
         !invocation.preflight,
     );
-    heartbeat.write({ phase: "initializing:commitment", eventHeadSha256: null });
+    let publishedHeartbeat = heartbeat.write({ phase: "initializing:commitment", eventHeadSha256: null });
+    const replayHeartbeat: IRunnerReplayHeartbeatContext = {
+        phase: "initializing:orchestrator-replay",
+        eventHeadSha256: null,
+        lastPublishedAtMs: publishedHeartbeat.updatedAtMs,
+    };
     const commitmentRef = publishImmutableArtifact(
         artifactRoot,
         COMMITMENT_PATH,
@@ -1996,8 +2034,18 @@ export async function runV07AlignedV2Runner(
     if (!sameValue(commitmentRef, definition.seedCommitment)) {
         throw new Error("persisted seed commitment reference differs from the preregistered definition");
     }
-    heartbeat.write({ phase: "initializing:commitment-persisted", eventHeadSha256: null });
+    publishedHeartbeat = heartbeat.write({ phase: "initializing:commitment-persisted", eventHeadSha256: null });
+    replayHeartbeat.lastPublishedAtMs = publishedHeartbeat.updatedAtMs;
     const resolverOptions: IV07AlignedV2FilesystemResolverOptions = { artifactRoot, definition };
+    resolverOptions.onEvidenceShardVerified = () => {
+        const nowMs = Date.now();
+        if (nowMs - replayHeartbeat.lastPublishedAtMs < REPLAY_HEARTBEAT_INTERVAL_MS) return;
+        const replayProgress = heartbeat.write({
+            phase: `${replayHeartbeat.phase}:shard-verified`,
+            eventHeadSha256: replayHeartbeat.eventHeadSha256,
+        });
+        replayHeartbeat.lastPublishedAtMs = replayProgress.updatedAtMs;
+    };
     const resolvers = createV07AlignedV2FilesystemReplayResolvers(resolverOptions);
     let ledger = initializeV07AlignedV2OrchestratorPersistence(orchestratorDirectory, definition, resolvers);
     const dependencies: IV07AlignedV2RunnerDependencies = {
@@ -2008,10 +2056,16 @@ export async function runV07AlignedV2Runner(
         invocationGamesExecuted: 0,
         invocationWorkersStarted: 0,
     };
-    heartbeat.write({ phase: `${ledger.state.phase}:initialized`, eventHeadSha256: ledger.current.eventHeadSha256 });
+    publishedHeartbeat = heartbeat.write({
+        phase: `${ledger.state.phase}:initialized`,
+        eventHeadSha256: ledger.current.eventHeadSha256,
+    });
+    replayHeartbeat.phase = `${ledger.state.phase}:idle`;
+    replayHeartbeat.eventHeadSha256 = ledger.current.eventHeadSha256;
+    replayHeartbeat.lastPublishedAtMs = publishedHeartbeat.updatedAtMs;
     let finalRevealRef: IV07AlignedV2SeedArtifactRef | null = ledger.state.revealedSeedArtifacts?.finalReveal ?? null;
     let now = commandNow(ledger.state, dependencies.nowMs());
-    ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, now);
+    ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now);
     let remainingCapacity = validateRemainingCapacity(
         artifactRoot,
         definition,
@@ -2026,7 +2080,7 @@ export async function runV07AlignedV2Runner(
         );
         if (!next) {
             now = commandNow(ledger.state, dependencies.nowMs());
-            ledger = applyCommand(ledger, definition, resolvers, heartbeat, {
+            ledger = applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
                 type: "freeze_candidate",
                 commandId: "freeze:finite-catalog",
                 nowMs: now,
@@ -2035,7 +2089,7 @@ export async function runV07AlignedV2Runner(
         }
         now = commandNow(ledger.state, dependencies.nowMs());
         if (now >= definition.schedule.trainDeadlineAtMs) {
-            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, now);
+            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now);
             break;
         }
         remainingCapacity = validateRemainingCapacity(artifactRoot, definition, preparation, ledger, now);
@@ -2056,8 +2110,8 @@ export async function runV07AlignedV2Runner(
         now = commandNow(ledger.state, dependencies.nowMs());
         ledger =
             now >= definition.schedule.trainDeadlineAtMs
-                ? maybeDeadline(ledger, definition, resolvers, heartbeat, now)
-                : applyCommand(ledger, definition, resolvers, heartbeat, {
+                ? maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now)
+                : applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
                       type: "record_train",
                       commandId: `train:${next.genomeSha256}`,
                       nowMs: now,
@@ -2088,8 +2142,8 @@ export async function runV07AlignedV2Runner(
         now = commandNow(ledger.state, dependencies.nowMs());
         ledger =
             now >= definition.schedule.confirmDeadlineAtMs
-                ? maybeDeadline(ledger, definition, resolvers, heartbeat, now)
-                : applyCommand(ledger, definition, resolvers, heartbeat, {
+                ? maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now)
+                : applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
                       type: "reveal_final_plan",
                       commandId: "reveal:final-after-freeze",
                       nowMs: now,
@@ -2103,7 +2157,7 @@ export async function runV07AlignedV2Runner(
     if (ledger.state.phase === "confirmation" && ledger.state.frozen) {
         now = commandNow(ledger.state, dependencies.nowMs());
         if (now >= definition.schedule.confirmDeadlineAtMs) {
-            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, now);
+            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now);
         } else {
             remainingCapacity = validateRemainingCapacity(artifactRoot, definition, preparation, ledger, now);
             const challenger = definition.candidates.find(
@@ -2140,8 +2194,8 @@ export async function runV07AlignedV2Runner(
             now = commandNow(ledger.state, dependencies.nowMs());
             ledger =
                 now >= definition.schedule.confirmDeadlineAtMs
-                    ? maybeDeadline(ledger, definition, resolvers, heartbeat, now)
-                    : applyCommand(ledger, definition, resolvers, heartbeat, {
+                    ? maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now)
+                    : applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
                           type: "record_confirmation",
                           commandId: "confirm:frozen-vs-incumbent",
                           nowMs: now,
@@ -2159,7 +2213,7 @@ export async function runV07AlignedV2Runner(
         )!;
         now = commandNow(ledger.state, dependencies.nowMs());
         if (now >= definition.schedule.finalDeadlineAtMs) {
-            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, now);
+            ledger = maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now);
         } else {
             remainingCapacity = validateRemainingCapacity(artifactRoot, definition, preparation, ledger, now);
             const evidence = await evaluatePanel({
@@ -2179,8 +2233,8 @@ export async function runV07AlignedV2Runner(
             now = commandNow(ledger.state, dependencies.nowMs());
             ledger =
                 now >= definition.schedule.finalDeadlineAtMs
-                    ? maybeDeadline(ledger, definition, resolvers, heartbeat, now)
-                    : applyCommand(ledger, definition, resolvers, heartbeat, {
+                    ? maybeDeadline(ledger, definition, resolvers, heartbeat, replayHeartbeat, now)
+                    : applyCommand(ledger, definition, resolvers, heartbeat, replayHeartbeat, {
                           type: "record_final",
                           commandId: "final:frozen-candidate",
                           nowMs: now,

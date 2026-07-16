@@ -44,6 +44,7 @@ import {
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_orchestrator";
 import { runV07AlignedV2SyntheticOrchestrationDryRun } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_orchestration_dry_run";
 import {
+    applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded,
     appendV07AlignedV2OrchestratorEvent,
     initializeV07AlignedV2OrchestratorPersistence,
     loadV07AlignedV2PersistedOrchestrator,
@@ -560,10 +561,12 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                 candidateGenomeSha256: candidate.genomeSha256,
                 evidence: evidenceInput,
             });
+            const verifiedShards: string[] = [];
             const filesystemEvidence = createV07AlignedV2FilesystemEvidenceResolver({
                 artifactRoot: root,
                 definition: fixture.definition,
                 resolveSeedPlan: () => fixture.trainPlan,
+                onEvidenceShardVerified: (progress) => verifiedShards.push(progress.manifestSha256),
             });
             expect(() =>
                 deriveV07AlignedV2OrchestratorState(fixture.definition, result.events, {
@@ -571,6 +574,7 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                     evidence: filesystemEvidence,
                 }),
             ).not.toThrow();
+            expect(verifiedShards).toEqual([persisted.manifestSha256]);
 
             writeFileSync(
                 join(persisted.directory, persisted.manifest.files.rawRecords.path),
@@ -582,8 +586,364 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                     evidence: filesystemEvidence,
                 }),
             ).toThrow("byte/hash mismatch");
+            expect(verifiedShards).toEqual([persisted.manifestSha256]);
+
+            const corruptReplayProgress: string[] = [];
+            const freshFilesystemEvidence = createV07AlignedV2FilesystemEvidenceResolver({
+                artifactRoot: root,
+                definition: fixture.definition,
+                resolveSeedPlan: () => fixture.trainPlan,
+                onEvidenceShardVerified: (progress) => corruptReplayProgress.push(progress.manifestSha256),
+            });
+            expect(() =>
+                deriveV07AlignedV2OrchestratorState(fixture.definition, result.events, {
+                    seedCommitment: fixture.resolvers.seedCommitment,
+                    evidence: freshFilesystemEvidence,
+                }),
+            ).toThrow("byte/hash mismatch");
+            expect(corruptReplayProgress).toEqual([]);
         } finally {
             rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("appends new evidence linearly and leaves strict cold replay authoritative", () => {
+        const root = mkdtempSync(join(tmpdir(), "hoc-v07-aligned-incremental-"));
+        const directory = join(root, "orchestrator");
+        try {
+            const fixture = orchestrationFixture();
+            let liveEvidenceCalls = 0;
+            const liveResolvers: IV07AlignedV2OrchestratorReplayResolvers = {
+                ...fixture.resolvers,
+                evidence: (summary) => {
+                    liveEvidenceCalls += 1;
+                    return fixture.resolvers.evidence!(summary);
+                },
+            };
+            let ledger = initializeV07AlignedV2OrchestratorPersistence(directory, fixture.definition, liveResolvers);
+            const staleInitialLedger = ledger;
+            for (const [index, training] of fixture.training.entries()) {
+                ledger = applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    ledger,
+                    fixture.definition,
+                    {
+                        type: "record_train",
+                        commandId: `incremental-train-${index}`,
+                        nowMs: fixture.definition.schedule.startAtMs + index + 1,
+                        candidateGenomeSha256: training.genomeSha256,
+                        evidence: training,
+                    },
+                    liveResolvers,
+                ).orchestration;
+                expect(liveEvidenceCalls).toBe(index + 1);
+            }
+            expect(() =>
+                applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    structuredClone(ledger),
+                    fixture.definition,
+                    {
+                        type: "freeze_candidate",
+                        commandId: "forged-ledger-clone",
+                        nowMs: fixture.definition.schedule.startAtMs + 3,
+                    },
+                    liveResolvers,
+                ),
+            ).toThrow("requires an opaque strictly loaded ledger");
+            expect(() =>
+                applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    staleInitialLedger,
+                    fixture.definition,
+                    {
+                        type: "record_train",
+                        commandId: "stale-loaded-ledger",
+                        nowMs: fixture.definition.schedule.startAtMs + 3,
+                        candidateGenomeSha256: fixture.training[0].genomeSha256,
+                        evidence: fixture.training[0],
+                    },
+                    liveResolvers,
+                ),
+            ).toThrow("transition head changed after the loaded replay");
+
+            const currentBytes = readFileSync(join(directory, "CURRENT"), "utf8");
+            const transitionBytes = readdirSync(join(directory, "transitions"))
+                .sort()
+                .map((name) => readFileSync(join(directory, "transitions", name), "utf8"));
+            let coldReplayCalls = 0;
+            const coldResolvers: IV07AlignedV2OrchestratorReplayResolvers = {
+                ...fixture.resolvers,
+                evidence: (summary) => {
+                    coldReplayCalls += 1;
+                    return fixture.resolvers.evidence!(summary);
+                },
+            };
+            const replayed = loadV07AlignedV2PersistedOrchestrator(directory, coldResolvers, fixture.definition);
+            expect(coldReplayCalls).toBe(fixture.training.length);
+            expect(replayed.events).toEqual(ledger.events);
+            expect(readFileSync(join(directory, "CURRENT"), "utf8")).toBe(currentBytes);
+            expect(
+                readdirSync(join(directory, "transitions"))
+                    .sort()
+                    .map((name) => readFileSync(join(directory, "transitions", name), "utf8")),
+            ).toEqual(transitionBytes);
+
+            ledger.current = { ...ledger.current, lastNowMs: ledger.current.lastNowMs + 1 };
+            expect(() =>
+                applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    ledger,
+                    fixture.definition,
+                    {
+                        type: "freeze_candidate",
+                        commandId: "mutated-loaded-ledger",
+                        nowMs: fixture.definition.schedule.startAtMs + 3,
+                    },
+                    liveResolvers,
+                ),
+            ).toThrow("strictly loaded ledger was mutated after validation");
+
+            const firstTraining = fixture.training[0];
+            const key = evidenceKey(fixture.definition.panels.train.panelFingerprint, firstTraining.genomeSha256);
+            const originalRows = fixture.evidenceRows.get(key)!;
+            fixture.evidenceRows.set(key, [
+                {
+                    ...originalRows[0],
+                    outcome: originalRows[0].outcome === "candidate_win" ? "opponent_win" : "candidate_win",
+                },
+                ...originalRows.slice(1),
+            ]);
+            expect(() =>
+                loadV07AlignedV2PersistedOrchestrator(
+                    directory,
+                    { ...fixture.resolvers, evidence: (summary) => fixture.resolvers.evidence!(summary) },
+                    fixture.definition,
+                ),
+            ).toThrow("does not replay exactly");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("recovers incremental appends at every existing transition durability boundary", () => {
+        for (const boundary of [
+            "append_claim_fsynced",
+            "transition_temp_fsynced",
+            "transition_published",
+            "current_published",
+        ] as const) {
+            const root = mkdtempSync(join(tmpdir(), `hoc-v07-aligned-incremental-${boundary}-`));
+            const directory = join(root, "orchestrator");
+            try {
+                const fixture = orchestrationFixture();
+                const ledger = initializeV07AlignedV2OrchestratorPersistence(
+                    directory,
+                    fixture.definition,
+                    fixture.resolvers,
+                );
+                const training = fixture.training[0];
+                const command: IV07AlignedV2OrchestratorCommand = {
+                    type: "record_train",
+                    commandId: `incremental-fault-${boundary}`,
+                    nowMs: fixture.definition.schedule.startAtMs + 1,
+                    candidateGenomeSha256: training.genomeSha256,
+                    evidence: training,
+                };
+                const appended = applyV07AlignedV2OrchestratorCommand(
+                    fixture.definition,
+                    ledger.events,
+                    command,
+                ).appended!;
+                expect(() =>
+                    applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                        ledger,
+                        fixture.definition,
+                        command,
+                        fixture.resolvers,
+                        faultAt(boundary),
+                    ),
+                ).toThrow(`synthetic fault after ${boundary}`);
+                const claimName = readdirSync(join(directory, "transitions")).find((name) =>
+                    name.startsWith(".append-"),
+                );
+                expect(claimName).toBeDefined();
+                expect(() =>
+                    applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                        ledger,
+                        fixture.definition,
+                        {
+                            type: "record_train",
+                            commandId: `incremental-competing-${boundary}`,
+                            nowMs: fixture.definition.schedule.startAtMs + 1,
+                            candidateGenomeSha256: training.genomeSha256,
+                            evidence: training,
+                        },
+                        fixture.resolvers,
+                    ),
+                ).toThrow();
+                expect(readdirSync(join(directory, "transitions"))).toContain(claimName!);
+                expect(() =>
+                    appendV07AlignedV2OrchestratorEvent(directory, fixture.definition, appended, fixture.resolvers),
+                ).toThrow("unsafe entry");
+                expect(readdirSync(join(directory, "transitions"))).toContain(claimName!);
+                const replayed = loadV07AlignedV2PersistedOrchestrator(
+                    directory,
+                    fixture.resolvers,
+                    fixture.definition,
+                );
+                expect(replayed.events).toHaveLength(
+                    boundary === "append_claim_fsynced" || boundary === "transition_temp_fsynced" ? 0 : 1,
+                );
+                expect(replayed.current.nextSequence).toBe(replayed.events.length);
+                expect(readdirSync(join(directory, "transitions")).some((name) => name.startsWith("."))).toBe(false);
+                expect(readdirSync(join(directory, "quarantine")).length).toBeGreaterThan(0);
+            } finally {
+                rmSync(root, { recursive: true, force: true });
+            }
+        }
+    });
+
+    it("rechecks the durable head while holding the incremental append claim", () => {
+        const root = mkdtempSync(join(tmpdir(), "hoc-v07-aligned-incremental-race-"));
+        const directory = join(root, "orchestrator");
+        try {
+            const fixture = orchestrationFixture();
+            const ledger = initializeV07AlignedV2OrchestratorPersistence(
+                directory,
+                fixture.definition,
+                fixture.resolvers,
+            );
+            const competing = applyV07AlignedV2OrchestratorCommand(fixture.definition, ledger.events, {
+                type: "record_train",
+                commandId: "incremental-race-winner",
+                nowMs: fixture.definition.schedule.startAtMs + 1,
+                candidateGenomeSha256: fixture.training[0].genomeSha256,
+                evidence: fixture.training[0],
+            }).appended!;
+            expect(() =>
+                applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    ledger,
+                    fixture.definition,
+                    {
+                        type: "record_train",
+                        commandId: "incremental-race-loser",
+                        nowMs: fixture.definition.schedule.startAtMs + 1,
+                        candidateGenomeSha256: fixture.training[1].genomeSha256,
+                        evidence: fixture.training[1],
+                    },
+                    fixture.resolvers,
+                    {
+                        afterDurableStep: (step) => {
+                            if (step !== "append_claim_fsynced") return;
+                            writeFileSync(
+                                join(directory, "transitions", `000000-${competing.eventSha256}.json`),
+                                canonicalFile(competing),
+                            );
+                        },
+                    },
+                ),
+            ).toThrow("transition head changed after the loaded replay");
+            expect(
+                readdirSync(join(directory, "transitions")).some((name) =>
+                    name.endsWith(`${competing.eventSha256}.json`),
+                ),
+            ).toBe(true);
+            expect(readdirSync(join(directory, "transitions")).some((name) => name.startsWith(".append-"))).toBe(true);
+
+            const replayed = loadV07AlignedV2PersistedOrchestrator(directory, fixture.resolvers, fixture.definition);
+            expect(replayed.events).toEqual([competing]);
+            expect(replayed.current.nextSequence).toBe(1);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps supervisor terminal replay valid across claim-release and publication fault images", () => {
+        for (const boundary of ["append_claim_released", "terminal_published"] as const) {
+            const root = mkdtempSync(join(tmpdir(), `hoc-v07-aligned-incremental-terminal-${boundary}-`));
+            const directory = join(root, "orchestrator");
+            try {
+                const fixture = orchestrationFixture();
+                let ledger = initializeV07AlignedV2OrchestratorPersistence(
+                    directory,
+                    fixture.definition,
+                    fixture.resolvers,
+                );
+                const append = (command: IV07AlignedV2OrchestratorCommand): void => {
+                    ledger = applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                        ledger,
+                        fixture.definition,
+                        command,
+                        fixture.resolvers,
+                    ).orchestration;
+                };
+                append({
+                    type: "record_train",
+                    commandId: `incremental-terminal-train-other-${boundary}`,
+                    nowMs: fixture.definition.schedule.startAtMs + 1,
+                    candidateGenomeSha256: fixture.training[0].genomeSha256,
+                    evidence: fixture.training[0],
+                });
+                append({
+                    type: "record_train",
+                    commandId: `incremental-terminal-train-selected-${boundary}`,
+                    nowMs: fixture.definition.schedule.startAtMs + 2,
+                    candidateGenomeSha256: fixture.training[1].genomeSha256,
+                    evidence: fixture.training[1],
+                });
+                append({
+                    type: "freeze_candidate",
+                    commandId: `incremental-terminal-freeze-${boundary}`,
+                    nowMs: fixture.definition.schedule.startAtMs + 3,
+                });
+                append({
+                    type: "reveal_final_plan",
+                    commandId: `incremental-terminal-reveal-${boundary}`,
+                    nowMs: fixture.definition.schedule.startAtMs + 4,
+                    trainSeedPlan: fixture.trainPlan,
+                    confirmSeedPlan: fixture.confirmPlan,
+                    finalSeedPlan: fixture.finalPlan,
+                    seedArtifacts: fixture.seedArtifacts,
+                });
+
+                expect(() =>
+                    applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                        ledger,
+                        fixture.definition,
+                        {
+                            type: "record_confirmation",
+                            commandId: `incremental-terminal-confirm-${boundary}`,
+                            nowMs: fixture.definition.schedule.startAtMs + 5,
+                            ...fixture.confirmation,
+                        },
+                        fixture.resolvers,
+                        faultAt(boundary),
+                    ),
+                ).toThrow(`synthetic fault after ${boundary}`);
+                expect(readdirSync(join(directory, "transitions")).some((name) => name.startsWith("."))).toBe(false);
+                expect(existsSync(join(directory, "TERMINAL.json"))).toBe(boundary === "terminal_published");
+
+                const beforeColdRestart = validateV07AlignedV2TerminalReplay(
+                    directory,
+                    fixture.definition,
+                    fixture.resolvers,
+                );
+                expect(beforeColdRestart === null).toBe(boundary === "append_claim_released");
+                const replayed = loadV07AlignedV2PersistedOrchestrator(
+                    directory,
+                    fixture.resolvers,
+                    fixture.definition,
+                );
+                expect(replayed.state.phase).toBe("terminal");
+                expect(replayed.current.nextSequence).toBe(replayed.events.length);
+                expect(readdirSync(join(directory, "quarantine"))).toEqual([]);
+
+                const accepted = validateV07AlignedV2TerminalReplay(directory, fixture.definition, fixture.resolvers);
+                expect(accepted).toEqual(replayed.state.terminal);
+                expect(validateV07AlignedV2TerminalReplay(directory, fixture.definition, fixture.resolvers)).toEqual(
+                    accepted,
+                );
+                if (beforeColdRestart) expect(beforeColdRestart).toEqual(accepted);
+            } finally {
+                rmSync(root, { recursive: true, force: true });
+            }
         }
     });
 
@@ -982,6 +1342,23 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             expect(() => validateV07AlignedV2TerminalReplay(directory, fixture.definition, {})).toThrow(
                 "terminal replay requires exact",
             );
+
+            const terminalPath = ledger.terminalPath!;
+            const terminalBytes = readFileSync(terminalPath, "utf8");
+            writeFileSync(terminalPath, canonicalFile({}));
+            expect(() =>
+                applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+                    ledger,
+                    fixture.definition,
+                    {
+                        type: "freeze_candidate",
+                        commandId: "terminal-byte-mutation",
+                        nowMs: fixture.definition.schedule.startAtMs + 6,
+                    },
+                    fixture.resolvers,
+                ),
+            ).toThrow("terminal changed after the loaded replay");
+            writeFileSync(terminalPath, terminalBytes);
 
             const currentPath = join(directory, "CURRENT");
             const validCurrent = JSON.parse(readFileSync(currentPath, "utf8")) as IV07AlignedV2OrchestratorCurrent;

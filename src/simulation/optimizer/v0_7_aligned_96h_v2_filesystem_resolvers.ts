@@ -111,6 +111,17 @@ function bindingForGenome(
 export interface IV07AlignedV2FilesystemResolverOptions {
     artifactRoot: string;
     definition: IV07AlignedV2OrchestratorDefinition;
+    onEvidenceShardVerified?: (progress: IV07AlignedV2EvidenceShardVerificationProgress) => void;
+}
+
+export interface IV07AlignedV2EvidenceShardVerificationProgress {
+    evidenceSha256: string;
+    artifactIndex: number;
+    artifactCount: number;
+    directory: string;
+    manifestSha256: string;
+    shardIndex: number;
+    shardCount: number;
 }
 
 export interface IV07AlignedV2FilesystemEvidenceResolverOptions extends IV07AlignedV2FilesystemResolverOptions {
@@ -129,6 +140,7 @@ function buildFilesystemEvidenceResolver(
     artifactRoot: string,
     definition: IV07AlignedV2OrchestratorDefinition,
     resolveSeedPlan: (panel: IV07AlignedV2CheckpointPanelBinding) => IV07AlignedV2InjectedSeedPlan,
+    onEvidenceShardVerified?: (progress: IV07AlignedV2EvidenceShardVerificationProgress) => void,
 ): V07AlignedV2EvidenceResolver {
     return (summary) => {
         const binding = bindingForGenome(definition, summary.genomeSha256);
@@ -136,7 +148,7 @@ function buildFilesystemEvidenceResolver(
         if (!samePanel(bindV07AlignedV2SeedPlan(seedPlan), summary.panel)) {
             throw new Error("aligned v2 filesystem evidence resolver returned a different seed panel");
         }
-        const shards = summary.artifacts.map((artifact) => {
+        const shards = summary.artifacts.map((artifact, artifactIndex) => {
             const directory = safeArtifactPath(artifactRoot, artifact.directory, "aligned v2 evidence shard directory");
             const persisted = loadV07AlignedV2PersistedPanelShard(directory, {
                 runFingerprint: definition.definitionSha256,
@@ -147,6 +159,15 @@ function buildFilesystemEvidenceResolver(
             if (!samePanel(persisted.evaluation.shard.panel, summary.panel)) {
                 throw new Error("aligned v2 evidence shard belongs to a different committed panel");
             }
+            onEvidenceShardVerified?.({
+                evidenceSha256: summary.evidenceSha256,
+                artifactIndex,
+                artifactCount: summary.artifacts.length,
+                directory: artifact.directory,
+                manifestSha256: artifact.manifestSha256,
+                shardIndex: persisted.evaluation.shard.shardIndex,
+                shardCount: persisted.evaluation.shard.shardCount,
+            });
             return persisted;
         });
         shards.sort((left, right) => left.evaluation.shard.shardIndex - right.evaluation.shard.shardIndex);
@@ -182,6 +203,7 @@ export function createV07AlignedV2FilesystemEvidenceResolver(
         validatedArtifactRoot(options.artifactRoot),
         validateV07AlignedV2OrchestratorDefinition(options.definition),
         options.resolveSeedPlan,
+        options.onEvidenceShardVerified,
     );
 }
 
@@ -264,7 +286,12 @@ export function createV07AlignedV2FilesystemReplayResolvers(
         throw new Error("aligned v2 persisted evidence panel has no currently revealed committed seed plan");
     };
 
-    const evidence = buildFilesystemEvidenceResolver(artifactRoot, definition, planForSummary);
+    const evidence = buildFilesystemEvidenceResolver(
+        artifactRoot,
+        definition,
+        planForSummary,
+        options.onEvidenceShardVerified,
+    );
 
     return { evidence, seedCommitment, seedPlans };
 }

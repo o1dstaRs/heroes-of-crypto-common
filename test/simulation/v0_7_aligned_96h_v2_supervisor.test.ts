@@ -722,6 +722,35 @@ describe("v0.7 aligned v2 durable supervisor", () => {
         }
     });
 
+    it("keeps authentic supervisor heartbeats advancing during verified terminal replay", async () => {
+        const root = temporaryDirectory();
+        const clock = new FakeClock();
+        const child = new FakeOptimizer();
+        const injected = dependencies(clock, () => child);
+        injected.validateTerminal = (onReplayProgress) => {
+            if (clock.now < 100) return null;
+            for (let verifiedShard = 0; verifiedShard < 25; verifiedShard += 1) {
+                clock.now += 100;
+                onReplayProgress();
+            }
+            return terminal();
+        };
+        try {
+            const result = await runV07AlignedV2Supervisor(config(root), injected);
+            expect(result).toMatchObject({ stop: "terminal", attempts: 1 });
+            expect(clock.now).toBeGreaterThan(config(root).watchdogMs);
+            expect(child.signals).toEqual(["SIGTERM"]);
+            const heartbeat = JSON.parse(readFileSync(join(root, "supervisor.heartbeat.json"), "utf8")) as {
+                sequence: number;
+                state: string;
+            };
+            expect(heartbeat.sequence).toBeGreaterThanOrEqual(25);
+            expect(heartbeat.state).toBe("terminal");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it("keeps a pinned clean launch valid when origin/main advances elsewhere", async () => {
         const root = temporaryDirectory();
         const clock = new FakeClock();
@@ -889,6 +918,7 @@ describe("v0.7 aligned v2 durable supervisor", () => {
         const clock = new FakeClock();
         let groupChecks = 0;
         let spawns = 0;
+        let immutableInputChecks = 0;
         try {
             await initializeSupervisorFixture(root);
             writeStaleOwnership(root, { child: false });
@@ -905,12 +935,23 @@ describe("v0.7 aligned v2 durable supervisor", () => {
                 groupChecks += 1;
                 return "absent";
             };
+            injected.verifyImmutableInputs = () => {
+                immutableInputChecks += 1;
+            };
 
             const result = await runV07AlignedV2Supervisor(config(root), injected);
             expect(result).toMatchObject({ stop: "terminal", attempts: 1 });
             expect(groupChecks).toBe(0);
             expect(spawns).toBe(0);
+            expect(immutableInputChecks).toBe(2);
             expect(readdirSync(root)).not.toContain("SUPERVISOR_ARMED.json");
+            const heartbeat = JSON.parse(readFileSync(join(root, "supervisor.heartbeat.json"), "utf8")) as Record<
+                string,
+                unknown
+            >;
+            expect(heartbeat).toMatchObject({ state: "terminal", attempt: 1, childPid: null });
+            const { heartbeatSha256, ...unsignedHeartbeat } = heartbeat;
+            expect(heartbeatSha256).toBe(fingerprintV07AlignedV2(unsignedHeartbeat));
         } finally {
             rmSync(root, { recursive: true, force: true });
         }

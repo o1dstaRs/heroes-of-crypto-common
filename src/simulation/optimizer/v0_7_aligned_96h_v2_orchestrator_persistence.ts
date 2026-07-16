@@ -17,6 +17,7 @@ import {
     readFileSync,
     readdirSync,
     renameSync,
+    unlinkSync,
     writeFileSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -24,6 +25,7 @@ import { basename, dirname, join } from "node:path";
 import {
     applyV07AlignedV2OrchestratorCommand,
     deriveV07AlignedV2OrchestratorState,
+    validateV07AlignedV2AppendedEventEvidence,
     validateV07AlignedV2OrchestratorDefinition,
     type IV07AlignedV2OrchestratorApplyResult,
     type IV07AlignedV2OrchestratorCommand,
@@ -70,6 +72,41 @@ export interface IV07AlignedV2PersistedOrchestratorApplyResult {
 }
 
 let tempSequence = 0;
+
+interface ITrustedLedgerIdentity {
+    directory: string;
+    definitionSha256: string;
+    eventsSha256: string;
+    stateSha256: string;
+    currentSha256: string;
+    terminalPath: string | null;
+}
+
+const trustedLedgers = new WeakMap<IV07AlignedV2PersistedOrchestrator, Readonly<ITrustedLedgerIdentity>>();
+
+function ledgerIdentity(ledger: IV07AlignedV2PersistedOrchestrator): ITrustedLedgerIdentity {
+    return {
+        directory: ledger.directory,
+        definitionSha256: fingerprintV07AlignedV2(ledger.definition),
+        eventsSha256: fingerprintV07AlignedV2(ledger.events),
+        stateSha256: fingerprintV07AlignedV2(ledger.state),
+        currentSha256: fingerprintV07AlignedV2(ledger.current),
+        terminalPath: ledger.terminalPath,
+    };
+}
+
+function trustLedger<T extends IV07AlignedV2PersistedOrchestrator>(ledger: T): T {
+    trustedLedgers.set(ledger, Object.freeze(ledgerIdentity(ledger)));
+    return ledger;
+}
+
+function requireTrustedLedger(ledger: IV07AlignedV2PersistedOrchestrator): void {
+    const trusted = trustedLedgers.get(ledger);
+    if (!trusted) throw new Error("aligned v2 incremental append requires an opaque strictly loaded ledger");
+    if (canonicalV07AlignedV2Json(ledgerIdentity(ledger)) !== canonicalV07AlignedV2Json(trusted)) {
+        throw new Error("aligned v2 incremental append strictly loaded ledger was mutated after validation");
+    }
+}
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -253,6 +290,40 @@ function transitionFileName(event: IV07AlignedV2OrchestratorEvent): string {
     return `${String(event.sequence).padStart(6, "0")}-${event.eventSha256}.json`;
 }
 
+function acquireIncrementalAppendClaim(
+    directory: string,
+    definition: IV07AlignedV2OrchestratorDefinition,
+    event: IV07AlignedV2OrchestratorEvent,
+): string {
+    // The supervisor supplies single-writer ownership; this file records reentrancy/crash boundaries.
+    const transitionsDirectory = join(directory, "transitions");
+    const path = join(transitionsDirectory, `.append-${String(event.sequence).padStart(6, "0")}.claim`);
+    const claim = {
+        schemaVersion: 1 as const,
+        artifactKind: "v0_7_aligned_96h_v2_incremental_append_claim" as const,
+        runFingerprint: definition.definitionSha256,
+        sequence: event.sequence,
+        previousEventSha256: event.previousEventSha256,
+        eventSha256: event.eventSha256,
+        processId: process.pid,
+    };
+    try {
+        writeDurableExclusive(path, canonicalJsonFile(claim));
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+            throw new Error(`aligned v2 incremental append sequence ${event.sequence} is already claimed`);
+        }
+        throw error;
+    }
+    fsyncDirectory(transitionsDirectory);
+    return path;
+}
+
+function releaseIncrementalAppendClaim(path: string): void {
+    unlinkSync(path);
+    fsyncDirectory(dirname(path));
+}
+
 function quarantineTemporaryEntries(directory: string): void {
     const quarantineDirectory = join(directory, "quarantine");
     const transitionsDirectory = join(directory, "transitions");
@@ -282,12 +353,23 @@ function validateRootInventory(directory: string, terminalExpected: boolean): vo
     }
 }
 
-function loadTransitionFiles(directory: string): IV07AlignedV2OrchestratorEvent[] {
+function loadTransitionFiles(directory: string, permittedClaimName?: string): IV07AlignedV2OrchestratorEvent[] {
     const transitionsDirectory = join(directory, "transitions");
     requireDirectory(transitionsDirectory, "aligned v2 transitions");
-    const entries = readdirSync(transitionsDirectory, { withFileTypes: true }).sort((left, right) =>
-        left.name.localeCompare(right.name),
-    );
+    let permittedClaimSeen = false;
+    const entries = readdirSync(transitionsDirectory, { withFileTypes: true })
+        .filter((entry) => {
+            if (entry.name !== permittedClaimName) return true;
+            if (!entry.isFile() || entry.isSymbolicLink()) {
+                throw new Error(`aligned v2 transition inventory contains unsafe entry ${entry.name}`);
+            }
+            permittedClaimSeen = true;
+            return false;
+        })
+        .sort((left, right) => left.name.localeCompare(right.name));
+    if (permittedClaimName && !permittedClaimSeen) {
+        throw new Error("aligned v2 incremental append lost its durable claim");
+    }
     const events: IV07AlignedV2OrchestratorEvent[] = [];
     for (const [index, entry] of entries.entries()) {
         const match = TRANSITION_PATTERN.exec(entry.name);
@@ -335,15 +417,16 @@ function readDefinition(directory: string): IV07AlignedV2OrchestratorDefinition 
     return validateV07AlignedV2OrchestratorDefinition(definition);
 }
 
-export function loadV07AlignedV2PersistedOrchestrator(
+function loadPersistedOrchestrator(
     directory: string,
     resolvers: IV07AlignedV2OrchestratorReplayResolvers,
     expectedDefinition?: IV07AlignedV2OrchestratorDefinition,
+    recoverTemporaryEntries = true,
 ): IV07AlignedV2PersistedOrchestrator {
     requireDirectory(directory, "aligned v2 orchestration root");
     requireDirectory(join(directory, "quarantine"), "aligned v2 quarantine");
     requireDirectory(join(directory, "transitions"), "aligned v2 transitions");
-    quarantineTemporaryEntries(directory);
+    if (recoverTemporaryEntries) quarantineTemporaryEntries(directory);
     const definition = readDefinition(directory);
     if (expectedDefinition && canonicalV07AlignedV2Json(definition) !== canonicalV07AlignedV2Json(expectedDefinition)) {
         throw new Error("aligned v2 orchestration directory belongs to a different immutable definition");
@@ -356,11 +439,10 @@ export function loadV07AlignedV2PersistedOrchestrator(
     const current = parseCanonicalJsonFile<IV07AlignedV2OrchestratorCurrent>(currentPath, "aligned v2 CURRENT");
     validateCurrentShape(current, definition);
     if (current.nextSequence > events.length) throw new Error("aligned v2 CURRENT points ahead of durable transitions");
-    const prefixState = deriveV07AlignedV2OrchestratorState(
-        definition,
-        events.slice(0, current.nextSequence),
-        resolvers,
-    );
+    const prefixState =
+        current.nextSequence === events.length
+            ? state
+            : deriveV07AlignedV2OrchestratorState(definition, events.slice(0, current.nextSequence), resolvers);
     const expectedAtPointer = makeCurrent(definition, prefixState);
     if (canonicalV07AlignedV2Json(current) !== canonicalV07AlignedV2Json(expectedAtPointer)) {
         throw new Error("aligned v2 CURRENT forks from its referenced durable transition prefix");
@@ -371,7 +453,7 @@ export function loadV07AlignedV2PersistedOrchestrator(
     }
     const terminal = ensureTerminalFile(directory, state.terminal);
     validateRootInventory(directory, state.terminal !== null);
-    return {
+    return trustLedger({
         directory,
         definition,
         events,
@@ -379,7 +461,19 @@ export function loadV07AlignedV2PersistedOrchestrator(
         current: expectedCurrent,
         terminalPath: terminal.path,
         reused: true,
-    };
+    });
+}
+
+/**
+ * Cold-recovery entrypoint. The external supervisor lifecycle must exclude an active writer:
+ * hidden append claims are abandoned-boundary evidence and are quarantined during this load.
+ */
+export function loadV07AlignedV2PersistedOrchestrator(
+    directory: string,
+    resolvers: IV07AlignedV2OrchestratorReplayResolvers,
+    expectedDefinition?: IV07AlignedV2OrchestratorDefinition,
+): IV07AlignedV2PersistedOrchestrator {
+    return loadPersistedOrchestrator(directory, resolvers, expectedDefinition);
 }
 
 function quarantineAbandonedInitializations(directory: string): void {
@@ -428,9 +522,10 @@ export function initializeV07AlignedV2OrchestratorPersistence(
     fsyncDirectory(parent);
     faultInjector?.afterDurableStep("init_parent_fsynced");
     const loaded = loadV07AlignedV2PersistedOrchestrator(directory, resolvers, definition);
-    return { ...loaded, reused: false };
+    return trustLedger({ ...loaded, reused: false });
 }
 
+/** Event-level append retained for callers already holding external single-writer ownership. */
 export function appendV07AlignedV2OrchestratorEvent(
     directory: string,
     definition: IV07AlignedV2OrchestratorDefinition,
@@ -438,34 +533,21 @@ export function appendV07AlignedV2OrchestratorEvent(
     resolvers: IV07AlignedV2OrchestratorReplayResolvers,
     faultInjector?: IV07AlignedV2OrchestratorPersistenceFaultInjector,
 ): IV07AlignedV2PersistedOrchestrator {
-    const loaded = loadV07AlignedV2PersistedOrchestrator(directory, resolvers, definition);
+    // A live claim must fail this append, not be mistaken for cold-start recovery debris.
+    const loaded = loadPersistedOrchestrator(directory, resolvers, definition, false);
     const existing = loaded.events[event.sequence];
     if (existing) {
         if (canonicalV07AlignedV2Json(existing) !== canonicalV07AlignedV2Json(event)) {
             throw new Error("aligned v2 immutable transition sequence already contains different content");
         }
-        return { ...loaded, reused: true };
+        return trustLedger({ ...loaded, reused: true });
     }
     if (event.sequence !== loaded.events.length) {
         throw new Error("aligned v2 transition append is not the exact next finite sequence");
     }
     const events = [...loaded.events, event];
-    requireReplayResolvers(events, resolvers);
-    const state = deriveV07AlignedV2OrchestratorState(definition, events, resolvers);
-    const transitionsDirectory = join(directory, "transitions");
-    const finalPath = join(transitionsDirectory, transitionFileName(event));
-    const tempPath = join(transitionsDirectory, `.${transitionFileName(event)}.tmp-${process.pid}-${tempSequence++}`);
-    writeDurableExclusive(tempPath, canonicalJsonFile(event));
-    faultInjector?.afterDurableStep("transition_temp_fsynced");
-    renameSync(tempPath, finalPath);
-    fsyncDirectory(transitionsDirectory);
-    faultInjector?.afterDurableStep("transition_published");
-    writeAtomicReplacement(join(directory, "CURRENT"), canonicalJsonFile(makeCurrent(definition, state)));
-    faultInjector?.afterDurableStep("current_published");
-    const terminal = ensureTerminalFile(directory, state.terminal);
-    if (terminal.published) faultInjector?.afterDurableStep("terminal_published");
-    const reloaded = loadV07AlignedV2PersistedOrchestrator(directory, resolvers, definition);
-    return { ...reloaded, reused: false };
+    const state = deriveV07AlignedV2OrchestratorState(definition, events);
+    return persistAppendedEventFromLoaded(loaded, definition, event, state, resolvers, faultInjector);
 }
 
 export function applyAndPersistV07AlignedV2OrchestratorCommand(
@@ -486,4 +568,132 @@ export function applyAndPersistV07AlignedV2OrchestratorCommand(
         faultInjector,
     );
     return { orchestration, command: result };
+}
+
+function assertLoadedOrchestratorMatchesDurableHead(
+    loaded: IV07AlignedV2PersistedOrchestrator,
+    definition: IV07AlignedV2OrchestratorDefinition,
+    permittedClaimName?: string,
+): void {
+    if (
+        canonicalV07AlignedV2Json(loaded.definition) !== canonicalV07AlignedV2Json(definition) ||
+        loaded.directory === ""
+    ) {
+        throw new Error("aligned v2 incremental append received a different loaded definition or directory");
+    }
+    requireDirectory(loaded.directory, "aligned v2 incremental orchestration root");
+    requireDirectory(join(loaded.directory, "quarantine"), "aligned v2 incremental quarantine");
+    requireDirectory(join(loaded.directory, "transitions"), "aligned v2 incremental transitions");
+    const durableDefinition = readDefinition(loaded.directory);
+    if (canonicalV07AlignedV2Json(durableDefinition) !== canonicalV07AlignedV2Json(definition)) {
+        throw new Error("aligned v2 incremental append definition changed after the loaded replay");
+    }
+    const durableEvents = loadTransitionFiles(loaded.directory, permittedClaimName);
+    if (canonicalV07AlignedV2Json(durableEvents) !== canonicalV07AlignedV2Json(loaded.events)) {
+        throw new Error("aligned v2 incremental append transition head changed after the loaded replay");
+    }
+    const structuralState = deriveV07AlignedV2OrchestratorState(definition, durableEvents);
+    if (canonicalV07AlignedV2Json(structuralState) !== canonicalV07AlignedV2Json(loaded.state)) {
+        throw new Error("aligned v2 incremental append loaded state does not match its transition head");
+    }
+    const current = parseCanonicalJsonFile<IV07AlignedV2OrchestratorCurrent>(
+        join(loaded.directory, "CURRENT"),
+        "aligned v2 incremental CURRENT",
+    );
+    validateCurrentShape(current, definition);
+    if (
+        canonicalV07AlignedV2Json(current) !== canonicalV07AlignedV2Json(loaded.current) ||
+        canonicalV07AlignedV2Json(current) !== canonicalV07AlignedV2Json(makeCurrent(definition, structuralState))
+    ) {
+        throw new Error("aligned v2 incremental append CURRENT changed after the loaded replay");
+    }
+    const terminalPath = join(loaded.directory, "TERMINAL.json");
+    if (!loaded.state.terminal) {
+        if (loaded.terminalPath !== null || existsSync(terminalPath)) {
+            throw new Error("aligned v2 incremental append terminal changed after the loaded replay");
+        }
+    } else {
+        if (loaded.terminalPath !== terminalPath || !existsSync(terminalPath)) {
+            throw new Error("aligned v2 incremental append terminal changed after the loaded replay");
+        }
+        const terminal = parseCanonicalJsonFile<IV07AlignedV2OrchestratorTerminal>(
+            terminalPath,
+            "aligned v2 incremental TERMINAL.json",
+        );
+        if (canonicalV07AlignedV2Json(terminal) !== canonicalV07AlignedV2Json(loaded.state.terminal)) {
+            throw new Error("aligned v2 incremental append terminal changed after the loaded replay");
+        }
+    }
+    validateRootInventory(loaded.directory, loaded.state.terminal !== null);
+}
+
+function persistAppendedEventFromLoaded(
+    loaded: IV07AlignedV2PersistedOrchestrator,
+    definition: IV07AlignedV2OrchestratorDefinition,
+    event: IV07AlignedV2OrchestratorEvent,
+    state: IV07AlignedV2OrchestratorState,
+    resolvers: IV07AlignedV2OrchestratorReplayResolvers,
+    faultInjector?: IV07AlignedV2OrchestratorPersistenceFaultInjector,
+): IV07AlignedV2PersistedOrchestrator {
+    requireTrustedLedger(loaded);
+    const claimPath = acquireIncrementalAppendClaim(loaded.directory, definition, event);
+    faultInjector?.afterDurableStep("append_claim_fsynced");
+    assertLoadedOrchestratorMatchesDurableHead(loaded, definition, basename(claimPath));
+    validateV07AlignedV2AppendedEventEvidence(definition, state, event, resolvers);
+    const transitionsDirectory = join(loaded.directory, "transitions");
+    const finalPath = join(transitionsDirectory, transitionFileName(event));
+    const tempPath = join(transitionsDirectory, `.${transitionFileName(event)}.tmp-${process.pid}-${tempSequence++}`);
+    writeDurableExclusive(tempPath, canonicalJsonFile(event));
+    faultInjector?.afterDurableStep("transition_temp_fsynced");
+    renameSync(tempPath, finalPath);
+    fsyncDirectory(transitionsDirectory);
+    faultInjector?.afterDurableStep("transition_published");
+    const current = makeCurrent(definition, state);
+    writeAtomicReplacement(join(loaded.directory, "CURRENT"), canonicalJsonFile(current));
+    faultInjector?.afterDurableStep("current_published");
+    releaseIncrementalAppendClaim(claimPath);
+    faultInjector?.afterDurableStep("append_claim_released");
+    const terminal = ensureTerminalFile(loaded.directory, state.terminal);
+    if (terminal.published) faultInjector?.afterDurableStep("terminal_published");
+    validateRootInventory(loaded.directory, state.terminal !== null);
+    return trustLedger({
+        directory: loaded.directory,
+        definition,
+        events: [...loaded.events, event],
+        state,
+        current,
+        terminalPath: terminal.path,
+        reused: false,
+    });
+}
+
+/**
+ * Append from one already strict-replayed ledger without revalidating historical shard evidence.
+ * The external supervisor lifecycle must provide single-writer ownership. A fresh process must
+ * still enter through loadV07AlignedV2PersistedOrchestrator before starting that owned writer.
+ */
+export function applyAndPersistV07AlignedV2OrchestratorCommandFromLoaded(
+    loaded: IV07AlignedV2PersistedOrchestrator,
+    definition: IV07AlignedV2OrchestratorDefinition,
+    command: IV07AlignedV2OrchestratorCommand,
+    resolvers: IV07AlignedV2OrchestratorReplayResolvers,
+    faultInjector?: IV07AlignedV2OrchestratorPersistenceFaultInjector,
+): IV07AlignedV2PersistedOrchestratorApplyResult {
+    requireTrustedLedger(loaded);
+    assertLoadedOrchestratorMatchesDurableHead(loaded, definition);
+    const result = applyV07AlignedV2OrchestratorCommand(definition, loaded.events, command);
+    if (!result.appended) {
+        return { orchestration: trustLedger({ ...loaded, reused: true }), command: result };
+    }
+    return {
+        orchestration: persistAppendedEventFromLoaded(
+            loaded,
+            definition,
+            result.appended,
+            result.state,
+            resolvers,
+            faultInjector,
+        ),
+        command: result,
+    };
 }

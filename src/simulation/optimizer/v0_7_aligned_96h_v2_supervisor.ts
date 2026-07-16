@@ -176,7 +176,7 @@ export interface IV07AlignedV2SupervisorDependencies {
         resetBaseline: boolean;
     }): Promise<IV07AlignedV2HostAssessment>;
     spawnOptimizer(attempt: number, ownerToken: string): Promise<IV07AlignedV2OptimizerHandle>;
-    validateTerminal(): IV07AlignedV2OrchestratorTerminal | null;
+    validateTerminal(onReplayProgress: () => void): IV07AlignedV2OrchestratorTerminal | null;
     readRunnerHeartbeat(): IV07AlignedV2RunnerHeartbeat | null;
     log(message: string): void;
 }
@@ -1232,6 +1232,7 @@ export async function runV07AlignedV2Supervisor(
     const supervisorHeartbeatPath = markerPath(config, "supervisor.heartbeat.json");
     const optimizerPidPath = markerPath(config, "optimizer.pid.json");
     let supervisorSequence = heartbeatSequence(supervisorHeartbeatPath, config.runFingerprint);
+    let lastSupervisorHeartbeatAtMs = dependencies.clock.nowMs();
     let attempt = 0;
     let child: IV07AlignedV2OptimizerHandle | null = null;
     let ownerToken = "";
@@ -1246,6 +1247,7 @@ export async function runV07AlignedV2Supervisor(
         detail,
     });
     const heartbeat = (state: string): void => {
+        const updatedAtMs = dependencies.clock.nowMs();
         writeHeartbeat(supervisorHeartbeatPath, {
             schemaVersion: 1,
             artifactKind: "v0_7_aligned_96h_v2_supervisor_heartbeat",
@@ -1256,8 +1258,9 @@ export async function runV07AlignedV2Supervisor(
             attempt,
             state,
             deadlineAtMs: config.deadlineAtMs,
-            updatedAtMs: dependencies.clock.nowMs(),
+            updatedAtMs,
         });
+        lastSupervisorHeartbeatAtMs = updatedAtMs;
     };
     const permanent = (): IV07AlignedV2SupervisorOutcome | null => {
         if (pathEntryExists(quarantinePath)) {
@@ -1313,7 +1316,13 @@ export async function runV07AlignedV2Supervisor(
             throw new Error("pinned-main/Bun/dependency provenance changed during the supervised run");
         }
     };
-    const terminal = (): IV07AlignedV2OrchestratorTerminal | null => dependencies.validateTerminal();
+    const terminal = (): IV07AlignedV2OrchestratorTerminal | null =>
+        dependencies.validateTerminal(() => {
+            const nowMs = dependencies.clock.nowMs();
+            if (nowMs - lastSupervisorHeartbeatAtMs >= config.heartbeatIntervalMs) {
+                heartbeat("terminal-replay");
+            }
+        });
     const acceptReplayValidTerminal = async (): Promise<IV07AlignedV2SupervisorOutcome | null> => {
         try {
             const foundTerminal = terminal();
@@ -1701,7 +1710,11 @@ export async function runV07AlignedV2Supervisor(
     try {
         await stableInputs();
         const existingTerminal = terminal();
-        if (existingTerminal) return outcome("terminal", `validated ${existingTerminal.verdict} terminal`);
+        if (existingTerminal) {
+            await stableInputs();
+            heartbeat("terminal");
+            return outcome("terminal", `validated ${existingTerminal.verdict} terminal`);
+        }
     } catch (error) {
         return mark("invalid", "startup-validation-failed", String(error));
     }
@@ -3261,9 +3274,11 @@ async function main(): Promise<void> {
     const optimizerLog = join(outputDirectory, "optimizer.log");
     const orchestratorDirectory = join(outputDirectory, "orchestrator");
     const optimizerHome = join(outputDirectory, ".optimizer-home");
+    let reportTerminalReplayProgress = (): void => undefined;
     const replayResolvers = createV07AlignedV2FilesystemReplayResolvers({
         artifactRoot: outputDirectory,
         definition,
+        onEvidenceShardVerified: () => reportTerminalReplayProgress(),
     });
     const verifyImmutableInputs = (): void => {
         const currentDefinitionRaw = readFileSync(definitionPath);
@@ -3415,7 +3430,14 @@ async function main(): Promise<void> {
                 closeSync(logDescriptor);
             }
         },
-        validateTerminal: () => validateV07AlignedV2TerminalReplay(orchestratorDirectory, definition, replayResolvers),
+        validateTerminal: (onReplayProgress) => {
+            reportTerminalReplayProgress = onReplayProgress;
+            try {
+                return validateV07AlignedV2TerminalReplay(orchestratorDirectory, definition, replayResolvers);
+            } finally {
+                reportTerminalReplayProgress = (): void => undefined;
+            }
+        },
         readRunnerHeartbeat: () => {
             const path = join(outputDirectory, "runner.heartbeat.json");
             if (!pathEntryExists(path)) return null;
