@@ -47,7 +47,9 @@ import {
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
 
-const WORKER_TERMINATION_TIMEOUT_MS = 10_000;
+// Bun can serialize teardown when all 40 production workers finish together on Zinc.
+// Keep cleanup bounded, but include that host-observed tail in the measured batch time.
+const WORKER_TERMINATION_TIMEOUT_MS = 60_000;
 
 export interface IV07AlignedV2WorkerAttestation {
     workerIndex: number;
