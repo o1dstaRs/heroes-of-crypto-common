@@ -632,14 +632,39 @@ export function auditPureRangedTerminalSeedRoots(
 ): IPureRangedTerminalSeedAudit {
     const existingRoots = roots.map((root) => resolve(root)).filter(existsSync);
     if (!existingRoots.length) throw new Error("Pure-ranged terminal seed audit has no existing roots");
-    const args = ["-o", "--no-filename", "--hidden"];
-    for (const pattern of ["!**/.git/**", "!**/node_modules/**", "!**/dist/**"]) args.push("--glob", pattern);
-    for (const name of OWNED_PROTOCOL_BASENAMES) args.push("--glob", `!**/${name}`);
-    args.push("[0-9]{7,10}", ...existingRoots);
-    const result = spawnSync("rg", args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
+    const hasRipgrep = spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
+    const command = hasRipgrep ? "rg" : "grep";
+    const args = hasRipgrep
+        ? [
+              "-o",
+              "--no-filename",
+              "--hidden",
+              "--glob",
+              "!**/.git/**",
+              "--glob",
+              "!**/node_modules/**",
+              "--glob",
+              "!**/dist/**",
+              ...[...OWNED_PROTOCOL_BASENAMES].flatMap((name) => ["--glob", `!**/${name}`]),
+              "[0-9]{7,10}",
+              ...existingRoots,
+          ]
+        : [
+              "-r",
+              "-h",
+              "-o",
+              "-E",
+              "--exclude-dir=.git",
+              "--exclude-dir=node_modules",
+              "--exclude-dir=dist",
+              ...[...OWNED_PROTOCOL_BASENAMES].map((name) => `--exclude=${name}`),
+              "[0-9]{7,10}",
+              ...existingRoots,
+          ];
+    const result = spawnSync(command, args, { encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
     if (result.error) throw result.error;
     if (result.status !== 0 && result.status !== 1) {
-        throw new Error(`Pure-ranged terminal seed audit failed (${result.status}): ${result.stderr}`);
+        throw new Error(`Pure-ranged terminal seed audit ${command} failed (${result.status}): ${result.stderr}`);
     }
     const tokens = result.stdout.split(/\s+/).filter(Boolean).map(Number).filter(Number.isSafeInteger);
     const collisions = findPureRangedTerminalSeedCollisions(manifest, tokens);
