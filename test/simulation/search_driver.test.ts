@@ -76,6 +76,10 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_INCLUDE_MOVES",
+    "SEARCH_MAX_MOVES",
+    "SEARCH_MAX_MELEE",
+    "SEARCH_MAX_SHOTS",
+    "SEARCH_MAX_THROWS",
     "SEARCH_OPP_MODEL",
     "V07_VALUE_WEIGHTS",
     "V07_VALUE_WEIGHTS_V2",
@@ -379,6 +383,13 @@ function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrate
 }
 
 describe("search driver — gating, hygiene, determinism", () => {
+    const stableSnapshot = (harness: Harness): unknown => {
+        const snapshot = normalize(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)) as {
+            fight?: { id?: string };
+        };
+        if (snapshot.fight) snapshot.fight.id = "<fight-id>";
+        return snapshot;
+    };
     const captureCandidates = (
         driver: SearchDriver,
         consumer: "search" | "ablate" = "search",
@@ -883,6 +894,51 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(chooseFresh()).toBe(chooseFresh());
     });
 
+    it("keeps a seeded unsearched policy state and decision byte-identical when IL knobs are ignored", () => {
+        const capture = (withIgnoredIlKnob: boolean): string => {
+            setEnv(withIgnoredIlKnob ? { SEARCH_IL_DATASET: "/tmp/ignored-il-v3.jsonl" } : {});
+            const h = buildBattle(0x1a17, "v0.6");
+            h.playTurns(12);
+            return JSON.stringify({
+                state: stableSnapshot(h),
+                decision: h.decideActive(),
+            });
+        };
+
+        expect(capture(true)).toBe(capture(false));
+    });
+
+    it("keeps a seeded searched decision byte-identical with v3 IL collection on or off", () => {
+        const dir = mkdtempSync(join(tmpdir(), "ild-identity-"));
+        const capture = (withIl: boolean): string => {
+            setEnv({
+                V07_SEARCH: "1",
+                SEARCH_VERSIONS: "v0.6",
+                SEARCH_ROLLOUTS: "1",
+                SEARCH_HORIZON: "2",
+                SEARCH_GATE: "0",
+                SEARCH_SHORTLIST: "2",
+                ...(withIl
+                    ? {
+                          SEARCH_IL_DATASET: join(dir, "rows.jsonl"),
+                          SEARCH_IL_RUN_FINGERPRINT: "e".repeat(64),
+                          SEARCH_IL_COHORT: "identity",
+                      }
+                    : {}),
+            });
+            const h = buildBattle(0x1a18, "v0.6");
+            h.playTurns(8);
+            const unit = h.activeUnit()!;
+            const incumbent = h.decideActive();
+            const before = stableSnapshot(h);
+            const chosen = h.makeDriver().chooseDecision(unit, "v0.6", incumbent);
+            const after = stableSnapshot(h);
+            return JSON.stringify({ incumbent, chosen, before, after });
+        };
+
+        expect(capture(true)).toBe(capture(false));
+    });
+
     it("restores battle and damage state when a rollout throws after mutating the engine", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_HORIZON: "2" });
         const h = buildBattle(909, "v0.6");
@@ -1280,12 +1336,7 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         driver.onMatchEnd("green", "elimination");
         const lines = readFileSync(ilPath, "utf8").trim().split("\n");
         expect(lines).toHaveLength(2);
-        const row = parseIlRow(
-            JSON.parse(lines[0]),
-            WAIT_FEATURE_NAMES.length,
-            VALUE_FEATURE_NAMES_V2.length,
-            fingerprint,
-        );
+        const row = parseIlRow(JSON.parse(lines[0]), fingerprint);
         const game = parseIlGameRow(JSON.parse(lines[1]), fingerprint);
         expect(row.seed).toBe(2040);
         expect(row.cohort).toBe("smoke");
@@ -1294,12 +1345,32 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
         expect(row.k).toBe(classifyActions(incumbent));
         expect(row.cands[0].kind).toBe("incumbent");
         expect(row.cands[0].sig).toBe(ilActionSignature(incumbent));
+        expect(row.vf).toHaveLength(VALUE_FEATURE_NAMES_V2.length);
+        expect(row.cands.every((candidate) => candidate.af.length > 40)).toBe(true);
+        expect(row.cands.every((candidate) => candidate.ck === candidate.am.family)).toBe(true);
         // The dumped chosen index resolves to the exact turn the driver returned to the battle loop.
         expect(row.cands[row.chosen].sig).toBe(ilActionSignature(decided));
         expect(row.act.length).toBeGreaterThan(0);
         expect(row.cands).toHaveLength(2);
         expect(row.nc).toBeGreaterThanOrEqual(row.cands.length);
-        expect(row.cfg).toMatchObject({ gate: 0, horizon: 2, rollouts: 1, leaf: "learned", shortlist: 2 });
+        expect(row.cfg).toEqual({
+            gate: 0,
+            horizon: 2,
+            rollouts: 1,
+            leaf: "learned",
+            shortlist: 2,
+            includeMoves: 0,
+            activeChallengers: 0,
+            oppModel: null,
+            decisionDeadlineMs: null,
+            circuitBreakerMs: null,
+            caps: {
+                maxMoveDestinations: 1,
+                maxMeleePairs: 8,
+                maxShotAims: 6,
+                maxAreaThrowCells: 4,
+            },
+        });
         // The incumbent's mean leaf is comparable (finite) unless it was illegal in simulation.
         expect(row.cands.some((c) => c.m !== null)).toBe(true);
         expect(game).toMatchObject({
@@ -1310,7 +1381,18 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
             deadlineFallbacks: 0,
             circuitOpened: 0,
             circuitSkipped: 0,
-            cfg: { shortlist: 2 },
+            cfg: {
+                shortlist: 2,
+                activeChallengers: 0,
+                decisionDeadlineMs: null,
+                circuitBreakerMs: null,
+                caps: {
+                    maxMoveDestinations: 1,
+                    maxMeleePairs: 8,
+                    maxShotAims: 6,
+                    maxAreaThrowCells: 4,
+                },
+            },
         });
 
         setEnv({

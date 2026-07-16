@@ -27,6 +27,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { ilCandidateActionEncoding } from "../../src/simulation/il_action_features";
 import {
     IL_CANDIDATE_FEATURE_NAMES,
     ilActionSignature,
@@ -165,6 +166,13 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         // Distinct stand cells enumerated (target x stand-cell pairs, not just one per target).
         const stands = new Set(melee.map((m) => `${m.standCell!.x},${m.standCell!.y}`));
         expect(stands.size).toBe(melee.length);
+
+        const anchor = enumerateCandidates(unit, ctxFor(c), moveStrike.actions, {
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(anchor.actions).toBe(moveStrike.actions);
+        expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(moveStrike.features));
+        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(moveStrike, LOWER));
     });
 
     it("moves: every reachable destination; capped enumeration reports truncation", () => {
@@ -292,6 +300,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(anchor.features.expectedKill).toBe(generated.features.expectedKill);
         expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(generated.features));
         expect(ilCandidateFeatureVector(anchor.features)).toHaveLength(IL_CANDIDATE_FEATURE_NAMES.length);
+        expect(Object.keys(anchor).sort()).toEqual(["actions", "features", "kind", "shotFeatures", "targetId"]);
+        const explicitOff = enumerateCandidates(shooter, ctxFor(c, true), incumbent, {
+            enrichIncumbentMetadata: false,
+        }).candidates[0];
+        expect(explicitOff).toEqual(anchor);
+        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(generated, LOWER));
 
         // Candidate 0 keeps the exact action identity and the generator does not emit it again as a challenger.
         const signatures = candidates.map((candidate) => ilActionSignature(candidate.actions));
@@ -358,6 +372,13 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(cluster).toBeDefined();
         const maxDamage = Math.max(...throws.map((t) => t.features.expectedDamage));
         expect(cluster!.features.expectedDamage).toBe(maxDamage);
+        const anchor = enumerateCandidates(garg, ctxFor(c), cluster!.actions, {
+            enrichIncumbentMetadata: true,
+            maxAreaThrowCells: 1,
+        }).candidates[0];
+        expect(anchor.actions).toBe(cluster!.actions);
+        expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(cluster!.features));
+        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(cluster!, LOWER));
         // Gargantuan also gets plain ranged shots (it is a shooter).
         expect(ofKind(candidates, "shot").length).toBeGreaterThan(0);
     });
@@ -478,6 +499,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         // Opportunity cost: the cast burns the Angel's own on-death auto-res charge.
         expect(res[0].features.burnsResurrectionCharge).toBe(1);
         expect(res[0].features.spendsSpellCharge).toBe(1);
+        const anchor = enumerateCandidates(angel, ctxFor(c), res[0].actions, {
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(anchor.actions).toBe(res[0].actions);
+        expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(res[0].features));
+        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(res[0], LOWER));
         // And the MELEE_MAGIC Angel still gets melee/move candidates alongside the cast.
         expect(ofKind(candidates, "move").length).toBeGreaterThan(0);
 

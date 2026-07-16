@@ -164,6 +164,12 @@ export interface IEnumerateOptions {
     maxShotAims?: number;
     /** Cap on area-throw target cells, kept by expected damage (0/undefined = all relevant). */
     maxAreaThrowCells?: number;
+    /**
+     * Dataset-only metadata enrichment for candidate 0. When its exact action is rediscovered by the
+     * generator, copy the generated candidate's observations onto the incumbent anchor. Default false;
+     * actions, ordering, deduplication, caps, and live scoring are unchanged.
+     */
+    enrichIncumbentMetadata?: boolean;
 }
 
 export interface ICandidateSet {
@@ -355,7 +361,7 @@ class CandidateGenerator {
     private push(cand: IEnumeratedCandidate): boolean {
         const sig = this.signature(cand.actions);
         if (this.seen.has(sig)) {
-            this.enrichIncumbentShot(cand, sig);
+            this.enrichIncumbentCandidate(cand, sig);
             return false;
         }
         this.seen.add(sig);
@@ -364,24 +370,32 @@ class CandidateGenerator {
     }
     /**
      * Candidate 0 is intentionally retained when enumeration rediscovers the incumbent action. A duplicate
-     * generated shot nevertheless has information the raw incumbent action list cannot carry, so copy that
-     * observation onto the anchor without changing its kind, actions, identity, or position.
+     * generated candidate nevertheless has information the raw incumbent action list cannot carry, so copy
+     * that observation onto the anchor without changing its kind, actions, identity, or position. Shot
+     * enrichment predates IL v3 and remains unconditional; other classes are dataset-only and opt-in.
      */
-    private enrichIncumbentShot(cand: IEnumeratedCandidate, sig = this.signature(cand.actions)): void {
+    private enrichIncumbentCandidate(cand: IEnumeratedCandidate, sig = this.signature(cand.actions)): void {
         const incumbent = this.candidates[0];
-        if (
-            cand.kind !== "shot" ||
-            !incumbent ||
-            incumbent.kind !== "incumbent" ||
-            this.signature(incumbent.actions) !== sig
-        ) {
+        if (!incumbent || incumbent.kind !== "incumbent" || this.signature(incumbent.actions) !== sig) {
+            return;
+        }
+        if (!this.options.enrichIncumbentMetadata) {
+            if (cand.kind === "shot") {
+                // Preserve the historical shot-only enrichment object shape and assignments exactly.
+                incumbent.targetId = cand.targetId;
+                incumbent.shotFeatures = cand.shotFeatures;
+                incumbent.features.spendsRangeShot = cand.features.spendsRangeShot;
+                incumbent.features.expectedDamage = cand.features.expectedDamage;
+                incumbent.features.expectedKill = cand.features.expectedKill;
+            }
             return;
         }
         incumbent.targetId = cand.targetId;
+        incumbent.spellName = cand.spellName;
+        incumbent.targetCell = cand.targetCell ? { ...cand.targetCell } : undefined;
+        incumbent.standCell = cand.standCell ? { ...cand.standCell } : undefined;
         incumbent.shotFeatures = cand.shotFeatures;
-        incumbent.features.spendsRangeShot = cand.features.spendsRangeShot;
-        incumbent.features.expectedDamage = cand.features.expectedDamage;
-        incumbent.features.expectedKill = cand.features.expectedKill;
+        incumbent.features = { ...cand.features };
     }
     // ---- wait / defend ---------------------------------------------------------------------------
     /** Hourglass — mirrors GameActionEngine.canWaitOnHourglass exactly. */
@@ -499,13 +513,17 @@ class CandidateGenerator {
             kept = [...routes].sort((a, b) => dist(a.cell) - dist(b.cell)).slice(0, cap);
             this.truncated.push("move");
         }
+        const candidateOf = (route: IWeightedRoute): IEnumeratedCandidate => ({
+            kind: "move",
+            actions: [this.moveAction(route)],
+            targetCell: { x: route.cell.x, y: route.cell.y },
+            features: this.features(),
+        });
+        if (this.options.enrichIncumbentMetadata) {
+            for (const route of routes) this.enrichIncumbentCandidate(candidateOf(route));
+        }
         for (const route of kept) {
-            this.push({
-                kind: "move",
-                actions: [this.moveAction(route)],
-                targetCell: { x: route.cell.x, y: route.cell.y },
-                features: this.features(),
-            });
+            this.push(candidateOf(route));
         }
     }
     // ---- melee -------------------------------------------------------------------------------------
@@ -600,7 +618,7 @@ class CandidateGenerator {
             kept = [...pairs].sort((a, b) => b.effective - a.effective).slice(0, cap);
             this.truncated.push("melee");
         }
-        for (const p of kept) {
+        const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
             const actions: GameAction[] = [...prefix];
             // Move-and-strike is emitted as a SEPARATE move_unit + stationary melee_attack — the pattern
             // v0.5 measured ~+2.5pp over folding the path into the melee_attack (the standalone move runs
@@ -614,13 +632,19 @@ class CandidateGenerator {
                 targetId: p.target.getId(),
                 attackFrom: { x: p.cell.x, y: p.cell.y },
             });
-            this.push({
+            return {
                 kind: "melee",
                 actions,
                 targetId: p.target.getId(),
                 standCell: { x: p.cell.x, y: p.cell.y },
                 features: this.features({ expectedDamage: p.effective, expectedKill: p.kill }),
-            });
+            };
+        };
+        if (this.options.enrichIncumbentMetadata) {
+            for (const pair of pairs) this.enrichIncumbentCandidate(candidateOf(pair));
+        }
+        for (const p of kept) {
+            this.push(candidateOf(p));
         }
     }
     // ---- ranged shots --------------------------------------------------------------------------------
@@ -885,7 +909,7 @@ class CandidateGenerator {
         // observation of candidate 0's exact shot.
         for (const s of found) {
             const candidate = candidateOf(s);
-            this.enrichIncumbentShot(candidate);
+            this.enrichIncumbentCandidate(candidate);
         }
         for (const s of kept) {
             this.push(candidateOf(s));
@@ -978,21 +1002,25 @@ class CandidateGenerator {
             kept = [...found].sort((a, b) => b.value - a.value).slice(0, cap);
             this.truncated.push("area_throw");
         }
+        const candidateOf = (t: IThrow): IEnumeratedCandidate => ({
+            kind: "area_throw",
+            actions: [
+                ...prefix,
+                {
+                    type: "area_throw_attack",
+                    attackerId: this.unit.getId(),
+                    targetCell: { x: t.aim.x, y: t.aim.y },
+                },
+            ],
+            targetId: t.primaryTargetId,
+            targetCell: { x: t.aim.x, y: t.aim.y },
+            features: this.features({ spendsRangeShot: 1, expectedDamage: t.value, expectedKill: t.kill }),
+        });
+        if (this.options.enrichIncumbentMetadata) {
+            for (const candidate of found) this.enrichIncumbentCandidate(candidateOf(candidate));
+        }
         for (const t of kept) {
-            this.push({
-                kind: "area_throw",
-                actions: [
-                    ...prefix,
-                    {
-                        type: "area_throw_attack",
-                        attackerId: this.unit.getId(),
-                        targetCell: { x: t.aim.x, y: t.aim.y },
-                    },
-                ],
-                targetId: t.primaryTargetId,
-                targetCell: { x: t.aim.x, y: t.aim.y },
-                features: this.features({ spendsRangeShot: 1, expectedDamage: t.value, expectedKill: t.kill }),
-            });
+            this.push(candidateOf(t));
         }
     }
     // ---- spells ----------------------------------------------------------------------------------

@@ -35,6 +35,7 @@ import { hashSimulationParts, makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
     IL_DATASET_VERSION,
+    IL_FEATURE_FINGERPRINTS,
     IL_GAME_ROW_TYPE,
     IL_ROW_TYPE,
     ilActionSignature,
@@ -42,6 +43,7 @@ import {
     requireIlRunFingerprint,
     type IIlSearchConfig,
 } from "./il_dataset";
+import { ilCandidateActionEncoding } from "./il_action_features";
 import type { ILookaheadDeps } from "./lookahead";
 import {
     canonicalPhaseBSeed,
@@ -147,11 +149,12 @@ import {
  * IMITATION-LEARNING DATASET (SEARCH_IL_DATASET=<jsonl path>, search mode only, default OFF): one line
  * per SEARCHED decision with the state feature vectors already computed elsewhere in the pipeline (the
  * 41-dim wait-scorer vector + the 60-dim deployed V2 value basis), the full scored candidate set (kind,
- * action class, semantic signature, F4 enumeration-time candidate features, mean rollout leaf value),
+ * action class, semantic signature, F4 enumeration-time features, canonical action metadata/features,
+ * mean rollout leaf value),
  * the index the search finally chose (0 = incumbent kept) and the chosen action list verbatim. Row
- * schema and downstream consumers (optimizer/extract_il.mjs -> optimizer/fit_il.mjs) live in
- * ./il_dataset.ts; buffered per game and appended once in onMatchEnd, like the audit. Decisions
- * abandoned by SEARCH_DECISION_DEADLINE_MS produce no row (no comparable scores exist for them).
+ * schema and the validation/extraction consumer (optimizer/extract_il.mjs) live in ./il_dataset.ts;
+ * v3 deliberately does not invoke or update the legacy fitter. Rows are buffered per game and appended
+ * once in onMatchEnd, like the audit. Decisions abandoned by SEARCH_DECISION_DEADLINE_MS produce no row.
  *
  * Q2 GATE-2 DATASET (Q2_DATASET=<jsonl path>, oracle mode only): one line per wait-eligible decision
  * point with the FULL wait-scorer feature vector (ai/versions/wait_scorer.ts WAIT_FEATURE_NAMES — the 20
@@ -599,7 +602,10 @@ export class SearchDriver {
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
             };
-            const set = enumerateCandidates(unit, context, incumbent, this.caps);
+            const set = enumerateCandidates(unit, context, incumbent, {
+                ...this.caps,
+                enrichIncumbentMetadata: this.ilPath !== undefined,
+            });
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
                 if (!this.includeMoves && candidate.kind === "move") return false;
@@ -637,6 +643,7 @@ export class SearchDriver {
                 t: IL_GAME_ROW_TYPE,
                 v: IL_DATASET_VERSION,
                 runFingerprint: this.ilRunFingerprint!,
+                featureFingerprints: IL_FEATURE_FINGERPRINTS,
                 cohort: this.ilCohort!,
                 seed: this.match.seed!,
                 green: this.match.greenVersion!,
@@ -839,13 +846,20 @@ export class SearchDriver {
                     act: scoredCandidates[chosenIdx].actions,
                     wf: ilState.wf.map((x) => Number(x.toFixed(5))),
                     vf: ilState.vf.map((x) => Number(x.toFixed(5))),
-                    cands: scoredCandidates.map((cand, i) => ({
-                        kind: cand.kind,
-                        ck: classifyActions(cand.actions),
-                        sig: ilActionSignature(cand.actions),
-                        cf: ilCandidateFeatureVector(cand.features).map((x) => Number(x.toFixed(4))),
-                        m: means[i] === -Infinity ? null : Number(means[i].toFixed(5)),
-                    })),
+                    featureFingerprints: IL_FEATURE_FINGERPRINTS,
+                    cands: scoredCandidates.map((cand, i) => {
+                        const encoding = ilCandidateActionEncoding(cand, unit.getTeam());
+                        return {
+                            kind: cand.kind,
+                            ck: classifyActions(cand.actions),
+                            sig: ilActionSignature(cand.actions),
+                            act: cand.actions,
+                            cf: ilCandidateFeatureVector(cand.features).map((x) => Number(x.toFixed(4))),
+                            am: encoding.metadata,
+                            af: encoding.features,
+                            m: means[i] === -Infinity ? null : Number(means[i].toFixed(5)),
+                        };
+                    }),
                     cfg: this.ilConfig(),
                 }),
             );
@@ -1005,7 +1019,11 @@ export class SearchDriver {
             leaf: this.leafKind(),
             shortlist: this.shortlist,
             includeMoves: this.includeMoves ? 1 : 0,
+            activeChallengers: this.activeChallengers ? 1 : 0,
             oppModel: this.oppModel?.version ?? null,
+            decisionDeadlineMs: this.decisionDeadlineMs,
+            circuitBreakerMs: this.circuitBreakerMs,
+            caps: { ...this.caps },
         };
     }
     /** Buffer one Q2 Gate-2 dataset row (Q2_DATASET, oracle mode) for this decision point. */

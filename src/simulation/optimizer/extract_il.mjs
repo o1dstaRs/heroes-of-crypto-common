@@ -1,12 +1,15 @@
-// SEARCH_IL_DATASET v2 dumps -> complete, provenance-bound fit rows.
+// SEARCH_IL_DATASET v3 dumps -> complete, provenance-bound extraction rows.
 //
-// Usage: bun src/simulation/optimizer/extract_il.mjs out=<rows.jsonl> fingerprint=<64hex>
+// Usage: bun src/simulation/optimizer/extract_il.mjs out=<rows.jsonl> fingerprint=<64hex> versions=<teacher>,<student>
 //        <cohort>=<dump.ild.jsonl> games.<cohort>=<n> base.<cohort>=<seed> [...]
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { WAIT_FEATURE_NAMES } from "../../ai/versions/wait_scorer";
-import { requireIlRunFingerprint, validateIlCorpus } from "../il_dataset";
-import { VALUE_FEATURE_NAMES_V2 } from "../value_features";
+import {
+    IL_FEATURE_FINGERPRINTS,
+    IL_MODEL_INPUT_CONTRACT,
+    requireIlRunFingerprint,
+    validateIlCorpus,
+} from "../il_dataset";
 import { deriveTeacherConfidence } from "./il_fit_core.mjs";
 
 const paths = new Map();
@@ -14,6 +17,7 @@ const expectedGames = new Map();
 const baseSeeds = new Map();
 let outPath = null;
 let runFingerprint = null;
+let versions = null;
 const put = (map, key, value, label) => {
     if (!key || map.has(key)) throw new Error(`Duplicate or empty ${label}: ${key}`);
     map.set(key, value);
@@ -30,6 +34,13 @@ for (const arg of process.argv.slice(2)) {
     } else if (key === "fingerprint") {
         if (runFingerprint) throw new Error("Duplicate fingerprint=");
         runFingerprint = requireIlRunFingerprint(value, "fingerprint");
+    } else if (key === "versions") {
+        if (versions) throw new Error("Duplicate versions=");
+        const parsed = value.split(",").map((version) => version.trim());
+        if (parsed.length !== 2 || parsed.some((version) => !version) || parsed[0] === parsed[1]) {
+            throw new Error("versions= requires exactly two distinct comma-separated strategy versions");
+        }
+        versions = parsed;
     } else if (key.startsWith("games.")) {
         put(expectedGames, key.slice("games.".length), Number(value), "games cohort");
     } else if (key.startsWith("base.")) {
@@ -38,9 +49,9 @@ for (const arg of process.argv.slice(2)) {
         put(paths, key, value, "dataset cohort");
     }
 }
-if (!outPath || !runFingerprint || !paths.size) {
+if (!outPath || !runFingerprint || !versions || !paths.size) {
     throw new Error(
-        "Usage: extract_il.mjs out=<rows.jsonl> fingerprint=<64hex> " +
+        "Usage: extract_il.mjs out=<rows.jsonl> fingerprint=<64hex> versions=<teacher>,<student> " +
             "<cohort>=<dump> games.<cohort>=<n> base.<cohort>=<seed> [...]",
     );
 }
@@ -53,8 +64,6 @@ for (const cohort of [...expectedGames.keys(), ...baseSeeds.keys()]) {
     if (!paths.has(cohort)) throw new Error(`${cohort}: count/seed metadata has no dataset path`);
 }
 
-const WF = WAIT_FEATURE_NAMES.length;
-const VF = VALUE_FEATURE_NAMES_V2.length;
 const quantile = (sorted, q) =>
     sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : null;
 const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(2)}%` : "n/a");
@@ -72,15 +81,14 @@ const pooled = {
     byIncClass: new Map(),
 };
 let sharedConfig = null;
-console.log(`extract_il v2: fingerprint=${runFingerprint} wf=${WF} vf=${VF}`);
+console.log(`extract_il v3: fingerprint=${runFingerprint} schema=${IL_FEATURE_FINGERPRINTS.schema}`);
 for (const [cohort, path] of paths) {
     const corpus = validateIlCorpus(readFileSync(path, "utf8").split("\n"), {
-        wfWidth: WF,
-        vfWidth: VF,
         runFingerprint,
         cohort,
         expectedGames: expectedGames.get(cohort),
         baseSeed: baseSeeds.get(cohort),
+        versions,
     });
     const config = JSON.stringify(corpus.config);
     if (sharedConfig !== null && sharedConfig !== config) throw new Error(`${cohort}: search configuration drifted`);
@@ -115,8 +123,9 @@ for (const [cohort, path] of paths) {
         outLines.push(
             JSON.stringify({
                 t: "ilx",
-                v: 2,
+                v: 3,
                 runFingerprint,
+                featureFingerprints: IL_FEATURE_FINGERPRINTS,
                 c: cohort,
                 s: row.seed,
                 side: row.side,
@@ -130,7 +139,14 @@ for (const [cohort, path] of paths) {
                 teacherWeight: teacher.weight,
                 teacherForced: teacher.forced ? 1 : 0,
                 wf: row.wf,
-                cands: row.cands.map((candidate) => ({ ck: candidate.ck, sig: candidate.sig, cf: candidate.cf })),
+                vf: row.vf,
+                cands: row.cands.map((candidate) => ({
+                    ck: candidate.ck,
+                    sig: candidate.sig,
+                    cf: candidate.cf,
+                    am: candidate.am,
+                    af: candidate.af,
+                })),
                 m: row.cands.map((candidate) => candidate.m),
             }),
         );
@@ -149,8 +165,11 @@ for (const [cohort, path] of paths) {
 
 const completion = JSON.stringify({
     t: "ilx_complete",
-    v: 2,
+    v: 3,
     runFingerprint,
+    featureFingerprints: IL_FEATURE_FINGERPRINTS,
+    modelInputContract: IL_MODEL_INPUT_CONTRACT,
+    versions,
     decisions: outLines.length,
     gamesByCohort,
     config: JSON.parse(sharedConfig),
