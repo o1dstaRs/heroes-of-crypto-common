@@ -120,7 +120,7 @@ export interface IPureRangedTerminalManifest {
         eligibleGamesMin: number;
         eligibleLeavesMin: number;
         nonzeroEligibleLeavesMin: number;
-        candidateActionHashChangedGamesMin: number;
+        causalCandidateActionHashChangedGamesMin: number;
         deadlineFallbacks: number;
         circuitOpenGameRateMax: number;
         searchedTurnLatencyP95MsMax: number;
@@ -129,7 +129,7 @@ export interface IPureRangedTerminalManifest {
         repeatEveryScoutGate: true;
         selectedDecisiveWinRate95LcbExclusiveMin: number;
         selectedDrawOrArmageddonRateMax: number;
-        eligibleRangedCandidateActionHashChangedGamesMin: number;
+        eligibleRangedCausalActionHashChangedGamesMin: number;
         ineligibleTemplateActionHashIdentity: string;
         ineligibleTemplates: PureRangedTerminalIdentityTemplate[];
     };
@@ -280,18 +280,24 @@ export interface IPureRangedTerminalComparison {
     candidate: IPureRangedTerminalArmMetrics;
     pairedScoreGain: IPureRangedTerminalEstimate;
     pairedDrawOrArmageddonDelta: IPureRangedTerminalEstimate;
+    /** Any changed candidate action stream, including changes on timing-contaminated games. */
     candidateActionHashChangedGames: number;
+    /** Changed candidate action streams on same-game nonzero leaf exposure with no timing fallback/circuit. */
+    causalCandidateActionHashChangedGames: number;
     gates: Record<string, boolean>;
     passed: boolean;
 }
 
-interface IPureRangedTerminalRawArmReport {
+export interface IPureRangedTerminalRawArmIdentity {
     id: string;
     phase: PureRangedTerminalPhase;
     weight: number;
     template: V07ArchetypeTemplateName;
     games: number;
     timingEnvelope: IPureRangedTerminalArm["timingEnvelope"];
+}
+
+interface IPureRangedTerminalRawArmReport extends IPureRangedTerminalRawArmIdentity {
     gamesPath: string;
     gamesBytes: number;
     gamesSha256: string;
@@ -356,6 +362,11 @@ interface IPureRangedTerminalValidatedGame {
     artifact: IPureRangedTerminalGameArtifact;
     audit: IPureRangedTerminalAuditDiagnostics;
     auditText: string;
+}
+
+interface IPureRangedTerminalValidatedRawEvidence {
+    report: IPureRangedTerminalRawReport;
+    rowsByArm: ReadonlyMap<string, readonly IPureRangedTerminalValidatedGame[]>;
 }
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -521,9 +532,9 @@ export function validatePureRangedTerminalManifest(manifest: IPureRangedTerminal
         scout.eligibleGamesMin !== 1 ||
         scout.eligibleLeavesMin !== 1 ||
         scout.nonzeroEligibleLeavesMin !== 1 ||
-        scout.candidateActionHashChangedGamesMin !== 1 ||
+        scout.causalCandidateActionHashChangedGamesMin !== 1 ||
         scout.deadlineFallbacks !== 0 ||
-        scout.circuitOpenGameRateMax !== 0.01 ||
+        scout.circuitOpenGameRateMax !== 0 ||
         scout.searchedTurnLatencyP95MsMax !== 200
     ) {
         throw new Error("Pure-ranged terminal scout gates drifted");
@@ -533,7 +544,7 @@ export function validatePureRangedTerminalManifest(manifest: IPureRangedTerminal
         !confirmation.repeatEveryScoutGate ||
         confirmation.selectedDecisiveWinRate95LcbExclusiveMin !== 0.5 ||
         confirmation.selectedDrawOrArmageddonRateMax !== 0.9 ||
-        confirmation.eligibleRangedCandidateActionHashChangedGamesMin !== 1 ||
+        confirmation.eligibleRangedCausalActionHashChangedGamesMin !== 1 ||
         stableJson(confirmation.ineligibleTemplates) !== stableJson(PURE_RANGED_TERMINAL_IDENTITY_TEMPLATES)
     ) {
         throw new Error("Pure-ranged terminal confirmation gates drifted");
@@ -1139,6 +1150,54 @@ function exactFileSet(path: string, games: number, suffix: string): void {
     }
 }
 
+function exactNamedEntries(path: string, expectedNames: readonly string[]): void {
+    const expected = new Set(expectedNames);
+    const actual = existsSync(path) ? readdirSync(path).filter((name) => !name.startsWith(".")) : [];
+    if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
+        throw new Error(
+            `${path}: expected exactly [${[...expected].sort().join(", ")}]; got [${actual.sort().join(", ")}]`,
+        );
+    }
+}
+
+function rawArmIdentity(arm: IPureRangedTerminalRawArmIdentity): IPureRangedTerminalRawArmIdentity {
+    return {
+        id: arm.id,
+        phase: arm.phase,
+        weight: arm.weight,
+        template: arm.template,
+        games: arm.games,
+        timingEnvelope: arm.timingEnvelope,
+    };
+}
+
+/** Reject a raw report whose registered arms, ordering, or total execution count differ from the phase plan. */
+export function validatePureRangedTerminalRawArmSet(
+    actual: readonly IPureRangedTerminalRawArmIdentity[],
+    expected: readonly IPureRangedTerminalRawArmIdentity[],
+    reportedGames: number,
+): void {
+    if (
+        stableJson(actual.map(rawArmIdentity)) !== stableJson(expected.map(rawArmIdentity)) ||
+        reportedGames !== expected.reduce((sum, arm) => sum + arm.games, 0)
+    ) {
+        throw new Error("Pure-ranged terminal raw report arm set/order/count drifted");
+    }
+}
+
+/** Reconstructed mutable raw evidence must be byte-identical to the hash-bound sealed concatenation. */
+export function assertPureRangedTerminalRawMatchesSealed(
+    label: string,
+    reconstructed: string,
+    sealed: string,
+    expectedBytes: number,
+    expectedSha256: string,
+): void {
+    if (reconstructed !== sealed || Buffer.byteLength(sealed) !== expectedBytes || sha256(sealed) !== expectedSha256) {
+        throw new Error(`${label}: mutable raw evidence does not match sealed bytes/hash`);
+    }
+}
+
 async function executeArm(
     runDir: string,
     arm: IPureRangedTerminalArm,
@@ -1326,21 +1385,80 @@ function validateRawMarker(
     phase: PureRangedTerminalPhase,
     run: IPureRangedTerminalRunManifest,
     manifest: IPureRangedTerminalManifest,
-): IPureRangedTerminalRawReport {
+    expectedArms: readonly IPureRangedTerminalArm[],
+): IPureRangedTerminalValidatedRawEvidence {
     const path = markerPath(manifest, runDir, phase);
     const marker = requireRecord(readJson(path), path);
-    const reportPath = resolve(runDir, String(marker.report));
+    const reportPath = join(runDir, `${phase}-raw-report.json`);
     const report = requireRecord(readJson(reportPath), reportPath) as unknown as IPureRangedTerminalRawReport;
     if (
+        marker.schemaVersion !== 1 ||
+        marker.kind !== `v0.7_pure_ranged_terminal_${phase}_raw_complete` ||
         marker.runFingerprint !== run.runFingerprint ||
+        marker.report !== relative(runDir, reportPath) ||
         marker.reportSha256 !== sha256(readFileSync(reportPath)) ||
+        report.schemaVersion !== 1 ||
+        report.kind !== "v0.7_pure_ranged_terminal_raw" ||
         report.phase !== phase ||
         report.runFingerprint !== run.runFingerprint ||
         report.protocolSha256 !== run.protocol.sha256 ||
         report.verdict !== "PASS" ||
+        !Array.isArray(report.arms) ||
         marker.sealedArmsSha256 !== sha256(stableJson(report.arms))
     ) {
         throw new Error(`${phase} raw completion marker failed validation`);
+    }
+    validatePureRangedTerminalRawArmSet(report.arms, expectedArms, report.games);
+    exactNamedEntries(
+        join(runDir, "raw", phase),
+        expectedArms.map(({ id }) => id),
+    );
+    exactNamedEntries(
+        join(runDir, "sealed", phase),
+        expectedArms.flatMap(({ id }) => [`${id}.games.jsonl`, `${id}.audit.jsonl`]),
+    );
+
+    const rowsByArm = new Map<string, readonly IPureRangedTerminalValidatedGame[]>();
+    for (let index = 0; index < expectedArms.length; index += 1) {
+        const expected = expectedArms[index];
+        const reported = report.arms[index];
+        const rawRoot = join(runDir, "raw", phase, expected.id);
+        const gamesPath = join(runDir, "sealed", phase, `${expected.id}.games.jsonl`);
+        const auditPath = join(runDir, "sealed", phase, `${expected.id}.audit.jsonl`);
+        if (reported.gamesPath !== relative(runDir, gamesPath) || reported.auditPath !== relative(runDir, auditPath)) {
+            throw new Error(`${phase}/${expected.id}: sealed artifact path drifted`);
+        }
+        exactNamedEntries(rawRoot, ["games", "audit"]);
+        exactFileSet(join(rawRoot, "games"), expected.games, ".json");
+        exactFileSet(join(rawRoot, "audit"), expected.games, ".jsonl");
+
+        let reconstructedGames = "";
+        let reconstructedAudit = "";
+        const rows: IPureRangedTerminalValidatedGame[] = [];
+        for (let game = 0; game < expected.games; game += 1) {
+            const validated = validateGameArtifact(runDir, expected, game, run.runFingerprint, manifest);
+            rows.push(validated);
+            reconstructedGames += `${JSON.stringify(validated.artifact)}\n`;
+            reconstructedAudit += validated.auditText.endsWith("\n") ? validated.auditText : `${validated.auditText}\n`;
+        }
+        assertPureRangedTerminalRawMatchesSealed(
+            `${phase}/${expected.id}/games`,
+            reconstructedGames,
+            readFileSync(gamesPath, "utf8"),
+            reported.gamesBytes,
+            reported.gamesSha256,
+        );
+        assertPureRangedTerminalRawMatchesSealed(
+            `${phase}/${expected.id}/audit`,
+            reconstructedAudit,
+            readFileSync(auditPath, "utf8"),
+            reported.auditBytes,
+            reported.auditSha256,
+        );
+        rowsByArm.set(expected.id, rows);
+    }
+    if (rowsByArm.size !== expectedArms.length) {
+        throw new Error(`${phase}: validated raw evidence arm count mismatch`);
     }
     for (const arm of report.arms) {
         const games = readFileSync(resolve(runDir, arm.gamesPath));
@@ -1354,7 +1472,7 @@ function validateRawMarker(
             throw new Error(`${phase}/${arm.id}: sealed artifact hash mismatch`);
         }
     }
-    return report;
+    return { report, rowsByArm };
 }
 
 /** Hash the exact pretty-printed report bytes bound by the raw completion marker. */
@@ -1463,14 +1581,34 @@ function armMetrics(
     };
 }
 
-function loadArm(
-    runDir: string,
+function evidenceArmRows(
+    evidence: IPureRangedTerminalValidatedRawEvidence,
     arm: IPureRangedTerminalArm,
-    run: IPureRangedTerminalRunManifest,
-    manifest: IPureRangedTerminalManifest,
 ): IPureRangedTerminalValidatedGame[] {
-    return Array.from({ length: arm.games }, (_, game) =>
-        validateGameArtifact(runDir, arm, game, run.runFingerprint, manifest),
+    const rows = evidence.rowsByArm.get(arm.id);
+    if (!rows || rows.length !== arm.games) throw new Error(`${arm.id}: validated evidence rows are missing`);
+    return [...rows];
+}
+
+export interface IPureRangedTerminalCausalActionEvidence {
+    candidateActionsSha256: string;
+    terminalNonzeroLeaves: number;
+    deadlineFallbacks: number;
+    circuitOpened: boolean;
+}
+
+/** A hash change is causal evidence only on the same game where the leaf fired and timing stayed clean. */
+export function isPureRangedTerminalCausalActionChange(
+    control: IPureRangedTerminalCausalActionEvidence,
+    candidate: IPureRangedTerminalCausalActionEvidence,
+): boolean {
+    return (
+        candidate.candidateActionsSha256 !== control.candidateActionsSha256 &&
+        candidate.terminalNonzeroLeaves > 0 &&
+        control.deadlineFallbacks === 0 &&
+        candidate.deadlineFallbacks === 0 &&
+        !control.circuitOpened &&
+        !candidate.circuitOpened
     );
 }
 
@@ -1508,6 +1646,23 @@ export function assessPureRangedTerminalComparison(
     const candidateActionHashChangedGames = candidateRows.filter(
         ({ artifact }, index) => artifact.candidateActionsSha256 !== controlRows[index].artifact.candidateActionsSha256,
     ).length;
+    const causalCandidateActionHashChangedGames = candidateRows.filter(({ artifact, audit }, index) => {
+        const control = controlRows[index];
+        return isPureRangedTerminalCausalActionChange(
+            {
+                candidateActionsSha256: control.artifact.candidateActionsSha256,
+                terminalNonzeroLeaves: control.audit.terminalNonzeroLeaves,
+                deadlineFallbacks: control.audit.deadlineFallbacks,
+                circuitOpened: control.audit.circuitOpened,
+            },
+            {
+                candidateActionsSha256: artifact.candidateActionsSha256,
+                terminalNonzeroLeaves: audit.terminalNonzeroLeaves,
+                deadlineFallbacks: audit.deadlineFallbacks,
+                circuitOpened: audit.circuitOpened,
+            },
+        );
+    }).length;
     const control = armMetrics(controlArm, controlRows);
     const candidate = armMetrics(candidateArm, candidateRows);
     const gate = manifest.scoutGates;
@@ -1528,7 +1683,8 @@ export function assessPureRangedTerminalComparison(
         eligibleGames: candidate.eligibleGames >= gate.eligibleGamesMin,
         eligibleLeaves: candidate.terminalLeaves >= gate.eligibleLeavesMin,
         nonzeroEligibleLeaves: candidate.terminalNonzeroLeaves >= gate.nonzeroEligibleLeavesMin,
-        changedCandidateActionHash: candidateActionHashChangedGames >= gate.candidateActionHashChangedGamesMin,
+        changedCandidateActionHash:
+            causalCandidateActionHashChangedGames >= gate.causalCandidateActionHashChangedGamesMin,
         zeroDeadlineFallbacks:
             control.deadlineFallbacks === gate.deadlineFallbacks &&
             candidate.deadlineFallbacks === gate.deadlineFallbacks,
@@ -1546,6 +1702,7 @@ export function assessPureRangedTerminalComparison(
         pairedScoreGain,
         pairedDrawOrArmageddonDelta,
         candidateActionHashChangedGames,
+        causalCandidateActionHashChangedGames,
         gates,
         passed: Object.values(gates).every(Boolean),
     };
@@ -1582,14 +1739,14 @@ function analyzeScout(
     arms: readonly IPureRangedTerminalArm[],
     run: IPureRangedTerminalRunManifest,
     manifest: IPureRangedTerminalManifest,
+    evidence: IPureRangedTerminalValidatedRawEvidence,
 ): IPureRangedTerminalScoutReport {
-    validateRawMarker(runDir, "scout", run, manifest);
     const controlArm = arms.find(({ weight }) => weight === 0)!;
-    const control = loadArm(runDir, controlArm, run, manifest);
+    const control = evidenceArmRows(evidence, controlArm);
     const comparisons = arms
         .filter(({ weight }) => weight > 0)
         .map((arm) =>
-            assessPureRangedTerminalComparison(manifest, control, loadArm(runDir, arm, run, manifest), controlArm, arm),
+            assessPureRangedTerminalComparison(manifest, control, evidenceArmRows(evidence, arm), controlArm, arm),
         );
     const selectedWeight = selectPureRangedTerminalWeight(comparisons);
     const verdict = selectedWeight === null ? "FAIL" : "PASS";
@@ -1638,19 +1795,17 @@ function readScoutSelection(
 }
 
 function identityChecks(
-    runDir: string,
     arms: readonly IPureRangedTerminalArm[],
-    run: IPureRangedTerminalRunManifest,
-    manifest: IPureRangedTerminalManifest,
     selectedWeight: number,
+    evidence: IPureRangedTerminalValidatedRawEvidence,
 ): IPureRangedTerminalIdentityCheck[] {
     return PURE_RANGED_TERMINAL_IDENTITY_TEMPLATES.map((template) => {
         const controlArm = arms.find(({ weight, template: candidate }) => weight === 0 && candidate === template)!;
         const selectedArm = arms.find(
             ({ weight, template: candidate }) => weight === selectedWeight && candidate === template,
         )!;
-        const control = loadArm(runDir, controlArm, run, manifest);
-        const selected = loadArm(runDir, selectedArm, run, manifest);
+        const control = evidenceArmRows(evidence, controlArm);
+        const selected = evidenceArmRows(evidence, selectedArm);
         return {
             template,
             games: selected.length,
@@ -1679,20 +1834,20 @@ function analyzeConfirmation(
     run: IPureRangedTerminalRunManifest,
     manifest: IPureRangedTerminalManifest,
     selectedWeight: number,
+    evidence: IPureRangedTerminalValidatedRawEvidence,
 ): IPureRangedTerminalConfirmationReport {
-    validateRawMarker(runDir, "confirmation", run, manifest);
     const controlArm = arms.find(({ weight, template }) => weight === 0 && template === PURE_RANGED_TERMINAL_TEMPLATE)!;
     const selectedArm = arms.find(
         ({ weight, template }) => weight === selectedWeight && template === PURE_RANGED_TERMINAL_TEMPLATE,
     )!;
     const comparison = assessPureRangedTerminalComparison(
         manifest,
-        loadArm(runDir, controlArm, run, manifest),
-        loadArm(runDir, selectedArm, run, manifest),
+        evidenceArmRows(evidence, controlArm),
+        evidenceArmRows(evidence, selectedArm),
         controlArm,
         selectedArm,
     );
-    const identities = identityChecks(runDir, arms, run, manifest, selectedWeight);
+    const identities = identityChecks(arms, selectedWeight, evidence);
     const gate = manifest.confirmationGates;
     const gates = {
         repeatedScoutGate: comparison.passed,
@@ -1701,7 +1856,7 @@ function analyzeConfirmation(
             gate.selectedDecisiveWinRate95LcbExclusiveMin,
         selectedAttritionCeiling: comparison.candidate.drawOrArmageddonRate <= gate.selectedDrawOrArmageddonRateMax,
         rangedActionChanged:
-            comparison.candidateActionHashChangedGames >= gate.eligibleRangedCandidateActionHashChangedGamesMin,
+            comparison.causalCandidateActionHashChangedGames >= gate.eligibleRangedCausalActionHashChangedGamesMin,
         ineligibleActionIdentity: identities.every(
             ({ exactActions, exactCandidateActions, exactOutcomes }) =>
                 exactActions && exactCandidateActions && exactOutcomes,
@@ -1747,18 +1902,17 @@ async function executePhase(
     const run = initializeRun(runDir, protocol, revision, manifest);
     const selectedWeight = phase === "confirmation" ? readScoutSelection(runDir, run, manifest) : null;
     const arms = phase === "scout" ? scoutArms(manifest) : confirmationArms(manifest, selectedWeight as number);
-    if (existsSync(markerPath(manifest, runDir, phase))) {
-        validateRawMarker(runDir, phase, run, manifest);
-    } else {
+    if (!existsSync(markerPath(manifest, runDir, phase))) {
         for (const arm of arms) await executeArm(runDir, arm, run, manifest, concurrency);
         sealRawPhase(runDir, arms, run, manifest);
     }
+    const evidence = validateRawMarker(runDir, phase, run, manifest, arms);
     const finalRevision = readCleanMainRevision();
     if (finalRevision.commit !== run.revision.commit) throw new Error("Source revision changed during trial phase");
     const report =
         phase === "scout"
-            ? analyzeScout(runDir, arms, run, manifest)
-            : analyzeConfirmation(runDir, arms, run, manifest, selectedWeight as number);
+            ? analyzeScout(runDir, arms, run, manifest, evidence)
+            : analyzeConfirmation(runDir, arms, run, manifest, selectedWeight as number, evidence);
     console.log(report.gateLine);
     console.log(`Research only: ${manifest.authority.instruction}`);
 }

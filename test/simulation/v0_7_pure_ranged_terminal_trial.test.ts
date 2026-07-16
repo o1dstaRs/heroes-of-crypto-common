@@ -19,9 +19,11 @@ import {
     PURE_RANGED_TERMINAL_IDENTITY_TEMPLATES,
     PURE_RANGED_TERMINAL_PAIR_SEED_STEP,
     PURE_RANGED_TERMINAL_SCOUT_WEIGHTS,
+    assertPureRangedTerminalRawMatchesSealed,
     auditPureRangedTerminalSeedRoots,
     estimatePureRangedTerminalDelta,
     findPureRangedTerminalSeedCollisions,
+    isPureRangedTerminalCausalActionChange,
     plannedPureRangedTerminalSeeds,
     probePureRangedTerminalWorkerEnvironment,
     pureRangedTerminalEnvironment,
@@ -29,8 +31,10 @@ import {
     readPureRangedTerminalManifest,
     selectPureRangedTerminalWeight,
     validatePureRangedTerminalManifest,
+    validatePureRangedTerminalRawArmSet,
     type IPureRangedTerminalComparison,
     type IPureRangedTerminalManifest,
+    type IPureRangedTerminalRawArmIdentity,
 } from "../../src/simulation/v0_7_pure_ranged_terminal_trial";
 
 const temporaryDirectories: string[] = [];
@@ -56,6 +60,7 @@ function comparison(weight: number, gain: number, passed = true): IPureRangedTer
             confidence95: { low: -0.08, high: -0.04 },
         },
         candidateActionHashChangedGames: 4,
+        causalCandidateActionHashChangedGames: 4,
         gates: {},
         passed,
     };
@@ -89,6 +94,7 @@ describe("pure-ranged terminal preregistration", () => {
             circuitBreakerMs: null,
         });
         expect(manifest.scoutGates.deadlineFallbacks).toBe(0);
+        expect(manifest.scoutGates.circuitOpenGameRateMax).toBe(0);
         expect(manifest.authority).toEqual({
             defaultWeight: 0,
             bake: false,
@@ -134,6 +140,10 @@ describe("pure-ranged terminal preregistration", () => {
         const fallback = cloneManifest();
         fallback.scoutGates.deadlineFallbacks = 1;
         expect(() => validatePureRangedTerminalManifest(fallback)).toThrow("scout gates drifted");
+
+        const circuit = cloneManifest();
+        circuit.scoutGates.circuitOpenGameRateMax = 0.01;
+        expect(() => validatePureRangedTerminalManifest(circuit)).toThrow("scout gates drifted");
 
         const authority = cloneManifest();
         authority.authority.bake = true as never;
@@ -255,6 +265,88 @@ describe("pure-ranged terminal analysis primitives", () => {
         expect(selectPureRangedTerminalWeight([comparison(0.5, 0.04), comparison(1, 0.06)])).toBe(1);
         expect(selectPureRangedTerminalWeight([comparison(1, 0.04), comparison(0.5, 0.04)])).toBe(0.5);
         expect(selectPureRangedTerminalWeight([comparison(0.5, 0.1, false), comparison(1, 0.09, false)])).toBeNull();
+    });
+
+    it("credits changed action hashes only on same-game nonzero leaf exposure with clean timing", () => {
+        const control = {
+            candidateActionsSha256: "a".repeat(64),
+            terminalNonzeroLeaves: 0,
+            deadlineFallbacks: 0,
+            circuitOpened: false,
+        };
+        const cleanCandidate = {
+            candidateActionsSha256: "b".repeat(64),
+            terminalNonzeroLeaves: 2,
+            deadlineFallbacks: 0,
+            circuitOpened: false,
+        };
+        expect(isPureRangedTerminalCausalActionChange(control, cleanCandidate)).toBe(true);
+        expect(isPureRangedTerminalCausalActionChange(control, { ...cleanCandidate, terminalNonzeroLeaves: 0 })).toBe(
+            false,
+        );
+        expect(isPureRangedTerminalCausalActionChange(control, { ...cleanCandidate, circuitOpened: true })).toBe(false);
+        expect(isPureRangedTerminalCausalActionChange({ ...control, circuitOpened: true }, cleanCandidate)).toBe(false);
+        expect(isPureRangedTerminalCausalActionChange(control, { ...cleanCandidate, deadlineFallbacks: 1 })).toBe(
+            false,
+        );
+        expect(isPureRangedTerminalCausalActionChange({ ...control, deadlineFallbacks: 1 }, cleanCandidate)).toBe(
+            false,
+        );
+        expect(
+            isPureRangedTerminalCausalActionChange(control, {
+                ...cleanCandidate,
+                candidateActionsSha256: control.candidateActionsSha256,
+            }),
+        ).toBe(false);
+    });
+
+    it("rejects missing, extra, reordered, or miscounted raw-report arms", () => {
+        const control: IPureRangedTerminalRawArmIdentity = {
+            id: "weight-0",
+            phase: "scout",
+            weight: 0,
+            template: "ranged_precision",
+            games: 512,
+            timingEnvelope: "ranged_performance",
+        };
+        const candidate: IPureRangedTerminalRawArmIdentity = {
+            ...control,
+            id: "weight-0p5",
+            weight: 0.5,
+        };
+        const expected = [control, candidate];
+        expect(() => validatePureRangedTerminalRawArmSet(expected, expected, 1_024)).not.toThrow();
+        expect(() => validatePureRangedTerminalRawArmSet([control], expected, 512)).toThrow("arm set/order/count");
+        expect(() => validatePureRangedTerminalRawArmSet([...expected, candidate], expected, 1_536)).toThrow(
+            "arm set/order/count",
+        );
+        expect(() => validatePureRangedTerminalRawArmSet([candidate, control], expected, 1_024)).toThrow(
+            "arm set/order/count",
+        );
+        expect(() => validatePureRangedTerminalRawArmSet(expected, expected, 512)).toThrow("arm set/order/count");
+    });
+
+    it("rejects a mutable raw concatenation that differs from sealed evidence", () => {
+        const sealed = '{"game":0}\n{"game":1}\n';
+        const sealedSha256 = new Bun.CryptoHasher("sha256").update(sealed).digest("hex");
+        expect(() =>
+            assertPureRangedTerminalRawMatchesSealed(
+                "scout/weight-0/games",
+                sealed,
+                sealed,
+                Buffer.byteLength(sealed),
+                sealedSha256,
+            ),
+        ).not.toThrow();
+        expect(() =>
+            assertPureRangedTerminalRawMatchesSealed(
+                "scout/weight-0/games",
+                '{"game":0}\n{"game":2}\n',
+                sealed,
+                Buffer.byteLength(sealed),
+                sealedSha256,
+            ),
+        ).toThrow("does not match sealed bytes/hash");
     });
 
     it("fails an external evidence-root audit on any derived scenario collision", () => {

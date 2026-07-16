@@ -80,16 +80,16 @@
         "eligibleGamesMin": 1,
         "eligibleLeavesMin": 1,
         "nonzeroEligibleLeavesMin": 1,
-        "candidateActionHashChangedGamesMin": 1,
+        "causalCandidateActionHashChangedGamesMin": 1,
         "deadlineFallbacks": 0,
-        "circuitOpenGameRateMax": 0.01,
+        "circuitOpenGameRateMax": 0,
         "searchedTurnLatencyP95MsMax": 200
     },
     "confirmationGates": {
         "repeatEveryScoutGate": true,
         "selectedDecisiveWinRate95LcbExclusiveMin": 0.5,
         "selectedDrawOrArmageddonRateMax": 0.9,
-        "eligibleRangedCandidateActionHashChangedGamesMin": 1,
+        "eligibleRangedCausalActionHashChangedGamesMin": 1,
         "ineligibleTemplateActionHashIdentity": "exact for both side swaps against weight 0",
         "ineligibleTemplates": [
             "mage_frontline",
