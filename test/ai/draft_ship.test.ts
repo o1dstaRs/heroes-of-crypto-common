@@ -19,11 +19,13 @@ import { afterEach, describe, expect, it } from "bun:test";
 import {
     draftGenomeCreatureScore,
     embedIntrinsicDraftWeights,
+    LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC,
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
     projectDraftGenomeForShipping,
 } from "../../src/ai/setup/draft_ship";
 import { DRAFT_ANCHOR_W, DRAFT_FEATURE_DIM, scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
+import leagueRound1CandidateGenome from "../../src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "../../src/ai/setup/draft_genomes/league_round3_br_52752642_projected.json";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
@@ -140,6 +142,29 @@ describe("draft ship genome", () => {
         expect(acceptance.report.options.baseSeed).toBe(leagueRound3ProjectedGenome.acceptance.baseSeed);
         expect(leagueRound3ProjectedGenome.authority).toEqual({
             acceptedForOptIn: true,
+            defaultChanged: false,
+            productionEnabled: false,
+            deployAuthorization: false,
+        });
+    });
+
+    it("exposes the round-1 candidate for reproducible research without granting ranked authority", () => {
+        const candidate = parseDraftGenome(LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC);
+
+        expect(candidate.id).toBe("br-57de5a2dab8b27b5");
+        expect(candidate.omniscientDraft).toBeUndefined();
+        expect(leagueGenomeFingerprint(candidate)).toBe(
+            "4664fbb0b8238e3db08254774ee3da774c290cd9b0a1f039ef6e923b48072a9f",
+        );
+        expect(leagueRound1CandidateGenome.projection.genomeFingerprint).toBe(leagueGenomeFingerprint(candidate));
+        expect(leagueRound1CandidateGenome.status).toBe("research_candidate");
+        expect(leagueRound1CandidateGenome.source.sourceArtifactSha256).toBe(
+            "3a9a109477a540f7da9806b9cb48e594685c6581c63f67deed8c226c7661a3aa",
+        );
+        expect(leagueRound1CandidateGenome.acceptance.status).toBe("not_evaluated");
+        expect(leagueRound1CandidateGenome.authority).toEqual({
+            researchOnly: true,
+            acceptedForRankedOptIn: false,
             defaultChanged: false,
             productionEnabled: false,
             deployAuthorization: false,

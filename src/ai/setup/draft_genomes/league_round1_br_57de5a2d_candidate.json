@@ -1,0 +1,40 @@
+{
+    "schemaVersion": 1,
+    "artifactKind": "projected_draft_genome",
+    "status": "research_candidate",
+    "id": "br-57de5a2dab8b27b5",
+    "omniscientDraft": false,
+    "source": {
+        "revision": "2b84e8bde5a135519b54b12ff23456f8bdcc2dc6",
+        "runFingerprint": "7a7229a05de4671c4b70b1c45bd9203b21b5f886e1469d48fefbf921b9a33a61",
+        "round": 1,
+        "genomeFingerprint": "57de5a2dab8b27b5fe5747e70073da684307ce672555e9a4bef0466bb3a21e56",
+        "sourceArtifactSha256": "3a9a109477a540f7da9806b9cb48e594685c6581c63f67deed8c226c7661a3aa",
+        "heldOutResultSha256": "58d122b0afecc56664cc8f0b3217b75335ede4ad49ffa657219742d688c65047"
+    },
+    "projection": {
+        "revision": "733644349dbb3a35d4c29e99f542b5f558b5d552",
+        "genomeFingerprint": "4664fbb0b8238e3db08254774ee3da774c290cd9b0a1f039ef6e923b48072a9f",
+        "preservedWeightRangeInclusive": [0, 14],
+        "resetWeightRangeInclusive": [15, 94]
+    },
+    "acceptance": {
+        "status": "not_evaluated",
+        "reason": "A fresh preregistered two-seed panel with durable offer-board records and a clean setup-interaction non-regression result is still required."
+    },
+    "authority": {
+        "researchOnly": true,
+        "acceptedForRankedOptIn": false,
+        "defaultChanged": false,
+        "productionEnabled": false,
+        "deployAuthorization": false
+    },
+    "weights": [
+        36.63063775080792, 0.6701344927936075, -137.21616968802834, -4.132501784849376, 1.6047168673341086,
+        7.304070020938186, -6.14057464104777, 5.432435228664942, -16.351771116858277, 43.04741453297146,
+        17.30041278712018, 8.07745697104766, 4.234042723569585, -1.9812895882001997, -5.949647161553291, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49.3, 45.4, 49.7, 51.4, 46.6, 44.5, 47.2, 51.5, 79.8, 45, 46.1, 42.8,
+        63.7, 63.9, 46.1, 62.2, 29.7, 45.3, 41.5, 47.1, 40.2, 68.8, 46.3, 45.4, 19, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0,
+        0, 7, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 6, 5, 7
+    ]
+}

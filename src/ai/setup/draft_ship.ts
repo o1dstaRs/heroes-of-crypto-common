@@ -23,6 +23,7 @@ import {
     type ILeagueGenome,
 } from "../../simulation/league_genome";
 import { DRAFT_FEATURE_DIM } from "./creature_score";
+import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
 
 /**
@@ -35,6 +36,9 @@ import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_527526
 
 /** Server env var carrying the draft genome spec (see parseDraftGenome for the accepted forms). */
 export const DRAFT_GENOME_ENV = "HOC_DRAFT_WEIGHTS";
+
+/** Immutable round-1 research candidate. Named for reproducible evaluation; not accepted for ranked use. */
+export const LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC = "league-r1-br-57de5a2d-candidate";
 
 /** Fresh v0.7-accepted, projected League round-3 candidate. Explicit opt-in; not the fallback default. */
 export const LEAGUE_ROUND3_DRAFT_SPEC = "league-r3-br-52752642";
@@ -97,6 +101,7 @@ const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
  * Parse a draft genome spec (env HOC_DRAFT_WEIGHTS / server config.ai.draftWeights). Accepted forms:
  * - "anchor" | "heuristic": the untrained setup-v0 heuristic reproduced as a genome (A/B reference);
  * - "default" | "melee" | "melee_coevo": the baked DEFAULT_DRAFT_W melee co-evolution champion;
+ * - "league-r1-br-57de5a2d-candidate": immutable round-1 research candidate (not ranked-accepted);
  * - "league-r3-br-52752642": the fresh-v0.7-accepted projected League round-3 candidate;
  * - inline JSON array of 11 intrinsic draft weights (embedded composition-blind into the anchor genome);
  * - inline JSON array of 95 league-genome weights, or an object with { id?, weights } of either length;
@@ -116,6 +121,9 @@ export function parseDraftGenome(
     }
     if (trimmed === "default" || trimmed === "melee" || trimmed === "melee_coevo") {
         return createMeleeLeagueGenome();
+    }
+    if (trimmed === LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC) {
+        return genomeFromParsedJson(leagueRound1CandidateGenome, LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC);
     }
     if (trimmed === LEAGUE_ROUND3_DRAFT_SPEC) {
         return genomeFromParsedJson(leagueRound3ProjectedGenome, LEAGUE_ROUND3_DRAFT_SPEC);
