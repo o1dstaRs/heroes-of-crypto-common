@@ -7,11 +7,12 @@
  */
 
 import { createHash } from "node:crypto";
+import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
 
 import { readV07AlignedV2AuditAppend, type IV07AlignedV2BattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
 import {
@@ -47,10 +48,10 @@ import {
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
 
-const WORKER_GRACEFUL_STOP_TIMEOUT_MS = 10_000;
-// Bun can serialize forced teardown when all 40 production workers finish together on Zinc.
-// Keep cleanup bounded, but derive completion from exit events rather than terminate() promises.
-const WORKER_TERMINATION_TIMEOUT_MS = 60_000;
+const WORKER_GRACEFUL_STOP_TIMEOUT_MS = 5_000;
+const WORKER_SIGTERM_TIMEOUT_MS = 5_000;
+const WORKER_EXIT_TIMEOUT_MS = 10_000;
+const WORKER_CLEANUP_TIMEOUT_MS = WORKER_GRACEFUL_STOP_TIMEOUT_MS + WORKER_SIGTERM_TIMEOUT_MS + WORKER_EXIT_TIMEOUT_MS;
 
 export interface IV07AlignedV2WorkerAttestation {
     workerIndex: number;
@@ -176,14 +177,14 @@ export async function evaluateV07AlignedV2Shard(
     const tasks = validateShardRequest(input);
     await mkdir(input.auditDirectory, { recursive: true });
     const workerCount = Math.min(input.workers, tasks.length);
-    const workers = new Set<Worker>();
+    const workers = new Set<ChildProcess>();
     const records = new Map<string, IV07AlignedV2BattleRecord>();
     const observations = new Map<string, IV07AlignedV2GameObservation>();
     const expectedTasks = new Map(tasks.map((task) => [v07AlignedV2TaskKey(task), task]));
     const attestations: IV07AlignedV2WorkerAttestation[] = [];
     const workerTaskKeys = new Map<number, string[]>();
-    const readyWorkers = new Set<Worker>();
-    const stoppingWorkers = new Set<Worker>();
+    const readyWorkers = new Set<ChildProcess>();
+    const stoppingWorkers = new Set<ChildProcess>();
     let cursor = 0;
     let settled = false;
     let poolStarted = false;
@@ -197,29 +198,39 @@ export async function evaluateV07AlignedV2Shard(
             if (deadlineTimer !== null) clearTimeout(deadlineTimer);
             deadlineTimer = null;
             cleanupPromise = new Promise<void>((resolveCleanup, rejectCleanup) => {
-                let forceTimeout: ReturnType<typeof setTimeout> | null = null;
+                let sigtermTimeout: ReturnType<typeof setTimeout> | null = null;
+                let exitTimeout: ReturnType<typeof setTimeout> | null = null;
                 const gracefulTimeout = setTimeout(() => {
-                    forceTimeout = setTimeout(() => {
-                        cleanupExitCheck = null;
-                        rejectCleanup(
-                            new Error(
-                                `aligned v2 worker termination exceeded ${WORKER_TERMINATION_TIMEOUT_MS}ms (${workers.size} survivor(s))`,
-                            ),
-                        );
-                    }, WORKER_TERMINATION_TIMEOUT_MS);
-                    for (const worker of workers) void worker.terminate();
+                    for (const worker of workers) worker.kill("SIGTERM");
+                    sigtermTimeout = setTimeout(() => {
+                        for (const worker of workers) worker.kill("SIGKILL");
+                        exitTimeout = setTimeout(() => {
+                            cleanupExitCheck = null;
+                            rejectCleanup(
+                                new Error(
+                                    `aligned v2 worker cleanup exceeded ${WORKER_CLEANUP_TIMEOUT_MS}ms (${workers.size} survivor(s))`,
+                                ),
+                            );
+                        }, WORKER_EXIT_TIMEOUT_MS);
+                    }, WORKER_SIGTERM_TIMEOUT_MS);
                 }, WORKER_GRACEFUL_STOP_TIMEOUT_MS);
                 cleanupExitCheck = () => {
                     if (workers.size > 0) return;
                     clearTimeout(gracefulTimeout);
-                    if (forceTimeout !== null) clearTimeout(forceTimeout);
+                    if (sigtermTimeout !== null) clearTimeout(sigtermTimeout);
+                    if (exitTimeout !== null) clearTimeout(exitTimeout);
                     cleanupExitCheck = null;
                     resolveCleanup();
                 };
                 for (const worker of workers) {
                     if (!stoppingWorkers.has(worker)) {
                         stoppingWorkers.add(worker);
-                        worker.postMessage({ type: "stop" });
+                        try {
+                            if (worker.connected && worker.send) worker.send({ type: "stop" });
+                            else worker.kill("SIGTERM");
+                        } catch {
+                            worker.kill("SIGTERM");
+                        }
                     }
                 }
                 cleanupExitCheck();
@@ -235,13 +246,17 @@ export async function evaluateV07AlignedV2Shard(
                 (cleanupError) => rejectPromise(new Error(`${failure.message}; ${String(cleanupError)}`)),
             );
         };
-        const dispatch = (worker: Worker): void => {
-            if (cursor >= tasks.length) {
-                stoppingWorkers.add(worker);
-                worker.postMessage({ type: "stop" });
+        const dispatch = (worker: ChildProcess): void => {
+            if (!worker.connected || !worker.send) {
+                fail(new Error("aligned v2 worker IPC channel closed before dispatch"));
                 return;
             }
-            worker.postMessage({ type: "evaluate", task: tasks[cursor] });
+            if (cursor >= tasks.length) {
+                stoppingWorkers.add(worker);
+                worker.send({ type: "stop" });
+                return;
+            }
+            worker.send({ type: "evaluate", task: tasks[cursor] });
             cursor += 1;
         };
         if (input.deadlineAtMs !== undefined) {
@@ -317,32 +332,23 @@ export async function evaluateV07AlignedV2Shard(
                 ...workerBaseEnvironment(input.sourceEnvironment),
                 ...behaviorEnvironment,
             };
-            let worker: Worker;
+            let worker: ChildProcess;
             try {
-                worker = new Worker(new URL("./v0_7_aligned_96h_v2_worker.ts", import.meta.url), {
-                    workerData: {
-                        marker: "v0_7_aligned_96h_v2_worker",
-                        workerIndex,
-                        runFingerprint: input.shard.runFingerprint,
-                        auditPath,
-                        binding: input.binding,
-                        environment: behaviorEnvironment,
-                        environmentSha256,
+                worker = spawn(
+                    process.execPath,
+                    [fileURLToPath(new URL("./v0_7_aligned_96h_v2_worker.ts", import.meta.url))],
+                    {
+                        env: environment,
+                        detached: false,
+                        serialization: "json",
+                        stdio: ["ignore", "ignore", "inherit", "ipc"],
                     },
-                    env: environment,
-                });
+                );
             } catch (error) {
                 fail(error);
                 return;
             }
             workers.add(worker);
-            try {
-                input.onWorkerStarted?.();
-            } catch (error) {
-                void worker.terminate();
-                fail(error);
-                return;
-            }
             worker.on(
                 "message",
                 (message: {
@@ -358,8 +364,6 @@ export async function evaluateV07AlignedV2Shard(
                             fail(new Error("aligned v2 worker stopped without a parent request"));
                             return;
                         }
-                        workers.delete(worker);
-                        cleanupExitCheck?.();
                         return;
                     }
                     if (settled) return;
@@ -427,17 +431,42 @@ export async function evaluateV07AlignedV2Shard(
                 },
             );
             worker.on("error", fail);
-            worker.on("exit", (code) => {
+            worker.on("disconnect", () => {
+                if (!settled && !stoppingWorkers.has(worker)) {
+                    fail(new Error("aligned v2 worker IPC channel disconnected unexpectedly"));
+                }
+            });
+            worker.on("exit", (code, signal) => {
                 workers.delete(worker);
                 cleanupExitCheck?.();
-                if (!settled && (code !== 0 || !stoppingWorkers.has(worker))) {
-                    fail(new Error(`aligned v2 worker exited unexpectedly with code ${code}`));
+                if (!settled && (code !== 0 || signal !== null || !stoppingWorkers.has(worker))) {
+                    fail(new Error(`aligned v2 worker exited unexpectedly with code ${code} and signal ${signal}`));
                     return;
                 }
                 if (!settled && workers.size === 0 && records.size !== tasks.length) {
                     fail(new Error("aligned v2 worker pool exited before completing its deterministic task set"));
                 }
             });
+            try {
+                input.onWorkerStarted?.();
+                if (!worker.connected || !worker.send) throw new Error("aligned v2 worker IPC failed to initialize");
+                worker.send({
+                    type: "initialize",
+                    data: {
+                        marker: "v0_7_aligned_96h_v2_worker",
+                        workerIndex,
+                        runFingerprint: input.shard.runFingerprint,
+                        auditPath,
+                        binding: input.binding,
+                        environment: behaviorEnvironment,
+                        environmentSha256,
+                    },
+                });
+            } catch (error) {
+                worker.kill("SIGKILL");
+                fail(error);
+                return;
+            }
         }
     });
 }

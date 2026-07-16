@@ -9,7 +9,6 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { parentPort, workerData } from "node:worker_threads";
 
 /** Keep this bootstrap free of game/policy imports until the environment is scrubbed and attested. */
 
@@ -23,8 +22,35 @@ interface IWorkerEnvelope {
     environmentSha256: string;
 }
 
-const data = workerData as IWorkerEnvelope;
-if (!parentPort) throw new Error("aligned v2 worker must run in a worker thread");
+interface IInitializeMessage {
+    type: "initialize";
+    data: IWorkerEnvelope;
+}
+
+if (!process.send || !process.connected) throw new Error("aligned v2 worker requires an authenticated IPC parent");
+const data = await new Promise<IWorkerEnvelope>((resolveData, rejectData) => {
+    const timeout = setTimeout(() => rejectData(new Error("aligned v2 worker initialization timed out")), 30_000);
+    const onDisconnect = (): void => {
+        clearTimeout(timeout);
+        rejectData(new Error("aligned v2 worker parent disconnected before initialization"));
+    };
+    process.once("disconnect", onDisconnect);
+    process.once("message", (message: unknown) => {
+        clearTimeout(timeout);
+        process.off("disconnect", onDisconnect);
+        if (
+            typeof message !== "object" ||
+            message === null ||
+            (message as Partial<IInitializeMessage>).type !== "initialize" ||
+            typeof (message as Partial<IInitializeMessage>).data !== "object" ||
+            (message as Partial<IInitializeMessage>).data === null
+        ) {
+            rejectData(new Error("aligned v2 worker received an invalid initialization envelope"));
+            return;
+        }
+        resolveData((message as IInitializeMessage).data);
+    });
+});
 if (data.marker !== "v0_7_aligned_96h_v2_worker") throw new Error("aligned v2 worker marker mismatch");
 if (process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH !== "0") {
     throw new Error("aligned v2 worker requires BUN_RUNTIME_TRANSPILER_CACHE_PATH=0");
@@ -97,17 +123,29 @@ const binding = protocol.validateV07AlignedV2CandidateBinding(
 );
 const gameAdapter = await import("./v0_7_aligned_96h_v2_game_adapter");
 
+const send = (message: unknown): void => {
+    if (!process.send || !process.connected) throw new Error("aligned v2 worker IPC parent is unavailable");
+    process.send!(message);
+};
+
+const onParentDisconnect = (): never => process.exit(1);
+process.once("disconnect", onParentDisconnect);
+
 let auditByteOffset = 0;
 let busy = false;
-parentPort.on("message", (message: { type: "evaluate"; task: unknown } | { type: "stop" }) => {
+process.on("message", (message: { type: "evaluate"; task: unknown } | { type: "stop" }) => {
     if (message.type === "stop") {
-        parentPort!.postMessage({ type: "stopped" });
-        parentPort!.close();
-        process.exit(0);
+        if (!process.send || !process.connected) process.exit(0);
+        process.send!({ type: "stopped" }, (error) => {
+            if (error) process.exit(1);
+            process.off("disconnect", onParentDisconnect);
+            process.disconnect?.();
+            process.exit(0);
+        });
         return;
     }
     if (busy) {
-        parentPort!.postMessage({ type: "error", error: "aligned v2 worker received overlapping tasks" });
+        send({ type: "error", error: "aligned v2 worker received overlapping tasks" });
         return;
     }
     busy = true;
@@ -123,14 +161,14 @@ parentPort.on("message", (message: { type: "evaluate"; task: unknown } | { type:
             );
         }
         const observation = gameAdapter.compactV07AlignedV2Observation(record, binding, appended.rows[0]);
-        parentPort!.postMessage({
+        send({
             type: "result",
             taskKey: protocol.v07AlignedV2TaskKey(task),
             record,
             observation,
         });
     } catch (error) {
-        parentPort!.postMessage({
+        send({
             type: "error",
             error: error instanceof Error ? (error.stack ?? error.message) : String(error),
         });
@@ -139,7 +177,7 @@ parentPort.on("message", (message: { type: "evaluate"; task: unknown } | { type:
     }
 });
 
-parentPort.postMessage({
+send({
     type: "ready",
     attestation: {
         workerIndex: data.workerIndex,

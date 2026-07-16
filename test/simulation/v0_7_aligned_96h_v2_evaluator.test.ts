@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -183,6 +183,28 @@ function army(templateName: "mage_frontline" | "ranged_precision"): IConditional
 }
 
 describe("v0.7 aligned 96-hour v2 evaluator", () => {
+    it("runs workers as isolated child processes with authenticated IPC and exit-bound cleanup", () => {
+        const evaluator = readFileSync(
+            new URL("../../src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator.ts", import.meta.url),
+            "utf8",
+        );
+        const worker = readFileSync(
+            new URL("../../src/simulation/optimizer/v0_7_aligned_96h_v2_worker.ts", import.meta.url),
+            "utf8",
+        );
+        expect(evaluator).toContain("worker = spawn(");
+        expect(evaluator).toContain('stdio: ["ignore", "ignore", "inherit", "ipc"]');
+        expect(evaluator).toContain('serialization: "json"');
+        expect(evaluator).toContain('worker.kill("SIGTERM")');
+        expect(evaluator).toContain('worker.kill("SIGKILL")');
+        expect(evaluator).toContain('worker.on("exit"');
+        expect(evaluator).not.toContain('from "node:worker_threads"');
+        expect(worker).toContain("aligned v2 worker requires an authenticated IPC parent");
+        expect(worker).toContain('type: "initialize"');
+        expect(worker).toContain('process.send!({ type: "stopped" }');
+        expect(worker).not.toContain('from "node:worker_threads"');
+    });
+
     it("binds the exact twelve cells to candidate v0.7s versus opponent v0.6", () => {
         expect(V07_ALIGNED_V2_EVALUATOR_CELLS).toHaveLength(12);
         expect(V07_ALIGNED_V2_EVALUATOR_CELLS.filter((cell) => cell.distribution === "ranked_taxonomy")).toHaveLength(
