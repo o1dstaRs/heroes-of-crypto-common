@@ -57,6 +57,11 @@ import {
     finishPressureProximity,
     type FinishPressureState,
 } from "./v0_7_finish_pressure";
+import {
+    capturePureRangedTerminalState,
+    pureRangedTerminalAdvantage,
+    type PureRangedTerminalState,
+} from "./v0_7_pure_ranged_terminal";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
 import {
     extractValueFeatures,
@@ -86,6 +91,9 @@ import {
  * SEARCH_LATE_RANGED_FINISH_WEIGHT=<0..16> is a default-zero research overlay on the leaf logit. It rewards
  * late damage to the enemy's original army in proportion to the post-setup board's HP-weighted rangedness,
  * ramping from zero through lap 3 to full strength at the first Armageddon lap. Summons are excluded.
+ * SEARCH_PURE_RANGED_TERMINAL_WEIGHT=<0..16> is a default-zero leaf-logit overlay restricted to battles in
+ * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
+ * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then this match's driver returns each
  * later incumbent unchanged. The live wrapper also includes call-site overhead outside this internal timer.
@@ -263,6 +271,12 @@ interface ISearchCounters {
     finishPressureNonzeroLeaves: number;
     /** Sum of the finish-pressure logit adjustment over enabled leaf evaluations. */
     finishPressureLogitSum: number;
+    /** Eligible pure-ranged leaves evaluated by the terminal-budget overlay. */
+    pureRangedTerminalLeaves: number;
+    /** Eligible leaves whose perspective-relative terminal advantage was non-zero. */
+    pureRangedTerminalNonzeroLeaves: number;
+    /** Signed sum of the pure-ranged terminal logit adjustment. */
+    pureRangedTerminalLogitSum: number;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -305,6 +319,9 @@ const emptyCounters = (): ISearchCounters => ({
     finishPressureLeaves: 0,
     finishPressureNonzeroLeaves: 0,
     finishPressureLogitSum: 0,
+    pureRangedTerminalLeaves: 0,
+    pureRangedTerminalNonzeroLeaves: 0,
+    pureRangedTerminalLogitSum: 0,
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -351,6 +368,7 @@ export class SearchDriver {
     private readonly shortlist: number | null;
     private readonly decisionDeadlineMs: number | null;
     private readonly lateRangedFinishWeight: number;
+    private readonly pureRangedTerminalWeight: number;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -383,6 +401,7 @@ export class SearchDriver {
     private readonly counters = emptyCounters();
     private readonly turnRows: string[] = [];
     private finishPressureState: FinishPressureState | null = null;
+    private pureRangedTerminalState: PureRangedTerminalState | null = null;
     private finishedSim = false;
     private circuitOpen = false;
     public constructor(deps: ILookaheadDeps, match: ISearchMatchInfo = {}) {
@@ -449,6 +468,16 @@ export class SearchDriver {
                 throw new Error("SEARCH_LATE_RANGED_FINISH_WEIGHT must be between 0 and 16");
             }
             this.lateRangedFinishWeight = finishWeight;
+        }
+        const rawPureRangedTerminalWeight = process.env.SEARCH_PURE_RANGED_TERMINAL_WEIGHT;
+        if (this.mode !== "search" || rawPureRangedTerminalWeight === undefined || rawPureRangedTerminalWeight === "") {
+            this.pureRangedTerminalWeight = 0;
+        } else {
+            const terminalWeight = Number(rawPureRangedTerminalWeight);
+            if (!Number.isFinite(terminalWeight) || terminalWeight < 0 || terminalWeight > 16) {
+                throw new Error("SEARCH_PURE_RANGED_TERMINAL_WEIGHT must be between 0 and 16");
+            }
+            this.pureRangedTerminalWeight = terminalWeight;
         }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
@@ -525,6 +554,12 @@ export class SearchDriver {
         if (this.lateRangedFinishWeight > 0 && this.finishPressureState === null) {
             this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
         }
+        if (this.pureRangedTerminalWeight > 0 && this.pureRangedTerminalState === null) {
+            this.pureRangedTerminalState = capturePureRangedTerminalState(
+                this.deps.unitsHolder,
+                this.deps.fightProperties.getCurrentLap(),
+            );
+        }
     }
     /**
      * Replace the strategy's single decision with the best-by-rollout candidate (search mode), arbitrate
@@ -535,7 +570,7 @@ export class SearchDriver {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
-        if (this.lateRangedFinishWeight > 0) {
+        if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
             this.onFightReady();
         }
         if (this.circuitOpen) {
@@ -660,6 +695,12 @@ export class SearchDriver {
             finishPressureLeaves: c.finishPressureLeaves,
             finishPressureNonzeroLeaves: c.finishPressureNonzeroLeaves,
             finishPressureLogitSum: Number(c.finishPressureLogitSum.toFixed(6)),
+            pureRangedTerminalWeight: this.pureRangedTerminalWeight,
+            pureRangedTerminalEligible: this.pureRangedTerminalState?.eligible ?? false,
+            pureRangedTerminalInitialScale: this.pureRangedTerminalState?.initialScale ?? 0,
+            pureRangedTerminalLeaves: c.pureRangedTerminalLeaves,
+            pureRangedTerminalNonzeroLeaves: c.pureRangedTerminalNonzeroLeaves,
+            pureRangedTerminalLogitSum: Number(c.pureRangedTerminalLogitSum.toFixed(6)),
             rolloutTurnsTotal: c.rolloutTurnsTotal,
             msTotal: Math.round(c.msTotal * 10) / 10,
             circuitBreakerMs: this.circuitBreakerMs,
@@ -1266,8 +1307,8 @@ export class SearchDriver {
             for (let i = 0; i < f.length; i += 1) {
                 z += model.w[i] * f[i];
             }
-            if (this.lateRangedFinishWeight > 0) {
-                z += this.finishPressureLogitAdjustment(team);
+            if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
+                z += this.researchLeafLogitAdjustment(team);
             }
             return 1 / (1 + Math.exp(-z));
         }
@@ -1284,11 +1325,14 @@ export class SearchDriver {
             }
         }
         const material = 0.5 * (1 + (ours - enemy) / (ours + enemy + 1));
-        if (this.lateRangedFinishWeight === 0) {
+        if (this.lateRangedFinishWeight === 0 && this.pureRangedTerminalWeight === 0) {
             return material;
         }
-        const z = Math.log(material / (1 - material)) + this.finishPressureLogitAdjustment(team);
+        const z = Math.log(material / (1 - material)) + this.researchLeafLogitAdjustment(team);
         return 1 / (1 + Math.exp(-z));
+    }
+    private researchLeafLogitAdjustment(team: TeamType): number {
+        return this.finishPressureLogitAdjustment(team) + this.pureRangedTerminalLogitAdjustment(team);
     }
     private finishPressureLogitAdjustment(team: TeamType): number {
         if (this.lateRangedFinishWeight === 0) {
@@ -1307,6 +1351,29 @@ export class SearchDriver {
             this.counters.finishPressureNonzeroLeaves += 1;
         }
         this.counters.finishPressureLogitSum += adjustment;
+        return adjustment;
+    }
+    private pureRangedTerminalLogitAdjustment(team: TeamType): number {
+        if (this.pureRangedTerminalWeight === 0) {
+            return 0;
+        }
+        this.onFightReady();
+        const state = this.pureRangedTerminalState;
+        if (!state?.eligible) {
+            return 0;
+        }
+        const feature = pureRangedTerminalAdvantage(
+            state,
+            this.deps.unitsHolder,
+            team,
+            this.deps.fightProperties.getCurrentLap(),
+        );
+        const adjustment = this.pureRangedTerminalWeight * feature;
+        this.counters.pureRangedTerminalLeaves += 1;
+        if (feature !== 0) {
+            this.counters.pureRangedTerminalNonzeroLeaves += 1;
+        }
+        this.counters.pureRangedTerminalLogitSum += adjustment;
         return adjustment;
     }
     // ---- simulated turn plumbing (mirrors lookahead.ts / battle_engine's loop, minus recording) ----
