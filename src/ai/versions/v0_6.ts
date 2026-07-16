@@ -169,7 +169,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
             setPreferAttackOverMining(false);
         }
         decision = this.routeCasterDecision(unit, context, decision);
-        decision = routeAreaThrow(unit, context, decision);
+        decision = routeAreaThrow(unit, context, decision, undefined, this.version);
         decision = routeMeleeRiderEV(unit, context, decision, undefined, this.version);
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
         // negative (melee 64.8%→66.2% vs ranged) — too crude; a real kite needs advance-to-range→shoot→retreat.

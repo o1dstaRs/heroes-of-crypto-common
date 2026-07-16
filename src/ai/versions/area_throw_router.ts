@@ -49,6 +49,29 @@ function areaThrowGateOn(unit: Unit): boolean {
 const sameCell = (a: XY | undefined, b: XY | undefined): boolean =>
     a === undefined || b === undefined ? a === b : a.x === b.x && a.y === b.y;
 
+/**
+ * Optional version scoping for a seat-scoped A/B (the rider-EV router's `V06_RIDER_EV_VERSIONS` pattern,
+ * itself modelled on the wait-scorer's `V07_WAIT_VERSIONS`). With `V06_AREA_THROW_VERSIONS` unset, every
+ * caller is in scope (the router's original team-color-only gate semantics, unchanged). When set to a
+ * comma list (e.g. "v0.7s"), only strategies whose version string is listed route — so a v0.7s-vs-v0.7
+ * mirror can carry the router on ONE seat while the other stays the frozen incumbent, isolating the
+ * router's own effect (W16's seat-scoped battery credits the pattern; see rider_ev_router.ts).
+ */
+function areaThrowScopeAllows(version: string | undefined): boolean {
+    const raw = process.env.V06_AREA_THROW_VERSIONS;
+    if (!raw) {
+        return true;
+    }
+    if (!version) {
+        return false;
+    }
+    return raw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .includes(version);
+}
+
 /** Return the turn's immediate combat action, ignoring a preceding attack-type selection or move. */
 function immediateAttack(actions: readonly GameAction[]): ImmediateAttack | undefined {
     for (let i = actions.length - 1; i >= 0; i -= 1) {
@@ -112,17 +135,20 @@ function incumbentDamage(attack: ImmediateAttack, candidates: readonly IEnumerat
  * router deliberately consumes that engine-mirrored score instead of reimplementing geometry here.
  *
  * `V06_AREA_THROW=on` is required until the LiveTwin A/B clears. `green`/`red` scope the router to one seat
- * for paired A/Bs and `both` aliases `on`. Gate-off returns the exact incumbent array without enumerating,
- * preserving frozen v0.6 fight behaviour. A strict comparison also preserves the incumbent on ties or whenever
- * F4 cannot price the incumbent combat action safely.
+ * for paired A/Bs and `both` aliases `on`. `V06_AREA_THROW_VERSIONS` additionally scopes by AI strategy
+ * version (see `areaThrowScopeAllows`), for a seat-scoped mirror A/B (e.g. v0.7s vs v0.7) independent of
+ * team color. Gate-off returns the exact incumbent array without enumerating, preserving frozen v0.6 fight
+ * behaviour. A strict comparison also preserves the incumbent on ties or whenever F4 cannot price the
+ * incumbent combat action safely.
  */
 export function routeAreaThrow(
     unit: Unit,
     context: IDecisionContext,
     incumbent: GameAction[],
     enumerate: CandidateEnumerator = enumerateCandidates,
+    version?: string,
 ): GameAction[] {
-    if (!areaThrowGateOn(unit) || !unit.hasAbilityActive("Area Throw")) {
+    if (!areaThrowGateOn(unit) || !areaThrowScopeAllows(version) || !unit.hasAbilityActive("Area Throw")) {
         return incumbent;
     }
 

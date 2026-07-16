@@ -294,6 +294,39 @@ describe("v0.6 Area Throw router", () => {
         expectInert(LOWER, "1");
     });
 
+    it("honours V06_AREA_THROW_VERSIONS: unset = every caller, set = only listed strategy versions", () => {
+        const combat = createCombatTestContext();
+        const gargantuan = makeGargantuan();
+        const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE, amountAlive: 20 });
+        placeLarge(combat, gargantuan, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
+        const context = contextFor(combat);
+        const incumbent = endTurn(gargantuan);
+
+        withAreaThrowGate("on", () => {
+            // Unset scope keeps the router's original semantics: any caller (with or without a version) routes.
+            expect(lastAction(routeAreaThrow(gargantuan, context, incumbent)).type).toBe("area_throw_attack");
+            expect(lastAction(routeAreaThrow(gargantuan, context, incumbent, undefined, "v0.6")).type).toBe(
+                "area_throw_attack",
+            );
+
+            // A set scope routes ONLY the listed versions; everything else (including version-less callers)
+            // preserves the exact incumbent array — the seat-scoped mirror contract.
+            process.env.V06_AREA_THROW_VERSIONS = "v0.7s";
+            try {
+                expect(lastAction(routeAreaThrow(gargantuan, context, incumbent, undefined, "v0.7s")).type).toBe(
+                    "area_throw_attack",
+                );
+                expect(routeAreaThrow(gargantuan, context, incumbent, undefined, "v0.7")).toBe(incumbent);
+                expect(routeAreaThrow(gargantuan, context, incumbent)).toBe(incumbent);
+            } finally {
+                delete process.env.V06_AREA_THROW_VERSIONS;
+            }
+        });
+    });
+
     it("is byte-parity inert gate-off: same array reference and no candidate enumeration", () => {
         const gargantuan = makeGargantuan();
         const incumbent = endTurn(gargantuan);
