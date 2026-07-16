@@ -350,6 +350,26 @@ describe("external wait-V2 run analysis", () => {
         await expect(analyzeExternalWaitV2Run(badRun.options)).rejects.toThrow("behavior/scoring identity");
     });
 
+    it("accepts only the runner's possible one-second completion-marker rollover", async () => {
+        const rollover = createFixture();
+        const rolloverPath = join(rollover.runDir, "RAW_COMPLETE");
+        const rolloverMarker = readFileSync(rolloverPath, "utf8");
+        const markerEpoch = Number(rolloverMarker.match(/ epoch=(\d+) /)?.[1]);
+        write(rolloverPath, rolloverMarker.replace(` epoch=${markerEpoch} `, ` epoch=${markerEpoch + 1} `));
+        await expect(analyzeExternalWaitV2Run(rollover.options)).resolves.toMatchObject({ revisionStable: true });
+
+        for (const offset of [-1, 2]) {
+            const invalid = createFixture();
+            const invalidPath = join(invalid.runDir, "RAW_COMPLETE");
+            const invalidMarker = readFileSync(invalidPath, "utf8");
+            const invalidEpoch = Number(invalidMarker.match(/ epoch=(\d+) /)?.[1]);
+            write(invalidPath, invalidMarker.replace(` epoch=${invalidEpoch} `, ` epoch=${invalidEpoch + offset} `));
+            await expect(analyzeExternalWaitV2Run(invalid.options)).rejects.toThrow(
+                "RAW_COMPLETE timestamp/epoch is invalid",
+            );
+        }
+    });
+
     it("rejects duplicate games, wrong seeds, and missing rejection telemetry", async () => {
         const duplicate = createFixture();
         const duplicatePath = join(duplicate.runDir, "control/mirror/hybrid/result.records.jsonl");

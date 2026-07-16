@@ -344,7 +344,18 @@ function validateRawComplete(value: string, run: IExternalRunIdentity): void {
     }
     const timestamp = Date.parse(marker.time);
     const epoch = Number(marker.epoch);
-    if (!Number.isFinite(timestamp) || !Number.isSafeInteger(epoch) || Math.floor(timestamp / 1000) !== epoch) {
+    const canonicalTime = Number.isFinite(timestamp) ? new Date(timestamp).toISOString().replace(".000Z", "Z") : "";
+    const timestampEpoch = timestamp / 1000;
+    const epochSkewSeconds = epoch - timestampEpoch;
+    // The frozen runner reads ISO time before epoch time, so a boundary crossing can only produce +1 second.
+    if (
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(marker.time) ||
+        canonicalTime !== marker.time ||
+        !/^(0|[1-9]\d*)$/.test(marker.epoch) ||
+        !Number.isSafeInteger(timestampEpoch) ||
+        !Number.isSafeInteger(epoch) ||
+        (epochSkewSeconds !== 0 && epochSkewSeconds !== 1)
+    ) {
         throw new Error("RAW_COMPLETE timestamp/epoch is invalid");
     }
 }
