@@ -79,6 +79,7 @@ import {
     type IV07AlignedV2ExecutionTask,
     type IV07AlignedV2InjectedSeedPlan,
 } from "./v0_7_aligned_96h_v2_protocol";
+import { quarantineV07AlignedV2Path } from "./v0_7_aligned_96h_v2_quarantine";
 import {
     commitV07AlignedV2SeedAllocation,
     ingestV07AlignedV2SeedCorpus,
@@ -450,6 +451,20 @@ function ensureDurableDirectory(path: string): void {
     fsyncDirectory(parent);
 }
 
+export function quarantineV07AlignedV2RunnerAtomicTemporaries(destination: string): string[] {
+    const parent = dirname(destination);
+    const temporaryPrefix = `.${basename(destination)}.tmp-`;
+    const quarantined: string[] = [];
+    for (const entry of readdirSync(parent)
+        .filter((name) => name.startsWith(temporaryPrefix))
+        .sort()) {
+        const target = quarantineV07AlignedV2Path(join(parent, entry), parent, "abandoned");
+        fsyncDirectory(parent);
+        quarantined.push(target);
+    }
+    return quarantined;
+}
+
 function publishImmutableArtifact(
     artifactRoot: string,
     relativePath: string,
@@ -465,11 +480,7 @@ function publishImmutableArtifact(
     const bytesSha256 = createHash("sha256").update(contents).digest("hex");
     const expected = Buffer.from(contents, "utf8");
     const prefix = `.${basename(destination)}.tmp-`;
-    for (const entry of readdirSync(parent).filter((name) => name.startsWith(prefix))) {
-        const abandoned = join(parent, entry);
-        renameSync(abandoned, `${abandoned}.abandoned-${Date.now()}-${process.pid}-${randomUUID()}`);
-        fsyncDirectory(parent);
-    }
+    quarantineV07AlignedV2RunnerAtomicTemporaries(destination);
     if (existsSync(destination)) {
         if (lstatSync(destination).isSymbolicLink() || !lstatSync(destination).isFile()) {
             throw new Error(`immutable artifact path is unsafe: ${relativePath}`);
@@ -513,11 +524,7 @@ function writeAtomicReplacement(path: string, contents: string): void {
         throw new Error(`atomic replacement destination is unsafe: ${path}`);
     }
     const prefix = `.${basename(path)}.tmp-`;
-    for (const entry of readdirSync(parent).filter((name) => name.startsWith(prefix))) {
-        const abandoned = join(parent, entry);
-        renameSync(abandoned, `${abandoned}.abandoned-${Date.now()}-${process.pid}-${randomUUID()}`);
-        fsyncDirectory(parent);
-    }
+    quarantineV07AlignedV2RunnerAtomicTemporaries(path);
     const temporary = join(parent, `${prefix}${process.pid}-${randomUUID()}`);
     const descriptor = openSync(temporary, "wx", 0o640);
     try {
@@ -1297,11 +1304,7 @@ function publishPreparedDefinitionBundle(directoryInput: string, expected: Reado
         return;
     }
     const prefix = `.${basename(directory)}.tmp-`;
-    for (const entry of readdirSync(parent).filter((name) => name.startsWith(prefix))) {
-        const abandoned = join(parent, entry);
-        renameSync(abandoned, `${abandoned}.abandoned-${Date.now()}-${process.pid}-${randomUUID()}`);
-        fsyncDirectory(parent);
-    }
+    quarantineV07AlignedV2RunnerAtomicTemporaries(directory);
     const temporary = join(parent, `${prefix}${process.pid}-${randomUUID()}`);
     try {
         mkdirSync(temporary, { mode: 0o750 });

@@ -34,6 +34,7 @@ import {
     type IV07AlignedV2OrchestratorTerminal,
 } from "./v0_7_aligned_96h_v2_orchestrator";
 import { canonicalV07AlignedV2Json, fingerprintV07AlignedV2 } from "./v0_7_aligned_96h_v2_protocol";
+import { quarantineV07AlignedV2Path, type V07AlignedV2QuarantineReason } from "./v0_7_aligned_96h_v2_quarantine";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const TRANSITION_PATTERN = /^(\d{6})-([0-9a-f]{64})\.json$/;
@@ -69,7 +70,6 @@ export interface IV07AlignedV2PersistedOrchestratorApplyResult {
 }
 
 let tempSequence = 0;
-let quarantineSequence = 0;
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -172,12 +172,8 @@ function writeAtomicReplacement(path: string, contents: string): void {
     fsyncDirectory(parent);
 }
 
-function quarantine(path: string, quarantineDirectory: string, reason: string): void {
-    const target = join(
-        quarantineDirectory,
-        `${basename(path)}.${reason}-${Date.now()}-${process.pid}-${quarantineSequence++}`,
-    );
-    renameSync(path, target);
+function quarantine(path: string, quarantineDirectory: string, reason: V07AlignedV2QuarantineReason): void {
+    quarantineV07AlignedV2Path(path, quarantineDirectory, reason);
     fsyncDirectory(dirname(path));
     fsyncDirectory(quarantineDirectory);
 }
@@ -391,8 +387,7 @@ function quarantineAbandonedInitializations(directory: string): void {
     const prefix = `.${basename(directory)}.tmp-`;
     for (const entry of readdirSync(parent).filter((name) => name.startsWith(prefix))) {
         const path = join(parent, entry);
-        const target = `${path}.abandoned-${Date.now()}-${process.pid}-${quarantineSequence++}`;
-        renameSync(path, target);
+        quarantineV07AlignedV2Path(path, parent, "abandoned");
         fsyncDirectory(parent);
     }
 }

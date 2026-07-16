@@ -480,7 +480,16 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             ).toThrow("synthetic fault");
             let resumed = persistV07AlignedV2ShardEvaluation(root, evaluation, seedPlan);
             expect(resumed.reused).toBe(false);
-            expect(readdirSync(root).some((name) => name.includes(".abandoned-"))).toBe(true);
+            const terminalInventory = readdirSync(root).sort();
+            const abandonedNames = terminalInventory.filter((name) =>
+                name.startsWith(".v07-aligned-v2-quarantine-abandoned-"),
+            );
+            expect(abandonedNames).toHaveLength(1);
+            expect(Buffer.byteLength(abandonedNames[0])).toBeLessThanOrEqual(255);
+            for (let restart = 0; restart < 16; restart += 1) {
+                expect(persistV07AlignedV2ShardEvaluation(root, evaluation, seedPlan).reused).toBe(true);
+                expect(readdirSync(root).sort()).toEqual(terminalInventory);
+            }
 
             expect(() =>
                 persistV07AlignedV2ShardEvaluation(publishedRoot, evaluation, seedPlan, faultAt("directory_published")),
@@ -509,7 +518,11 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             ).toThrow("hash mismatch");
             const rebuilt = persistV07AlignedV2ShardEvaluation(root, evaluation, seedPlan);
             expect(rebuilt.reused).toBe(false);
-            expect(readdirSync(root).some((name) => name.includes(".corrupt-"))).toBe(true);
+            const corruptNames = readdirSync(root).filter((name) =>
+                name.startsWith(".v07-aligned-v2-quarantine-corrupt-"),
+            );
+            expect(corruptNames).toHaveLength(2);
+            expect(corruptNames.every((name) => Buffer.byteLength(name) <= 255)).toBe(true);
         } finally {
             rmSync(root, { recursive: true, force: true });
             rmSync(publishedRoot, { recursive: true, force: true });
@@ -990,6 +1003,65 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             expect(() =>
                 loadV07AlignedV2PersistedOrchestrator(directory, fixture.resolvers, fixture.definition),
             ).toThrow();
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps orchestration quarantine bounded and terminal across repeated initialization", () => {
+        const root = mkdtempSync(join(tmpdir(), "hoc-v07-aligned-ledger-quarantine-"));
+        const directory = join(root, "orchestrator");
+        try {
+            const fixture = orchestrationFixture();
+            expect(() =>
+                initializeV07AlignedV2OrchestratorPersistence(
+                    directory,
+                    fixture.definition,
+                    fixture.resolvers,
+                    faultAt("init_file:CURRENT"),
+                ),
+            ).toThrow("synthetic fault");
+            expect(readdirSync(root).some((name) => name.startsWith(".orchestrator.tmp-"))).toBe(true);
+
+            expect(
+                initializeV07AlignedV2OrchestratorPersistence(directory, fixture.definition, fixture.resolvers).reused,
+            ).toBe(false);
+            const currentPrefix = ".CURRENT.tmp-";
+            const maximumCurrentTemporary = `${currentPrefix}${"x".repeat(255 - Buffer.byteLength(currentPrefix))}`;
+            writeFileSync(join(directory, maximumCurrentTemporary), "interrupted current\n", "utf8");
+            const maximumTransitionTemporary = `.${"y".repeat(254)}`;
+            writeFileSync(
+                join(directory, "transitions", maximumTransitionTemporary),
+                "interrupted transition\n",
+                "utf8",
+            );
+
+            expect(loadV07AlignedV2PersistedOrchestrator(directory, fixture.resolvers, fixture.definition).reused).toBe(
+                true,
+            );
+            const parentInventory = readdirSync(root).sort();
+            const parentQuarantines = parentInventory.filter((name) =>
+                name.startsWith(".v07-aligned-v2-quarantine-abandoned-"),
+            );
+            expect(parentQuarantines).toHaveLength(1);
+            expect(Buffer.byteLength(parentQuarantines[0])).toBeLessThanOrEqual(255);
+            const quarantineInventory = readdirSync(join(directory, "quarantine")).sort();
+            expect(quarantineInventory).toHaveLength(2);
+            expect(
+                quarantineInventory.every(
+                    (name) =>
+                        name.startsWith(".v07-aligned-v2-quarantine-abandoned-") && Buffer.byteLength(name) <= 255,
+                ),
+            ).toBe(true);
+
+            for (let restart = 0; restart < 16; restart += 1) {
+                expect(
+                    initializeV07AlignedV2OrchestratorPersistence(directory, fixture.definition, fixture.resolvers)
+                        .reused,
+                ).toBe(true);
+                expect(readdirSync(root).sort()).toEqual(parentInventory);
+                expect(readdirSync(join(directory, "quarantine")).sort()).toEqual(quarantineInventory);
+            }
         } finally {
             rmSync(root, { recursive: true, force: true });
         }

@@ -17,7 +17,7 @@ import {
     writeFileSync,
 } from "node:fs";
 import { arch, availableParallelism, hostname, platform, release, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { V07_COMPOSED_SEED_SCAN_POLICY } from "../../src/simulation/v0_7_composed_seed_scan";
 import {
@@ -34,6 +34,7 @@ import {
 import {
     parseV07AlignedV2RunnerArgs,
     prepareV07AlignedV2DefinitionBundle,
+    quarantineV07AlignedV2RunnerAtomicTemporaries,
     runV07AlignedV2Runner,
     validateV07AlignedV2RunnerConfig,
     validateV07AlignedV2RunnerHeartbeat,
@@ -461,6 +462,73 @@ describe("v0.7 aligned 96-hour v2 exact runner", () => {
             ).toBe(first.terminalSha256);
         } finally {
             rmSync(fixture.root, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps interrupted prepared-directory quarantine terminal across repeated preparation", () => {
+        const fixture = runnerFixture();
+        try {
+            rmSync(fixture.preparedDirectory, { recursive: true });
+            const temporaryPrefix = `.${basename(fixture.preparedDirectory)}.tmp-`;
+            const maximumLengthTemporary = `${temporaryPrefix}${"x".repeat(255 - Buffer.byteLength(temporaryPrefix))}`;
+            mkdirSync(join(dirname(fixture.preparedDirectory), maximumLengthTemporary));
+
+            expect(
+                prepareV07AlignedV2DefinitionBundle({
+                    configPath: fixture.configPath,
+                    requestPath: fixture.requestPath,
+                    preparedDirectory: fixture.preparedDirectory,
+                }),
+            ).toEqual(fixture.bundle);
+            const terminalInventory = readdirSync(fixture.root).sort();
+            const quarantineNames = terminalInventory.filter((name) =>
+                name.startsWith(".v07-aligned-v2-quarantine-abandoned-"),
+            );
+            expect(quarantineNames).toHaveLength(1);
+            expect(Buffer.byteLength(quarantineNames[0])).toBeLessThanOrEqual(255);
+            for (let restart = 0; restart < 16; restart += 1) {
+                expect(
+                    prepareV07AlignedV2DefinitionBundle({
+                        configPath: fixture.configPath,
+                        requestPath: fixture.requestPath,
+                        preparedDirectory: fixture.preparedDirectory,
+                    }),
+                ).toEqual(fixture.bundle);
+                expect(readdirSync(fixture.root).sort()).toEqual(terminalInventory);
+            }
+        } finally {
+            rmSync(fixture.root, { recursive: true, force: true });
+        }
+    });
+
+    it("quarantines interrupted atomic temporaries once with bounded terminal names", () => {
+        const root = mkdtempSync(join(tmpdir(), "aligned-v2-runner-atomic-"));
+        const destination = join(root, "runner.heartbeat.json");
+        const temporaryPrefix = ".runner.heartbeat.json.tmp-";
+        const maximumLengthTemporary = `${temporaryPrefix}${"x".repeat(255 - Buffer.byteLength(temporaryPrefix))}`;
+        const legacyAbandonedTemporary = `${temporaryPrefix}123-${"a".repeat(36)}.abandoned-1-2-${"b".repeat(36)}`;
+        try {
+            writeFileSync(join(root, maximumLengthTemporary), "maximum\n", "utf8");
+            writeFileSync(join(root, legacyAbandonedTemporary), "legacy\n", "utf8");
+
+            const quarantined = quarantineV07AlignedV2RunnerAtomicTemporaries(destination);
+            expect(quarantined).toHaveLength(2);
+            expect(new Set(quarantined).size).toBe(2);
+            expect(quarantined.map((path) => readFileSync(path, "utf8")).sort()).toEqual(["legacy\n", "maximum\n"]);
+            for (const path of quarantined) {
+                expect(basename(path)).toMatch(
+                    /^\.v07-aligned-v2-quarantine-abandoned-[0-9a-f]{16}-\d+-\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+                );
+                expect(Buffer.byteLength(basename(path))).toBeLessThanOrEqual(255);
+            }
+
+            const terminalInventory = readdirSync(root).sort();
+            for (let restart = 0; restart < 32; restart += 1) {
+                expect(quarantineV07AlignedV2RunnerAtomicTemporaries(destination)).toEqual([]);
+                expect(readdirSync(root).sort()).toEqual(terminalInventory);
+            }
+        } finally {
+            rmSync(root, { recursive: true, force: true });
         }
     });
 

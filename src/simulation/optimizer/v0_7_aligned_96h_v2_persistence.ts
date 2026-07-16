@@ -41,6 +41,7 @@ import {
     type IV07AlignedV2ExecutionTask,
     type IV07AlignedV2InjectedSeedPlan,
 } from "./v0_7_aligned_96h_v2_protocol";
+import { quarantineV07AlignedV2Path, type V07AlignedV2QuarantineReason } from "./v0_7_aligned_96h_v2_quarantine";
 import type {
     IV07AlignedV2ShardEvaluation,
     IV07AlignedV2WorkerAttestation,
@@ -127,8 +128,6 @@ interface IArtifactBundle {
     manifest: IV07AlignedV2ShardArtifactManifest;
     contents: Map<string, string>;
 }
-
-let quarantineSequence = 0;
 
 function sha256Bytes(value: string | Buffer): string {
     return createHash("sha256").update(value).digest("hex");
@@ -749,11 +748,8 @@ function writeDurableFile(path: string, contents: string): void {
     }
 }
 
-function quarantinePath(path: string, reason: "corrupt" | "abandoned"): string {
-    const suffix = `${Date.now()}-${process.pid}-${quarantineSequence++}`;
-    const target = `${path}.${reason}-${suffix}`;
-    renameSync(path, target);
-    return target;
+function quarantinePath(path: string, reason: V07AlignedV2QuarantineReason): string {
+    return quarantineV07AlignedV2Path(path, dirname(path), reason);
 }
 
 export function v07AlignedV2ShardArtifactDirectoryName(shard: IV07AlignedV2CheckpointShardSpec): string {
