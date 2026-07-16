@@ -814,6 +814,16 @@ export function validateWaitV3StageAGameArtifacts(
     return { result, q2Text, auditText: readFileSync(paths.audit, "utf8"), scoredRows };
 }
 
+export function validateWaitV3StageAExactDirectoryEntries(path: string, expectedNames: readonly string[]): void {
+    const expected = new Set(expectedNames);
+    const actual = existsSync(path) ? readdirSync(path) : [];
+    if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
+        throw new Error(
+            `${path}: expected exactly [${[...expected].sort().join(", ")}]; got [${actual.sort().join(", ")}]`,
+        );
+    }
+}
+
 function assertExactGameFiles(runDir: string, cohort: IWaitV3StageACohort): void {
     for (const [directory, suffix] of [
         [join(runDir, "raw", cohort.id), ".q2.jsonl"],
@@ -823,12 +833,7 @@ function assertExactGameFiles(runDir: string, cohort: IWaitV3StageACohort): void
         const expected = new Set(
             Array.from({ length: cohort.games }, (_, game) => `${game.toString().padStart(5, "0")}${suffix}`),
         );
-        const actual = existsSync(directory) ? readdirSync(directory).filter((name) => !name.startsWith(".")) : [];
-        if (actual.length !== expected.size || actual.some((name) => !expected.has(name))) {
-            throw new Error(
-                `${directory}: expected exactly ${expected.size} ${suffix} artifacts; got ${actual.length}`,
-            );
-        }
+        validateWaitV3StageAExactDirectoryEntries(directory, [...expected]);
     }
 }
 
@@ -842,6 +847,10 @@ export function validateAndSealWaitV3StageARaw(
     manifest: IWaitV3StageAManifest,
     runManifest: IWaitV3StageARunManifest,
 ): IWaitV3StageARawReport {
+    const cohortIds = manifest.cohorts.map(({ id }) => id);
+    for (const root of ["raw", "audit", "games"]) {
+        validateWaitV3StageAExactDirectoryEntries(join(runDir, root), cohortIds);
+    }
     const cohorts: IWaitV3StageACohortRawReport[] = [];
     let totalRows = 0;
     for (const cohort of manifest.cohorts) {
@@ -891,6 +900,10 @@ export function validateAndSealWaitV3StageARaw(
             gamesSha256: gamesSummary.sha256,
         });
     }
+    validateWaitV3StageAExactDirectoryEntries(
+        join(runDir, "datasets"),
+        manifest.cohorts.flatMap(({ id }) => [`${id}.q2.jsonl`, `${id}.audit.jsonl`, `${id}.games.jsonl`]),
+    );
     const runManifestPath = join(runDir, "run.json");
     const report: IWaitV3StageARawReport = {
         schemaVersion: 1,
@@ -941,6 +954,9 @@ async function executeCohort(
     }
     if (!pending.length) return;
     const workerCount = Math.min(concurrency, pending.length);
+    const workerEnvironment = Object.fromEntries(
+        Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    );
     const workers = new Set<Worker>();
     let cursor = 0;
     let completed = cohort.games - pending.length;
@@ -979,12 +995,10 @@ async function executeCohort(
                     cohort,
                     runDir,
                     runFingerprint,
-                    environment: Object.fromEntries(
-                        Object.entries(environment).filter(
-                            (entry): entry is [string, string] => entry[1] !== undefined,
-                        ),
-                    ),
+                    environment: workerEnvironment,
                 } satisfies IStageAWorkerEnvelope,
+                // Install the frozen environment before this module's static policy imports execute.
+                env: workerEnvironment,
             });
             workers.add(worker);
             worker.on("message", (message: { type: string; artifact?: IWaitV3StageAGameArtifact; error?: string }) => {

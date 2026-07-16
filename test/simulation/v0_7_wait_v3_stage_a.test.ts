@@ -47,6 +47,7 @@ import {
     readWaitV3StageAManifest,
     validateWaitV3StageAGameArtifacts,
     validateWaitV3StageAManifest,
+    validateWaitV3StageAExactDirectoryEntries,
     waitV3StageAEnvironment,
     type IWaitV3StageAManifest,
     type IWaitV3StageARawReport,
@@ -205,6 +206,18 @@ describe("Wait V3 Stage-A nonfiring sentinel", () => {
 });
 
 describe("Wait V3 Stage-A fail-closed artifacts", () => {
+    it("rejects hidden and visible extras in exact evidence directories", () => {
+        const directory = mkdtempSync(join(tmpdir(), "wait-v3-exact-directory-"));
+        writeFileSync(join(directory, "expected.jsonl"), "{}\n");
+        expect(() => validateWaitV3StageAExactDirectoryEntries(directory, ["expected.jsonl"])).not.toThrow();
+
+        writeFileSync(join(directory, ".unregistered"), "unexpected\n");
+        expect(() => validateWaitV3StageAExactDirectoryEntries(directory, ["expected.jsonl"])).toThrow(
+            "expected exactly",
+        );
+        rmSync(directory, { recursive: true, force: true });
+    });
+
     it("requires exact Q2/audit completeness and zero oracle wait rejections", () => {
         const directory = mkdtempSync(join(tmpdir(), "wait-v3-stage-a-"));
         try {
