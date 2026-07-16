@@ -159,7 +159,7 @@ describe("B1 full-game league genome", () => {
         const first = resolveLeaguePick(777, anchor, melee);
         const second = resolveLeaguePick(777, anchor, melee);
         expect(first).toEqual(second);
-        expect(first.state.phaseSequence).toBe(10);
+        expect(first.state.phaseSequence).toBe(11);
         expect(first.state.lower.creatures).toHaveLength(6);
         expect(first.state.upper.creatures).toHaveLength(6);
         expect(first.state.lower.tier1Artifact).toBeGreaterThan(0);
