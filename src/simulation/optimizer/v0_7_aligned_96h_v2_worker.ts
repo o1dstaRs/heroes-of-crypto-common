@@ -136,7 +136,7 @@ let busy = false;
 process.on("message", (message: { type: "evaluate"; task: unknown } | { type: "stop" }) => {
     if (message.type === "stop") {
         if (!process.send || !process.connected) process.exit(0);
-        process.send!({ type: "stopped" }, (error) => {
+        process.send!({ type: "stopped" }, undefined, undefined, (error: Error | null) => {
             if (error) process.exit(1);
             process.off("disconnect", onParentDisconnect);
             process.disconnect?.();

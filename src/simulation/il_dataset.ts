@@ -734,10 +734,11 @@ export interface IValidatedIlCorpus {
 
 const plannedVersions = (value: unknown, context: string): readonly [string, string] => {
     if (!Array.isArray(value) || value.length !== 2) {
-        fail(context, "expected exactly two planned strategy versions");
+        return fail(context, "expected exactly two planned strategy versions");
     }
-    const left = string(value[0], `${context}[0]`);
-    const right = string(value[1], `${context}[1]`);
+    const items: readonly unknown[] = value;
+    const left = string(items[0], `${context}[0]`);
+    const right = string(items[1], `${context}[1]`);
     if (left === right) fail(context, "planned strategy versions must be distinct");
     return [left, right];
 };

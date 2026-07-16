@@ -442,3 +442,35 @@ describe("IL dataset v3", () => {
         });
     });
 });
+
+describe("planned-versions option validation (regression: unknown-narrowing after never-guard)", () => {
+    const validateWithVersions = (versions: unknown) =>
+        validateIlCorpus(completePair(), {
+            runFingerprint: FINGERPRINT,
+            cohort: "melee",
+            expectedGames: 2,
+            baseSeed: 7,
+            versions: versions as never,
+        });
+
+    it("accepts a distinct two-version pair (the fixed narrowed-index path)", () => {
+        expect(() => validateWithVersions(["v0.7s", "v0.7"])).not.toThrow();
+    });
+
+    it("rejects a non-array", () => {
+        expect(() => validateWithVersions("v0.7s,v0.7")).toThrow(/exactly two planned strategy versions/);
+    });
+
+    it("rejects the wrong arity", () => {
+        expect(() => validateWithVersions(["v0.7s"])).toThrow(/exactly two planned strategy versions/);
+        expect(() => validateWithVersions(["v0.7s", "v0.7", "v0.6"])).toThrow(/exactly two planned strategy versions/);
+    });
+
+    it("rejects an identical pair", () => {
+        expect(() => validateWithVersions(["v0.7", "v0.7"])).toThrow(/must be distinct/);
+    });
+
+    it("rejects non-string members via the element validator", () => {
+        expect(() => validateWithVersions([7, "v0.7"])).toThrow();
+    });
+});
