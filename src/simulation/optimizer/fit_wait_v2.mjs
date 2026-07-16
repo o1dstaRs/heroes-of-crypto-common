@@ -14,6 +14,7 @@
 // Prints V2 JSON for numerically stable fits and V3 JSON only after the held-out RANGE release gates pass.
 //
 // Usage: bun fit_wait_v2.mjs fingerprint=<64hex> melee=q2d.jsonl mixed=... [...] epochs=400 lr=0.5 l2=0.0001
+// `lr` applies to logistic A/B. Ridge C/D use `epochs` as a fail-closed PCG iteration cap.
 import { readFileSync } from "node:fs";
 
 import {
@@ -28,6 +29,7 @@ import {
 } from "../../ai/versions/wait_scorer";
 import { parsePhaseBFitterArgs, parsePhaseBQ2Row } from "../phase_b_dataset";
 import { phaseBModelStabilityIssue } from "./model_stability";
+import { fitStableRidge } from "./ridge_regression";
 import { evaluateWaitV3HeldoutGates } from "./wait_v3_gates";
 
 const parsedArgs = parsePhaseBFitterArgs(process.argv.slice(2), {
@@ -220,25 +222,6 @@ const evalScores = (set, rawScore) => {
  * calibrate to the OVERRIDE FREQUENCY and, on low-wait-share cohorts (ranged 17%, pure 8%), end up
  * firing on ~0% of points at z>0 (guard-zero behavior with extra steps).
  */
-function fitRidge(set, dims, featOf, epochs, lr, l2) {
-    const w = new Array(dims).fill(0);
-    let b = 0;
-    for (let e = 0; e < epochs; e++) {
-        const gw = new Array(dims).fill(0);
-        let gb = 0;
-        for (const r of set) {
-            const f = featOf(r);
-            let z = b;
-            for (let i = 0; i < dims; i++) z += w[i] * f[i];
-            const err = z - r.dc;
-            for (let i = 0; i < dims; i++) gw[i] += err * f[i];
-            gb += err;
-        }
-        for (let i = 0; i < dims; i++) w[i] -= lr * (gw[i] / set.length + l2 * w[i]);
-        b -= (lr * gb) / set.length;
-    }
-    return { b, w };
-}
 // Target scaled x10 (deltas are ~1e-2) to keep its gradient closer to the logistic fits. Deployment only
 // tests sign(z), so the scale is free; the explicit stability gate below rejects a divergent run.
 for (const r of rows) r.dc = typeof r.d === "number" ? 10 * Math.max(-0.3, Math.min(0.3, r.d)) : 0;
@@ -254,10 +237,24 @@ const t1 = Date.now();
 const fitB = fitLogistic(train, D2, (r) => r.x, EPOCHS, LR, L2);
 console.log(`B done in ${((Date.now() - t1) / 1000).toFixed(0)}s`);
 const t2 = Date.now();
-const fitC = fitRidge(trainD, D2, (r) => r.x, EPOCHS, LR, L2);
+const fitC = fitStableRidge(
+    trainD,
+    D2,
+    (r) => r.x,
+    (r) => r.dc,
+    EPOCHS,
+    L2,
+);
 console.log(`C done in ${((Date.now() - t2) / 1000).toFixed(0)}s`);
 const t3 = Date.now();
-const fitD = fitRidge(trainD, D3, (r) => r.x3, EPOCHS, LR, L2);
+const fitD = fitStableRidge(
+    trainD,
+    D3,
+    (r) => r.x3,
+    (r) => r.dc,
+    EPOCHS,
+    L2,
+);
 console.log(`D done in ${((Date.now() - t3) / 1000).toFixed(0)}s`);
 for (const [tag, model] of [
     ["fit A", fitA],

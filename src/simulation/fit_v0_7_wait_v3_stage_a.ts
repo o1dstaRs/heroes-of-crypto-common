@@ -24,7 +24,7 @@ import {
     type IWaitV3StageARunManifest,
 } from "./v0_7_wait_v3_stage_a";
 
-interface IWaitV3StageAFitReport {
+export interface IWaitV3StageAFitReport {
     schemaVersion: 1;
     kind: "v0.7_wait_v3_stage_a_fit";
     verdict: "PASS";
@@ -55,6 +55,11 @@ interface IWaitV3StageAFitReport {
     releaseInstruction: "RESEARCH_ONLY_NO_BAKE";
 }
 
+export interface IWaitV3StageARawHashes {
+    rawCompleteSha256: string;
+    rawReportSha256: string;
+}
+
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const FITTER_SOURCE = join(PROJECT_ROOT, "src/simulation/optimizer/fit_wait_v2.mjs");
 const FIT_WRAPPER_SOURCE = fileURLToPath(import.meta.url);
@@ -81,6 +86,17 @@ export function parseWaitV3StageAFitterOutput(stdout: string, literalGate = "V3 
 
 function sha256(value: string | Buffer): string {
     return createHash("sha256").update(value).digest("hex");
+}
+
+function stableJson(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+    if (value !== null && typeof value === "object") {
+        return `{${Object.entries(value as Record<string, unknown>)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+            .join(",")}}`;
+    }
+    return JSON.stringify(value);
 }
 
 function fileSha256(path: string): string {
@@ -110,6 +126,18 @@ function requireFileHash(path: string, expected: string, role: string): void {
     if (!existsSync(path)) throw new Error(`Missing ${role}: ${path}`);
     const actual = fileSha256(path);
     if (actual !== expected) throw new Error(`${role} hash mismatch: expected ${expected}; got ${actual}`);
+}
+
+export function assertWaitV3StageAFitRawBinding(
+    report: Pick<IWaitV3StageAFitReport, "rawCompleteSha256" | "rawReportSha256">,
+    rawHashes: IWaitV3StageARawHashes,
+): void {
+    if (
+        report.rawCompleteSha256 !== rawHashes.rawCompleteSha256 ||
+        report.rawReportSha256 !== rawHashes.rawReportSha256
+    ) {
+        throw new Error("Completed fit report is not bound to the current sealed raw evidence");
+    }
 }
 
 export function validateWaitV3StageARawShape(manifest: IWaitV3StageAManifest, raw: IWaitV3StageARawReport): void {
@@ -149,7 +177,7 @@ function validateRawEnvelope(
     runDir: string,
     run: IWaitV3StageARunManifest,
     raw: IWaitV3StageARawReport,
-): { rawCompleteSha256: string; rawReportSha256: string } {
+): IWaitV3StageARawHashes {
     const rawReportPath = join(runDir, "raw-report.json");
     const rawCompletePath = join(runDir, "RAW_COMPLETE");
     if (!existsSync(rawCompletePath)) throw new Error(`Missing atomic RAW_COMPLETE marker: ${rawCompletePath}`);
@@ -157,9 +185,11 @@ function validateRawEnvelope(
     if (
         marker.schemaVersion !== 1 ||
         marker.kind !== "v0.7_wait_v3_stage_a_raw_complete" ||
+        !Number.isFinite(Date.parse(String(marker.completedAt))) ||
         marker.runFingerprint !== run.runFingerprint ||
         marker.report !== "raw-report.json" ||
-        typeof marker.reportSha256 !== "string"
+        typeof marker.reportSha256 !== "string" ||
+        typeof marker.artifactsSha256 !== "string"
     ) {
         throw new Error("Invalid RAW_COMPLETE identity");
     }
@@ -168,6 +198,7 @@ function validateRawEnvelope(
         raw.schemaVersion !== 1 ||
         raw.kind !== "v0.7_wait_v3_stage_a_raw" ||
         raw.verdict !== "PASS" ||
+        !Number.isFinite(Date.parse(raw.generatedAt)) ||
         raw.runFingerprint !== run.runFingerprint ||
         raw.protocolSha256 !== run.identity.protocol.sha256 ||
         raw.runManifestSha256 !== fileSha256(join(runDir, "run.json")) ||
@@ -177,6 +208,9 @@ function validateRawEnvelope(
     }
     const { manifest } = readWaitV3StageAManifest();
     validateWaitV3StageARawShape(manifest, raw);
+    if (marker.artifactsSha256 !== sha256(stableJson(raw.cohorts))) {
+        throw new Error("RAW_COMPLETE artifact envelope hash mismatch");
+    }
     for (const cohort of raw.cohorts) {
         const q2Path = join(runDir, cohort.q2Path);
         const auditPath = join(runDir, cohort.auditPath);
@@ -205,15 +239,24 @@ function validateRawEnvelope(
     return { rawCompleteSha256: fileSha256(rawCompletePath), rawReportSha256: fileSha256(rawReportPath) };
 }
 
-function validateExistingFit(runDir: string, run: IWaitV3StageARunManifest): IWaitV3StageAFitReport | null {
+function validateExistingFit(
+    runDir: string,
+    run: IWaitV3StageARunManifest,
+    raw: IWaitV3StageARawReport,
+    rawHashes: IWaitV3StageARawHashes,
+    manifest: IWaitV3StageAManifest,
+): IWaitV3StageAFitReport | null {
     const markerPath = join(runDir, "FIT_COMPLETE");
     if (!existsSync(markerPath)) return null;
     const marker = readJson<Record<string, unknown>>(markerPath);
     if (
         marker.schemaVersion !== 1 ||
         marker.kind !== "v0.7_wait_v3_stage_a_fit_complete" ||
+        !Number.isFinite(Date.parse(String(marker.completedAt))) ||
         marker.runFingerprint !== run.runFingerprint ||
         marker.report !== "fit/report.json" ||
+        marker.model !== "fit/model.json" ||
+        marker.releaseInstruction !== "RESEARCH_ONLY_NO_BAKE" ||
         typeof marker.reportSha256 !== "string" ||
         typeof marker.modelSha256 !== "string"
     ) {
@@ -224,8 +267,40 @@ function validateExistingFit(runDir: string, run: IWaitV3StageARunManifest): IWa
     requireFileHash(reportPath, marker.reportSha256, "fit report");
     requireFileHash(modelPath, marker.modelSha256, "fit model");
     const report = readJson<IWaitV3StageAFitReport>(reportPath);
-    if (report.verdict !== "PASS" || report.runFingerprint !== run.runFingerprint) {
+    const expectedRawArtifacts = raw.cohorts.map((cohort) => ({
+        cohort: cohort.id,
+        q2Sha256: cohort.q2Sha256,
+        auditSha256: cohort.auditSha256,
+        gamesSha256: cohort.gamesSha256,
+    }));
+    if (
+        report.schemaVersion !== 1 ||
+        report.kind !== "v0.7_wait_v3_stage_a_fit" ||
+        report.verdict !== "PASS" ||
+        !Number.isFinite(Date.parse(report.generatedAt)) ||
+        report.runFingerprint !== run.runFingerprint ||
+        stableJson(report.revision) !== stableJson(run.identity.revision) ||
+        report.protocolSha256 !== run.identity.protocol.sha256 ||
+        report.runManifestSha256 !== fileSha256(join(runDir, "run.json")) ||
+        stableJson(report.rawArtifacts) !== stableJson(expectedRawArtifacts) ||
+        report.fitterSourceSha256 !== fileSha256(FITTER_SOURCE) ||
+        report.fitWrapperSourceSha256 !== fileSha256(FIT_WRAPPER_SOURCE) ||
+        report.gateSourceSha256 !== fileSha256(GATE_SOURCE) ||
+        report.literalGate !== manifest.completion.requireLiteralFitterLine ||
+        report.modelPath !== "fit/model.json" ||
+        report.modelSha256 !== marker.modelSha256 ||
+        report.modelWidth !== manifest.completion.modelWidth ||
+        !report.modelNonzero ||
+        report.releaseInstruction !== "RESEARCH_ONLY_NO_BAKE"
+    ) {
         throw new Error("Completed fit report identity mismatch");
+    }
+    assertWaitV3StageAFitRawBinding(report, rawHashes);
+    requireFileHash(join(runDir, "fit/fitter.stdout.txt"), report.fitterStdoutSha256, "fitter stdout");
+    requireFileHash(join(runDir, "fit/fitter.stderr.txt"), report.fitterStderrSha256, "fitter stderr");
+    const model = parseWaitWeightsV3(readFileSync(modelPath, "utf8"));
+    if (!model || model.w.length !== 125 || (model.b === 0 && model.w.every((weight) => weight === 0))) {
+        throw new Error("Completed fit model does not satisfy the frozen nonzero 125-vector contract");
     }
     return report;
 }
@@ -251,13 +326,12 @@ export function runWaitV3StageAFit(runDirInput: string): IWaitV3StageAFitReport 
     requireFileHash(FITTER_SOURCE, run.identity.fitterSourceSha256, "fitter source");
     requireFileHash(FIT_WRAPPER_SOURCE, run.identity.fitWrapperSourceSha256, "fit-wrapper source");
     requireFileHash(GATE_SOURCE, run.identity.gateSourceSha256, "V3 gate source");
-    const existing = validateExistingFit(runDir, run);
-    if (existing) return existing;
-
     const rawPath = join(runDir, "raw-report.json");
     if (!existsSync(rawPath)) throw new Error(`Missing Stage-A raw report: ${rawPath}`);
     const raw = readJson<IWaitV3StageARawReport>(rawPath);
     const rawHashes = validateRawEnvelope(runDir, run, raw);
+    const existing = validateExistingFit(runDir, run, raw, rawHashes, manifest);
+    if (existing) return existing;
     const command = [
         process.execPath,
         FITTER_SOURCE,

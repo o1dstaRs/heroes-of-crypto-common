@@ -1,0 +1,3366 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "v0.7-composed-ranked-20260716-v2-prereg",
+  "manifestPath": "manifest.json",
+  "manifestSha256": "76c0d770703ab899077f6773d82369a09bb1993d703bf48e0c253ddd24c51e2f",
+  "guardContractPath": "zinc-guard/contract.json",
+  "guardContractSha256": "c739e0b22aea08119acb0cf9fab127b09e5450b8be3a444488aa4b67f8acf01f",
+  "initialSnapshotPath": "zinc-guard/initial-source.json",
+  "initialSnapshotSha256": "464330738be52b9f55ed4f18e4a1e7dc0d17832f83dde1b062dd8950684c786d",
+  "prelaunchCheckpointPath": "zinc-guard/prelaunch/checkpoint.json",
+  "prelaunchCheckpointSha256": "36e7fc926f95fbfb49c368540a03f5361519d4359bbbac8276024120246e9916",
+  "prelaunchLedgerPath": "zinc-guard/prelaunch/ledger-source.json",
+  "prelaunchLedgerSha256": "f4e58abe56f1980bf074ca0ad60519b5f65c9c72e85622671bce3c029c9fedb1",
+  "prelaunchEntries": 62,
+  "prelaunchFirstCapturedAt": "2026-07-16T09:14:44.280Z",
+  "prelaunchLastCapturedAt": "2026-07-16T10:01:58.298Z",
+  "guardIntervalMs": 60000,
+  "maxGuardGapMs": 90000,
+  "guardLedger": [
+    {
+      "sequence": 0,
+      "phase": "initial",
+      "path": "zinc-guard/prelaunch/artifacts/0000-initial.json",
+      "sha256": "2caaf9c9acde56bea73ab39d2cf44bbded85f252d2363d7637436c95d35aff3d",
+      "checkedAt": "2026-07-16T09:14:44.280Z",
+      "snapshotSha256": "91b391797a076fddfe9369236f08e1332e3a2457704c55309939bbb8f05762a1"
+    },
+    {
+      "sequence": 1,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0001-periodic.json",
+      "sha256": "e6d26ee4933036a4c5c194ff9d26867ec52851a533e2b607c9b770229c01857d",
+      "checkedAt": "2026-07-16T09:15:31.085Z",
+      "snapshotSha256": "ba207b84fcabc0592eeca7868be6a3f914158aa1442a4c22d4d34d6d5b4cb3d5"
+    },
+    {
+      "sequence": 2,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0002-periodic.json",
+      "sha256": "a70d5fb9f2c13b6424c9747cb823212ab4ad3724889b53e88ef8d0577a9340f7",
+      "checkedAt": "2026-07-16T09:16:17.441Z",
+      "snapshotSha256": "f4a35e23f8d4f811cc0f1ae219b6947e3279a30a1428155d4b71d059506735dd"
+    },
+    {
+      "sequence": 3,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0003-periodic.json",
+      "sha256": "6c301a44f487b5a7684ec76a5d2b16b1215628b456c9b68ac6deab73ec7ee015",
+      "checkedAt": "2026-07-16T09:17:03.810Z",
+      "snapshotSha256": "7a2666da4f84964c5319b1346af6cb4ef2cb7c149f043b21f0fe26397e527a38"
+    },
+    {
+      "sequence": 4,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0004-periodic.json",
+      "sha256": "e7364f31d1516d1569ead6e2aacd44385b119562cbd9e86af307d396ad3406bb",
+      "checkedAt": "2026-07-16T09:17:50.194Z",
+      "snapshotSha256": "cd12385ad2a1956d1bf2b242a1c7bb45f88a6c7c701f590e83a71ece463d41fc"
+    },
+    {
+      "sequence": 5,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0005-periodic.json",
+      "sha256": "66cdf7a0699c97431f1a918aa18ab35f4b822005c289f736720cea7171f442fd",
+      "checkedAt": "2026-07-16T09:18:36.503Z",
+      "snapshotSha256": "e3cf843138c928f7b4eb1261f75d41469f46f6b2302b35fc29634db8a460a2cb"
+    },
+    {
+      "sequence": 6,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0006-periodic.json",
+      "sha256": "d09ff548a6aae3da0ad809635f29e0148f5a8221396c9b58d69bfcdc213aa336",
+      "checkedAt": "2026-07-16T09:19:22.776Z",
+      "snapshotSha256": "7e32bc357b23c5029308fd909d0c7e2b49942139bf0ce97824282f4d210c6c95"
+    },
+    {
+      "sequence": 7,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0007-periodic.json",
+      "sha256": "b068fcd608f5413cd97e46993e36f42af21c2fd44e2973a3186dc69761cb4e09",
+      "checkedAt": "2026-07-16T09:20:09.018Z",
+      "snapshotSha256": "5586c304458deebfc7a9138862b9200de32c26ae9b742cdd544bf27186fd2813"
+    },
+    {
+      "sequence": 8,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0008-periodic.json",
+      "sha256": "b4dbf81ffb3eb6a98c50b160e028e45563bda1fa2ffe8eb61548fd049a3f4f4b",
+      "checkedAt": "2026-07-16T09:20:55.310Z",
+      "snapshotSha256": "7ca303c62ee971b7c8c6b24fcf51ab51fc492bbcda644cbb97d811c741f519ee"
+    },
+    {
+      "sequence": 9,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0009-periodic.json",
+      "sha256": "8321de158b4442ed20ed52d8e33cbaf3bac4f6a25d8b8a57d31208043fe3e0c9",
+      "checkedAt": "2026-07-16T09:21:41.586Z",
+      "snapshotSha256": "78973696d70bb5e0b9ba092f43755c6ea3d91762685f561f943925a376b783b6"
+    },
+    {
+      "sequence": 10,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0010-periodic.json",
+      "sha256": "4ba8aa3369d319aedb0482100845ec1e6c82a874131d0cd1bf33c8b0dc7cab5d",
+      "checkedAt": "2026-07-16T09:22:27.861Z",
+      "snapshotSha256": "667be4548ad43639efb972d769e7f3a625f33b7923b88eb683634ef330861a2b"
+    },
+    {
+      "sequence": 11,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0011-periodic.json",
+      "sha256": "95bb576b943ca6a836a933a7100af4bba2351d951485c03ff78db6a13e1c2af8",
+      "checkedAt": "2026-07-16T09:23:14.233Z",
+      "snapshotSha256": "b5ff978ccbaf4bf91b50c8cedbee7461c60e59f0cb860cdd1fafc93b838d6a38"
+    },
+    {
+      "sequence": 12,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0012-periodic.json",
+      "sha256": "4ddfa76bb288ba73477aceae8b2787d0d9a99c1384e385bab54d7c3f6fa7767f",
+      "checkedAt": "2026-07-16T09:24:00.570Z",
+      "snapshotSha256": "3755c5096a87affb47da8d737ea2ed9d0a1ea08baccfff2866cbef97a677e65c"
+    },
+    {
+      "sequence": 13,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0013-periodic.json",
+      "sha256": "360d5d22a5fa2ae0290dec05152faeeb19aba1734afaa61c40c2338e78f1cd51",
+      "checkedAt": "2026-07-16T09:24:46.860Z",
+      "snapshotSha256": "c0873a3d9a8ce874c7a84718684b9ad8227fbc495b0c08c66d18442f8d0e164d"
+    },
+    {
+      "sequence": 14,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0014-periodic.json",
+      "sha256": "242774d2ca449871a4d2bb6af9295cce550c15d292153be937c80be0b4f17106",
+      "checkedAt": "2026-07-16T09:25:33.172Z",
+      "snapshotSha256": "3118180e9d8c3282c006baa365ecee5b5ad7b804f42271aedc72bacdd84228c2"
+    },
+    {
+      "sequence": 15,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0015-periodic.json",
+      "sha256": "5da53d2deea8d72ac4f48691600a723581ad4639fc664725794078191d7ad8e0",
+      "checkedAt": "2026-07-16T09:26:19.427Z",
+      "snapshotSha256": "4202a6582e40f31c6b353354b1543c60caa0132f006b585794970e2705693ea7"
+    },
+    {
+      "sequence": 16,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0016-periodic.json",
+      "sha256": "2a3704dd57c78c1ce837dc84fefc71a09c55f8d12dafb89c47e9c8e9d6c813a1",
+      "checkedAt": "2026-07-16T09:27:05.849Z",
+      "snapshotSha256": "41815fec96ab7a7360e2fddf803988eb755393b268c3f572d9a8b07f813e9359"
+    },
+    {
+      "sequence": 17,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0017-periodic.json",
+      "sha256": "b7e74d188bb570bbf373f1cf52e55157e515a79432d952ec070ae551ab890362",
+      "checkedAt": "2026-07-16T09:27:52.247Z",
+      "snapshotSha256": "daa724980518209ce2a895e5d413036615f5b5d2b5e71e3e08c9f32e07abd389"
+    },
+    {
+      "sequence": 18,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0018-periodic.json",
+      "sha256": "45c6600303b56f7f7cb6eb7cad4bdcaed6d3e286e1d2d566caf86fabd464b6c6",
+      "checkedAt": "2026-07-16T09:28:38.567Z",
+      "snapshotSha256": "84f09cc739f6f1dd95389115a320747890aa2c5bbaf5a9b458aedfadb97e9236"
+    },
+    {
+      "sequence": 19,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0019-periodic.json",
+      "sha256": "1b15d8c4f7a3503c1bc496136857783685d019b33ba49a11a8faa13f920f1fb1",
+      "checkedAt": "2026-07-16T09:29:25.419Z",
+      "snapshotSha256": "124280db3b234d6dca0a07fdaa0d8bb17bdb1b1e5f7be8d5075816aeca7842ca"
+    },
+    {
+      "sequence": 20,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0020-periodic.json",
+      "sha256": "26f4edb6bdc086ef945d11f9259a688f3edd8ff01661e7e43d4005f189b55f17",
+      "checkedAt": "2026-07-16T09:30:11.753Z",
+      "snapshotSha256": "22df066bd7c685f3189f550d0f1f706dc3a4151171ea76dedbfbbff23c5a8629"
+    },
+    {
+      "sequence": 21,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0021-periodic.json",
+      "sha256": "32d7be50b0b41023d6ddb3a3cccdef25234f6afddf138c1be7bdbd9a5e420e6c",
+      "checkedAt": "2026-07-16T09:30:58.539Z",
+      "snapshotSha256": "3ac15f28d7949175bbd4ecfbf03488a192bd887d53e13e011f00ed282e3917d2"
+    },
+    {
+      "sequence": 22,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0022-periodic.json",
+      "sha256": "e8d4a2661673a584b02264d6794a9ae59c8ad0989744702b3c87dc0f79c355b9",
+      "checkedAt": "2026-07-16T09:31:44.885Z",
+      "snapshotSha256": "379da94805aa66637d72470cd33b8ad10e840d48ecd6eed8bc61f5fb24e1663a"
+    },
+    {
+      "sequence": 23,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0023-periodic.json",
+      "sha256": "7db7b4d3ab8ea8c12fc56aae2e88d75f60ddb93eafeece13cb88b3f6708d175e",
+      "checkedAt": "2026-07-16T09:32:32.155Z",
+      "snapshotSha256": "378a7216bdb1901de4b3dcabec99e86370d5b067050e66902f6309a109bc2305"
+    },
+    {
+      "sequence": 24,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0024-periodic.json",
+      "sha256": "8c04eb80203bf2d991cc68a03c17a241d3f724baaa9b3cf85db240887de6992b",
+      "checkedAt": "2026-07-16T09:33:18.508Z",
+      "snapshotSha256": "2a29c5d6152ce906d52f774de39a11a04afd9bdf0f748952af9c34b80b8dd682"
+    },
+    {
+      "sequence": 25,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0025-periodic.json",
+      "sha256": "4c213ddea8ca0db18888428fa626a22ceca3b0d12845346078fb6737e17bb526",
+      "checkedAt": "2026-07-16T09:34:04.809Z",
+      "snapshotSha256": "c657ecfcbeab4fd08812b40301681fb889cb9f8905ea21aa8ee22929c1998c89"
+    },
+    {
+      "sequence": 26,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0026-periodic.json",
+      "sha256": "c418674a12945d9d2871bbd0ffff08213f439540b7d9d416ab287557d83c1801",
+      "checkedAt": "2026-07-16T09:34:51.114Z",
+      "snapshotSha256": "91deb3da436feb446f32d845d5812ae282f06956fdabb943667508dcfd68a5d7"
+    },
+    {
+      "sequence": 27,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0027-periodic.json",
+      "sha256": "79f3076695962d4d21486ffa6b7c0ab4c4013bf3f062ddf57a3d998dc316ccca",
+      "checkedAt": "2026-07-16T09:35:37.662Z",
+      "snapshotSha256": "bce93309a2cd4f79e5eb50ecb9e115bd86c82d1ea79c6e1f95ebdb9f22f4bb4a"
+    },
+    {
+      "sequence": 28,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0028-periodic.json",
+      "sha256": "6dbc27f05f08f765abbfeab1210dffcb3f540c3b5df9d0e6595a41cab9a680d4",
+      "checkedAt": "2026-07-16T09:36:24.057Z",
+      "snapshotSha256": "2a54a62aa28408ffc77f45b30c405f91d16ea99799201bacf3976f00778472b9"
+    },
+    {
+      "sequence": 29,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0029-periodic.json",
+      "sha256": "0082ecec8c9de8c184112a44496eb91ae86170dd9526003d5735fc0243d3c9c1",
+      "checkedAt": "2026-07-16T09:37:10.387Z",
+      "snapshotSha256": "b38c3b495b1a70420fe5d860607d0cd81cb7b59d3b9274c2565f1632c979906e"
+    },
+    {
+      "sequence": 30,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0030-periodic.json",
+      "sha256": "b04f85fcc02dbec85380baf1f4a7082ebe144d9180ba9a63db879697df926c6f",
+      "checkedAt": "2026-07-16T09:37:56.682Z",
+      "snapshotSha256": "9f3585d8e00c93d03715a5653b52cf9407605e328f89f15a578717017829bb15"
+    },
+    {
+      "sequence": 31,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0031-periodic.json",
+      "sha256": "a653f8b42fb2fd19a68072d4007c1030152bdfac893373b527603931330d5312",
+      "checkedAt": "2026-07-16T09:38:42.991Z",
+      "snapshotSha256": "826127b00fb44dd7bc2ec605c5f20b08e01d45c6644a761c90213a38f28b71da"
+    },
+    {
+      "sequence": 32,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0032-periodic.json",
+      "sha256": "f14c6b319f6cf7caaa61319979449aef3aabb4d3ebe069bec9e15343a496271e",
+      "checkedAt": "2026-07-16T09:39:29.322Z",
+      "snapshotSha256": "57fcf466d8dcd277cb8e9bc3155ce05d4da5cef776079709d24d3051f294c6da"
+    },
+    {
+      "sequence": 33,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0033-periodic.json",
+      "sha256": "a297547b2beceeab57f07b6b197f3461d48c8affa1e29268f23c39f26b83b52c",
+      "checkedAt": "2026-07-16T09:40:15.665Z",
+      "snapshotSha256": "5eabe1de0a35569fc4150a19b8d4c0eb43d8c2caeb15873fb45fd044830111e7"
+    },
+    {
+      "sequence": 34,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0034-periodic.json",
+      "sha256": "ae9d88e261cb4c45cda0d9233acedc46495e2d3ddb621fbd4b0c46d839282921",
+      "checkedAt": "2026-07-16T09:41:02.067Z",
+      "snapshotSha256": "2f61358e378ba0bd307b383cb973e580607bbf6f3e33f88ee6920700f5cc5a44"
+    },
+    {
+      "sequence": 35,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0035-periodic.json",
+      "sha256": "a8ec92476a1c779b1eba784436e4fc0c1f274c03b2f584c01c8e1f688140ff02",
+      "checkedAt": "2026-07-16T09:41:48.438Z",
+      "snapshotSha256": "5d1082aee02fa9477f8ae98db45d6471364b975ce330f7eeef01782df8d1d7d7"
+    },
+    {
+      "sequence": 36,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0036-periodic.json",
+      "sha256": "c8829fa834ce0e5422c9538ca70000c85bfb4f8e68570015dc9365298746ba2d",
+      "checkedAt": "2026-07-16T09:42:35.278Z",
+      "snapshotSha256": "b32cf27565860483ef77b95e51797f92d0877415a354b8bca72d2854ad18239f"
+    },
+    {
+      "sequence": 37,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0037-periodic.json",
+      "sha256": "f482cbae83bf6e9fa325e82c695894b39fca91d3657bf08dc940f24acdb7e035",
+      "checkedAt": "2026-07-16T09:43:21.700Z",
+      "snapshotSha256": "302fce071001fefb0f606f8a3b863283b519270f05aaa6c3a551b1b05e397565"
+    },
+    {
+      "sequence": 38,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0038-periodic.json",
+      "sha256": "38130711c138413fb964f868c223b180f34e903d4f2638090e4b076423827e78",
+      "checkedAt": "2026-07-16T09:44:08.505Z",
+      "snapshotSha256": "5020d6a9508daa41b5f435bd68f6037f3b201a0e424707c4efd41ff422f9bf76"
+    },
+    {
+      "sequence": 39,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0039-periodic.json",
+      "sha256": "ea021f4cd38686d44d475fd0e03dc0f144d8311311cc2552a0ec154d1cc3d299",
+      "checkedAt": "2026-07-16T09:44:54.866Z",
+      "snapshotSha256": "65ad82f528f98355d2fc7f89cc16296042193a365636e51fe23579a6ce3d873a"
+    },
+    {
+      "sequence": 40,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0040-periodic.json",
+      "sha256": "ce40f882fb0c576c22ccefe971ac6c57353eaa70cc5a28eea8b13fd2a84de211",
+      "checkedAt": "2026-07-16T09:45:41.689Z",
+      "snapshotSha256": "ef6b8a29545999d1a936e73124fa47759d7f71be4eb1f15bdc1c49deaca85ebb"
+    },
+    {
+      "sequence": 41,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0041-periodic.json",
+      "sha256": "7b89faffb3ebef47c2909f0e859d076d5fd3cbc7bd14f5a8deb0c5a6b1660680",
+      "checkedAt": "2026-07-16T09:46:28.048Z",
+      "snapshotSha256": "7dd4fbd7256749aaf0b6fc01393cb485482042ca2e189fe6f74c90b13f751822"
+    },
+    {
+      "sequence": 42,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0042-periodic.json",
+      "sha256": "3ed719d970ef6f0ad8ce90bf97dd42d6e26ee51ed672d42a9bf957ffb260bf3c",
+      "checkedAt": "2026-07-16T09:47:15.222Z",
+      "snapshotSha256": "4bf602a243cb7f1a09374f39d2cef4c02952e02a1b792715ffef015fb674147c"
+    },
+    {
+      "sequence": 43,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0043-periodic.json",
+      "sha256": "b1511e8a1ad8aea1f0ea09a89a519092615d1d0afc5dae027a6cdda82a668d9b",
+      "checkedAt": "2026-07-16T09:48:01.482Z",
+      "snapshotSha256": "ec50f592d1eade0f80ebf641597a98607ed744415771cb27cd1b4edec5602176"
+    },
+    {
+      "sequence": 44,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0044-periodic.json",
+      "sha256": "79fd9d861e3e343ee3b7d95125d570e53ef1ac7295ab035e75a871543d989f54",
+      "checkedAt": "2026-07-16T09:48:47.832Z",
+      "snapshotSha256": "ee055948a3c70c29565baa8239121e91fc0113481de7309d365b35c62a4db267"
+    },
+    {
+      "sequence": 45,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0045-periodic.json",
+      "sha256": "2cd52836d8d25c68d2a31d1bb8891e516ba0bb3c682d1ba22bf3bc919ec09f6a",
+      "checkedAt": "2026-07-16T09:49:34.088Z",
+      "snapshotSha256": "8076e9fab9aa8d7a194c4a11725d955a25945d70919adb470d49ac36f54b96c7"
+    },
+    {
+      "sequence": 46,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0046-periodic.json",
+      "sha256": "026dcc645a993dd194872106dbc7d0ec04779b58b8eb391b6605029bcd28d3c2",
+      "checkedAt": "2026-07-16T09:50:20.391Z",
+      "snapshotSha256": "fcf5221dbc25fbde544c61ae66f0c95daf56aa519440c33a7b6831015c1a9647"
+    },
+    {
+      "sequence": 47,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0047-periodic.json",
+      "sha256": "00e0aa055a4adbc3ea0eb192e3fb6bdf5d74453992f564751ba0d130e5dab253",
+      "checkedAt": "2026-07-16T09:51:06.738Z",
+      "snapshotSha256": "7942c7b3182abd0a9e5c5594fa83c9616a578a8df4522973a03ccf0e8188f11e"
+    },
+    {
+      "sequence": 48,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0048-periodic.json",
+      "sha256": "8f182bee6e39c9b57b53b765c481962d7a0a32dd04ccd9c2a1f77efce37f2f5f",
+      "checkedAt": "2026-07-16T09:51:53.033Z",
+      "snapshotSha256": "d8fcf618af796e1062a93f449d2d02037aa994b0ee473bfb77971b362b6ebdab"
+    },
+    {
+      "sequence": 49,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0049-periodic.json",
+      "sha256": "bc0431e0dbe21e5da54310e0b4c93033b2e413775eb5a2b2dd7b5a8499e283e3",
+      "checkedAt": "2026-07-16T09:52:39.346Z",
+      "snapshotSha256": "81ddaf3d13119f4157a7a0e237bf3fb809c432051ea1e7c320084982a5796f0c"
+    },
+    {
+      "sequence": 50,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0050-periodic.json",
+      "sha256": "1df1bfe2c5e77c4a5e423393ed5e8cdeadcc8a66502dd3aed389196e6c4ae38a",
+      "checkedAt": "2026-07-16T09:53:25.635Z",
+      "snapshotSha256": "f4fbc8ef74674d52fb0f359f818b742039df6c77c60346aeee1ad709edbbddad"
+    },
+    {
+      "sequence": 51,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0051-periodic.json",
+      "sha256": "a19a4f22677a0957bd2a8555c33d515b269283118b89208f52a33c023962540e",
+      "checkedAt": "2026-07-16T09:54:11.988Z",
+      "snapshotSha256": "d261a9e0a05e8b997d8134ac4db6d025e151881f03a4259100ec5c784f832122"
+    },
+    {
+      "sequence": 52,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0052-periodic.json",
+      "sha256": "0b47f444d74062b5bd4e592bb789b2380e2b025eb3208b6ef87489a1ccfd4e0c",
+      "checkedAt": "2026-07-16T09:54:58.774Z",
+      "snapshotSha256": "d71591d2be14b5b1980547e4039857ea33ff06b781eef89d830554406c6e7e4a"
+    },
+    {
+      "sequence": 53,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0053-periodic.json",
+      "sha256": "873f6998ea104cc5eb8e35479b7bfc536453018d326729ff2d268218a88c2133",
+      "checkedAt": "2026-07-16T09:55:45.212Z",
+      "snapshotSha256": "eef68837e03d80987828aa368ea1992a62a7d4da9daa6dc0839583e757bd311c"
+    },
+    {
+      "sequence": 54,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0054-periodic.json",
+      "sha256": "5adcc18871c346fef5f763f6fed713cd73c87d33fdcad03253a4b5e7aedbf597",
+      "checkedAt": "2026-07-16T09:56:32.028Z",
+      "snapshotSha256": "b41b0f5fb51d9bcdd23eb66c9ee90ea5aaf4ae1b1c042b4f3bf6417447cc7157"
+    },
+    {
+      "sequence": 55,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0055-periodic.json",
+      "sha256": "88c626845c1bf1bafa85cd80e782cc69484acf6040769bbb5d06c58747a5ccfe",
+      "checkedAt": "2026-07-16T09:57:18.390Z",
+      "snapshotSha256": "12b3cfeb63dcc01b6c950890e4914ea8bc927f3db40d7ca7c7e80b8f166ac979"
+    },
+    {
+      "sequence": 56,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0056-periodic.json",
+      "sha256": "c8bbe1074bfcc681da8aac809cea3e00a6db3cd97ffb22cd5f632a176965ddc7",
+      "checkedAt": "2026-07-16T09:58:05.256Z",
+      "snapshotSha256": "3eabdd572212328c29140e49b76d66ba3050f79895a492d88a30eb2cd730d0dd"
+    },
+    {
+      "sequence": 57,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0057-periodic.json",
+      "sha256": "90217fe4be4f04befab16bb830c0680fe44a219b6084e4655b90bc1bd184f517",
+      "checkedAt": "2026-07-16T09:58:51.647Z",
+      "snapshotSha256": "afc56cf9f9cbffb998673fbef750899d01ea31584041d6b271a848a89bb1defb"
+    },
+    {
+      "sequence": 58,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0058-periodic.json",
+      "sha256": "ff67ec64d26a13570d4f8046fc9f3147f4c56900472f9bb5e622eceaff61f088",
+      "checkedAt": "2026-07-16T09:59:38.476Z",
+      "snapshotSha256": "32e981272e3ec6d9a3042266d7bd28e86a1d12ee6cb12140a352f3cf94c47974"
+    },
+    {
+      "sequence": 59,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0059-periodic.json",
+      "sha256": "fecf25bce16c65bc279efcc0e822266acc8127496963d56b551998d83580a665",
+      "checkedAt": "2026-07-16T10:00:24.808Z",
+      "snapshotSha256": "99af7a6730e13c864658b67056ea416d9b70cfb6f9cd0e91fbaa65fefa293306"
+    },
+    {
+      "sequence": 60,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0060-periodic.json",
+      "sha256": "82ae69ce73e211e8b9ade0ad98dceeab577dd956ada646f97b1aef098d508cdb",
+      "checkedAt": "2026-07-16T10:01:11.983Z",
+      "snapshotSha256": "c049f1765a126bd5dd361bc2910e53b7d6cad26ed34bae969c5857eab62a8281"
+    },
+    {
+      "sequence": 61,
+      "phase": "periodic",
+      "path": "zinc-guard/prelaunch/artifacts/0061-periodic.json",
+      "sha256": "a8f6b0ad05758fc9020772721bd894ca42bfe1eecd8cc6dde6b6fdc705dc822a",
+      "checkedAt": "2026-07-16T10:01:58.298Z",
+      "snapshotSha256": "eddc59b299298694191f0b2187cc8a63b616462bef564249d70b196470450e3e"
+    },
+    {
+      "sequence": 62,
+      "phase": "pre",
+      "path": "zinc-guard/0062-pre.json",
+      "sha256": "966ac1ee61fa7dd7cdaff4608788e69f3816756e3b185a5570c09e79a7409753",
+      "checkedAt": "2026-07-16T10:02:10.781Z",
+      "snapshotSha256": "2f2dbf4fedc8e3954f006af934f62c9196f8b5e1e44d0113fb2fcf7e185fb0d6"
+    },
+    {
+      "sequence": 63,
+      "phase": "post-cell",
+      "path": "zinc-guard/0063-post-cell.json",
+      "sha256": "6303ac6fe1478ff8dbb78eaf2a580f21ffba978e630dd04bc71cce8971fadcc2",
+      "checkedAt": "2026-07-16T10:02:54.763Z",
+      "snapshotSha256": "ea57c9e5fd886f31f8cd49cf33385c36d8812fdaeda63592e11305e638980efe"
+    },
+    {
+      "sequence": 64,
+      "phase": "periodic",
+      "path": "zinc-guard/0064-periodic.json",
+      "sha256": "4c060f7e89bcbd51f52b9d5b6799587d5cc94f4d9c3a37b31624e5d70744e7ce",
+      "checkedAt": "2026-07-16T10:03:41.400Z",
+      "snapshotSha256": "ddf6d3a361ec9ee90c0c41302d9e6bf23fdac442c34d8d0ce73c9bed23318b02"
+    },
+    {
+      "sequence": 65,
+      "phase": "periodic",
+      "path": "zinc-guard/0065-periodic.json",
+      "sha256": "f572ded6360a253a62d84f35c550f57f0a24cc479c6cc7d9242abcaffc0cd7bb",
+      "checkedAt": "2026-07-16T10:04:26.399Z",
+      "snapshotSha256": "e3d4a9b404d475ba33d580016dc5c3529f32717eec995d9ebaaf4bed3384d05f"
+    },
+    {
+      "sequence": 66,
+      "phase": "periodic",
+      "path": "zinc-guard/0066-periodic.json",
+      "sha256": "380c95138004c50223c96a9d69918a6d7bd69c084d6af63b4df4290c8f6e3e01",
+      "checkedAt": "2026-07-16T10:05:11.402Z",
+      "snapshotSha256": "073a4e387740cb617c3d68863ac7e7904b1b11af2a87a6c64abd03ae189dacaf"
+    },
+    {
+      "sequence": 67,
+      "phase": "periodic",
+      "path": "zinc-guard/0067-periodic.json",
+      "sha256": "b58ce462b1a24e7f3bef598fa81144e812e3fe1d323592137f9b8ed14cd7f321",
+      "checkedAt": "2026-07-16T10:05:56.382Z",
+      "snapshotSha256": "3d701aa5241b2f42b24c0ad5d0f6df222af4da4e2cc2a4116fed3e90edda7b16"
+    },
+    {
+      "sequence": 68,
+      "phase": "periodic",
+      "path": "zinc-guard/0068-periodic.json",
+      "sha256": "dc05d8ba5f6d939f756ba171126a94f3ffe53e575a9e7aaf5cba5a9489bea2db",
+      "checkedAt": "2026-07-16T10:06:41.342Z",
+      "snapshotSha256": "d0d31e8fdca7dd6bf438650cd7709bc73281ec7613edda9e32a6735231a9515c"
+    },
+    {
+      "sequence": 69,
+      "phase": "periodic",
+      "path": "zinc-guard/0069-periodic.json",
+      "sha256": "8fc15695ab50923a2d58a28edccaf9b908ef0fc94556b8a9c09995c9c27f8a66",
+      "checkedAt": "2026-07-16T10:07:26.362Z",
+      "snapshotSha256": "f38e46d78f118708288e8cdc6edc1a1f4e6dfb717c3b8c7cccec925e7252856b"
+    },
+    {
+      "sequence": 70,
+      "phase": "periodic",
+      "path": "zinc-guard/0070-periodic.json",
+      "sha256": "0c049166bb70a2d37c91a0cc5d198f72b3e530e8da8adf1d0f7d90402fc2f1c6",
+      "checkedAt": "2026-07-16T10:08:11.407Z",
+      "snapshotSha256": "b401faa667a499c749b94986d61fbbd1fc2adf8e7ecf6ea6096ed8b2d654f968"
+    },
+    {
+      "sequence": 71,
+      "phase": "periodic",
+      "path": "zinc-guard/0071-periodic.json",
+      "sha256": "3a7d82d49b4ceb19f504f5e80f56d5a97759a51cb88b54333947cf3a5340e633",
+      "checkedAt": "2026-07-16T10:08:56.469Z",
+      "snapshotSha256": "6f9cf96513fd1e7a55fc4c93bc041df1f127e275c295b7995ced7db5133fe1d2"
+    },
+    {
+      "sequence": 72,
+      "phase": "periodic",
+      "path": "zinc-guard/0072-periodic.json",
+      "sha256": "c7b96f426232195ceec562fd657e9442b91e5edcf6ff1a85cc4b9f834d44f523",
+      "checkedAt": "2026-07-16T10:09:41.466Z",
+      "snapshotSha256": "077281a09e0106e3571a4ab8d389629ecd448b244e65b60c907fd0d4b6b33b87"
+    },
+    {
+      "sequence": 73,
+      "phase": "periodic",
+      "path": "zinc-guard/0073-periodic.json",
+      "sha256": "4e5b40472c6a3ae919f9ded7957808d405e7b3dee1ca71a5acc79688c27105b6",
+      "checkedAt": "2026-07-16T10:10:26.900Z",
+      "snapshotSha256": "67277c66526a82004237bfdb07f059c6975ae3977ea569cb493f498891834790"
+    },
+    {
+      "sequence": 74,
+      "phase": "periodic",
+      "path": "zinc-guard/0074-periodic.json",
+      "sha256": "8b999a8f7b8ad9eb6be19fe8814a7201d3206bd2ac4ebd94b162c100622d019e",
+      "checkedAt": "2026-07-16T10:11:11.437Z",
+      "snapshotSha256": "ea7e200749a2c9bf6bbeddf37b899e8339084fbcba1099b01877ec5db6acd7d4"
+    },
+    {
+      "sequence": 75,
+      "phase": "periodic",
+      "path": "zinc-guard/0075-periodic.json",
+      "sha256": "1afcd7f2dcd98063494adc3eb7393b02cada09ac4787b4ebfaeecd5e7f457ad3",
+      "checkedAt": "2026-07-16T10:11:56.911Z",
+      "snapshotSha256": "7c524c7518cc87bb8e2b9a25c5379896c6612d9112c755fe8542b303bdb1bf8e"
+    },
+    {
+      "sequence": 76,
+      "phase": "periodic",
+      "path": "zinc-guard/0076-periodic.json",
+      "sha256": "ec1386697c90e3db4a02b261a88469f289587be20bbe9ab77ccdb3bd33346dcd",
+      "checkedAt": "2026-07-16T10:12:41.458Z",
+      "snapshotSha256": "fd763cbc6662dcf5152509ed0d0e287b5ee9055676bd02ebcb41809a1a946207"
+    },
+    {
+      "sequence": 77,
+      "phase": "periodic",
+      "path": "zinc-guard/0077-periodic.json",
+      "sha256": "0a78677ae0cd4e7469ecda714913de58df2213143165fa4f254cf0da0bdbf80a",
+      "checkedAt": "2026-07-16T10:13:26.986Z",
+      "snapshotSha256": "cfa0e76b12431154ad23dd98b7e3abd994860d404e90935cf80a10a180c2a4e2"
+    },
+    {
+      "sequence": 78,
+      "phase": "periodic",
+      "path": "zinc-guard/0078-periodic.json",
+      "sha256": "406aeef14c1de0b60afe361dad8edca1fb62a857a71c06a9fa7e5dcaed4bd7b5",
+      "checkedAt": "2026-07-16T10:14:11.432Z",
+      "snapshotSha256": "26a63cdf8ca7b786ec4322312d63d7d0185477f047abebcd2127d40a210230a0"
+    },
+    {
+      "sequence": 79,
+      "phase": "periodic",
+      "path": "zinc-guard/0079-periodic.json",
+      "sha256": "7bca4b8eba3ddf6f5a9184383fc50dc52c264a0e46b90cec891a41a0a34b9b21",
+      "checkedAt": "2026-07-16T10:14:56.447Z",
+      "snapshotSha256": "85d2f80b1a905ecb33cacf4b8877f47af07092aaec887e6e3169fe39fe2a3598"
+    },
+    {
+      "sequence": 80,
+      "phase": "periodic",
+      "path": "zinc-guard/0080-periodic.json",
+      "sha256": "660306f4e2bf44845ecb0350ddf7146780653d483bc5671ebac6c4735395aa60",
+      "checkedAt": "2026-07-16T10:15:41.384Z",
+      "snapshotSha256": "804dce32c6677c92360b97b50e19213e648faf4dbbf0a6254c87befb2ad6feeb"
+    },
+    {
+      "sequence": 81,
+      "phase": "periodic",
+      "path": "zinc-guard/0081-periodic.json",
+      "sha256": "cadd1efd44a45be7daf624c14765e9ee81fdcac5f01ecd8767ec41f4f7e1d486",
+      "checkedAt": "2026-07-16T10:16:26.449Z",
+      "snapshotSha256": "ca44dc574e0eea983a5c443290a27aa7914febb33f76aa96134b1e67723d15d3"
+    },
+    {
+      "sequence": 82,
+      "phase": "periodic",
+      "path": "zinc-guard/0082-periodic.json",
+      "sha256": "880734c6ae510168cf3ad10f853d1592b39493afa7d943415dc9344615ee031b",
+      "checkedAt": "2026-07-16T10:17:11.399Z",
+      "snapshotSha256": "bcf354e9d38762a9593f8372d3864c52200b08c29b14fcdb778c762f80a85c8e"
+    },
+    {
+      "sequence": 83,
+      "phase": "periodic",
+      "path": "zinc-guard/0083-periodic.json",
+      "sha256": "24109bdda38782623017fccb4fec5aaa62398e01cd4af45ef88cfed987a78db2",
+      "checkedAt": "2026-07-16T10:17:56.469Z",
+      "snapshotSha256": "5ea49a4a2fdb72e1372d4a41a54858ae0a96968ad9189fdd201b400aac7ad043"
+    },
+    {
+      "sequence": 84,
+      "phase": "periodic",
+      "path": "zinc-guard/0084-periodic.json",
+      "sha256": "b6f43add103c682ebaec97ff5c68e4acac40a7082ba5185fe7ea3ffff984b45f",
+      "checkedAt": "2026-07-16T10:18:41.434Z",
+      "snapshotSha256": "02c148b3b0269a6fde5399bd8079224109736e46a3c1598e723efb4781e7a52e"
+    },
+    {
+      "sequence": 85,
+      "phase": "periodic",
+      "path": "zinc-guard/0085-periodic.json",
+      "sha256": "c2575bbff4ad0ff079a20d0d734e0aae3949a2a73207178bf0607450775368cc",
+      "checkedAt": "2026-07-16T10:19:26.458Z",
+      "snapshotSha256": "f35e710cb552c7c40914dbc2617f42307f54c63d1f7f80ce7981e6f9d71c87c1"
+    },
+    {
+      "sequence": 86,
+      "phase": "periodic",
+      "path": "zinc-guard/0086-periodic.json",
+      "sha256": "ef32e4da42446cacae0cb9f6c4bcce9a8f6326ceb9c4216f5ef90beb9dcafecd",
+      "checkedAt": "2026-07-16T10:20:11.425Z",
+      "snapshotSha256": "e7edd66e89e24a0fad84db67bbd49a8add922bc70a4de396a65f040b4708b2cc"
+    },
+    {
+      "sequence": 87,
+      "phase": "periodic",
+      "path": "zinc-guard/0087-periodic.json",
+      "sha256": "0401adece6473623274c418bec555b776ae8752075057ae3b4f7e381affcc9bd",
+      "checkedAt": "2026-07-16T10:20:56.460Z",
+      "snapshotSha256": "596c1d34ecae60e7ca770b2a6fd3ebf9e6816dca2196d34ef5e26c060cfb1ec7"
+    },
+    {
+      "sequence": 88,
+      "phase": "periodic",
+      "path": "zinc-guard/0088-periodic.json",
+      "sha256": "0a120b90fa01d7f1afbafe235d7a4d3aeba4abb62a2380bc939a2c4328963ccf",
+      "checkedAt": "2026-07-16T10:21:41.433Z",
+      "snapshotSha256": "8706fbadb646803e82ccaaf3e15a1ecdf32e7c272bf053c358336e0ae976b15e"
+    },
+    {
+      "sequence": 89,
+      "phase": "periodic",
+      "path": "zinc-guard/0089-periodic.json",
+      "sha256": "74ffa09ef6eb9d51ba6bb2019924f0b9adc4873faa57cf9401a8b1e026fbfa38",
+      "checkedAt": "2026-07-16T10:22:26.368Z",
+      "snapshotSha256": "f879bbb7cdb71830059d8d9688bab112f307c2a6a87c69bfbea3c545e2acf026"
+    },
+    {
+      "sequence": 90,
+      "phase": "periodic",
+      "path": "zinc-guard/0090-periodic.json",
+      "sha256": "72c215c307eb93a0cdf4eea2015c063385f2a257e8207d70a95a1402d4d3e546",
+      "checkedAt": "2026-07-16T10:23:11.966Z",
+      "snapshotSha256": "99ac1eee3e2bcb7918c89eb5eee519d8c80359d9c6ba4514b900bdcc7a84b378"
+    },
+    {
+      "sequence": 91,
+      "phase": "post-cell",
+      "path": "zinc-guard/0091-post-cell.json",
+      "sha256": "c9ddd90a0386cdb7074dc0f0b435bec7ffd7119416376fe580c294379b835f97",
+      "checkedAt": "2026-07-16T10:23:50.532Z",
+      "snapshotSha256": "84df96c6723971fb1733f6ab92e9f6cd492aedb859354cfd81045ef6008fdab3"
+    },
+    {
+      "sequence": 92,
+      "phase": "periodic",
+      "path": "zinc-guard/0092-periodic.json",
+      "sha256": "c39e3d4cc420f21f035d6b4d867657da00225c71439a545467730b6b1604a990",
+      "checkedAt": "2026-07-16T10:24:37.514Z",
+      "snapshotSha256": "653773fc4b18d49982286ca05040a9faeb1030e9d4f22757c68b50ba5775dc58"
+    },
+    {
+      "sequence": 93,
+      "phase": "periodic",
+      "path": "zinc-guard/0093-periodic.json",
+      "sha256": "f59e638c23ea6b8a67a49941ea1e79850036a670c9415457ff63fc13fda0d31c",
+      "checkedAt": "2026-07-16T10:25:22.082Z",
+      "snapshotSha256": "fce65c7da93f7ba95082945b5b2d287c10aba13f6bf3da034e996909bb025a86"
+    },
+    {
+      "sequence": 94,
+      "phase": "periodic",
+      "path": "zinc-guard/0094-periodic.json",
+      "sha256": "4524e38e3d7a5e7e26a4dfa0fcddfde1b033579daa2ee4c0e7b480a55a678899",
+      "checkedAt": "2026-07-16T10:26:07.492Z",
+      "snapshotSha256": "2a32c9a9a7ef4e0c0dc5c040093ff14edd015f9ab5954c8d44cd664133c6f309"
+    },
+    {
+      "sequence": 95,
+      "phase": "periodic",
+      "path": "zinc-guard/0095-periodic.json",
+      "sha256": "0fa45a1b7ad5d16d5b47d0efbf269a16d1bd895cb04fc28c76f626d06e5b75bf",
+      "checkedAt": "2026-07-16T10:26:52.055Z",
+      "snapshotSha256": "978de2f259ece0e628c3ad6c88613d4538e98179a844a14964d0efb913ed9f9d"
+    },
+    {
+      "sequence": 96,
+      "phase": "periodic",
+      "path": "zinc-guard/0096-periodic.json",
+      "sha256": "1ffc7d90f41f0138c8437521c71ff127538ef3b6bb795e0bb39eba5da6a2c9c3",
+      "checkedAt": "2026-07-16T10:27:37.504Z",
+      "snapshotSha256": "b3a5237546a44574ae913a17ee2d8ca898db169163cba51f2f39c67a50c89c81"
+    },
+    {
+      "sequence": 97,
+      "phase": "periodic",
+      "path": "zinc-guard/0097-periodic.json",
+      "sha256": "20df0805b395a1f853612989134b45a97d883927c09e676135e49a8a2a76cb99",
+      "checkedAt": "2026-07-16T10:28:22.036Z",
+      "snapshotSha256": "0f39eb1315e56965328179932397beb225bab3d37f8e5427116f78e5d5cb539f"
+    },
+    {
+      "sequence": 98,
+      "phase": "periodic",
+      "path": "zinc-guard/0098-periodic.json",
+      "sha256": "e8279202ba47a82b83d94b013aced3b36d7b8f4ca597e0fae361611cfe163058",
+      "checkedAt": "2026-07-16T10:29:07.818Z",
+      "snapshotSha256": "d077476e3e76717b9fb60c65f56e638f45cb176398020a58b9f8d16ba565edb9"
+    },
+    {
+      "sequence": 99,
+      "phase": "periodic",
+      "path": "zinc-guard/0099-periodic.json",
+      "sha256": "e199fec66721b5e543e3a06f23775d773d3ae0390ee42a973e788af9a26e193b",
+      "checkedAt": "2026-07-16T10:29:51.989Z",
+      "snapshotSha256": "e7e49dd9064f086babcabdc2046e61d38886b5e70c7ebded3d2703093c3f157b"
+    },
+    {
+      "sequence": 100,
+      "phase": "periodic",
+      "path": "zinc-guard/0100-periodic.json",
+      "sha256": "ce9f89683df655cddd1aae10a06ddf76d5c9b2b251a0ffecffbe29372e2e39ed",
+      "checkedAt": "2026-07-16T10:30:36.984Z",
+      "snapshotSha256": "2ca49cd097e12bf7bea1299278922eee87356b093d92b9b94ea759aac1653b3c"
+    },
+    {
+      "sequence": 101,
+      "phase": "periodic",
+      "path": "zinc-guard/0101-periodic.json",
+      "sha256": "479a3a126d842bbc8ab23fe84e4dee85b274f33fd2bdc78b92d8e94d2bbfad11",
+      "checkedAt": "2026-07-16T10:31:22.088Z",
+      "snapshotSha256": "4cfb8126348473259cffa8efda5b44dbfde74482807c01af43151ee0f8db3554"
+    },
+    {
+      "sequence": 102,
+      "phase": "periodic",
+      "path": "zinc-guard/0102-periodic.json",
+      "sha256": "810d3a83c6546e23ce163e2061e44e9431c7fd379136f5f382cd421bcccbdbef",
+      "checkedAt": "2026-07-16T10:32:07.006Z",
+      "snapshotSha256": "deb4c91311b03ab43d4665928cafffcb46f41b4f01f56f7da5164c1bcb3b855f"
+    },
+    {
+      "sequence": 103,
+      "phase": "post-cell",
+      "path": "zinc-guard/0103-post-cell.json",
+      "sha256": "562166123dfbb747a168f8a5dc04223e0ac1fee2c325829db67c44ffe43b4f79",
+      "checkedAt": "2026-07-16T10:32:32.263Z",
+      "snapshotSha256": "efced9f3ba1d5af283de775eea22d8becb9a36ac22ccd6931b6c00a143e0f4da"
+    },
+    {
+      "sequence": 104,
+      "phase": "periodic",
+      "path": "zinc-guard/0104-periodic.json",
+      "sha256": "3b6a4d53541c2d6874da01529a88a8f9bbe9573c98e911e545eaaa7ba0029225",
+      "checkedAt": "2026-07-16T10:33:18.953Z",
+      "snapshotSha256": "a39c94da4ddae2a6b9c71f7924202f25d8cc2fd9e31f0a1a985cb6e92cd4bc13"
+    },
+    {
+      "sequence": 105,
+      "phase": "periodic",
+      "path": "zinc-guard/0105-periodic.json",
+      "sha256": "059f52f1dc1ba40be3c9aac5aab1e3a5826e1150ca3ecd4b19f4ebe1a84b3cff",
+      "checkedAt": "2026-07-16T10:34:03.896Z",
+      "snapshotSha256": "8123fcec60bf4ca8a5273fe92a7761032e83cfd1d204773021022585e0ca3dbd"
+    },
+    {
+      "sequence": 106,
+      "phase": "periodic",
+      "path": "zinc-guard/0106-periodic.json",
+      "sha256": "fa8ba510cb62b4d9ea3210e0116f502b1bb36cb7636cf0924bc493f871bee943",
+      "checkedAt": "2026-07-16T10:34:48.863Z",
+      "snapshotSha256": "0c59d59cd1bce4061a15237af5df7b15f1362769e4ab302b7c9a1aa836dfbaf7"
+    },
+    {
+      "sequence": 107,
+      "phase": "periodic",
+      "path": "zinc-guard/0107-periodic.json",
+      "sha256": "a20f890db71a9493f9f5a0d62d5a84aab05ed8e2cc75059991c60db8eefdbf19",
+      "checkedAt": "2026-07-16T10:35:33.873Z",
+      "snapshotSha256": "39480a3f14974da53f877462a81180a2c7e81e71b2fbf2bfbdb4730307812809"
+    },
+    {
+      "sequence": 108,
+      "phase": "periodic",
+      "path": "zinc-guard/0108-periodic.json",
+      "sha256": "8c47e9164e9971afe10e197935bdfe3871d713e579e0c1a55e6eaffa9e77d521",
+      "checkedAt": "2026-07-16T10:36:18.874Z",
+      "snapshotSha256": "9b0702aaf8e0861bc588be51565c32bb1284b82e8484dd07030a18b62b2ed56a"
+    },
+    {
+      "sequence": 109,
+      "phase": "periodic",
+      "path": "zinc-guard/0109-periodic.json",
+      "sha256": "6db2ea379cc8dd0acc142350e605ddf575fa5356448a2b9caee71e8c17189421",
+      "checkedAt": "2026-07-16T10:37:04.405Z",
+      "snapshotSha256": "27218fed194426f63ef00e07e8cdae2000ce139018e88666ad20a7606ae7c0b8"
+    },
+    {
+      "sequence": 110,
+      "phase": "periodic",
+      "path": "zinc-guard/0110-periodic.json",
+      "sha256": "bf843e6dac0464074d79e5c38d1022842038824ee8e689fa19f9ade6144f7086",
+      "checkedAt": "2026-07-16T10:37:49.025Z",
+      "snapshotSha256": "a9eb7991812f870553d11a08ba625e5e73f6ff557084c3bfe5aca14747d227ba"
+    },
+    {
+      "sequence": 111,
+      "phase": "periodic",
+      "path": "zinc-guard/0111-periodic.json",
+      "sha256": "7a98374e334e6ef8d30563870f56d695801438cd91538a42aeb9a6cfa931e9d6",
+      "checkedAt": "2026-07-16T10:38:34.431Z",
+      "snapshotSha256": "6f9e9d7af5b313826e16b61501bb1853de72240a4b9928c95a125549bfa5f8ce"
+    },
+    {
+      "sequence": 112,
+      "phase": "periodic",
+      "path": "zinc-guard/0112-periodic.json",
+      "sha256": "a8a2f4a4be7808b8c792664c4ba7d764cf63d8249c975a1a3def662dbc389412",
+      "checkedAt": "2026-07-16T10:39:18.986Z",
+      "snapshotSha256": "98460a18cc85c0dde736bb465df5987960f8eb91fbd0102abdfadf54238cfa8e"
+    },
+    {
+      "sequence": 113,
+      "phase": "periodic",
+      "path": "zinc-guard/0113-periodic.json",
+      "sha256": "03a88cb3cf91207349740c1ae1f729125c632191a76b338b7152abc748b73f08",
+      "checkedAt": "2026-07-16T10:40:04.432Z",
+      "snapshotSha256": "75bde300a26fa28ab70aa19886a1aaf23eaa2354191d1ef358bfb0f2a04ad24f"
+    },
+    {
+      "sequence": 114,
+      "phase": "periodic",
+      "path": "zinc-guard/0114-periodic.json",
+      "sha256": "18978d214bea158811bf54589af2e52dd6330bdaac5e588408a0fff543ced52a",
+      "checkedAt": "2026-07-16T10:40:48.983Z",
+      "snapshotSha256": "facf9eecec60f808e1d7cc8987d32358c5d379e28a473f44409b33ad4e132211"
+    },
+    {
+      "sequence": 115,
+      "phase": "periodic",
+      "path": "zinc-guard/0115-periodic.json",
+      "sha256": "3db8e8c673582f919fa960da1729ae6a0e8a7851727366127b16c93ae5b20ede",
+      "checkedAt": "2026-07-16T10:41:34.497Z",
+      "snapshotSha256": "74da7b4e62cfb95ebbbface5de7216001966a89558386e141cd4bba6faab22dc"
+    },
+    {
+      "sequence": 116,
+      "phase": "periodic",
+      "path": "zinc-guard/0116-periodic.json",
+      "sha256": "f3b15fce76161e31ecc495aeda4ae2aa4e2becdd133b3b417dd20de73c35e91e",
+      "checkedAt": "2026-07-16T10:42:18.988Z",
+      "snapshotSha256": "7e1d90090030c45e075f5cab106d0682c2bbaa1bcf589b3d09b58d0416969b29"
+    },
+    {
+      "sequence": 117,
+      "phase": "periodic",
+      "path": "zinc-guard/0117-periodic.json",
+      "sha256": "fffb3aa26eadc49fdda7d15d09b073a4fc88b2a60c4dd9243143c1667f94fba1",
+      "checkedAt": "2026-07-16T10:43:04.754Z",
+      "snapshotSha256": "82ec064b300c3ef27b70ace0419caa1da471201ed143796f99ab4fc34ebf9759"
+    },
+    {
+      "sequence": 118,
+      "phase": "periodic",
+      "path": "zinc-guard/0118-periodic.json",
+      "sha256": "1ed6118fa5a6211e2c842deb0d529b5b9f7d31c40f06775bc186e219c2ab124e",
+      "checkedAt": "2026-07-16T10:43:48.902Z",
+      "snapshotSha256": "34c0a9ce8103a12c9d664cb77419c9cb9e41fe72a67caab8e08f35e775f7d0f3"
+    },
+    {
+      "sequence": 119,
+      "phase": "periodic",
+      "path": "zinc-guard/0119-periodic.json",
+      "sha256": "e472c873d9f59362bcfe1e590f65fbc6014e1194dcbc459aa08b8ac7a5cd98ae",
+      "checkedAt": "2026-07-16T10:44:33.945Z",
+      "snapshotSha256": "e9f40f98eedc3cc822e646aa15faa7c806f2429da6c0ff2ef0e2f3b4e11521e7"
+    },
+    {
+      "sequence": 120,
+      "phase": "periodic",
+      "path": "zinc-guard/0120-periodic.json",
+      "sha256": "cb25025ef5ff8d9bf8cac16b291e45b8c27ed8069653f237ac1d8a0eca1a82a6",
+      "checkedAt": "2026-07-16T10:45:18.942Z",
+      "snapshotSha256": "977d286128dafe4447eeae1ccff93cd80e2f652dfebeb990ec5eb19d5ab224e1"
+    },
+    {
+      "sequence": 121,
+      "phase": "periodic",
+      "path": "zinc-guard/0121-periodic.json",
+      "sha256": "846c81af330ae6c375ac78748403a5f2f8c185eee2b258743d87da3a1cac8c41",
+      "checkedAt": "2026-07-16T10:46:03.913Z",
+      "snapshotSha256": "1f80b2d0a191700546ad94752cf02976fd88afe4596259ff5e5974a42933ff73"
+    },
+    {
+      "sequence": 122,
+      "phase": "periodic",
+      "path": "zinc-guard/0122-periodic.json",
+      "sha256": "b619a55971efbb3b9d3226f32c889b66d451cad320d06c90aa468820531960bd",
+      "checkedAt": "2026-07-16T10:46:48.931Z",
+      "snapshotSha256": "961a003dce69592bc9b06d101a3e162f5a6de20b41397518cff9494f9e6e712c"
+    },
+    {
+      "sequence": 123,
+      "phase": "periodic",
+      "path": "zinc-guard/0123-periodic.json",
+      "sha256": "df0feeccf186c275417bb07624c2f06364465f9cd577889284cbcdf373bd3cb9",
+      "checkedAt": "2026-07-16T10:47:33.903Z",
+      "snapshotSha256": "def007d74801b6532262a3d2a525e0ecd6b7addf783baa6253941664fac66725"
+    },
+    {
+      "sequence": 124,
+      "phase": "periodic",
+      "path": "zinc-guard/0124-periodic.json",
+      "sha256": "ef06cd001f69a3a05457823c2a641b6dbf4db89e676aa8c7b718c45ab6c24ca4",
+      "checkedAt": "2026-07-16T10:48:18.931Z",
+      "snapshotSha256": "1ef9a1353dd9ad63ce3942c804d0b49290ca319a254cef35b164a2ee0df84498"
+    },
+    {
+      "sequence": 125,
+      "phase": "periodic",
+      "path": "zinc-guard/0125-periodic.json",
+      "sha256": "82b8119c241a394d9e590771cbcf2c2cb44632ef1034f1debb7d13cab2a8d4cd",
+      "checkedAt": "2026-07-16T10:49:03.936Z",
+      "snapshotSha256": "bf4a5c1cc06bab27e78b199d0b3e6f2454a88d67a0d41657c80a500ea6dbc3cc"
+    },
+    {
+      "sequence": 126,
+      "phase": "periodic",
+      "path": "zinc-guard/0126-periodic.json",
+      "sha256": "413d77d5566edc7c6e8e9c4de4a97b269e756a8dc9c3f2a575e2e6eae1732c20",
+      "checkedAt": "2026-07-16T10:49:48.962Z",
+      "snapshotSha256": "c61652dcbfb7631309a741112f629c0596a87707ffad99a200e262865051ef65"
+    },
+    {
+      "sequence": 127,
+      "phase": "periodic",
+      "path": "zinc-guard/0127-periodic.json",
+      "sha256": "2504fb692a60ee03e8acf13f43d51356fc7dc4fa41c594307776173b23a9c894",
+      "checkedAt": "2026-07-16T10:50:34.302Z",
+      "snapshotSha256": "b49178e1eeeadaa5b9290bb261451c01944fa6d5df94a9dfdb65a96120d13d8f"
+    },
+    {
+      "sequence": 128,
+      "phase": "post-cell",
+      "path": "zinc-guard/0128-post-cell.json",
+      "sha256": "2e146b68026e4c8f49d73b911c1160376d5b513691dac3be51fb24b60d2a3403",
+      "checkedAt": "2026-07-16T10:50:55.559Z",
+      "snapshotSha256": "724c23e822e0595b134db17b7399f24d31f6d995f8b9dc256b16be2826e86ba0"
+    },
+    {
+      "sequence": 129,
+      "phase": "periodic",
+      "path": "zinc-guard/0129-periodic.json",
+      "sha256": "40419fd5aaa5e821480f60befb297758960d962153cd37c47c23e63008c417db",
+      "checkedAt": "2026-07-16T10:51:42.471Z",
+      "snapshotSha256": "6c6871cc981aaf63fe45fd872bb2743e2f48a4027c07fe0ab763edf107db0957"
+    },
+    {
+      "sequence": 130,
+      "phase": "periodic",
+      "path": "zinc-guard/0130-periodic.json",
+      "sha256": "23c9957b03e045c1ac32d8518700453719be8105f0cbea17dad56c530b995be9",
+      "checkedAt": "2026-07-16T10:52:27.069Z",
+      "snapshotSha256": "341b82cd5d208638ba8e1d9959179d2caa79b6c131bfbf4c2130c0dc745f0b21"
+    },
+    {
+      "sequence": 131,
+      "phase": "periodic",
+      "path": "zinc-guard/0131-periodic.json",
+      "sha256": "e90949f347f87984bda189de27f04688e55b8441f8a1d4f3e8c5f06802f4903a",
+      "checkedAt": "2026-07-16T10:53:12.530Z",
+      "snapshotSha256": "a45fd657dba2ce5bc1fce7998a1355d333c98a03862315b9fb304df053aa6ddc"
+    },
+    {
+      "sequence": 132,
+      "phase": "periodic",
+      "path": "zinc-guard/0132-periodic.json",
+      "sha256": "5da0995bd48000b59523a8744a65c2d59c592aa79727559c6ad0fe595a5765ef",
+      "checkedAt": "2026-07-16T10:53:57.172Z",
+      "snapshotSha256": "f408e5b1eb6703f77a52d51181f57639552f004d3a27b696aafac17ae1caca85"
+    },
+    {
+      "sequence": 133,
+      "phase": "periodic",
+      "path": "zinc-guard/0133-periodic.json",
+      "sha256": "1b1387972e4cd41be0100d352c8788c99547efd6865ec51078672146f8ddb8ad",
+      "checkedAt": "2026-07-16T10:54:42.520Z",
+      "snapshotSha256": "5efaf4258e6ec1911a71230740f7a1ba5551d5422204122daf3150f9b6564443"
+    },
+    {
+      "sequence": 134,
+      "phase": "periodic",
+      "path": "zinc-guard/0134-periodic.json",
+      "sha256": "5dd47e2e0c86d282239bc14e8c3ac84e8c91e7ecbe55bee8f368df3a518cac14",
+      "checkedAt": "2026-07-16T10:55:27.085Z",
+      "snapshotSha256": "4547079ca3cecf3f379df122c4c27f0ad39fa28470779455662f543d9e6499f8"
+    },
+    {
+      "sequence": 135,
+      "phase": "periodic",
+      "path": "zinc-guard/0135-periodic.json",
+      "sha256": "56e13d199386d9148cf54b052de655ecf5b4d4dc402c888406309da61430a8d9",
+      "checkedAt": "2026-07-16T10:56:12.546Z",
+      "snapshotSha256": "4605cf5cc35d31a63e63a4a82ce794098af60cd9ed82f95151e4847dda4c1376"
+    },
+    {
+      "sequence": 136,
+      "phase": "periodic",
+      "path": "zinc-guard/0136-periodic.json",
+      "sha256": "c44780a4f03186924baa09ce8118cbcde0e71ddbe29439f9a74a55de4e9e6fe6",
+      "checkedAt": "2026-07-16T10:56:57.038Z",
+      "snapshotSha256": "551b8b2ed9d45e808eb8a21527caf097be23c5ff8972b11b628bf17335f41adb"
+    },
+    {
+      "sequence": 137,
+      "phase": "periodic",
+      "path": "zinc-guard/0137-periodic.json",
+      "sha256": "06e7d3d051c6bb40f56ff9e1ea73b8e9dea073c158cc9b578d84aac9fdf7affc",
+      "checkedAt": "2026-07-16T10:57:42.899Z",
+      "snapshotSha256": "d3e8d9759284237ea3806331d9a1a6b3f9f5340f4923753f0d76aa611e4b1d1a"
+    },
+    {
+      "sequence": 138,
+      "phase": "periodic",
+      "path": "zinc-guard/0138-periodic.json",
+      "sha256": "dda16825abadd519596ccb41a72930bb565675391459ec58eafbb703f97141f4",
+      "checkedAt": "2026-07-16T10:58:27.043Z",
+      "snapshotSha256": "2f16a3192005c43d1ea786c8766011ede4a699ebb9cdf98dba169ea0edec3262"
+    },
+    {
+      "sequence": 139,
+      "phase": "periodic",
+      "path": "zinc-guard/0139-periodic.json",
+      "sha256": "2464a3d580c8166e332d4cd3ceea704da2ad4032355f14e90ce955d26246b949",
+      "checkedAt": "2026-07-16T10:59:12.050Z",
+      "snapshotSha256": "39222cd7d2d45714dbbda31866bd2a89995307bdb74067556c8fb399d3d9b153"
+    },
+    {
+      "sequence": 140,
+      "phase": "periodic",
+      "path": "zinc-guard/0140-periodic.json",
+      "sha256": "3fe1e44ab631902eec6af50a3f19dc2c974beb2c7de2eb69ec235b7814730ee1",
+      "checkedAt": "2026-07-16T10:59:57.042Z",
+      "snapshotSha256": "44cb72622e362031aad988e7e7f0fa5b955e63d18f65adf480067ffe9ea9a167"
+    },
+    {
+      "sequence": 141,
+      "phase": "periodic",
+      "path": "zinc-guard/0141-periodic.json",
+      "sha256": "3b8b99bea7931bf5e7624540a3f8def2a791b1b8f2c49d95302ce43c3f170392",
+      "checkedAt": "2026-07-16T11:00:42.055Z",
+      "snapshotSha256": "2aa88eedbd18f46a07f2e54cf7535783f72e26bdef8c306e60eead3ad97cc12f"
+    },
+    {
+      "sequence": 142,
+      "phase": "post-cell",
+      "path": "zinc-guard/0142-post-cell.json",
+      "sha256": "ddf2070f3a0cc669dc3254772baac9655aed29c5b25c0018cf04c5378948c3ae",
+      "checkedAt": "2026-07-16T11:01:17.044Z",
+      "snapshotSha256": "4b9b494410096fbdd676a0c37534c712626206ea002976ca7d6c95bb9ed00ff1"
+    },
+    {
+      "sequence": 143,
+      "phase": "periodic",
+      "path": "zinc-guard/0143-periodic.json",
+      "sha256": "3903bc0ac6e07cb5b0d6673ca4a4cc611bfdadbd4c86ef9b1ee11d0059a30333",
+      "checkedAt": "2026-07-16T11:02:03.687Z",
+      "snapshotSha256": "a4aef37288a7527c8c87649941d99bd1ca70e701c63fd7e196f4c7250337e3ee"
+    },
+    {
+      "sequence": 144,
+      "phase": "periodic",
+      "path": "zinc-guard/0144-periodic.json",
+      "sha256": "f776ab7318ff843874a7621fc266fee40712a2b6ab42838f9beaa7b4ae6b869c",
+      "checkedAt": "2026-07-16T11:02:48.649Z",
+      "snapshotSha256": "f3ee472e57f74d8c1bef2f1fc346a6db847b062604ebf514ae11f39b9bc80a82"
+    },
+    {
+      "sequence": 145,
+      "phase": "periodic",
+      "path": "zinc-guard/0145-periodic.json",
+      "sha256": "83822d136ad5fd0fae2cd6f5710c5c23bf3dee99193b803fdb01c4d2bc346eec",
+      "checkedAt": "2026-07-16T11:03:33.724Z",
+      "snapshotSha256": "efa0f983ffbe1604d7d2aa7537fc85415743ce99a20fca6115bbe26261a97259"
+    },
+    {
+      "sequence": 146,
+      "phase": "periodic",
+      "path": "zinc-guard/0146-periodic.json",
+      "sha256": "3c9280addfa2a883ecd18da84c34d8ec5e0b0d8f508737bdeb3e6d269ca66760",
+      "checkedAt": "2026-07-16T11:04:18.662Z",
+      "snapshotSha256": "3b1bad879d89657b18eef17eec723d42a1d5450265eeb164833f78d26068614c"
+    },
+    {
+      "sequence": 147,
+      "phase": "periodic",
+      "path": "zinc-guard/0147-periodic.json",
+      "sha256": "eba9ebeb6e39cafe2ab39edc86c33d780326d6daeeb3bc75403dedcd156c3bed",
+      "checkedAt": "2026-07-16T11:05:03.660Z",
+      "snapshotSha256": "a780c68a6727ac61459f7ef65fb8eadfd978ed7e841333f64a35320b1d80fe2c"
+    },
+    {
+      "sequence": 148,
+      "phase": "periodic",
+      "path": "zinc-guard/0148-periodic.json",
+      "sha256": "1b41a0092aa64c236365fdf1b4fcbd2f6a3d84e188217f9569628b56c071a424",
+      "checkedAt": "2026-07-16T11:05:49.208Z",
+      "snapshotSha256": "60cb4f2fa9f994db3dbd3d16ff3076f59669b4b75721718cacdc8d94d4b3a0bb"
+    },
+    {
+      "sequence": 149,
+      "phase": "periodic",
+      "path": "zinc-guard/0149-periodic.json",
+      "sha256": "3cabb56adb5fb083715f56790a581db8b0b6240e8a27155c778f5f64da4c0f69",
+      "checkedAt": "2026-07-16T11:06:33.740Z",
+      "snapshotSha256": "8957902876b5fa0ba929e916b9b0a061c37788a4e1afd4a35dd5a97fa6f0c1db"
+    },
+    {
+      "sequence": 150,
+      "phase": "periodic",
+      "path": "zinc-guard/0150-periodic.json",
+      "sha256": "f1de494aec4cf4c9e4af50a7266f10a8790aa302e60c06324890b197741ff4b0",
+      "checkedAt": "2026-07-16T11:07:19.183Z",
+      "snapshotSha256": "633eeb7e1e0e3da5d52b2dec352a73b7287c09bad71503c6594e6b71b2dd9326"
+    },
+    {
+      "sequence": 151,
+      "phase": "periodic",
+      "path": "zinc-guard/0151-periodic.json",
+      "sha256": "5cd6c2720ed8973264de06e98cd5a1116c1a722c88cc3e27437418b0be4b6537",
+      "checkedAt": "2026-07-16T11:08:03.695Z",
+      "snapshotSha256": "a885f9f9bc3218f484814488fbafdcabe8a540a63b86488eac4d677360ee2d20"
+    },
+    {
+      "sequence": 152,
+      "phase": "periodic",
+      "path": "zinc-guard/0152-periodic.json",
+      "sha256": "a85bbe2fe568e0c7f41480d839e45195b3a3a09db8da05a0992a1b13fe481cea",
+      "checkedAt": "2026-07-16T11:08:49.177Z",
+      "snapshotSha256": "a9106a702f8d11ac27a33290ced264bd051721eb4e1b1fe02575d5584537471f"
+    },
+    {
+      "sequence": 153,
+      "phase": "periodic",
+      "path": "zinc-guard/0153-periodic.json",
+      "sha256": "ed45822a867ee2328295a47170fefce9a0f27baec35adfbb2459c46a4ea7360b",
+      "checkedAt": "2026-07-16T11:09:33.672Z",
+      "snapshotSha256": "08a25ab168d89673db8a79da99f3af541e77137095709c6f70e8702793078fab"
+    },
+    {
+      "sequence": 154,
+      "phase": "periodic",
+      "path": "zinc-guard/0154-periodic.json",
+      "sha256": "1e8d4a5b946118384985d36a40d04f3ca81fd5237e89c72404629f8a19290aa8",
+      "checkedAt": "2026-07-16T11:10:19.143Z",
+      "snapshotSha256": "df2d04e164de97748319a4f9e623d005f6b27ee56966bbc6e2eb463f3bc31f6d"
+    },
+    {
+      "sequence": 155,
+      "phase": "post-cell",
+      "path": "zinc-guard/0155-post-cell.json",
+      "sha256": "924d5ea257bd1bcada1abcf1ea1befb48fb57eaa136c8fff5ef86e343f73e767",
+      "checkedAt": "2026-07-16T11:10:55.262Z",
+      "snapshotSha256": "0363726a0e59527757786234f24a5360c7c10467c146f771aa148bafc0c2fa24"
+    },
+    {
+      "sequence": 156,
+      "phase": "periodic",
+      "path": "zinc-guard/0156-periodic.json",
+      "sha256": "3743402b1ce8a88860253dd6b74c6921669626b29913526e7042de602bc9a0eb",
+      "checkedAt": "2026-07-16T11:11:42.584Z",
+      "snapshotSha256": "59541677486bb34a9dcbc3cde746420d4ca0a5dc00576071b482566053fd7b5e"
+    },
+    {
+      "sequence": 157,
+      "phase": "periodic",
+      "path": "zinc-guard/0157-periodic.json",
+      "sha256": "60e22b20d821e44e94bc51a1967c410ea4c73f8f28409e4178736718fdb8bb8f",
+      "checkedAt": "2026-07-16T11:12:26.705Z",
+      "snapshotSha256": "8dce063eac8a7ea4950a6f0ca871a5bef781324c6df26edea011e28bbfa653aa"
+    },
+    {
+      "sequence": 158,
+      "phase": "periodic",
+      "path": "zinc-guard/0158-periodic.json",
+      "sha256": "0aebedc504f08344e80241eff4cdb6d6f274a40d2e19d849f9a3147fa12d312a",
+      "checkedAt": "2026-07-16T11:13:11.744Z",
+      "snapshotSha256": "7a5f132d2900b5c5f03bad39db614457b5bd5701195313a5ddf9f52d467993e3"
+    },
+    {
+      "sequence": 159,
+      "phase": "periodic",
+      "path": "zinc-guard/0159-periodic.json",
+      "sha256": "0be79a1ee12ac6e66dc38cf699be4ec41f7f27bfca2a690717bdd3f5072fae0c",
+      "checkedAt": "2026-07-16T11:13:56.697Z",
+      "snapshotSha256": "1879ee00bf44d385f756afa3f229c881bcad10f4f6bc7ce0ccae69192bc8a54a"
+    },
+    {
+      "sequence": 160,
+      "phase": "periodic",
+      "path": "zinc-guard/0160-periodic.json",
+      "sha256": "58d3fb9074481e6752bf6716cc927167b56768eb27c6cf485926a31503cb2b21",
+      "checkedAt": "2026-07-16T11:14:41.701Z",
+      "snapshotSha256": "635fcc0c9fd3147c2ce1bea938f9b15ecfe45e8c840389df2b8afa8521d2dc86"
+    },
+    {
+      "sequence": 161,
+      "phase": "periodic",
+      "path": "zinc-guard/0161-periodic.json",
+      "sha256": "f7f01083584504a0949cac40a2df54d0c11406e0f56c0909b70c9e2dcf143117",
+      "checkedAt": "2026-07-16T11:15:26.703Z",
+      "snapshotSha256": "34650ffd9194f364bc391a4affb1a7878a60d9f072882e151b799b9125a5b7b3"
+    },
+    {
+      "sequence": 162,
+      "phase": "periodic",
+      "path": "zinc-guard/0162-periodic.json",
+      "sha256": "b3c07cb3b5706dcde776d9a536f9d6c43c254a1dfa25616c523b89c0f2b53a98",
+      "checkedAt": "2026-07-16T11:16:11.761Z",
+      "snapshotSha256": "15e782ada5660daae2914c280e6610c6b948f3608b6fbfb1821518c4425aee91"
+    },
+    {
+      "sequence": 163,
+      "phase": "periodic",
+      "path": "zinc-guard/0163-periodic.json",
+      "sha256": "a7da953eb8c0c245dfeb62d127c882e488459b254c7c5f09fd157465665a69bf",
+      "checkedAt": "2026-07-16T11:16:56.721Z",
+      "snapshotSha256": "c51dd0404329bb3a320db34796a6d32c2ab30ba1323add288e96a8ddec440737"
+    },
+    {
+      "sequence": 164,
+      "phase": "periodic",
+      "path": "zinc-guard/0164-periodic.json",
+      "sha256": "214e4eb8d954a7ff17721a382bdfa33a18b56041eae452edbb77260b4a10e5ad",
+      "checkedAt": "2026-07-16T11:17:41.752Z",
+      "snapshotSha256": "b834104c5b2df47814114a38c0f6c81c2553c55fc2a9b0edc6d6b28c7129d85c"
+    },
+    {
+      "sequence": 165,
+      "phase": "periodic",
+      "path": "zinc-guard/0165-periodic.json",
+      "sha256": "ff5eb37254368cc64f34a86ff5e529da580d8544f3c1df67c71329f526417ba5",
+      "checkedAt": "2026-07-16T11:18:26.729Z",
+      "snapshotSha256": "af7e8f6e8a4d852456b24cb68027354fd44e0da7949e5ebbdecced9f4dd00009"
+    },
+    {
+      "sequence": 166,
+      "phase": "periodic",
+      "path": "zinc-guard/0166-periodic.json",
+      "sha256": "d76e524cb1d9d1441cabf21890c3dea4a7435d3ee17bfc953a13f0fa02fb43c1",
+      "checkedAt": "2026-07-16T11:19:11.760Z",
+      "snapshotSha256": "fbf4bd00e86ed8a7943e873263ac150e108ec4fba896a438fbd40509a9019497"
+    },
+    {
+      "sequence": 167,
+      "phase": "periodic",
+      "path": "zinc-guard/0167-periodic.json",
+      "sha256": "5d3e2e1564898ed3f18f527881a247900f7b171e53cc8f2c76a7b8acc8d41d50",
+      "checkedAt": "2026-07-16T11:19:57.204Z",
+      "snapshotSha256": "26ba786ae8e23049fb24a7ce994aaaffb046f0157f8019914fa56438d8be2b63"
+    },
+    {
+      "sequence": 168,
+      "phase": "post-cell",
+      "path": "zinc-guard/0168-post-cell.json",
+      "sha256": "aca3edfffb92af3ba1128fdfd987d3646b7804a169eab259537fa24c5171a1ff",
+      "checkedAt": "2026-07-16T11:20:20.814Z",
+      "snapshotSha256": "e9d69ef151d789bd92ac0531d1938678fc844120aefedd3cd7166a39cf4e9373"
+    },
+    {
+      "sequence": 169,
+      "phase": "periodic",
+      "path": "zinc-guard/0169-periodic.json",
+      "sha256": "fb3990d74ecc72f5a5639938510559e3d24387bdcc50550630957343d733b639",
+      "checkedAt": "2026-07-16T11:21:07.782Z",
+      "snapshotSha256": "ea7e552630416da555721ef4ca6ee9c9a328d20f63f6e87391a55c2311585435"
+    },
+    {
+      "sequence": 170,
+      "phase": "periodic",
+      "path": "zinc-guard/0170-periodic.json",
+      "sha256": "29a9baf93f801fe15cd7770862d5cad8901f3d71bc54b49a4294057a3639cd2d",
+      "checkedAt": "2026-07-16T11:21:52.344Z",
+      "snapshotSha256": "9ac9368e1e0c1f2dbba28a41ed76ac2e49eb4b5239e4d888411fa7d797fed09f"
+    },
+    {
+      "sequence": 171,
+      "phase": "periodic",
+      "path": "zinc-guard/0171-periodic.json",
+      "sha256": "f52d223b21a44cd98e6c1fa09d5a9047c057f337186e44d633423ca6c28c4c10",
+      "checkedAt": "2026-07-16T11:22:37.751Z",
+      "snapshotSha256": "bc9d5c78beddcfe84198a9f7721d8b8d537bf0b445ee68b43bbffe8c006d1827"
+    },
+    {
+      "sequence": 172,
+      "phase": "periodic",
+      "path": "zinc-guard/0172-periodic.json",
+      "sha256": "648636bc9211fd38d3f37e97371064bfb4460deedf3ce7ef6bf44adca1832a16",
+      "checkedAt": "2026-07-16T11:23:22.316Z",
+      "snapshotSha256": "8884b5a1f32fe0af7b479c7e890b39286b8481b9c614206550b3a850d112844d"
+    },
+    {
+      "sequence": 173,
+      "phase": "periodic",
+      "path": "zinc-guard/0173-periodic.json",
+      "sha256": "71c3fa70b9e65127d5b0ea7b092e6866eecc05f6f3e29f6b4f17ed80b6e32449",
+      "checkedAt": "2026-07-16T11:24:07.779Z",
+      "snapshotSha256": "e5699c7a17a66d00079b9cc2cc33049c85eefc8895867e41895a9d213a5fb4b9"
+    },
+    {
+      "sequence": 174,
+      "phase": "periodic",
+      "path": "zinc-guard/0174-periodic.json",
+      "sha256": "7f5c1361abf6e5607884d2f64ffa931b2b46cde5ddea7451019d0f078654810f",
+      "checkedAt": "2026-07-16T11:24:52.312Z",
+      "snapshotSha256": "55f55db9b4a43e2ffb66c60f8f363caa5cdd87f32eb6e5b9f7bb82ea455551c6"
+    },
+    {
+      "sequence": 175,
+      "phase": "periodic",
+      "path": "zinc-guard/0175-periodic.json",
+      "sha256": "5a4629b6c9beb9445ed5efd9d0d615ae62054fb85f7e7a2daa74452ca7497a1e",
+      "checkedAt": "2026-07-16T11:25:38.036Z",
+      "snapshotSha256": "9083c5ed0b13a57095cba4a877ae33a8fb9bf7585dc3e98e7975a3553b76a4a7"
+    },
+    {
+      "sequence": 176,
+      "phase": "periodic",
+      "path": "zinc-guard/0176-periodic.json",
+      "sha256": "8df256ba238a6f4bf9b6844839b2ea3ee3e80a0aa62fc459d988a2c42ed939d6",
+      "checkedAt": "2026-07-16T11:26:22.273Z",
+      "snapshotSha256": "1277c5ee6586e9bb2748c35fb2b334481cfea3a8c8d55c70d1a8e27d31d7205c"
+    },
+    {
+      "sequence": 177,
+      "phase": "periodic",
+      "path": "zinc-guard/0177-periodic.json",
+      "sha256": "4be67d0973e0404092bbeef31f2e9fb110dc9d6a6e4bcec7d0ad1b4d9d0a0669",
+      "checkedAt": "2026-07-16T11:27:07.312Z",
+      "snapshotSha256": "a6891e6bbf780eb5a027989a0c129234e8d37783ac6e4df500a260b909e5471c"
+    },
+    {
+      "sequence": 178,
+      "phase": "periodic",
+      "path": "zinc-guard/0178-periodic.json",
+      "sha256": "77318a9cd152358ce77da2dc0283e0cbe152863ab1263652be78d81bec0ee3a5",
+      "checkedAt": "2026-07-16T11:27:52.276Z",
+      "snapshotSha256": "a62ae14b2d1cc55cf0a9b85c0f301299772c69383f0bf03802f6a5b123d50ab9"
+    },
+    {
+      "sequence": 179,
+      "phase": "periodic",
+      "path": "zinc-guard/0179-periodic.json",
+      "sha256": "27cfaaa568c13184948f8375c63ba1d2382acb290fc198050ac4e40b77c684a0",
+      "checkedAt": "2026-07-16T11:28:37.330Z",
+      "snapshotSha256": "cb8e7977229edd9a56ab3bbba755b4aaf384fbe9c23edbb987cf7d3c496906ec"
+    },
+    {
+      "sequence": 180,
+      "phase": "periodic",
+      "path": "zinc-guard/0180-periodic.json",
+      "sha256": "8b4996dd21c13410c4f8a8a8a1769250b6242271930a0fe694356cc7509a1dcc",
+      "checkedAt": "2026-07-16T11:29:22.270Z",
+      "snapshotSha256": "b7467fe62d0c8a72e63a6762efed7ac19b3de4369add5d22b9ae845154092d94"
+    },
+    {
+      "sequence": 181,
+      "phase": "periodic",
+      "path": "zinc-guard/0181-periodic.json",
+      "sha256": "d356af625cf29cfbea4196dd2d2ad7094d90e401c36f98e06b2e0b6a864239bf",
+      "checkedAt": "2026-07-16T11:30:07.344Z",
+      "snapshotSha256": "73b57bb46bc61161437a1b1995967387e9a5f46237ff50e126d64f7d004ca182"
+    },
+    {
+      "sequence": 182,
+      "phase": "post-cell",
+      "path": "zinc-guard/0182-post-cell.json",
+      "sha256": "782a562935edab852e38d9e203a257de63482a204db1be6dd9b6da972c084bc1",
+      "checkedAt": "2026-07-16T11:30:18.095Z",
+      "snapshotSha256": "ac78be3721142f70fb484f9a3480e494f550b8c23c4585cd559f0f5f6c2d7684"
+    },
+    {
+      "sequence": 183,
+      "phase": "periodic",
+      "path": "zinc-guard/0183-periodic.json",
+      "sha256": "55c181a892610ad0483fc7776dd6eed48b77354813ecbe624332722bd7c9adf2",
+      "checkedAt": "2026-07-16T11:31:04.693Z",
+      "snapshotSha256": "5c765fd0a58519ddc00ca017557a7ed63ab335ff7c01358a1c0c596520f469cc"
+    },
+    {
+      "sequence": 184,
+      "phase": "periodic",
+      "path": "zinc-guard/0184-periodic.json",
+      "sha256": "a0ebcbad4c91457f8b7c0068aa95c133c0b9e12ecf92dac0453c7c026155eb1c",
+      "checkedAt": "2026-07-16T11:31:49.704Z",
+      "snapshotSha256": "34150a784e9d01d44ff9f8e696c4bd372bd0fb17d325c68ce63712282514ae43"
+    },
+    {
+      "sequence": 185,
+      "phase": "periodic",
+      "path": "zinc-guard/0185-periodic.json",
+      "sha256": "a196fb0a6a051248fbebf01f90d4af057768f42e1d0db47ebc31b8134b645ab3",
+      "checkedAt": "2026-07-16T11:32:34.711Z",
+      "snapshotSha256": "26e3338c2741f90d87845aa0f8f94e3491438ca73f5c4648886f744c3e2f839a"
+    },
+    {
+      "sequence": 186,
+      "phase": "periodic",
+      "path": "zinc-guard/0186-periodic.json",
+      "sha256": "f18071228bc575013292470a7a818bd877a51eca96445116437116dedca6b228",
+      "checkedAt": "2026-07-16T11:33:20.083Z",
+      "snapshotSha256": "23f835f2009f4b3419f8741cc097bf0cc60a2e3dfe265f1abf0950c266346777"
+    },
+    {
+      "sequence": 187,
+      "phase": "periodic",
+      "path": "zinc-guard/0187-periodic.json",
+      "sha256": "cd69ad35c36790c8a41d6f80caffca1cdc1d480dfda00263c47e0758c11d94f6",
+      "checkedAt": "2026-07-16T11:34:04.791Z",
+      "snapshotSha256": "18e8e6a5f7b5dade1641e742f5938bf55e84386e5712f2927658bf9300017919"
+    },
+    {
+      "sequence": 188,
+      "phase": "periodic",
+      "path": "zinc-guard/0188-periodic.json",
+      "sha256": "c88948e8c3cd49b4ba83b28bc56dba1b2b75bd06e6d1b783afb35c90eb33def9",
+      "checkedAt": "2026-07-16T11:34:50.202Z",
+      "snapshotSha256": "06a567566d28a1b454f3693385024ceba440e250d56a51221b92e68960538d7b"
+    },
+    {
+      "sequence": 189,
+      "phase": "periodic",
+      "path": "zinc-guard/0189-periodic.json",
+      "sha256": "68366aa4e147f2aef156e03f1b89a9db07ed11b83420b856cea8ad1b3d44008e",
+      "checkedAt": "2026-07-16T11:35:34.792Z",
+      "snapshotSha256": "fd171ba9a6df69fc330df8bcec2aaed80f561d70e13ad2240823bf31fc08c4b0"
+    },
+    {
+      "sequence": 190,
+      "phase": "periodic",
+      "path": "zinc-guard/0190-periodic.json",
+      "sha256": "7ea1fa1574ea7c93f03409977e2e22e5cb52a2da0dd542fca58688b50e6a4d8b",
+      "checkedAt": "2026-07-16T11:36:20.270Z",
+      "snapshotSha256": "f03de1cdeb0fe023b941e3fc182bef1ad755087a842bf5879151dd85b96cd222"
+    },
+    {
+      "sequence": 191,
+      "phase": "periodic",
+      "path": "zinc-guard/0191-periodic.json",
+      "sha256": "0c9a3a99b64a1b998221cdc0c9ebd1240e1de85399f6983378314d150348035a",
+      "checkedAt": "2026-07-16T11:37:04.823Z",
+      "snapshotSha256": "af471f7194dc80cd33b5a33667f719a456379669340769916b42391f1f2d0506"
+    },
+    {
+      "sequence": 192,
+      "phase": "periodic",
+      "path": "zinc-guard/0192-periodic.json",
+      "sha256": "c4f117ec95daac0e144dee05b5d5004e488f3db910299bd56b50323db407de59",
+      "checkedAt": "2026-07-16T11:37:50.291Z",
+      "snapshotSha256": "d7ffc4df1b985d43887c4f164b2bb64ae1d96c40824e0e105a4a41390867a926"
+    },
+    {
+      "sequence": 193,
+      "phase": "periodic",
+      "path": "zinc-guard/0193-periodic.json",
+      "sha256": "abe80fb2800c738fea6eaf942b48bc5a30912458f9582852a8fb3c4ddf7f6f5c",
+      "checkedAt": "2026-07-16T11:38:34.794Z",
+      "snapshotSha256": "1336d9fb2b55aff9b39aebdb36f3fa1051dfe1f6fb53cb0b394fdbdbbba98cbb"
+    },
+    {
+      "sequence": 194,
+      "phase": "post-cell",
+      "path": "zinc-guard/0194-post-cell.json",
+      "sha256": "087101c51d96f96aa55e39ccd6898f8b7d8be1eb46a96069695f15ee24c90898",
+      "checkedAt": "2026-07-16T11:38:55.712Z",
+      "snapshotSha256": "7d6b504c0f445f3c851e6a491a536ecf62fa50aac388f7d0c9e72586c72d9b16"
+    },
+    {
+      "sequence": 195,
+      "phase": "periodic",
+      "path": "zinc-guard/0195-periodic.json",
+      "sha256": "232b983a575c7b0f440b169c014bade1f8b16486277be94163d4e8bbe758b460",
+      "checkedAt": "2026-07-16T11:39:42.292Z",
+      "snapshotSha256": "070024c61f680abf64b56dd7aa4055ef38901042fdb5e734b04825b582e8231f"
+    },
+    {
+      "sequence": 196,
+      "phase": "periodic",
+      "path": "zinc-guard/0196-periodic.json",
+      "sha256": "90f8199c17220a0923f0189dc311603b158309b0bcec1c5c1fee41377eae4283",
+      "checkedAt": "2026-07-16T11:40:27.322Z",
+      "snapshotSha256": "1c92da45b4a14866998d5a57b753dcef7bff7401c399e6548ee65122f322d488"
+    },
+    {
+      "sequence": 197,
+      "phase": "periodic",
+      "path": "zinc-guard/0197-periodic.json",
+      "sha256": "41f66d061f8084e0f59e04668ea224298ba4fbe8e8f264b0a6eab4c43fdda2ee",
+      "checkedAt": "2026-07-16T11:41:12.310Z",
+      "snapshotSha256": "7260760aa6a83b257ee8da381910ca9566ecc80dabbb5ae4cc0ffef08d1ccc0b"
+    },
+    {
+      "sequence": 198,
+      "phase": "periodic",
+      "path": "zinc-guard/0198-periodic.json",
+      "sha256": "8a0459a614009a997d63e0b73fb83f8a4aee62b7ccde4bb67b4dd648286273ed",
+      "checkedAt": "2026-07-16T11:41:57.352Z",
+      "snapshotSha256": "0b9d659b0253c0fda9800700b73977c5537a8af7a464710297c2d048527d1a2f"
+    },
+    {
+      "sequence": 199,
+      "phase": "periodic",
+      "path": "zinc-guard/0199-periodic.json",
+      "sha256": "ac64b80e508e828cb676a652f59c946cc5940e4ed3a4538180c2a0841e058bde",
+      "checkedAt": "2026-07-16T11:42:42.331Z",
+      "snapshotSha256": "1e1ed8a9f59303524f5a30c5440294256a33e514c045664b6efbcb3fd5f974e4"
+    },
+    {
+      "sequence": 200,
+      "phase": "periodic",
+      "path": "zinc-guard/0200-periodic.json",
+      "sha256": "2b5fd88c181f9de2b114616e302b05c10f997acc7b306f2fd10b8b89e10a306f",
+      "checkedAt": "2026-07-16T11:43:27.323Z",
+      "snapshotSha256": "5c293675c66d15ec6edf783c8184ee51a6630bfee03cf23db59f11f742385028"
+    },
+    {
+      "sequence": 201,
+      "phase": "periodic",
+      "path": "zinc-guard/0201-periodic.json",
+      "sha256": "d11d8017cf13d77c634c592d6a78cca080ba6d5c89ecf703e0a035d6c9ef310a",
+      "checkedAt": "2026-07-16T11:44:12.334Z",
+      "snapshotSha256": "c0c015d8e716e8dbaa06068a76cc7094fb4f3df8c8debe635c1394f1782b3ed7"
+    },
+    {
+      "sequence": 202,
+      "phase": "periodic",
+      "path": "zinc-guard/0202-periodic.json",
+      "sha256": "866aee6f42a585726099f9f5828790f074479f9c2baaf07ecfb597c390663204",
+      "checkedAt": "2026-07-16T11:44:57.328Z",
+      "snapshotSha256": "33656fca21e5e1ac921f42d107dfead7ff63486699aa8c03aee764b502ee2b23"
+    },
+    {
+      "sequence": 203,
+      "phase": "periodic",
+      "path": "zinc-guard/0203-periodic.json",
+      "sha256": "6c0971f37a4846242eead84ed1a9b8a94c6a17fef3e469b02a110856f347dd90",
+      "checkedAt": "2026-07-16T11:45:42.393Z",
+      "snapshotSha256": "c406e4e3882aa098061f99a0bd95e2e4f1ecce5727a2686f8cec08eb018050c2"
+    },
+    {
+      "sequence": 204,
+      "phase": "periodic",
+      "path": "zinc-guard/0204-periodic.json",
+      "sha256": "7f44570d5af363550764897347671158b5a1ba67cf59612d05e9eadb67f78b07",
+      "checkedAt": "2026-07-16T11:46:27.352Z",
+      "snapshotSha256": "96493e930278b5a8fc985c1fe1f198ab4c266332cab8e4cdca49f833360531b1"
+    },
+    {
+      "sequence": 205,
+      "phase": "periodic",
+      "path": "zinc-guard/0205-periodic.json",
+      "sha256": "2ffb531f72193cf44a5f674624f889a1edce48c17204be5fd76a177b2b8ac5a9",
+      "checkedAt": "2026-07-16T11:47:12.818Z",
+      "snapshotSha256": "8085cbea65a3c5c6eef6d4bccf4f60352ffaf09a66013aeefbd1284e62830b93"
+    },
+    {
+      "sequence": 206,
+      "phase": "periodic",
+      "path": "zinc-guard/0206-periodic.json",
+      "sha256": "d9cd4f868b6d54ad788a6c5fade74dc86dc910f0342bc4a4569969c79f487913",
+      "checkedAt": "2026-07-16T11:47:57.407Z",
+      "snapshotSha256": "bb11adb5fb08eaeeade29d21429f1acd3a80a62860db39f5c1d9b7f76f9b8f08"
+    },
+    {
+      "sequence": 207,
+      "phase": "periodic",
+      "path": "zinc-guard/0207-periodic.json",
+      "sha256": "2cbdf45b602e2c11361260d012228c51adaf5e0df592a14d099bc925abf7674d",
+      "checkedAt": "2026-07-16T11:48:42.878Z",
+      "snapshotSha256": "2dbb1b85789d1880ecb5e84b003be2436e3a42afc9fd256d6ca6892225574e06"
+    },
+    {
+      "sequence": 208,
+      "phase": "periodic",
+      "path": "zinc-guard/0208-periodic.json",
+      "sha256": "9cbe2bf470c797d3538a55352b1f91e12d95a8da598067aade9ee9d0739b53cd",
+      "checkedAt": "2026-07-16T11:49:27.431Z",
+      "snapshotSha256": "93efebf400f49442c7c9179f025a071ae0cfd0b8acf43371907456486b8d688a"
+    },
+    {
+      "sequence": 209,
+      "phase": "periodic",
+      "path": "zinc-guard/0209-periodic.json",
+      "sha256": "714a1d1299f92755a5e8b8d912cfef530e0a8e7941cb322e7e34a489aad09b01",
+      "checkedAt": "2026-07-16T11:50:12.804Z",
+      "snapshotSha256": "61e4859d80b8012957a938d642dc031ac6c4a807388ff92a79a911c7d9e7c593"
+    },
+    {
+      "sequence": 210,
+      "phase": "periodic",
+      "path": "zinc-guard/0210-periodic.json",
+      "sha256": "58c096bbd72550720775b4b1f2716abc2c3826dec1d033ba73237751bec05c98",
+      "checkedAt": "2026-07-16T11:50:57.388Z",
+      "snapshotSha256": "06a634889410893356ee8fc9914ed3df58b11fe84a8d48108500fc4d146264ad"
+    },
+    {
+      "sequence": 211,
+      "phase": "periodic",
+      "path": "zinc-guard/0211-periodic.json",
+      "sha256": "c100c5ac35ffe43571de34917d6ed6787588903c70188d65e6949c40f78dd557",
+      "checkedAt": "2026-07-16T11:51:42.865Z",
+      "snapshotSha256": "bfb837989550f5defbcb5d0b7cf2f0898ff81ac8449fa48ac422bc6bd988de90"
+    },
+    {
+      "sequence": 212,
+      "phase": "periodic",
+      "path": "zinc-guard/0212-periodic.json",
+      "sha256": "4d9d359779baff1fb548f46c4e54384411e17a974bacb3f2e6411cd9b5a8f1b5",
+      "checkedAt": "2026-07-16T11:52:27.444Z",
+      "snapshotSha256": "b3820df4266c74ee54116a0b2d6f770df114aa8fa18332a49f77325960bb2600"
+    },
+    {
+      "sequence": 213,
+      "phase": "periodic",
+      "path": "zinc-guard/0213-periodic.json",
+      "sha256": "d5a518b6f1109e3cf48f6eb588bbf1585d540f6825cfb4d761da4006e2ef6098",
+      "checkedAt": "2026-07-16T11:53:12.593Z",
+      "snapshotSha256": "be9a06ad34dc6a9d53c7a3125e60dab86d3f84dfcf1a81152592ece401cd491c"
+    },
+    {
+      "sequence": 214,
+      "phase": "post-cell",
+      "path": "zinc-guard/0214-post-cell.json",
+      "sha256": "632c13472fd478e7c3df3a4884a04173d4cac6c89f6e476f663a9facb5950df0",
+      "checkedAt": "2026-07-16T11:53:47.884Z",
+      "snapshotSha256": "372940331c75902dc525ffe94435cb717a18a10c4b9cf8de5815ae3d093d2ce2"
+    },
+    {
+      "sequence": 215,
+      "phase": "periodic",
+      "path": "zinc-guard/0215-periodic.json",
+      "sha256": "0854ee836146a37103a64593f829cb92e5dc83bfb81d324a56df4953017bd8e9",
+      "checkedAt": "2026-07-16T11:54:34.628Z",
+      "snapshotSha256": "4082e1b01cfd449baa62b100392e79d2f86a77e71d89977c11814831adb65a52"
+    },
+    {
+      "sequence": 216,
+      "phase": "periodic",
+      "path": "zinc-guard/0216-periodic.json",
+      "sha256": "6f626543a5ebc42e73a084b6c99a80ac557e30bb1d5306ec50dc8c6dcf0a391c",
+      "checkedAt": "2026-07-16T11:55:19.280Z",
+      "snapshotSha256": "2e87052daa21b1d9a9ed5fbd829382061f745a246790243f8b577c5c589cd8b3"
+    },
+    {
+      "sequence": 217,
+      "phase": "periodic",
+      "path": "zinc-guard/0217-periodic.json",
+      "sha256": "6030416c6e556aa26141d67effe93ed3615ea4b16f0b4c73774d2f0e7079fc88",
+      "checkedAt": "2026-07-16T11:56:05.201Z",
+      "snapshotSha256": "0699d90ceb20ac00eb3c261fc04dcd5b8f16a024770333699d2587b9c7e92ae5"
+    },
+    {
+      "sequence": 218,
+      "phase": "periodic",
+      "path": "zinc-guard/0218-periodic.json",
+      "sha256": "2ac9609e0f51fef125f7aed13ff5965b6578fe9a1a69ee477c2b64d5df680985",
+      "checkedAt": "2026-07-16T11:56:49.314Z",
+      "snapshotSha256": "431b6b45cb0e6fb6f28c9e49151ee47531962b8cc28de6159c2a6b597336a0a0"
+    },
+    {
+      "sequence": 219,
+      "phase": "periodic",
+      "path": "zinc-guard/0219-periodic.json",
+      "sha256": "7a304c3d06ee2ff386e7e8474f90c4961e4970a1ecd66811fd1bacb710b42230",
+      "checkedAt": "2026-07-16T11:57:34.334Z",
+      "snapshotSha256": "405993891582137d722684dbb13e57df27d700296157c335a1d297e16b71c4b9"
+    },
+    {
+      "sequence": 220,
+      "phase": "periodic",
+      "path": "zinc-guard/0220-periodic.json",
+      "sha256": "b7af7e26472ff7bb8e54137cb87b6c8a892e6b130fe72e215d863005e09d00f0",
+      "checkedAt": "2026-07-16T11:58:19.308Z",
+      "snapshotSha256": "5a96769c299c37eeca5bdc4fac07e2d0b867b644a53cbd34349a1726f07457a7"
+    },
+    {
+      "sequence": 221,
+      "phase": "periodic",
+      "path": "zinc-guard/0221-periodic.json",
+      "sha256": "dad05cd0002e501c3bce0d664e089f277a9b99bc950d7142fb79fd8b410d36cc",
+      "checkedAt": "2026-07-16T11:59:04.331Z",
+      "snapshotSha256": "1ea5b0730436a3dce112f0c67a57fb0b265f3f7432606dcbb70a795b7e6352f9"
+    },
+    {
+      "sequence": 222,
+      "phase": "periodic",
+      "path": "zinc-guard/0222-periodic.json",
+      "sha256": "70d8a088f0874c2ff08559cb495c298c467af89c03be82fca22107de9e40f831",
+      "checkedAt": "2026-07-16T11:59:49.379Z",
+      "snapshotSha256": "3dae23b7cf8160470d6eafb7e8b8524155eb0ac566ef45f4e43a5d70d1cdf438"
+    },
+    {
+      "sequence": 223,
+      "phase": "periodic",
+      "path": "zinc-guard/0223-periodic.json",
+      "sha256": "14600117f58fe4f0feba0d45d37967344cc36e4cc6e27725f8e6d1f777296f9b",
+      "checkedAt": "2026-07-16T12:00:34.372Z",
+      "snapshotSha256": "9245c0daea228af7043b156600a7dc232ba11d54fb39b63bf66b23e845af3444"
+    },
+    {
+      "sequence": 224,
+      "phase": "periodic",
+      "path": "zinc-guard/0224-periodic.json",
+      "sha256": "68398a2d7335cf1e7a9e8187a8adebbe13b7d865fe5b0413af453362103deba1",
+      "checkedAt": "2026-07-16T12:01:19.398Z",
+      "snapshotSha256": "95f9638cc6b418d2ef08cc2c398c22f3d5ea3e3e6ce271095dd9555bdef514e2"
+    },
+    {
+      "sequence": 225,
+      "phase": "periodic",
+      "path": "zinc-guard/0225-periodic.json",
+      "sha256": "a69cb90bd6387413af449e7b65c9795ec89904d4656cdbbd5d05416ac32ae5e6",
+      "checkedAt": "2026-07-16T12:02:04.341Z",
+      "snapshotSha256": "ab2fabfcf37a0700eae07f231c8c08d8f337b9dc792e1e2129171af6a4319893"
+    },
+    {
+      "sequence": 226,
+      "phase": "periodic",
+      "path": "zinc-guard/0226-periodic.json",
+      "sha256": "b773fa2a944c14886a8192fefb4cfeae71912031d8f8cbfda5c49847619b2ff0",
+      "checkedAt": "2026-07-16T12:02:49.348Z",
+      "snapshotSha256": "fc4bfdd17b90f981f0a67ef3528ba3d2228c09f370886ba3a932767384dd4ce2"
+    },
+    {
+      "sequence": 227,
+      "phase": "post-cell",
+      "path": "zinc-guard/0227-post-cell.json",
+      "sha256": "e66b42718f8f473097dc0d2afcf1511b674d5940679cf59921b51d546a34ce08",
+      "checkedAt": "2026-07-16T12:03:15.659Z",
+      "snapshotSha256": "a7a9a22bf995ec4c6781406d1fe5a4ffe08016cb9c2b1f67642bf46741cae237"
+    },
+    {
+      "sequence": 228,
+      "phase": "periodic",
+      "path": "zinc-guard/0228-periodic.json",
+      "sha256": "143d6eeeb0d1e71c6270b740b0d6b6773f5676b05caa30192fa95d1ab2800e0a",
+      "checkedAt": "2026-07-16T12:04:02.767Z",
+      "snapshotSha256": "e56361643f584a7f6eff12de5da82477266e9999f7ae580f13839d4d6a21830b"
+    },
+    {
+      "sequence": 229,
+      "phase": "periodic",
+      "path": "zinc-guard/0229-periodic.json",
+      "sha256": "58a5129298bbde0ce628f29be94e15b240b6d4f5154638e5f862ff5d905682a4",
+      "checkedAt": "2026-07-16T12:04:47.255Z",
+      "snapshotSha256": "ac7433057e709f7882f014411c8edcf5a67e5d2bf1bba73f3e7106c22d843e9b"
+    },
+    {
+      "sequence": 230,
+      "phase": "periodic",
+      "path": "zinc-guard/0230-periodic.json",
+      "sha256": "43d5847ed95e003f847974496806599cea629f3f8fc617407d5000e779527000",
+      "checkedAt": "2026-07-16T12:05:32.761Z",
+      "snapshotSha256": "10c3892798069f15acab90e40ddd9bbf71d48ec1b7e6bf6cc3ab74bef0397b9e"
+    },
+    {
+      "sequence": 231,
+      "phase": "periodic",
+      "path": "zinc-guard/0231-periodic.json",
+      "sha256": "fe3bdefae3223dcce0e9a499d0412ecae27885bbc6d44d1d5373fa2321ea4c58",
+      "checkedAt": "2026-07-16T12:06:17.243Z",
+      "snapshotSha256": "693329b88007f049edb5a1e662ceb83460b75c478d96c241f083e3f9c44a71be"
+    },
+    {
+      "sequence": 232,
+      "phase": "periodic",
+      "path": "zinc-guard/0232-periodic.json",
+      "sha256": "716e6e50591cdda3ea3e53074683f684effe93eff14e72435e845c8e8a798eae",
+      "checkedAt": "2026-07-16T12:07:02.758Z",
+      "snapshotSha256": "625aec19ad6be82c87ee21965d701bb72d630aaa8ebc42b833ec98091d34acf8"
+    },
+    {
+      "sequence": 233,
+      "phase": "periodic",
+      "path": "zinc-guard/0233-periodic.json",
+      "sha256": "baf0e766854d882a401c7b2d93c98ede99a53d980b70e1b6b5a24bdeb9d03ab3",
+      "checkedAt": "2026-07-16T12:07:47.278Z",
+      "snapshotSha256": "484eb05be801611c8fbd364e34b08bd8f1bc83e460ea74c68ba4d19a8f78c386"
+    },
+    {
+      "sequence": 234,
+      "phase": "periodic",
+      "path": "zinc-guard/0234-periodic.json",
+      "sha256": "087e687e9bbc5e2253eae69b88f8e79ea1df9d98677f54da59b9b61b496ec2b2",
+      "checkedAt": "2026-07-16T12:08:32.698Z",
+      "snapshotSha256": "7473ada7aa98bacb8d90ee306ff8203b9be11a1e3a6e025db84ebb5f3eccfd2e"
+    },
+    {
+      "sequence": 235,
+      "phase": "periodic",
+      "path": "zinc-guard/0235-periodic.json",
+      "sha256": "6b52cc39322bbb405cbfa849e0ccfd82e0b976907ed375df7f04d98123dc3947",
+      "checkedAt": "2026-07-16T12:09:17.207Z",
+      "snapshotSha256": "94ab426260d49837544d4188b71da210f9039f10bd3bc6b57269ced85d3d440d"
+    },
+    {
+      "sequence": 236,
+      "phase": "post-cell",
+      "path": "zinc-guard/0236-post-cell.json",
+      "sha256": "3605f4e9a8c20a088659dcbec218fd7d4e3ec19e8b15322120d9c04956b60ade",
+      "checkedAt": "2026-07-16T12:09:36.671Z",
+      "snapshotSha256": "f72ad50b3173c1fb79d711d9d4d74c429d6cd19cf21d3d0266efcd2fd56745d0"
+    },
+    {
+      "sequence": 237,
+      "phase": "periodic",
+      "path": "zinc-guard/0237-periodic.json",
+      "sha256": "bacc0779b3c9581ce93da13b0f8bdc83956e49f2d3386de027127e7278b5ea0f",
+      "checkedAt": "2026-07-16T12:10:23.276Z",
+      "snapshotSha256": "1224e2ebf53bc586173a1b9e0ec9fd5aaebe85d5aad570c3b2d8e70e0c762383"
+    },
+    {
+      "sequence": 238,
+      "phase": "periodic",
+      "path": "zinc-guard/0238-periodic.json",
+      "sha256": "03ae4a7bc2e58a0b4ef839b6945425935fb1859f8b42a45d4a10033c7c872196",
+      "checkedAt": "2026-07-16T12:11:08.323Z",
+      "snapshotSha256": "90b88315c9f73d0d9f37a329161a458c2bf2512c2ce04a027b6591241af3c557"
+    },
+    {
+      "sequence": 239,
+      "phase": "periodic",
+      "path": "zinc-guard/0239-periodic.json",
+      "sha256": "7bda520a1a3d7be4202b3118e7a522e0c44b739a1c64bfcf5f2d64d3b8133300",
+      "checkedAt": "2026-07-16T12:11:53.248Z",
+      "snapshotSha256": "3b63a2bcd4b260c84f666db55623b963df87f4905296006e39c940b9c2bed854"
+    },
+    {
+      "sequence": 240,
+      "phase": "periodic",
+      "path": "zinc-guard/0240-periodic.json",
+      "sha256": "625a4371823ac7598382847c2ef1bf80c8dc28047cf005f99ffccf2520169798",
+      "checkedAt": "2026-07-16T12:12:38.276Z",
+      "snapshotSha256": "60efc00e4a8e79d3575d1574b1685233c140e8e97eb2d90a0b979229df455862"
+    },
+    {
+      "sequence": 241,
+      "phase": "periodic",
+      "path": "zinc-guard/0241-periodic.json",
+      "sha256": "baa8334cf1a1eb1b89d529841a55acc66921a5f7cca54cda594d0747c5fdb349",
+      "checkedAt": "2026-07-16T12:13:23.355Z",
+      "snapshotSha256": "78b4017ad02ecf32c6868c3c19965da3d14d3134727a74287fa630b6b6333cd5"
+    },
+    {
+      "sequence": 242,
+      "phase": "periodic",
+      "path": "zinc-guard/0242-periodic.json",
+      "sha256": "b1356e9f4d5694bdbd8ed04e525d69bfda835a53aa8ba37827ccc85cf7f42040",
+      "checkedAt": "2026-07-16T12:14:08.266Z",
+      "snapshotSha256": "304aa35d5f0b87603b389517fa5e5afad783e4bfe65de2c9bd469e3c29c69479"
+    },
+    {
+      "sequence": 243,
+      "phase": "periodic",
+      "path": "zinc-guard/0243-periodic.json",
+      "sha256": "1489c9acc0a11d1ec304450e36b5b9af9b6b13bcb9c78ceb9b3521c1d5339620",
+      "checkedAt": "2026-07-16T12:14:53.290Z",
+      "snapshotSha256": "55085741b643bdf5d4dfb627b1c2fb488a76f2ed5b6668222079e2d420e8f9f2"
+    },
+    {
+      "sequence": 244,
+      "phase": "periodic",
+      "path": "zinc-guard/0244-periodic.json",
+      "sha256": "5389e3accd41b5467c4f22693ae7c268b2402a039a527765f9e8872c18351b9e",
+      "checkedAt": "2026-07-16T12:15:38.292Z",
+      "snapshotSha256": "4d6e052106c9a107f9e96f2c4d0617c18a5d516a2f9b4d36538bebddb6c34429"
+    },
+    {
+      "sequence": 245,
+      "phase": "periodic",
+      "path": "zinc-guard/0245-periodic.json",
+      "sha256": "89ca71541252aee76c6b9b00a29f158f52eb4a8cfa3fbea3db898ae7a40a200e",
+      "checkedAt": "2026-07-16T12:16:23.295Z",
+      "snapshotSha256": "7df7e6286af630a70e822f77926a4a2193f1f9d4779277f1f45dcba83f409e5c"
+    },
+    {
+      "sequence": 246,
+      "phase": "periodic",
+      "path": "zinc-guard/0246-periodic.json",
+      "sha256": "395cb448d4699ebb73aa0409827cfe0a5fd632ff1ce61e98298c68d76e7536d1",
+      "checkedAt": "2026-07-16T12:17:08.253Z",
+      "snapshotSha256": "8635878fe0053354beca88eefdbe5c5f39610afdc75708ebf5f8e874430c7178"
+    },
+    {
+      "sequence": 247,
+      "phase": "periodic",
+      "path": "zinc-guard/0247-periodic.json",
+      "sha256": "92b603f1f1fc1e84a8a06f7e7973f3b6ed5e07262d99361448872a2de2c4ab09",
+      "checkedAt": "2026-07-16T12:17:53.831Z",
+      "snapshotSha256": "d21be352d4fd7714422b8974876c6a23517d1bde1506f463e7516b7fc64b0543"
+    },
+    {
+      "sequence": 248,
+      "phase": "periodic",
+      "path": "zinc-guard/0248-periodic.json",
+      "sha256": "39db45aab16fc81841a398ab321c9fe87372d6897b5e0c4b4058e48b4e98111e",
+      "checkedAt": "2026-07-16T12:18:38.414Z",
+      "snapshotSha256": "33ca0af5cc12fe362014ede5f5c4cf5cb8664b91afcb824835b042d11da7a4bb"
+    },
+    {
+      "sequence": 249,
+      "phase": "post-cell",
+      "path": "zinc-guard/0249-post-cell.json",
+      "sha256": "26697619cbeac5c565a918b48431c0a74b757b6d510f28ef4210c70194f73c42",
+      "checkedAt": "2026-07-16T12:19:09Z",
+      "snapshotSha256": "92668cc6aa6a1bbf6b70233372081956568ed5f5f76fc981cff51f532490d8e0"
+    },
+    {
+      "sequence": 250,
+      "phase": "periodic",
+      "path": "zinc-guard/0250-periodic.json",
+      "sha256": "a8b41773fe78ee89aecaeb23e2dfee199d7bdd1f86fa3f08e18cf0711b7d9238",
+      "checkedAt": "2026-07-16T12:19:55.534Z",
+      "snapshotSha256": "94303793721bab550e06c87a3190d6c2ef5565cdaae090a80a998230d5aff912"
+    },
+    {
+      "sequence": 251,
+      "phase": "periodic",
+      "path": "zinc-guard/0251-periodic.json",
+      "sha256": "b8231bc27296e70c7dd05763936e60e8863a64ea0ed4c452cbab541eefd8ee6a",
+      "checkedAt": "2026-07-16T12:20:41.008Z",
+      "snapshotSha256": "bc0b38896d3e2acdf9b5c901ee7b4e773210c5c41dfc32f41e5675453cd0bf2e"
+    },
+    {
+      "sequence": 252,
+      "phase": "periodic",
+      "path": "zinc-guard/0252-periodic.json",
+      "sha256": "6a37f7e2ebd165e061234c6ab6501a841c767432b459d4fadedc32ee81f22474",
+      "checkedAt": "2026-07-16T12:21:25.515Z",
+      "snapshotSha256": "58fdac9d435dcc281491c884ad11f4d613517b673d5cca8149147115c2339513"
+    },
+    {
+      "sequence": 253,
+      "phase": "periodic",
+      "path": "zinc-guard/0253-periodic.json",
+      "sha256": "04297320553087d6447be61fdb5bcc74ea8613d8966a630e641740eaf9e8c7b0",
+      "checkedAt": "2026-07-16T12:22:10.960Z",
+      "snapshotSha256": "3c9fd59fe3a2887b6823fb5c4ad592d30b9ee053702db7b73b2e381288dce832"
+    },
+    {
+      "sequence": 254,
+      "phase": "periodic",
+      "path": "zinc-guard/0254-periodic.json",
+      "sha256": "3655f8d8f49fb66d2c58d2c0423d13eedb11914533b3c2c1794648c5a320e79c",
+      "checkedAt": "2026-07-16T12:22:55.491Z",
+      "snapshotSha256": "610666f671bf21a874d641601a39befeb2dfa44514d2bf688540288f9eb3c4bb"
+    },
+    {
+      "sequence": 255,
+      "phase": "periodic",
+      "path": "zinc-guard/0255-periodic.json",
+      "sha256": "5ea7afb1cd55bade843ede9cf16be6d132d089423a5dd299c7cd780a06e6ff85",
+      "checkedAt": "2026-07-16T12:23:41.214Z",
+      "snapshotSha256": "7ab72d4bdbe39d7e0603a049c5b99102009c34d2c8ec6b72dd8c5ee678e6db89"
+    },
+    {
+      "sequence": 256,
+      "phase": "periodic",
+      "path": "zinc-guard/0256-periodic.json",
+      "sha256": "01ab8f7b93d0c0edbfba13d469dd918db339ef10df57d96e229be651805437f8",
+      "checkedAt": "2026-07-16T12:24:25.447Z",
+      "snapshotSha256": "9a7267608512ba9bcbfd1a4d11284aba6f8861926fd932f976c1181a2e3145be"
+    },
+    {
+      "sequence": 257,
+      "phase": "periodic",
+      "path": "zinc-guard/0257-periodic.json",
+      "sha256": "dbeb247bca15e9c18f5bd4d1b435ebbb1cb9e226d5690e6bfa4946d5fe831ac4",
+      "checkedAt": "2026-07-16T12:25:10.470Z",
+      "snapshotSha256": "75951e7600da278cc1eb858d3df98d54f64f29b1cd2b4ca113466f229eab00be"
+    },
+    {
+      "sequence": 258,
+      "phase": "periodic",
+      "path": "zinc-guard/0258-periodic.json",
+      "sha256": "ad3ca9e4828e270d8344c37627be173f2b75c7a4a8777058967fb5ee5d0a6dd6",
+      "checkedAt": "2026-07-16T12:25:55.472Z",
+      "snapshotSha256": "c0b0eddfbd622dd6cb74743418de5671b10e9a0d98e1d373123424aaa84d0c95"
+    },
+    {
+      "sequence": 259,
+      "phase": "periodic",
+      "path": "zinc-guard/0259-periodic.json",
+      "sha256": "05dc5bfed21fdaded89565cb190b4eafd68534da0e3f0bd40d0ff1347f5d0bfe",
+      "checkedAt": "2026-07-16T12:26:40.485Z",
+      "snapshotSha256": "3c2569b21ab1e919daa1d1cc257122c8435587057b66825a5cfed41bd8295257"
+    },
+    {
+      "sequence": 260,
+      "phase": "periodic",
+      "path": "zinc-guard/0260-periodic.json",
+      "sha256": "2c25d66cd233689ab020b21d05eec21572c218fe9cba9bc6d8d6ae2dff7385db",
+      "checkedAt": "2026-07-16T12:27:25.463Z",
+      "snapshotSha256": "033367a2be40823c70139c4ad1e734139d1165ea0bdde63d648d632ac4edc5e3"
+    },
+    {
+      "sequence": 261,
+      "phase": "periodic",
+      "path": "zinc-guard/0261-periodic.json",
+      "sha256": "969c23d8cd64cd73bd7d856bcbd5f3dc946a4135e7db99c41ad65c7d1c40a231",
+      "checkedAt": "2026-07-16T12:28:10.506Z",
+      "snapshotSha256": "2f8c2564786255847627e8cc9a22385cb4788d7347f9d6eda95552009e7ec645"
+    },
+    {
+      "sequence": 262,
+      "phase": "periodic",
+      "path": "zinc-guard/0262-periodic.json",
+      "sha256": "4d17c838d4550a2a5a2c60ebe427fd380a562a54fe56af9addd4901fcdbec5a2",
+      "checkedAt": "2026-07-16T12:28:55.517Z",
+      "snapshotSha256": "52a53e4bff2151433b4b96330177a0770072fd66dcbca268e4fa659890f69acb"
+    },
+    {
+      "sequence": 263,
+      "phase": "periodic",
+      "path": "zinc-guard/0263-periodic.json",
+      "sha256": "6f83d49def853e1ff2e371b310157d077575d8bf07a42e212b9bcc509b8e5c21",
+      "checkedAt": "2026-07-16T12:29:40.500Z",
+      "snapshotSha256": "a53d4f9a10d5f6ad69e22ba72ab8ee8b2423fcd43fca8fe509106953bb06291d"
+    },
+    {
+      "sequence": 264,
+      "phase": "post-cell",
+      "path": "zinc-guard/0264-post-cell.json",
+      "sha256": "8ffc32eeafd01dfe3a61385b085bc95bc4cd8b67e2e946b7f883960da3b6b727",
+      "checkedAt": "2026-07-16T12:30:10.371Z",
+      "snapshotSha256": "c6285dd8c25bc8f68e8adf4fb2c60d7809f2814b750bae7a59d3d46be57e2046"
+    },
+    {
+      "sequence": 265,
+      "phase": "periodic",
+      "path": "zinc-guard/0265-periodic.json",
+      "sha256": "3e4c0f8833fa88e5e5450ca9587ceab7af18022ad44fdc6f9f77ec509f1a5c3f",
+      "checkedAt": "2026-07-16T12:30:56.987Z",
+      "snapshotSha256": "a9e1cccf6a9aa523549bc9d9c2d8cfb0215d381e1ecc49ca56f42c1a7e4ff930"
+    },
+    {
+      "sequence": 266,
+      "phase": "periodic",
+      "path": "zinc-guard/0266-periodic.json",
+      "sha256": "19eaf1cfd02c8ee573ca399fe611e776f7975d81cb83137658df387f1c8eeee8",
+      "checkedAt": "2026-07-16T12:31:42.252Z",
+      "snapshotSha256": "200b50612b6461127aa37e66e4877be87cf897043a7457ca413a6d7e0b08aa18"
+    },
+    {
+      "sequence": 267,
+      "phase": "periodic",
+      "path": "zinc-guard/0267-periodic.json",
+      "sha256": "8a475a377350812432852da769193658dcb1e05092a2564bee2e522798d8941b",
+      "checkedAt": "2026-07-16T12:32:27.044Z",
+      "snapshotSha256": "1694102a9e98b444eff408aeee71b2962926e54f91dac0e4806dca497139c3f0"
+    },
+    {
+      "sequence": 268,
+      "phase": "periodic",
+      "path": "zinc-guard/0268-periodic.json",
+      "sha256": "fac1bdb16b5e3941dd91a30b21ea9e30060708be0148be66bb91f33d04b121ec",
+      "checkedAt": "2026-07-16T12:33:12.508Z",
+      "snapshotSha256": "a5da6fad00a107e8e722ee83f7a50267536e396c427c1f8a22a35682b9ac433d"
+    },
+    {
+      "sequence": 269,
+      "phase": "periodic",
+      "path": "zinc-guard/0269-periodic.json",
+      "sha256": "7777acea2b050c67478c527b179682e9c8e27bda7f1cf30e584bf6198f916da6",
+      "checkedAt": "2026-07-16T12:33:57.025Z",
+      "snapshotSha256": "596391b92b752ce6b1934d9296517646168e1f99bf104105760503e78f556037"
+    },
+    {
+      "sequence": 270,
+      "phase": "periodic",
+      "path": "zinc-guard/0270-periodic.json",
+      "sha256": "1db74a41bf6fa81033644078488038777d5e8eec8d3b98b24355464c30721900",
+      "checkedAt": "2026-07-16T12:34:42.524Z",
+      "snapshotSha256": "74963b27e94f416725097ae0c8e06a1ed06a933a880a82abbbb7d96c33546ca2"
+    },
+    {
+      "sequence": 271,
+      "phase": "periodic",
+      "path": "zinc-guard/0271-periodic.json",
+      "sha256": "ecddd7777bca19c6e350913da6121b7e7f1fc1978920d1499aa0171861274385",
+      "checkedAt": "2026-07-16T12:35:27.070Z",
+      "snapshotSha256": "22add1920755f207948e0ff2f14f45b1fc1abd7e2c6d909b39041001968978b0"
+    },
+    {
+      "sequence": 272,
+      "phase": "periodic",
+      "path": "zinc-guard/0272-periodic.json",
+      "sha256": "6b74fe482e11e8e39d4d60376f22799e4b3f4bde616b630066390a690d00ecf9",
+      "checkedAt": "2026-07-16T12:36:12.541Z",
+      "snapshotSha256": "80a9e5ae66ba8c62291616b847c0fe67b9edff1aa7fe038418be5d0f7fbfba97"
+    },
+    {
+      "sequence": 273,
+      "phase": "periodic",
+      "path": "zinc-guard/0273-periodic.json",
+      "sha256": "2d5fa626ebbc33ffe9411f755958569c3823672ef40f60bdb92be809caaf1d02",
+      "checkedAt": "2026-07-16T12:36:57.052Z",
+      "snapshotSha256": "4b44f764480b5361e9a2107c48bd3fd96c2d403999493019e8c325c22d5160c9"
+    },
+    {
+      "sequence": 274,
+      "phase": "periodic",
+      "path": "zinc-guard/0274-periodic.json",
+      "sha256": "896ef92feb0c1e6786bcf31ccff3ce991f9bec5b15cad6c8d5f535afa8bcc8ca",
+      "checkedAt": "2026-07-16T12:37:42.665Z",
+      "snapshotSha256": "3fe9bb01ae6878ed0a5a790d40cb2822886017344dc809296603a33c625f0b87"
+    },
+    {
+      "sequence": 275,
+      "phase": "periodic",
+      "path": "zinc-guard/0275-periodic.json",
+      "sha256": "eb831e074e536e1d585471166eccb6073644c1573d98b0a28c06278f1ed62eae",
+      "checkedAt": "2026-07-16T12:38:26.970Z",
+      "snapshotSha256": "b516a1dca4722ce862b09655e8c078c6cd39edbec9d2f67d2ab7df432d940769"
+    },
+    {
+      "sequence": 276,
+      "phase": "periodic",
+      "path": "zinc-guard/0276-periodic.json",
+      "sha256": "b653ca900c0c0e5d4d0c8aa5c8869a0d63cb84668230564e1da54fd0fbca0fff",
+      "checkedAt": "2026-07-16T12:39:12.078Z",
+      "snapshotSha256": "267532bde33237d76003b8b6c8698326f6ee300d21507bb2b54193a2bc453a7c"
+    },
+    {
+      "sequence": 277,
+      "phase": "periodic",
+      "path": "zinc-guard/0277-periodic.json",
+      "sha256": "11eb28936c8d35a7446dea26fcab2fa1d930ee4604930ba47191951205380d6d",
+      "checkedAt": "2026-07-16T12:39:57.021Z",
+      "snapshotSha256": "d61186f6f51347e206329ea25030499e112586447b4fbee4e6b46dbd39f433a2"
+    },
+    {
+      "sequence": 278,
+      "phase": "periodic",
+      "path": "zinc-guard/0278-periodic.json",
+      "sha256": "9469af64a2fd0a68f4046826b5c90e84126f25720c44b706024736ae3a9ff9e0",
+      "checkedAt": "2026-07-16T12:40:42.028Z",
+      "snapshotSha256": "63110293eda344d0925417892de6303455a477958c1b8bc2e7063061f6e2fa36"
+    },
+    {
+      "sequence": 279,
+      "phase": "post-cell",
+      "path": "zinc-guard/0279-post-cell.json",
+      "sha256": "24af599e7bc59b556e3b404066c950a5d3e7ef5b5d01de1d414be12c99b73b31",
+      "checkedAt": "2026-07-16T12:40:55.061Z",
+      "snapshotSha256": "626209b4a229619efd378a7c0d020acab1e02abaf5c44224e4d01d2a662a97c5"
+    },
+    {
+      "sequence": 280,
+      "phase": "periodic",
+      "path": "zinc-guard/0280-periodic.json",
+      "sha256": "6e49762282245f4f11750fe8dc8295ac87e9b39dd6cd848cf0bbe9f0171b4e82",
+      "checkedAt": "2026-07-16T12:41:41.683Z",
+      "snapshotSha256": "81b33ecbef9b0e105048fb63211995dcbb05badd8b068b9ef7600d34d60e00e2"
+    },
+    {
+      "sequence": 281,
+      "phase": "periodic",
+      "path": "zinc-guard/0281-periodic.json",
+      "sha256": "b0460d518c383267c43a1e58878b0bc95dd4558f069d763d356e4fa67b761a15",
+      "checkedAt": "2026-07-16T12:42:26.719Z",
+      "snapshotSha256": "e81946a1735feaab984bf63c4fc1f7d0fcd4ee0675341192b1701740f2ebd479"
+    },
+    {
+      "sequence": 282,
+      "phase": "periodic",
+      "path": "zinc-guard/0282-periodic.json",
+      "sha256": "6e1c1eb1766bbaa98cd14d5029cea7d7c21f89a57ea4dcc2dc6e132afd05c189",
+      "checkedAt": "2026-07-16T12:43:11.696Z",
+      "snapshotSha256": "06ad9b4d8f507252f7c4023aa279fd9fdf45e35267a3a4ae03595a158a097784"
+    },
+    {
+      "sequence": 283,
+      "phase": "periodic",
+      "path": "zinc-guard/0283-periodic.json",
+      "sha256": "bcc2d43cf402c7d3d07985608a13dcf2dbd269db51f647ed2b670bf3982dcc0f",
+      "checkedAt": "2026-07-16T12:43:56.718Z",
+      "snapshotSha256": "cd342847dff0cfcd092e2d3ef5843158dd619941379ae2cf67245a6f2f2a60b4"
+    },
+    {
+      "sequence": 284,
+      "phase": "periodic",
+      "path": "zinc-guard/0284-periodic.json",
+      "sha256": "e1f1a7be9dc4b02a59b4455ba31ecf51fa23d8f9a3b10e9ec3288a9ef81202f8",
+      "checkedAt": "2026-07-16T12:44:41.696Z",
+      "snapshotSha256": "5814966528cb141bc627e7c8fc04048aaf60ab6a5071f1ec1af2156097de1734"
+    },
+    {
+      "sequence": 285,
+      "phase": "periodic",
+      "path": "zinc-guard/0285-periodic.json",
+      "sha256": "2a098d3c8d1339567b2c5a6e271b32a7944bc9ad5bce5fa037a2155e971bd683",
+      "checkedAt": "2026-07-16T12:45:26.681Z",
+      "snapshotSha256": "ab67e427006b5d1f79e18f8d1b95fce48b7f4536abbf3c537322d3033181f31a"
+    },
+    {
+      "sequence": 286,
+      "phase": "periodic",
+      "path": "zinc-guard/0286-periodic.json",
+      "sha256": "ff953bce57677df5678900b1e2c0b9da93e68114a17d0f393ea3a29d8f42fd50",
+      "checkedAt": "2026-07-16T12:46:12.114Z",
+      "snapshotSha256": "b530518c5143e9d7bc739cdc424103e9bbf696d35d7bd4fda9db0b15e2167315"
+    },
+    {
+      "sequence": 287,
+      "phase": "periodic",
+      "path": "zinc-guard/0287-periodic.json",
+      "sha256": "ed5e81eefbee7c9f1f20185b70d011870296613550eb84bf9550fb3328058456",
+      "checkedAt": "2026-07-16T12:46:56.771Z",
+      "snapshotSha256": "dde3e0967c12ce134e217db6569b0d3f0776d91ead56ba28abe9e62e2218c1c4"
+    },
+    {
+      "sequence": 288,
+      "phase": "periodic",
+      "path": "zinc-guard/0288-periodic.json",
+      "sha256": "d3ba95f7369bcd3d49cca2e7c985865d794ef4db81318aecc0ca8e1400d1603f",
+      "checkedAt": "2026-07-16T12:47:41.745Z",
+      "snapshotSha256": "e4a125ea3a4db2f4b648aa282997c3623be7b2d848e4290faf5461933519789d"
+    },
+    {
+      "sequence": 289,
+      "phase": "periodic",
+      "path": "zinc-guard/0289-periodic.json",
+      "sha256": "ba4a33011f1b5a53263f1535fdc4d955b836089896d040af8531582b9ada2f87",
+      "checkedAt": "2026-07-16T12:48:26.735Z",
+      "snapshotSha256": "d60ab5f673343d0635f2f53f02ac9bfcbb4d1a9645187d14e4ca244563e1b478"
+    },
+    {
+      "sequence": 290,
+      "phase": "periodic",
+      "path": "zinc-guard/0290-periodic.json",
+      "sha256": "ec78b06b69a074da4af5a5eb692958f53529684b6895e0581237f47e31e03f3d",
+      "checkedAt": "2026-07-16T12:49:12.190Z",
+      "snapshotSha256": "f83fb71a39877bb73cb3b2398c5bf32effcf561e17608b70720d75e37ecfbebd"
+    },
+    {
+      "sequence": 291,
+      "phase": "periodic",
+      "path": "zinc-guard/0291-periodic.json",
+      "sha256": "166d886bb5561739aa31e020953d08f6ca3eac35e6203d86c63c72fad5c42caf",
+      "checkedAt": "2026-07-16T12:49:56.785Z",
+      "snapshotSha256": "aa6d0f6df8df5c4b2006bdbf8876c18dd51b2c2c12bb1fae38075667337213fc"
+    },
+    {
+      "sequence": 292,
+      "phase": "post-cell",
+      "path": "zinc-guard/0292-post-cell.json",
+      "sha256": "3b4179c1c0840f5b1eec7ba15812cbfb27fa12b0815c7251b1e9c91c5e2d0791",
+      "checkedAt": "2026-07-16T12:50:32.277Z",
+      "snapshotSha256": "f673c39d92efee794ae56aefdcf363b01130aaa757550c721725171c3d6c6dfd"
+    },
+    {
+      "sequence": 293,
+      "phase": "post-combat",
+      "path": "zinc-guard/0293-post-combat.json",
+      "sha256": "ad513f844aadbca288780cc237e257ea3f0661c377627f7ed9d2aa968c9d1b38",
+      "checkedAt": "2026-07-16T12:50:33.824Z",
+      "snapshotSha256": "bb438a3e3b5e4991ab0b2be1430006a0308b500ab9e575a346beb3309636b793"
+    },
+    {
+      "sequence": 294,
+      "phase": "post-assembly",
+      "path": "zinc-guard/0294-post-assembly.json",
+      "sha256": "8c518d87d088585ffedee3d1f2f531c273b1290ac232b782427b8c521790721d",
+      "checkedAt": "2026-07-16T12:50:58.357Z",
+      "snapshotSha256": "07a641ae805ccee05f09c5ace61b745139dcce1740d2ff48794d8437b0c87c42"
+    }
+  ],
+  "guardLedgerSha256": "c32f7f7918ea25284ac2161517b71f7e304099d437e323aa0f29218fc93035cf",
+  "finalReportPath": "final-report.json",
+  "finalReportSha256": "acd3ab90e2d9434757ffa56e1c3ddfcda0922297b73d3d90f832b9116a90114b",
+  "cellEvidence": [
+    {
+      "cellId": "round1_search_off_symmetry",
+      "completion": {
+        "path": "cells/round1_search_off_symmetry/complete.json",
+        "sha256": "efb93c05da4d10147f9554c54bd252b122e7a4b708861415d5655751323539dd"
+      },
+      "raw": {
+        "path": "cells/round1_search_off_symmetry/raw.jsonl",
+        "sha256": "a04c172266b9c559e6e21502275551a5cc272b19b1d6e7f501eb1cd9c00fd379"
+      },
+      "audits": [
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-00.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-01.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-02.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-03.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-04.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-05.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-06.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-07.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-08.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-09.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-10.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "cells/round1_search_off_symmetry/audit/worker-11.jsonl",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "cellId": "round1_search_uncapped",
+      "completion": {
+        "path": "cells/round1_search_uncapped/complete.json",
+        "sha256": "d852c44e1a75fb8407136ef85723053aa4f965e1d6648f569be33f70769c2bd6"
+      },
+      "raw": {
+        "path": "cells/round1_search_uncapped/raw.jsonl",
+        "sha256": "9da52b660a29d03d520e1841b5ed7510b2e19e95897633a8888d1270f825d10f"
+      },
+      "audits": [
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-00.jsonl",
+          "sha256": "6c5959b7cef20271936c8ae7170299cff0c2eed8ee80db831054f61599da4972"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-01.jsonl",
+          "sha256": "3ffdb0697a77406f3ecaf73a516a57dc84ddea09afa38d91eed70780f20f6cdc"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-02.jsonl",
+          "sha256": "526d2c102e6dd8e5cecff3d6500515d6949d1d7fcb55ebf794176bd850fbb8e4"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-03.jsonl",
+          "sha256": "5c7c0f6c9dc805fa0bb91e4d34ab2dc568aafc9d4079b87c2e7af7f79858bb4b"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-04.jsonl",
+          "sha256": "d024127e243ad5f210221eb90297a0e6d17d647620faacac6a516625c6edb45f"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-05.jsonl",
+          "sha256": "7695f6f26f7ae4dec1dad4b2a8337b28e5fd7c87a56fe7b250c453c2a670923e"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-06.jsonl",
+          "sha256": "c240c9e87b6dc0e258958c8de239371b5d4596e559aaaf594e67e618dfba3f19"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-07.jsonl",
+          "sha256": "c142b6e3e9ad8e0ad252b583aabbf795abea4566bf90b1b2460e25b5e59f2ddf"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-08.jsonl",
+          "sha256": "7a5eabd6f08700f6473f9a1eaa51f59e08605dc6f515169d156bf232ba8de42f"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-09.jsonl",
+          "sha256": "fd41909559e543ccb63f24ccdb0bb6575f09f78401618f46f2b098106ba2790f"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-10.jsonl",
+          "sha256": "6f0022d4b5c3c1da641323a2f4b89dcd691b9c3aab74e0d4f4dc7287802768fe"
+        },
+        {
+          "path": "cells/round1_search_uncapped/audit/worker-11.jsonl",
+          "sha256": "e33f5d0dbb428bae9839f7e0e308ae8e86915b4148fa1db774571605352a5ac3"
+        }
+      ]
+    },
+    {
+      "cellId": "round1_search_server300",
+      "completion": {
+        "path": "cells/round1_search_server300/complete.json",
+        "sha256": "0459bef07d4bf4dce197d5e540ce8dbe309e1b21f6ed9fb4a3c5fb14f5214fe2"
+      },
+      "raw": {
+        "path": "cells/round1_search_server300/raw.jsonl",
+        "sha256": "5a75aff44494504b3cb251f2d4e50ffe873402fdc6816604fca476ae9a6e2f54"
+      },
+      "audits": [
+        {
+          "path": "cells/round1_search_server300/audit/worker-00.jsonl",
+          "sha256": "b9d7c3450d2084437a81ec0ea7a145c2de73e5db5ce1f6eb0b0d03959ad6a618"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-01.jsonl",
+          "sha256": "0a6f2a2763f5a9ee77f0364d0f3decf331189980b1179f9b9ff1a7bb1b7a6265"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-02.jsonl",
+          "sha256": "d11cc209e65734fc25e399734e2e0bc1198f9fc2051f7b9533fa611e9f2dce90"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-03.jsonl",
+          "sha256": "3abea5e2dd172a5af7b2363e8fd39036caad18fbc66ca5554d96c2ec2336b6cd"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-04.jsonl",
+          "sha256": "10a1854ca26fa965d23a5c505d53316cc54e365f9f4e2b10d0acde6b5fa9ce9e"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-05.jsonl",
+          "sha256": "c180cb071c0f16828b3fcf977c74cb79a440823d94e65a6e91df6436cb4da71d"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-06.jsonl",
+          "sha256": "be776b2e8b82119f1037018d94b52b963be0945a67f4927ae8df5c0a53f1b2e7"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-07.jsonl",
+          "sha256": "1d68657d99e848d2130680afc6de625044959e61e1b8e3a31ba77a588f8f6f72"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-08.jsonl",
+          "sha256": "62f7a64520a4824bdd8ae72099a7d3c398c2621e2a48dbea109df313aa401b6d"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-09.jsonl",
+          "sha256": "b37586f03d0e0e79fca05ce7c8c07d1432af0d32ffdd294b7266bc5ddcbab117"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-10.jsonl",
+          "sha256": "a0ec39f5e1aad8b4e4eab9196e8c54cdab3ee9284d66aa9828297de210ce7b91"
+        },
+        {
+          "path": "cells/round1_search_server300/audit/worker-11.jsonl",
+          "sha256": "e27893fc6c026acb490881c6af68905aa792c86eecdf370f92c007dc785203f3"
+        }
+      ]
+    },
+    {
+      "cellId": "round1_search_conservative200_275",
+      "completion": {
+        "path": "cells/round1_search_conservative200_275/complete.json",
+        "sha256": "66e966c9e41c81da124fac116ac52466a5b67a742095a1761e50de950d14b01b"
+      },
+      "raw": {
+        "path": "cells/round1_search_conservative200_275/raw.jsonl",
+        "sha256": "3d9d9a1f6762b04f22a721b0c0d83accf24ce24a855e85aa7626256c85505c2b"
+      },
+      "audits": [
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "cb37f9a34c48ff09b00ad8a0264a433b7625a373eb1a015cec587db6a3afe648"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "7404f34aaa2c76a8098b34c2e681046ef8859f64f0130f972e37c503b2ca578d"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "a6da89de34acaf9a1f2ae2b6d60f28dcdc46dbcc74bd7dc8c9992fdaa91cc01f"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "1efaf9eca16ed41172c03b3c3748daace8e8d7e4be4b376a6a72b9ff6e567843"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "7196caccf0f0c30155ccf77f29f2f34f1e05c1925b2337a12ebbb9a29265b4c5"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "d60684d574eb513a6bfecb853924d0be01112c48276ade1aec2f11ab7a818b1e"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "a1ed72a7d868583f8c709bcd845fccd26ff1d4ebdcfca1f6381b5a84ebfe8ee9"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "8aa306b1980c52e519abec797dc93f0b8d50be9a2d52d15fe9452ec9f59aa10a"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "3549e8d5b25be90c66a950bb0eff2cb6c1dfe9cbc1ffb0fe6af05c3e1a6b6475"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "516b445e61055efe64aad6cbff1f9882b1acac73f93d1d77801edb33df5319f3"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "e28030ab8737fa6aca0147ffce73d5412f103e297fb296d55afda9b93305c32b"
+        },
+        {
+          "path": "cells/round1_search_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "68a61840466eb5277b83b58ee53f9b094ba9795c767691f9c6a3cfcda2695bd1"
+        }
+      ]
+    },
+    {
+      "cellId": "ranked_mage_conservative200_275",
+      "completion": {
+        "path": "cells/ranked_mage_conservative200_275/complete.json",
+        "sha256": "e80fb0eee12cd6042db20d2b5311a35b4a8f97a41269b8ad2a7860d7cd0eb83d"
+      },
+      "raw": {
+        "path": "cells/ranked_mage_conservative200_275/raw.jsonl",
+        "sha256": "5a41bf5d880d6954d089c4701c0d4f3f9bba834680c620bb5c885d7cf4cb7ef2"
+      },
+      "audits": [
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "13893f1201a15fda107f5c2b9d78aea73f5e54337ccbfb6d3c9ea8937f07f7f7"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "e5aa5fdbc36293c4046f008c4aca33cc897736c187d5cc063d910bba3997965a"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "4f597df4636e2fb9323c56fc5b557f7aa9073828778f62680ebcc65ddb065de3"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "c785c223f37229f730d5eaf9d13f9952aa44e2907e08c14bd032eaa120aa95b0"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "2e0647f003f31d262f551dae745f0a9326b227cb8b860788a4e791f3060a5262"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "48fee513ebbb673fcfce72a6ad4864a24f7f24c811f9f06b0a5b5861243ae204"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "b147fd1c10635b035ba54f6e32b93c7f66277cc13aa920d2711773d140e30c13"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "91747efd221cd8388d64f417c71c3966605c9afd86daebb50330d3f42ebf3af5"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "f5f02de9d385e4fa458b31d46fc74b442029c17ed39962a06a8bab37b011b91c"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "d6551f2cbe41906566ffe0eeaad603626008e7c9768d3e42d515bbeb038fce7d"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "12ecca0ca4602d071b5f70fe2bc82c5875be05367a6ea8b171bccdb204f112d1"
+        },
+        {
+          "path": "cells/ranked_mage_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "b195a40ee019ba9182a80ab57bb51a6e7ad616483abfb022adffb70b9fd90d39"
+        }
+      ]
+    },
+    {
+      "cellId": "ranked_melee_mage_conservative200_275",
+      "completion": {
+        "path": "cells/ranked_melee_mage_conservative200_275/complete.json",
+        "sha256": "45226e8e20df20d81e6b256d7991a0ba627711c12a54b41351685bdc9d87175b"
+      },
+      "raw": {
+        "path": "cells/ranked_melee_mage_conservative200_275/raw.jsonl",
+        "sha256": "a8dc7c6b1d20dd7ef50217231d7f2da2a4b86ace30653277a727b1f6a0b778ed"
+      },
+      "audits": [
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "d0f403a8f5a3bc9b931ea98a90bbabb4d4888474274aeaa465c5cfe496552b1e"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "fbe8de6d98c91725182d2aa9fa8f906ead84c1dd14dabb666075b32bd6381a9e"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "ea7250a10f931637a58e2490fa7da1bcb22f8a61e39dd7a2a69c8d9fd36c5d89"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "22bf09483d4c22d836c7a8d9d1c3ba3857cadb4f87a51367dad34a7cda4cb84d"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "68521b9320baef96028e7e948599e5deef5029e760b42ea3f6dbd824cf93cd25"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "c077a420025ee6d79be609f4e62a28941f178a4d5a026b6bbbc73a484459c710"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "edb2835693faaf12bd7ab922e0c95cd5d1dd2f0a8143950a4af22439d7b54dde"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "48a518ab4ed9c33ab644919050d5aedb09a098c78402a6678ab9401dc1e7ffbe"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "00e1c9ca53ab361c5dca6502e26e1fd3297c1a771fd5f992c715ee248248db4d"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "9491433a66114a3eb0a5c2440eb17768d1e3afcebb3d57086ed0c0be877f84fb"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "755509561171b9af2149d415801f639dc1820c21aadbe9e62659e9b899f0f936"
+        },
+        {
+          "path": "cells/ranked_melee_mage_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "727a3cd0242de00678000a0a2c6cca79b0938bf13bbbb9d507abf0490dd22f20"
+        }
+      ]
+    },
+    {
+      "cellId": "ranked_aura_conservative200_275",
+      "completion": {
+        "path": "cells/ranked_aura_conservative200_275/complete.json",
+        "sha256": "23587d35e915fe7c4ac0d582581f82802f1ca65f339c6f51b60667a4d11352c2"
+      },
+      "raw": {
+        "path": "cells/ranked_aura_conservative200_275/raw.jsonl",
+        "sha256": "243cd7ebe183e06c392418d4a19a3f5802215520f7eb474e44d219f42fd982cf"
+      },
+      "audits": [
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "9be5bcb0f0c8c634a70426b2442702812bd6ee3c08389ebfe95e2ef532b08565"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "3852a71e4f8bba966fbb39185d000d64b32aa90c6e6bc4e39062369fdfe42185"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "ab95057af16f2684bd7181006185ffc2a27a9b421610291312a7b11187843eae"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "c95500de0e4244d6f6cb02f451bb7a0ab281064e50c70d13d7ea737f52602924"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "7b6e06202ef3bc6cc2f682d99e2dc7b6e4580ed08381f29897c246b07c31f360"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "655f09a3fec87628587007f2cd554bcec621ee91a32ed30d68be385c84483393"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "2f2ad191bfd20b8a629982da0f6fb2d83196706dbd6c4816bc57df2a79d8e0e1"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "dd800b6b138f5bd9e303fd36e7f301b1eaa055bf6b0cbf2db798229ab4db3d01"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "b9a8851588a4c85a2cf23c9c375be0dc0047ef6f9c43c25724edd1f29a194395"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "f51107c8fcf8c44e808de1db1de2d65e4087153a64e793f185d3a4a0ff028aa0"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "56911ce3d2d90df0b5da07e307b866850f7797027b849dc1a881f7cf25736df6"
+        },
+        {
+          "path": "cells/ranked_aura_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "555f1552e6bb7e93a258618ee07c945ec230093077dd8ad2c4597e5f4fb28e62"
+        }
+      ]
+    },
+    {
+      "cellId": "ranked_ranged_conservative200_275",
+      "completion": {
+        "path": "cells/ranked_ranged_conservative200_275/complete.json",
+        "sha256": "0911fb896816428d7649c96ba6bfe2c788c4770eb6e00152118b4afa78b324d1"
+      },
+      "raw": {
+        "path": "cells/ranked_ranged_conservative200_275/raw.jsonl",
+        "sha256": "3abddb256a8321743f9ca1b0088fd9ca3809a60a2c17d26b092b1af2aab7efbd"
+      },
+      "audits": [
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "e797ecf66f0ca2b3340aa50995312440ca56eb15a6ff6c9a0096b4ef28ed84e7"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "57bc3e5fca2ec6234287e6510b943268e52f50b022c03cb044fbaf642522c93d"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "a5656246a7393cb489ed06263f2301af68a91fb5370cc8832279dac8042058e2"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "0ad825de7a6584030aa0fef4054a788398092d0c325cc8410996c74e0065e5de"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "3cec36051c2dbd41314b238550b0f32cd968ffc8cf8b15de6a17c66d0cc69cc0"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "f6596d3c3a804efe432415a2fdc778a9f8a2977b2efaa02a69a89cad4b2b7607"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "1b2c55d79cae2c9bf53a1d0b17a7eb4ab6ab88291abe9be775b479ed2f6298fc"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "9fded1000504e1886bc4b4cca8f57223c02519c1f2551012c367fc232903b01e"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "06d329748b8371c9f1401cae6f1e973b3be1dc2227608d8168a70365cf9e62a2"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "4ed6a6872f8301ae2d3360ffb3711cc09513dbeab4afda00b498ee4d71e9b9a3"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "b49f5a07966a525c5a4c69bb0f5763d968726c63714ee7cad6b74cc2d40714f0"
+        },
+        {
+          "path": "cells/ranked_ranged_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "6653e6f2ca28dad323711581f5d26f39106cd967acc28c1fafc1009bfaf3991a"
+        }
+      ]
+    },
+    {
+      "cellId": "mage_frontline_conservative200_275",
+      "completion": {
+        "path": "cells/mage_frontline_conservative200_275/complete.json",
+        "sha256": "ca8809c44022c44d2fc36251eff39e8537736703d3005095ba4c24e5f223917b"
+      },
+      "raw": {
+        "path": "cells/mage_frontline_conservative200_275/raw.jsonl",
+        "sha256": "3f774a477245d2a93a45fe846ee64e596d995e9b539b5d2df42122bb4da3096c"
+      },
+      "audits": [
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "83d93552c4fdecbae14696485b8099800997a43c8a266a682f8359e832d43fa8"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "31cfc6527e9cd1a17ab935e70411875daa2b6ea5ab682eba69a73fe05f2653a0"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "473d64dce885cb9f51aaa7790190841f7867134d04ee12cd1ee7697ddd058277"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "6df91515493f0d6a71598a05eb83239df255bdbf37a84d1af0c13fc3f2006b1b"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "2d62cf6ad194f66e2f8636f96167d3b340ec544176fc70769f74f73a8d43d02e"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "4de9138a394cd5ef60df11397b665dc2dfe59e0fff8cf8783e075e3875c5ee02"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "e7a2c03f20af27ba018692e22fd6c76618bd621a128bbda946ba581fa3024de3"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "f5e7f72e5efffc5338feb80538c40348fad43f7f82fe5bb86ef1dc173eb38c7a"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "245e801366c09bacb51f3caeedc5e430b45322dc27e5114289af6c73a7990e70"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "5341057a3c4ced319ba68fb89e9c3499d5b5dd29486a82710898d1e657949d88"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "6afcd0e37937a92dc19319f2761dc8c791761249a2484ba5d9290b011304f872"
+        },
+        {
+          "path": "cells/mage_frontline_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "f5214ec8dfeb7a0ff7f2650e8978448415179da267cdff496cc264951ac27c34"
+        }
+      ]
+    },
+    {
+      "cellId": "mage_fireline_conservative200_275",
+      "completion": {
+        "path": "cells/mage_fireline_conservative200_275/complete.json",
+        "sha256": "4993dd149da01430d11d91bdc4d8573d4e6180b95b1a10b1eab75361afc06761"
+      },
+      "raw": {
+        "path": "cells/mage_fireline_conservative200_275/raw.jsonl",
+        "sha256": "40066b08963a4fabfe7aab9eb2f97df4d075f835892e7c4eb26a036712c41797"
+      },
+      "audits": [
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "7cc1f6027fdad4f85a691ff43b5dee2ce3cf65845b12ede22bf15b0fc1ba83a7"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "4742f7ba194782690d16145c4d6215d6ef01b8eb2338b5d77532ed2e430a2130"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "0f38ce0c9f87055287e74f87bb2b88be7c08ea391305596002630d38d47929ca"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "5d86caf4755d09034027e1d7af75cc8c9e110f75d4f52ea78575de1a4549c0ae"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "6b988d0fc9fcad5dc222f48d32855f852f154d2613969890c64762d573b38768"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "c19ecfaf12d3f151e24bc4af0b420c5589a7e24815d64e51e1c2b3835b6210a8"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "5c91229eb617f6d7b7391b1ec093b5187885d8fbb0e3773cb576cc7a593c3a00"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "cfa327cea9aa47128c71c73a32f9d4585c2d89fdc14e32faaab524bd357d64f3"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "6e12a9c369073cf9747afdfb2a81cbea45c2189c364c2a23733205a6c749087e"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "1af6ae1174a0aeeb5e8e3289b4668db95548a0ac58346bf3e78c8cb3e3fd88fe"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "5b636d1a5ab1f776b60e760d5db1d685c2d001cab3c50bfb8ac2ba89c78cf468"
+        },
+        {
+          "path": "cells/mage_fireline_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "e7b15924aed6e99d61722fba2c66d3a6d841055a39f304d3f39e8363f4f44fcb"
+        }
+      ]
+    },
+    {
+      "cellId": "melee_magic_utility_conservative200_275",
+      "completion": {
+        "path": "cells/melee_magic_utility_conservative200_275/complete.json",
+        "sha256": "22f5685a7c3356421ad66d0bc1ae8fa4afb94656e695fdfaf767419ebab2c673"
+      },
+      "raw": {
+        "path": "cells/melee_magic_utility_conservative200_275/raw.jsonl",
+        "sha256": "0750b57ac72a2e8a7641ad7dd870d4cde1c4f2aa1489065671ec3176599c87c5"
+      },
+      "audits": [
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "43b81799eeca8f6c0921c7e45ad7d19e557eaed18351321213ee7e2416f1212e"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "56fb8b62f921fc8d5fdcca9252c01fdfc17ea95e6bad4b55e7a5c2897d31d41f"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "04b67e55ee983c1df5452a756e86d111812d05c6b4c388d97235571f4c840a63"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "47bc1cfa6c3b7566b17e69f7fd112de80a6e103d07fdae9ed73adff360bf1ed3"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "85a519a975f427729110b0f83693e1a0e80d22874ac433e2f0d4cf817f7ee5f8"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "f33138082007edf77c3579ddd54e9f3ea19e01085a246babc473f550037966ae"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "eecec9b5d53bbdcb91eca7db964f97e12b1be7725fc8c92c3f72b1847648c6e8"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "2bae9b19ddeae2ca6443b53d0a4b8236f9cd6d1cdf6b7f31a98f189444a7f791"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "5a960278b6ce4c137a38d63eaecc5cb6d50ffcf5f08547ebe73340d36ebeb53e"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "835d57ec201ad453e191e0a2280f5bb433dbc2f3bf76a60e2dfcafa9fa9bb233"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "9d6f875cb7bb8d3af50737ae22349f08fb1b5a41bc99075f79d83a89bc9dae40"
+        },
+        {
+          "path": "cells/melee_magic_utility_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "758d1015fca77e26d5390a84b6abba0f79e52f6cbb7a4e17f38c0bca763cc200"
+        }
+      ]
+    },
+    {
+      "cellId": "melee_magic_brawler_conservative200_275",
+      "completion": {
+        "path": "cells/melee_magic_brawler_conservative200_275/complete.json",
+        "sha256": "686f8f3b9c0da81eb8b1b6e0963eaf4bbdcd314a217f686fd645c31f80617def"
+      },
+      "raw": {
+        "path": "cells/melee_magic_brawler_conservative200_275/raw.jsonl",
+        "sha256": "bd3816e04467d73f5054fd3f889600cda0cfd60628bd0245bf23ec8c89794eba"
+      },
+      "audits": [
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "f20b84b0b76455dd2db5435e88233790e3d2254933654974d520dba8094d569b"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "c714c2db0a482578320e267b4c7044f2f3240e634604c8d805f2f7bf757923f8"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "e50fee11fa99fc5f3218b46dcf7913308d8d1b7e56fa50f4022ca995463d28aa"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "0343d93a45db42a228627b2eafdac39695852e3ff4f999b133ec83303cdca981"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "5244f5b82888c7e64d5223378d6b3498602cc946f31b0c82d5964dd5cb4b6baf"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "e4e0e3930636bde64b79990e356ff353136824818a3866ec021094f88988cda2"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "093ed954b206245235476f49c8a38e12d0127bb04ad8ebb6e8a0ef49c0efacf7"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "5b3e65fb908339263dfab364678750add0310deb1251e4b25ef5dd1b3962f0f7"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "6ca5d9b3e79559908363665de98a2b390bbb3fd596b008263a4628f7fcb1a37d"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "9aecb620d0485f277ffb36a266e7afa961b0a9debc2ec7dd26ca5bc3b9a4b895"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "a0740d022a71b90602fb9b5d2e894ca0e819f9ca22d2765454eb568962ee0bd8"
+        },
+        {
+          "path": "cells/melee_magic_brawler_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "75607ddae92ab8d812fcf4f2431f7959d772f4d3b1d52536f7a0b4990b4b3f39"
+        }
+      ]
+    },
+    {
+      "cellId": "aura_support_conservative200_275",
+      "completion": {
+        "path": "cells/aura_support_conservative200_275/complete.json",
+        "sha256": "f2873a3a13b5f09fb00225d7a4c421c5007f06c78363e4d4e8da126bab986888"
+      },
+      "raw": {
+        "path": "cells/aura_support_conservative200_275/raw.jsonl",
+        "sha256": "a393f9064b44b9af08dfb40b91d8c6df8842b8e785f74ce4f26a0a6832f74f92"
+      },
+      "audits": [
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "a54eaac96862af3d53615410d4789f6ff060b7fa3a32603c7cae34e6c48c69c2"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "e440476d4e4f4fe1467f723c566f7d3f6762e46d0c81c2178a3dcded54efea0b"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "beeff7f3026a7849c3cb38136f20765f9194514be1dc0da908a13777cacc5f15"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "f998a1fa3726a4c26f18329055dfc36748cf4429045d03186a266d812e8c9531"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "8f58e382b524098602aab4d197617f8c663114745986509780278f4b803cb2b1"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "18d40077b04f61d71d4916459eea1f4e34595ad2038ff98676593ada44a17550"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "dcf14e18d9a3c2acaa9b6621b474f7c8e4a9320087896cb2e01a0f978d1c25ef"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "f07a8ef53a812daeea59019c844ae8770766e4df0c74dafaebbdf5226cd84b00"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "6234581607757f49efa99b6e09156e8d1382d974475e3d00abbac059b78e7b9d"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "654460d52bb7d935cc50fc49668edece5629678b939e922cbb12573cc47026ad"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "a86972d4ce6070d35c8bc9364a01a311942d819e4972ca83fb5dc6a28a67c7b7"
+        },
+        {
+          "path": "cells/aura_support_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "233f7a38e9e6ba38109b9a5c22f0cd722fe13913c07a62cdfee54904f88f0186"
+        }
+      ]
+    },
+    {
+      "cellId": "aura_offense_conservative200_275",
+      "completion": {
+        "path": "cells/aura_offense_conservative200_275/complete.json",
+        "sha256": "dc11c50c0e26f4d702874ba8a51198445fb0cfac7a484002f4b25c401d4d7b17"
+      },
+      "raw": {
+        "path": "cells/aura_offense_conservative200_275/raw.jsonl",
+        "sha256": "f44056646b20ab5b21562ad7367e413cbfa6c186ff0fb2a633b5a7ee6816f67e"
+      },
+      "audits": [
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "cc8e5189e7e84161beff9851a9b37cd86127b45a1ad0d5c8b031521844b36e8d"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "0a46cdb84b71a1beba7e137a70d75935c25f2949fc4a72a6684622a274bb4283"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "4b703a7f585ccd56504a74a47193e7d2382f15c60c283e6c82491514e14974c8"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "7bba0114f7e068d34d61cbffda614c0f7bce388a6e5b3b1c16bc38dbf756fc78"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "90aa2281b51a4439cf6344792c26da7ce4ff238ba8eb83c1c55e128af80604fc"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "18aecfa99066891a04758ed0cc11eff92a76064c5131280a89c9cdd2c145d870"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "fb2f10e4a9591096814d762183b64c76534fcee196fa6dd3f08bee14d7a67d64"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "deb0711fb81b2624052319e98142d6120ad66c66d24d778922e8f02767a8ed03"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "3998f1a0bab936a791844e27fdaf305f7cb959d1a395790c7078e6ee83d22c87"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "7d595945abbaa876a8a141fa2026ce3369bf8c8d9854043182a17431f014a0d4"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "b944593e861b455a348bcab87bed6d7117c8636fcb62de63614c9d146850997c"
+        },
+        {
+          "path": "cells/aura_offense_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "0d719d8c411da22d0f5f7f829959b8e4a5c4b720545ef853607ad4f935e651e8"
+        }
+      ]
+    },
+    {
+      "cellId": "ranged_precision_conservative200_275",
+      "completion": {
+        "path": "cells/ranged_precision_conservative200_275/complete.json",
+        "sha256": "b9ee0c79a92a17dc1cc381bfaeb3ec911c3bc92fc3f17f73bb279358c84b2635"
+      },
+      "raw": {
+        "path": "cells/ranged_precision_conservative200_275/raw.jsonl",
+        "sha256": "0189e419b4214fab35d839be0608807dfc292029f8bdbfc151cacd6362950b1a"
+      },
+      "audits": [
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "f69b148052fa088220e44b103d0dc7e3bb5502f3b29e872cdcf07301eb163f1c"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "5782b72f57462f26d790650ae29971c3c21fb83a06e404f94426d12e18610588"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "e8fdaa85491f0c82e0516cb93c42aa8f78815dc6ba5024e7e86b38b2d2b84dc4"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "6720ca960ffbe03310ccf70ee166c6c58141cf3d36f7d7a25a5272448848f37b"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "4f8e7391fe517ebc48691a412c58d57540d6d107737e7a24548b7ef754e34503"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "e442d5dfb538ea6ea80946aedd385f62c5e18a1a735d4ff2acd75cc6ea0cd496"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "606a1e3670a07adc3e395a009b0c57df69b0c15bb1468e3a09c9ee83b35336d9"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "a553a3c84ed3d06b5f717c974cf9b1fd6488e09260ec9c7dc34f46252c5b7306"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "2995f396da8b60e66b514c4dc4bd3f7e81f928769f46eaf4da726c724b669ff4"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "303957c59172ee9316033dab9c4173eb67a0d010e67796f54fd24f2e220024a1"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "c486e9ceecabac9b0e7db1d435c0bb14f77f3b36528defd8f19f896ed329acca"
+        },
+        {
+          "path": "cells/ranged_precision_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "12ab1beb47a2ac8f6c6f735d60810a660cae674431a2faab5fa3dceab97b3090"
+        }
+      ]
+    },
+    {
+      "cellId": "ranged_control_conservative200_275",
+      "completion": {
+        "path": "cells/ranged_control_conservative200_275/complete.json",
+        "sha256": "1c65f1aaed058262c92c67bdef4e23718d50f0d1486cd947a8b3c08e19b6bb3e"
+      },
+      "raw": {
+        "path": "cells/ranged_control_conservative200_275/raw.jsonl",
+        "sha256": "6b2c0b56a4e2e272e3f05e9df7605875cd46f59e2987b9e9301363b990195684"
+      },
+      "audits": [
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-00.jsonl",
+          "sha256": "763a68e5f784124e1f3b7fc23c864997bd9fab7c701a4c6a3c9c68e4f4abc9ad"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-01.jsonl",
+          "sha256": "91db61a2c1b2cf78f61f02701bc02c03f3a1a2804adadad3062a17bc044a467a"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-02.jsonl",
+          "sha256": "ba207fd57119967042913ca26dca0ce1b53cb104f330fcbc51d096498ef7d716"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-03.jsonl",
+          "sha256": "7660df0197f542256e2b898977fd8de00c703f9ee9fd16271746be9134e8e8f2"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-04.jsonl",
+          "sha256": "ce30dada842a76ffa281fd74392cde6ef61169bae0b9367bf6f1f53aa50dccb1"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-05.jsonl",
+          "sha256": "7219553bfb3b85db890f0551dbbf79722c9cce8a94b75d7a0613e5cf7c652fee"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-06.jsonl",
+          "sha256": "4ca5f9a9ba6b13ab62cc196ad0e0cb3539236b11d67251ceb7256e2b6bfdad97"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-07.jsonl",
+          "sha256": "2aae273999c16823f60438e8276d043487ab57bb6842fae2186f6b4a976a664d"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-08.jsonl",
+          "sha256": "6143389585268b85d9cdd9d5144e4abd513869bd41aa46ea0318110b713eb9de"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-09.jsonl",
+          "sha256": "4429e9962aa757a110a91000ff25656a58cd10b2b061438967592d2387d610fa"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-10.jsonl",
+          "sha256": "c914f21a668032064b38d21b8f4fc0bc32937fd31eaaa5b3f10d99d03d0175bf"
+        },
+        {
+          "path": "cells/ranged_control_conservative200_275/audit/worker-11.jsonl",
+          "sha256": "353d115a0a1167f6b7002bfac78c9ff9988890586ba9eb8c40d466fca5799915"
+        }
+      ]
+    }
+  ],
+  "cellEvidenceSha256": "4b8a97fa7622bd7b0e6b83cd84146aeeae280e320bf65139c3a0078f52bf91c4",
+  "qualificationVerdict": "FAIL",
+  "sealedAt": "2026-07-16T12:50:58.570Z",
+  "guardPassed": true
+}

@@ -21,6 +21,7 @@ import {
     MAX_PHASE_B_MODEL_COEFFICIENT,
     phaseBModelStabilityIssue,
 } from "../../src/simulation/optimizer/model_stability";
+import { fitStableRidge } from "../../src/simulation/optimizer/ridge_regression";
 import {
     evaluateWaitV3HeldoutGates,
     WAIT_V3_MIN_RANGE_FIRED_SEEDS,
@@ -88,6 +89,79 @@ function runFitter(args: string[]): ReturnType<typeof Bun.spawnSync> {
 }
 
 describe("Phase-B fitter validation", () => {
+    it("solves a correlated 125-feature ridge fit within the frozen iteration budget", () => {
+        const dimensions = 125;
+        const rows = Array.from({ length: 64 }, (_, index) => {
+            const sign = index % 2 === 0 ? 1 : -1;
+            return { features: new Array<number>(dimensions).fill(sign), target: sign };
+        });
+        const model = fitStableRidge(
+            rows,
+            dimensions,
+            (value) => value.features,
+            (value) => value.target,
+            400,
+            0.0001,
+        );
+
+        expect(phaseBModelStabilityIssue("correlated ridge", model)).toBeNull();
+        expect(model.b).toBeFinite();
+        expect(model.w.every(Number.isFinite)).toBe(true);
+        expect(model.w.reduce((sum, value) => sum + value, 0)).toBeCloseTo(1, 3);
+    });
+
+    it("matches an analytic unregularized line fit", () => {
+        const model = fitStableRidge(
+            [
+                { features: [0], target: 2 },
+                { features: [1], target: 4 },
+            ],
+            1,
+            (value) => value.features,
+            (value) => value.target,
+            10,
+            0,
+        );
+        expect(model.b).toBeCloseTo(2, 10);
+        expect(model.w).toEqual([expect.closeTo(2, 10)]);
+    });
+
+    it("fails closed when ridge normal-equation accumulation overflows", () => {
+        expect(() =>
+            fitStableRidge(
+                [{ features: [1e200], target: 1 }],
+                1,
+                (value) => value.features,
+                (value) => value.target,
+                10,
+                0,
+            ),
+        ).toThrow("overflowed the normal equations");
+        expect(() =>
+            fitStableRidge(
+                [{ features: [0], target: 1e200 }],
+                1,
+                (value) => value.features,
+                (value) => value.target,
+                10,
+                0,
+            ),
+        ).toThrow("normal-equation norm is non-finite");
+    });
+
+    it("uses a scale-relative convergence tolerance for small nonzero targets", () => {
+        const model = fitStableRidge(
+            [{ features: [0], target: 1e-11 }],
+            1,
+            (value) => value.features,
+            (value) => value.target,
+            10,
+            0,
+        );
+        expect(model.b).toBeCloseTo(1e-11, 20);
+        expect(model.w).toEqual([0]);
+    });
+
     it("rejects non-finite and numerically divergent linear models", () => {
         expect(phaseBModelStabilityIssue("stable", { b: 0.1, w: [-2, MAX_PHASE_B_MODEL_COEFFICIENT] })).toBeNull();
         expect(phaseBModelStabilityIssue("nan", { b: Number.NaN, w: [0] })).toContain("non-finite bias");
@@ -212,7 +286,7 @@ describe("Phase-B fitter validation", () => {
         expect(result.reasons).toContain("RANGE action bucket move has negative fired-row oracle delta -0.100000");
     });
 
-    it("marks a divergent C fit rejected without suppressing A and B candidates", () => {
+    it("keeps high-norm C and D fits stable without suppressing A and B candidates", () => {
         const directory = mkdtempSync(join(tmpdir(), "phase-b-wait-divergence-"));
         try {
             const path = join(directory, "divergent.jsonl");
@@ -220,11 +294,12 @@ describe("Phase-B fitter validation", () => {
             const result = runFitter([`fingerprint=${FINGERPRINT}`, `divergent=${path}`, "epochs=6", "lr=0.5", "l2=0"]);
             const stdout = new TextDecoder().decode(result.stdout);
             expect(result.exitCode).toBe(0);
-            expect(stdout).toContain("C REJECTED before evaluation");
+            expect(stdout).not.toContain("non-finite");
+            expect(stdout).not.toContain("D REJECTED before evaluation");
             expect(stdout).toContain("V07_WAIT_WEIGHTS_V2 JSON (A, linear49 padded): {");
             expect(stdout).toContain("V07_WAIT_WEIGHTS_V2 JSON (B, class-conditional 98): {");
-            expect(stdout).toContain("V07_WAIT_WEIGHTS_V2 JSON (C): REJECTED");
-            expect(stdout).not.toContain("V07_WAIT_WEIGHTS_V2 JSON (C, delta regression 98, x100): {");
+            expect(stdout).toContain("V07_WAIT_WEIGHTS_V2 JSON (C, delta regression 98, x100): {");
+            expect(stdout).not.toContain("V07_WAIT_WEIGHTS_V2 JSON (C): REJECTED");
         } finally {
             rmSync(directory, { force: true, recursive: true });
         }

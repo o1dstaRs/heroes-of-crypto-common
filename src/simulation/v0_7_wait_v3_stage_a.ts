@@ -11,9 +11,22 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+    closeSync,
+    existsSync,
+    lstatSync,
+    mkdirSync,
+    openSync,
+    readFileSync,
+    readSync,
+    readdirSync,
+    renameSync,
+    unlinkSync,
+    writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
@@ -329,6 +342,8 @@ function requireInteger(value: unknown, label: string, minimum = 0): number {
     return value as number;
 }
 
+export type WaitV3StageAGitTextReader = (repo: string, args: string[]) => string;
+
 function gitText(repo: string, args: string[]): string {
     try {
         return execFileSync("git", ["-C", repo, ...args], {
@@ -340,22 +355,48 @@ function gitText(repo: string, args: string[]): string {
     }
 }
 
-export function readCleanMainRevision(repo: string = PROJECT_ROOT): IRevisionProvenance {
-    const status = gitText(repo, ["status", "--porcelain"]);
+function parseLiveOriginMain(value: string): string {
+    const rows = value
+        .split("\n")
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .map((row) => row.split(/\s+/));
+    if (
+        rows.length !== 1 ||
+        rows[0].length !== 2 ||
+        rows[0][1] !== "refs/heads/main" ||
+        !/^[0-9a-f]{40,64}$/i.test(rows[0][0])
+    ) {
+        throw new Error("Wait V3 Stage A could not resolve exactly one live origin main revision");
+    }
+    return rows[0][0].toLowerCase();
+}
+
+export function readCleanMainRevision(
+    repo: string = PROJECT_ROOT,
+    readGit: WaitV3StageAGitTextReader = gitText,
+): IRevisionProvenance {
+    const status = readGit(repo, ["status", "--porcelain"]);
     if (status) throw new Error(`Wait V3 Stage A requires a completely clean execution repository: ${repo}`);
-    const branch = gitText(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    const branch = readGit(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
     if (branch !== "main") throw new Error(`Wait V3 Stage A requires branch main; got ${branch}`);
-    const commit = gitText(repo, ["rev-parse", "HEAD"]);
-    const originMain = gitText(repo, ["rev-parse", "origin/main"]);
+    const commit = readGit(repo, ["rev-parse", "HEAD"]).toLowerCase();
+    const originMain = readGit(repo, ["rev-parse", "origin/main"]).toLowerCase();
     if (commit !== originMain)
         throw new Error(`Wait V3 Stage A requires HEAD == origin/main; got ${commit}/${originMain}`);
+    const liveOriginMain = parseLiveOriginMain(
+        readGit(repo, ["ls-remote", "--exit-code", "origin", "refs/heads/main"]),
+    );
+    if (commit !== liveOriginMain) {
+        throw new Error(`Wait V3 Stage A requires HEAD == live origin/main; got ${commit}/${liveOriginMain}`);
+    }
     return {
         commit,
-        commitDate: gitText(repo, ["show", "-s", "--format=%cI", "HEAD"]),
+        commitDate: readGit(repo, ["show", "-s", "--format=%cI", "HEAD"]),
         branch,
         remote: (() => {
             try {
-                return gitText(repo, ["remote", "get-url", "origin"]);
+                return readGit(repo, ["remote", "get-url", "origin"]);
             } catch {
                 return null;
             }
@@ -493,32 +534,237 @@ export function findWaitV3StageASeedCollisions(
     return [...collisions].sort((left, right) => left - right);
 }
 
+export function canonicalWaitV3StageASeedToken(value: unknown): number | undefined {
+    if (typeof value === "number") {
+        if (!Number.isSafeInteger(value) || value < -0x80000000 || value > 0xffffffff) return undefined;
+        return value >>> 0;
+    }
+    if (typeof value !== "string" || !/^(?:0x[0-9a-f]{1,8}|-?[0-9]{1,10})$/i.test(value)) return undefined;
+    const parsed = value.toLowerCase().startsWith("0x") ? Number.parseInt(value.slice(2), 16) : Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < -0x80000000 || parsed > 0xffffffff) return undefined;
+    return parsed >>> 0;
+}
+
+const WAIT_V3_STAGE_A_SEED_SCAN_EXCLUDED_DIRECTORIES = new Set([".git", "dist", "node_modules"]);
+const WAIT_V3_STAGE_A_MAX_SCAN_LINE_CHARACTERS = 64 * 1024 * 1024;
+
+export function discoverWaitV3StageASeedTokens(roots: readonly string[]): Set<number> {
+    const existing = roots.map((root) => resolve(root)).filter(existsSync);
+    if (!existing.length) throw new Error("Wait V3 Stage-A seed audit has no existing roots");
+
+    type FileSnapshot = { path: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number };
+    const files = new Map<string, FileSnapshot>();
+    const ownManifestPath = resolve(WAIT_V3_STAGE_A_MANIFEST_PATH);
+    const walk = (path: string): void => {
+        const absolute = resolve(path);
+        let stat: ReturnType<typeof lstatSync>;
+        try {
+            stat = lstatSync(absolute);
+        } catch (error) {
+            if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return;
+            throw error;
+        }
+        if (stat.isSymbolicLink()) return;
+        if (stat.isDirectory()) {
+            if (WAIT_V3_STAGE_A_SEED_SCAN_EXCLUDED_DIRECTORIES.has(basename(absolute))) return;
+            for (const entry of readdirSync(absolute).sort()) walk(join(absolute, entry));
+            return;
+        }
+        if (!stat.isFile() || absolute === ownManifestPath) return;
+        if (stat.size > 2 * 1024 * 1024 * 1024) throw new Error(`Refusing oversized seed-corpus file ${absolute}`);
+        files.set(absolute, {
+            path: absolute,
+            dev: stat.dev,
+            ino: stat.ino,
+            size: stat.size,
+            mtimeMs: stat.mtimeMs,
+            ctimeMs: stat.ctimeMs,
+        });
+    };
+    for (const root of existing) walk(root);
+
+    const tokens = new Set<number>();
+    const add = (value: unknown): void => {
+        const canonical = canonicalWaitV3StageASeedToken(value);
+        if (canonical !== undefined) tokens.add(canonical);
+    };
+    const seedKey = (key: string): boolean => /seed/i.test(key);
+    const visitStructured = (value: unknown, inheritedSeedContext = false): void => {
+        if (typeof value === "number" || typeof value === "string") {
+            if (inheritedSeedContext) add(value);
+            return;
+        }
+        if (value === null || typeof value !== "object") return;
+        if (Array.isArray(value)) {
+            for (const entry of value) visitStructured(entry, inheritedSeedContext);
+            return;
+        }
+        for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+            if (inheritedSeedContext) add(key);
+            visitStructured(entry, inheritedSeedContext || seedKey(key));
+        }
+    };
+    const expandTournamentPanels = (value: unknown): void => {
+        if (value === null || typeof value !== "object") return;
+        if (Array.isArray(value)) {
+            for (const entry of value) expandTournamentPanels(entry);
+            return;
+        }
+        const record = value as Record<string, unknown>;
+        const baseSeed = canonicalWaitV3StageASeedToken(record.baseSeed);
+        const gamesPerArm = record.gamesPerArm;
+        const declaredPairSeeds = record.pairSeeds;
+        const compactPanel =
+            record.games === undefined &&
+            Number.isSafeInteger(gamesPerArm) &&
+            (gamesPerArm as number) >= 1 &&
+            Number.isSafeInteger(declaredPairSeeds) &&
+            (declaredPairSeeds as number) === Math.ceil((gamesPerArm as number) / 2);
+        const games = compactPanel ? gamesPerArm : record.games;
+        const step =
+            record.pairSeedStep === undefined
+                ? WAIT_V3_STAGE_A_PAIR_SEED_STEP
+                : canonicalWaitV3StageASeedToken(record.pairSeedStep);
+        if (
+            baseSeed !== undefined &&
+            step !== undefined &&
+            Number.isSafeInteger(games) &&
+            (games as number) >= 1 &&
+            (compactPanel || (games as number) % 2 === 0)
+        ) {
+            const pairs = compactPanel ? (declaredPairSeeds as number) : (games as number) / 2;
+            for (let pair = 0; pair < pairs; pair += 1) add((baseSeed + Math.imul(pair, step)) >>> 0);
+        }
+        if (
+            Array.isArray(record.cells) &&
+            Number.isSafeInteger(gamesPerArm) &&
+            (gamesPerArm as number) >= 2 &&
+            (gamesPerArm as number) % 2 === 0 &&
+            step !== undefined
+        ) {
+            for (const cell of record.cells) {
+                const cellBaseSeed =
+                    cell !== null && typeof cell === "object"
+                        ? canonicalWaitV3StageASeedToken((cell as Record<string, unknown>).baseSeed)
+                        : undefined;
+                if (cellBaseSeed === undefined) continue;
+                for (let pair = 0; pair < (gamesPerArm as number) / 2; pair += 1) {
+                    add((cellBaseSeed + Math.imul(pair, step)) >>> 0);
+                }
+            }
+        }
+        for (const entry of Object.values(record)) expandTournamentPanels(entry);
+    };
+    const seedContextPattern =
+        /(?:base[_-]?seed|seed|scenarioRoot|setupSeed|combatSeed|pairSeeds?)[^0-9a-fA-F-]{0,16}(0x[0-9a-fA-F]{1,8}|-?[0-9]{1,10})(?![0-9A-Za-z_])/gi;
+    const numericTokenPattern = /(?<![\w-])(?:-?[0-9]{1,10}|0x[0-9a-fA-F]{1,8})\b/g;
+    const scanText = (value: string, allNumbers: boolean): void => {
+        for (const match of value.matchAll(seedContextPattern)) add(match[1]);
+        if (allNumbers) for (const match of value.matchAll(numericTokenPattern)) add(match[0]);
+    };
+    const scanStream = (path: string, parseJsonLines: boolean, allNumbers: boolean): void => {
+        const descriptor = openSync(path, "r");
+        const decoder = new StringDecoder("utf8");
+        const buffer = Buffer.allocUnsafe(1024 * 1024);
+        let pending = "";
+        const consume = (line: string): void => {
+            if (parseJsonLines && line.trim()) {
+                try {
+                    const parsed = JSON.parse(line) as unknown;
+                    visitStructured(parsed);
+                    expandTournamentPanels(parsed);
+                } catch {
+                    // In-progress JSONL remains covered by the contextual text scan.
+                }
+            }
+            scanText(line, allNumbers);
+        };
+        try {
+            for (;;) {
+                const bytes = readSync(descriptor, buffer, 0, buffer.length, null);
+                if (bytes === 0) break;
+                pending += decoder.write(buffer.subarray(0, bytes));
+                let newline = pending.indexOf("\n");
+                while (newline >= 0) {
+                    consume(pending.slice(0, newline));
+                    pending = pending.slice(newline + 1);
+                    newline = pending.indexOf("\n");
+                }
+                if (pending.length > WAIT_V3_STAGE_A_MAX_SCAN_LINE_CHARACTERS) {
+                    throw new Error(`Seed-corpus text line is too long: ${path}`);
+                }
+            }
+            pending += decoder.end();
+            if (pending.length > WAIT_V3_STAGE_A_MAX_SCAN_LINE_CHARACTERS) {
+                throw new Error(`Seed-corpus text line is too long: ${path}`);
+            }
+            if (pending) consume(pending);
+        } finally {
+            closeSync(descriptor);
+        }
+    };
+    const isBinary = (path: string, size: number): boolean => {
+        const descriptor = openSync(path, "r");
+        const sample = Buffer.allocUnsafe(Math.min(size, 8192));
+        try {
+            const bytes = readSync(descriptor, sample, 0, sample.length, 0);
+            return sample.subarray(0, bytes).includes(0);
+        } finally {
+            closeSync(descriptor);
+        }
+    };
+    const assertUnchanged = (snapshot: FileSnapshot): void => {
+        const observed = lstatSync(snapshot.path);
+        if (
+            !observed.isFile() ||
+            observed.dev !== snapshot.dev ||
+            observed.ino !== snapshot.ino ||
+            observed.size !== snapshot.size ||
+            observed.mtimeMs !== snapshot.mtimeMs ||
+            observed.ctimeMs !== snapshot.ctimeMs
+        ) {
+            throw new Error(`Seed-corpus file changed during audit: ${snapshot.path}`);
+        }
+    };
+
+    for (const snapshot of [...files.values()].sort((left, right) => left.path.localeCompare(right.path))) {
+        assertUnchanged(snapshot);
+        if (isBinary(snapshot.path, snapshot.size)) {
+            assertUnchanged(snapshot);
+            continue;
+        }
+        const extension = extname(snapshot.path).toLowerCase();
+        const allNumbers = /seed/i.test(basename(snapshot.path)) || /[\\/]manifests[\\/]/.test(snapshot.path);
+        if (extension === ".json" && snapshot.size <= WAIT_V3_STAGE_A_MAX_SCAN_LINE_CHARACTERS) {
+            const text = readFileSync(snapshot.path, "utf8");
+            try {
+                const parsed = JSON.parse(text) as unknown;
+                visitStructured(parsed);
+                expandTournamentPanels(parsed);
+            } catch {
+                // Malformed or in-progress JSON remains covered by the text fallback.
+            }
+            scanText(text, allNumbers);
+        } else {
+            scanStream(snapshot.path, extension === ".jsonl", allNumbers);
+        }
+        assertUnchanged(snapshot);
+    }
+    return tokens;
+}
+
 export function auditWaitV3StageASeedRoots(
     manifest: IWaitV3StageAManifest,
     roots: readonly string[],
 ): IWaitV3StageASeedAudit {
     const existing = roots.map((root) => resolve(root)).filter(existsSync);
     if (!existing.length) throw new Error("Wait V3 Stage-A seed audit has no existing roots");
-    const hasRipgrep = spawnSync("rg", ["--version"], { stdio: "ignore" }).status === 0;
-    const command = hasRipgrep ? "rg" : "grep";
-    const args = hasRipgrep
-        ? ["-o", "--no-filename", "--glob", `!${basename(WAIT_V3_STAGE_A_MANIFEST_PATH)}`, "[0-9]{7,10}", ...existing]
-        : ["-r", "-h", "-o", "-E", `--exclude=${basename(WAIT_V3_STAGE_A_MANIFEST_PATH)}`, "[0-9]{7,10}", ...existing];
-    const result = spawnSync(command, args, { encoding: "utf8", maxBuffer: 128 * 1024 * 1024 });
-    if (result.error) throw result.error;
-    if (result.status !== 0 && result.status !== 1) {
-        throw new Error(`Seed collision audit ${command} failed (${result.status}): ${result.stderr}`);
-    }
-    const tokens = result.stdout
-        .split(/\s+/)
-        .filter(Boolean)
-        .map(Number)
-        .filter((value) => Number.isSafeInteger(value));
+    const tokens = discoverWaitV3StageASeedTokens(existing);
     const collisions = findWaitV3StageASeedCollisions(manifest, tokens);
     if (collisions.length) {
         throw new Error(`Wait V3 Stage-A fresh-seed collision(s): ${collisions.slice(0, 20).join(", ")}`);
     }
-    return { roots: existing, numericTokens: new Set(tokens).size, collisions };
+    return { roots: existing, numericTokens: tokens.size, collisions };
 }
 
 export function defaultWaitV3StageASeedAuditRoots(projectRoot: string = PROJECT_ROOT): string[] {
@@ -842,11 +1088,24 @@ function artifactSummary(path: string): { bytes: number; sha256: string } {
     return { bytes: content.length, sha256: sha256(content) };
 }
 
-export function validateAndSealWaitV3StageARaw(
+interface IWaitV3StageABuiltDataset {
+    path: string;
+    text: string;
+    bytes: number;
+    sha256: string;
+}
+
+interface IWaitV3StageABuiltRaw {
+    cohorts: IWaitV3StageACohortRawReport[];
+    totalRows: number;
+}
+
+function buildWaitV3StageARaw(
     runDir: string,
     manifest: IWaitV3StageAManifest,
     runManifest: IWaitV3StageARunManifest,
-): IWaitV3StageARawReport {
+    consumeDatasets: (datasets: readonly IWaitV3StageABuiltDataset[]) => void,
+): IWaitV3StageABuiltRaw {
     const cohortIds = manifest.cohorts.map(({ id }) => id);
     for (const root of ["raw", "audit", "games"]) {
         validateWaitV3StageAExactDirectoryEntries(join(runDir, root), cohortIds);
@@ -875,12 +1134,16 @@ export function validateAndSealWaitV3StageARaw(
         const q2Path = join(runDir, "datasets", `${cohort.id}.q2.jsonl`);
         const auditPath = join(runDir, "datasets", `${cohort.id}.audit.jsonl`);
         const gamesPath = join(runDir, "datasets", `${cohort.id}.games.jsonl`);
-        atomicWriteText(q2Path, q2);
-        atomicWriteText(auditPath, audit);
-        atomicWriteText(gamesPath, games);
-        const q2Summary = artifactSummary(q2Path);
-        const auditSummary = artifactSummary(auditPath);
-        const gamesSummary = artifactSummary(gamesPath);
+        const buildDataset = (path: string, text: string): IWaitV3StageABuiltDataset => ({
+            path,
+            text,
+            bytes: Buffer.byteLength(text),
+            sha256: sha256(text),
+        });
+        const q2Dataset = buildDataset(q2Path, q2);
+        const auditDataset = buildDataset(auditPath, audit);
+        const gamesDataset = buildDataset(gamesPath, games);
+        consumeDatasets([q2Dataset, auditDataset, gamesDataset]);
         const q2Rows = q2.split("\n").filter(Boolean).length;
         totalRows += q2Rows;
         cohorts.push({
@@ -890,16 +1153,106 @@ export function validateAndSealWaitV3StageARaw(
             q2ScoredRows: scoredRows,
             q2WaitRejected: 0,
             q2Path: relative(runDir, q2Path),
-            q2Bytes: q2Summary.bytes,
-            q2Sha256: q2Summary.sha256,
+            q2Bytes: q2Dataset.bytes,
+            q2Sha256: q2Dataset.sha256,
             auditPath: relative(runDir, auditPath),
-            auditBytes: auditSummary.bytes,
-            auditSha256: auditSummary.sha256,
+            auditBytes: auditDataset.bytes,
+            auditSha256: auditDataset.sha256,
             gamesPath: relative(runDir, gamesPath),
-            gamesBytes: gamesSummary.bytes,
-            gamesSha256: gamesSummary.sha256,
+            gamesBytes: gamesDataset.bytes,
+            gamesSha256: gamesDataset.sha256,
         });
     }
+    return { cohorts, totalRows };
+}
+
+export interface IWaitV3StageARawCompletion {
+    report: IWaitV3StageARawReport;
+    rawCompleteSha256: string;
+    rawReportSha256: string;
+}
+
+export function readCompletedWaitV3StageARaw(
+    runDir: string,
+    manifest: IWaitV3StageAManifest,
+    runManifest: IWaitV3StageARunManifest,
+): IWaitV3StageARawCompletion | null {
+    const markerPath = join(runDir, manifest.completion.rawMarker);
+    if (!existsSync(markerPath)) return null;
+    const marker = requireRecord(readJson(markerPath), markerPath);
+    const reportPath = join(runDir, "raw-report.json");
+    if (
+        marker.schemaVersion !== 1 ||
+        marker.kind !== "v0.7_wait_v3_stage_a_raw_complete" ||
+        !Number.isFinite(Date.parse(String(marker.completedAt))) ||
+        marker.runFingerprint !== runManifest.runFingerprint ||
+        marker.report !== "raw-report.json" ||
+        typeof marker.reportSha256 !== "string" ||
+        !/^[0-9a-f]{64}$/.test(marker.reportSha256) ||
+        typeof marker.artifactsSha256 !== "string" ||
+        !/^[0-9a-f]{64}$/.test(marker.artifactsSha256)
+    ) {
+        throw new Error(`${markerPath}: invalid completed raw marker`);
+    }
+    if (!existsSync(reportPath)) throw new Error(`${markerPath}: completed raw report is missing`);
+    const rawReportSha256 = fileHash(reportPath);
+    if (rawReportSha256 !== marker.reportSha256) {
+        throw new Error(`${markerPath}: completed raw report hash mismatch`);
+    }
+    const report = readJson(reportPath) as IWaitV3StageARawReport;
+    const expectedGames = manifest.cohorts.reduce((sum, cohort) => sum + cohort.games, 0);
+    if (
+        report.schemaVersion !== 1 ||
+        report.kind !== "v0.7_wait_v3_stage_a_raw" ||
+        report.verdict !== "PASS" ||
+        !Number.isFinite(Date.parse(report.generatedAt)) ||
+        report.runFingerprint !== runManifest.runFingerprint ||
+        report.protocolSha256 !== runManifest.identity.protocol.sha256 ||
+        report.runManifestSha256 !== fileHash(join(runDir, "run.json")) ||
+        report.games !== expectedGames ||
+        !Array.isArray(report.cohorts) ||
+        report.cohorts.length !== manifest.cohorts.length
+    ) {
+        throw new Error(`${reportPath}: completed raw report identity mismatch`);
+    }
+    if (marker.artifactsSha256 !== sha256(stableJson(report.cohorts))) {
+        throw new Error(`${markerPath}: completed raw artifact envelope hash mismatch`);
+    }
+
+    const built = buildWaitV3StageARaw(runDir, manifest, runManifest, (datasets) => {
+        for (const expected of datasets) {
+            if (!existsSync(expected.path)) throw new Error(`${expected.path}: completed raw dataset is missing`);
+            const actual = artifactSummary(expected.path);
+            if (actual.bytes !== expected.bytes || actual.sha256 !== expected.sha256) {
+                throw new Error(`${expected.path}: completed raw dataset differs from source artifacts`);
+            }
+        }
+    });
+    if (report.q2Rows !== built.totalRows || stableJson(report.cohorts) !== stableJson(built.cohorts)) {
+        throw new Error(`${reportPath}: completed raw report differs from source artifacts`);
+    }
+    validateWaitV3StageAExactDirectoryEntries(
+        join(runDir, "datasets"),
+        manifest.cohorts.flatMap(({ id }) => [`${id}.q2.jsonl`, `${id}.audit.jsonl`, `${id}.games.jsonl`]),
+    );
+    return {
+        report,
+        rawCompleteSha256: fileHash(markerPath),
+        rawReportSha256,
+    };
+}
+
+export function validateAndSealWaitV3StageARaw(
+    runDir: string,
+    manifest: IWaitV3StageAManifest,
+    runManifest: IWaitV3StageARunManifest,
+): IWaitV3StageARawReport {
+    if (existsSync(join(runDir, manifest.completion.rawMarker))) {
+        throw new Error("Refusing to rewrite an existing Wait V3 Stage-A raw completion");
+    }
+    const built = buildWaitV3StageARaw(runDir, manifest, runManifest, (datasets) => {
+        for (const dataset of datasets) atomicWriteText(dataset.path, dataset.text);
+    });
     validateWaitV3StageAExactDirectoryEntries(
         join(runDir, "datasets"),
         manifest.cohorts.flatMap(({ id }) => [`${id}.q2.jsonl`, `${id}.audit.jsonl`, `${id}.games.jsonl`]),
@@ -914,8 +1267,8 @@ export function validateAndSealWaitV3StageARaw(
         protocolSha256: runManifest.identity.protocol.sha256,
         runManifestSha256: fileHash(runManifestPath),
         games: manifest.cohorts.reduce((sum, cohort) => sum + cohort.games, 0),
-        q2Rows: totalRows,
-        cohorts,
+        q2Rows: built.totalRows,
+        cohorts: built.cohorts,
     };
     const reportPath = join(runDir, "raw-report.json");
     atomicWriteJson(reportPath, report);
@@ -926,7 +1279,7 @@ export function validateAndSealWaitV3StageARaw(
         runFingerprint: runManifest.runFingerprint,
         report: relative(runDir, reportPath),
         reportSha256: fileHash(reportPath),
-        artifactsSha256: sha256(stableJson(cohorts)),
+        artifactsSha256: sha256(stableJson(built.cohorts)),
     };
     atomicWriteJson(join(runDir, manifest.completion.rawMarker), marker);
     return report;
@@ -1122,10 +1475,16 @@ export async function runWaitV3StageA(options: {
     );
     process.env.PHASE_B_RUN_FINGERPRINT = runManifest.runFingerprint;
     environment.PHASE_B_RUN_FINGERPRINT = runManifest.runFingerprint;
-    for (const cohort of manifest.cohorts) {
-        await executeCohort(runDir, manifest, cohort, runManifest.runFingerprint, environment, options.concurrency);
+    const completedRaw = readCompletedWaitV3StageARaw(runDir, manifest, runManifest);
+    let report: IWaitV3StageARawReport;
+    if (completedRaw) {
+        report = completedRaw.report;
+    } else {
+        for (const cohort of manifest.cohorts) {
+            await executeCohort(runDir, manifest, cohort, runManifest.runFingerprint, environment, options.concurrency);
+        }
+        report = validateAndSealWaitV3StageARaw(runDir, manifest, runManifest);
     }
-    const report = validateAndSealWaitV3StageARaw(runDir, manifest, runManifest);
     if (!options.rawOnly) {
         const fit = spawnSync(process.execPath, [FIT_WRAPPER_SOURCE, "--run-dir", runDir], {
             cwd: PROJECT_ROOT,

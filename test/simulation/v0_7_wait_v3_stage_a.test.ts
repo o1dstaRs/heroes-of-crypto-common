@@ -31,6 +31,7 @@ import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import {
+    assertWaitV3StageAFitRawBinding,
     parseWaitV3StageAFitterOutput,
     validateWaitV3StageARawShape,
 } from "../../src/simulation/fit_v0_7_wait_v3_stage_a";
@@ -41,16 +42,22 @@ import {
 import {
     WAIT_V3_STAGE_A_SENTINEL_JSON,
     WAIT_V3_STAGE_A_V2_JSON,
+    auditWaitV3StageASeedRoots,
+    canonicalWaitV3StageASeedToken,
     expectedWaitV3StageASeed,
     findWaitV3StageASeedCollisions,
     plannedWaitV3StageASeeds,
+    readCleanMainRevision,
+    readCompletedWaitV3StageARaw,
     readWaitV3StageAManifest,
+    validateAndSealWaitV3StageARaw,
     validateWaitV3StageAGameArtifacts,
     validateWaitV3StageAManifest,
     validateWaitV3StageAExactDirectoryEntries,
     waitV3StageAEnvironment,
     type IWaitV3StageAManifest,
     type IWaitV3StageARawReport,
+    type IWaitV3StageARunManifest,
 } from "../../src/simulation/v0_7_wait_v3_stage_a";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
@@ -70,6 +77,117 @@ afterEach(() => {
 
 function cloneManifest(): IWaitV3StageAManifest {
     return JSON.parse(JSON.stringify(readWaitV3StageAManifest().manifest)) as IWaitV3StageAManifest;
+}
+
+function createRawReplayFixture(): {
+    directory: string;
+    manifest: IWaitV3StageAManifest;
+    runManifest: IWaitV3StageARunManifest;
+} {
+    const directory = mkdtempSync(join(tmpdir(), "wait-v3-raw-replay-"));
+    const manifest = cloneManifest();
+    manifest.cohorts = [{ ...manifest.cohorts[0], games: 1 }];
+    const fingerprint = "a".repeat(64);
+    const runManifest: IWaitV3StageARunManifest = {
+        schemaVersion: 1,
+        createdAt: "2026-07-16T00:00:00.000Z",
+        runFingerprint: fingerprint,
+        concurrency: 1,
+        identity: {
+            protocol: { path: "frozen-wait-v3.json", sha256: "b".repeat(64) },
+            revision: {
+                commit: "c".repeat(40),
+                commitDate: "2026-07-16T00:00:00.000Z",
+                branch: "main",
+                remote: "git@example.test:heroes-of-crypto-common.git",
+                trackedClean: true,
+                trackedDiffSha256: null,
+            },
+            harnessSourceSha256: "d".repeat(64),
+            fitWrapperSourceSha256: "e".repeat(64),
+            fitterSourceSha256: "f".repeat(64),
+            gateSourceSha256: "0".repeat(64),
+            candidate: "v0.7",
+            opponent: "v0.6",
+            cohorts: manifest.cohorts,
+            oracle: manifest.oracle,
+            v2WeightsSha256: manifest.incumbent.v2WeightsSha256,
+            v3SentinelSha256: manifest.incumbent.v3SentinelSha256,
+            effectiveBehaviorEnvironment: {},
+            seedAudit: { roots: [directory], numericTokens: 0, collisions: [] },
+            automaticBake: false,
+            automaticDeploy: false,
+        },
+    };
+    writeFileSync(join(directory, "run.json"), `${JSON.stringify(runManifest, null, 2)}\n`);
+
+    const cohort = manifest.cohorts[0];
+    const seed = expectedWaitV3StageASeed(cohort, 0);
+    const q2Path = join(directory, "raw", cohort.id, "00000.q2.jsonl");
+    const auditPath = join(directory, "audit", cohort.id, "00000.audit.jsonl");
+    const resultPath = join(directory, "games", cohort.id, "00000.json");
+    for (const path of [q2Path, auditPath, resultPath]) mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+        q2Path,
+        `${JSON.stringify({
+            t: "q2d",
+            v: 2,
+            runFingerprint: fingerprint,
+            seed,
+            greenVersion: "v0.7",
+            redVersion: "v0.6",
+            lap: 1,
+            unit: "Arbalester",
+            incumbentKind: "shot",
+            incumbentWait: 0,
+            incumbentIllegal: 0,
+            waitRejected: 0,
+            label: 1,
+            delta: 0.02,
+            features: new Array(WAIT_FEATURE_NAMES_V2_RAW.length).fill(0),
+            oracle: { gate: 0.01, rollouts: 3, horizon: "lap", leaf: "material", opponentModel: null },
+        })}\n`,
+    );
+    writeFileSync(
+        auditPath,
+        `${JSON.stringify({
+            t: "game",
+            mode: "oracle",
+            seed,
+            green: "v0.7",
+            red: "v0.6",
+            winner: "green",
+            endReason: "elimination",
+            gate: 0.01,
+            horizon: "lap",
+            rollouts: 3,
+            leaf: "material",
+            decisions: 1,
+            q2oPoints: 1,
+            q2oScored: 1,
+            q2oIncumbentWait: 0,
+            q2oWaitRejected: 0,
+        })}\n`,
+    );
+    writeFileSync(
+        resultPath,
+        `${JSON.stringify({
+            schemaVersion: 1,
+            runFingerprint: fingerprint,
+            cohort: cohort.id,
+            game: 0,
+            seed,
+            greenVersion: "v0.7",
+            redVersion: "v0.6",
+            winner: "green",
+            endReason: "elimination",
+            laps: 1,
+            decidedByArmageddon: false,
+            rejectedGreen: 0,
+            rejectedRed: 0,
+        })}\n`,
+    );
+    return { directory, manifest, runManifest };
 }
 
 class TestStrategyV0_7 extends StrategyV0_7 {
@@ -168,6 +286,59 @@ describe("Wait V3 Stage-A frozen protocol", () => {
         expect(environment.SEARCH_VERSIONS).toBe("v0.7");
         expect(environment.Q2_DATASET_V2).toBe("1");
         expect(environment.FORCE_CREATURES).toBeUndefined();
+    });
+
+    it("detects six-digit and signed uint32 seed collisions without external search tools", () => {
+        const { manifest } = readWaitV3StageAManifest();
+        const directory = mkdtempSync(join(tmpdir(), "wait-v3-seed-audit-"));
+        const savedPath = process.env.PATH;
+        try {
+            expect(plannedWaitV3StageASeeds(manifest).has(134_786)).toBe(true);
+            expect(canonicalWaitV3StageASeedToken(-1_891_132_448)).toBe(2_403_834_848);
+
+            process.env.PATH = "";
+            writeFileSync(join(directory, "evidence.txt"), "historical seed 1347860\n");
+            expect(() => auditWaitV3StageASeedRoots(manifest, [directory])).not.toThrow();
+
+            writeFileSync(join(directory, "evidence.txt"), "historical seed 134786\n");
+            expect(() => auditWaitV3StageASeedRoots(manifest, [directory])).toThrow("fresh-seed collision(s): 134786");
+
+            writeFileSync(join(directory, "evidence.json"), `${JSON.stringify({ seed: -1_891_132_448 })}\n`);
+            writeFileSync(join(directory, "evidence.txt"), "no seed evidence\n");
+            expect(() => auditWaitV3StageASeedRoots(manifest, [directory])).toThrow(
+                "fresh-seed collision(s): 2403834848",
+            );
+        } finally {
+            if (savedPath === undefined) delete process.env.PATH;
+            else process.env.PATH = savedPath;
+            rmSync(directory, { recursive: true, force: true });
+        }
+    });
+
+    it("requires HEAD to match the live origin/main ref", () => {
+        const commit = "a".repeat(40);
+        const responses = new Map<string, string>([
+            ["status --porcelain", ""],
+            ["rev-parse --abbrev-ref HEAD", "main"],
+            ["rev-parse HEAD", commit],
+            ["rev-parse origin/main", commit],
+            ["ls-remote --exit-code origin refs/heads/main", `${commit}\trefs/heads/main`],
+            ["show -s --format=%cI HEAD", "2026-07-16T00:00:00-07:00"],
+            ["remote get-url origin", "git@example.test:heroes-of-crypto-common.git"],
+        ]);
+        const reader = (_repo: string, args: string[]): string => {
+            const key = args.join(" ");
+            const value = responses.get(key);
+            if (value === undefined) throw new Error(`unexpected git call: ${key}`);
+            return value;
+        };
+        expect(readCleanMainRevision("/repo", reader).commit).toBe(commit);
+
+        responses.set("ls-remote --exit-code origin refs/heads/main", `${"b".repeat(40)}\trefs/heads/main`);
+        expect(() => readCleanMainRevision("/repo", reader)).toThrow("HEAD == live origin/main");
+
+        responses.set("ls-remote --exit-code origin refs/heads/main", "");
+        expect(() => readCleanMainRevision("/repo", reader)).toThrow("exactly one live origin main revision");
     });
 });
 
@@ -317,6 +488,42 @@ describe("Wait V3 Stage-A fail-closed artifacts", () => {
         expect(() => parseWaitV3StageAFitterOutput(`${prefix}${model}\n`)).toThrow("exactly one literal");
         const zero = JSON.stringify({ b: 0, w: new Array(125).fill(0) });
         expect(() => parseWaitV3StageAFitterOutput(`V3 GATE: PASS\n${prefix}${zero}\n`)).toThrow("all zero");
+    });
+
+    it("binds completed fits to the exact sealed raw marker and report", () => {
+        const hashes = { rawCompleteSha256: "a".repeat(64), rawReportSha256: "b".repeat(64) };
+        expect(() => assertWaitV3StageAFitRawBinding(hashes, hashes)).not.toThrow();
+        expect(() => assertWaitV3StageAFitRawBinding({ ...hashes, rawCompleteSha256: "c".repeat(64) }, hashes)).toThrow(
+            "not bound to the current sealed raw evidence",
+        );
+        expect(() => assertWaitV3StageAFitRawBinding({ ...hashes, rawReportSha256: "d".repeat(64) }, hashes)).toThrow(
+            "not bound to the current sealed raw evidence",
+        );
+    });
+
+    it("replays a completed raw run read-only and rejects sealed-dataset drift", () => {
+        const { directory, manifest, runManifest } = createRawReplayFixture();
+        try {
+            const report = validateAndSealWaitV3StageARaw(directory, manifest, runManifest);
+            const reportPath = join(directory, "raw-report.json");
+            const markerPath = join(directory, "RAW_COMPLETE");
+            const q2Path = join(directory, report.cohorts[0].q2Path);
+            const before = [reportPath, markerPath, q2Path].map((path) => readFileSync(path));
+
+            expect(readCompletedWaitV3StageARaw(directory, manifest, runManifest)?.report).toEqual(report);
+            const after = [reportPath, markerPath, q2Path].map((path) => readFileSync(path));
+            expect(after).toEqual(before);
+            expect(() => validateAndSealWaitV3StageARaw(directory, manifest, runManifest)).toThrow(
+                "Refusing to rewrite",
+            );
+
+            writeFileSync(q2Path, `${readFileSync(q2Path, "utf8")}{}\n`);
+            expect(() => readCompletedWaitV3StageARaw(directory, manifest, runManifest)).toThrow(
+                "completed raw dataset differs from source artifacts",
+            );
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
     });
 
     it("rejects duplicate, partial, or falsely totalled raw cohort envelopes", () => {

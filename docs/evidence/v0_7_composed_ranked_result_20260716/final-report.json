@@ -1,0 +1,4897 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "v0.7-composed-ranked-20260716-v2-prereg",
+  "manifestSha256": "76c0d770703ab899077f6773d82369a09bb1993d703bf48e0c253ddd24c51e2f",
+  "assembledAt": "2026-07-16T12:50:49.004Z",
+  "authority": "UNSEALED_NON_AUTHORITATIVE_UNTIL_GUARD_SEAL",
+  "git": {
+    "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+    "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+    "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+    "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+    "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+    "branch": "main",
+    "cleanIncludingUntracked": true,
+    "statusPorcelainSha256": null,
+    "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+    "preregisteredBaseIsAncestor": true
+  },
+  "hostLock": {
+    "schemaVersion": 1,
+    "protocol": "v0.7-composed-ranked",
+    "manifestId": "v0.7-composed-ranked-20260716-v2-prereg",
+    "manifestSha256": "76c0d770703ab899077f6773d82369a09bb1993d703bf48e0c253ddd24c51e2f",
+    "gitCommit": "a52564d339f89add5b9a5c501c7c2356af233579",
+    "hostname": "Stepans-Mac-Studio.local",
+    "pid": 71315,
+    "mode": "assemble",
+    "outputRoot": "/Users/zolotukhin/Workplace/hoc-v07-composed-ranked-output-20260716",
+    "acquiredAt": "2026-07-16T12:50:41.146Z"
+  },
+  "allCellsComplete": true,
+  "completionEvidence": {
+    "derivation": "sha256_manifest_ordered_completion_marker_paths_and_bytes",
+    "markers": 16,
+    "sha256": "ff05eabf5c0c2e3d4979b277095e8abd3c6092a08cb1de50dfe8d2e05b18a52b"
+  },
+  "cells": [
+    {
+      "cell": {
+        "id": "round1_search_off_symmetry",
+        "stage": 0,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "off",
+        "candidate": "v0.7s",
+        "opponent": "v0.7",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 716560508,
+        "qualification": false,
+        "purpose": "Byte-policy alias symmetry control under the current ranked draft and setup composition."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1994,
+      "candidateWins": 997,
+      "opponentWins": 997,
+      "draws": 6,
+      "candidateWinRate": 0.5,
+      "clusteredSePp": 0,
+      "confidence95": {
+        "low": 0.5,
+        "high": 0.5
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 619,
+          "losses": 378,
+          "draws": 3,
+          "drawOrArmageddon": 22,
+          "drawOrArmageddonFraction": 0.022,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.6208625877632898,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.5722597610394289,
+            "high": 0.6671549432827671
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 378,
+          "losses": 619,
+          "draws": 3,
+          "drawOrArmageddon": 22,
+          "drawOrArmageddonFraction": 0.022,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.3791374122367101,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.33284505671723286,
+            "high": 0.427740238960571
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 997,
+        "sumWinDecisive": 1994,
+        "sumDecisiveSquared": 3988
+      },
+      "drawOrArmageddon": 44,
+      "drawOrArmageddonRate": 0.022,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 619,
+      "candidateWinsAsRed": 378,
+      "search": {
+        "auditRows": 0,
+        "decisions": 0,
+        "searched": 0,
+        "overrides": 0,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 0,
+        "circuitSkipped": 0,
+        "deadlineFallbackRate": 0,
+        "msTotal": 0,
+        "msPerSearchedDecision": null,
+        "gameMs": null
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    },
+    {
+      "cell": {
+        "id": "round1_search_uncapped",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "uncapped",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 3959890980,
+        "qualification": false,
+        "purpose": "Exploratory upper bound on search strength under the current ranked composition distribution."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3980,
+      "candidateWins": 3492,
+      "opponentWins": 488,
+      "draws": 20,
+      "candidateWinRate": 0.8773869346733668,
+      "clusteredSePp": 0.48474563605383936,
+      "confidence95": {
+        "low": 0.8678860947900819,
+        "high": 0.8868877745566517
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1994,
+          "wins": 1878,
+          "losses": 116,
+          "draws": 6,
+          "drawOrArmageddon": 10,
+          "drawOrArmageddonFraction": 0.005,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.9418254764292878,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9233450500503348,
+            "high": 0.956062542058457
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1986,
+          "wins": 1614,
+          "losses": 372,
+          "draws": 14,
+          "drawOrArmageddon": 49,
+          "drawOrArmageddonFraction": 0.0245,
+          "decisiveFraction": 0.993,
+          "decisiveWinRate": 0.8126888217522659,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7840481874933332,
+            "high": 0.8383143050190349
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 6480,
+        "sumWinDecisive": 6964,
+        "sumDecisiveSquared": 7940
+      },
+      "drawOrArmageddon": 59,
+      "drawOrArmageddonRate": 0.01475,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1878,
+      "candidateWinsAsRed": 1614,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 106662,
+        "searched": 106662,
+        "overrides": 33150,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 0,
+        "circuitSkipped": 0,
+        "deadlineFallbackRate": 0,
+        "msTotal": 14757893.700000044,
+        "msPerSearchedDecision": 138.3613067446705,
+        "gameMs": {
+          "p50": 3448.2,
+          "p95": 5907.7,
+          "p99": 8477,
+          "max": 17797
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    },
+    {
+      "cell": {
+        "id": "round1_search_server300",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "server_300",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 1856617332,
+        "qualification": false,
+        "purpose": "Diagnostic 300ms circuit lower-bound emulation under the current ranked composition distribution."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3962,
+      "candidateWins": 2997,
+      "opponentWins": 965,
+      "draws": 38,
+      "candidateWinRate": 0.7564361433619384,
+      "clusteredSePp": 0.5913278810039737,
+      "confidence95": {
+        "low": 0.7448463298637167,
+        "high": 0.7680259568601602
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1992,
+          "wins": 1688,
+          "losses": 304,
+          "draws": 8,
+          "drawOrArmageddon": 26,
+          "drawOrArmageddonFraction": 0.013,
+          "decisiveFraction": 0.996,
+          "decisiveWinRate": 0.8473895582329317,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8207313818382218,
+            "high": 0.8707080174767893
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1970,
+          "wins": 1309,
+          "losses": 661,
+          "draws": 30,
+          "drawOrArmageddon": 66,
+          "drawOrArmageddonFraction": 0.033,
+          "decisiveFraction": 0.985,
+          "decisiveWinRate": 0.6644670050761421,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6307397722131856,
+            "high": 0.6965955212603651
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 5053,
+        "sumWinDecisive": 5960,
+        "sumDecisiveSquared": 7886
+      },
+      "drawOrArmageddon": 92,
+      "drawOrArmageddonRate": 0.023,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1688,
+      "candidateWinsAsRed": 1309,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 42864,
+        "searched": 42864,
+        "overrides": 14826,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 2875,
+        "circuitSkipped": 62089,
+        "deadlineFallbackRate": 0,
+        "msTotal": 5924233.899999968,
+        "msPerSearchedDecision": 138.2100107316155,
+        "gameMs": {
+          "p50": 1109,
+          "p95": 3525.9,
+          "p99": 4433,
+          "max": 6069.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    },
+    {
+      "cell": {
+        "id": "round1_search_conservative200_275",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 4048310980,
+        "qualification": true,
+        "purpose": "Primary current-ranked qualification cell under the conservative latency profile."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3977,
+      "candidateWins": 3290,
+      "opponentWins": 687,
+      "draws": 23,
+      "candidateWinRate": 0.8272567261755092,
+      "clusteredSePp": 0.5485285296707878,
+      "confidence95": {
+        "low": 0.8165057645490346,
+        "high": 0.8380076878019838
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1996,
+          "wins": 1810,
+          "losses": 186,
+          "draws": 4,
+          "drawOrArmageddon": 12,
+          "drawOrArmageddonFraction": 0.006,
+          "decisiveFraction": 0.998,
+          "decisiveWinRate": 0.906813627254509,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8846335169141673,
+            "high": 0.9250905322526757
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1981,
+          "wins": 1480,
+          "losses": 501,
+          "draws": 19,
+          "drawOrArmageddon": 46,
+          "drawOrArmageddonFraction": 0.023,
+          "decisiveFraction": 0.9905,
+          "decisiveWinRate": 0.7470974255426552,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7156595814695148,
+            "high": 0.7761466091930272
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 5900,
+        "sumWinDecisive": 6559,
+        "sumDecisiveSquared": 7931
+      },
+      "drawOrArmageddon": 58,
+      "drawOrArmageddonRate": 0.0145,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1810,
+      "candidateWinsAsRed": 1480,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 105768,
+        "searched": 105768,
+        "overrides": 21186,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 28418,
+        "circuitOpenedGames": 139,
+        "circuitSkipped": 2013,
+        "deadlineFallbackRate": 0.26868239921337267,
+        "msTotal": 12899555.399999997,
+        "msPerSearchedDecision": 121.96085205355114,
+        "gameMs": {
+          "p50": 3132.1,
+          "p95": 4918.3,
+          "p99": 5866,
+          "max": 8155.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranked_mage_conservative200_275",
+        "stage": 2,
+        "distribution": "ranked_taxonomy",
+        "scenarioProtocol": "independent_seat_conditioned",
+        "archetype": "mage",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 1945037332,
+        "qualification": true,
+        "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled MAGIC attacker; the opponent composition is unrestricted."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1983,
+      "candidateWins": 1551,
+      "opponentWins": 432,
+      "draws": 17,
+      "candidateWinRate": 0.7821482602118003,
+      "clusteredSePp": null,
+      "confidence95": null,
+      "pairedDiagnosticApplicable": false,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 995,
+          "wins": 890,
+          "losses": 105,
+          "draws": 5,
+          "drawOrArmageddon": 13,
+          "drawOrArmageddonFraction": 0.013,
+          "decisiveFraction": 0.995,
+          "decisiveWinRate": 0.8944723618090452,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8603911218073599,
+            "high": 0.9209976533713291
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 988,
+          "wins": 661,
+          "losses": 327,
+          "draws": 12,
+          "drawOrArmageddon": 42,
+          "drawOrArmageddonFraction": 0.042,
+          "decisiveFraction": 0.988,
+          "decisiveWinRate": 0.6690283400809717,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6211571449701486,
+            "high": 0.7136391523426198
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 0,
+        "sumWinSquared": 0,
+        "sumWinDecisive": 0,
+        "sumDecisiveSquared": 0
+      },
+      "drawOrArmageddon": 55,
+      "drawOrArmageddonRate": 0.0275,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 890,
+      "candidateWinsAsRed": 661,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 59888,
+        "searched": 59888,
+        "overrides": 13238,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 15629,
+        "circuitOpenedGames": 37,
+        "circuitSkipped": 593,
+        "deadlineFallbackRate": 0.26097047822602193,
+        "msTotal": 7219467.999999998,
+        "msPerSearchedDecision": 120.54949238578678,
+        "gameMs": {
+          "p50": 3499.4,
+          "p95": 5543.3,
+          "p99": 6781.9,
+          "max": 8381
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": null,
+        "independentSeatStreamsExact": true,
+        "seatConditioningExact": true,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranked_melee_mage_conservative200_275",
+        "stage": 2,
+        "distribution": "ranked_taxonomy",
+        "scenarioProtocol": "independent_seat_conditioned",
+        "archetype": "meleeMage",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 1348038076,
+        "qualification": true,
+        "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled MELEE_MAGIC attacker; the opponent composition is unrestricted."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1988,
+      "candidateWins": 1675,
+      "opponentWins": 313,
+      "draws": 12,
+      "candidateWinRate": 0.8425553319919518,
+      "clusteredSePp": null,
+      "confidence95": null,
+      "pairedDiagnosticApplicable": false,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 995,
+          "wins": 901,
+          "losses": 94,
+          "draws": 5,
+          "drawOrArmageddon": 11,
+          "drawOrArmageddonFraction": 0.011,
+          "decisiveFraction": 0.995,
+          "decisiveWinRate": 0.9055276381909547,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8727578791909534,
+            "high": 0.9305296896870109
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 993,
+          "wins": 774,
+          "losses": 219,
+          "draws": 7,
+          "drawOrArmageddon": 22,
+          "drawOrArmageddonFraction": 0.022,
+          "decisiveFraction": 0.993,
+          "decisiveWinRate": 0.7794561933534743,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7360699773100584,
+            "high": 0.8174788684649426
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 0,
+        "sumWinSquared": 0,
+        "sumWinDecisive": 0,
+        "sumDecisiveSquared": 0
+      },
+      "drawOrArmageddon": 33,
+      "drawOrArmageddonRate": 0.0165,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 901,
+      "candidateWinsAsRed": 774,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 52455,
+        "searched": 52455,
+        "overrides": 9629,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 15922,
+        "circuitOpenedGames": 72,
+        "circuitSkipped": 1184,
+        "deadlineFallbackRate": 0.3035363645029073,
+        "msTotal": 6656279.699999991,
+        "msPerSearchedDecision": 126.8950471832998,
+        "gameMs": {
+          "p50": 3230,
+          "p95": 4978.4,
+          "p99": 6111.7,
+          "max": 7436.3
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": null,
+        "independentSeatStreamsExact": true,
+        "seatConditioningExact": true,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranked_aura_conservative200_275",
+        "stage": 2,
+        "distribution": "ranked_taxonomy",
+        "scenarioProtocol": "independent_seat_conditioned",
+        "archetype": "aura",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 751038820,
+        "qualification": true,
+        "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled creature with a non-null aura effect; the opponent composition is unrestricted."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1989,
+      "candidateWins": 1628,
+      "opponentWins": 361,
+      "draws": 11,
+      "candidateWinRate": 0.8185017596782302,
+      "clusteredSePp": null,
+      "confidence95": null,
+      "pairedDiagnosticApplicable": false,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 996,
+          "wins": 897,
+          "losses": 99,
+          "draws": 4,
+          "drawOrArmageddon": 7,
+          "drawOrArmageddonFraction": 0.007,
+          "decisiveFraction": 0.996,
+          "decisiveWinRate": 0.9006024096385542,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.867253868537899,
+            "high": 0.926285214341803
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 993,
+          "wins": 731,
+          "losses": 262,
+          "draws": 7,
+          "drawOrArmageddon": 32,
+          "drawOrArmageddonFraction": 0.032,
+          "decisiveFraction": 0.993,
+          "decisiveWinRate": 0.7361530715005036,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6906542392699808,
+            "high": 0.7771194700425877
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 0,
+        "sumWinSquared": 0,
+        "sumWinDecisive": 0,
+        "sumDecisiveSquared": 0
+      },
+      "drawOrArmageddon": 39,
+      "drawOrArmageddonRate": 0.0195,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 897,
+      "candidateWinsAsRed": 731,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 53096,
+        "searched": 53096,
+        "overrides": 10756,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 14325,
+        "circuitOpenedGames": 71,
+        "circuitSkipped": 1106,
+        "deadlineFallbackRate": 0.2697943347898147,
+        "msTotal": 6489746.700000003,
+        "msPerSearchedDecision": 122.22665925870128,
+        "gameMs": {
+          "p50": 3145.1,
+          "p95": 4924.7,
+          "p99": 6031.5,
+          "max": 8276.6
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": null,
+        "independentSeatStreamsExact": true,
+        "seatConditioningExact": true,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranked_ranged_conservative200_275",
+        "stage": 2,
+        "distribution": "ranked_taxonomy",
+        "scenarioProtocol": "independent_seat_conditioned",
+        "archetype": "ranged",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 154039564,
+        "qualification": true,
+        "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled RANGE attacker; the opponent composition is unrestricted."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1989,
+      "candidateWins": 1608,
+      "opponentWins": 381,
+      "draws": 11,
+      "candidateWinRate": 0.808446455505279,
+      "clusteredSePp": null,
+      "confidence95": null,
+      "pairedDiagnosticApplicable": false,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 999,
+          "wins": 900,
+          "losses": 99,
+          "draws": 1,
+          "drawOrArmageddon": 10,
+          "drawOrArmageddonFraction": 0.01,
+          "decisiveFraction": 0.999,
+          "decisiveWinRate": 0.9009009009009009,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8676439546259378,
+            "high": 0.9265092166135699
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 990,
+          "wins": 708,
+          "losses": 282,
+          "draws": 10,
+          "drawOrArmageddon": 36,
+          "drawOrArmageddonFraction": 0.036,
+          "decisiveFraction": 0.99,
+          "decisiveWinRate": 0.7151515151515152,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6687519347999368,
+            "high": 0.7574093472858077
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 0,
+        "sumWinSquared": 0,
+        "sumWinDecisive": 0,
+        "sumDecisiveSquared": 0
+      },
+      "drawOrArmageddon": 46,
+      "drawOrArmageddonRate": 0.023,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 900,
+      "candidateWinsAsRed": 708,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 53845,
+        "searched": 53845,
+        "overrides": 10490,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 16921,
+        "circuitOpenedGames": 63,
+        "circuitSkipped": 1070,
+        "deadlineFallbackRate": 0.31425387686879,
+        "msTotal": 6860751.5999999875,
+        "msPerSearchedDecision": 127.41668864332784,
+        "gameMs": {
+          "p50": 3326.7,
+          "p95": 5243.2,
+          "p99": 6149.9,
+          "max": 7900.9
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": null,
+        "independentSeatStreamsExact": true,
+        "seatConditioningExact": true,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "mage_frontline_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "mage",
+        "template": "mage_frontline",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 3852007604,
+        "qualification": true,
+        "purpose": "Artifact-free mage frontline tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1992,
+      "candidateWins": 1936,
+      "opponentWins": 56,
+      "draws": 8,
+      "candidateWinRate": 0.9718875502008032,
+      "clusteredSePp": 0.3719604559498212,
+      "confidence95": {
+        "low": 0.9645972592274558,
+        "high": 0.9791778411741506
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 995,
+          "wins": 968,
+          "losses": 27,
+          "draws": 5,
+          "drawOrArmageddon": 10,
+          "drawOrArmageddonFraction": 0.01,
+          "decisiveFraction": 0.995,
+          "decisiveWinRate": 0.9728643216080402,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9518024599003401,
+            "high": 0.9848686706004832
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 968,
+          "losses": 29,
+          "draws": 3,
+          "drawOrArmageddon": 7,
+          "drawOrArmageddonFraction": 0.007,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.970912738214644,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9493764784950336,
+            "high": 0.9834467885528587
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 3810,
+        "sumWinDecisive": 3864,
+        "sumDecisiveSquared": 3976
+      },
+      "drawOrArmageddon": 17,
+      "drawOrArmageddonRate": 0.0085,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 968,
+      "candidateWinsAsRed": 968,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 70168,
+        "searched": 70168,
+        "overrides": 18856,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 5956,
+        "circuitOpenedGames": 120,
+        "circuitSkipped": 3649,
+        "deadlineFallbackRate": 0.08488199749173413,
+        "msTotal": 5888366.900000006,
+        "msPerSearchedDecision": 83.91812364610657,
+        "gameMs": {
+          "p50": 2883,
+          "p95": 4308.9,
+          "p99": 6326.9,
+          "max": 8629.3
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": true,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "mage_fireline_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "mage",
+        "template": "mage_fireline",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 2800370780,
+        "qualification": true,
+        "purpose": "Artifact-free mage fireline tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1420,
+      "candidateWins": 713,
+      "opponentWins": 707,
+      "draws": 580,
+      "candidateWinRate": 0.502112676056338,
+      "clusteredSePp": 1.2731611369025306,
+      "confidence95": {
+        "low": 0.47715917630788773,
+        "high": 0.5270661758047883
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 708,
+          "wins": 342,
+          "losses": 366,
+          "draws": 292,
+          "drawOrArmageddon": 881,
+          "drawOrArmageddonFraction": 0.881,
+          "decisiveFraction": 0.708,
+          "decisiveWinRate": 0.4830508474576271,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.4254154331704687,
+            "high": 0.541140754968211
+          },
+          "decisiveFractionPassed": false,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": false,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 712,
+          "wins": 371,
+          "losses": 341,
+          "draws": 288,
+          "drawOrArmageddon": 848,
+          "drawOrArmageddonFraction": 0.848,
+          "decisiveFraction": 0.712,
+          "decisiveWinRate": 0.5210674157303371,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.46310230188840973,
+            "high": 0.5784707361279204
+          },
+          "decisiveFractionPassed": false,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": false,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 935,
+        "sumWinDecisive": 1219,
+        "sumDecisiveSquared": 2442
+      },
+      "drawOrArmageddon": 1729,
+      "drawOrArmageddonRate": 0.8645,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 342,
+      "candidateWinsAsRed": 371,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 126355,
+        "searched": 126355,
+        "overrides": 48631,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 17421,
+        "circuitOpenedGames": 93,
+        "circuitSkipped": 3478,
+        "deadlineFallbackRate": 0.1378734517826758,
+        "msTotal": 10347155.900000004,
+        "msPerSearchedDecision": 81.88956432274152,
+        "gameMs": {
+          "p50": 5223.6,
+          "p95": 6697.9,
+          "p99": 7629.7,
+          "max": 11213.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": false,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": false,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "melee_magic_utility_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "meleeMage",
+        "template": "melee_magic_utility",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 1748733956,
+        "qualification": true,
+        "purpose": "Artifact-free melee-mage utility tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1993,
+      "candidateWins": 1434,
+      "opponentWins": 559,
+      "draws": 7,
+      "candidateWinRate": 0.7195183140993477,
+      "clusteredSePp": 1.0007860336914731,
+      "confidence95": {
+        "low": 0.699903268276688,
+        "high": 0.7391333599220075
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 995,
+          "wins": 711,
+          "losses": 284,
+          "draws": 5,
+          "drawOrArmageddon": 5,
+          "drawOrArmageddonFraction": 0.005,
+          "decisiveFraction": 0.995,
+          "decisiveWinRate": 0.714572864321608,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6682731592865953,
+            "high": 0.7567625184220674
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 998,
+          "wins": 723,
+          "losses": 275,
+          "draws": 2,
+          "drawOrArmageddon": 3,
+          "drawOrArmageddonFraction": 0.003,
+          "decisiveFraction": 0.998,
+          "decisiveWinRate": 0.7244488977955912,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6785936219231004,
+            "high": 0.7660177516694179
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 2456,
+        "sumWinDecisive": 2862,
+        "sumDecisiveSquared": 3979
+      },
+      "drawOrArmageddon": 8,
+      "drawOrArmageddonRate": 0.004,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 711,
+      "candidateWinsAsRed": 723,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 45660,
+        "searched": 45660,
+        "overrides": 10228,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 16834,
+        "circuitOpenedGames": 92,
+        "circuitSkipped": 1249,
+        "deadlineFallbackRate": 0.3686815593517302,
+        "msTotal": 6472268.300000006,
+        "msPerSearchedDecision": 141.74919623302685,
+        "gameMs": {
+          "p50": 3146.7,
+          "p95": 4769.1,
+          "p99": 5365.1,
+          "max": 6870.8
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "melee_magic_brawler_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "meleeMage",
+        "template": "melee_magic_brawler",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 697097132,
+        "qualification": true,
+        "purpose": "Artifact-free melee-mage brawler tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1996,
+      "candidateWins": 1863,
+      "opponentWins": 133,
+      "draws": 4,
+      "candidateWinRate": 0.9333667334669339,
+      "clusteredSePp": 0.5742741460315168,
+      "confidence95": {
+        "low": 0.9221111670321912,
+        "high": 0.9446222999016766
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 998,
+          "wins": 939,
+          "losses": 59,
+          "draws": 2,
+          "drawOrArmageddon": 3,
+          "drawOrArmageddonFraction": 0.003,
+          "decisiveFraction": 0.998,
+          "decisiveWinRate": 0.9408817635270541,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9132441891863309,
+            "high": 0.9600995803704013
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 998,
+          "wins": 924,
+          "losses": 74,
+          "draws": 2,
+          "drawOrArmageddon": 2,
+          "drawOrArmageddonFraction": 0.002,
+          "decisiveFraction": 0.998,
+          "decisiveWinRate": 0.9258517034068137,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8958611943771603,
+            "high": 0.9477094921265016
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 3605,
+        "sumWinDecisive": 3722,
+        "sumDecisiveSquared": 3988
+      },
+      "drawOrArmageddon": 5,
+      "drawOrArmageddonRate": 0.0025,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 939,
+      "candidateWinsAsRed": 924,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 44511,
+        "searched": 44511,
+        "overrides": 9277,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 6731,
+        "circuitOpenedGames": 125,
+        "circuitSkipped": 1743,
+        "deadlineFallbackRate": 0.15122104648289186,
+        "msTotal": 4275099.500000006,
+        "msPerSearchedDecision": 96.04590999977546,
+        "gameMs": {
+          "p50": 2094.9,
+          "p95": 3127.6,
+          "p99": 3818.7,
+          "max": 4727.8
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "aura_support_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "aura",
+        "template": "aura_support",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 3940427604,
+        "qualification": true,
+        "purpose": "Artifact-free aura support tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1991,
+      "candidateWins": 1349,
+      "opponentWins": 642,
+      "draws": 9,
+      "candidateWinRate": 0.67754897036665,
+      "clusteredSePp": 0.7982295123524983,
+      "confidence95": {
+        "low": 0.6619039594105713,
+        "high": 0.6931939813227286
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 994,
+          "wins": 695,
+          "losses": 299,
+          "draws": 6,
+          "drawOrArmageddon": 7,
+          "drawOrArmageddonFraction": 0.007,
+          "decisiveFraction": 0.994,
+          "decisiveWinRate": 0.6991951710261569,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6523415486786746,
+            "high": 0.7422294938109723
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 654,
+          "losses": 343,
+          "draws": 3,
+          "drawOrArmageddon": 8,
+          "drawOrArmageddonFraction": 0.008,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.6559679037111334,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6080091495892149,
+            "high": 0.700945095407478
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 2075,
+        "sumWinDecisive": 2691,
+        "sumDecisiveSquared": 3973
+      },
+      "drawOrArmageddon": 15,
+      "drawOrArmageddonRate": 0.0075,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 695,
+      "candidateWinsAsRed": 654,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 47296,
+        "searched": 47296,
+        "overrides": 8034,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 17548,
+        "circuitOpenedGames": 33,
+        "circuitSkipped": 458,
+        "deadlineFallbackRate": 0.3710250338294993,
+        "msTotal": 6506104.799999999,
+        "msPerSearchedDecision": 137.56141745602162,
+        "gameMs": {
+          "p50": 3147.5,
+          "p95": 4435.5,
+          "p99": 5092.2,
+          "max": 6189.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "aura_offense_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "aura",
+        "template": "aura_offense",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 2888790780,
+        "qualification": true,
+        "purpose": "Artifact-free aura offense tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1993,
+      "candidateWins": 1888,
+      "opponentWins": 105,
+      "draws": 7,
+      "candidateWinRate": 0.9473156046161565,
+      "clusteredSePp": 0.49701811274365515,
+      "confidence95": {
+        "low": 0.9375742286097402,
+        "high": 0.9570569806225728
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 996,
+          "wins": 935,
+          "losses": 61,
+          "draws": 4,
+          "drawOrArmageddon": 4,
+          "drawOrArmageddonFraction": 0.004,
+          "decisiveFraction": 0.996,
+          "decisiveWinRate": 0.9387550200803213,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9107304182430984,
+            "high": 0.9583838153870515
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 953,
+          "losses": 44,
+          "draws": 3,
+          "drawOrArmageddon": 8,
+          "drawOrArmageddonFraction": 0.008,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.9558676028084253,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9309628336762915,
+            "high": 0.9720577730825308
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 3670,
+        "sumWinDecisive": 3770,
+        "sumDecisiveSquared": 3979
+      },
+      "drawOrArmageddon": 12,
+      "drawOrArmageddonRate": 0.006,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 935,
+      "candidateWinsAsRed": 953,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 54553,
+        "searched": 54553,
+        "overrides": 10124,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 16055,
+        "circuitOpenedGames": 24,
+        "circuitSkipped": 318,
+        "deadlineFallbackRate": 0.29430095503455356,
+        "msTotal": 7568077.000000006,
+        "msPerSearchedDecision": 138.7288875038954,
+        "gameMs": {
+          "p50": 3726.1,
+          "p95": 4615.4,
+          "p99": 6002.1,
+          "max": 8611
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": true,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranged_precision_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "ranged",
+        "template": "ranged_precision",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 1837153956,
+        "qualification": true,
+        "purpose": "Artifact-free ranged precision tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1695,
+      "candidateWins": 861,
+      "opponentWins": 834,
+      "draws": 305,
+      "candidateWinRate": 0.5079646017699115,
+      "clusteredSePp": 0.7206195033762062,
+      "confidence95": {
+        "low": 0.4938407190381665,
+        "high": 0.5220884845016566
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 867,
+          "wins": 451,
+          "losses": 416,
+          "draws": 133,
+          "drawOrArmageddon": 478,
+          "drawOrArmageddonFraction": 0.478,
+          "decisiveFraction": 0.867,
+          "decisiveWinRate": 0.5201845444059977,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.46762271666961425,
+            "high": 0.5723032925944078
+          },
+          "decisiveFractionPassed": false,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": false,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 828,
+          "wins": 410,
+          "losses": 418,
+          "draws": 172,
+          "drawOrArmageddon": 492,
+          "drawOrArmageddonFraction": 0.492,
+          "decisiveFraction": 0.828,
+          "decisiveWinRate": 0.49516908212560384,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.44163892475928757,
+            "high": 0.5488102225552454
+          },
+          "decisiveFractionPassed": false,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": false,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 967,
+        "sumWinDecisive": 1610,
+        "sumDecisiveSquared": 3169
+      },
+      "drawOrArmageddon": 970,
+      "drawOrArmageddonRate": 0.485,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 451,
+      "candidateWinsAsRed": 410,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 80356,
+        "searched": 80356,
+        "overrides": 23652,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 19476,
+        "circuitOpenedGames": 288,
+        "circuitSkipped": 8091,
+        "deadlineFallbackRate": 0.24237144706058042,
+        "msTotal": 7358459.800000002,
+        "msPerSearchedDecision": 91.57324655283989,
+        "gameMs": {
+          "p50": 3827.9,
+          "p95": 5261.5,
+          "p99": 6040,
+          "max": 8651.5
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": false,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": false,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    {
+      "cell": {
+        "id": "ranged_control_conservative200_275",
+        "stage": 3,
+        "distribution": "fixed_template",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "archetype": "ranged",
+        "template": "ranged_control",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 785517132,
+        "qualification": true,
+        "purpose": "Artifact-free ranged control tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1958,
+      "candidateWins": 1626,
+      "opponentWins": 332,
+      "draws": 42,
+      "candidateWinRate": 0.8304392236976507,
+      "clusteredSePp": 0.8211364820836479,
+      "confidence95": {
+        "low": 0.814345244384892,
+        "high": 0.8465332030104094
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 986,
+          "wins": 881,
+          "losses": 105,
+          "draws": 14,
+          "drawOrArmageddon": 20,
+          "drawOrArmageddonFraction": 0.02,
+          "decisiveFraction": 0.986,
+          "decisiveWinRate": 0.8935091277890467,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8591451732508676,
+            "high": 0.920267448408801
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 972,
+          "wins": 745,
+          "losses": 227,
+          "draws": 28,
+          "drawOrArmageddon": 64,
+          "drawOrArmageddonFraction": 0.064,
+          "decisiveFraction": 0.972,
+          "decisiveWinRate": 0.7664609053497943,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7218811824857239,
+            "high": 0.8058170956030584
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 2928,
+        "sumWinDecisive": 3216,
+        "sumDecisiveSquared": 3874
+      },
+      "drawOrArmageddon": 84,
+      "drawOrArmageddonRate": 0.042,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 881,
+      "candidateWinsAsRed": 745,
+      "search": {
+        "auditRows": 2000,
+        "decisions": 57265,
+        "searched": 57265,
+        "overrides": 15325,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 16864,
+        "circuitOpenedGames": 86,
+        "circuitSkipped": 1606,
+        "deadlineFallbackRate": 0.2944905264996071,
+        "msTotal": 6591248.6000000015,
+        "msPerSearchedDecision": 115.10082249192354,
+        "gameMs": {
+          "p50": 3258.6,
+          "p95": 4598.3,
+          "p99": 5304.9,
+          "max": 6743.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    }
+  ],
+  "executionWindow": {
+    "startedAt": "2026-07-16T10:02:24.657Z",
+    "assembledAt": "2026-07-16T12:50:49.004Z",
+    "elapsedMs": 10104347,
+    "maxRunElapsedMs": 86400000
+  },
+  "executionProvenance": {
+    "round1_search_off_symmetry": {
+      "startedAt": "2026-07-16T10:02:24.657Z",
+      "completedAt": "2026-07-16T10:02:53.402Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "round1_search_uncapped": {
+      "startedAt": "2026-07-16T10:03:01.725Z",
+      "completedAt": "2026-07-16T10:23:49.067Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "round1_search_server300": {
+      "startedAt": "2026-07-16T10:23:57.879Z",
+      "completedAt": "2026-07-16T10:32:30.900Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "round1_search_conservative200_275": {
+      "startedAt": "2026-07-16T10:32:39.832Z",
+      "completedAt": "2026-07-16T10:50:54.139Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranked_mage_conservative200_275": {
+      "startedAt": "2026-07-16T10:51:03.129Z",
+      "completedAt": "2026-07-16T11:01:15.718Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranked_melee_mage_conservative200_275": {
+      "startedAt": "2026-07-16T11:01:27.750Z",
+      "completedAt": "2026-07-16T11:10:53.893Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranked_aura_conservative200_275": {
+      "startedAt": "2026-07-16T11:11:06.699Z",
+      "completedAt": "2026-07-16T11:20:19.460Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranked_ranged_conservative200_275": {
+      "startedAt": "2026-07-16T11:20:32.989Z",
+      "completedAt": "2026-07-16T11:30:16.778Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "mage_frontline_conservative200_275": {
+      "startedAt": "2026-07-16T11:30:33.267Z",
+      "completedAt": "2026-07-16T11:38:53.536Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "mage_fireline_conservative200_275": {
+      "startedAt": "2026-07-16T11:39:10.899Z",
+      "completedAt": "2026-07-16T11:53:46.582Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "melee_magic_utility_conservative200_275": {
+      "startedAt": "2026-07-16T11:54:03.009Z",
+      "completedAt": "2026-07-16T12:03:14.340Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "melee_magic_brawler_conservative200_275": {
+      "startedAt": "2026-07-16T12:03:30.643Z",
+      "completedAt": "2026-07-16T12:09:34.527Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "aura_support_conservative200_275": {
+      "startedAt": "2026-07-16T12:09:51.646Z",
+      "completedAt": "2026-07-16T12:19:07.115Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "aura_offense_conservative200_275": {
+      "startedAt": "2026-07-16T12:19:24.059Z",
+      "completedAt": "2026-07-16T12:30:09.065Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranged_precision_conservative200_275": {
+      "startedAt": "2026-07-16T12:30:25.584Z",
+      "completedAt": "2026-07-16T12:40:53.706Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    },
+    "ranged_control_conservative200_275": {
+      "startedAt": "2026-07-16T12:41:10.343Z",
+      "completedAt": "2026-07-16T12:50:30.367Z",
+      "git": {
+        "commit": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "remoteOriginMain": "a52564d339f89add5b9a5c501c7c2356af233579",
+        "originUrl": "git@github.com:o1dstaRs/heroes-of-crypto-common.git",
+        "originIdentity": "github.com/o1dstars/heroes-of-crypto-common",
+        "branch": "main",
+        "cleanIncludingUntracked": true,
+        "statusPorcelainSha256": null,
+        "preregisteredBaseCommit": "c200b0d31363da8f0c04684e3241149b1d95d47c",
+        "preregisteredBaseIsAncestor": true
+      },
+      "host": {
+        "hostname": "Stepans-Mac-Studio.local",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpuModel": "Apple M4 Max",
+        "availableParallelism": 16,
+        "bunVersion": "1.3.14",
+        "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+        "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233"
+      },
+      "concurrency": {
+        "requested": 12,
+        "workers": 12
+      }
+    }
+  },
+  "qualification": {
+    "cells": 13,
+    "hypotheses": 26,
+    "method": "bonferroni_two_sided_wilson_by_candidate_seat",
+    "nominalFamilywiseConfidence": 0.95,
+    "rankedCell": {
+      "cell": {
+        "id": "round1_search_conservative200_275",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "conservative_200_275",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 4048310980,
+        "qualification": true,
+        "purpose": "Primary current-ranked qualification cell under the conservative latency profile."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3977,
+      "candidateWins": 3290,
+      "opponentWins": 687,
+      "draws": 23,
+      "candidateWinRate": 0.8272567261755092,
+      "clusteredSePp": 0.5485285296707878,
+      "confidence95": {
+        "low": 0.8165057645490346,
+        "high": 0.8380076878019838
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1996,
+          "wins": 1810,
+          "losses": 186,
+          "draws": 4,
+          "drawOrArmageddon": 12,
+          "drawOrArmageddonFraction": 0.006,
+          "decisiveFraction": 0.998,
+          "decisiveWinRate": 0.906813627254509,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8846335169141673,
+            "high": 0.9250905322526757
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1981,
+          "wins": 1480,
+          "losses": 501,
+          "draws": 19,
+          "drawOrArmageddon": 46,
+          "drawOrArmageddonFraction": 0.023,
+          "decisiveFraction": 0.9905,
+          "decisiveWinRate": 0.7470974255426552,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7156595814695148,
+            "high": 0.7761466091930272
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 5900,
+        "sumWinDecisive": 6559,
+        "sumDecisiveSquared": 7931
+      },
+      "drawOrArmageddon": 58,
+      "drawOrArmageddonRate": 0.0145,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1810,
+      "candidateWinsAsRed": 1480,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 105768,
+        "searched": 105768,
+        "overrides": 21186,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 28418,
+        "circuitOpenedGames": 139,
+        "circuitSkipped": 2013,
+        "deadlineFallbackRate": 0.26868239921337267,
+        "msTotal": 12899555.399999997,
+        "msPerSearchedDecision": 121.96085205355114,
+        "gameMs": {
+          "p50": 3132.1,
+          "p95": 4918.3,
+          "p99": 5866,
+          "max": 8155.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": true,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": false,
+        "latencyAttritionPassed": false,
+        "passed": false
+      }
+    },
+    "taxonomyCells": {
+      "mage": {
+        "cell": {
+          "id": "ranked_mage_conservative200_275",
+          "stage": 2,
+          "distribution": "ranked_taxonomy",
+          "scenarioProtocol": "independent_seat_conditioned",
+          "archetype": "mage",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 1945037332,
+          "qualification": true,
+          "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled MAGIC attacker; the opponent composition is unrestricted."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1983,
+        "candidateWins": 1551,
+        "opponentWins": 432,
+        "draws": 17,
+        "candidateWinRate": 0.7821482602118003,
+        "clusteredSePp": null,
+        "confidence95": null,
+        "pairedDiagnosticApplicable": false,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 995,
+            "wins": 890,
+            "losses": 105,
+            "draws": 5,
+            "drawOrArmageddon": 13,
+            "drawOrArmageddonFraction": 0.013,
+            "decisiveFraction": 0.995,
+            "decisiveWinRate": 0.8944723618090452,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.8603911218073599,
+              "high": 0.9209976533713291
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 988,
+            "wins": 661,
+            "losses": 327,
+            "draws": 12,
+            "drawOrArmageddon": 42,
+            "drawOrArmageddonFraction": 0.042,
+            "decisiveFraction": 0.988,
+            "decisiveWinRate": 0.6690283400809717,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6211571449701486,
+              "high": 0.7136391523426198
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 0,
+          "sumWinSquared": 0,
+          "sumWinDecisive": 0,
+          "sumDecisiveSquared": 0
+        },
+        "drawOrArmageddon": 55,
+        "drawOrArmageddonRate": 0.0275,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 890,
+        "candidateWinsAsRed": 661,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 59888,
+          "searched": 59888,
+          "overrides": 13238,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 15629,
+          "circuitOpenedGames": 37,
+          "circuitSkipped": 593,
+          "deadlineFallbackRate": 0.26097047822602193,
+          "msTotal": 7219467.999999998,
+          "msPerSearchedDecision": 120.54949238578678,
+          "gameMs": {
+            "p50": 3499.4,
+            "p95": 5543.3,
+            "p99": 6781.9,
+            "max": 8381
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": null,
+          "independentSeatStreamsExact": true,
+          "seatConditioningExact": true,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "meleeMage": {
+        "cell": {
+          "id": "ranked_melee_mage_conservative200_275",
+          "stage": 2,
+          "distribution": "ranked_taxonomy",
+          "scenarioProtocol": "independent_seat_conditioned",
+          "archetype": "meleeMage",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 1348038076,
+          "qualification": true,
+          "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled MELEE_MAGIC attacker; the opponent composition is unrestricted."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1988,
+        "candidateWins": 1675,
+        "opponentWins": 313,
+        "draws": 12,
+        "candidateWinRate": 0.8425553319919518,
+        "clusteredSePp": null,
+        "confidence95": null,
+        "pairedDiagnosticApplicable": false,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 995,
+            "wins": 901,
+            "losses": 94,
+            "draws": 5,
+            "drawOrArmageddon": 11,
+            "drawOrArmageddonFraction": 0.011,
+            "decisiveFraction": 0.995,
+            "decisiveWinRate": 0.9055276381909547,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.8727578791909534,
+              "high": 0.9305296896870109
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 993,
+            "wins": 774,
+            "losses": 219,
+            "draws": 7,
+            "drawOrArmageddon": 22,
+            "drawOrArmageddonFraction": 0.022,
+            "decisiveFraction": 0.993,
+            "decisiveWinRate": 0.7794561933534743,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.7360699773100584,
+              "high": 0.8174788684649426
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 0,
+          "sumWinSquared": 0,
+          "sumWinDecisive": 0,
+          "sumDecisiveSquared": 0
+        },
+        "drawOrArmageddon": 33,
+        "drawOrArmageddonRate": 0.0165,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 901,
+        "candidateWinsAsRed": 774,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 52455,
+          "searched": 52455,
+          "overrides": 9629,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 15922,
+          "circuitOpenedGames": 72,
+          "circuitSkipped": 1184,
+          "deadlineFallbackRate": 0.3035363645029073,
+          "msTotal": 6656279.699999991,
+          "msPerSearchedDecision": 126.8950471832998,
+          "gameMs": {
+            "p50": 3230,
+            "p95": 4978.4,
+            "p99": 6111.7,
+            "max": 7436.3
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": null,
+          "independentSeatStreamsExact": true,
+          "seatConditioningExact": true,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "aura": {
+        "cell": {
+          "id": "ranked_aura_conservative200_275",
+          "stage": 2,
+          "distribution": "ranked_taxonomy",
+          "scenarioProtocol": "independent_seat_conditioned",
+          "archetype": "aura",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 751038820,
+          "qualification": true,
+          "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled creature with a non-null aura effect; the opponent composition is unrestricted."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1989,
+        "candidateWins": 1628,
+        "opponentWins": 361,
+        "draws": 11,
+        "candidateWinRate": 0.8185017596782302,
+        "clusteredSePp": null,
+        "confidence95": null,
+        "pairedDiagnosticApplicable": false,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 996,
+            "wins": 897,
+            "losses": 99,
+            "draws": 4,
+            "drawOrArmageddon": 7,
+            "drawOrArmageddonFraction": 0.007,
+            "decisiveFraction": 0.996,
+            "decisiveWinRate": 0.9006024096385542,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.867253868537899,
+              "high": 0.926285214341803
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 993,
+            "wins": 731,
+            "losses": 262,
+            "draws": 7,
+            "drawOrArmageddon": 32,
+            "drawOrArmageddonFraction": 0.032,
+            "decisiveFraction": 0.993,
+            "decisiveWinRate": 0.7361530715005036,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6906542392699808,
+              "high": 0.7771194700425877
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 0,
+          "sumWinSquared": 0,
+          "sumWinDecisive": 0,
+          "sumDecisiveSquared": 0
+        },
+        "drawOrArmageddon": 39,
+        "drawOrArmageddonRate": 0.0195,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 897,
+        "candidateWinsAsRed": 731,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 53096,
+          "searched": 53096,
+          "overrides": 10756,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 14325,
+          "circuitOpenedGames": 71,
+          "circuitSkipped": 1106,
+          "deadlineFallbackRate": 0.2697943347898147,
+          "msTotal": 6489746.700000003,
+          "msPerSearchedDecision": 122.22665925870128,
+          "gameMs": {
+            "p50": 3145.1,
+            "p95": 4924.7,
+            "p99": 6031.5,
+            "max": 8276.6
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": null,
+          "independentSeatStreamsExact": true,
+          "seatConditioningExact": true,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "ranged": {
+        "cell": {
+          "id": "ranked_ranged_conservative200_275",
+          "stage": 2,
+          "distribution": "ranked_taxonomy",
+          "scenarioProtocol": "independent_seat_conditioned",
+          "archetype": "ranged",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 154039564,
+          "qualification": true,
+          "purpose": "Seat-balanced ranked cohort where the candidate physical army contains at least one enabled RANGE attacker; the opponent composition is unrestricted."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1989,
+        "candidateWins": 1608,
+        "opponentWins": 381,
+        "draws": 11,
+        "candidateWinRate": 0.808446455505279,
+        "clusteredSePp": null,
+        "confidence95": null,
+        "pairedDiagnosticApplicable": false,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 999,
+            "wins": 900,
+            "losses": 99,
+            "draws": 1,
+            "drawOrArmageddon": 10,
+            "drawOrArmageddonFraction": 0.01,
+            "decisiveFraction": 0.999,
+            "decisiveWinRate": 0.9009009009009009,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.8676439546259378,
+              "high": 0.9265092166135699
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 990,
+            "wins": 708,
+            "losses": 282,
+            "draws": 10,
+            "drawOrArmageddon": 36,
+            "drawOrArmageddonFraction": 0.036,
+            "decisiveFraction": 0.99,
+            "decisiveWinRate": 0.7151515151515152,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6687519347999368,
+              "high": 0.7574093472858077
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 0,
+          "sumWinSquared": 0,
+          "sumWinDecisive": 0,
+          "sumDecisiveSquared": 0
+        },
+        "drawOrArmageddon": 46,
+        "drawOrArmageddonRate": 0.023,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 900,
+        "candidateWinsAsRed": 708,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 53845,
+          "searched": 53845,
+          "overrides": 10490,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 16921,
+          "circuitOpenedGames": 63,
+          "circuitSkipped": 1070,
+          "deadlineFallbackRate": 0.31425387686879,
+          "msTotal": 6860751.5999999875,
+          "msPerSearchedDecision": 127.41668864332784,
+          "gameMs": {
+            "p50": 3326.7,
+            "p95": 5243.2,
+            "p99": 6149.9,
+            "max": 7900.9
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": null,
+          "independentSeatStreamsExact": true,
+          "seatConditioningExact": true,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      }
+    },
+    "templateCells": {
+      "mage_frontline": {
+        "cell": {
+          "id": "mage_frontline_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "mage",
+          "template": "mage_frontline",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 3852007604,
+          "qualification": true,
+          "purpose": "Artifact-free mage frontline tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1992,
+        "candidateWins": 1936,
+        "opponentWins": 56,
+        "draws": 8,
+        "candidateWinRate": 0.9718875502008032,
+        "clusteredSePp": 0.3719604559498212,
+        "confidence95": {
+          "low": 0.9645972592274558,
+          "high": 0.9791778411741506
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 995,
+            "wins": 968,
+            "losses": 27,
+            "draws": 5,
+            "drawOrArmageddon": 10,
+            "drawOrArmageddonFraction": 0.01,
+            "decisiveFraction": 0.995,
+            "decisiveWinRate": 0.9728643216080402,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.9518024599003401,
+              "high": 0.9848686706004832
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": true,
+            "drawOrArmageddonPassed": true,
+            "passed": true
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 997,
+            "wins": 968,
+            "losses": 29,
+            "draws": 3,
+            "drawOrArmageddon": 7,
+            "drawOrArmageddonFraction": 0.007,
+            "decisiveFraction": 0.997,
+            "decisiveWinRate": 0.970912738214644,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.9493764784950336,
+              "high": 0.9834467885528587
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": true,
+            "drawOrArmageddonPassed": true,
+            "passed": true
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 3810,
+          "sumWinDecisive": 3864,
+          "sumDecisiveSquared": 3976
+        },
+        "drawOrArmageddon": 17,
+        "drawOrArmageddonRate": 0.0085,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 968,
+        "candidateWinsAsRed": 968,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 70168,
+          "searched": 70168,
+          "overrides": 18856,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 5956,
+          "circuitOpenedGames": 120,
+          "circuitSkipped": 3649,
+          "deadlineFallbackRate": 0.08488199749173413,
+          "msTotal": 5888366.900000006,
+          "msPerSearchedDecision": 83.91812364610657,
+          "gameMs": {
+            "p50": 2883,
+            "p95": 4308.9,
+            "p99": 6326.9,
+            "max": 8629.3
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": true,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": true,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "mage_fireline": {
+        "cell": {
+          "id": "mage_fireline_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "mage",
+          "template": "mage_fireline",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 2800370780,
+          "qualification": true,
+          "purpose": "Artifact-free mage fireline tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1420,
+        "candidateWins": 713,
+        "opponentWins": 707,
+        "draws": 580,
+        "candidateWinRate": 0.502112676056338,
+        "clusteredSePp": 1.2731611369025306,
+        "confidence95": {
+          "low": 0.47715917630788773,
+          "high": 0.5270661758047883
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 708,
+            "wins": 342,
+            "losses": 366,
+            "draws": 292,
+            "drawOrArmageddon": 881,
+            "drawOrArmageddonFraction": 0.881,
+            "decisiveFraction": 0.708,
+            "decisiveWinRate": 0.4830508474576271,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.4254154331704687,
+              "high": 0.541140754968211
+            },
+            "decisiveFractionPassed": false,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": false,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 712,
+            "wins": 371,
+            "losses": 341,
+            "draws": 288,
+            "drawOrArmageddon": 848,
+            "drawOrArmageddonFraction": 0.848,
+            "decisiveFraction": 0.712,
+            "decisiveWinRate": 0.5210674157303371,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.46310230188840973,
+              "high": 0.5784707361279204
+            },
+            "decisiveFractionPassed": false,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": false,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 935,
+          "sumWinDecisive": 1219,
+          "sumDecisiveSquared": 2442
+        },
+        "drawOrArmageddon": 1729,
+        "drawOrArmageddonRate": 0.8645,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 342,
+        "candidateWinsAsRed": 371,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 126355,
+          "searched": 126355,
+          "overrides": 48631,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 17421,
+          "circuitOpenedGames": 93,
+          "circuitSkipped": 3478,
+          "deadlineFallbackRate": 0.1378734517826758,
+          "msTotal": 10347155.900000004,
+          "msPerSearchedDecision": 81.88956432274152,
+          "gameMs": {
+            "p50": 5223.6,
+            "p95": 6697.9,
+            "p99": 7629.7,
+            "max": 11213.4
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": false,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": false,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "melee_magic_utility": {
+        "cell": {
+          "id": "melee_magic_utility_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "meleeMage",
+          "template": "melee_magic_utility",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 1748733956,
+          "qualification": true,
+          "purpose": "Artifact-free melee-mage utility tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1993,
+        "candidateWins": 1434,
+        "opponentWins": 559,
+        "draws": 7,
+        "candidateWinRate": 0.7195183140993477,
+        "clusteredSePp": 1.0007860336914731,
+        "confidence95": {
+          "low": 0.699903268276688,
+          "high": 0.7391333599220075
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 995,
+            "wins": 711,
+            "losses": 284,
+            "draws": 5,
+            "drawOrArmageddon": 5,
+            "drawOrArmageddonFraction": 0.005,
+            "decisiveFraction": 0.995,
+            "decisiveWinRate": 0.714572864321608,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6682731592865953,
+              "high": 0.7567625184220674
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 998,
+            "wins": 723,
+            "losses": 275,
+            "draws": 2,
+            "drawOrArmageddon": 3,
+            "drawOrArmageddonFraction": 0.003,
+            "decisiveFraction": 0.998,
+            "decisiveWinRate": 0.7244488977955912,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6785936219231004,
+              "high": 0.7660177516694179
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 2456,
+          "sumWinDecisive": 2862,
+          "sumDecisiveSquared": 3979
+        },
+        "drawOrArmageddon": 8,
+        "drawOrArmageddonRate": 0.004,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 711,
+        "candidateWinsAsRed": 723,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 45660,
+          "searched": 45660,
+          "overrides": 10228,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 16834,
+          "circuitOpenedGames": 92,
+          "circuitSkipped": 1249,
+          "deadlineFallbackRate": 0.3686815593517302,
+          "msTotal": 6472268.300000006,
+          "msPerSearchedDecision": 141.74919623302685,
+          "gameMs": {
+            "p50": 3146.7,
+            "p95": 4769.1,
+            "p99": 5365.1,
+            "max": 6870.8
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "melee_magic_brawler": {
+        "cell": {
+          "id": "melee_magic_brawler_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "meleeMage",
+          "template": "melee_magic_brawler",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 697097132,
+          "qualification": true,
+          "purpose": "Artifact-free melee-mage brawler tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1996,
+        "candidateWins": 1863,
+        "opponentWins": 133,
+        "draws": 4,
+        "candidateWinRate": 0.9333667334669339,
+        "clusteredSePp": 0.5742741460315168,
+        "confidence95": {
+          "low": 0.9221111670321912,
+          "high": 0.9446222999016766
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 998,
+            "wins": 939,
+            "losses": 59,
+            "draws": 2,
+            "drawOrArmageddon": 3,
+            "drawOrArmageddonFraction": 0.003,
+            "decisiveFraction": 0.998,
+            "decisiveWinRate": 0.9408817635270541,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.9132441891863309,
+              "high": 0.9600995803704013
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": true,
+            "drawOrArmageddonPassed": true,
+            "passed": true
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 998,
+            "wins": 924,
+            "losses": 74,
+            "draws": 2,
+            "drawOrArmageddon": 2,
+            "drawOrArmageddonFraction": 0.002,
+            "decisiveFraction": 0.998,
+            "decisiveWinRate": 0.9258517034068137,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.8958611943771603,
+              "high": 0.9477094921265016
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 3605,
+          "sumWinDecisive": 3722,
+          "sumDecisiveSquared": 3988
+        },
+        "drawOrArmageddon": 5,
+        "drawOrArmageddonRate": 0.0025,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 939,
+        "candidateWinsAsRed": 924,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 44511,
+          "searched": 44511,
+          "overrides": 9277,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 6731,
+          "circuitOpenedGames": 125,
+          "circuitSkipped": 1743,
+          "deadlineFallbackRate": 0.15122104648289186,
+          "msTotal": 4275099.500000006,
+          "msPerSearchedDecision": 96.04590999977546,
+          "gameMs": {
+            "p50": 2094.9,
+            "p95": 3127.6,
+            "p99": 3818.7,
+            "max": 4727.8
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "aura_support": {
+        "cell": {
+          "id": "aura_support_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "aura",
+          "template": "aura_support",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 3940427604,
+          "qualification": true,
+          "purpose": "Artifact-free aura support tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1991,
+        "candidateWins": 1349,
+        "opponentWins": 642,
+        "draws": 9,
+        "candidateWinRate": 0.67754897036665,
+        "clusteredSePp": 0.7982295123524983,
+        "confidence95": {
+          "low": 0.6619039594105713,
+          "high": 0.6931939813227286
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 994,
+            "wins": 695,
+            "losses": 299,
+            "draws": 6,
+            "drawOrArmageddon": 7,
+            "drawOrArmageddonFraction": 0.007,
+            "decisiveFraction": 0.994,
+            "decisiveWinRate": 0.6991951710261569,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6523415486786746,
+              "high": 0.7422294938109723
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 997,
+            "wins": 654,
+            "losses": 343,
+            "draws": 3,
+            "drawOrArmageddon": 8,
+            "drawOrArmageddonFraction": 0.008,
+            "decisiveFraction": 0.997,
+            "decisiveWinRate": 0.6559679037111334,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.6080091495892149,
+              "high": 0.700945095407478
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 2075,
+          "sumWinDecisive": 2691,
+          "sumDecisiveSquared": 3973
+        },
+        "drawOrArmageddon": 15,
+        "drawOrArmageddonRate": 0.0075,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 695,
+        "candidateWinsAsRed": 654,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 47296,
+          "searched": 47296,
+          "overrides": 8034,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 17548,
+          "circuitOpenedGames": 33,
+          "circuitSkipped": 458,
+          "deadlineFallbackRate": 0.3710250338294993,
+          "msTotal": 6506104.799999999,
+          "msPerSearchedDecision": 137.56141745602162,
+          "gameMs": {
+            "p50": 3147.5,
+            "p95": 4435.5,
+            "p99": 5092.2,
+            "max": 6189.4
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "aura_offense": {
+        "cell": {
+          "id": "aura_offense_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "aura",
+          "template": "aura_offense",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 2888790780,
+          "qualification": true,
+          "purpose": "Artifact-free aura offense tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1993,
+        "candidateWins": 1888,
+        "opponentWins": 105,
+        "draws": 7,
+        "candidateWinRate": 0.9473156046161565,
+        "clusteredSePp": 0.49701811274365515,
+        "confidence95": {
+          "low": 0.9375742286097402,
+          "high": 0.9570569806225728
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 996,
+            "wins": 935,
+            "losses": 61,
+            "draws": 4,
+            "drawOrArmageddon": 4,
+            "drawOrArmageddonFraction": 0.004,
+            "decisiveFraction": 0.996,
+            "decisiveWinRate": 0.9387550200803213,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.9107304182430984,
+              "high": 0.9583838153870515
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": true,
+            "drawOrArmageddonPassed": true,
+            "passed": true
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 997,
+            "wins": 953,
+            "losses": 44,
+            "draws": 3,
+            "drawOrArmageddon": 8,
+            "drawOrArmageddonFraction": 0.008,
+            "decisiveFraction": 0.997,
+            "decisiveWinRate": 0.9558676028084253,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.9309628336762915,
+              "high": 0.9720577730825308
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": true,
+            "drawOrArmageddonPassed": true,
+            "passed": true
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 3670,
+          "sumWinDecisive": 3770,
+          "sumDecisiveSquared": 3979
+        },
+        "drawOrArmageddon": 12,
+        "drawOrArmageddonRate": 0.006,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 935,
+        "candidateWinsAsRed": 953,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 54553,
+          "searched": 54553,
+          "overrides": 10124,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 16055,
+          "circuitOpenedGames": 24,
+          "circuitSkipped": 318,
+          "deadlineFallbackRate": 0.29430095503455356,
+          "msTotal": 7568077.000000006,
+          "msPerSearchedDecision": 138.7288875038954,
+          "gameMs": {
+            "p50": 3726.1,
+            "p95": 4615.4,
+            "p99": 6002.1,
+            "max": 8611
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": true,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": true,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "ranged_precision": {
+        "cell": {
+          "id": "ranged_precision_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "ranged",
+          "template": "ranged_precision",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 1837153956,
+          "qualification": true,
+          "purpose": "Artifact-free ranged precision tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1695,
+        "candidateWins": 861,
+        "opponentWins": 834,
+        "draws": 305,
+        "candidateWinRate": 0.5079646017699115,
+        "clusteredSePp": 0.7206195033762062,
+        "confidence95": {
+          "low": 0.4938407190381665,
+          "high": 0.5220884845016566
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 867,
+            "wins": 451,
+            "losses": 416,
+            "draws": 133,
+            "drawOrArmageddon": 478,
+            "drawOrArmageddonFraction": 0.478,
+            "decisiveFraction": 0.867,
+            "decisiveWinRate": 0.5201845444059977,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.46762271666961425,
+              "high": 0.5723032925944078
+            },
+            "decisiveFractionPassed": false,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": false,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 828,
+            "wins": 410,
+            "losses": 418,
+            "draws": 172,
+            "drawOrArmageddon": 492,
+            "drawOrArmageddonFraction": 0.492,
+            "decisiveFraction": 0.828,
+            "decisiveWinRate": 0.49516908212560384,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.44163892475928757,
+              "high": 0.5488102225552454
+            },
+            "decisiveFractionPassed": false,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": false,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 967,
+          "sumWinDecisive": 1610,
+          "sumDecisiveSquared": 3169
+        },
+        "drawOrArmageddon": 970,
+        "drawOrArmageddonRate": 0.485,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 451,
+        "candidateWinsAsRed": 410,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 80356,
+          "searched": 80356,
+          "overrides": 23652,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 19476,
+          "circuitOpenedGames": 288,
+          "circuitSkipped": 8091,
+          "deadlineFallbackRate": 0.24237144706058042,
+          "msTotal": 7358459.800000002,
+          "msPerSearchedDecision": 91.57324655283989,
+          "gameMs": {
+            "p50": 3827.9,
+            "p95": 5261.5,
+            "p99": 6040,
+            "max": 8651.5
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": false,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": false,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      },
+      "ranged_control": {
+        "cell": {
+          "id": "ranged_control_conservative200_275",
+          "stage": 3,
+          "distribution": "fixed_template",
+          "scenarioProtocol": "fixed_physical_side_swap",
+          "archetype": "ranged",
+          "template": "ranged_control",
+          "profile": "conservative_200_275",
+          "candidate": "v0.7s",
+          "opponent": "v0.6",
+          "games": 2000,
+          "pairScenarios": 1000,
+          "baseSeed": 785517132,
+          "qualification": true,
+          "purpose": "Artifact-free ranged control tactical qualification with CONDITIONAL_SETUP_V1 augments and synergies."
+        },
+        "games": 2000,
+        "pairScenarios": 1000,
+        "decisive": 1958,
+        "candidateWins": 1626,
+        "opponentWins": 332,
+        "draws": 42,
+        "candidateWinRate": 0.8304392236976507,
+        "clusteredSePp": 0.8211364820836479,
+        "confidence95": {
+          "low": 0.814345244384892,
+          "high": 0.8465332030104094
+        },
+        "pairedDiagnosticApplicable": true,
+        "formalSeatEvidence": {
+          "candidate_green": {
+            "games": 1000,
+            "decisive": 986,
+            "wins": 881,
+            "losses": 105,
+            "draws": 14,
+            "drawOrArmageddon": 20,
+            "drawOrArmageddonFraction": 0.02,
+            "decisiveFraction": 0.986,
+            "decisiveWinRate": 0.8935091277890467,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.8591451732508676,
+              "high": 0.920267448408801
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          },
+          "candidate_red": {
+            "games": 1000,
+            "decisive": 972,
+            "wins": 745,
+            "losses": 227,
+            "draws": 28,
+            "drawOrArmageddon": 64,
+            "drawOrArmageddonFraction": 0.064,
+            "decisiveFraction": 0.972,
+            "decisiveWinRate": 0.7664609053497943,
+            "wilson": {
+              "method": "bonferroni_two_sided_wilson",
+              "hypotheses": 26,
+              "nominalFamilywiseConfidence": 0.95,
+              "z": 3.1018618337400956,
+              "low": 0.7218811824857239,
+              "high": 0.8058170956030584
+            },
+            "decisiveFractionPassed": true,
+            "wilsonLowPassed": false,
+            "drawOrArmageddonPassed": true,
+            "passed": false
+          }
+        },
+        "pairMoments": {
+          "clusters": 1000,
+          "sumWinSquared": 2928,
+          "sumWinDecisive": 3216,
+          "sumDecisiveSquared": 3874
+        },
+        "drawOrArmageddon": 84,
+        "drawOrArmageddonRate": 0.042,
+        "endReasons": {
+          "elimination": 2000
+        },
+        "candidateRejections": 0,
+        "opponentRejections": 0,
+        "missingRejectionCounts": 0,
+        "candidateWinsAsGreen": 881,
+        "candidateWinsAsRed": 745,
+        "search": {
+          "auditRows": 2000,
+          "decisions": 57265,
+          "searched": 57265,
+          "overrides": 15325,
+          "illegalIncumbent": 0,
+          "deadlineFallbacks": 16864,
+          "circuitOpenedGames": 86,
+          "circuitSkipped": 1606,
+          "deadlineFallbackRate": 0.2944905264996071,
+          "msTotal": 6591248.6000000015,
+          "msPerSearchedDecision": 115.10082249192354,
+          "gameMs": {
+            "p50": 3258.6,
+            "p95": 4598.3,
+            "p99": 5304.9,
+            "max": 6743.4
+          }
+        },
+        "integrity": {
+          "complete": true,
+          "fixedPhysicalSideSwapExact": true,
+          "independentSeatStreamsExact": null,
+          "seatConditioningExact": null,
+          "auditJoinedExactly": true,
+          "offControlExact": true,
+          "zeroEngineRejections": true,
+          "zeroIllegalIncumbents": true
+        },
+        "gate": {
+          "applicable": true,
+          "seatWilsonThreshold": 0.9,
+          "minimumSeatDecisiveFraction": 0.9,
+          "everySeatDecisiveFractionPassed": true,
+          "everySeatWilsonLowPassed": false,
+          "everySeatDrawOrArmageddonPassed": true,
+          "outcomePassed": false,
+          "latencyAttritionPassed": false,
+          "passed": false
+        }
+      }
+    },
+    "allSeatDecisiveFractionsAtLeast90": false,
+    "allSeatWilsonLowsAtLeast90": false,
+    "allSeatDrawOrArmageddonAtMost10": false,
+    "allLatencyAttritionPassed": false,
+    "allIntegrityGatesPassed": true,
+    "verdict": "FAIL"
+  },
+  "aggregateCohortEvidence": {
+    "ranked": {
+      "cells": [
+        "round1_search_conservative200_275"
+      ],
+      "scenarioProtocols": [
+        "fixed_physical_side_swap"
+      ],
+      "games": 4000,
+      "pairScenarios": 2000,
+      "candidateWins": 3290,
+      "opponentWins": 687,
+      "draws": 23,
+      "candidateWinRate": 0.8272567261755092,
+      "policy": "EQUAL_GAME_POOLED_DIAGNOSTIC_NOT_A_FORMAL_GATE"
+    },
+    "mage": {
+      "cells": [
+        "ranked_mage_conservative200_275",
+        "mage_frontline_conservative200_275",
+        "mage_fireline_conservative200_275"
+      ],
+      "scenarioProtocols": [
+        "independent_seat_conditioned",
+        "fixed_physical_side_swap"
+      ],
+      "games": 6000,
+      "pairScenarios": 3000,
+      "candidateWins": 4200,
+      "opponentWins": 1195,
+      "draws": 605,
+      "candidateWinRate": 0.7784986098239111,
+      "policy": "EQUAL_GAME_POOLED_DIAGNOSTIC_NOT_A_FORMAL_GATE"
+    },
+    "meleeMage": {
+      "cells": [
+        "ranked_melee_mage_conservative200_275",
+        "melee_magic_utility_conservative200_275",
+        "melee_magic_brawler_conservative200_275"
+      ],
+      "scenarioProtocols": [
+        "independent_seat_conditioned",
+        "fixed_physical_side_swap"
+      ],
+      "games": 6000,
+      "pairScenarios": 3000,
+      "candidateWins": 4972,
+      "opponentWins": 1005,
+      "draws": 23,
+      "candidateWinRate": 0.8318554458758575,
+      "policy": "EQUAL_GAME_POOLED_DIAGNOSTIC_NOT_A_FORMAL_GATE"
+    },
+    "aura": {
+      "cells": [
+        "ranked_aura_conservative200_275",
+        "aura_support_conservative200_275",
+        "aura_offense_conservative200_275"
+      ],
+      "scenarioProtocols": [
+        "independent_seat_conditioned",
+        "fixed_physical_side_swap"
+      ],
+      "games": 6000,
+      "pairScenarios": 3000,
+      "candidateWins": 4865,
+      "opponentWins": 1108,
+      "draws": 27,
+      "candidateWinRate": 0.8144985769295161,
+      "policy": "EQUAL_GAME_POOLED_DIAGNOSTIC_NOT_A_FORMAL_GATE"
+    },
+    "ranged": {
+      "cells": [
+        "ranked_ranged_conservative200_275",
+        "ranged_precision_conservative200_275",
+        "ranged_control_conservative200_275"
+      ],
+      "scenarioProtocols": [
+        "independent_seat_conditioned",
+        "fixed_physical_side_swap"
+      ],
+      "games": 6000,
+      "pairScenarios": 3000,
+      "candidateWins": 4095,
+      "opponentWins": 1547,
+      "draws": 358,
+      "candidateWinRate": 0.7258064516129032,
+      "policy": "EQUAL_GAME_POOLED_DIAGNOSTIC_NOT_A_FORMAL_GATE"
+    }
+  },
+  "diagnostics": {
+    "uncapped": {
+      "cell": {
+        "id": "round1_search_uncapped",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "uncapped",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 3959890980,
+        "qualification": false,
+        "purpose": "Exploratory upper bound on search strength under the current ranked composition distribution."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3980,
+      "candidateWins": 3492,
+      "opponentWins": 488,
+      "draws": 20,
+      "candidateWinRate": 0.8773869346733668,
+      "clusteredSePp": 0.48474563605383936,
+      "confidence95": {
+        "low": 0.8678860947900819,
+        "high": 0.8868877745566517
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1994,
+          "wins": 1878,
+          "losses": 116,
+          "draws": 6,
+          "drawOrArmageddon": 10,
+          "drawOrArmageddonFraction": 0.005,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.9418254764292878,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.9233450500503348,
+            "high": 0.956062542058457
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": true,
+          "drawOrArmageddonPassed": true,
+          "passed": true
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1986,
+          "wins": 1614,
+          "losses": 372,
+          "draws": 14,
+          "drawOrArmageddon": 49,
+          "drawOrArmageddonFraction": 0.0245,
+          "decisiveFraction": 0.993,
+          "decisiveWinRate": 0.8126888217522659,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.7840481874933332,
+            "high": 0.8383143050190349
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 6480,
+        "sumWinDecisive": 6964,
+        "sumDecisiveSquared": 7940
+      },
+      "drawOrArmageddon": 59,
+      "drawOrArmageddonRate": 0.01475,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1878,
+      "candidateWinsAsRed": 1614,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 106662,
+        "searched": 106662,
+        "overrides": 33150,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 0,
+        "circuitSkipped": 0,
+        "deadlineFallbackRate": 0,
+        "msTotal": 14757893.700000044,
+        "msPerSearchedDecision": 138.3613067446705,
+        "gameMs": {
+          "p50": 3448.2,
+          "p95": 5907.7,
+          "p99": 8477,
+          "max": 17797
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    },
+    "server300LowerBoundEmulation": {
+      "cell": {
+        "id": "round1_search_server300",
+        "stage": 1,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "server_300",
+        "candidate": "v0.7s",
+        "opponent": "v0.6",
+        "games": 4000,
+        "pairScenarios": 2000,
+        "baseSeed": 1856617332,
+        "qualification": false,
+        "purpose": "Diagnostic 300ms circuit lower-bound emulation under the current ranked composition distribution."
+      },
+      "games": 4000,
+      "pairScenarios": 2000,
+      "decisive": 3962,
+      "candidateWins": 2997,
+      "opponentWins": 965,
+      "draws": 38,
+      "candidateWinRate": 0.7564361433619384,
+      "clusteredSePp": 0.5913278810039737,
+      "confidence95": {
+        "low": 0.7448463298637167,
+        "high": 0.7680259568601602
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 2000,
+          "decisive": 1992,
+          "wins": 1688,
+          "losses": 304,
+          "draws": 8,
+          "drawOrArmageddon": 26,
+          "drawOrArmageddonFraction": 0.013,
+          "decisiveFraction": 0.996,
+          "decisiveWinRate": 0.8473895582329317,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.8207313818382218,
+            "high": 0.8707080174767893
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 2000,
+          "decisive": 1970,
+          "wins": 1309,
+          "losses": 661,
+          "draws": 30,
+          "drawOrArmageddon": 66,
+          "drawOrArmageddonFraction": 0.033,
+          "decisiveFraction": 0.985,
+          "decisiveWinRate": 0.6644670050761421,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.6307397722131856,
+            "high": 0.6965955212603651
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 2000,
+        "sumWinSquared": 5053,
+        "sumWinDecisive": 5960,
+        "sumDecisiveSquared": 7886
+      },
+      "drawOrArmageddon": 92,
+      "drawOrArmageddonRate": 0.023,
+      "endReasons": {
+        "elimination": 4000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 1688,
+      "candidateWinsAsRed": 1309,
+      "search": {
+        "auditRows": 4000,
+        "decisions": 42864,
+        "searched": 42864,
+        "overrides": 14826,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 2875,
+        "circuitSkipped": 62089,
+        "deadlineFallbackRate": 0,
+        "msTotal": 5924233.899999968,
+        "msPerSearchedDecision": 138.2100107316155,
+        "gameMs": {
+          "p50": 1109,
+          "p95": 3525.9,
+          "p99": 4433,
+          "max": 6069.4
+        }
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    },
+    "offSymmetry": {
+      "cell": {
+        "id": "round1_search_off_symmetry",
+        "stage": 0,
+        "distribution": "ranked_round1",
+        "scenarioProtocol": "fixed_physical_side_swap",
+        "profile": "off",
+        "candidate": "v0.7s",
+        "opponent": "v0.7",
+        "games": 2000,
+        "pairScenarios": 1000,
+        "baseSeed": 716560508,
+        "qualification": false,
+        "purpose": "Byte-policy alias symmetry control under the current ranked draft and setup composition."
+      },
+      "games": 2000,
+      "pairScenarios": 1000,
+      "decisive": 1994,
+      "candidateWins": 997,
+      "opponentWins": 997,
+      "draws": 6,
+      "candidateWinRate": 0.5,
+      "clusteredSePp": 0,
+      "confidence95": {
+        "low": 0.5,
+        "high": 0.5
+      },
+      "pairedDiagnosticApplicable": true,
+      "formalSeatEvidence": {
+        "candidate_green": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 619,
+          "losses": 378,
+          "draws": 3,
+          "drawOrArmageddon": 22,
+          "drawOrArmageddonFraction": 0.022,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.6208625877632898,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.5722597610394289,
+            "high": 0.6671549432827671
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        },
+        "candidate_red": {
+          "games": 1000,
+          "decisive": 997,
+          "wins": 378,
+          "losses": 619,
+          "draws": 3,
+          "drawOrArmageddon": 22,
+          "drawOrArmageddonFraction": 0.022,
+          "decisiveFraction": 0.997,
+          "decisiveWinRate": 0.3791374122367101,
+          "wilson": {
+            "method": "bonferroni_two_sided_wilson",
+            "hypotheses": 26,
+            "nominalFamilywiseConfidence": 0.95,
+            "z": 3.1018618337400956,
+            "low": 0.33284505671723286,
+            "high": 0.427740238960571
+          },
+          "decisiveFractionPassed": true,
+          "wilsonLowPassed": false,
+          "drawOrArmageddonPassed": true,
+          "passed": false
+        }
+      },
+      "pairMoments": {
+        "clusters": 1000,
+        "sumWinSquared": 997,
+        "sumWinDecisive": 1994,
+        "sumDecisiveSquared": 3988
+      },
+      "drawOrArmageddon": 44,
+      "drawOrArmageddonRate": 0.022,
+      "endReasons": {
+        "elimination": 2000
+      },
+      "candidateRejections": 0,
+      "opponentRejections": 0,
+      "missingRejectionCounts": 0,
+      "candidateWinsAsGreen": 619,
+      "candidateWinsAsRed": 378,
+      "search": {
+        "auditRows": 0,
+        "decisions": 0,
+        "searched": 0,
+        "overrides": 0,
+        "illegalIncumbent": 0,
+        "deadlineFallbacks": 0,
+        "circuitOpenedGames": 0,
+        "circuitSkipped": 0,
+        "deadlineFallbackRate": 0,
+        "msTotal": 0,
+        "msPerSearchedDecision": null,
+        "gameMs": null
+      },
+      "integrity": {
+        "complete": true,
+        "fixedPhysicalSideSwapExact": true,
+        "independentSeatStreamsExact": null,
+        "seatConditioningExact": null,
+        "auditJoinedExactly": true,
+        "offControlExact": true,
+        "zeroEngineRejections": true,
+        "zeroIllegalIncumbents": true
+      },
+      "gate": {
+        "applicable": false,
+        "seatWilsonThreshold": 0.9,
+        "minimumSeatDecisiveFraction": 0.9,
+        "everySeatDecisiveFractionPassed": true,
+        "everySeatWilsonLowPassed": false,
+        "everySeatDrawOrArmageddonPassed": true,
+        "outcomePassed": true,
+        "latencyAttritionPassed": true,
+        "passed": true
+      }
+    }
+  },
+  "releaseInstruction": "NO_AUTOMATIC_BAKE_OR_DEPLOY"
+}
