@@ -88,8 +88,10 @@ const blessRelThresh = Number(process.env.V05_BLESS_REL ?? 0.33);
  */
 export class StrategyV0_5 extends StrategyV0_4 {
     public override readonly version: string = "v0.5";
-    /** Learned coefficients; see V05_WEIGHT_KEYS for the layout. */
-    private readonly w: number[];
+    /** Learned coefficients; see V05_WEIGHT_KEYS for the layout. Protected (not private) so StrategyV0_6's
+     * env-gated melee-dims overlay (V06_MELEE_DIMS, default OFF = byte-identical) can write the two anchored
+     * dims [56..57] on its own instances. v0.5 itself never mutates it. */
+    protected readonly w: number[];
     /**
      * How an aura-bearer weights the targets it covers when repositioning to keep them in its auras. v0.5
      * counts each covered target equally (flat +1 — unchanged). v0.6 overrides this with a relevance weight

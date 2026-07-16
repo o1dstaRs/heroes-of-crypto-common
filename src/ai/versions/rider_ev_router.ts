@@ -234,6 +234,28 @@ export function estimateMeleeRiderEV(
 }
 
 /**
+ * Optional version scoping for a seat-scoped A/B (the wait-scorer V07_WAIT_VERSIONS pattern): with
+ * V06_RIDER_EV_VERSIONS unset, every caller is in scope (the router's original one-global-switch
+ * semantics). When set to a comma list (e.g. "v0.7s"), only strategies whose version string is listed
+ * route — so ONE seat of a v0.7s-vs-v0.7 mirror can carry the router while the other stays incumbent.
+ * A caller that passes no version (undefined) is out of scope whenever the list is set.
+ */
+function riderScopeAllows(version: string | undefined): boolean {
+    const raw = process.env.V06_RIDER_EV_VERSIONS;
+    if (!raw) {
+        return true;
+    }
+    if (!version) {
+        return false;
+    }
+    return raw
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .includes(version);
+}
+
+/**
  * Q1/M3 evidence-gated melee rider router. It only re-picks the target from the incumbent's exact stand cell
  * and rewrites only that target id, retaining the incumbent's action sequence and path. Strict improvement is
  * required; ties, unsupported sequences, missing fight state and every gate-off call preserve the exact array.
@@ -243,9 +265,11 @@ export function routeMeleeRiderEV(
     context: IDecisionContext,
     incumbent: GameAction[],
     enumerate: CandidateEnumerator = enumerateCandidates,
+    version?: string,
 ): GameAction[] {
     if (
         process.env.V06_RIDER_EV !== "on" ||
+        !riderScopeAllows(version) ||
         !context.fightProperties ||
         !!unit.getAbility("Devour Essence") ||
         (!unit.getAbility("Petrifying Gaze") && !unit.getAbility("Stun") && !unit.getAbility("Devour Essence"))

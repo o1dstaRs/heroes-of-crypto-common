@@ -181,6 +181,7 @@ function estimateWithMissSource(mutate?: (attacker: Unit, target: Unit) => void)
 
 afterEach(() => {
     delete process.env.V06_RIDER_EV;
+    delete process.env.V06_RIDER_EV_VERSIONS;
 });
 
 describe("v0.6 melee rider EV router", () => {
@@ -264,6 +265,58 @@ describe("v0.6 melee rider EV router", () => {
         const context = contextFor(combat);
 
         expect(selectedTarget(routeMeleeRiderEV(attacker, context, melee(attacker, evasive)))).toBe(reliable.getId());
+    });
+
+    it("honours V06_RIDER_EV_VERSIONS: unset = every caller, set = only listed strategy versions", () => {
+        process.env.V06_RIDER_EV = "on";
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Large Petrifier",
+            team: LOWER,
+            attackType: MELEE,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 10,
+            stackPower: 100,
+            size: PBTypes.UnitSizeVals.LARGE,
+            abilities: ["Petrifying Gaze"],
+        });
+        const evasive = createTestUnit({
+            name: "Evasive",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 100,
+            stackPower: 100,
+            abilities: ["Dodge", "Small Specie"],
+        });
+        const reliable = createTestUnit({
+            name: "Reliable",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 100,
+        });
+        placeLarge(combat, attacker, { x: 6, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, evasive, { x: 4, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, reliable, { x: 7, y: 6 });
+        const context = contextFor(combat);
+        const incumbent = melee(attacker, evasive);
+
+        // Unset scope keeps the router's original semantics: any caller (with or without a version) routes.
+        expect(selectedTarget(routeMeleeRiderEV(attacker, context, incumbent))).toBe(reliable.getId());
+        expect(selectedTarget(routeMeleeRiderEV(attacker, context, incumbent, undefined, "v0.6"))).toBe(
+            reliable.getId(),
+        );
+
+        // A set scope routes ONLY the listed versions; everything else (including version-less callers)
+        // preserves the exact incumbent array — the seat-scoped mirror contract.
+        process.env.V06_RIDER_EV_VERSIONS = "v0.7s";
+        expect(selectedTarget(routeMeleeRiderEV(attacker, context, incumbent, undefined, "v0.7s"))).toBe(
+            reliable.getId(),
+        );
+        expect(routeMeleeRiderEV(attacker, context, incumbent, undefined, "v0.7")).toBe(incumbent);
+        expect(routeMeleeRiderEV(attacker, context, incumbent)).toBe(incumbent);
     });
 
     it("is byte-parity inert while gated off and when fight state is unavailable", () => {

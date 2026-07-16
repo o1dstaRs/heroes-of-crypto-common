@@ -86,6 +86,44 @@ export function loadV06Weights(): number[] {
     }
     return DEFAULT_V06_W.slice();
 }
+
+/**
+ * W16 gap-#1 (melee within-class target/stand-cell selection): env-gated overlay of the two ANCHORED melee
+ * dims — [56] meleeRapidCharge (charge-distance-scaled damage for Champion/Wolf Rider/Nomad) and [57]
+ * meleeRangedTarget (pre-empt/pin enemy shooters) — onto the loaded vector. DEFAULT OFF: with
+ * `V06_MELEE_DIMS` unset (or malformed, or the caller out of scope) the caller's weights stay byte-identical
+ * to DEFAULT_V06_W / V06_WEIGHTS, so nothing anywhere changes.
+ *
+ * `V06_MELEE_DIMS="w56,w57"` supplies the trained values. `V06_MELEE_DIMS_VERSIONS` (comma list) scopes the
+ * overlay by strategy version for seat-scoped mirrors (the wait-scorer V07_WAIT_VERSIONS pattern: set it to
+ * "v0.7s" so a v0.7s-vs-v0.7 tournament carries the dims on exactly one seat); unset = every v0.6-family
+ * caller, which is the eventual live-flip semantics (one env var).
+ */
+export function meleeDimsOverlay(version: string): [number, number] | undefined {
+    const raw = process.env.V06_MELEE_DIMS;
+    if (!raw) {
+        return undefined;
+    }
+    const scope = process.env.V06_MELEE_DIMS_VERSIONS;
+    if (scope) {
+        const allowed = scope
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+        if (!allowed.includes(version)) {
+            return undefined;
+        }
+    }
+    const entries = raw.split(",").map((entry) => entry.trim());
+    if (entries.length !== 2 || entries.some((entry) => entry === "")) {
+        return undefined;
+    }
+    const parts = entries.map(Number);
+    if (!parts.every((value) => Number.isFinite(value))) {
+        return undefined;
+    }
+    return [parts[0], parts[1]];
+}
 const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "obstacle_attack", "area_throw_attack"]);
 
 /**
@@ -100,14 +138,26 @@ const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "o
 export class StrategyV0_6 extends StrategyV0_5 {
     public override readonly version: string = "v0.6";
     /** Load v0.6's OWN fight weights (V06_WEIGHTS env or DEFAULT_V06_W) — decoupled from v0.5's V05_WEIGHTS. */
+    /** The as-loaded values of melee dims [56..57], restored whenever the overlay gate is off/out-of-scope
+     * so toggling V06_MELEE_DIMS between decisions (tests, batched A/B cells) can never leak state. */
+    private readonly pristineMeleeDims: [number, number];
     public constructor() {
         super(loadV06Weights());
+        this.pristineMeleeDims = [this.w[56] ?? 0, this.w[57] ?? 0];
         // v0.6 improvement: aura-bearers weight covered targets by relevance, so Griffin's range-null aura
         // chases enemy SHOOTERS instead of blanketing the most bodies. V06_AURA_FLAT=1 restores v0.5's flat
         // count for A/B measurement.
         this.auraWeight = process.env.V06_AURA_FLAT === "1" ? () => 1 : auraRelevanceWeight;
     }
+    /** Apply (or restore) the env-gated melee-dims overlay. Runs per decision: env parsing of a <20-char
+     * string is negligible next to the scorer, and re-reading keeps the gate honest under env toggling. */
+    protected applyMeleeDims(): void {
+        const dims = meleeDimsOverlay(this.version) ?? this.pristineMeleeDims;
+        this.w[56] = dims[0];
+        this.w[57] = dims[1];
+    }
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
+        this.applyMeleeDims();
         // v0.6: an idle melee unit that can instead reach + attack an enemy this turn does that rather than
         // mining the center mountain ("why is the AI attacking the mountain?"). On by default; V06_LEGACY_MINE=1
         // restores the old attack-preempting mining so a tournament can A/B the change against the same v0.5.
@@ -120,7 +170,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
         }
         decision = this.routeCasterDecision(unit, context, decision);
         decision = routeAreaThrow(unit, context, decision);
-        decision = routeMeleeRiderEV(unit, context, decision);
+        decision = routeMeleeRiderEV(unit, context, decision, undefined, this.version);
         // Kite is OPT-IN (V06_KITE=on). The minimal "hold instead of advance" version measured neutral-to-slightly
         // negative (melee 64.8%→66.2% vs ranged) — too crude; a real kite needs advance-to-range→shoot→retreat.
         // Default off keeps v0.6's fight byte-for-byte v0.5 (only the draft/setup weights differ).
