@@ -102,6 +102,7 @@ let busy = false;
 parentPort.on("message", (message: { type: "evaluate"; task: unknown } | { type: "stop" }) => {
     if (message.type === "stop") {
         parentPort!.close();
+        process.exit(0);
         return;
     }
     if (busy) {
