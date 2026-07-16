@@ -94,7 +94,7 @@ describe("measure_picksim_oracle pick phase", () => {
                 for (const seed of [1, 42, 1337]) {
                     const outcome = runPickPhase(seed, lower, upper);
                     const again = runPickPhase(seed, lower, upper);
-                    expect(outcome.state.phaseSequence).toBe(10);
+                    expect(outcome.state.phaseSequence).toBe(11);
                     expect(again.state.lower.creatures).toEqual(outcome.state.lower.creatures);
                     expect(again.state.upper.creatures).toEqual(outcome.state.upper.creatures);
                     for (const team of [outcome.state.lower, outcome.state.upper]) {

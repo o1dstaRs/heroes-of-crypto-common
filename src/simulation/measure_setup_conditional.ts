@@ -269,6 +269,9 @@ function runConditionalPickGameWithOptions(
                 if (teamState(team).perk === Perk.NO_PERK) {
                     accept({ type: "select_perk", team, perk: SETUP_POLICY_V0.pickPerk() });
                 }
+            }
+        } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
+            for (const team of [LOWER, UPPER] as const) {
                 if (teamState(team).selectedBundleIndex === undefined) {
                     accept({ type: "select_bundle", team, bundleIndex: chooseBundle(state, team, draft, genome) });
                 }

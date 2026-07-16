@@ -11,7 +11,7 @@
 
 import { ArtifactTier } from "../artifacts/artifact_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getPerkRevealMode, PERKS, PERK_RANDOM_REVEAL_SLOTS, Perk } from "../perks/perk_properties";
+import { getPerkRevealMode, PERKS, Perk } from "../perks/perk_properties";
 import { CreatureLevelList, CreaturePoolByLevel } from "../units/unit_properties";
 
 export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.UPPER;
@@ -29,10 +29,17 @@ export interface ILivePickPhase {
     readonly creatureLevel: 0 | 1 | 2 | 3 | 4;
 }
 
-/** Exact order persisted by the ranked server. AUGMENTS markers hand the completed draft to placement. */
+/** Exact order persisted by the ranked server (PickPhaseOrder). The first step is split into TWO
+ * independent simultaneous phases: PERK (doctrine only) then INITIAL_PICK (the starting bundle). AUGMENTS
+ * markers hand the completed draft to placement. */
 export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
     {
         phase: PBTypes.PickPhaseVals.PERK,
+        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        creatureLevel: 0,
+    },
+    {
+        phase: PBTypes.PickPhaseVals.INITIAL_PICK,
         actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
         creatureLevel: 0,
     },
@@ -156,7 +163,10 @@ export interface IPickTeamView {
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
-const COMPLETE_PHASE_SEQUENCE = 10;
+// The AUGMENTS phase (seq 11) is the ranked handoff: the server transitions PICK -> PLAY when it reaches an
+// AUGMENTS/AUGMENTS_SCOUT phase, so the sim is "complete" from AUGMENTS onward. (AUGMENTS_SCOUT at seq 12
+// only fires for scout augments, which the sim does not model; it stops at the AUGMENTS handoff.)
+const COMPLETE_PHASE_SEQUENCE = 11;
 
 const draw = (rng: PickRandomInt, maxExclusive: number): number => {
     if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
@@ -258,19 +268,21 @@ const phaseAccepts = (state: IPickSimState, team: PickTeam, phase: PBTypes.PickP
     return current.phase === phase && current.actors.includes(team);
 };
 
-const combinedPhaseComplete = (state: IPickSimState): boolean =>
-    state.lower.perk !== Perk.NO_PERK &&
-    state.upper.perk !== Perk.NO_PERK &&
-    state.lower.selectedBundleIndex !== undefined &&
-    state.upper.selectedBundleIndex !== undefined;
+const perkPhaseComplete = (state: IPickSimState): boolean =>
+    state.lower.perk !== Perk.NO_PERK && state.upper.perk !== Perk.NO_PERK;
+
+const bundlePhaseComplete = (state: IPickSimState): boolean =>
+    state.lower.selectedBundleIndex !== undefined && state.upper.selectedBundleIndex !== undefined;
 
 const tier2PhaseComplete = (state: IPickSimState): boolean =>
     state.lower.tier2Artifact !== undefined && state.upper.tier2Artifact !== undefined;
 
 const advanceIfReady = (state: IPickSimState): void => {
-    if (state.phaseSequence === 0 && combinedPhaseComplete(state)) {
+    if (state.phaseSequence === 0 && perkPhaseComplete(state)) {
         state.phaseSequence += 1;
-    } else if (state.phaseSequence === 7 && tier2PhaseComplete(state)) {
+    } else if (state.phaseSequence === 1 && bundlePhaseComplete(state)) {
+        state.phaseSequence += 1;
+    } else if (state.phaseSequence === 8 && tier2PhaseComplete(state)) {
         state.phaseSequence += 1;
     }
 };
@@ -313,16 +325,18 @@ const applyPerk = (
     const next = cloneState(state);
     const nextOwn = teamState(next, action.team);
     nextOwn.perk = action.perk;
+    // The fixed six-slot creature layout by level is [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]
+    // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" doctrine reveals ONE slot per tier block rather than
+    // drawing three uniformly: one of the two L1 slots, one of the two L2 slots, and either the L3 or L4 slot.
+    // This mirrors the ranked server's legacy seeding in arango_hoc.ts (pickPhaseLogic slotsSeen seeding).
     const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
     const revealMode = getPerkRevealMode(action.perk);
     if (revealMode === "all") {
         nextOwn.revealedOpponentSlots = Array.from({ length: totalSlots }, (_, index) => index);
     } else if (revealMode === "random3") {
-        nextOwn.revealedOpponentSlots = pickDistinct(
-            Array.from({ length: totalSlots }, (_, index) => index),
-            Math.min(PERK_RANDOM_REVEAL_SLOTS, totalSlots),
-            rng,
-        );
+        const slots = [draw(rng, 2), 2 + draw(rng, 2), draw(rng, 2) ? 4 : 5];
+        slots.sort((a, b) => a - b);
+        nextOwn.revealedOpponentSlots = slots;
     }
     const event: Extract<PickTranscriptEntry, { type: "perk_selected" }> = {
         ...eventBase(next, action.team),
@@ -335,7 +349,7 @@ const applyPerk = (
 };
 
 const applyBundle = (state: IPickSimState, action: Extract<PickAction, { type: "select_bundle" }>): PickTransition => {
-    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.PERK)) {
+    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.INITIAL_PICK)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
     const own = teamState(state, action.team);
@@ -543,8 +557,8 @@ export function getPickTeamView(state: IPickSimState, team: PickTeam): IPickTeam
         creaturesPicked: [...own.creatures],
         knownOpponentCreatures: getKnownOpponentCreatures(state, team),
         perk: own.perk,
-        bundles: state.phaseSequence === 0 ? own.bundles.map((bundle) => [...bundle] as PickBundle) : [],
-        tier2Offers: state.phaseSequence === 7 ? [...own.tier2Offers] : [],
+        bundles: state.phaseSequence === 1 ? own.bundles.map((bundle) => [...bundle] as PickBundle) : [],
+        tier2Offers: state.phaseSequence === 8 ? [...own.tier2Offers] : [],
         artifacts,
     };
 }

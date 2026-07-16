@@ -390,6 +390,9 @@ export function runPickPhase(
                     // paying upgrade points for in-draft vision would only weaken its army.
                     accept({ type: "select_perk", team, perk: SETUP_POLICY_V0.pickPerk() });
                 }
+            }
+        } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
+            for (const team of combinedOrder) {
                 if (teamState(team).selectedBundleIndex === undefined) {
                     accept({ type: "select_bundle", team, bundleIndex: chooseBundle(team) });
                 }
