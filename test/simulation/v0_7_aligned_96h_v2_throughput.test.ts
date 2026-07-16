@@ -224,7 +224,9 @@ describe("v0.7 aligned 96-hour v2 throughput evidence", () => {
         expect(() => validateV07AlignedV2ThroughputSeedReceipt(tampered, sourceBytes, plan)).toThrow(
             "does not replay from the frozen committed manifest",
         );
-    });
+        // Expands ~1.08M seeds and sha256s the 268,288-seed plan — inherent compute that overruns the
+        // 5s default on CI's 2-core runner (7.7s observed). Generous cap; matches the heavy-test convention.
+    }, 60_000);
 
     it("partitions all twelve cells into eight disjoint, balanced 768-game batches", () => {
         const { plan } = buildV07AlignedV2ThroughputSeedReceipt(readFileSync(SOURCE_MANIFEST));
@@ -295,5 +297,7 @@ describe("v0.7 aligned 96-hour v2 throughput evidence", () => {
         } finally {
             rmSync(fixture.root, { recursive: true, force: true });
         }
-    });
+        // Replays every batch/shard reference over the full frozen plan — heavy compute that overruns the
+        // 5s default on CI's 2-core runner (11.3s observed). Generous cap; matches the heavy-test convention.
+    }, 60_000);
 });

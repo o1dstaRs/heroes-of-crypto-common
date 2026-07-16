@@ -302,7 +302,8 @@ describe("composed-ranked preregistration", () => {
         const injected = structuredClone(frozen);
         injected.seedAudit.zinc.excluded.push("/home/agent-zinc/hoc-common/sim-out/cem/unbound.json");
         expect(() => validateV07ComposedManifest(injected)).toThrow("seed-audit totals are inconsistent");
-    }, 15_000);
+        // 15s was not enough on CI's 2-core runner (15.15s observed); raise to match the heavy-test convention.
+    }, 60_000);
 
     it("separates setup and combat while retaining shared seeds only for fixed side swaps", () => {
         const fixed = fixedCell();
