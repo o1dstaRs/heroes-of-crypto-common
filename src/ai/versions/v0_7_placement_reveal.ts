@@ -12,6 +12,7 @@
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { creatureInfo } from "../setup/creature_score";
+import type { PlacementPolicyVariant } from "../setup/setup_ship";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IPlacementContext } from "../ai_strategy";
@@ -45,7 +46,8 @@ import type { IPlacementContext } from "../ai_strategy";
 
 export const REVEAL_PLACEMENT_ENV = "V07_PLACEMENT_REVEAL";
 
-export const revealPlacementEnabled = (): boolean => process.env[REVEAL_PLACEMENT_ENV] === "on";
+export const revealPlacementEnabled = (policy?: PlacementPolicyVariant): boolean =>
+    policy === undefined ? process.env[REVEAL_PLACEMENT_ENV] === "on" : policy === "legitimate-reveal";
 
 /** Adjacent-splash ranged AOE abilities (same measured set as v0.6's baked dispersion trigger). */
 export const SPLASH_AOE_ABILITIES: readonly string[] = ["Area Throw", "Large Caliber"];
@@ -236,7 +238,7 @@ export function enemyFieldsSplashAoe(context: IPlacementContext): boolean {
  * placement byte-identical).
  */
 export function revealConditionedPlacement(units: Unit[], context: IPlacementContext): Map<string, XY> | undefined {
-    if (!revealPlacementEnabled()) {
+    if (!revealPlacementEnabled(context.setupPlacementPolicy)) {
         return undefined;
     }
     const revealed = context.revealedOpponentCreatures;

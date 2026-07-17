@@ -5,6 +5,7 @@ docs/evidence/zinc_historical_cem_schedules_20260716
 docs/evidence/v0_7_composed_guard_20260716
 docs/evidence/v0_7_composed_ranked_result_20260716
 docs/evidence/v0_7_composed_seed_scan_v9d_20260716
+docs/evidence/v0_7_nonfight_11h_result_20260717
 package-lock.json
 src/generated
 src/simulation/results/draft_league_round3_*.json

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only_no_bake",
+  "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+  "deadlineMs": 1784306217027,
+  "workers": 12,
+  "smoke": false,
+  "preflightReserveMs": 1800000,
+  "autoBake": false,
+  "maps": [
+    1,
+    3,
+    4
+  ],
+  "cluster": "four_games_pick_seat_by_battle_side",
+  "panels": {
+    "naturalBoards": 8000,
+    "cohortBoards": 2500,
+    "cohortScanMaxBoards": 1000000,
+    "symmetryBoards": 64,
+    "replayBoards": 8
+  },
+  "campaign": {
+    "runSha256": "6f4fb7fc65934616cba067ef8c7ddeeab87fb107b1c12124f4331a9ca10cc41f",
+    "terminalSha256": "1e9999a97e40725371fbf71e21676d4e9288552b0144da5c134df23f235a133f",
+    "configSha256": "722a84d493c3c61ad33e7454a8544eb6747f1412a23748505bc9959d31d59e03",
+    "provenanceSha256": "fb796bb030d7ef58b81d284080082f2f8fa6f7feb8a51b7f02057b2b035f8578",
+    "sourceCommit": "9736421c6416c535e68bfd2ddd61ab88cf2267cf",
+    "guardSourceCommit": "3f6e95d5dc4f5a86f544e860af5ab2eb21bebc04",
+    "sourceLineage": {
+      "campaignSourceCommit": "9736421c6416c535e68bfd2ddd61ab88cf2267cf",
+      "guardSourceCommit": "3f6e95d5dc4f5a86f544e860af5ab2eb21bebc04",
+      "campaignIsAncestor": true,
+      "allowedDescendantPaths": [
+        "docs/v0_7_composed_nonfight_guard.md",
+        "src/simulation/measure_setup_conditional.ts",
+        "src/simulation/ranked_draft_eval.ts",
+        "src/simulation/optimizer/v0_7_composed_nonfight_guard.ts",
+        "src/simulation/optimizer/v0_7_composed_nonfight_guard_worker.ts",
+        "test/simulation/v0_7_composed_nonfight_guard.test.ts"
+      ],
+      "changedPaths": [
+        "docs/v0_7_composed_nonfight_guard.md",
+        "src/simulation/measure_setup_conditional.ts",
+        "src/simulation/optimizer/v0_7_composed_nonfight_guard.ts",
+        "src/simulation/optimizer/v0_7_composed_nonfight_guard_worker.ts",
+        "src/simulation/ranked_draft_eval.ts",
+        "test/simulation/v0_7_composed_nonfight_guard.test.ts"
+      ],
+      "diffSha256": "5d3e9d2e30381d27bd0fbe536f68f6000fbfa1f01f8df85912d104c9fc33c782",
+      "lineageSha256": "ae5674f990e575597d5ece8659cf3740b27995294201c76840a6bdd95d03636b"
+    },
+    "draftLane": "draft",
+    "setupLane": "setup"
+  },
+  "sealedInputs": {
+    "campaign-run.json": {
+      "path": "inputs/campaign-run.json",
+      "bytesSha256": "2b5e5d27fe5b8cac8905fce7155b2d30917be06efda1371279a97da709ed38b2"
+    },
+    "campaign-terminal.json": {
+      "path": "inputs/campaign-terminal.json",
+      "bytesSha256": "784cf446c162f8a0e321b4c183de51503b99b25fb2e102371c2e556421982e05"
+    },
+    "draft-verdict.json": {
+      "path": "inputs/draft-verdict.json",
+      "bytesSha256": "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4"
+    },
+    "draft-run.json": {
+      "path": "inputs/draft-run.json",
+      "bytesSha256": "8be3d5db2aa9ab7ec14aba961af0053677b6cafb424e78d809867850d14957ce"
+    },
+    "draft-state.json": {
+      "path": "inputs/draft-state.json",
+      "bytesSha256": "cb10be91f60738728d139d31a3da483b452b5001c9601893b15674947dd9c6b3"
+    },
+    "setup-final.json": {
+      "path": "inputs/setup-final.json",
+      "bytesSha256": "808c75b6ea6e74ee858c741a2fab9659f86266889cdf0cd815de965746b7221b"
+    },
+    "setup-checkpoint.json": {
+      "path": "inputs/setup-checkpoint.json",
+      "bytesSha256": "0a5c8c63a1020a083a0ccbc8d83096dfe137b83799922059119092a6062d27d6"
+    },
+    "draft-candidate-guard.json": {
+      "path": "inputs/draft-candidate-guard.json",
+      "bytesSha256": "2a248399232754e60d529c5b0a8ebaed85227750ed4d01d8d1a5124384f17d9f"
+    },
+    "draft-incumbent-guard.json": {
+      "path": "inputs/draft-incumbent-guard.json",
+      "bytesSha256": "8ed8b541aed0a554da3a7e54aea3b59bf3089bca7a98ded6757b259f3d12f6b2"
+    },
+    "draft-cohort-scan.json": {
+      "path": "inputs/draft-cohort-scan.json",
+      "bytesSha256": "1a8baa3cc9778760a0bc33bce835277d7a56b3423f5b722fc5d536ddb85793cc"
+    },
+    "draft-cohort-ranged.json": {
+      "path": "inputs/draft-cohort-ranged.json",
+      "bytesSha256": "9b4dd8d51cca9f98ce559da903c3ee2a2fea84c82e7c4ff33c9c7748def5aace"
+    },
+    "draft-cohort-mage.json": {
+      "path": "inputs/draft-cohort-mage.json",
+      "bytesSha256": "a807a109377397a910bfef934f671065d10a6f594dd7723f3642b308ac899014"
+    },
+    "draft-cohort-melee_magic.json": {
+      "path": "inputs/draft-cohort-melee_magic.json",
+      "bytesSha256": "1974ae3e850b3092721b5e0375b33b333d246587f364a8e01cb7b2fd668a9f55"
+    },
+    "draft-cohort-aura_heavy.json": {
+      "path": "inputs/draft-cohort-aura_heavy.json",
+      "bytesSha256": "05023d5c8a5cad55725d344af6133b97eab7e8a4e03c2e9519dfa178424db7b3"
+    },
+    "draft-replay-summary.json": {
+      "path": "inputs/draft-replay-summary.json",
+      "bytesSha256": "09f16fdf5499f0a1ddaf44b278bb60147fb40aec177f94b10a0ccca61fbabf7c"
+    },
+    "draft-replay-first.json": {
+      "path": "inputs/draft-replay-first.json",
+      "bytesSha256": "1787b3f43a280ab9a526f085939710c86daaccb4e4596e992fda0b07648c9550"
+    },
+    "draft-replay-second.json": {
+      "path": "inputs/draft-replay-second.json",
+      "bytesSha256": "89d8e876c48ae2ebc2e08ccce397303c8e02f2061376ba36ebab11b0666f24f5"
+    }
+  },
+  "artifacts": {
+    "draft": {
+      "path": "/Users/zolotukhin/Workplace/hoc-common-v07-nonfight-11h-20260716T223822PDT/composed-guard-run2/inputs/draft-verdict.json",
+      "bytesSha256": "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4",
+      "artifactSha256": "6ccb33f4bb41d2a44cb602ecbac7e3218d08a17a8925190df128f7fbb92a5a10",
+      "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+      "runFingerprint": "245a85596bf93ff50e59b3303e9345e1ba4a83569380a6492f9f7d2746803caa",
+      "candidateId": "draft-g0005-c003-bd939323fa",
+      "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+      "intrinsicSha256": "bd939323faf629f6f0cb0b4725dc61768eb510f80f89eb33ae136fc7bc32fb34"
+    },
+    "setup": {
+      "path": "/Users/zolotukhin/Workplace/hoc-common-v07-nonfight-11h-20260716T223822PDT/composed-guard-run2/inputs/setup-final.json",
+      "bytesSha256": "808c75b6ea6e74ee858c741a2fab9659f86266889cdf0cd815de965746b7221b",
+      "artifactSha256": "ff64bdef6bada7bedd8aa170b257886a6ef0fa064c3284f70a9901c1c90bf068",
+      "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+      "policyFingerprint": "e640818efda3ca12e88099773b08a0b942beba7402403805f576acb02b72ee2c"
+    }
+  },
+  "candidate": {
+    "draftFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+    "setupFingerprint": "e640818efda3ca12e88099773b08a0b942beba7402403805f576acb02b72ee2c",
+    "composedFingerprint": "2a819358b3dde36e8c7493da6fcd406f4d2d24fa384e3856469b69d333df61dd"
+  },
+  "baseline": {
+    "draftSpec": "league-r1-br-57de5a2d",
+    "draftFingerprint": "087547b8ae01eb54ebf1a4b856aa6ff6e7cca65734ba217e03cc83c1e9acd9b4",
+    "setupPolicyId": "round1-conditional-v1",
+    "setupFingerprint": "4455f6b3ba5936a7010d4b7c3f94e8b4ab11b1a41221f809abe595dffb912ab2",
+    "composedFingerprint": "a6f0e58f1a6b0263a1be8e2e5a3d07525055ba96787e4ba81f3003e8f789ce23"
+  },
+  "seedLedger": {
+    "path": "seed-ledger.json",
+    "ledgerSha256": "0398e0421e73caa669fd943e79023f382e7b59eada6a8d4828ca4a6abd1cd9a9",
+    "bytesSha256": "2083c88c4971661b1572cae5a820971d16549eec54ccf586b7a09ca2ba7d88c7"
+  },
+  "seedPlan": {
+    "path": "seed-plan.checkpoint.json",
+    "checkpointSha256": "a1b3c8588074a29b64a7751ae8775e6a93726c12ff70eae904df316a018f449b",
+    "bytesSha256": "e78a27959f46d1f0417cb00a17814de18296ecaebd0bb778c846a350803c37c4"
+  },
+  "runtime": {
+    "effectiveBehaviorEnvironment": {
+      "LIVETWIN": "1",
+      "V07_PLACEMENT_REVEAL": "on",
+      "V07_SEARCH": "0"
+    },
+    "behaviorEnvironmentSha256": "fe362fb13f1e2ab07fc16f60204137280a5011b43161b9c7c8cbb524688ccb32",
+    "runtimeControls": {
+      "bunRuntimeTranspilerCachePath": "0",
+      "workerExecArgv": [],
+      "fightVersion": "v0.7",
+      "maxLaps": 60,
+      "maps": [
+        1,
+        3,
+        4
+      ]
+    },
+    "runtimeControlsSha256": "c7a60174bad7b7c9d67e9edc91554a50b28d5952c20a04825b599767902642d0",
+    "bunExecutable": "/Users/zolotukhin/.bun/bin/bun",
+    "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
+    "bunVersion": "1.3.14",
+    "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4"
+  },
+  "provenance": {
+    "commit": "3f6e95d5dc4f5a86f544e860af5ab2eb21bebc04",
+    "tree": "028ddcc0faf6191654d40c45bcfc137dfb108e29",
+    "branch": "main",
+    "originMain": "3f6e95d5dc4f5a86f544e860af5ab2eb21bebc04",
+    "statusPorcelainSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanIncludingUntracked": true,
+    "platform": "darwin",
+    "arch": "arm64",
+    "bunVersion": "1.3.14",
+    "bunRevision": "0d9b296af33f2b851fcbf4df3e9ec89751734ba4",
+    "bunExecutableSha256": "e0c90ec15d33363e6b70713d56bc3b2c7585c17f40a0fe0f8fd9305901d4e233",
+    "runtimeEnvelopeSha256": "95056682827474cc972c4346923932d1526b7147cc7862b6064e3492a823d177",
+    "provenanceSha256": "c0421d10974b56c0316a4938fcf8d50b834963781103f82e27516bb8c404daf8"
+  },
+  "qualification": "Research-only composed guard. Passing permits manual review only; this harness cannot edit, bake, promote, or deploy a policy.",
+  "manifestSha256": "986397a74135fa4160491b26fb254ba6016ff95f59fcf5a69f43bb808b400230"
+}

@@ -1,0 +1,70 @@
+{
+    "schemaVersion": 1,
+    "spec": "v07-nonfight-4eda84635fe7",
+    "behaviorSha256": "4eda84635fe7e3e9054e1d8161328ce61d45719734adf16acf98006eb3f88f57",
+    "policy": {
+        "augmentsByCohort": {
+            "ranged-4plus": {
+                "placement": 0,
+                "armor": 3,
+                "might": 1,
+                "sniper": 3,
+                "movement": 0
+            },
+            "ranged-2to3": {
+                "placement": 0,
+                "armor": 2,
+                "might": 2,
+                "sniper": 3,
+                "movement": 0
+            },
+            "ranged-1": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 1,
+                "movement": 0
+            },
+            "melee-magic": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 0,
+                "movement": 1
+            },
+            "mage": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 0,
+                "movement": 1
+            },
+            "aura-heavy": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 0,
+                "movement": 1
+            },
+            "melee-other": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 0,
+                "movement": 1
+            }
+        },
+        "tier2ByCohort": {
+            "ranged-4plus": "baseline",
+            "ranged-2to3": "promote:10",
+            "ranged-1": "promote:1",
+            "melee-magic": "baseline",
+            "mage": "baseline",
+            "aura-heavy": "baseline",
+            "melee-other": "promote:4"
+        },
+        "synergy": "flip-chaos",
+        "placement": "legitimate-reveal",
+        "placementAugmentTiming": "setup-before-placement"
+    }
+}

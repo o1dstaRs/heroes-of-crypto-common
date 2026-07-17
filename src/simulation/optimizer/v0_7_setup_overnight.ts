@@ -25,16 +25,14 @@ import { runRankedConditionalPickGame, type IConditionalArmy } from "../measure_
 import {
     augmentPlanId,
     cloneNonFightPolicy,
+    compileNonFightSetupPolicy,
     enumerateFullBudgetAugmentPlans,
     pairedSetupEstimate,
-    pickSynergiesForVariant,
-    pickTier2ForVariant,
     SETUP_COHORTS,
     SETUP_DIAGNOSTIC_TAGS,
     SETUP_GUARD_THRESHOLDS,
     SETUP_LIVE_GRID_TYPES,
     SETUP_NAMED_GUARD_TAGS,
-    setupAugmentsForPlan,
     setupCohort,
     setupDiagnosticTags,
     setupGuardPromotable,
@@ -44,6 +42,7 @@ import {
     SYNERGY_POLICY_VARIANTS,
     T2_POLICY_VARIANTS,
     V07_SETUP_CONDITIONAL_SPEC,
+    V07_SETUP_BUDGET,
     V07_SETUP_DRAFT_SPEC,
     V07_SETUP_FIGHT_VERSION,
     V07_SETUP_OVERNIGHT_SCHEMA_VERSION,
@@ -227,10 +226,11 @@ function collectSetupSeeds(
 }
 
 function candidateArmySetup(policy: INonFightCandidatePolicy, army: IConditionalArmy) {
-    const cohort = setupCohort(army.creatureIds);
+    const resolved = compileNonFightSetupPolicy(policy, policy.id);
     return {
-        augments: setupAugmentsForPlan(policy.augmentsByCohort[cohort]),
-        synergies: pickSynergiesForVariant(army.creatureIds, policy.synergy),
+        augments: resolved.pickAugments(V07_SETUP_BUDGET, army.creatureIds),
+        synergies: resolved.pickSynergies(army.creatureIds),
+        placement: resolved.placement,
     };
 }
 
@@ -266,11 +266,11 @@ function playCandidateSide(
     gridType: SetupLiveGridType,
 ): ISetupEvaluatedGame {
     const candidateTeam = candidateSide === "green" ? LOWER : UPPER;
+    const resolved = compileNonFightSetupPolicy(policy, policy.id);
     const pick = runRankedConditionalPickGame(seed, CONDITIONAL_ALL, shippedGenome, {
         pickArtifactT2: (team, offered, ownCreatureIdsAtTier2) => {
             if (team !== candidateTeam) return undefined;
-            const cohort = setupCohort(ownCreatureIdsAtTier2);
-            return pickTier2ForVariant(offered, ownCreatureIdsAtTier2, policy.tier2ByCohort[cohort]);
+            return resolved.pickArtifactT2(offered, ownCreatureIdsAtTier2);
         },
     });
     const candidateArmy = candidateTeam === LOWER ? pick.lower : pick.upper;
@@ -296,6 +296,8 @@ function playCandidateSide(
         redSynergies: candidateIsLower ? pick.upper.synergies : setup.synergies,
         greenRevealedCreatures: candidateIsLower ? candidateReveals : undefined,
         redRevealedCreatures: candidateIsLower ? undefined : candidateReveals,
+        greenSetupPlacementPolicy: candidateIsLower ? setup.placement : "baseline",
+        redSetupPlacementPolicy: candidateIsLower ? "baseline" : setup.placement,
         placementAugmentTiming: policy.placementAugmentTiming,
     };
     FightStateManager.getInstance();

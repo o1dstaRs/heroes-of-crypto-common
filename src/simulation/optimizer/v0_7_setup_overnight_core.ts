@@ -9,23 +9,55 @@
  * -----------------------------------------------------------------------------
  */
 
-import CREATURES_JSON from "../../configuration/creatures.json";
-import { Tier2Artifact } from "../../artifacts/artifact_properties";
-import { creatureInfo } from "../../ai/setup/creature_score";
-import {
-    conditionalArtifactT2,
-    conditionalAugments,
-    parseConditionalRules,
-    TIER2_ARTIFACT_WINRATE_MELEE,
-    TIER2_ARTIFACT_WINRATE_RANGED,
-} from "../../ai/setup/setup_conditional";
-import { TIER2_ARTIFACT_WINRATE } from "../../ai/setup/setup_strategy";
-import { pickSynergiesSituational, SYNERGY_ANCHOR_W, SYNERGY_OPTIONS } from "../../ai/setup/synergy_score";
+import { SETUP_OPTIMIZED_BUDGET, setupRosterFeatures, type PlacementAugmentTiming } from "../../ai/setup/setup_ship";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import type { ISetupAugment, ISetupSynergy } from "../battle_engine";
+
+export {
+    augmentPlanCost,
+    augmentPlanId,
+    assertAugmentPlan,
+    canonicalSetupPolicyBehavior,
+    cloneNonFightPolicy,
+    compileNonFightSetupPolicy,
+    enumerateFullBudgetAugmentPlans,
+    parseSetupPolicyArtifact,
+    parseSetupPolicyBehavior,
+    pickSynergiesForVariant,
+    pickTier2ForVariant,
+    resolveSetupPolicy,
+    SETUP_COHORTS,
+    SETUP_OPTIMIZED_BUDGET,
+    SETUP_POLICY_V0_RESOLVED,
+    setupAugmentsForPlan,
+    setupCohort,
+    setupRosterFeatures,
+    shippedAugmentPlan,
+    shippedNonFightPolicy,
+    SYNERGY_POLICY_VARIANTS,
+    T2_POLICY_VARIANTS,
+    V07_NONFIGHT_BEHAVIOR_SHA256,
+    V07_NONFIGHT_SETUP_ARTIFACT,
+    V07_NONFIGHT_SETUP_SPEC,
+} from "../../ai/setup/setup_ship";
+export type {
+    IAugmentPlan,
+    INonFightCandidatePolicy,
+    IResolvedSetupPolicy,
+    ISetupAugmentChoice,
+    ISetupPolicyArtifact,
+    ISetupPolicyBehavior,
+    ISetupRosterFeatures,
+    ISetupSynergyChoice,
+    PlacementAugmentTiming,
+    PlacementPolicyVariant,
+    ResolvedSetupPolicyMode,
+    SetupCohort,
+    SynergyPolicyVariant,
+    T2PolicyVariant,
+} from "../../ai/setup/setup_ship";
 
 export const V07_SETUP_OVERNIGHT_SCHEMA_VERSION = 3;
-export const V07_SETUP_BUDGET = 7;
+export const V07_SETUP_BUDGET = SETUP_OPTIMIZED_BUDGET;
 export const V07_SETUP_DRAFT_SPEC = "league-r1-br-57de5a2d";
 export const V07_SETUP_CONDITIONAL_SPEC = "all";
 export const V07_SETUP_FIGHT_VERSION = "v0.7";
@@ -35,17 +67,6 @@ export const SETUP_LIVE_GRID_TYPES = [
     PBTypes.GridVals.BLOCK_CENTER,
 ] as const;
 export type SetupLiveGridType = (typeof SETUP_LIVE_GRID_TYPES)[number];
-
-export const SETUP_COHORTS = [
-    "ranged-4plus",
-    "ranged-2to3",
-    "ranged-1",
-    "melee-magic",
-    "mage",
-    "aura-heavy",
-    "melee-other",
-] as const;
-export type SetupCohort = (typeof SETUP_COHORTS)[number];
 
 export const SETUP_DIAGNOSTIC_TAGS = ["aggregate", "ranged", "mage", "melee-magic", "aura-heavy"] as const;
 export type SetupDiagnosticTag = (typeof SETUP_DIAGNOSTIC_TAGS)[number];
@@ -68,65 +89,6 @@ export function setupLiveGridType(seed: number): SetupLiveGridType {
     return SETUP_LIVE_GRID_TYPES[seed % SETUP_LIVE_GRID_TYPES.length];
 }
 
-export interface ISetupRosterFeatures {
-    total: number;
-    ranged: number;
-    mage: number;
-    meleeMagic: number;
-    flyers: number;
-    auraCarriers: number;
-}
-
-type CreatureJson = Record<string, Record<string, { attack_type?: string } | undefined> | undefined>;
-
-let attackTypeByName: Map<string, string> | undefined;
-
-function creatureAttackType(name: string): string {
-    if (!attackTypeByName) {
-        attackTypeByName = new Map();
-        for (const faction of Object.values(CREATURES_JSON as unknown as CreatureJson)) {
-            for (const [creatureName, config] of Object.entries(faction ?? {})) {
-                attackTypeByName.set(creatureName, config?.attack_type ?? "");
-            }
-        }
-    }
-    return attackTypeByName.get(name) ?? "";
-}
-
-export function setupRosterFeatures(creatureIds: readonly number[]): ISetupRosterFeatures {
-    const features: ISetupRosterFeatures = {
-        total: 0,
-        ranged: 0,
-        mage: 0,
-        meleeMagic: 0,
-        flyers: 0,
-        auraCarriers: 0,
-    };
-    for (const creatureId of creatureIds) {
-        const info = creatureInfo(creatureId);
-        if (!info) continue;
-        features.total += 1;
-        features.ranged += Number(info.ranged);
-        features.flyers += Number(info.canFly);
-        features.auraCarriers += Number(info.auraCount > 0);
-        const attackType = creatureAttackType(info.name);
-        features.mage += Number(attackType === "MAGIC");
-        features.meleeMagic += Number(attackType === "MELEE_MAGIC");
-    }
-    return features;
-}
-
-export function setupCohort(creatureIds: readonly number[]): SetupCohort {
-    const features = setupRosterFeatures(creatureIds);
-    if (features.ranged >= 4) return "ranged-4plus";
-    if (features.ranged >= 2) return "ranged-2to3";
-    if (features.ranged === 1) return "ranged-1";
-    if (features.meleeMagic > 0) return "melee-magic";
-    if (features.mage > 0) return "mage";
-    if (features.auraCarriers > 0) return "aura-heavy";
-    return "melee-other";
-}
-
 export function setupDiagnosticTags(creatureIds: readonly number[]): SetupDiagnosticTag[] {
     const features = setupRosterFeatures(creatureIds);
     const tags: SetupDiagnosticTag[] = ["aggregate"];
@@ -135,199 +97,6 @@ export function setupDiagnosticTags(creatureIds: readonly number[]): SetupDiagno
     if (features.meleeMagic > 0) tags.push("melee-magic");
     if (features.auraCarriers > 0) tags.push("aura-heavy");
     return tags;
-}
-
-export interface IAugmentPlan {
-    /** Placement uses its wire levels 0/1/2; 0 is the free default 3-wide zone. */
-    placement: number;
-    armor: number;
-    might: number;
-    sniper: number;
-    movement: number;
-}
-
-const AUGMENT_CAPS: Readonly<IAugmentPlan> = { placement: 2, armor: 3, might: 3, sniper: 3, movement: 2 };
-
-export function augmentPlanCost(plan: Readonly<IAugmentPlan>): number {
-    return plan.placement + plan.armor + plan.might + plan.sniper + plan.movement;
-}
-
-export function assertAugmentPlan(plan: Readonly<IAugmentPlan>, budget: number = V07_SETUP_BUDGET): void {
-    for (const key of Object.keys(AUGMENT_CAPS) as (keyof IAugmentPlan)[]) {
-        const value = plan[key];
-        if (!Number.isInteger(value) || value < 0 || value > AUGMENT_CAPS[key]) {
-            throw new RangeError(`${key}=${value} is outside [0, ${AUGMENT_CAPS[key]}]`);
-        }
-    }
-    if (augmentPlanCost(plan) > budget) {
-        throw new RangeError(`augment plan costs ${augmentPlanCost(plan)} but budget is ${budget}`);
-    }
-}
-
-export function augmentPlanId(plan: Readonly<IAugmentPlan>): string {
-    assertAugmentPlan(plan);
-    return `P${plan.placement}-A${plan.armor}-M${plan.might}-S${plan.sniper}-V${plan.movement}`;
-}
-
-/** All 96 full-spend legal SEE_NONE plans. Full spend is safe because Armor/Might/Sniper are monotone buffs. */
-export function enumerateFullBudgetAugmentPlans(budget: number = V07_SETUP_BUDGET): IAugmentPlan[] {
-    if (!Number.isInteger(budget) || budget < 0) throw new RangeError("budget must be a non-negative integer");
-    const plans: IAugmentPlan[] = [];
-    for (let placement = 0; placement <= AUGMENT_CAPS.placement; placement += 1) {
-        for (let armor = 0; armor <= AUGMENT_CAPS.armor; armor += 1) {
-            for (let might = 0; might <= AUGMENT_CAPS.might; might += 1) {
-                for (let sniper = 0; sniper <= AUGMENT_CAPS.sniper; sniper += 1) {
-                    for (let movement = 0; movement <= AUGMENT_CAPS.movement; movement += 1) {
-                        const plan = { placement, armor, might, sniper, movement };
-                        if (augmentPlanCost(plan) === budget) plans.push(plan);
-                    }
-                }
-            }
-        }
-    }
-    return plans.sort((left, right) => augmentPlanId(left).localeCompare(augmentPlanId(right)));
-}
-
-export function setupAugmentsForPlan(plan: Readonly<IAugmentPlan>): ISetupAugment[] {
-    assertAugmentPlan(plan);
-    const augments: ISetupAugment[] = [];
-    if (plan.placement > 0) augments.push({ kind: "Placement", value: plan.placement });
-    if (plan.armor > 0) augments.push({ kind: "Armor", value: plan.armor });
-    if (plan.might > 0) augments.push({ kind: "Might", value: plan.might });
-    if (plan.sniper > 0) augments.push({ kind: "Sniper", value: plan.sniper });
-    if (plan.movement > 0) augments.push({ kind: "Movement", value: plan.movement });
-    return augments;
-}
-
-const CONDITIONAL_ALL = parseConditionalRules(V07_SETUP_CONDITIONAL_SPEC);
-
-export function shippedAugmentPlan(creatureIds: readonly number[]): IAugmentPlan {
-    const plan: IAugmentPlan = { placement: 0, armor: 0, might: 0, sniper: 0, movement: 0 };
-    for (const augment of conditionalAugments(V07_SETUP_BUDGET, creatureIds, CONDITIONAL_ALL)) {
-        const key = augment.kind.toLowerCase() as "armor" | "might" | "sniper" | "movement";
-        plan[key] = augment.value;
-    }
-    return plan;
-}
-
-export type T2PolicyVariant = "baseline" | "blind" | "melee-table" | "ranged-table" | `promote:${number}`;
-
-export const T2_POLICY_VARIANTS: readonly T2PolicyVariant[] = [
-    "baseline",
-    "blind",
-    "melee-table",
-    "ranged-table",
-    ...Array.from({ length: 12 }, (_, index) => `promote:${index + 1}` as const),
-];
-
-const bestFromTable = (offered: readonly number[], table: Readonly<Record<number, number>>): number | undefined => {
-    let best: number | undefined;
-    let score = -Infinity;
-    for (const artifact of offered) {
-        const candidate = table[artifact];
-        if (candidate !== undefined && candidate > score) {
-            score = candidate;
-            best = artifact;
-        }
-    }
-    return best;
-};
-
-export function pickTier2ForVariant(
-    offered: readonly number[],
-    creatureIds: readonly number[],
-    variant: T2PolicyVariant,
-): number {
-    if (!offered.length) return Tier2Artifact.NO_ARTIFACT;
-    const baseline = conditionalArtifactT2(offered, creatureIds, CONDITIONAL_ALL);
-    if (variant === "baseline") return baseline;
-    if (variant === "blind") return bestFromTable(offered, TIER2_ARTIFACT_WINRATE) ?? baseline;
-    if (variant === "melee-table") return bestFromTable(offered, TIER2_ARTIFACT_WINRATE_MELEE) ?? baseline;
-    if (variant === "ranged-table") return bestFromTable(offered, TIER2_ARTIFACT_WINRATE_RANGED) ?? baseline;
-    const promoted = Number(variant.slice("promote:".length));
-    return Number.isInteger(promoted) && offered.includes(promoted) ? promoted : baseline;
-}
-
-export const SYNERGY_POLICY_VARIANTS = [
-    "baseline",
-    "beneficiary",
-    "beneficiary-with-anchor",
-    "flip-life",
-    "flip-chaos",
-    "flip-might",
-    "flip-nature",
-] as const;
-export type SynergyPolicyVariant = (typeof SYNERGY_POLICY_VARIANTS)[number];
-
-function synergyWeights(variant: SynergyPolicyVariant): number[] {
-    if (variant === "baseline") return [...SYNERGY_ANCHOR_W];
-    if (variant === "beneficiary" || variant === "beneficiary-with-anchor") {
-        return SYNERGY_OPTIONS.flatMap((option) => [
-            variant === "beneficiary-with-anchor" && option.tablePick ? 0.25 : 0,
-            1,
-        ]);
-    }
-    const factionName = variant.slice("flip-".length);
-    const factionByLabel: Record<string, number> = {
-        life: PBTypes.FactionVals.LIFE,
-        chaos: PBTypes.FactionVals.CHAOS,
-        might: PBTypes.FactionVals.MIGHT,
-        nature: PBTypes.FactionVals.NATURE,
-    };
-    const faction = factionByLabel[factionName];
-    return SYNERGY_OPTIONS.flatMap((option) => {
-        if (option.faction !== faction) return [option.tablePick ? 1 : 0, 0];
-        return [option.tablePick ? 0 : 1, 0];
-    });
-}
-
-export function pickSynergiesForVariant(
-    creatureIds: readonly number[],
-    variant: SynergyPolicyVariant,
-): ISetupSynergy[] {
-    return pickSynergiesSituational(creatureIds, synergyWeights(variant));
-}
-
-export type PlacementPolicyVariant = "baseline" | "legitimate-reveal";
-export type PlacementAugmentTiming = "current-live" | "setup-before-placement";
-
-export interface INonFightCandidatePolicy {
-    id: string;
-    augmentsByCohort: Record<SetupCohort, IAugmentPlan>;
-    tier2ByCohort: Record<SetupCohort, T2PolicyVariant>;
-    synergy: SynergyPolicyVariant;
-    placement: PlacementPolicyVariant;
-    placementAugmentTiming: PlacementAugmentTiming;
-}
-
-export function shippedNonFightPolicy(id: string = "shipped-round1-conditional-all"): INonFightCandidatePolicy {
-    const augmentsByCohort = {} as Record<SetupCohort, IAugmentPlan>;
-    const tier2ByCohort = {} as Record<SetupCohort, T2PolicyVariant>;
-    for (const cohort of SETUP_COHORTS) {
-        const ranged = cohort === "ranged-4plus" || cohort === "ranged-2to3";
-        augmentsByCohort[cohort] = ranged
-            ? { placement: 0, armor: 3, might: 1, sniper: 3, movement: 0 }
-            : { placement: 0, armor: 3, might: 3, sniper: 1, movement: 0 };
-        tier2ByCohort[cohort] = "baseline";
-    }
-    return {
-        id,
-        augmentsByCohort,
-        tier2ByCohort,
-        synergy: "baseline",
-        placement: "baseline",
-        placementAugmentTiming: "setup-before-placement",
-    };
-}
-
-export function cloneNonFightPolicy(policy: Readonly<INonFightCandidatePolicy>): INonFightCandidatePolicy {
-    return {
-        ...policy,
-        augmentsByCohort: Object.fromEntries(
-            SETUP_COHORTS.map((cohort) => [cohort, { ...policy.augmentsByCohort[cohort] }]),
-        ) as Record<SetupCohort, IAugmentPlan>,
-        tier2ByCohort: { ...policy.tier2ByCohort },
-    };
 }
 
 export const SETUP_SEED_PANELS = ["train", "selection", "guard"] as const;

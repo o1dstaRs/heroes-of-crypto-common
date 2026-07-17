@@ -11,6 +11,7 @@
 
 import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../ai";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
+import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -182,6 +183,9 @@ export interface IMatchConfig {
     greenRevealedCreatures?: readonly number[];
     /** Creature ids of GREEN stacks legitimately revealed to RED. Same contract, RED's placement context. */
     redRevealedCreatures?: readonly number[];
+    /** Explicit per-side placement modes. When present they override the legacy V07_PLACEMENT_REVEAL env gate. */
+    greenSetupPlacementPolicy?: PlacementPolicyVariant;
+    redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
@@ -603,6 +607,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             unitsHolder,
             pathHelper,
             config.greenRevealedCreatures,
+            config.greenSetupPlacementPolicy,
         ),
         red: placeArmy(
             redUnits,
@@ -615,6 +620,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             unitsHolder,
             pathHelper,
             config.redRevealedCreatures,
+            config.redSetupPlacementPolicy,
         ),
     };
 
@@ -1180,6 +1186,7 @@ function placeArmy(
     unitsHolder: UnitsHolder,
     pathHelper: PathHelper,
     revealedOpponentCreatures?: readonly number[],
+    setupPlacementPolicy?: PlacementPolicyVariant,
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
@@ -1192,6 +1199,7 @@ function placeArmy(
         pathHelper,
         placement: zone,
         ...(revealedOpponentCreatures?.length ? { revealedOpponentCreatures } : {}),
+        ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
     });
 
     const tryPlaceAt = (unit: Unit, base: XY): boolean => {

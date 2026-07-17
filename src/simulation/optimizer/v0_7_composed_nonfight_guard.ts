@@ -64,19 +64,17 @@ import {
 import {
     assertAugmentPlan,
     cloneNonFightPolicy,
-    pickSynergiesForVariant,
-    pickTier2ForVariant,
+    compileNonFightSetupPolicy,
     pairedSetupEstimate,
     SETUP_COHORTS,
     SETUP_GUARD_THRESHOLDS,
     SETUP_LIVE_GRID_TYPES,
     SETUP_NAMED_GUARD_TAGS,
     shippedNonFightPolicy,
-    setupAugmentsForPlan,
-    setupCohort,
     setupGuardPromotable,
     SYNERGY_POLICY_VARIANTS,
     T2_POLICY_VARIANTS,
+    V07_SETUP_BUDGET,
     V07_SETUP_OVERNIGHT_SCHEMA_VERSION,
     type ISetupEvaluatedPair,
     type INonFightCandidatePolicy,
@@ -1195,11 +1193,12 @@ function composedCohorts(creatureIds: readonly number[]): V07ComposedNonfightCoh
 }
 
 function armySetup(policy: INonFightCandidatePolicy, army: IConditionalArmy) {
-    const cohort = setupCohort(army.creatureIds);
+    const resolved = compileNonFightSetupPolicy(policy, policy.id);
     return {
-        augments: setupAugmentsForPlan(policy.augmentsByCohort[cohort]),
-        synergies: pickSynergiesForVariant(army.creatureIds, policy.synergy),
-        revealedCreatures: policy.placement === "legitimate-reveal" ? army.revealedOpponentCreatures : undefined,
+        augments: resolved.pickAugments(V07_SETUP_BUDGET, army.creatureIds),
+        synergies: resolved.pickSynergies(army.creatureIds),
+        revealedCreatures: resolved.placement === "legitimate-reveal" ? army.revealedOpponentCreatures : undefined,
+        placement: resolved.placement,
     };
 }
 
@@ -1217,8 +1216,7 @@ function pickForAssignment(
         upperGenome: upperArm.genome,
         pickArtifactT2: (team, offered, ownCreatureIdsAtTier2) => {
             const policy = armForTeam(team).policy;
-            const cohort = setupCohort(ownCreatureIdsAtTier2);
-            return pickTier2ForVariant(offered, ownCreatureIdsAtTier2, policy.tier2ByCohort[cohort]);
+            return compileNonFightSetupPolicy(policy, policy.id).pickArtifactT2(offered, ownCreatureIdsAtTier2);
         },
     });
     return { pick, lowerArm, upperArm };
@@ -1307,6 +1305,8 @@ export function prepareV07ComposedMatch(
         redSynergies: redSetup.synergies,
         greenRevealedCreatures: greenSetup.revealedCreatures,
         redRevealedCreatures: redSetup.revealedCreatures,
+        greenSetupPlacementPolicy: greenSetup.placement,
+        redSetupPlacementPolicy: redSetup.placement,
         placementAugmentTiming: "setup-before-placement",
     };
     return {

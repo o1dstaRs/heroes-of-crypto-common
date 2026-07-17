@@ -1,0 +1,538 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only_no_bake",
+  "runFingerprint": "245a85596bf93ff50e59b3303e9345e1ba4a83569380a6492f9f7d2746803caa",
+  "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+  "completedGeneration": 110,
+  "eligibleForManualReview": true,
+  "checks": {
+    "naturalGuardPassed": true,
+    "targetedCohortGuardPassed": true,
+    "deterministicReplayByteIdentical": true,
+    "deterministicReplayBehaviorTraceIdentical": true
+  },
+  "naturalGuard": {
+    "schemaVersion": 1,
+    "status": "research_only_no_bake",
+    "eligibleForManualReview": true,
+    "checks": {
+      "candidateVsIncumbentLower95AboveEven": true,
+      "candidateRejectedActionsZero": true,
+      "robustPoolNonRegression": true,
+      "drawOrArmageddonNonRegression": true,
+      "incumbentSelfPlayExactSymmetry": true,
+      "incumbentRejectedActionsZero": true,
+      "exactLiveMapPanel": true,
+      "allLiveMapsPointEstimateAtLeast49_5": true,
+      "allLiveMapsClusteredLower95AtLeast48": true,
+      "allLiveMapsCandidateRejectedActionsZero": true,
+      "comparableGuardPanel": true
+    },
+    "candidateVsIncumbent": {
+      "decisiveWinRate": 0.552751135790005,
+      "confidence95": {
+        "low": 0.5308795004246297,
+        "high": 0.5744205108936401
+      },
+      "decisiveGames": 7924
+    },
+    "incumbentSymmetryControl": {
+      "wins": 3957,
+      "losses": 3957,
+      "draws": 86,
+      "decisiveGames": 7914,
+      "decisiveWinRate": 0.5,
+      "rejectedCandidate": 0
+    },
+    "thresholds": {
+      "candidateVsIncumbentLower95": 0.5,
+      "robustPoolTolerance": 0.005,
+      "drawOrArmageddonTolerance": 0.01,
+      "liveMapDecisiveWinRate": 0.495,
+      "liveMapClusteredLower95": 0.48,
+      "rejectedCandidate": 0
+    },
+    "liveMapGuard": [
+      {
+        "mapType": 1,
+        "games": 10668,
+        "decisiveGames": 10545,
+        "decisiveWinRate": 0.5990516832622096,
+        "confidence95": {
+          "low": 0.5803217070955173,
+          "high": 0.6174967178236639
+        },
+        "rejectedCandidate": 0,
+        "avgLaps": 6.325553055868016,
+        "endReasons": {
+          "elimination": 10668,
+          "turn_cap": 0,
+          "stuck": 0
+        },
+        "checks": {
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        }
+      },
+      {
+        "mapType": 3,
+        "games": 10668,
+        "decisiveGames": 10570,
+        "decisiveWinRate": 0.6353831598864711,
+        "confidence95": {
+          "low": 0.6169329656811533,
+          "high": 0.6534438978641939
+        },
+        "rejectedCandidate": 0,
+        "avgLaps": 6.569835020622422,
+        "endReasons": {
+          "elimination": 10668,
+          "turn_cap": 0,
+          "stuck": 0
+        },
+        "checks": {
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        }
+      },
+      {
+        "mapType": 4,
+        "games": 10664,
+        "decisiveGames": 10526,
+        "decisiveWinRate": 0.6234087022610678,
+        "confidence95": {
+          "low": 0.6048507224982621,
+          "high": 0.6416115397033658
+        },
+        "rejectedCandidate": 0,
+        "avgLaps": 6.554576144036009,
+        "endReasons": {
+          "elimination": 10664,
+          "turn_cap": 0,
+          "stuck": 0
+        },
+        "checks": {
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        }
+      }
+    ],
+    "cohortCoverage": {
+      "minimumGames": 320,
+      "minimumDecisiveGames": 160,
+      "cohorts": [
+        {
+          "cohort": "ranged",
+          "candidateGames": 31474,
+          "candidateDecisiveGames": 31121,
+          "incumbentGames": 5818,
+          "incumbentDecisiveGames": 5739,
+          "candidateDecisiveWinRate": 0.6177179396548954,
+          "incumbentDecisiveWinRate": 0.5729221118661788,
+          "covered": true,
+          "pointEstimateNonRegression": true
+        },
+        {
+          "cohort": "mage",
+          "candidateGames": 1700,
+          "candidateDecisiveGames": 1684,
+          "incumbentGames": 5244,
+          "incumbentDecisiveGames": 5171,
+          "candidateDecisiveWinRate": 0.5213776722090261,
+          "incumbentDecisiveWinRate": 0.5327789595822858,
+          "covered": true,
+          "pointEstimateNonRegression": true
+        },
+        {
+          "cohort": "melee_magic",
+          "candidateGames": 19482,
+          "candidateDecisiveGames": 19274,
+          "incumbentGames": 23398,
+          "incumbentDecisiveGames": 23128,
+          "candidateDecisiveWinRate": 0.6663380720141123,
+          "incumbentDecisiveWinRate": 0.6013057765479073,
+          "covered": true,
+          "pointEstimateNonRegression": true
+        },
+        {
+          "cohort": "aura_heavy",
+          "candidateGames": 17978,
+          "candidateDecisiveGames": 17769,
+          "incumbentGames": 27586,
+          "incumbentDecisiveGames": 27278,
+          "candidateDecisiveWinRate": 0.5966008216556925,
+          "incumbentDecisiveWinRate": 0.5682601363736345,
+          "covered": true,
+          "pointEstimateNonRegression": true
+        }
+      ]
+    },
+    "qualification": "Fresh natural-distribution guard only. Natural cohort comparisons are diagnostic and may be indeterminate; targeted cohort guard evidence is separately required for final manual-review eligibility."
+  },
+  "targetedCohortGuard": {
+    "schemaVersion": 1,
+    "status": "research_only_no_bake",
+    "eligibleForManualReview": true,
+    "thresholds": {
+      "decisiveWinRate": 0.495,
+      "clusteredLower95": 0.48,
+      "rejectedCandidate": 0
+    },
+    "cohortDefinitions": {
+      "ranged": "candidate roster contains at least one RANGE creature",
+      "mage": "candidate roster contains at least one MAGIC creature",
+      "melee_magic": "candidate roster contains at least one MELEE_MAGIC creature",
+      "aura_heavy": "candidate roster contains at least one creature carrying an aura"
+    },
+    "cohorts": [
+      {
+        "cohort": "ranged",
+        "requiredOfferBoards": 2500,
+        "qualifiedOfferBoards": 2500,
+        "scannedOfferBoards": 2503,
+        "exhausted": false,
+        "games": 9852,
+        "decisiveGames": 9748,
+        "wins": 5994,
+        "losses": 3754,
+        "draws": 104,
+        "decisiveWinRate": 0.6148953631514157,
+        "confidence95": {
+          "low": 0.5956574000489261,
+          "high": 0.6337807623959659
+        },
+        "rejectedCandidate": 0,
+        "rejectedOpponent": 0,
+        "opponentBreakdown": [
+          {
+            "opponentId": "league-round3-exploiter",
+            "qualifiedOfferBoards": 625,
+            "games": 2492,
+            "decisiveWinRate": 0.7186234817813765
+          },
+          {
+            "opponentId": "ranked-round1-incumbent",
+            "qualifiedOfferBoards": 625,
+            "games": 2494,
+            "decisiveWinRate": 0.5470016207455429
+          },
+          {
+            "opponentId": "shipped-default-draft",
+            "qualifiedOfferBoards": 625,
+            "games": 2492,
+            "decisiveWinRate": 0.6076205918119173
+          },
+          {
+            "opponentId": "untrained-heuristic",
+            "qualifiedOfferBoards": 625,
+            "games": 2374,
+            "decisiveWinRate": 0.5847204438753735
+          }
+        ],
+        "checks": {
+          "enoughQualifiedOfferBoards": true,
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        },
+        "passed": true
+      },
+      {
+        "cohort": "mage",
+        "requiredOfferBoards": 2500,
+        "qualifiedOfferBoards": 2500,
+        "scannedOfferBoards": 24215,
+        "exhausted": false,
+        "games": 5024,
+        "decisiveGames": 4964,
+        "wins": 2588,
+        "losses": 2376,
+        "draws": 60,
+        "decisiveWinRate": 0.5213537469782433,
+        "confidence95": {
+          "low": 0.5017538675598298,
+          "high": 0.5408881010420244
+        },
+        "rejectedCandidate": 0,
+        "rejectedOpponent": 0,
+        "opponentBreakdown": [
+          {
+            "opponentId": "league-round3-exploiter",
+            "qualifiedOfferBoards": 625,
+            "games": 1264,
+            "decisiveWinRate": 0.6305732484076433
+          },
+          {
+            "opponentId": "ranked-round1-incumbent",
+            "qualifiedOfferBoards": 625,
+            "games": 1252,
+            "decisiveWinRate": 0.43478260869565216
+          },
+          {
+            "opponentId": "shipped-default-draft",
+            "qualifiedOfferBoards": 625,
+            "games": 1254,
+            "decisiveWinRate": 0.5097087378640777
+          },
+          {
+            "opponentId": "untrained-heuristic",
+            "qualifiedOfferBoards": 625,
+            "games": 1254,
+            "decisiveWinRate": 0.5089430894308943
+          }
+        ],
+        "checks": {
+          "enoughQualifiedOfferBoards": true,
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        },
+        "passed": true
+      },
+      {
+        "cohort": "melee_magic",
+        "requiredOfferBoards": 2500,
+        "qualifiedOfferBoards": 2500,
+        "scannedOfferBoards": 2858,
+        "exhausted": false,
+        "games": 7074,
+        "decisiveGames": 7015,
+        "wins": 4684,
+        "losses": 2331,
+        "draws": 59,
+        "decisiveWinRate": 0.667712045616536,
+        "confidence95": {
+          "low": 0.6490025862156564,
+          "high": 0.6859068697509989
+        },
+        "rejectedCandidate": 0,
+        "rejectedOpponent": 0,
+        "opponentBreakdown": [
+          {
+            "opponentId": "league-round3-exploiter",
+            "qualifiedOfferBoards": 625,
+            "games": 1720,
+            "decisiveWinRate": 0.7404580152671756
+          },
+          {
+            "opponentId": "ranked-round1-incumbent",
+            "qualifiedOfferBoards": 625,
+            "games": 1700,
+            "decisiveWinRate": 0.6143364928909952
+          },
+          {
+            "opponentId": "shipped-default-draft",
+            "qualifiedOfferBoards": 625,
+            "games": 1704,
+            "decisiveWinRate": 0.6822209096278795
+          },
+          {
+            "opponentId": "untrained-heuristic",
+            "qualifiedOfferBoards": 625,
+            "games": 1950,
+            "decisiveWinRate": 0.6374935266701192
+          }
+        ],
+        "checks": {
+          "enoughQualifiedOfferBoards": true,
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        },
+        "passed": true
+      },
+      {
+        "cohort": "aura_heavy",
+        "requiredOfferBoards": 2500,
+        "qualifiedOfferBoards": 2500,
+        "scannedOfferBoards": 3186,
+        "exhausted": false,
+        "games": 7192,
+        "decisiveGames": 7116,
+        "wins": 4348,
+        "losses": 2768,
+        "draws": 76,
+        "decisiveWinRate": 0.6110174255199551,
+        "confidence95": {
+          "low": 0.5917424726036256,
+          "high": 0.6299514419502358
+        },
+        "rejectedCandidate": 0,
+        "rejectedOpponent": 0,
+        "opponentBreakdown": [
+          {
+            "opponentId": "league-round3-exploiter",
+            "qualifiedOfferBoards": 625,
+            "games": 1702,
+            "decisiveWinRate": 0.6977434679334917
+          },
+          {
+            "opponentId": "ranked-round1-incumbent",
+            "qualifiedOfferBoards": 625,
+            "games": 1808,
+            "decisiveWinRate": 0.5262569832402234
+          },
+          {
+            "opponentId": "shipped-default-draft",
+            "qualifiedOfferBoards": 625,
+            "games": 1750,
+            "decisiveWinRate": 0.6063400576368876
+          },
+          {
+            "opponentId": "untrained-heuristic",
+            "qualifiedOfferBoards": 625,
+            "games": 1932,
+            "decisiveWinRate": 0.6182485579444154
+          }
+        ],
+        "checks": {
+          "enoughQualifiedOfferBoards": true,
+          "pointEstimateAtLeast49_5": true,
+          "clusteredLower95AtLeast48": true,
+          "candidateRejectedActionsZero": true
+        },
+        "passed": true
+      }
+    ],
+    "qualification": "Frozen-candidate targeted roster guard. Offer-board selection uses candidate pick composition only; fight outcomes never enter seed selection. Passing permits manual review only."
+  },
+  "deterministicReplay": {
+    "schemaVersion": 1,
+    "status": "research_only_no_bake",
+    "runFingerprint": "245a85596bf93ff50e59b3303e9345e1ba4a83569380a6492f9f7d2746803caa",
+    "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+    "panel": {
+      "purpose": "untouched-deterministic-replay",
+      "baseSeed": 4043309056,
+      "endSeedExclusive": 4043309068,
+      "seedChannels": 12,
+      "gamesPerOpponent": 8,
+      "mapTypes": [
+        1,
+        3,
+        4
+      ]
+    },
+    "first": {
+      "recordsSha256": "b3f18dfbcd897029579ad6450036cad0e8c550cc110e6f46d2967626ee53ebca",
+      "reportSha256": "16f1305b23b21e2df80691e097e78161e2aa5626e60f147782af283fb5420680",
+      "behaviorTraceSetSha256": "1efb28d2c521c7e3d99ded52460146a6011ed11a45f0b34e9f0c1f5c741d8dbd"
+    },
+    "second": {
+      "recordsSha256": "b3f18dfbcd897029579ad6450036cad0e8c550cc110e6f46d2967626ee53ebca",
+      "reportSha256": "16f1305b23b21e2df80691e097e78161e2aa5626e60f147782af283fb5420680",
+      "behaviorTraceSetSha256": "1efb28d2c521c7e3d99ded52460146a6011ed11a45f0b34e9f0c1f5c741d8dbd"
+    },
+    "byteIdentical": true,
+    "behaviorTraceIdentical": true,
+    "qualification": "Exact repeated replay on one dedicated guard subrange; no acceptance data are reused.",
+    "summaryPath": "guard/replay/summary.json"
+  },
+  "candidate": {
+    "generation": 5,
+    "candidateId": "draft-g0005-c003-bd939323fa",
+    "intrinsic": [
+      40.975293028896075,
+      1.498908025207488,
+      -21.09196055162904,
+      -1.6044267697879002,
+      2.2029729972083874,
+      13.816854245867777,
+      -5.833315666018342,
+      8.275304457126794,
+      -6.479687167897642,
+      57.61932553632063,
+      8.51775447402829,
+      5.000640024375176,
+      3.851141893085941,
+      -2.067090225784848,
+      -7.39416457989152
+    ],
+    "validationFitness": 0.5013484999312358,
+    "validationReportPath": "generations/0005/validation.json",
+    "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+    "serializedHeads": [
+      "draftIntrinsic"
+    ],
+    "draftDimensions": {
+      "offset": 0,
+      "length": 15
+    },
+    "guardReportPath": "guard/candidate.json"
+  },
+  "incumbent": {
+    "candidateId": "ranked-round1-incumbent",
+    "candidateFingerprint": "087547b8ae01eb54ebf1a4b856aa6ff6e7cca65734ba217e03cc83c1e9acd9b4",
+    "guardReportPath": "guard/incumbent.json"
+  },
+  "naturalCohortDiagnostics": [
+    {
+      "cohort": "ranged",
+      "games": 31474,
+      "wins": 19224,
+      "losses": 11897,
+      "draws": 353,
+      "decisiveGames": 31121,
+      "decisiveWinRate": 0.6177179396548954,
+      "confidence95": {
+        "low": 0.607006357789283,
+        "high": 0.6283163356360627
+      }
+    },
+    {
+      "cohort": "mage",
+      "games": 1700,
+      "wins": 878,
+      "losses": 806,
+      "draws": 16,
+      "decisiveGames": 1684,
+      "decisiveWinRate": 0.5213776722090261,
+      "confidence95": {
+        "low": 0.4876748914505454,
+        "high": 0.5548869552276265
+      }
+    },
+    {
+      "cohort": "melee_magic",
+      "games": 19482,
+      "wins": 12843,
+      "losses": 6431,
+      "draws": 208,
+      "decisiveGames": 19274,
+      "decisiveWinRate": 0.6663380720141123,
+      "confidence95": {
+        "low": 0.6551297655522289,
+        "high": 0.6773615038978051
+      }
+    },
+    {
+      "cohort": "aura_heavy",
+      "games": 17978,
+      "wins": 10601,
+      "losses": 7168,
+      "draws": 209,
+      "decisiveGames": 17769,
+      "decisiveWinRate": 0.5966008216556925,
+      "confidence95": {
+        "low": 0.5844069666135289,
+        "high": 0.6086764696335235
+      }
+    }
+  ],
+  "cohortScan": {
+    "path": "guard/cohorts/scan.json",
+    "manifestSha256": "1673d35add827dfd0bc033ab590784b8734f4e4492abdfafe5efadc82e0e299f",
+    "selectionRule": "candidate_pick_roster_only_no_fight_outcomes",
+    "cohortDefinitions": {
+      "ranged": "candidate roster contains at least one RANGE creature",
+      "mage": "candidate roster contains at least one MAGIC creature",
+      "melee_magic": "candidate roster contains at least one MELEE_MAGIC creature",
+      "aura_heavy": "candidate roster contains at least one creature carrying an aura"
+    }
+  },
+  "finishedAt": "2026-07-17T14:17:13.826Z",
+  "qualification": "Fresh natural, targeted-cohort, and deterministic-replay eligibility only. Passing permits manual review; this autonomous job cannot bake or promote a policy."
+}

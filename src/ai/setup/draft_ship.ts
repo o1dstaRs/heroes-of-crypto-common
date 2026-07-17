@@ -25,6 +25,7 @@ import {
 import { DRAFT_FEATURE_DIM } from "./creature_score";
 import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
+import v07NonfightDraftGenome from "./draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
 
 /**
  * DRAFT SHIP-PATH: turn a config/env value into the deployable draft genome the ranked server consumes.
@@ -46,15 +47,20 @@ export const LEAGUE_ROUND1_DRAFT_CANDIDATE_SPEC = "league-r1-br-57de5a2d-candida
 /** Fresh v0.7-accepted, projected League round-3 candidate. Explicit opt-in; not the fallback default. */
 export const LEAGUE_ROUND3_DRAFT_SPEC = "league-r3-br-52752642";
 
+/** Fresh overnight non-fight candidate. Explicit opt-in; not the fallback default. */
+export const V07_NONFIGHT_DRAFT_SPEC = "v07-nonfight-draft-48d23ac4461";
+
 /**
- * Embed an 11-weight intrinsic draft vector into the full league anchor genome. Composition-blind: the four
- * extra intrinsic features and every counter-draft interaction stay at the anchor's zeros, and the artifact,
- * augment, placement and perk heads keep the measured-table anchor values — so the resulting genome drafts by
- * exactly scoreCreatureWeighted(id, intrinsic) while every non-draft head behaves like the shipped heuristic.
+ * Embed either the legacy 11-weight creature score or the full 15-weight intrinsic draft head into the league
+ * anchor. With the legacy shape, the four extra intrinsic features stay at the anchor's zeros. Counter-draft
+ * interactions and every setup head always keep the measured-table anchor values.
  */
 export function embedIntrinsicDraftWeights(intrinsic: readonly number[]): number[] {
-    if (intrinsic.length !== DRAFT_FEATURE_DIM) {
-        throw new RangeError(`Intrinsic draft vector has ${intrinsic.length} weights; expected ${DRAFT_FEATURE_DIM}`);
+    const fullIntrinsicDimension = LEAGUE_GENOME_LAYOUT.draftIntrinsic.length;
+    if (intrinsic.length !== DRAFT_FEATURE_DIM && intrinsic.length !== fullIntrinsicDimension) {
+        throw new RangeError(
+            `Intrinsic draft vector has ${intrinsic.length} weights; expected ${DRAFT_FEATURE_DIM} (legacy) or ${fullIntrinsicDimension} (full intrinsic)`,
+        );
     }
     if (!intrinsic.every((weight) => typeof weight === "number" && Number.isFinite(weight))) {
         throw new TypeError("Intrinsic draft weights must all be finite numbers");
@@ -67,14 +73,14 @@ export function embedIntrinsicDraftWeights(intrinsic: readonly number[]): number
 const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
     if (Array.isArray(parsed)) {
         const weights = parsed as number[];
-        if (weights.length === DRAFT_FEATURE_DIM) {
+        if (weights.length === DRAFT_FEATURE_DIM || weights.length === LEAGUE_GENOME_LAYOUT.draftIntrinsic.length) {
             return createLeagueGenome(id, embedIntrinsicDraftWeights(weights));
         }
         if (weights.length === LEAGUE_GENOME_DIM) {
             return createLeagueGenome(id, weights);
         }
         throw new RangeError(
-            `Draft weights array has ${weights.length} entries; expected ${DRAFT_FEATURE_DIM} (intrinsic) or ${LEAGUE_GENOME_DIM} (league genome)`,
+            `Draft weights array has ${weights.length} entries; expected ${DRAFT_FEATURE_DIM} (legacy intrinsic), ${LEAGUE_GENOME_LAYOUT.draftIntrinsic.length} (full intrinsic), or ${LEAGUE_GENOME_DIM} (league genome)`,
         );
     }
     if (parsed && typeof parsed === "object") {
@@ -107,8 +113,9 @@ const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
  * - "league-r1-br-57de5a2d": fresh-v0.7-accepted projected League round-1 candidate;
  * - "league-r1-br-57de5a2d-candidate": compatibility alias for the same immutable round-1 weights;
  * - "league-r3-br-52752642": the fresh-v0.7-accepted projected League round-3 candidate;
- * - inline JSON array of 11 intrinsic draft weights (embedded composition-blind into the anchor genome);
- * - inline JSON array of 95 league-genome weights, or an object with { id?, weights } of either length;
+ * - "v07-nonfight-draft-48d23ac4461": the fresh overnight non-fight candidate;
+ * - inline JSON array of 11 legacy or 15 full intrinsic weights (embedded into the anchor genome);
+ * - inline JSON array of 95 league-genome weights, or an object with { id?, weights } of any accepted length;
  * - anything else: path to a JSON file containing one of the above (a league champion artifact).
  */
 export function parseDraftGenome(
@@ -131,6 +138,9 @@ export function parseDraftGenome(
     }
     if (trimmed === LEAGUE_ROUND3_DRAFT_SPEC) {
         return genomeFromParsedJson(leagueRound3ProjectedGenome, LEAGUE_ROUND3_DRAFT_SPEC);
+    }
+    if (trimmed === V07_NONFIGHT_DRAFT_SPEC) {
+        return genomeFromParsedJson(v07NonfightDraftGenome, V07_NONFIGHT_DRAFT_SPEC);
     }
     const raw =
         trimmed.startsWith("[") || trimmed.startsWith("{") ? trimmed : readFileSync(resolve(cwd, trimmed), "utf8");

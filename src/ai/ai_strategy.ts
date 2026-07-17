@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../engine/actions";
+import type { PlacementPolicyVariant } from "./setup/setup_ship";
 import type { FightProperties } from "../fights/fight_properties";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Grid } from "../grid/grid";
@@ -41,10 +42,11 @@ export interface IPlacementContext {
      * Optional: creature ids of OPPONENT stacks this team LEGITIMATELY learned during the pick phase
      * (perk reveals + pick collisions — pick_sim's getKnownOpponentCreatures; live equivalent: the
      * server session's knownOpponentCreatureIdsByPlayer). Absent/empty = the seat knows nothing it
-     * could fairly act on. Consumed only by the env-gated reveal-conditioned placement experiment
-     * (V07_PLACEMENT_REVEAL=on, default off); absent keeps every strategy byte-identical.
+     * could fairly act on. Consumed only by reveal-conditioned placement when setupPlacementPolicy selects it.
      */
     revealedOpponentCreatures?: readonly number[];
+    /** Explicit setup-policy placement mode. When present it overrides the legacy process env gate. */
+    setupPlacementPolicy?: PlacementPolicyVariant;
 }
 
 export interface IDecisionContext {

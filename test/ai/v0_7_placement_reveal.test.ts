@@ -1,8 +1,8 @@
 /*
  * -----------------------------------------------------------------------------
- * V07_PLACEMENT_REVEAL (env-gated, default OFF): reveal-conditioned deployment heuristics act only on
- * IPlacementContext.revealedOpponentCreatures — what the seat legitimately learned during picks. Gate
- * off / no reveals / no relevant threat => v0.7's placement stays byte-identical. Gate on:
+ * Reveal-conditioned deployment heuristics act only on IPlacementContext.revealedOpponentCreatures — what
+ * the seat legitimately learned during picks. The explicit setup policy overrides the legacy environment
+ * fallback. Gate off / no reveals / no relevant threat => v0.7's placement stays byte-identical. Gate on:
  * splash reveal -> 2-cell-gap dispersion; >=2 flyers -> shooter screen; charger -> corner shift.
  * -----------------------------------------------------------------------------
  */
@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy } from "../../src/ai";
 import type { IPlacementContext } from "../../src/ai/ai_strategy";
+import type { PlacementPolicyVariant } from "../../src/ai/setup/setup_ship";
 import {
     classifyRevealedThreats,
     FLYER_SCREEN_THRESHOLD,
@@ -86,11 +87,16 @@ function buildScenario(scenario: IPlacementScenario): {
 }
 
 /** Placement cells in UNIT ORDER (unit ids are fresh per scenario build, so order is the identity). */
-function place(scenario: IPlacementScenario, revealed?: readonly number[]): XY[] {
+function place(
+    scenario: IPlacementScenario,
+    revealed?: readonly number[],
+    setupPlacementPolicy?: PlacementPolicyVariant,
+): XY[] {
     const { units, context } = buildScenario(scenario);
     const placed = v07.placeArmy(units, {
         ...context,
         ...(revealed ? { revealedOpponentCreatures: revealed } : {}),
+        ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
     });
     expect(placed.size).toBe(units.length);
     for (const cell of placed.values()) {
@@ -154,6 +160,28 @@ describe("V07_PLACEMENT_REVEAL gating (byte-identical defaults)", () => {
         process.env[REVEAL_PLACEMENT_ENV] = "on";
         const gated = place({ shooters: 1, groundMelee: 3 }, [CREATURES.PEASANT]);
         expect(samePlacement(baseline, gated)).toBe(true);
+    });
+
+    it("explicit baseline overrides an env-on process", () => {
+        process.env[REVEAL_PLACEMENT_ENV] = "on";
+        const baseline = place({ shooters: 1, groundMelee: 3 }, [], "baseline");
+        const withFlyerReveals = place(
+            { shooters: 1, groundMelee: 3 },
+            [CREATURES.GRIFFIN, CREATURES.BLACK_DRAGON],
+            "baseline",
+        );
+        expect(samePlacement(baseline, withFlyerReveals)).toBe(true);
+    });
+
+    it("explicit legitimate-reveal overrides an env-off process", () => {
+        process.env[REVEAL_PLACEMENT_ENV] = "off";
+        const baseline = place({ shooters: 1, groundMelee: 3 }, [], "legitimate-reveal");
+        const withFlyerReveals = place(
+            { shooters: 1, groundMelee: 3 },
+            [CREATURES.GRIFFIN, CREATURES.BLACK_DRAGON],
+            "legitimate-reveal",
+        );
+        expect(samePlacement(baseline, withFlyerReveals)).toBe(false);
     });
 });
 

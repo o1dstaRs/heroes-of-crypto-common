@@ -1,0 +1,51 @@
+{
+    "schemaVersion": 1,
+    "artifactKind": "projected_draft_genome",
+    "status": "accepted_opt_in",
+    "id": "draft-g0005-c003-bd939323fa",
+    "omniscientDraft": false,
+    "source": {
+        "revision": "9736421c6416c535e68bfd2ddd61ab88cf2267cf",
+        "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+        "runFingerprint": "245a85596bf93ff50e59b3303e9345e1ba4a83569380a6492f9f7d2746803caa",
+        "verdictSha256": "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4",
+        "generation": 5,
+        "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+        "serializedHeads": ["draftIntrinsic"],
+        "draftDimensions": {
+            "offset": 0,
+            "length": 15
+        }
+    },
+    "projection": {
+        "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+        "genomeFingerprint": "fc73cc65dc600f0b10da028513d190479be3e444a9cd39b40968bdd32f6de96b",
+        "preservedWeightRangeInclusive": [0, 14],
+        "resetWeightRangeInclusive": [15, 94]
+    },
+    "acceptance": {
+        "status": "PASS",
+        "verdictStatus": "research_only_no_bake",
+        "eligibleForManualReview": true,
+        "checks": {
+            "naturalGuardPassed": true,
+            "targetedCohortGuardPassed": true,
+            "deterministicReplayByteIdentical": true,
+            "deterministicReplayBehaviorTraceIdentical": true
+        }
+    },
+    "authority": {
+        "acceptedForOptIn": true,
+        "defaultChanged": false,
+        "productionEnabled": false,
+        "deployAuthorization": false
+    },
+    "weights": [
+        40.975293028896075, 1.498908025207488, -21.09196055162904, -1.6044267697879002, 2.2029729972083874,
+        13.816854245867777, -5.833315666018342, 8.275304457126794, -6.479687167897642, 57.61932553632063,
+        8.51775447402829, 5.000640024375176, 3.851141893085941, -2.067090225784848, -7.39416457989152, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49.3, 45.4, 49.7, 51.4, 46.6, 44.5, 47.2, 51.5, 79.8, 45, 46.1, 42.8, 63.7,
+        63.9, 46.1, 62.2, 29.7, 45.3, 41.5, 47.1, 40.2, 68.8, 46.3, 45.4, 19, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 7,
+        0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 6, 5, 7
+    ]
+}

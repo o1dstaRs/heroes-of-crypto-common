@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "v0_7_nonfight_11h_promotion_report",
+  "status": "accepted_setup_only",
+  "recordedAt": "2026-07-17T14:29:50.264Z",
+  "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+  "campaign": {
+    "sourceCommit": "9736421c6416c535e68bfd2ddd61ab88cf2267cf",
+    "guardSourceCommit": "3f6e95d5dc4f5a86f544e860af5ab2eb21bebc04",
+    "runSha256": "6f4fb7fc65934616cba067ef8c7ddeeab87fb107b1c12124f4331a9ca10cc41f",
+    "terminalSha256": "1e9999a97e40725371fbf71e21676d4e9288552b0144da5c134df23f235a133f",
+    "configSha256": "722a84d493c3c61ad33e7454a8544eb6747f1412a23748505bc9959d31d59e03",
+    "provenanceSha256": "fb796bb030d7ef58b81d284080082f2f8fa6f7feb8a51b7f02057b2b035f8578"
+  },
+  "archive": {
+    "campaignRun": {
+      "path": "campaign-run.json",
+      "bytesSha256": "2b5e5d27fe5b8cac8905fce7155b2d30917be06efda1371279a97da709ed38b2",
+      "artifactSha256": "6f4fb7fc65934616cba067ef8c7ddeeab87fb107b1c12124f4331a9ca10cc41f"
+    },
+    "campaignTerminal": {
+      "path": "campaign-terminal.json",
+      "bytesSha256": "784cf446c162f8a0e321b4c183de51503b99b25fb2e102371c2e556421982e05",
+      "artifactSha256": "1e9999a97e40725371fbf71e21676d4e9288552b0144da5c134df23f235a133f"
+    },
+    "draftVerdict": {
+      "path": "draft-verdict.json",
+      "bytesSha256": "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4",
+      "artifactSha256": "6ccb33f4bb41d2a44cb602ecbac7e3218d08a17a8925190df128f7fbb92a5a10"
+    },
+    "manifest": {
+      "path": "composed-manifest.json",
+      "bytesSha256": "1cce8972bec52ea6c60907a3decd31b4ea4006d6c0c2d2c7b6a532f350711495",
+      "artifactSha256": "986397a74135fa4160491b26fb254ba6016ff95f59fcf5a69f43bb808b400230"
+    },
+    "report": {
+      "path": "composed-report.json",
+      "bytesSha256": "d3725240157132c5580b245afc5117084d018b6661af69776bda38be427d57c5",
+      "artifactSha256": "d6264acb4d5f9b25bf47e44a326d5fa3f602ab065ca17365e9ac1651bc849313"
+    },
+    "outcome": {
+      "path": "composed-outcome.json",
+      "bytesSha256": "371f558a238320d37c97f581ebfc6906dd75a9b64393f9bbbaae888f98df7217"
+    },
+    "campaignAttestation": {
+      "path": "campaign.expected.env",
+      "bytesSha256": "fc19b4a117a07d74c47716488efdd5a5d9d1281aad32b15369d1125a1dc9ae1e",
+      "sourceMode": "0440"
+    },
+    "guardAttestation": {
+      "path": "guard.expected.env",
+      "bytesSha256": "ef92ed546c9fdcf09afa0425187190f4c20b74bdea70b20d4bb1df70dfbfea0c",
+      "sourceMode": "0440"
+    },
+    "checkpoint": {
+      "archived": false,
+      "reason": "The final checkpoint is 100,950,708 bytes; the compact archive binds both exact byte and self hashes.",
+      "bytesSha256": "48d4766412a3a2cab95f54eb05366b4aecb094c06a68324e74022c2c58f97b57",
+      "artifactSha256": "44611bbaee4ff8a24d9a78314758c58bc43c613eff68e814e26d36883655927b"
+    }
+  },
+  "sealedInputs": {
+    "count": 17,
+    "draftVerdictBytesSha256": "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4",
+    "draftRunFingerprint": "245a85596bf93ff50e59b3303e9345e1ba4a83569380a6492f9f7d2746803caa",
+    "setupFinalBytesSha256": "808c75b6ea6e74ee858c741a2fab9659f86266889cdf0cd815de965746b7221b",
+    "setupFinalArtifactSha256": "ff64bdef6bada7bedd8aa170b257886a6ef0fa064c3284f70a9901c1c90bf068",
+    "setupCheckpointBytesSha256": "0a5c8c63a1020a083a0ccbc8d83096dfe137b83799922059119092a6062d27d6"
+  },
+  "policies": {
+    "setup": {
+      "spec": "v07-nonfight-4eda84635fe7",
+      "behaviorSha256": "4eda84635fe7e3e9054e1d8161328ce61d45719734adf16acf98006eb3f88f57",
+      "guardPolicyFingerprint": "e640818efda3ca12e88099773b08a0b942beba7402403805f576acb02b72ee2c"
+    },
+    "draft": {
+      "spec": "v07-nonfight-draft-48d23ac4461",
+      "candidateFingerprint": "48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e",
+      "genomeFingerprint": "fc73cc65dc600f0b10da028513d190479be3e444a9cd39b40968bdd32f6de96b",
+      "disposition": "explicit_opt_in_only_not_default"
+    },
+    "composed": {
+      "candidateFingerprint": "2a819358b3dde36e8c7493da6fcd406f4d2d24fa384e3856469b69d333df61dd",
+      "baselineFingerprint": "a6f0e58f1a6b0263a1be8e2e5a3d07525055ba96787e4ba81f3003e8f789ce23"
+    }
+  },
+  "individualSetupGuard": {
+    "completedAt": "2026-07-17T10:56:25.370Z",
+    "promotable": true,
+    "aggregate": {
+      "pairs": 12288,
+      "games": 24576,
+      "wins": 13144,
+      "losses": 11198,
+      "draws": 234,
+      "decisiveWinRate": 0.5399720647440638,
+      "confidence95LowGainPp": 3.114872276491476,
+      "candidateRejections": 0,
+      "baselineRejections": 0
+    },
+    "cohorts": {
+      "ranged": {
+        "games": 4343,
+        "decisiveWinRate": 0.5043093407873283,
+        "confidence95LowGainPp": -1.0999172394204892
+      },
+      "mage": {
+        "games": 4326,
+        "decisiveWinRate": 0.5421911421911422,
+        "confidence95LowGainPp": 2.6901101587160636
+      },
+      "melee-magic": {
+        "games": 6340,
+        "decisiveWinRate": 0.563315303849825,
+        "confidence95LowGainPp": 4.807402605736765
+      },
+      "aura-heavy": {
+        "games": 7526,
+        "decisiveWinRate": 0.53158953722334,
+        "confidence95LowGainPp": 1.6285442829343633
+      }
+    },
+    "maps": {
+      "NORMAL": {
+        "games": 8190,
+        "decisiveWinRate": 0.5428641914394967,
+        "confidence95LowGainPp": 2.757340741387193
+      },
+      "LAVA_CENTER": {
+        "games": 8196,
+        "decisiveWinRate": 0.5352130017237133,
+        "confidence95LowGainPp": 1.991666982732332
+      },
+      "BLOCK_CENTER": {
+        "games": 8190,
+        "decisiveWinRate": 0.5418464193270061,
+        "confidence95LowGainPp": 2.655394272824807
+      }
+    },
+    "controlSymmetry": {
+      "passed": true,
+      "sha256": "340f4bed6db6a3236a8349248202d69e20e4abb702aabe78938888333c718337"
+    },
+    "deterministicReplay": {
+      "byteIdentical": true,
+      "sha256": "13535c6cf6631afa7967df32e454ad3edbbcb6eb1fd7318c45bbf685c53181d8"
+    }
+  },
+  "composedGuard": {
+    "completion": "complete",
+    "eligibleForManualReview": false,
+    "checksPassed": 21,
+    "checksTotal": 23,
+    "natural": {
+      "offerBoards": 8000,
+      "games": 32000,
+      "decisiveWinRate": 0.5610816944024206,
+      "confidence95Low": 0.5501802803965051,
+      "candidateRejections": 0,
+      "baselineRejections": 0
+    },
+    "targetedCohorts": {
+      "ranged": {
+        "qualifiedOfferBoards": 2500,
+        "games": 9988,
+        "decisiveWinRate": 0.5673300333367006,
+        "confidence95Low": 0.5478198795059293
+      },
+      "mage": {
+        "qualifiedOfferBoards": 2500,
+        "games": 5036,
+        "decisiveWinRate": 0.47375801282051283,
+        "confidence95Low": 0.45424026838105624
+      },
+      "melee_magic": {
+        "qualifiedOfferBoards": 2500,
+        "games": 6890,
+        "decisiveWinRate": 0.618245716796017,
+        "confidence95Low": 0.5990340266881589
+      },
+      "aura": {
+        "qualifiedOfferBoards": 2500,
+        "games": 7148,
+        "decisiveWinRate": 0.5313778028486814,
+        "confidence95Low": 0.5117832463244276
+      }
+    },
+    "failedChecks": [
+      "targetedCohortPointEstimatesAtLeast49_5",
+      "targetedCohortClusteredLower95AtLeast48"
+    ],
+    "failure": {
+      "cohort": "mage",
+      "pointThreshold": 0.495,
+      "observedPoint": 0.47375801282051283,
+      "lower95Threshold": 0.48,
+      "observedLower95": 0.45424026838105624
+    },
+    "deterministicReplay": {
+      "boards": 8,
+      "sha256": "02abedad3ede4b99fc5d602b3b1a2bbafd917d760492b2b894ad650a1d59fc41",
+      "byteIdentical": true
+    }
+  },
+  "decision": {
+    "setup": "accept_for_promotion",
+    "draft": "do_not_promote_from_this_campaign",
+    "composed": "reject",
+    "reason": "The setup lane independently passed every preregistered guard. The composed draft-plus-setup arm completed but missed both targeted named-cohort gates because mage reached 47.3758% decisive with a 45.4240% clustered lower bound, below the 49.5% and 48% floors. The draft artifact remains available only through its explicit opt-in spec and is not made the default."
+  },
+  "authority": {
+    "setupAcceptedForPromotion": true,
+    "draftAcceptedForPromotion": false,
+    "draftExplicitOptInRetained": true,
+    "composedAcceptedForPromotion": false,
+    "defaultChangedByThisArtifact": false,
+    "productionEnabled": false,
+    "deployAuthorization": false
+  },
+  "promotionSha256": "efc2e00a2de54cce085256c3b63b58c83d2387dd94c3427129e139e42209c276"
+}

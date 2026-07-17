@@ -24,10 +24,12 @@ import {
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
     projectDraftGenomeForShipping,
+    V07_NONFIGHT_DRAFT_SPEC,
 } from "../../src/ai/setup/draft_ship";
 import { DRAFT_ANCHOR_W, DRAFT_FEATURE_DIM, scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
 import leagueRound1CandidateGenome from "../../src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "../../src/ai/setup/draft_genomes/league_round3_br_52752642_projected.json";
+import v07NonfightDraftGenome from "../../src/ai/setup/draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
     createLeagueGenome,
@@ -36,6 +38,7 @@ import {
     LEAGUE_GENOME_LAYOUT,
 } from "../../src/simulation/league_genome";
 import { leagueGenomeFingerprint } from "../../src/simulation/optimizer/league_cycle_core";
+import { fingerprintRankedDraftArtifact } from "../../src/simulation/optimizer/ranked_draft_cem_core";
 
 const temporaryDirectories: string[] = [];
 
@@ -56,6 +59,21 @@ describe("draft ship genome", () => {
         expect(draftGenomeCreatureScore(genome, creatureId)).toBe(scoreCreatureWeighted(creatureId, DRAFT_ANCHOR_W));
         expect(() => embedIntrinsicDraftWeights(new Array(DRAFT_FEATURE_DIM - 1).fill(0))).toThrow(RangeError);
         expect(() => embedIntrinsicDraftWeights([...DRAFT_ANCHOR_W.slice(0, -1), Number.NaN])).toThrow(TypeError);
+    });
+
+    it("embeds the full intrinsic head while preserving every non-draft anchor weight", () => {
+        const intrinsic = v07NonfightDraftGenome.weights.slice(0, LEAGUE_GENOME_LAYOUT.draftIntrinsic.length);
+        const embedded = embedIntrinsicDraftWeights(intrinsic);
+        const parsed = parseDraftGenome(JSON.stringify({ id: "full-intrinsic", weights: intrinsic }));
+
+        expect(intrinsic).toHaveLength(15);
+        expect(embedded.slice(0, 15)).toEqual(intrinsic);
+        expect(embedded.slice(15)).toEqual(LEAGUE_ANCHOR_GENOME.slice(15));
+        expect(parsed.id).toBe("full-intrinsic");
+        expect(parsed.weights).toEqual(embedded);
+        expect(() => embedIntrinsicDraftWeights(new Array(12).fill(0))).toThrow(
+            "expected 11 (legacy) or 15 (full intrinsic)",
+        );
     });
 
     it("parses named, inline and file artifacts and rejects non-deployable metadata", () => {
@@ -171,6 +189,49 @@ describe("draft ship genome", () => {
             researchOnly: false,
             acceptedForRankedOptIn: true,
             eligibleForDefaultReview: true,
+            defaultChanged: false,
+            productionEnabled: false,
+            deployAuthorization: false,
+        });
+    });
+
+    it("exposes the qualified overnight draft as an immutable explicit opt-in", () => {
+        const accepted = parseDraftGenome(V07_NONFIGHT_DRAFT_SPEC);
+        const projected = projectDraftGenomeForShipping(accepted);
+        const artifactBytesSha256 = createHash("sha256")
+            .update(
+                readFileSync(
+                    new URL(
+                        "../../src/ai/setup/draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json",
+                        import.meta.url,
+                    ),
+                ),
+            )
+            .digest("hex");
+
+        expect(accepted.id).toBe("draft-g0005-c003-bd939323fa");
+        expect(artifactBytesSha256).toBe("368e206d6c26e355db7550af445e80b0ddb774c7a64081dc39b424bca8e4b424");
+        expect(accepted.weights).toHaveLength(LEAGUE_GENOME_DIM);
+        expect(accepted.weights).toEqual(v07NonfightDraftGenome.weights);
+        expect(projected).toEqual(accepted);
+        expect(
+            fingerprintRankedDraftArtifact({ schemaVersion: accepted.schemaVersion, weights: accepted.weights }),
+        ).toBe("48d23ac446177be6a231f2fa85bd156a24f707b26215baf72b829ed43e4e454e");
+        expect(v07NonfightDraftGenome.source.candidateFingerprint).toBe(
+            v07NonfightDraftGenome.projection.candidateFingerprint,
+        );
+        expect(leagueGenomeFingerprint(accepted)).toBe(
+            "fc73cc65dc600f0b10da028513d190479be3e444a9cd39b40968bdd32f6de96b",
+        );
+        expect(v07NonfightDraftGenome.projection.genomeFingerprint).toBe(leagueGenomeFingerprint(accepted));
+        expect(v07NonfightDraftGenome.source.verdictSha256).toBe(
+            "daa7dd631d833f7548c6d5448bc0ab7c4afca9a9e9a462852ebec38cec60f9f4",
+        );
+        expect(v07NonfightDraftGenome.acceptance.status).toBe("PASS");
+        expect(Object.values(v07NonfightDraftGenome.acceptance.checks).every(Boolean)).toBe(true);
+        expect(parseDraftGenome("default").weights).not.toEqual(accepted.weights);
+        expect(v07NonfightDraftGenome.authority).toEqual({
+            acceptedForOptIn: true,
             defaultChanged: false,
             productionEnabled: false,
             deployAuthorization: false,

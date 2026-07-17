@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "status": "research_only_no_bake",
+  "autoBaked": false,
+  "runId": "c77bae00-909a-4095-bb12-27dbe9b796bb",
+  "completion": "complete",
+  "eligibleForManualReview": false,
+  "manifestSha256": "986397a74135fa4160491b26fb254ba6016ff95f59fcf5a69f43bb808b400230",
+  "ledgerSha256": "0398e0421e73caa669fd943e79023f382e7b59eada6a8d4828ca4a6abd1cd9a9",
+  "reportSha256": "d6264acb4d5f9b25bf47e44a326d5fa3f602ab065ca17365e9ac1651bc849313",
+  "reportPath": "report.json",
+  "qualification": "Research-only outcome. Even an eligible result requires owner review and a separate coordinated commit/deploy; no policy was auto-baked."
+}

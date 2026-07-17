@@ -86,6 +86,23 @@ export type {
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
 export type { ISetupPolicy } from "./ai/setup/setup_strategy";
 export { scoreCreature, creatureInfo } from "./ai/setup/creature_score";
+export {
+    compileNonFightSetupPolicy,
+    resolveSetupPolicy,
+    SETUP_COHORTS,
+    setupCohort,
+    V07_NONFIGHT_BEHAVIOR_SHA256,
+    V07_NONFIGHT_SETUP_ARTIFACT,
+    V07_NONFIGHT_SETUP_SPEC,
+} from "./ai/setup/setup_ship";
+export type {
+    IResolvedSetupPolicy,
+    ISetupAugmentChoice,
+    ISetupPolicyBehavior,
+    ISetupSynergyChoice,
+    PlacementPolicyVariant,
+    SetupCohort,
+} from "./ai/setup/setup_ship";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";
 export { default as CREATURES_JSON } from "./configuration/creatures.json";
