@@ -202,6 +202,8 @@ interface ITeamSetupOutcome {
 interface IConditionalPickDriverOptions {
     conditionalTeams: ReadonlySet<PickTeam>;
     preservePickOrder: boolean;
+    /** Ranked-composed evaluation may assign independent deployable draft genomes to the two pick seats. */
+    genomeForTeam?: (team: PickTeam) => ILeagueGenome | undefined;
     /** Research-only per-seat Tier-2 override evaluated at the live ARTIFACT_2 timing (five creatures). */
     pickArtifactT2?: (
         team: PickTeam,
@@ -211,6 +213,10 @@ interface IConditionalPickDriverOptions {
 }
 
 export interface IRankedConditionalPickOverrides {
+    /** Optional lower-seat draft policy. The positional genome remains the backward-compatible default. */
+    lowerGenome?: ILeagueGenome;
+    /** Optional upper-seat draft policy. The positional genome remains the backward-compatible default. */
+    upperGenome?: ILeagueGenome;
     /** Return undefined to retain CONDITIONAL_SETUP_V1 for this seat. */
     pickArtifactT2?: IConditionalPickDriverOptions["pickArtifactT2"];
 }
@@ -246,6 +252,8 @@ export function runRankedConditionalPickGame(
     return runConditionalPickGameWithOptions(seed, "league", rules, genome, {
         conditionalTeams: new Set([LOWER, UPPER]),
         preservePickOrder: true,
+        genomeForTeam: (team) =>
+            team === LOWER ? (overrides.lowerGenome ?? genome) : (overrides.upperGenome ?? genome),
         pickArtifactT2: overrides.pickArtifactT2,
     });
 }
@@ -286,12 +294,16 @@ function runConditionalPickGameWithOptions(
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
             for (const team of [LOWER, UPPER] as const) {
                 if (teamState(team).selectedBundleIndex === undefined) {
-                    accept({ type: "select_bundle", team, bundleIndex: chooseBundle(state, team, draft, genome) });
+                    accept({
+                        type: "select_bundle",
+                        team,
+                        bundleIndex: chooseBundle(state, team, draft, options.genomeForTeam?.(team) ?? genome),
+                    });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.PICK) {
             const team = phase.actors[0];
-            const creatureId = chooseCreature(state, team, draft, genome);
+            const creatureId = chooseCreature(state, team, draft, options.genomeForTeam?.(team) ?? genome);
             const transition = transitionPickSim(state, { type: "pick_creature", team, creatureId }, rngInt);
             if (transition.status === "rejected") {
                 throw new Error(`Creature pick rejected (${transition.reason})`);

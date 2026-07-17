@@ -704,7 +704,9 @@ export function inspectRankedDraftBoard(
     return { offerBoard, pairSeed, pickSeed, assignments };
 }
 
-export function clusteredRankedDraftConfidence95(records: readonly IRankedDraftGameRecord[]): {
+export function clusteredRankedDraftConfidence95(
+    records: readonly Pick<IRankedDraftGameRecord, "pairSeed" | "candidateResult">[],
+): {
     low: number;
     high: number;
 } {
@@ -713,7 +715,7 @@ export function clusteredRankedDraftConfidence95(records: readonly IRankedDraftG
     const decisive = wins + losses;
     if (!decisive) return { low: 0, high: 1 };
     const point = wins / decisive;
-    const clusters = new Map<number, IRankedDraftGameRecord[]>();
+    const clusters = new Map<number, Pick<IRankedDraftGameRecord, "pairSeed" | "candidateResult">[]>();
     for (const record of records) {
         const values = clusters.get(record.pairSeed) ?? [];
         values.push(record);
@@ -951,6 +953,7 @@ export function summarizeRankedDraftRecords(
 }
 
 interface IWorkerData {
+    rankedDraftEvaluationWorker: true;
     candidate: ILeagueGenome;
     pool: IRankedDraftPoolEntry[];
     options: INormalizedOptions;
@@ -1029,7 +1032,7 @@ export function evaluateRankedDraftTasks(
         };
         for (let index = 0; index < Math.min(options.concurrency, tasks.length); index += 1) {
             const worker = new Worker(new URL(import.meta.url), {
-                workerData: { candidate, pool, options } satisfies IWorkerData,
+                workerData: { rankedDraftEvaluationWorker: true, candidate, pool, options } satisfies IWorkerData,
                 env: environment,
             });
             workers.push(worker);
@@ -1152,7 +1155,7 @@ function workerMain(data: IWorkerData): void {
     parentPort.postMessage({ type: "ready" });
 }
 
-if (!isMainThread) {
+if (!isMainThread && (workerData as Partial<IWorkerData> | undefined)?.rankedDraftEvaluationWorker) {
     workerMain(workerData as IWorkerData);
 } else if (import.meta.main) {
     cliMain().catch((error) => {
