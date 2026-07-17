@@ -784,6 +784,10 @@ export class FightProperties {
     public getSynergiesPerTeam(teamType: TeamType): string[] {
         return this.synergiesPerTeam.get(teamType) ?? [];
     }
+    /** Restore the active synergy keys when hydrating a fresh fight state. */
+    public setSynergiesPerTeam(teamType: TeamType, synergies: string[]): void {
+        this.synergiesPerTeam.set(teamType, [...synergies]);
+    }
     public updateSynergyPerTeam(
         teamType: TeamType,
         faction: FactionType,

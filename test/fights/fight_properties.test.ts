@@ -387,6 +387,31 @@ describe("FightProperties", () => {
             ).toBe(false);
         });
 
+        it("restores a team's active synergies without sharing the input array", () => {
+            const team = PBTypes.TeamVals.LOWER;
+            const prior = new FightProperties();
+            prior.setSynergyUnitsPerFactions(team, 6, 6, 6, 6);
+            expect(
+                prior.updateSynergyPerTeam(
+                    team,
+                    PBTypes.FactionVals.MIGHT,
+                    MightSynergy.PLUS_AURAS_RANGE,
+                    SynergyLevel.LEVEL_3,
+                ),
+            ).toBe(true);
+
+            const restored = new FightProperties();
+            const synergies = prior.getSynergiesPerTeam(team);
+            restored.setSynergiesPerTeam(team, synergies);
+            synergies.length = 0;
+
+            expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(3);
+            expect(restored.getSynergiesPerTeam(PBTypes.TeamVals.UPPER)).toEqual([]);
+
+            restored.setSynergiesPerTeam(team, []);
+            expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(0);
+        });
+
         it("updates selected synergies when team faction counts change", () => {
             const fightProperties = new FightProperties();
             const team = PBTypes.TeamVals.LOWER;
