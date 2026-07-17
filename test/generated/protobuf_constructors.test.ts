@@ -107,14 +107,27 @@ describe("generated message constructors (new X({...}))", () => {
     it("constructs player_portal messages directly", () => {
         const match = {
             game_id: "g",
-            won: true,
-            abandoned: false,
+            won: false,
+            abandoned: true,
             finished_time: 1,
             opponent_username: "o",
             team: TypesPB.TeamVals.UPPER,
             creature_ids: [1, 2],
             opponent_creature_ids: [3],
+            duration_ms: 150000,
+            total_laps: 9,
+            player_damage: 2100,
+            opponent_damage: 1900,
+            replay_available: true,
+            player_top_units: [new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 })],
+            opponent_top_units: [new PortalPB.PortalUnitPerformance({ creature_id: 3, damage_dealt: 1200 })],
+            draw: false,
+            player_abandoned: true,
         };
+        roundTrip(
+            new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 }),
+            PortalPB.PortalUnitPerformance.deserializeBinary,
+        );
         roundTrip(new PortalPB.PortalMatch(match), PortalPB.PortalMatch.deserializeBinary);
         roundTrip(
             new PortalPB.PortalComboStat({ creature_ids: [1, 2], games: 3, wins: 2 }),

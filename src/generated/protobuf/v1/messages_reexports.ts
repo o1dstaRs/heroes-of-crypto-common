@@ -92,6 +92,11 @@ export type ReadyRequest = InstanceType<typeof m_lobby.PBTypes.ReadyRequest>;
 export type ReadyRequestObject = ReturnType<InstanceType<typeof m_lobby.PBTypes.ReadyRequest>["toObject"]>;
 
 import * as m_player_portal from "./player_portal";
+export const PortalUnitPerformance = m_player_portal.PBTypes.PortalUnitPerformance;
+export type PortalUnitPerformance = InstanceType<typeof m_player_portal.PBTypes.PortalUnitPerformance>;
+export type PortalUnitPerformanceObject = ReturnType<
+    InstanceType<typeof m_player_portal.PBTypes.PortalUnitPerformance>["toObject"]
+>;
 export const PortalMatch = m_player_portal.PBTypes.PortalMatch;
 export type PortalMatch = InstanceType<typeof m_player_portal.PBTypes.PortalMatch>;
 export type PortalMatchObject = ReturnType<InstanceType<typeof m_player_portal.PBTypes.PortalMatch>["toObject"]>;
@@ -113,4 +118,3 @@ export type ResponsePlayerPortal = InstanceType<typeof m_player_portal.PBTypes.R
 export type ResponsePlayerPortalObject = ReturnType<
     InstanceType<typeof m_player_portal.PBTypes.ResponsePlayerPortal>["toObject"]
 >;
-

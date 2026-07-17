@@ -2,6 +2,12 @@ syntax = "proto3";
 
 package PBTypes;
 
+// Per-creature combat output for one team in a finished match.
+message PortalUnitPerformance {
+    int32 creature_id = 1;
+    int64 damage_dealt = 2;
+}
+
 // One finished match from the requesting player's perspective.
 message PortalMatch {
     string game_id = 1;
@@ -14,6 +20,15 @@ message PortalMatch {
     // Creature ids the viewer fielded, and the opponent's (when known).
     repeated int32 creature_ids = 7 [packed = false];
     repeated int32 opponent_creature_ids = 8 [packed = false];
+    int64 duration_ms = 9;
+    int32 total_laps = 10;
+    int64 player_damage = 11;
+    int64 opponent_damage = 12;
+    bool replay_available = 13;
+    repeated PortalUnitPerformance player_top_units = 14;
+    repeated PortalUnitPerformance opponent_top_units = 15;
+    bool draw = 16;
+    bool player_abandoned = 17;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.

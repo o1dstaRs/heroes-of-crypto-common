@@ -6,6 +6,96 @@
  * git: https://github.com/thesayyn/protoc-gen-ts */
 import * as pb_1 from "google-protobuf";
 export namespace PBTypes {
+    export class PortalUnitPerformance extends pb_1.Message {
+        #one_of_decls: number[][] = [];
+        constructor(data?: any[] | {
+            creature_id?: number;
+            damage_dealt?: number;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("creature_id" in data && data.creature_id != undefined) {
+                    this.creature_id = data.creature_id;
+                }
+                if ("damage_dealt" in data && data.damage_dealt != undefined) {
+                    this.damage_dealt = data.damage_dealt;
+                }
+            }
+        }
+        get creature_id() {
+            return pb_1.Message.getFieldWithDefault(this, 1, 0) as number;
+        }
+        set creature_id(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get damage_dealt() {
+            return pb_1.Message.getFieldWithDefault(this, 2, 0) as number;
+        }
+        set damage_dealt(value: number) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        static fromObject(data: {
+            creature_id?: number;
+            damage_dealt?: number;
+        }): PortalUnitPerformance {
+            const message = new PortalUnitPerformance({});
+            if (data.creature_id != null) {
+                message.creature_id = data.creature_id;
+            }
+            if (data.damage_dealt != null) {
+                message.damage_dealt = data.damage_dealt;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                creature_id?: number;
+                damage_dealt?: number;
+            } = {};
+            if (this.creature_id != null) {
+                data.creature_id = this.creature_id;
+            }
+            if (this.damage_dealt != null) {
+                data.damage_dealt = this.damage_dealt;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.creature_id != 0)
+                writer.writeInt32(1, this.creature_id);
+            if (this.damage_dealt != 0)
+                writer.writeInt64(2, this.damage_dealt);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): PortalUnitPerformance {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new PortalUnitPerformance();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.creature_id = reader.readInt32();
+                        break;
+                    case 2:
+                        message.damage_dealt = reader.readInt64();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): PortalUnitPerformance {
+            return PortalUnitPerformance.deserialize(bytes);
+        }
+    }
     export class PortalMatch extends pb_1.Message {
         #one_of_decls: number[][] = [];
         constructor(data?: any[] | {
@@ -17,9 +107,18 @@ export namespace PBTypes {
             team?: number;
             creature_ids?: number[];
             opponent_creature_ids?: number[];
+            duration_ms?: number;
+            total_laps?: number;
+            player_damage?: number;
+            opponent_damage?: number;
+            replay_available?: boolean;
+            player_top_units?: PortalUnitPerformance[];
+            opponent_top_units?: PortalUnitPerformance[];
+            draw?: boolean;
+            player_abandoned?: boolean;
         }) {
             super();
-            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8], this.#one_of_decls);
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
             if (!Array.isArray(data) && typeof data == "object") {
                 if ("game_id" in data && data.game_id != undefined) {
                     this.game_id = data.game_id;
@@ -44,6 +143,33 @@ export namespace PBTypes {
                 }
                 if ("opponent_creature_ids" in data && data.opponent_creature_ids != undefined) {
                     this.opponent_creature_ids = data.opponent_creature_ids;
+                }
+                if ("duration_ms" in data && data.duration_ms != undefined) {
+                    this.duration_ms = data.duration_ms;
+                }
+                if ("total_laps" in data && data.total_laps != undefined) {
+                    this.total_laps = data.total_laps;
+                }
+                if ("player_damage" in data && data.player_damage != undefined) {
+                    this.player_damage = data.player_damage;
+                }
+                if ("opponent_damage" in data && data.opponent_damage != undefined) {
+                    this.opponent_damage = data.opponent_damage;
+                }
+                if ("replay_available" in data && data.replay_available != undefined) {
+                    this.replay_available = data.replay_available;
+                }
+                if ("player_top_units" in data && data.player_top_units != undefined) {
+                    this.player_top_units = data.player_top_units;
+                }
+                if ("opponent_top_units" in data && data.opponent_top_units != undefined) {
+                    this.opponent_top_units = data.opponent_top_units;
+                }
+                if ("draw" in data && data.draw != undefined) {
+                    this.draw = data.draw;
+                }
+                if ("player_abandoned" in data && data.player_abandoned != undefined) {
+                    this.player_abandoned = data.player_abandoned;
                 }
             }
         }
@@ -95,6 +221,60 @@ export namespace PBTypes {
         set opponent_creature_ids(value: number[]) {
             pb_1.Message.setField(this, 8, value);
         }
+        get duration_ms() {
+            return pb_1.Message.getFieldWithDefault(this, 9, 0) as number;
+        }
+        set duration_ms(value: number) {
+            pb_1.Message.setField(this, 9, value);
+        }
+        get total_laps() {
+            return pb_1.Message.getFieldWithDefault(this, 10, 0) as number;
+        }
+        set total_laps(value: number) {
+            pb_1.Message.setField(this, 10, value);
+        }
+        get player_damage() {
+            return pb_1.Message.getFieldWithDefault(this, 11, 0) as number;
+        }
+        set player_damage(value: number) {
+            pb_1.Message.setField(this, 11, value);
+        }
+        get opponent_damage() {
+            return pb_1.Message.getFieldWithDefault(this, 12, 0) as number;
+        }
+        set opponent_damage(value: number) {
+            pb_1.Message.setField(this, 12, value);
+        }
+        get replay_available() {
+            return pb_1.Message.getFieldWithDefault(this, 13, false) as boolean;
+        }
+        set replay_available(value: boolean) {
+            pb_1.Message.setField(this, 13, value);
+        }
+        get player_top_units() {
+            return pb_1.Message.getRepeatedWrapperField(this, PortalUnitPerformance, 14) as PortalUnitPerformance[];
+        }
+        set player_top_units(value: PortalUnitPerformance[]) {
+            pb_1.Message.setRepeatedWrapperField(this, 14, value);
+        }
+        get opponent_top_units() {
+            return pb_1.Message.getRepeatedWrapperField(this, PortalUnitPerformance, 15) as PortalUnitPerformance[];
+        }
+        set opponent_top_units(value: PortalUnitPerformance[]) {
+            pb_1.Message.setRepeatedWrapperField(this, 15, value);
+        }
+        get draw() {
+            return pb_1.Message.getFieldWithDefault(this, 16, false) as boolean;
+        }
+        set draw(value: boolean) {
+            pb_1.Message.setField(this, 16, value);
+        }
+        get player_abandoned() {
+            return pb_1.Message.getFieldWithDefault(this, 17, false) as boolean;
+        }
+        set player_abandoned(value: boolean) {
+            pb_1.Message.setField(this, 17, value);
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -104,6 +284,15 @@ export namespace PBTypes {
             team?: number;
             creature_ids?: number[];
             opponent_creature_ids?: number[];
+            duration_ms?: number;
+            total_laps?: number;
+            player_damage?: number;
+            opponent_damage?: number;
+            replay_available?: boolean;
+            player_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
+            opponent_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
+            draw?: boolean;
+            player_abandoned?: boolean;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -130,6 +319,33 @@ export namespace PBTypes {
             if (data.opponent_creature_ids != null) {
                 message.opponent_creature_ids = data.opponent_creature_ids;
             }
+            if (data.duration_ms != null) {
+                message.duration_ms = data.duration_ms;
+            }
+            if (data.total_laps != null) {
+                message.total_laps = data.total_laps;
+            }
+            if (data.player_damage != null) {
+                message.player_damage = data.player_damage;
+            }
+            if (data.opponent_damage != null) {
+                message.opponent_damage = data.opponent_damage;
+            }
+            if (data.replay_available != null) {
+                message.replay_available = data.replay_available;
+            }
+            if (data.player_top_units != null) {
+                message.player_top_units = data.player_top_units.map(item => PortalUnitPerformance.fromObject(item));
+            }
+            if (data.opponent_top_units != null) {
+                message.opponent_top_units = data.opponent_top_units.map(item => PortalUnitPerformance.fromObject(item));
+            }
+            if (data.draw != null) {
+                message.draw = data.draw;
+            }
+            if (data.player_abandoned != null) {
+                message.player_abandoned = data.player_abandoned;
+            }
             return message;
         }
         toObject() {
@@ -142,6 +358,15 @@ export namespace PBTypes {
                 team?: number;
                 creature_ids?: number[];
                 opponent_creature_ids?: number[];
+                duration_ms?: number;
+                total_laps?: number;
+                player_damage?: number;
+                opponent_damage?: number;
+                replay_available?: boolean;
+                player_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
+                opponent_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
+                draw?: boolean;
+                player_abandoned?: boolean;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -167,6 +392,33 @@ export namespace PBTypes {
             if (this.opponent_creature_ids != null) {
                 data.opponent_creature_ids = this.opponent_creature_ids;
             }
+            if (this.duration_ms != null) {
+                data.duration_ms = this.duration_ms;
+            }
+            if (this.total_laps != null) {
+                data.total_laps = this.total_laps;
+            }
+            if (this.player_damage != null) {
+                data.player_damage = this.player_damage;
+            }
+            if (this.opponent_damage != null) {
+                data.opponent_damage = this.opponent_damage;
+            }
+            if (this.replay_available != null) {
+                data.replay_available = this.replay_available;
+            }
+            if (this.player_top_units != null) {
+                data.player_top_units = this.player_top_units.map((item: PortalUnitPerformance) => item.toObject());
+            }
+            if (this.opponent_top_units != null) {
+                data.opponent_top_units = this.opponent_top_units.map((item: PortalUnitPerformance) => item.toObject());
+            }
+            if (this.draw != null) {
+                data.draw = this.draw;
+            }
+            if (this.player_abandoned != null) {
+                data.player_abandoned = this.player_abandoned;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -189,6 +441,24 @@ export namespace PBTypes {
                 writer.writeRepeatedInt32(7, this.creature_ids);
             if (this.opponent_creature_ids.length)
                 writer.writeRepeatedInt32(8, this.opponent_creature_ids);
+            if (this.duration_ms != 0)
+                writer.writeInt64(9, this.duration_ms);
+            if (this.total_laps != 0)
+                writer.writeInt32(10, this.total_laps);
+            if (this.player_damage != 0)
+                writer.writeInt64(11, this.player_damage);
+            if (this.opponent_damage != 0)
+                writer.writeInt64(12, this.opponent_damage);
+            if (this.replay_available != false)
+                writer.writeBool(13, this.replay_available);
+            if (this.player_top_units.length)
+                writer.writeRepeatedMessage(14, this.player_top_units, (item: PortalUnitPerformance) => item.serialize(writer));
+            if (this.opponent_top_units.length)
+                writer.writeRepeatedMessage(15, this.opponent_top_units, (item: PortalUnitPerformance) => item.serialize(writer));
+            if (this.draw != false)
+                writer.writeBool(16, this.draw);
+            if (this.player_abandoned != false)
+                writer.writeBool(17, this.player_abandoned);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -221,6 +491,33 @@ export namespace PBTypes {
                         break;
                     case 8:
                         pb_1.Message.addToRepeatedField(message, 8, reader.readInt32());
+                        break;
+                    case 9:
+                        message.duration_ms = reader.readInt64();
+                        break;
+                    case 10:
+                        message.total_laps = reader.readInt32();
+                        break;
+                    case 11:
+                        message.player_damage = reader.readInt64();
+                        break;
+                    case 12:
+                        message.opponent_damage = reader.readInt64();
+                        break;
+                    case 13:
+                        message.replay_available = reader.readBool();
+                        break;
+                    case 14:
+                        reader.readMessage(message.player_top_units, () => pb_1.Message.addToRepeatedWrapperField(message, 14, PortalUnitPerformance.deserialize(reader), PortalUnitPerformance));
+                        break;
+                    case 15:
+                        reader.readMessage(message.opponent_top_units, () => pb_1.Message.addToRepeatedWrapperField(message, 15, PortalUnitPerformance.deserialize(reader), PortalUnitPerformance));
+                        break;
+                    case 16:
+                        message.draw = reader.readBool();
+                        break;
+                    case 17:
+                        message.player_abandoned = reader.readBool();
                         break;
                     default: reader.skipField();
                 }

@@ -23,6 +23,8 @@ function roundTrip<T extends { serializeBinary(): Uint8Array; toObject(): unknow
     expect(deserialize(msg.serializeBinary()).toObject()).toEqual(msg.toObject());
 }
 
+const playerTopUnit = { creature_id: 2, damage_dealt: 4200 };
+const opponentTopUnit = { creature_id: 5, damage_dealt: 3700 };
 const portalMatch = {
     game_id: "game-1",
     won: true,
@@ -32,6 +34,15 @@ const portalMatch = {
     team: TypesPB.TeamVals.UPPER,
     creature_ids: [1, 2, 3],
     opponent_creature_ids: [4, 5],
+    duration_ms: 725000,
+    total_laps: 18,
+    player_damage: 9200,
+    opponent_damage: 8100,
+    replay_available: true,
+    player_top_units: [playerTopUnit],
+    opponent_top_units: [opponentTopUnit],
+    draw: false,
+    player_abandoned: false,
 };
 const portalCombo = { creature_ids: [7, 8], games: 12, wins: 9 };
 const portalCreature = { creature_id: 5, games: 20, wins: 14 };
@@ -48,7 +59,15 @@ const lobbyPlayer = {
 
 describe("generated player_portal protobuf messages", () => {
     it("round-trips each portal sub-message directly", () => {
+        roundTrip(
+            PortalPB.PortalUnitPerformance.fromObject(playerTopUnit),
+            PortalPB.PortalUnitPerformance.deserializeBinary,
+        );
         roundTrip(PortalPB.PortalMatch.fromObject(portalMatch), PortalPB.PortalMatch.deserializeBinary);
+        roundTrip(
+            PortalPB.PortalMatch.fromObject({ ...portalMatch, game_id: "game-draw", won: false, draw: true }),
+            PortalPB.PortalMatch.deserializeBinary,
+        );
         roundTrip(PortalPB.PortalComboStat.fromObject(portalCombo), PortalPB.PortalComboStat.deserializeBinary);
         roundTrip(
             PortalPB.PortalCreatureStat.fromObject(portalCreature),
@@ -66,7 +85,16 @@ describe("generated player_portal protobuf messages", () => {
             current_streak: 4,
             best_win_streak: 11,
             last_login: 1700000,
-            recent_matches: [portalMatch, { ...portalMatch, game_id: "game-2", won: false, abandoned: true }],
+            recent_matches: [
+                portalMatch,
+                {
+                    ...portalMatch,
+                    game_id: "game-2",
+                    won: false,
+                    abandoned: true,
+                    player_abandoned: true,
+                },
+            ],
             combos: [portalCombo],
             creature_stats: [portalCreature],
             faction_stats: [portalFaction],
