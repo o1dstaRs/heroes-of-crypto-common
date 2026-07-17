@@ -1,0 +1,458 @@
+{
+    "schemaVersion": 1,
+    "status": "v0.7_passive_evidence_complete",
+    "evidenceSemantics": {
+        "census": "Complete engine-legal candidate enumeration on skip/shield decisions; expected damage and expected kill are heuristic EV diagnostics.",
+        "shadow": "Observe-only search compares the shipped incumbent with a discovery-selected attack using a separate paired validation rollout bank.",
+        "conclusionBoundary": "Legal/positive-EV alternatives and model-based rollout deltas are evidence of opportunities, not terminal proof that an attack is strategically optimal."
+    },
+    "inputs": {
+        "revisionCommit": "a71cb8ce93fd05462a32f32ba3fd7643565ed3fd",
+        "sourceSha256": "6b5c315d2b3e9f6350f796b3dc71910cf8e94d50793395520cddfe12fcc22c64",
+        "censusSummary": {
+            "path": "sim-out/v0_7_selfplay_passive_audit_100k_a71cb8c.summary.json",
+            "sha256": "ae7de044a1ab5c6b97b37ebec6a2290fe3c29122763711ec41fa4f6005214cd1",
+            "runFingerprint": "a2c11022054e4dd253c147ce96716979d1c0b275b3cb8a544c875ec636a4d182",
+            "planSha256": "87b09e3e033876949e0e3b98afb89142121477c7e020b6d0b9d13a4fba3d01e2"
+        },
+        "shadowSummary": {
+            "path": "sim-out/v0_7_passive_shadow_4k_a71cb8c/summary.json",
+            "sha256": "9b20a9583ff607173c1182f2cff8f26e5c8c7c255d9cd70d9f15236cc74245d3",
+            "runFingerprint": "607430d3b3d39f475383b573d8aa15f3a15e212ffeb0c20e1fcfd8e68a9a78dc",
+            "planSha256": "c8348e1341f2bff8dfbe5fbf01cc426b0d8d7cbb85a31549c7380d0a8f742984"
+        },
+        "shadowAudit": {
+            "path": "sim-out/v0_7_passive_shadow_4k_a71cb8c/search.jsonl",
+            "sha256": "a3310f89306a0a9d10c975c545f870d1259b35716fba20f5096c0bc98840c883"
+        }
+    },
+    "coverage": {
+        "censusGames": 100000,
+        "shadowGames": 4000,
+        "shadowComparisons": 1049,
+        "duplicateShadowTurnRows": 0,
+        "duplicateShadowGameRows": 0
+    },
+    "legalExpectedValueCensus": {
+        "aggregate": {
+            "key": "aggregate",
+            "decisions": 6485876,
+            "skipTurns": 180292,
+            "shieldTurns": 0,
+            "passiveTurns": 180292,
+            "skipShare": 0.027797632887215235,
+            "shieldShare": 0,
+            "attackAlternativeTurns": 26541,
+            "attackAlternativeShareOfPassive": 0.14721119073502983,
+            "positiveExpectedDamageTurns": 26541,
+            "positiveExpectedDamageShareOfPassive": 0.14721119073502983,
+            "expectedKillTurns": 169,
+            "expectedKillShareOfPassive": 0.0009373682692521021,
+            "directMeleeAlternativeTurns": 84,
+            "moveAssistedMeleeAlternativeTurns": 26541
+        },
+        "byTemplate": [
+            {
+                "key": "mage_frontline",
+                "decisions": 906578,
+                "skipTurns": 284,
+                "shieldTurns": 0,
+                "passiveTurns": 284,
+                "skipShare": 0.00031326592968282927,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 0,
+                "attackAlternativeShareOfPassive": 0,
+                "positiveExpectedDamageTurns": 0,
+                "positiveExpectedDamageShareOfPassive": 0,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": 0,
+                "directMeleeAlternativeTurns": 0,
+                "moveAssistedMeleeAlternativeTurns": 0
+            },
+            {
+                "key": "mage_fireline",
+                "decisions": 1322316,
+                "skipTurns": 395,
+                "shieldTurns": 0,
+                "passiveTurns": 395,
+                "skipShare": 0.00029871830939049365,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 1,
+                "attackAlternativeShareOfPassive": 0.002531645569620253,
+                "positiveExpectedDamageTurns": 1,
+                "positiveExpectedDamageShareOfPassive": 0.002531645569620253,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": 0,
+                "directMeleeAlternativeTurns": 1,
+                "moveAssistedMeleeAlternativeTurns": 1
+            },
+            {
+                "key": "melee_magic_utility",
+                "decisions": 673456,
+                "skipTurns": 59886,
+                "shieldTurns": 0,
+                "passiveTurns": 59886,
+                "skipShare": 0.08892340405312299,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 26096,
+                "attackAlternativeShareOfPassive": 0.4357612797648866,
+                "positiveExpectedDamageTurns": 26096,
+                "positiveExpectedDamageShareOfPassive": 0.4357612797648866,
+                "expectedKillTurns": 26,
+                "expectedKillShareOfPassive": 0.00043415823397789134,
+                "directMeleeAlternativeTurns": 0,
+                "moveAssistedMeleeAlternativeTurns": 26096
+            },
+            {
+                "key": "melee_magic_brawler",
+                "decisions": 503706,
+                "skipTurns": 0,
+                "shieldTurns": 0,
+                "passiveTurns": 0,
+                "skipShare": 0,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 0,
+                "attackAlternativeShareOfPassive": null,
+                "positiveExpectedDamageTurns": 0,
+                "positiveExpectedDamageShareOfPassive": null,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": null,
+                "directMeleeAlternativeTurns": 0,
+                "moveAssistedMeleeAlternativeTurns": 0
+            },
+            {
+                "key": "aura_support",
+                "decisions": 534505,
+                "skipTurns": 2134,
+                "shieldTurns": 0,
+                "passiveTurns": 2134,
+                "skipShare": 0.003992479022647122,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 0,
+                "attackAlternativeShareOfPassive": 0,
+                "positiveExpectedDamageTurns": 0,
+                "positiveExpectedDamageShareOfPassive": 0,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": 0,
+                "directMeleeAlternativeTurns": 0,
+                "moveAssistedMeleeAlternativeTurns": 0
+            },
+            {
+                "key": "aura_offense",
+                "decisions": 574758,
+                "skipTurns": 106266,
+                "shieldTurns": 0,
+                "passiveTurns": 106266,
+                "skipShare": 0.18488824861941897,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 0,
+                "attackAlternativeShareOfPassive": 0,
+                "positiveExpectedDamageTurns": 0,
+                "positiveExpectedDamageShareOfPassive": 0,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": 0,
+                "directMeleeAlternativeTurns": 0,
+                "moveAssistedMeleeAlternativeTurns": 0
+            },
+            {
+                "key": "ranged_precision",
+                "decisions": 1098491,
+                "skipTurns": 615,
+                "shieldTurns": 0,
+                "passiveTurns": 615,
+                "skipShare": 0.0005598589337554882,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 1,
+                "attackAlternativeShareOfPassive": 0.0016260162601626016,
+                "positiveExpectedDamageTurns": 1,
+                "positiveExpectedDamageShareOfPassive": 0.0016260162601626016,
+                "expectedKillTurns": 0,
+                "expectedKillShareOfPassive": 0,
+                "directMeleeAlternativeTurns": 1,
+                "moveAssistedMeleeAlternativeTurns": 1
+            },
+            {
+                "key": "ranged_control",
+                "decisions": 872066,
+                "skipTurns": 10712,
+                "shieldTurns": 0,
+                "passiveTurns": 10712,
+                "skipShare": 0.012283473957246355,
+                "shieldShare": 0,
+                "attackAlternativeTurns": 443,
+                "attackAlternativeShareOfPassive": 0.04135548917102315,
+                "positiveExpectedDamageTurns": 443,
+                "positiveExpectedDamageShareOfPassive": 0.04135548917102315,
+                "expectedKillTurns": 143,
+                "expectedKillShareOfPassive": 0.013349514563106795,
+                "directMeleeAlternativeTurns": 82,
+                "moveAssistedMeleeAlternativeTurns": 443
+            }
+        ]
+    },
+    "modelBasedRolloutShadow": {
+        "protocol": {
+            "discoveryRollouts": 3,
+            "validationRollouts": 16,
+            "horizon": 12,
+            "discoveryGate": 0.01,
+            "incumbentKinds": ["idle", "defend"],
+            "challengerKinds": ["melee", "shot", "area_throw"]
+        },
+        "observedIncumbentKinds": {
+            "idle": 1049
+        },
+        "selectedAttackKinds": {
+            "melee": 1049
+        },
+        "selectedMeleeRoutes": {
+            "direct": 1,
+            "move_assisted": 1048,
+            "unknown": 0
+        },
+        "discoveryWouldOverride": {
+            "yes": 826,
+            "no": 223
+        },
+        "bootstrap": {
+            "method": "stratified nonparametric whole-game cluster percentile bootstrap",
+            "samplingUnit": "complete game; all modeled turns from a sampled game move together",
+            "confidenceLevel": 0.95,
+            "replicates": 1000,
+            "deterministicSeedSha256": "258f3a95d363af52096843b2dcaac45e5d7dee448b7789bed10a3daafdecd353",
+            "aggregate": {
+                "key": "aggregate",
+                "games": 4000,
+                "gamesWithComparisons": 510,
+                "comparisons": 1049,
+                "validationPositive": 793,
+                "validationAtLeastPoint01": 759,
+                "metrics": {
+                    "validationPositiveRate": {
+                        "point": 0.7559580552907531,
+                        "confidence95": {
+                            "low": 0.7345351847821591,
+                            "high": 0.7764082332935199
+                        }
+                    },
+                    "validationAtLeastPoint01Rate": {
+                        "point": 0.7235462345090562,
+                        "confidence95": {
+                            "low": 0.7012531984665835,
+                            "high": 0.7444152345512891
+                        }
+                    },
+                    "meanValidationDelta": {
+                        "point": 0.08607283126787424,
+                        "confidence95": {
+                            "low": 0.0818381991525423,
+                            "high": 0.09029893182637927
+                        }
+                    }
+                }
+            },
+            "byTemplate": [
+                {
+                    "key": "mage_frontline",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "mage_fireline",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "melee_magic_utility",
+                    "games": 500,
+                    "gamesWithComparisons": 496,
+                    "comparisons": 1034,
+                    "validationPositive": 784,
+                    "validationAtLeastPoint01": 756,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": 0.758220502901354,
+                            "confidence95": {
+                                "low": 0.7369890282995473,
+                                "high": 0.77907005160381
+                            }
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": 0.7311411992263056,
+                            "confidence95": {
+                                "low": 0.7090558766859345,
+                                "high": 0.7517041587784749
+                            }
+                        },
+                        "meanValidationDelta": {
+                            "point": 0.08740000000000007,
+                            "confidence95": {
+                                "low": 0.08324148849472672,
+                                "high": 0.09152005805495475
+                            }
+                        }
+                    }
+                },
+                {
+                    "key": "melee_magic_brawler",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "aura_support",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "aura_offense",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "ranged_precision",
+                    "games": 500,
+                    "gamesWithComparisons": 0,
+                    "comparisons": 0,
+                    "validationPositive": 0,
+                    "validationAtLeastPoint01": 0,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": null,
+                            "confidence95": null
+                        },
+                        "meanValidationDelta": {
+                            "point": null,
+                            "confidence95": null
+                        }
+                    }
+                },
+                {
+                    "key": "ranged_control",
+                    "games": 500,
+                    "gamesWithComparisons": 14,
+                    "comparisons": 15,
+                    "validationPositive": 9,
+                    "validationAtLeastPoint01": 3,
+                    "metrics": {
+                        "validationPositiveRate": {
+                            "point": 0.6,
+                            "confidence95": {
+                                "low": 0.3333333333333333,
+                                "high": 0.8333333333333334
+                            }
+                        },
+                        "validationAtLeastPoint01Rate": {
+                            "point": 0.2,
+                            "confidence95": {
+                                "low": 0,
+                                "high": 0.440111111111111
+                            }
+                        },
+                        "meanValidationDelta": {
+                            "point": -0.005413333333333332,
+                            "confidence95": {
+                                "low": -0.04849222368421052,
+                                "high": 0.03639630208333332
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "limitations": [
+        "The shadow panel reuses the first 500 seeds per template from the census seed protocol; no cross-corpus freshness claim is made.",
+        "Validation is independent of discovery rollouts but uses the same learned finite-horizon evaluator, so it is model-based rather than a terminal outcome oracle.",
+        "A null template metric means that template produced no modeled incumbent-versus-attack comparisons; it is not evidence of a zero opportunity rate.",
+        "Confidence intervals resample complete games within template and preserve all within-game turn dependence."
+    ]
+}

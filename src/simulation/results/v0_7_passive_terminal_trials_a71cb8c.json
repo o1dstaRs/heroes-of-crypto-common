@@ -1,0 +1,98 @@
+{
+    "schemaVersion": 1,
+    "status": "v0.7_passive_terminal_trials_complete",
+    "baselineCommit": "a71cb8ce93fd05462a32f32ba3fd7643565ed3fd",
+    "protocol": {
+        "candidate": "v0.7s with one seat-scoped experimental policy",
+        "opponent": "unchanged v0.7",
+        "pairing": "same-roster, same-seed side swaps",
+        "confidence": "paired-side-swap cluster sandwich, 95%",
+        "scopeBoundary": "fixed archetype rosters; these trials are terminal evidence for the tested interventions, not ranked-draft acceptance"
+    },
+    "trials": [
+        {
+            "name": "angel_idle_max_fraction_attack",
+            "source": {
+                "path": "sim-out/v0_7_angel_idle_salvage_max_fraction_16k_a71cb8c.json",
+                "sha256": "791c1f723faf190ade6c1bb5511d265b4d8809bb9cf2c474e6c3ab9bdd1e7591"
+            },
+            "intervention": "On lap 1, replace an Angel end-only decision with the legal move-assisted melee candidate maximizing expected damage divided by current target HP.",
+            "gamesPerTemplate": 2000,
+            "templates": 8,
+            "affectedTemplate": {
+                "name": "melee_magic_utility",
+                "games": 2000,
+                "pairClusters": 1000,
+                "candidateWins": 697,
+                "opponentWins": 1291,
+                "draws": 12,
+                "candidateWinRate": 0.3506036217303823,
+                "deltaFromParityPp": -14.939637826961771,
+                "confidence95": {
+                    "low": 0.33134668463995975,
+                    "high": 0.3698605588208048
+                },
+                "candidateRejections": 0,
+                "opponentRejections": 0,
+                "candidateAngelResurrectionCasts": 18,
+                "opponentAngelResurrectionCasts": 1353
+            },
+            "unaffectedTemplates": "The other seven templates were exact 50% mirrors.",
+            "decision": "rejected",
+            "reason": "A legal, positive-immediate-damage charge materially reduces terminal wins and largely removes the Angel's later Resurrection contribution."
+        },
+        {
+            "name": "replace_policy_skip_with_luck_shield",
+            "source": {
+                "path": "sim-out/v0_7_skip_defend_high_skip_20k_a71cb8c.json",
+                "sha256": "8a465a41c081ad4eed1add1938347ea2e4effdf79ead94a15904b7c749ceb887"
+            },
+            "intervention": "Replace every genuine end-only v0.7s policy decision with defend_turn; do not alter attacks, moves, spells, waits, or rejected-action recovery.",
+            "gamesPerTemplate": 10000,
+            "templates": [
+                {
+                    "name": "aura_offense",
+                    "baseSeed": 2384185293,
+                    "games": 10000,
+                    "pairClusters": 5000,
+                    "candidateWins": 4929,
+                    "opponentWins": 5066,
+                    "draws": 5,
+                    "candidateWinRate": 0.4931465732866433,
+                    "deltaFromParityPp": -0.6853426713356703,
+                    "confidence95": {
+                        "low": 0.48722302713451604,
+                        "high": 0.49907011943877055
+                    },
+                    "candidateDefendTurns": 42699,
+                    "opponentSkipTurns": 42685,
+                    "candidateRejections": 0,
+                    "opponentRejections": 0
+                },
+                {
+                    "name": "melee_magic_utility",
+                    "baseSeed": 3964413386,
+                    "games": 10000,
+                    "pairClusters": 5000,
+                    "candidateWins": 4959,
+                    "opponentWins": 5001,
+                    "draws": 40,
+                    "candidateWinRate": 0.49789156626506026,
+                    "deltaFromParityPp": -0.21084337349397408,
+                    "confidence95": {
+                        "low": 0.4933037968790263,
+                        "high": 0.5024793356510943
+                    },
+                    "candidateDefendTurns": 23939,
+                    "opponentSkipTurns": 23933,
+                    "candidateRejections": 0,
+                    "opponentRejections": 0
+                }
+            ],
+            "decision": "rejected",
+            "reason": "Luck Shield is significantly worse in aura_offense and has no positive terminal signal in melee_magic_utility."
+        }
+    ],
+    "conclusion": "Keep the shipped v0.7 passive choices. Legal attacks, positive immediate expected damage, and finite-horizon rollout gains do not establish terminal superiority; neither tested policy replacement is suitable for mainline behavior.",
+    "implementationDisposition": "All experimental policy code was removed after measurement. The a71cb8c real-action legality fix and zero-recovery audit remain shipped."
+}
