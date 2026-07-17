@@ -1,0 +1,248 @@
+{
+    "schemaVersion": 1,
+    "artifactKind": "v0_7_aligned_96h_v2_launch_receipt",
+    "recordedAt": "2026-07-17T01:21:41.473Z",
+    "status": "RUNNING",
+    "authority": {
+        "automaticBake": false,
+        "automaticDeploy": false,
+        "resultAuthority": "research_only_no_bake",
+        "targetIsNotAClaimedResult": true
+    },
+    "objective": {
+        "candidate": "v0.7 aligned-v2 behavior catalog",
+        "opponent": "v0.6",
+        "candidateCount": 48,
+        "cells": [
+            "ranked_mage",
+            "ranked_melee_mage",
+            "ranked_aura",
+            "ranked_ranged",
+            "fixed_mage_frontline",
+            "fixed_mage_fireline",
+            "fixed_melee_magic_utility",
+            "fixed_melee_magic_brawler",
+            "fixed_aura_support",
+            "fixed_aura_offense",
+            "fixed_ranged_precision",
+            "fixed_ranged_control"
+        ],
+        "candidateSeats": ["candidate_green", "candidate_red"],
+        "formalClaims": 24,
+        "targetDecisiveWinRate": 0.9,
+        "minimumDecisiveFraction": 0.9,
+        "maximumDrawOrArmageddonRate": 0.1,
+        "formalMethod": "bonferroni_two_sided_wilson_by_cell_and_candidate_seat",
+        "nominalFamilywiseConfidence": 0.95
+    },
+    "source": {
+        "productionCommit": "e6eeb609c9800433fc4e4b22e1e65f2928480311",
+        "scannerCompatibilityFixCommit": "4933110a105519b33ecb409b38a9f4f3173da287",
+        "defendDefaultRevertCommit": "9941d86ab2b6401af38e43ed029c2fbf9ae3bc98",
+        "rejectedExperimentHistoryCommit": "1931ccf497f80e705b742130ad935f40a793c514",
+        "runFingerprint": "7ec852e4857d3b5038f5dafbf143568cf06dbd3b40649ff0610e1273f75b4a4d"
+    },
+    "schedule": {
+        "durationHours": 96,
+        "startAtMs": 1784250965598,
+        "startAt": "2026-07-17T01:16:05.598Z",
+        "deadlineAtMs": 1784596565598,
+        "deadlineAt": "2026-07-21T01:16:05.598Z",
+        "cronStopEpochSeconds": 1784600166,
+        "cronStopAt": "2026-07-21T02:16:06.000Z"
+    },
+    "budget": {
+        "workers": 40,
+        "reservedCpus": 4,
+        "trainGames": 294912,
+        "confirmGames": 48000,
+        "finalGames": 48000,
+        "totalPlannedGames": 390912,
+        "trainScenariosPerCell": 256,
+        "confirmScenariosPerCell": 1000,
+        "finalScenariosPerCell": 2000,
+        "budgetSha256": "f786716a00b87c4f7e72d4303841d9561e0516d6e7f97b6154f5a3244269f69c"
+    },
+    "paths": {
+        "common": "/home/agent-zinc/hoc-common-v07-aligned-v2-e6eeb60-20260716",
+        "input": "/home/agent-zinc/hoc-common-v07-aligned-v2-throughput-e6eeb60-20260716",
+        "prepared": "/home/agent-zinc/hoc-common-v07-aligned-v2-prepared-e6eeb60-20260716",
+        "runOutput": "/home/agent-zinc/hoc-common-v07-aligned-v2-production-e6eeb60-20260716",
+        "operations": "/home/agent-zinc/aligned-v2-production-ops-e6eeb60-20260716"
+    },
+    "seedCensus": {
+        "cutoff": "2026-07-17T00:07:00Z",
+        "combinedUniqueSeeds": 12492779,
+        "denysetSha256": "9177213e17347df4523c11634136cb81d839e8c0e334672eea9a83a9392d4357",
+        "corpusAttestationSha256": "e08dd2c62276882943f7dde0be24c2dfaddaba581a1099220d4e790be9e99109",
+        "local": {
+            "uniqueSeeds": 1568301,
+            "byteIdenticalReplay": true,
+            "summaryBytesSha256": "88d6c5f7f1a3938669b862353ba16d331c58990455b07c96313881550218667d",
+            "seedSetBytesSha256": "10587d59095f38760ce176c127157b9a0f55449fe1242fda2d246a7b04dbea0d",
+            "operationBytesSha256": "97b0d93dd2b24075413672be3bb509d4573fc7bc87a064dc11096da1386f0cab",
+            "verifierBytesSha256": "5eeeef7c1fd329ba3fae029c50c72ebd10e05de4bd9775aac2e251e9dd91ae42"
+        },
+        "zinc": {
+            "uniqueSeeds": 10846630,
+            "byteIdenticalReplay": true,
+            "summaryBytesSha256": "940b0e0700ad2e32580be9cb42d4fb760f18845e92a0038334a369e33052dc34",
+            "seedSetBytesSha256": "b61a0774df7057cfde249caa4c1afb4d420191c7e64594e84d96212e62741854",
+            "operationBytesSha256": "3d7807b30b2b099164c9fbf876688f3c5a71f80e265692adb9f935e91e96a135",
+            "verifierBytesSha256": "de739f0fdfbcaadf02e2c3e7d5f5ebd89645314232f24532286fa7cf15e79336"
+        }
+    },
+    "quiescence": {
+        "local": {
+            "path": "/Users/zolotukhin/Workplace/hoc-aligned-v2-launch-prep-20260716/quiescence-e6e-local-20260716-retry2/receipt.json",
+            "receiptSha256": "a59dec84bb853a97e6f50cb2fbac26a515c154fcddf163087b5a8b119b4da5c0",
+            "bytesSha256": "57ca6cb42c594732ef1b75bfba4e5a1a94969675f4e5688f790822a46bf94c33"
+        },
+        "zinc": {
+            "path": "/home/agent-zinc/aligned-v2-quiescence-receipt-20260716-e6eeb60/receipt.json",
+            "receiptSha256": "c2b7f859b5a8cc3603dc4913a01f2634e68d36bec08252176a781543d261fb9c",
+            "bytesSha256": "5451e83047770280fa4273bcd21c6606a49d79f75160276f3efa1e10db76738a"
+        }
+    },
+    "throughput": {
+        "sampleGames": 6144,
+        "gamesPerWorkerHour": 897.9762633417147,
+        "persistedReplayVerified": true,
+        "attestationSha256": "34302a3ee75a294ccd6d80be5e71856e12761abe67e4934758fa2dd72b32895f",
+        "attestationBytesSha256": "c92e52783b213b0aeb10ba995859fb0793bc288c2efa30fc0c6cfe1ec58a2867",
+        "evidenceSha256": "4e06c469f27f660243868fae46319d67a4dd5464be3f1573a075370ccd64f469",
+        "evidenceBytesSha256": "4c823a96cc228a32dca382b00b13ad75ce60018b5f259077251e66a7ceaaef56",
+        "strictReplayBytesSha256": "7388af28169889abed1713f1214b9e1602a9ecb8007b44a0b7ed6354c64f2be3"
+    },
+    "processPreflight": {
+        "status": "PASS",
+        "focusedTestsPassed": 39,
+        "focusedTestsFailed": 0,
+        "auditSha256": "63bd76940ac78f40481e8dd9711e63fe3f4d3fdc86acc0e3d56794236c60dc6a",
+        "auditBytesSha256": "cf85f7fe6cbd6446851ae24cbed0f54fd78083ef4acfd3070807529e6675c4e7",
+        "inventoryBytesSha256": "826a9a05a70cf9c0ac116e65c619ce8da065ede14552c2391f421f83845c81bd",
+        "primaryReceiptsBytesSha256": "0e7922daeaefc5edf19e6387a1918462db1c1dcffcba9523330c2aece07c3c9e"
+    },
+    "generation": {
+        "stdoutBytesSha256": "e884690bf61938cea9cb76f589ab2c18774e37faf9e745de47f5858e93b5c9cb",
+        "runnerConfigBytesSha256": "f7bb8973b0baccf7d65ad43245c9f0d471f0a7577032ff8bb03e577aaebf8ea6",
+        "runnerConfigSha256": "533a18c6fa392b1c368d3e6ff9ff9a5a854b3719fa7e4c180016fd3aa333dfad",
+        "definitionInputBytesSha256": "e9b4a8103cf8119dc7aede7619c04e38cea829948e35158ca69c77b96db6605d",
+        "requestSha256": "59034d37b06974a7dbd51e5ef8bf6f86fb231d87be0a2601058feb5555551889",
+        "reportBytesSha256": "1a8e9adfd31c9179a5475f0478f92544aca60a64099e0d21ad3d0bc6adb2bb78"
+    },
+    "preparedDefinition": {
+        "gamesExecuted": 0,
+        "workersStarted": 0,
+        "bundleBytesSha256": "9a41026d695283974d48f0fd5eaa22d14c6c9fa0fb8dd6985240ef1c462e6c0f",
+        "bundleSha256": "75e0951b0b056a213b973d509fcc5bdaa5d6263723c5bc0d2f6f6ab4a4f43abd",
+        "definitionBytesSha256": "b2f49a8f27969a959fea8170597d4e8249409286fa1217ee41b42c7b1307bd34",
+        "definitionSha256": "7ec852e4857d3b5038f5dafbf143568cf06dbd3b40649ff0610e1273f75b4a4d",
+        "commitmentBytesSha256": "8fe74d024b63a72e513d4e5d688ca8f96e0ccf91cf018b6ecaf63368e667ba0c",
+        "commitmentSha256": "5eb402147ccb0acff5af4784c6a021a26f52ef944df0b2211b778041766828ae",
+        "allocationRequestSha256": "9688f8985a0292b7fd6a97fb2f6ad10d3d17417f68f811ecabe706a8d4612f17",
+        "allPlansSha256": "0a61158e93cd2ba5978745d4a92334d97684c93f9a9f048d8d1c557d9ffdf38f"
+    },
+    "supervisor": {
+        "keepalivePid": 1612604,
+        "keepalivePgid": 1612604,
+        "keepaliveSid": 1612604,
+        "supervisorPid": 1612651,
+        "supervisorPgid": 1612604,
+        "supervisorSid": 1612604,
+        "supervisorRunBytesSha256": "540977cf090b8e4e2fe1bd2b6ebd5162cb3f66852b2ed45435c1e42a875b0ebd",
+        "supervisorRunSha256": "df978ae2f0cd7061f906c39015fb68d2f60a28c62adf8ccbed56dab6ee27c344",
+        "prestartHeartbeatSequences": [0, 1],
+        "prestartHeartbeatBytesSha256": [
+            "91d34b002214545d88a87448c8c3f4fcef3dafb4e0228a34020184358ed3c37c",
+            "8dbf110146609257d98305c572c4d2d587c4a3dee72d0b74e93ac10489c651c2"
+        ],
+        "launchAuditPath": "/home/agent-zinc/aligned-v2-production-ops-e6eeb60-20260716/production-prestart-launch-audit.json",
+        "launchAuditSha256": "7050a7f106c1e7f13526e21225100379ae5ebc5ed2a6d4ae49c2edb1b41c1958",
+        "launchAuditBytesSha256": "0da4641548743e859493959b0e4072a42350eb8155593dcaf0a3a7a8d8a766ee",
+        "launchAuditVerifierBytesSha256": "1a01e45f322b9824943cd6371cfbdd81388657d73d0b9015423cb5224584bef3"
+    },
+    "durability": {
+        "cronMarker": "HOC_ALIGNED_V2_E6EEB60_PRODUCTION_20260716",
+        "terminalGateBytesSha256": "76323ffed13cb1d105755ce026b98bd1ceaca66362ac1713d486748f3993e2ab",
+        "keepaliveBytesSha256": "3b756a6febf61483f56e2994f91b61a19573ffddb94f9c5faf46d65f482cea0e",
+        "cronInstallerBytesSha256": "0f29911749a72f8d28e7b2ecaf6bd728c6c8796e23108f3831746c11e4295738",
+        "crontabBytesSha256": "b47462163098c8fd30de82ee44a0f63d4aa2a516b5c43d9a3ab1afbb5445a502",
+        "cronManifestBytesSha256": "43e6163bce28c59060fe16c1e27b7fd5e344c19e9baee77c3342260a905edfe1"
+    },
+    "rejectedDefendExperiment": {
+        "status": "REJECTED_NOT_A_WIN",
+        "exactPairedGames": 100,
+        "fixedImprovements": 5,
+        "fixedRegressions": 14,
+        "bothWin": 79,
+        "bothLoss": 2,
+        "draws": 0,
+        "archivePath": "/Users/zolotukhin/Workplace/hoc-defend-loop-legacy-archive-20260717-e6eeb60",
+        "archiveReceiptBytesSha256": "1bf16b215a9ceac667a6d1bcc9c38e98a95365017b6d44dc31ebbecdee10509b"
+    },
+    "runningObservation": {
+        "status": "PASS",
+        "auditedAtMs": 1784251301473,
+        "armedAtMs": 1784251029984,
+        "armedSha256": "edd19293f9074509d8807e9311dc83e185f0d79f49c2170e6344711d6f500ca0",
+        "armedBytesSha256": "9bae77252bd2bee6bd9063ee6640c9b43f2f26639a041207ddf538464f6a76a1",
+        "guardPid": 1646120,
+        "guardPgid": 1646120,
+        "guardSid": 1646120,
+        "runnerPid": 1646121,
+        "runnerPgid": 1646120,
+        "runnerSid": 1646120,
+        "ownerToken": "2c16083a-2b63-47d8-951a-f65337311945",
+        "pidRecordSha256": "2156d452e28253f2e63e821c1e9f5c744fbcebc444b81ecb660b06e0275dcb16",
+        "pidRecordBytesSha256": "49f0cb8ee560541434608cf65256c543508447e95b22fb209097876c093e8196",
+        "panel": "train",
+        "panelId": "v0.7-aligned-v2-production-20260716-e6eeb60-train",
+        "panelFingerprint": "983000682a5642068dfd403216459ca7a274b0d18ba0001bad0a5f53c5ecccae",
+        "activeGenomeSha256": "0f54623d9cf034ff60df8d6dc0df1b5bd91615308e266766899fbc02295bf3ff",
+        "firstPersistedSample": {
+            "sequence": 66,
+            "phase": "train:shard-start",
+            "completedShards": 1,
+            "completedGames": 24,
+            "updatedAtMs": 1784251239502,
+            "heartbeatSha256": "bb3d43e3a74bfcf369d5aa87c6fb23ace979b7ebe9293ea811fae9b9b4d6b8c5",
+            "bytesSha256": "0235363d6d69adc3a956c152035eab6bafc2e0b29520aec2f290930635976836"
+        },
+        "secondPersistedSample": {
+            "sequence": 79,
+            "phase": "train:shard-evaluated",
+            "completedShards": 2,
+            "completedGames": 48,
+            "updatedAtMs": 1784251241629,
+            "heartbeatSha256": "b9744e11ff5b0f59089a92cc7c9068097660417ea304807d1e5ed4a78fc7acd1",
+            "bytesSha256": "8705a1753f6c45333e7ae25b45e0c97b6e2f905fac6380961499f2ec05ba015d"
+        },
+        "auditSnapshot": {
+            "sequence": 242,
+            "phase": "train:shard-start",
+            "completedShards": 23,
+            "completedGames": 552,
+            "evidenceManifests": 23,
+            "auditIndexes": 23,
+            "heartbeatSha256": "08973b292995fb910c62a5f0b93d59e9427293f7a1da7468d8256a082430de32"
+        },
+        "supervisorState": "optimizer-running",
+        "hostLockHeld": true,
+        "outputLockHeld": true,
+        "terminalMarkersPresent": false,
+        "refusalMarkersPresent": false,
+        "liveOriginMainAtAudit": "1931ccf497f80e705b742130ad935f40a793c514",
+        "auditPath": "/home/agent-zinc/aligned-v2-production-ops-e6eeb60-20260716/production-poststart-live-audit.json",
+        "auditSha256": "553a04b2c7aa7fcb3cfa0274a8ea2d7dc7a2776fa08b1b36afa2284baf4d0e84",
+        "auditBytesSha256": "463eeb12be2efc6e3d6d99715974560cf565df64ec4354b37faeefd8d88ea61c",
+        "verifierBytesSha256": "062f346ec9a4b6c4f38f31ee4755a9893b6ed706aa11c95cba42845dfc542bf0"
+    },
+    "disclosures": [
+        "The 90% threshold is a preregistered target, not a result claimed by this launch receipt.",
+        "The composed predecessor qualification verdict was FAIL; this run is the research-only improvement attempt.",
+        "An inert first launch attempt encountered the host lock before supervisor initialization and executed zero games with zero workers.",
+        "A concurrent default DEFEND exclusion was pushed after the production pin; exact paired overlap was unfavorable, so main forward-reverted it before launch and remains behaviorally aligned with the frozen evaluator.",
+        "No artifact from this run has authority to bake or deploy an AI policy automatically."
+    ]
+}
