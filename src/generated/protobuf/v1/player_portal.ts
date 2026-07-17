@@ -96,6 +96,280 @@ export namespace PBTypes {
             return PortalUnitPerformance.deserialize(bytes);
         }
     }
+    export class PortalMatchSetup extends pb_1.Message {
+        #one_of_decls: number[][] = [];
+        constructor(data?: any[] | {
+            artifact_tier_1?: number;
+            artifact_tier_2?: number;
+            perk?: number;
+            augment_placement?: number;
+            augment_armor?: number;
+            augment_might?: number;
+            augment_sniper?: number;
+            augment_movement?: number;
+            synergies?: string[];
+            complete?: boolean;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("artifact_tier_1" in data && data.artifact_tier_1 != undefined) {
+                    this.artifact_tier_1 = data.artifact_tier_1;
+                }
+                if ("artifact_tier_2" in data && data.artifact_tier_2 != undefined) {
+                    this.artifact_tier_2 = data.artifact_tier_2;
+                }
+                if ("perk" in data && data.perk != undefined) {
+                    this.perk = data.perk;
+                }
+                if ("augment_placement" in data && data.augment_placement != undefined) {
+                    this.augment_placement = data.augment_placement;
+                }
+                if ("augment_armor" in data && data.augment_armor != undefined) {
+                    this.augment_armor = data.augment_armor;
+                }
+                if ("augment_might" in data && data.augment_might != undefined) {
+                    this.augment_might = data.augment_might;
+                }
+                if ("augment_sniper" in data && data.augment_sniper != undefined) {
+                    this.augment_sniper = data.augment_sniper;
+                }
+                if ("augment_movement" in data && data.augment_movement != undefined) {
+                    this.augment_movement = data.augment_movement;
+                }
+                if ("synergies" in data && data.synergies != undefined) {
+                    this.synergies = data.synergies;
+                }
+                if ("complete" in data && data.complete != undefined) {
+                    this.complete = data.complete;
+                }
+            }
+        }
+        get artifact_tier_1() {
+            return pb_1.Message.getFieldWithDefault(this, 1, 0) as number;
+        }
+        set artifact_tier_1(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get artifact_tier_2() {
+            return pb_1.Message.getFieldWithDefault(this, 2, 0) as number;
+        }
+        set artifact_tier_2(value: number) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get perk() {
+            return pb_1.Message.getFieldWithDefault(this, 3, 0) as number;
+        }
+        set perk(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        get augment_placement() {
+            return pb_1.Message.getFieldWithDefault(this, 4, 0) as number;
+        }
+        set augment_placement(value: number) {
+            pb_1.Message.setField(this, 4, value);
+        }
+        get augment_armor() {
+            return pb_1.Message.getFieldWithDefault(this, 5, 0) as number;
+        }
+        set augment_armor(value: number) {
+            pb_1.Message.setField(this, 5, value);
+        }
+        get augment_might() {
+            return pb_1.Message.getFieldWithDefault(this, 6, 0) as number;
+        }
+        set augment_might(value: number) {
+            pb_1.Message.setField(this, 6, value);
+        }
+        get augment_sniper() {
+            return pb_1.Message.getFieldWithDefault(this, 7, 0) as number;
+        }
+        set augment_sniper(value: number) {
+            pb_1.Message.setField(this, 7, value);
+        }
+        get augment_movement() {
+            return pb_1.Message.getFieldWithDefault(this, 8, 0) as number;
+        }
+        set augment_movement(value: number) {
+            pb_1.Message.setField(this, 8, value);
+        }
+        get synergies() {
+            return pb_1.Message.getFieldWithDefault(this, 9, []) as string[];
+        }
+        set synergies(value: string[]) {
+            pb_1.Message.setField(this, 9, value);
+        }
+        get complete() {
+            return pb_1.Message.getFieldWithDefault(this, 10, false) as boolean;
+        }
+        set complete(value: boolean) {
+            pb_1.Message.setField(this, 10, value);
+        }
+        static fromObject(data: {
+            artifact_tier_1?: number;
+            artifact_tier_2?: number;
+            perk?: number;
+            augment_placement?: number;
+            augment_armor?: number;
+            augment_might?: number;
+            augment_sniper?: number;
+            augment_movement?: number;
+            synergies?: string[];
+            complete?: boolean;
+        }): PortalMatchSetup {
+            const message = new PortalMatchSetup({});
+            if (data.artifact_tier_1 != null) {
+                message.artifact_tier_1 = data.artifact_tier_1;
+            }
+            if (data.artifact_tier_2 != null) {
+                message.artifact_tier_2 = data.artifact_tier_2;
+            }
+            if (data.perk != null) {
+                message.perk = data.perk;
+            }
+            if (data.augment_placement != null) {
+                message.augment_placement = data.augment_placement;
+            }
+            if (data.augment_armor != null) {
+                message.augment_armor = data.augment_armor;
+            }
+            if (data.augment_might != null) {
+                message.augment_might = data.augment_might;
+            }
+            if (data.augment_sniper != null) {
+                message.augment_sniper = data.augment_sniper;
+            }
+            if (data.augment_movement != null) {
+                message.augment_movement = data.augment_movement;
+            }
+            if (data.synergies != null) {
+                message.synergies = data.synergies;
+            }
+            if (data.complete != null) {
+                message.complete = data.complete;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                artifact_tier_1?: number;
+                artifact_tier_2?: number;
+                perk?: number;
+                augment_placement?: number;
+                augment_armor?: number;
+                augment_might?: number;
+                augment_sniper?: number;
+                augment_movement?: number;
+                synergies?: string[];
+                complete?: boolean;
+            } = {};
+            if (this.artifact_tier_1 != null) {
+                data.artifact_tier_1 = this.artifact_tier_1;
+            }
+            if (this.artifact_tier_2 != null) {
+                data.artifact_tier_2 = this.artifact_tier_2;
+            }
+            if (this.perk != null) {
+                data.perk = this.perk;
+            }
+            if (this.augment_placement != null) {
+                data.augment_placement = this.augment_placement;
+            }
+            if (this.augment_armor != null) {
+                data.augment_armor = this.augment_armor;
+            }
+            if (this.augment_might != null) {
+                data.augment_might = this.augment_might;
+            }
+            if (this.augment_sniper != null) {
+                data.augment_sniper = this.augment_sniper;
+            }
+            if (this.augment_movement != null) {
+                data.augment_movement = this.augment_movement;
+            }
+            if (this.synergies != null) {
+                data.synergies = this.synergies;
+            }
+            if (this.complete != null) {
+                data.complete = this.complete;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.artifact_tier_1 != 0)
+                writer.writeInt32(1, this.artifact_tier_1);
+            if (this.artifact_tier_2 != 0)
+                writer.writeInt32(2, this.artifact_tier_2);
+            if (this.perk != 0)
+                writer.writeInt32(3, this.perk);
+            if (this.augment_placement != 0)
+                writer.writeInt32(4, this.augment_placement);
+            if (this.augment_armor != 0)
+                writer.writeInt32(5, this.augment_armor);
+            if (this.augment_might != 0)
+                writer.writeInt32(6, this.augment_might);
+            if (this.augment_sniper != 0)
+                writer.writeInt32(7, this.augment_sniper);
+            if (this.augment_movement != 0)
+                writer.writeInt32(8, this.augment_movement);
+            if (this.synergies.length)
+                writer.writeRepeatedString(9, this.synergies);
+            if (this.complete != false)
+                writer.writeBool(10, this.complete);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): PortalMatchSetup {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new PortalMatchSetup();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.artifact_tier_1 = reader.readInt32();
+                        break;
+                    case 2:
+                        message.artifact_tier_2 = reader.readInt32();
+                        break;
+                    case 3:
+                        message.perk = reader.readInt32();
+                        break;
+                    case 4:
+                        message.augment_placement = reader.readInt32();
+                        break;
+                    case 5:
+                        message.augment_armor = reader.readInt32();
+                        break;
+                    case 6:
+                        message.augment_might = reader.readInt32();
+                        break;
+                    case 7:
+                        message.augment_sniper = reader.readInt32();
+                        break;
+                    case 8:
+                        message.augment_movement = reader.readInt32();
+                        break;
+                    case 9:
+                        pb_1.Message.addToRepeatedField(message, 9, reader.readString());
+                        break;
+                    case 10:
+                        message.complete = reader.readBool();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): PortalMatchSetup {
+            return PortalMatchSetup.deserialize(bytes);
+        }
+    }
     export class PortalMatch extends pb_1.Message {
         #one_of_decls: number[][] = [];
         constructor(data?: any[] | {
@@ -116,6 +390,8 @@ export namespace PBTypes {
             opponent_top_units?: PortalUnitPerformance[];
             draw?: boolean;
             player_abandoned?: boolean;
+            player_setup?: PortalMatchSetup;
+            opponent_setup?: PortalMatchSetup;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
@@ -170,6 +446,12 @@ export namespace PBTypes {
                 }
                 if ("player_abandoned" in data && data.player_abandoned != undefined) {
                     this.player_abandoned = data.player_abandoned;
+                }
+                if ("player_setup" in data && data.player_setup != undefined) {
+                    this.player_setup = data.player_setup;
+                }
+                if ("opponent_setup" in data && data.opponent_setup != undefined) {
+                    this.opponent_setup = data.opponent_setup;
                 }
             }
         }
@@ -275,6 +557,24 @@ export namespace PBTypes {
         set player_abandoned(value: boolean) {
             pb_1.Message.setField(this, 17, value);
         }
+        get player_setup() {
+            return pb_1.Message.getWrapperField(this, PortalMatchSetup, 18) as PortalMatchSetup;
+        }
+        set player_setup(value: PortalMatchSetup) {
+            pb_1.Message.setWrapperField(this, 18, value);
+        }
+        get has_player_setup() {
+            return pb_1.Message.getField(this, 18) != null;
+        }
+        get opponent_setup() {
+            return pb_1.Message.getWrapperField(this, PortalMatchSetup, 19) as PortalMatchSetup;
+        }
+        set opponent_setup(value: PortalMatchSetup) {
+            pb_1.Message.setWrapperField(this, 19, value);
+        }
+        get has_opponent_setup() {
+            return pb_1.Message.getField(this, 19) != null;
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -293,6 +593,8 @@ export namespace PBTypes {
             opponent_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
             draw?: boolean;
             player_abandoned?: boolean;
+            player_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
+            opponent_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -346,6 +648,12 @@ export namespace PBTypes {
             if (data.player_abandoned != null) {
                 message.player_abandoned = data.player_abandoned;
             }
+            if (data.player_setup != null) {
+                message.player_setup = PortalMatchSetup.fromObject(data.player_setup);
+            }
+            if (data.opponent_setup != null) {
+                message.opponent_setup = PortalMatchSetup.fromObject(data.opponent_setup);
+            }
             return message;
         }
         toObject() {
@@ -367,6 +675,8 @@ export namespace PBTypes {
                 opponent_top_units?: ReturnType<typeof PortalUnitPerformance.prototype.toObject>[];
                 draw?: boolean;
                 player_abandoned?: boolean;
+                player_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
+                opponent_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -419,6 +729,12 @@ export namespace PBTypes {
             if (this.player_abandoned != null) {
                 data.player_abandoned = this.player_abandoned;
             }
+            if (this.player_setup != null) {
+                data.player_setup = this.player_setup.toObject();
+            }
+            if (this.opponent_setup != null) {
+                data.opponent_setup = this.opponent_setup.toObject();
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -459,6 +775,10 @@ export namespace PBTypes {
                 writer.writeBool(16, this.draw);
             if (this.player_abandoned != false)
                 writer.writeBool(17, this.player_abandoned);
+            if (this.has_player_setup)
+                writer.writeMessage(18, this.player_setup, () => this.player_setup.serialize(writer));
+            if (this.has_opponent_setup)
+                writer.writeMessage(19, this.opponent_setup, () => this.opponent_setup.serialize(writer));
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -518,6 +838,12 @@ export namespace PBTypes {
                         break;
                     case 17:
                         message.player_abandoned = reader.readBool();
+                        break;
+                    case 18:
+                        reader.readMessage(message.player_setup, () => message.player_setup = PortalMatchSetup.deserialize(reader));
+                        break;
+                    case 19:
+                        reader.readMessage(message.opponent_setup, () => message.opponent_setup = PortalMatchSetup.deserialize(reader));
                         break;
                     default: reader.skipField();
                 }

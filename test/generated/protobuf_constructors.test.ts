@@ -105,6 +105,30 @@ describe("generated message constructors (new X({...}))", () => {
     });
 
     it("constructs player_portal messages directly", () => {
+        const playerSetup = new PortalPB.PortalMatchSetup({
+            artifact_tier_1: 3,
+            artifact_tier_2: 11,
+            perk: 2,
+            augment_placement: 1,
+            augment_armor: 3,
+            augment_might: 2,
+            augment_sniper: 1,
+            augment_movement: 0,
+            synergies: ["Life:1:2", "Might:2:1"],
+            complete: true,
+        });
+        const opponentSetup = new PortalPB.PortalMatchSetup({
+            artifact_tier_1: 12,
+            artifact_tier_2: 5,
+            perk: 3,
+            augment_placement: 0,
+            augment_armor: 2,
+            augment_might: 3,
+            augment_sniper: 0,
+            augment_movement: 1,
+            synergies: ["Chaos:2:1"],
+            complete: true,
+        });
         const match = {
             game_id: "g",
             won: false,
@@ -123,11 +147,14 @@ describe("generated message constructors (new X({...}))", () => {
             opponent_top_units: [new PortalPB.PortalUnitPerformance({ creature_id: 3, damage_dealt: 1200 })],
             draw: false,
             player_abandoned: true,
+            player_setup: playerSetup,
+            opponent_setup: opponentSetup,
         };
         roundTrip(
             new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 }),
             PortalPB.PortalUnitPerformance.deserializeBinary,
         );
+        roundTrip(playerSetup, PortalPB.PortalMatchSetup.deserializeBinary);
         roundTrip(new PortalPB.PortalMatch(match), PortalPB.PortalMatch.deserializeBinary);
         roundTrip(
             new PortalPB.PortalComboStat({ creature_ids: [1, 2], games: 3, wins: 2 }),

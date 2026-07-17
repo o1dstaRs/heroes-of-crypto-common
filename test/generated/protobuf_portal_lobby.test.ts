@@ -25,6 +25,30 @@ function roundTrip<T extends { serializeBinary(): Uint8Array; toObject(): unknow
 
 const playerTopUnit = { creature_id: 2, damage_dealt: 4200 };
 const opponentTopUnit = { creature_id: 5, damage_dealt: 3700 };
+const playerSetup = {
+    artifact_tier_1: 3,
+    artifact_tier_2: 11,
+    perk: 2,
+    augment_placement: 1,
+    augment_armor: 3,
+    augment_might: 2,
+    augment_sniper: 1,
+    augment_movement: 0,
+    synergies: ["Life:1:2", "Might:2:1"],
+    complete: true,
+};
+const opponentSetup = {
+    artifact_tier_1: 12,
+    artifact_tier_2: 5,
+    perk: 3,
+    augment_placement: 0,
+    augment_armor: 2,
+    augment_might: 3,
+    augment_sniper: 0,
+    augment_movement: 1,
+    synergies: ["Chaos:2:1"],
+    complete: true,
+};
 const portalMatch = {
     game_id: "game-1",
     won: true,
@@ -43,6 +67,8 @@ const portalMatch = {
     opponent_top_units: [opponentTopUnit],
     draw: false,
     player_abandoned: false,
+    player_setup: playerSetup,
+    opponent_setup: opponentSetup,
 };
 const portalCombo = { creature_ids: [7, 8], games: 12, wins: 9 };
 const portalCreature = { creature_id: 5, games: 20, wins: 14 };
@@ -63,11 +89,17 @@ describe("generated player_portal protobuf messages", () => {
             PortalPB.PortalUnitPerformance.fromObject(playerTopUnit),
             PortalPB.PortalUnitPerformance.deserializeBinary,
         );
+        roundTrip(PortalPB.PortalMatchSetup.fromObject(playerSetup), PortalPB.PortalMatchSetup.deserializeBinary);
         roundTrip(PortalPB.PortalMatch.fromObject(portalMatch), PortalPB.PortalMatch.deserializeBinary);
         roundTrip(
             PortalPB.PortalMatch.fromObject({ ...portalMatch, game_id: "game-draw", won: false, draw: true }),
             PortalPB.PortalMatch.deserializeBinary,
         );
+        const match = PortalPB.PortalMatch.fromObject(portalMatch);
+        expect(match.player_setup?.synergies).toEqual(["Life:1:2", "Might:2:1"]);
+        expect(match.player_setup?.complete).toBe(true);
+        expect(match.opponent_setup?.artifact_tier_2).toBe(5);
+        expect(PortalPB.PortalMatchSetup.fromObject({ perk: 3 }).complete).toBe(false);
         roundTrip(PortalPB.PortalComboStat.fromObject(portalCombo), PortalPB.PortalComboStat.deserializeBinary);
         roundTrip(
             PortalPB.PortalCreatureStat.fromObject(portalCreature),

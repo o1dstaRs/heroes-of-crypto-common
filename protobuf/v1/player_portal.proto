@@ -8,6 +8,22 @@ message PortalUnitPerformance {
     int64 damage_dealt = 2;
 }
 
+// One side's completed pre-fight setup. Numeric values are the existing common enum ids; 0 means none.
+message PortalMatchSetup {
+    int32 artifact_tier_1 = 1;
+    int32 artifact_tier_2 = 2;
+    int32 perk = 3;
+    int32 augment_placement = 4;
+    int32 augment_armor = 5;
+    int32 augment_might = 6;
+    int32 augment_sniper = 7;
+    int32 augment_movement = 8;
+    // Existing FightProperties keys: "Faction:synergyId:level".
+    repeated string synergies = 9;
+    // True only when this setup came from a terminal play snapshot rather than partial pick history.
+    bool complete = 10;
+}
+
 // One finished match from the requesting player's perspective.
 message PortalMatch {
     string game_id = 1;
@@ -29,6 +45,8 @@ message PortalMatch {
     repeated PortalUnitPerformance opponent_top_units = 15;
     bool draw = 16;
     bool player_abandoned = 17;
+    PortalMatchSetup player_setup = 18;
+    PortalMatchSetup opponent_setup = 19;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.

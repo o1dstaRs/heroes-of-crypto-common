@@ -97,6 +97,11 @@ export type PortalUnitPerformance = InstanceType<typeof m_player_portal.PBTypes.
 export type PortalUnitPerformanceObject = ReturnType<
     InstanceType<typeof m_player_portal.PBTypes.PortalUnitPerformance>["toObject"]
 >;
+export const PortalMatchSetup = m_player_portal.PBTypes.PortalMatchSetup;
+export type PortalMatchSetup = InstanceType<typeof m_player_portal.PBTypes.PortalMatchSetup>;
+export type PortalMatchSetupObject = ReturnType<
+    InstanceType<typeof m_player_portal.PBTypes.PortalMatchSetup>["toObject"]
+>;
 export const PortalMatch = m_player_portal.PBTypes.PortalMatch;
 export type PortalMatch = InstanceType<typeof m_player_portal.PBTypes.PortalMatch>;
 export type PortalMatchObject = ReturnType<InstanceType<typeof m_player_portal.PBTypes.PortalMatch>["toObject"]>;
