@@ -389,6 +389,78 @@ describe("composed-ranked worker bootstrap", () => {
 });
 
 describe("composed-ranked prior-seed scanner", () => {
+    it("treats aligned-v2 panels as generic structured evidence", async () => {
+        const parent = mkdtempSync(join(tmpdir(), "v07-composed-aligned-v2-definition-"));
+        const path = join(parent, "definition.json");
+        const cutoffMs = Math.floor(Date.now() / 1000) * 1000;
+        writeFileSync(
+            path,
+            `${JSON.stringify({
+                schemaVersion: 1,
+                artifactKind: "v0_7_aligned_96h_v2_definition",
+                panels: {
+                    train: { panelId: "train", mode: "train" },
+                    confirm: { panelId: "confirm", mode: "confirm" },
+                    finalCommitment: { panelId: "final-commitment", mode: "final" },
+                },
+                historicalSeedContextDeliberatelyBeyondTextWindow: { value: 87113710 },
+            })}\n`,
+        );
+        utimesSync(path, new Date(cutoffMs - 10_000), new Date(cutoffMs - 10_000));
+        const corePath = resolve(import.meta.dir, "../../src/simulation/optimizer/v0_7_96h_core.ts");
+        try {
+            const result = await scanV07ComposedSeedCorpus({
+                cutoff: new Date(cutoffMs).toISOString().replace(".000Z", "Z"),
+                commonRoot: resolve(import.meta.dir, "../.."),
+                priorManifestExpanderPath: corePath,
+                priorManifestExpanderSha256: fileSha256(corePath),
+                roots: [path],
+                excluded: [],
+                excludedRelativeSuffixes: ["target.json"],
+            });
+            expect(result.seeds).toEqual([87113710]);
+            expect(result.summary).toMatchObject({
+                matchedSeedTokens: 1,
+                expandedManifests: 0,
+            });
+        } finally {
+            rmSync(parent, { recursive: true, force: true });
+        }
+    });
+
+    it("fails closed for malformed panels carrying any legacy 96-hour marker", async () => {
+        const parent = mkdtempSync(join(tmpdir(), "v07-composed-malformed-legacy-panels-"));
+        const cutoffMs = Math.floor(Date.now() / 1000) * 1000;
+        const corePath = resolve(import.meta.dir, "../../src/simulation/optimizer/v0_7_96h_core.ts");
+        const fixtures = [
+            { pairSeedStep: 0x9e3779b1, panels: { train: {} } },
+            { allocatedDerivedScenarioSeeds: 1, panels: { train: {} } },
+            { panels: { train: { id: null } } },
+            { panels: { train: { gamesPerTemplate: null } } },
+            { panels: { train: { seeds: null } } },
+        ];
+        try {
+            for (const [index, fixture] of fixtures.entries()) {
+                const path = join(parent, `fixture-${index}.json`);
+                writeFileSync(path, `${JSON.stringify({ schemaVersion: 1, ...fixture })}\n`);
+                utimesSync(path, new Date(cutoffMs - 10_000), new Date(cutoffMs - 10_000));
+                await expect(
+                    scanV07ComposedSeedCorpus({
+                        cutoff: new Date(cutoffMs).toISOString().replace(".000Z", "Z"),
+                        commonRoot: resolve(import.meta.dir, "../.."),
+                        priorManifestExpanderPath: corePath,
+                        priorManifestExpanderSha256: fileSha256(corePath),
+                        roots: [path],
+                        excluded: [],
+                        excludedRelativeSuffixes: ["target.json"],
+                    }),
+                ).rejects.toThrow("Recognized prior-seed manifest failed authoritative expansion");
+            }
+        } finally {
+            rmSync(parent, { recursive: true, force: true });
+        }
+    });
+
     it("recurses past new directory mtimes and expands structured prior panels", async () => {
         const parent = mkdtempSync(join(tmpdir(), "v07-composed-scan-"));
         const discovered = join(parent, "hoc-common-synthetic");

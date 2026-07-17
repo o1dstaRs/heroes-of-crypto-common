@@ -653,10 +653,26 @@ export async function scanV07ComposedSeedCorpus(
     };
     const expand = (value: unknown): void => {
         const record = value !== null && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+        const panelChildren =
+            record?.panels !== null && typeof record?.panels === "object"
+                ? Object.values(record.panels as Record<string, unknown>)
+                : [];
+        const legacyPanels =
+            record !== undefined &&
+            record.panels !== undefined &&
+            (Object.hasOwn(record, "pairSeedStep") ||
+                Object.hasOwn(record, "allocatedDerivedScenarioSeeds") ||
+                panelChildren.some(
+                    (panel) =>
+                        panel !== null &&
+                        typeof panel === "object" &&
+                        !Array.isArray(panel) &&
+                        ["id", "gamesPerTemplate", "seeds"].some((field) => Object.hasOwn(panel, field)),
+                ));
         const recognized =
             record !== undefined &&
             (record.seedSeries !== undefined ||
-                record.panels !== undefined ||
+                legacyPanels ||
                 (record.gamesPerCell !== undefined && record.cells !== undefined) ||
                 record.headline !== undefined ||
                 record.cohorts !== undefined);
