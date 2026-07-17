@@ -298,13 +298,25 @@ export function buildRoster(
     amountMode: StackAmountMode = "levelTable",
 ): IArmyUnitSpec[] {
     const forced = forcedByLevel();
+    // COHORT env (range|melee) for artifact/AI cohort measurement: restrict the draft pool to RANGE or
+    // non-RANGE creatures so a whole roster is one archetype. "mixed"/unset = full pool. Env-gated (default off).
+    const cohortEnv = (process.env.COHORT ?? "").toLowerCase();
+    const cohortType = cohortEnv === "range" ? "RANGE" : cohortEnv === "melee" ? "MELEE" : undefined;
     const buildOnce = (): { roster: IArmyUnitSpec[]; ranged: number; flyer: number; caster: number } => {
         const roster: IArmyUnitSpec[] = [];
         let ranged = 0;
         let flyer = 0;
         let caster = 0;
         for (const { level, count } of composition) {
-            const pool = creaturesByLevel(level, factionFilter);
+            let pool = creaturesByLevel(level, factionFilter);
+            if (cohortType) {
+                const filtered = pool.filter((e) =>
+                    cohortType === "RANGE" ? e.attackType === "RANGE" : e.attackType !== "RANGE",
+                );
+                if (filtered.length) {
+                    pool = filtered;
+                }
+            }
             if (!pool.length) {
                 throw new Error(`No creatures found for level ${level}`);
             }
