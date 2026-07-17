@@ -29,6 +29,7 @@ import { MoveHandler } from "../handlers/move_handler";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import { SceneLogMock } from "../scene/scene_log_mock";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
+import { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { ArtifactTier } from "../artifacts/artifact_properties";
 import { DefaultPlacementLevel1, type AugmentType } from "../augments/augment_properties";
@@ -164,6 +165,13 @@ export interface IMatchConfig {
      * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the perk. */
     greenAugments?: ISetupAugment[];
     redAugments?: ISetupAugment[];
+    /**
+     * Deployment timing for the Placement augment. The default `current-live` name is retained for compatibility
+     * but now represents legacy pre-fix behavior. `setup-before-placement` models server main at a03dece3: a
+     * successful Placement augment triggers strategy re-placement in the expanded zone. Since no intervening
+     * fight state is retained here, seeding accepted setup before the final strategy placement is equivalent.
+     */
+    placementAugmentTiming?: "current-live" | "setup-before-placement";
     /** Synergies per team ({faction, synergy, level}) — recorded on fightProperties; combat + adjustBaseStats
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
@@ -183,6 +191,22 @@ export interface IMatchConfig {
 export interface ISetupAugment {
     kind: "Placement" | "Armor" | "Might" | "Sniper" | "Movement";
     value: number;
+}
+
+/** Seed setup through FightProperties' authoritative budget/order checks before intended-timing placement. */
+export function seedAcceptedSetupForPlacement(
+    fightProperties: FightProperties,
+    team: TeamType,
+    perk: number | undefined,
+    augments: readonly ISetupAugment[] | undefined,
+): void {
+    fightProperties.setDefaultPlacementPerTeam(team, DefaultPlacementLevel1.THREE_BY_THREE);
+    if (perk) {
+        fightProperties.setPerkPerTeam(team, perk);
+    }
+    for (const augment of augments ?? []) {
+        fightProperties.setAugmentPerTeam(team, { type: augment.kind, value: augment.value } as AugmentType);
+    }
 }
 
 export interface ISetupSynergy {
@@ -373,7 +397,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const gridSettings = simulationGridSettings();
 
     FightStateManager.getInstance().reset();
-    const grid = new Grid(gridSettings, config.gridType ?? PBTypes.GridVals.NORMAL);
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    const effectiveGridType = config.gridType ?? PBTypes.GridVals.NORMAL;
+    // Reset still consumes FightProperties' seeded live-map roll, preserving every downstream RNG draw.
+    // Explicit simulation maps then replace that roll in both state holders so combat map checks agree.
+    fightProperties.setGridType(effectiveGridType);
+    const grid = new Grid(gridSettings, effectiveGridType);
     const unitsHolder = new UnitsHolder(grid);
     clearAITargetMemory(unitsHolder);
     const sceneLog = new SceneLogMock();
@@ -381,12 +410,24 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const attackHandler = new AttackHandler(gridSettings, grid, sceneLog, damageStatisticHolder);
     const moveHandler = new MoveHandler(gridSettings, grid, unitsHolder);
     const pathHelper = new PathHelper(gridSettings);
-    const fightProperties = FightStateManager.getInstance().getFightProperties();
     const runtime = createDefaultGameRuntime();
     const { abilityFactory, effectFactory } = createCombatFactories();
 
-    const greenZone = new RectanglePlacement(gridSettings, PlacementPositionType.LOWER_LEFT, 3);
-    const redZone = new RectanglePlacement(gridSettings, PlacementPositionType.UPPER_RIGHT, 3);
+    const setupBeforePlacement = config.placementAugmentTiming === "setup-before-placement";
+    if (setupBeforePlacement) {
+        seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenPerk, config.greenAugments);
+        seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redPerk, config.redAugments);
+    }
+    const greenZone = new RectanglePlacement(
+        gridSettings,
+        PlacementPositionType.LOWER_LEFT,
+        setupBeforePlacement ? fightProperties.getAugmentPlacement(GREEN_TEAM)[0] : 3,
+    );
+    const redZone = new RectanglePlacement(
+        gridSettings,
+        PlacementPositionType.UPPER_RIGHT,
+        setupBeforePlacement ? fightProperties.getAugmentPlacement(RED_TEAM)[0] : 3,
+    );
     const zoneHashesFor = (team: TeamType): Set<number> =>
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
 

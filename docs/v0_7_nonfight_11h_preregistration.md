@@ -12,6 +12,14 @@ changing a ranked default, baking a candidate, or deploying a server.
   rules, plus the current fixed synergy table.
 - Placement and combat: v0.7, persisted creature order, legitimate pick reveals,
   `SEE_NONE`, and search off unless both arms explicitly enable the same setting.
+  Placement candidates target the corrected server-main lifecycle in which a
+  successful Placement augment re-runs the versioned bot placement strategy in
+  the expanded zone (`heroes-of-crypto-server` commit `a03dece30b05852694d569a0c5c17aa993e54c2d`).
+  The earlier delayed-setup 3-wide behavior is retained only as a legacy
+  diagnostic and is not promotion-eligible.
+- Maps: the live equal-probability set only: `NORMAL`, `LAVA_CENTER`, and
+  `BLOCK_CENTER`. `WATER_CENTER` is disabled and is excluded. The simulator's
+  `Grid` and `FightProperties` must carry the same registered map type.
 - Initial source revision: `31a92cef9014d8deba8d699d6ba8b2e07e5a8d53`.
   The launched campaign records the final pushed revision that contains its
   harnesses and runs from a clean clone of that exact revision.
@@ -25,7 +33,9 @@ changing a ranked default, baking a candidate, or deploying a server.
 2. **Setup and placement:** keep the accepted draft on both sides and search
    own-roster-only setup plans. The panel includes Tier-2 artifact ordering,
    synergy choice, augment plans (including Movement and Placement), and
-   placement behavior. Unsupported opponent information is forbidden.
+   placement behavior. Placement plans are scored against the corrected
+   server-main expanded-zone lifecycle. Unsupported opponent information is
+   forbidden.
 
 The two lanes share at most the M4 Max's 12 performance cores. The already
 running Zinc combat campaign is not modified and receives no competing workers.
@@ -41,8 +51,10 @@ Each lane uses three deterministic, non-overlapping seed domains:
 All comparisons use paired same-board seat swaps and treat the pair, not each
 fight, as the independent cluster. Reports include wins, losses, draws, decisive
 win rate, paired-cluster 95% confidence interval, laps/end reasons, and rejected
-actions by arm. A control comparison must reproduce symmetry before a candidate
-can be considered.
+actions by arm. The ranged, mage, melee-magic, and aura guard tags are inclusive:
+one matching own-roster creature is enough to enter the corresponding cohort.
+A control comparison must reproduce symmetry before a candidate can be
+considered.
 
 ## Promotion bars
 
@@ -54,9 +66,12 @@ hold on the untouched final guard:
 - candidate-side rejected actions are zero and no invalid/failed game is omitted;
 - no registered composition cohort has a point estimate below 49.5% or a 95%
   lower bound below 48.0%;
+- no live map has a point estimate below 49.5% or a paired-cluster 95% lower
+  bound below 48.0%;
 - the policy is expressible using information available to the ranked bot and
   the serialized candidate contains only heads the production seam consumes;
-- a deterministic replay sample is byte-identical.
+- a deterministic replay sample is byte-identical, including placement and the
+  complete executed action trace rather than only the final outcome.
 
 Passing these bars permits a review and a separately committed candidate
 artifact. It does not automatically flip configuration or deploy. A failure is

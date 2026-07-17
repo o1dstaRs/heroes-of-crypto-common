@@ -202,6 +202,17 @@ interface ITeamSetupOutcome {
 interface IConditionalPickDriverOptions {
     conditionalTeams: ReadonlySet<PickTeam>;
     preservePickOrder: boolean;
+    /** Research-only per-seat Tier-2 override evaluated at the live ARTIFACT_2 timing (five creatures). */
+    pickArtifactT2?: (
+        team: PickTeam,
+        offered: readonly number[],
+        ownCreatureIdsAtTier2: readonly number[],
+    ) => number | undefined;
+}
+
+export interface IRankedConditionalPickOverrides {
+    /** Return undefined to retain CONDITIONAL_SETUP_V1 for this seat. */
+    pickArtifactT2?: IConditionalPickDriverOptions["pickArtifactT2"];
 }
 
 /**
@@ -230,10 +241,12 @@ export function runRankedConditionalPickGame(
     seed: number,
     rules: ReadonlySet<ConditionalSetupRule>,
     genome: ILeagueGenome,
+    overrides: IRankedConditionalPickOverrides = {},
 ): { lower: IConditionalArmy; upper: IConditionalArmy } {
     return runConditionalPickGameWithOptions(seed, "league", rules, genome, {
         conditionalTeams: new Set([LOWER, UPPER]),
         preservePickOrder: true,
+        pickArtifactT2: overrides.pickArtifactT2,
     });
 }
 
@@ -291,9 +304,12 @@ function runConditionalPickGameWithOptions(
                     continue;
                 }
                 const staticPick = SETUP_POLICY_V0.pickArtifactT2(own.tier2Offers);
-                const artifactId = options.conditionalTeams.has(team)
-                    ? conditionalArtifactT2(own.tier2Offers, own.creatures, rules)
-                    : staticPick;
+                const overridden = options.pickArtifactT2?.(team, own.tier2Offers, own.creatures);
+                const artifactId =
+                    overridden ??
+                    (options.conditionalTeams.has(team)
+                        ? conditionalArtifactT2(own.tier2Offers, own.creatures, rules)
+                        : staticPick);
                 setupOutcome.set(team, {
                     tier2Artifact: artifactId,
                     t2Overridden: artifactId !== staticPick,
