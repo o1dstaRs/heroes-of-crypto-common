@@ -471,9 +471,15 @@ describe("grid_math", () => {
         expect(a).toEqual(b);
     });
 
-    it("hides an edge occluded by a unit further along the trajectory (not just the adjacent cell)", () => {
+    it("resolves the aim by the immediate-neighbour rule only — a unit further along the line does NOT hide the edge (the engine owns trajectory occlusion)", () => {
         // Attacker (UPPER) at the far left, target at x=4 on the same row. An enemy (LOWER) sits at
         // (2,1) — between them, but NOT the target's immediate LEFT neighbour (3,1), which stays empty.
+        // The "visible edge" rule is deliberately LOCAL: the LEFT edge is observable, so it is offered as
+        // the aim. Whether the shot actually threads past the unit at (2,1) is decided by the engine's
+        // evaluateRangeAttack (authoritative, shared with the server) — getClosestSideCenterDetailed does
+        // NOT raycast the line here. (An earlier on-line raycast broke the two-mountain BLOCK_CENTER map:
+        // it deleted edges of units standing behind/beside a mountain and through the corridor, making
+        // shots the engine would happily land unselectable.)
         const targetCell = { x: 4, y: 1 };
         const targetCenter = getPositionForCell(
             targetCell,
@@ -491,12 +497,11 @@ describe("grid_math", () => {
         const occluded = emptyMatrix();
         occluded[1][2] = PBTypes.TeamVals.LOWER; // matrix[y][x]: a unit two cells in front of the target
 
-        // The adjacent-cell check still considers the LEFT side observable (its neighbour 3,1 is empty)...
+        // The adjacent-cell check considers the LEFT side observable (its neighbour 3,1 is empty)...
         expect(
             isRangeAttackSideObservable(occluded, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER),
         ).toBe(true);
-        // ...but a non-Through-Shot projectile can't fly through the unit at (2,1), so the only edge
-        // facing the attacker is hidden and no aim is offered.
+        // ...and the aim resolver offers exactly that edge — it does not second-guess the trajectory.
         expect(
             getClosestSideCenterDetailed(
                 occluded,
@@ -507,10 +512,10 @@ describe("grid_math", () => {
                 true,
                 true,
                 PBTypes.TeamVals.UPPER,
-            ),
-        ).toBeUndefined();
+            )?.side,
+        ).toBe(RangeAttackCellSide.LEFT);
 
-        // Through Shot pierces units, so the same edge stays selectable.
+        // Through Shot behaves identically (it too checks only the immediate neighbour).
         expect(
             getClosestSideCenterDetailed(
                 occluded,
@@ -525,7 +530,7 @@ describe("grid_math", () => {
             )?.side,
         ).toBe(RangeAttackCellSide.LEFT);
 
-        // With the occluder removed the edge is selectable for a normal shot too (control).
+        // With no occluder at all the same edge is selected (control).
         expect(
             getClosestSideCenterDetailed(
                 emptyMatrix(),

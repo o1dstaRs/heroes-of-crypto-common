@@ -140,3 +140,92 @@ describe("range attack aim selection (getClosestSideCenterDetailed)", () => {
         expect(aim).toBeUndefined();
     });
 });
+
+describe("two-mountain BLOCK_CENTER map: visible edges stay selectable (occlusion-raycast regression)", () => {
+    // The two 2x2 mountains flanking the walkable 2x2 corridor of a BLOCK_CENTER board. Left mountain
+    // occupies x∈{5,6}, right mountain x∈{9,10}, both at y∈{7,8}; the corridor is x∈{7,8}, y∈{7,8}.
+    const MOUNTAIN_CELLS: Array<[number, number]> = [
+        [5, 7],
+        [6, 7],
+        [5, 8],
+        [6, 8], // left mountain
+        [9, 7],
+        [10, 7],
+        [9, 8],
+        [10, 8], // right mountain
+    ];
+    const mountainMatrix = (): number[][] => {
+        const m = emptyMatrix();
+        for (const [x, y] of MOUNTAIN_CELLS) {
+            setCell(m, x, y, ObstacleType.BLOCK);
+        }
+        return m;
+    };
+    // Aim as the client does when the cursor sits on the target's cell — the mouse position IS the
+    // target centre, so the resolved side is deterministic.
+    const aimAt = (
+        m: number[][],
+        attackerCell: { x: number; y: number },
+        targetCell: { x: number; y: number },
+        throughShot = false,
+    ) =>
+        getClosestSideCenterDetailed(
+            m,
+            GS,
+            cellCenter(targetCell.x, targetCell.y),
+            cellCenter(attackerCell.x, attackerCell.y),
+            cellCenter(targetCell.x, targetCell.y),
+            true,
+            true,
+            UPPER,
+            throughShot,
+        );
+
+    it("keeps the attacker-facing edge selectable when a mountain lies on the straight line to the target", () => {
+        // Attacker below-left, target above the corridor. BOTH facing edges (LEFT and DOWN) have their
+        // straight line to the attacker crossing the left mountain, so the removed on-line raycast used to
+        // delete both and return undefined — nothing to aim at even though the edges are plainly visible.
+        // The immediate-neighbour rule keeps them selectable; the engine owns the actual trajectory block.
+        const m = mountainMatrix();
+        const aim = aimAt(m, { x: 4, y: 3 }, { x: 7, y: 11 });
+        expect(aim).toBeDefined();
+        expect(aim!.cell).toEqual({ x: 7, y: 11 });
+        // Whichever facing edge is chosen, it must be one that actually faces the attacker below-left.
+        expect([RangeAttackCellSide.DOWN, RangeAttackCellSide.LEFT]).toContain(aim!.side);
+    });
+
+    it("exposes the attacker-facing DOWN edge for every unit in a row standing above the mountains", () => {
+        // A packed enemy row: each unit's LEFT/RIGHT edges are hidden by its neighbours, so only the DOWN
+        // edge (facing a shooter directly below) is legal. Units sitting above the mountains used to lose
+        // even that edge to the raycast; now every unit in the row is targetable from below.
+        const rowY = 11;
+        const rowXs = [4, 5, 6, 7, 8, 9];
+        for (const xt of rowXs) {
+            const m = mountainMatrix();
+            for (const x of rowXs) {
+                setCell(m, x, rowY, LOWER); // the whole enemy row is the target's team
+            }
+            const aim = aimAt(m, { x: xt, y: 2 }, { x: xt, y: rowY });
+            expect(aim, `unit at x=${xt} must still expose an edge`).toBeDefined();
+            expect(aim!.side).toBe(RangeAttackCellSide.DOWN);
+            expect(aim!.cell).toEqual({ x: xt, y: rowY });
+        }
+    });
+
+    it("selects the facing edge from every cardinal approach (target clear of the mountains)", () => {
+        const m = mountainMatrix();
+        const target = { x: 13, y: 13 }; // far corner, well away from the rock
+        const cases: Array<[{ x: number; y: number }, RangeAttackCellSide]> = [
+            [{ x: 3, y: 13 }, RangeAttackCellSide.LEFT], // attacker to the left
+            [{ x: 15, y: 13 }, RangeAttackCellSide.RIGHT], // to the right
+            [{ x: 13, y: 3 }, RangeAttackCellSide.DOWN], // below
+            [{ x: 13, y: 15 }, RangeAttackCellSide.UP], // above
+        ];
+        for (const [attackerCell, side] of cases) {
+            const aim = aimAt(m, attackerCell, target);
+            expect(aim, `approach ${RangeAttackCellSide[side]} must resolve an edge`).toBeDefined();
+            expect(aim!.side).toBe(side);
+            expect(aim!.cell).toEqual(target);
+        }
+    });
+});

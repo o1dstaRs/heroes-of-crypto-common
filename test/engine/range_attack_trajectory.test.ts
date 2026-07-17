@@ -16,7 +16,12 @@ import { createSequenceGameRuntime } from "../../src/engine/runtime";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { GridType } from "../../src/generated/protobuf/v1/types_gen";
-import { getPositionForCell, getRangeAttackSideCenter, RangeAttackCellSide } from "../../src/grid/grid_math";
+import {
+    getClosestSideCenterDetailed,
+    getPositionForCell,
+    getRangeAttackSideCenter,
+    RangeAttackCellSide,
+} from "../../src/grid/grid_math";
 import { getDistance } from "../../src/utils/math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -233,5 +238,120 @@ describe("range attack trajectory (server/common engine)", () => {
         // not the old "centre of the board" projection that landed in the empty corridor between the two.
         expect(evaluation.attackObstacle!.position.x).toBeLessThan(0);
         expect(evaluation.attackObstacle!.size).toBe(2);
+    });
+});
+
+describe("range attack on the two-mountain BLOCK_CENTER map (all angles)", () => {
+    // Fire from the attacker centre to an aim point and report whether the rock intercepts and who is hit.
+    const evalLine = (setup: RangeFightSetup, aim: { x: number; y: number }) =>
+        setup.attackHandler.evaluateRangeAttack(
+            setup.unitsHolder.getAllUnits(),
+            setup.attacker,
+            setup.attacker.getPosition(),
+            aim,
+            false,
+            false,
+            false,
+        );
+
+    it("a unit reachable through the 2x2 corridor is hit, not the mountain", () => {
+        // Attacker and target aligned on corridor column x=8 (x∈{7,8} is the walkable gap between the two
+        // mountains). The shot threads the corridor and lands on the unit.
+        const setup = setupRangeFight({
+            attackerCell: { x: 8, y: 1 },
+            targetCell: { x: 8, y: 14 },
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+        });
+        // The corridor cells really are empty (not rock).
+        expect(setup.grid.getOccupantUnitId({ x: 8, y: 7 })).toBe("");
+        expect(setup.grid.getOccupantUnitId({ x: 8, y: 8 })).toBe("");
+
+        const edge = getRangeAttackSideCenter(
+            GS,
+            { x: 8, y: 14 },
+            RangeAttackCellSide.DOWN,
+            setup.attacker.getPosition(),
+        );
+        const evaluation = evalLine(setup, edge);
+        expect(evaluation.attackObstacle).toBeUndefined();
+        expect(evaluation.affectedUnits.flat()).toContain(setup.target);
+    });
+
+    it("a unit directly behind a mountain cannot be reached — the shot hits the rock", () => {
+        // Target behind the LEFT mountain (column 6) from a shooter on the far side: the line crosses rock
+        // at rows 7-8, so the engine intercepts at the mountain and the unit takes no hit.
+        const setup = setupRangeFight({
+            attackerCell: { x: 6, y: 1 },
+            targetCell: { x: 6, y: 14 },
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+        });
+        const evaluation = evalLine(setup, setup.target.getPosition());
+        expect(evaluation.attackObstacle).toBeDefined();
+        expect(evaluation.affectedUnits.flat()).not.toContain(setup.target);
+        expect(evaluation.attackObstacle!.position.x).toBeLessThan(0); // the LEFT mountain (world-x < 0)
+    });
+
+    it("aims at the resolved visible edge, not the target centre, so a unit whose centre line clips the rock is still hit", () => {
+        // Regression for the client "Hit the mountain" check that evaluated the target's geometric CENTRE.
+        // Attacker (4,1), target (8,10) above the corridor: the attacker->centre line clips the mountain
+        // corner, but the attacker-facing DOWN edge threads past it. Centre => "Hit the mountain" (unit
+        // unattackable); the resolved edge => the shot lands on the unit.
+        const setup = setupRangeFight({
+            attackerCell: { x: 4, y: 1 },
+            targetCell: { x: 8, y: 10 },
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+        });
+
+        // 1) The CENTRE line is blocked by the rock — this is exactly what the buggy client check used.
+        const centre = evalLine(setup, setup.target.getPosition());
+        expect(centre.attackObstacle).toBeDefined();
+        expect(centre.affectedUnits.flat()).not.toContain(setup.target);
+
+        // 2) The resolved visible edge is the DOWN edge facing the attacker, and its line is clear.
+        const aim = getClosestSideCenterDetailed(
+            setup.grid.getMatrix(),
+            GS,
+            setup.target.getPosition(),
+            setup.attacker.getPosition(),
+            setup.target.getPosition(),
+            setup.attacker.isSmallSize(),
+            setup.target.isSmallSize(),
+            setup.attacker.getTeam(),
+            false,
+        );
+        expect(aim).toBeDefined();
+        expect(aim!.side).toBe(RangeAttackCellSide.DOWN);
+
+        const edge = evalLine(setup, aim!.position);
+        expect(edge.attackObstacle).toBeUndefined();
+        expect(edge.affectedUnits.flat()).toContain(setup.target);
+
+        // 3) End to end: the engine action lands on the unit, not the rock.
+        const hpBefore = setup.target.getCumulativeHp();
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.attacker.getId(),
+            targetId: setup.target.getId(),
+            aimCell: { x: 8, y: 10 },
+            aimSide: RangeAttackCellSide.DOWN,
+        });
+        expect(result.completed).toBe(true);
+        expect(setup.target.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
+    it("once the mountains are cleared the shot passes through and reaches the unit behind", () => {
+        const setup = setupRangeFight({
+            attackerCell: { x: 6, y: 1 },
+            targetCell: { x: 6, y: 14 },
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+        });
+        // Before: the standing mountain blocks the column-6 shot.
+        expect(evalLine(setup, setup.target.getPosition()).attackObstacle).toBeDefined();
+
+        setup.grid.cleanupCenterObstacle(); // both mountains crumble to walkable ground
+
+        const after = evalLine(setup, setup.target.getPosition());
+        expect(after.attackObstacle).toBeUndefined();
+        expect(after.affectedUnits.flat()).toContain(setup.target);
     });
 });

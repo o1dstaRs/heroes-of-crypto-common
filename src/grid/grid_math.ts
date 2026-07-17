@@ -740,35 +740,15 @@ export function getClosestSideCenterDetailed(
         });
     }
 
-    // A non-Through-Shot projectile can't fly through a unit, so an edge whose straight line from the
-    // attacker is blocked by ANOTHER unit (or a solid obstacle) before reaching the target is hidden
-    // and must not be selectable. isRangeAttackSideObservable above only checks the cell immediately
-    // adjacent to the edge, which misses an occluder further along the trajectory — raycast the rest.
-    let visiblePoints = points;
-    if (!isThroughShot && points.length) {
-        const aimedCellKey = (cell.x << 4) | cell.y;
-        const occludes = (value: number): boolean =>
-            value !== 0 && value !== fromTeamType && value !== ObstacleType.LAVA && value !== ObstacleType.WATER;
-        const hasClearLine = (sideCenter: XY): boolean => {
-            const distance = getDistance(fromPosition, sideCenter);
-            const samples = Math.max(2, Math.ceil(distance / (gridSettings.getCellSize() * 0.4)));
-            for (let i = 1; i < samples; i++) {
-                const t = i / samples;
-                const sampleCell = getCellForPosition(gridSettings, {
-                    x: fromPosition.x + (sideCenter.x - fromPosition.x) * t,
-                    y: fromPosition.y + (sideCenter.y - fromPosition.y) * t,
-                });
-                if (!sampleCell || ((sampleCell.x << 4) | sampleCell.y) === aimedCellKey) {
-                    continue;
-                }
-                if (occludes(matrixElement(gridMatrix, sampleCell.x, sampleCell.y))) {
-                    return false;
-                }
-            }
-            return true;
-        };
-        visiblePoints = points.filter((p) => hasClearLine(p.xy));
-    }
+    // Which edges are visible is decided by isRangeAttackSideObservable (the immediate-neighbour rule)
+    // plus the geometry gate above. The full attacker -> edge trajectory occlusion — a mountain or a
+    // second unit standing between the shooter and the target — is owned by the engine's
+    // evaluateRangeAttack, which is authoritative and shared verbatim with the server. So we do NOT
+    // raycast the line here. An earlier on-line raycast deleted every edge whose sampled line clipped a
+    // BLOCK cell, which on the two-mountain BLOCK_CENTER map wrongly hid the edges of units standing
+    // behind/beside a mountain and units reachable through the 2x2 corridor — making shots the engine
+    // would happily land unselectable. Let the engine resolve unit-vs-mountain; keep the edge visible.
+    const visiblePoints = points;
 
     for (const p of visiblePoints) {
         p.distance = getDistance(fromPosition, p.xy);
