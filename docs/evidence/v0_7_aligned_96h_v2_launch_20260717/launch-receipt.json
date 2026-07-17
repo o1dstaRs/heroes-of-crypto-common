@@ -181,6 +181,15 @@
         "archivePath": "/Users/zolotukhin/Workplace/hoc-defend-loop-legacy-archive-20260717-e6eeb60",
         "archiveReceiptBytesSha256": "1bf16b215a9ceac667a6d1bcc9c38e98a95365017b6d44dc31ebbecdee10509b"
     },
+    "legacyCoordinatorDisposition": {
+        "status": "PASS",
+        "exitObservedExternally": true,
+        "signalsSentAfterLaunch": 0,
+        "noRelaunchCensuses": 7,
+        "matchingProcessesAtFinalCensus": 0,
+        "path": "/Users/zolotukhin/Workplace/hoc-aligned-v2-launch-prep-20260716/legacy-coordinator-disposition-e6eeb60-20260717.json",
+        "bytesSha256": "8b0e0d0889b77a725f934613734e9a7611a1b2647ea157d7a2d5851554fadf45"
+    },
     "runningObservation": {
         "status": "PASS",
         "auditedAtMs": 1784251301473,
