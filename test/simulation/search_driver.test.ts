@@ -71,6 +71,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_INCLUDE_DEFEND",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
@@ -643,7 +644,10 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.appliesTo("v0.5")).toBe(false);
     });
 
-    it("keeps wait and defend challengers when SEARCH_ACTIVE_CHALLENGERS is default-off", () => {
+    it("keeps wait challengers but excludes defend by default; SEARCH_INCLUDE_DEFEND=1 re-admits them", () => {
+        // Live defend-loop fix (plan §8 W19): a scored defend challenger could override a LEGAL attack
+        // whenever the horizon-bounded leaf preferred deferring an unfavorable trade, and — the driver
+        // being stateless — re-choose it every lap (see test/simulation/search_defend_loop.test.ts).
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const h = buildBattle(203, "v0.6");
         const unit = h.activeUnit();
@@ -655,7 +659,17 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
         expect(calls).toHaveLength(1);
         expect(calls[0][0].kind).toBe("incumbent");
-        expect(calls[0].map((candidate) => candidate.kind)).toEqual(expect.arrayContaining(["wait", "defend"]));
+        const kinds = calls[0].map((candidate) => candidate.kind);
+        expect(kinds).toContain("wait");
+        expect(kinds).not.toContain("defend");
+
+        // Research escape hatch: the pre-fix candidate set comes back under SEARCH_INCLUDE_DEFEND=1.
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_INCLUDE_DEFEND: "1" });
+        const prefixDriver = h.makeDriver();
+        const prefixCalls = captureCandidates(prefixDriver);
+        expect(prefixDriver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
+        expect(prefixCalls).toHaveLength(1);
+        expect(prefixCalls[0].map((candidate) => candidate.kind)).toEqual(expect.arrayContaining(["wait", "defend"]));
     });
 
     it("SEARCH_ACTIVE_CHALLENGERS removes wait/defend challengers but never the incumbent anchor", () => {
@@ -940,7 +954,15 @@ describe("search driver — gating, hygiene, determinism", () => {
     });
 
     it("restores battle and damage state when a rollout throws after mutating the engine", () => {
-        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "1", SEARCH_HORIZON: "2" });
+        // SEARCH_INCLUDE_DEFEND keeps the defend challenger so this state still has >=2 candidates to
+        // roll out (the W19 default exclusion would otherwise dedupe this point down to the incumbent).
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "2",
+            SEARCH_INCLUDE_DEFEND: "1",
+        });
         const h = buildBattle(909, "v0.6");
         h.playTurns(4);
         const unit = h.activeUnit();
