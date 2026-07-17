@@ -81,13 +81,6 @@ import {
  * Candidate 0 is always the incumbent policy decision (the anchor). Plain MOVE (kite/retreat-cell)
  * candidates are EXCLUDED by default — that candidate class is ledger-dead twice (crude hold and
  * safe-frontier kiting both regressed); SEARCH_INCLUDE_MOVES=1 re-includes them for experiments only.
- * DEFEND (Luck Shield) challengers are ALSO excluded by default (2026-07-16 live defend-loop fix, plan §8
- * W19): defend fully skips the turn for −2 morale, and within a bounded horizon the rollout leaf — which
- * has no morale/luck/tempo-debt features — systematically prefers deferring a locally unfavorable trade
- * over taking it (live-observed: a bot Berserker Luck-Shielding on consecutive laps while a Pikeman
- * ground it down; reproduced at seed 87901710, laps 2–3, with a legal melee incumbent both times). The
- * driver is stateless and paired-seed deterministic, so the misjudgment recurs every lap — a defend
- * spiral no gate can dampen. SEARCH_INCLUDE_DEFEND=1 restores the pre-fix candidate set for experiments.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
  * SEARCH_SHORTLIST=<K> is an opt-in research cost control: score every candidate once at the immediate
@@ -374,8 +367,6 @@ export class SearchDriver {
     private readonly horizon: number;
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
-    /** SEARCH_INCLUDE_DEFEND=1 — research-only: re-admit defend (Luck Shield) challengers (see class doc). */
-    private readonly includeDefend: boolean;
     private readonly activeChallengers: boolean;
     private readonly shortlist: number | null;
     private readonly decisionDeadlineMs: number | null;
@@ -438,8 +429,6 @@ export class SearchDriver {
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
-        // Overriding search mode only — the Q2 ablation's observational candidate census keeps defend.
-        this.includeDefend = this.mode !== "search" || process.env.SEARCH_INCLUDE_DEFEND === "1";
         this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
         const rawShortlist = process.env.SEARCH_SHORTLIST;
         if (this.mode !== "search" || rawShortlist === undefined || rawShortlist === "") {
@@ -620,10 +609,6 @@ export class SearchDriver {
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
                 if (!this.includeMoves && candidate.kind === "move") return false;
-                // Live defend-loop fix (see class doc): a defend challenger can otherwise override a LEGAL
-                // attack whenever the horizon-bounded leaf prefers deferring an unfavorable local trade —
-                // and, being stateless, re-choose it every lap while the unit's morale drains away.
-                if (!this.includeDefend && candidate.kind === "defend") return false;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             });
             if (this.mode === "ablation") {
