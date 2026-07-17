@@ -784,7 +784,10 @@ export class FightProperties {
     public getSynergiesPerTeam(teamType: TeamType): string[] {
         return this.synergiesPerTeam.get(teamType) ?? [];
     }
-    /** Restore the active synergy keys when hydrating a fresh fight state. */
+    // Restore a team's active synergy list wholesale (raw "Faction:synergyId:level" keys, as findSynergyLevel
+    // reads them). Used by the client to carry synergies across a FightStateManager.reset() on snapshot
+    // hydrate — the authoritative snapshot doesn't re-seed them, so without this the aura-range / movement /
+    // ability-power synergies silently drop at fight start in ranked.
     public setSynergiesPerTeam(teamType: TeamType, synergies: string[]): void {
         this.synergiesPerTeam.set(teamType, [...synergies]);
     }

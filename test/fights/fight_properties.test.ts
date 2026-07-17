@@ -412,6 +412,44 @@ describe("FightProperties", () => {
             expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(0);
         });
 
+        it("setSynergiesPerTeam carries synergies across a fresh FightProperties (the ranked hydrate)", () => {
+            const team = PBTypes.TeamVals.LOWER;
+            // "prior" — the client's FightProperties holding a picked synergy, just before a snapshot hydrate.
+            const prior = new FightProperties();
+            prior.setSynergyUnitsPerFactions(team, 6, 6, 6, 6);
+            expect(
+                prior.updateSynergyPerTeam(
+                    team,
+                    PBTypes.FactionVals.MIGHT,
+                    MightSynergy.PLUS_AURAS_RANGE,
+                    SynergyLevel.LEVEL_3,
+                ),
+            ).toBe(true);
+            expect(prior.getAdditionalAuraRangePerTeam(team)).toBe(3);
+
+            // "fresh" — what FightStateManager.reset() builds on the client's fight-start hydrate: no
+            // synergies, so the aura-range bonus is silently zero. This is the bug — the authoritative
+            // snapshot re-seeds perk/artifacts/augments but never synergies.
+            const fresh = new FightProperties();
+            expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
+
+            // The hydrate preservation carries the synergy list wholesale, and the effect comes back.
+            const carried = prior.getSynergiesPerTeam(team);
+            expect(carried.length).toBeGreaterThan(0);
+            fresh.setSynergiesPerTeam(team, carried);
+            expect(fresh.getSynergiesPerTeam(team)).toEqual(carried);
+            expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(3);
+
+            // setSynergiesPerTeam REPLACES (doesn't append); an empty list clears — mirrors placement, where
+            // the server intentionally broadcasts no synergies so it can't wipe the viewer's optimistic picks.
+            fresh.setSynergiesPerTeam(team, []);
+            expect(fresh.getSynergiesPerTeam(team)).toEqual([]);
+            expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
+
+            // Isolation: restoring LOWER's synergies must not leak into UPPER.
+            expect(prior.getAdditionalAuraRangePerTeam(PBTypes.TeamVals.UPPER)).toBe(0);
+        });
+
         it("updates selected synergies when team faction counts change", () => {
             const fightProperties = new FightProperties();
             const team = PBTypes.TeamVals.LOWER;
