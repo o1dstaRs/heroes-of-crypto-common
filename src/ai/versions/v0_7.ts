@@ -14,6 +14,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { normalizeMeleeMagicSelection } from "../melee_attack_type";
 import {
     type CasterRouterSpell,
     type ICasterRouterPolicy,
@@ -165,9 +166,10 @@ export class StrategyV0_7 extends StrategyV0_6 {
         if (profile?.auraSaturated) {
             const incumbent = this.archetypeAnchor.decideTurn(unit, context);
             const policy = auraCasterRouterPolicy();
-            return policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
+            const decision = policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
+            return normalizeMeleeMagicSelection(unit, decision);
         }
-        return super.decideTurn(unit, context);
+        return normalizeMeleeMagicSelection(unit, super.decideTurn(unit, context));
     }
     /**
      * Pure-ranged armies use the measured v0.4 placement anchor only against Area Throw; combat remains

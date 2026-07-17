@@ -97,6 +97,43 @@ export interface IDecisionObservation {
     strategyVersion: string;
 }
 
+/** Result of applying one action from the strategy's chosen decision. */
+export interface IStrategyActionExecution {
+    readonly action: Readonly<GameAction>;
+    readonly completed: boolean;
+    readonly rejectionReason?: string;
+    readonly events: readonly GameEvent[];
+}
+
+export type TurnRecoverySource = "none" | "advance" | "defend";
+
+/** Simulator fallback used only when every substantive strategy action was declined. */
+export interface ITurnRecoveryObservation {
+    readonly source: TurnRecoverySource;
+    readonly completed: boolean;
+    readonly action?: Readonly<GameAction>;
+    readonly rejectionReason?: string;
+    readonly events: readonly GameEvent[];
+}
+
+/**
+ * Synchronous, detached view emitted exactly once after a decided turn has been applied, recovered if
+ * necessary, and closed. `events` includes strategy, recovery, and final end-turn events in engine order.
+ */
+export interface ITurnExecutionObservation {
+    readonly unitId: string;
+    readonly creatureName: string;
+    readonly side: Side;
+    readonly strategyVersion: string;
+    readonly rawIncumbent: readonly Readonly<GameAction>[];
+    readonly chosenDecision: readonly Readonly<GameAction>[];
+    readonly strategyActions: readonly IStrategyActionExecution[];
+    /** Every fallback attempt in engine order. `recovery` is the final attempt, or `none`. */
+    readonly recoveryAttempts: readonly ITurnRecoveryObservation[];
+    readonly recovery: ITurnRecoveryObservation;
+    readonly events: readonly GameEvent[];
+}
+
 export interface IMatchConfig {
     greenVersion: string;
     redVersion: string;
@@ -139,6 +176,8 @@ export interface IMatchConfig {
     redRevealedCreatures?: readonly number[];
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
+    /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
+    turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
 }
 
 export interface ISetupAugment {
@@ -811,6 +850,28 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         }
 
+        const turnExecutionObserver = config.turnExecutionObserver;
+        const rawIncumbentForObservation = turnExecutionObserver ? structuredClone(decided0) : undefined;
+        const chosenDecisionForObservation = turnExecutionObserver
+            ? decided === decided0
+                ? rawIncumbentForObservation
+                : structuredClone(decided)
+            : undefined;
+        const strategyActionsForObservation: IStrategyActionExecution[] | undefined = turnExecutionObserver
+            ? []
+            : undefined;
+        const turnEventsForObservation: GameEvent[] | undefined = turnExecutionObserver ? [] : undefined;
+        const recoveryAttemptsForObservation: ITurnRecoveryObservation[] | undefined = turnExecutionObserver
+            ? []
+            : undefined;
+        let recoveryForObservation: ITurnRecoveryObservation | undefined = turnExecutionObserver
+            ? {
+                  source: "none",
+                  completed: false,
+                  events: [],
+              }
+            : undefined;
+
         let didSomething = false;
         // Skip-audit bookkeeping (only meaningful when SKIP_AUDIT.enabled): what actually landed this turn,
         // and what the strategy PROPOSED, so the recovery branch can label WHY a turn landed nothing.
@@ -819,9 +880,20 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         let auditMoved = false;
         const auditProposedAttack = decided.some((a) => a.type === "melee_attack" || a.type === "range_attack");
         const auditProposedMove = decided.some((a) => a.type === "move_unit");
-        for (const action of decided) {
+        for (let actionIndex = 0; actionIndex < decided.length; actionIndex += 1) {
+            const action = decided[actionIndex];
             const fromCell = { ...unit.getBaseCell() };
             const result = engine.apply(action);
+            if (turnExecutionObserver) {
+                const observedEvents = structuredClone(result.events);
+                strategyActionsForObservation!.push({
+                    action: chosenDecisionForObservation![actionIndex],
+                    completed: result.completed,
+                    rejectionReason: result.rejectionReason,
+                    events: observedEvents,
+                });
+                turnEventsForObservation!.push(...observedEvents);
+            }
             if (result.completed && action.type !== "select_attack_type") {
                 didSomething = true; // a real action landed (a move or an attack)
                 if (action.type === "wait_turn") {
@@ -933,11 +1005,24 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             );
         }
         if (!finished && currentActiveUnitId === actingUnitId && !didSomething) {
-            const recover = (action: GameAction): boolean => {
+            const recover = (action: GameAction, source: Exclude<TurnRecoverySource, "none">): boolean => {
                 if (finished || currentActiveUnitId !== actingUnitId) {
                     return false;
                 }
                 const r = engine.apply(action);
+                if (turnExecutionObserver) {
+                    const observedEvents = structuredClone(r.events);
+                    const recoveryAttempt: ITurnRecoveryObservation = {
+                        source,
+                        completed: r.completed,
+                        action: structuredClone(action),
+                        rejectionReason: r.rejectionReason,
+                        events: observedEvents,
+                    };
+                    recoveryAttemptsForObservation!.push(recoveryAttempt);
+                    recoveryForObservation = recoveryAttempt;
+                    turnEventsForObservation!.push(...observedEvents);
+                }
                 recordAction(
                     actions,
                     action,
@@ -951,9 +1036,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 return r.completed;
             };
             const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
-            const advanced = !!advance && recover(advance);
+            const advanced = !!advance && recover(advance, "advance");
             if (!advanced) {
-                recover({ type: "defend_turn", unitId: actingUnitId });
+                recover({ type: "defend_turn", unitId: actingUnitId }, "defend");
             }
             if (SKIP_AUDIT.enabled) {
                 // decideTurn landed NOTHING — this is exactly what the client renders as "skips turn" (it has
@@ -968,10 +1053,27 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
         if (!finished && currentActiveUnitId === actingUnitId) {
             const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
+            if (turnExecutionObserver) {
+                turnEventsForObservation!.push(...structuredClone(endResult.events));
+            }
             applyEvents(endResult.events);
             if (!endResult.completed) {
                 currentActiveUnitId = ""; // could not even end the turn — bail rather than loop forever
             }
+        }
+        if (turnExecutionObserver) {
+            turnExecutionObserver({
+                unitId: actingUnitId,
+                creatureName: unit.getName(),
+                side: sideForTeam(unit.getTeam()),
+                strategyVersion: strategy.version,
+                rawIncumbent: rawIncumbentForObservation!,
+                chosenDecision: chosenDecisionForObservation!,
+                strategyActions: strategyActionsForObservation!,
+                recoveryAttempts: recoveryAttemptsForObservation!,
+                recovery: recoveryForObservation!,
+                events: turnEventsForObservation!,
+            });
         }
     }
 

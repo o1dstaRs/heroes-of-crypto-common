@@ -15,6 +15,7 @@ import { join } from "node:path";
 import {
     enumerateCandidates,
     getAIStrategy,
+    type CandidateKind,
     type IAIStrategy,
     type IDecisionContext,
     type IEnumeratedCandidate,
@@ -83,6 +84,12 @@ import {
  * safe-frontier kiting both regressed); SEARCH_INCLUDE_MOVES=1 re-includes them for experiments only.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
+ * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
+ * the exact incumbent action-array reference. SEARCH_INCUMBENT_KINDS limits which incumbent action classes
+ * enter shadow search (the filter runs before enumeration), and SEARCH_CHALLENGER_KINDS limits the generated
+ * challenger classes. SEARCH_VALIDATION_ROLLOUTS independently re-scores the incumbent and discovery-best
+ * challenger under a domain-separated paired-seed bank and reports through SEARCH_AUDIT_TURNS; its leaf delta
+ * is diagnostic, not terminal proof. Validation is rejected with SEARCH_IL_DATASET so v3 IL rows stay exact.
  * SEARCH_SHORTLIST=<K> is an opt-in research cost control: score every candidate once at the immediate
  * post-action leaf, then run the configured horizon only for the incumbent plus the best K-1 legal
  * challengers. K includes the incumbent and must be >=2. Unset keeps the original full-candidate search.
@@ -144,7 +151,9 @@ import {
  *
  * AUDIT (SEARCH_AUDIT=<jsonl path, or "1" for ./search_audit.jsonl>): one summary line per game with the
  * override/flip counters, per-class distributions and wall-clock cost; SEARCH_AUDIT_TURNS=1 adds one line
- * per searched turn. Lines are buffered per game and appended once (atomic enough across worker threads).
+ * per searched turn. Every turn row carries a stable in-game identity (`seed`, `side`, `unitId`, `lap`,
+ * `decisionOrdinal`) so replayed games can be deduplicated after a worker restart. Lines are buffered per
+ * game and appended once; use search_audit_reducer.ts when multiple workers share an append-only path.
  *
  * IMITATION-LEARNING DATASET (SEARCH_IL_DATASET=<jsonl path>, search mode only, default OFF): one line
  * per SEARCHED decision with the state feature vectors already computed elsewhere in the pipeline (the
@@ -177,6 +186,7 @@ const MAX_REPLY_HORIZON_TURNS = 12;
 
 type SearchMode = "off" | "search" | "ablation" | "oracle";
 type HorizonMode = "leaf" | "turns" | "reply" | "lap";
+type IncumbentKind = "idle" | "defend" | "wait" | "move" | "melee" | "shot" | "area_throw" | "spell" | "mine";
 
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
@@ -224,8 +234,28 @@ const envNum = (name: string, fallback: number, min: number): number => {
     return Number.isFinite(v) && v >= min ? v : fallback;
 };
 
+const INCUMBENT_KINDS = new Set(["idle", "defend", "wait", "move", "melee", "shot", "area_throw", "spell", "mine"]);
+const CHALLENGER_KINDS = new Set<CandidateKind>(["wait", "defend", "move", "melee", "shot", "area_throw", "spell"]);
+
+function parseKindFilter<T extends string>(
+    name: string,
+    raw: string | undefined,
+    allowed: ReadonlySet<string>,
+): ReadonlySet<T> | null {
+    if (raw === undefined || raw === "") return null;
+    const values = raw.split(",").map((value) => value.trim());
+    if (
+        !values.length ||
+        values.some((value) => !value || !allowed.has(value)) ||
+        new Set(values).size !== values.length
+    ) {
+        throw new Error(`${name} must be a comma-separated list of unique supported kinds`);
+    }
+    return new Set(values as T[]);
+}
+
 /** Classify an arbitrary decided action list into the candidate-kind vocabulary (for audit buckets). */
-export function classifyActions(actions: readonly GameAction[]): string {
+export function classifyActions(actions: readonly GameAction[]): IncumbentKind {
     for (const action of actions) {
         switch (action.type) {
             case "melee_attack":
@@ -259,6 +289,8 @@ interface ISearchCounters {
     searched: number;
     /** Decisions where the gate fired and the incumbent was replaced. */
     overrides: number;
+    /** Observe-only decisions where the normal gate would have replaced the incumbent. */
+    shadowRecommendations: number;
     /** Searched decisions whose incumbent was rejected by the engine in simulation. */
     illegalIncumbent: number;
     /** Decisions skipped because only the incumbent existed after filtering. */
@@ -314,6 +346,7 @@ const emptyCounters = (): ISearchCounters => ({
     decisions: 0,
     searched: 0,
     overrides: 0,
+    shadowRecommendations: 0,
     illegalIncumbent: 0,
     singleCandidate: 0,
     candidatesTotal: 0,
@@ -368,6 +401,10 @@ export class SearchDriver {
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly activeChallengers: boolean;
+    private readonly observeOnly: boolean;
+    private readonly incumbentKinds: ReadonlySet<IncumbentKind> | null;
+    private readonly challengerKinds: ReadonlySet<CandidateKind> | null;
+    private readonly validationRollouts: number | null;
     private readonly shortlist: number | null;
     private readonly decisionDeadlineMs: number | null;
     private readonly lateRangedFinishWeight: number;
@@ -430,6 +467,44 @@ export class SearchDriver {
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
         this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
+        const rawObserveOnly = process.env.SEARCH_OBSERVE_ONLY;
+        if (rawObserveOnly !== undefined && rawObserveOnly !== "" && rawObserveOnly !== "0" && rawObserveOnly !== "1") {
+            throw new Error("SEARCH_OBSERVE_ONLY must be 0 or 1");
+        }
+        this.observeOnly = rawObserveOnly === "1";
+        this.incumbentKinds = parseKindFilter<IncumbentKind>(
+            "SEARCH_INCUMBENT_KINDS",
+            process.env.SEARCH_INCUMBENT_KINDS,
+            INCUMBENT_KINDS,
+        );
+        this.challengerKinds = parseKindFilter<CandidateKind>(
+            "SEARCH_CHALLENGER_KINDS",
+            process.env.SEARCH_CHALLENGER_KINDS,
+            CHALLENGER_KINDS,
+        );
+        const rawValidationRollouts = process.env.SEARCH_VALIDATION_ROLLOUTS;
+        if (rawValidationRollouts === undefined || rawValidationRollouts === "") {
+            this.validationRollouts = null;
+        } else {
+            const validationRollouts = Number(rawValidationRollouts);
+            if (!Number.isSafeInteger(validationRollouts) || validationRollouts <= 0) {
+                throw new Error("SEARCH_VALIDATION_ROLLOUTS must be a positive integer");
+            }
+            this.validationRollouts = validationRollouts;
+        }
+        if (this.observeOnly && this.mode !== "search") {
+            throw new Error("SEARCH_OBSERVE_ONLY requires V07_SEARCH=1");
+        }
+        if ((this.incumbentKinds || this.challengerKinds || this.validationRollouts !== null) && !this.observeOnly) {
+            throw new Error(
+                "SEARCH_INCUMBENT_KINDS, SEARCH_CHALLENGER_KINDS, and SEARCH_VALIDATION_ROLLOUTS require SEARCH_OBSERVE_ONLY=1",
+            );
+        }
+        if (this.validationRollouts !== null && process.env.SEARCH_IL_DATASET) {
+            throw new Error(
+                "SEARCH_VALIDATION_ROLLOUTS cannot be combined with SEARCH_IL_DATASET; use SEARCH_AUDIT_TURNS",
+            );
+        }
         const rawShortlist = process.env.SEARCH_SHORTLIST;
         if (this.mode !== "search" || rawShortlist === undefined || rawShortlist === "") {
             this.shortlist = null;
@@ -573,6 +648,9 @@ export class SearchDriver {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
+        if (this.incumbentKinds && !this.incumbentKinds.has(classifyActions(incumbent))) {
+            return incumbent;
+        }
         if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
             this.onFightReady();
         }
@@ -608,6 +686,7 @@ export class SearchDriver {
             });
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
+                if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 if (!this.includeMoves && candidate.kind === "move") return false;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             });
@@ -670,7 +749,7 @@ export class SearchDriver {
             }
             this.datasetRows.length = 0;
         }
-        if (!this.enabled || !this.auditPath || this.counters.decisions === 0) {
+        if (!this.enabled || !this.auditPath) {
             return;
         }
         const c = this.counters;
@@ -690,6 +769,15 @@ export class SearchDriver {
             decisions: c.decisions,
             searched: c.searched,
             overrides: c.overrides,
+            ...(this.observeOnly
+                ? {
+                      observeOnly: true,
+                      shadowRecommendations: c.shadowRecommendations,
+                      incumbentKinds: this.incumbentKinds ? [...this.incumbentKinds] : null,
+                      challengerKinds: this.challengerKinds ? [...this.challengerKinds] : null,
+                      validationRollouts: this.validationRollouts,
+                  }
+                : {}),
             illegalIncumbent: c.illegalIncumbent,
             singleCandidate: c.singleCandidate,
             candidatesTotal: c.candidatesTotal,
@@ -747,6 +835,21 @@ export class SearchDriver {
         this.turnRows.length = 0;
     }
     // ---- search mode ----------------------------------------------------------------------------
+    private auditTurnIdentity(unit: Unit): {
+        side: "green" | "red";
+        unitId: string;
+        decisionOrdinal: number;
+    } {
+        const decisionOrdinal = this.counters.decisions - 1;
+        if (decisionOrdinal < 0) {
+            throw new Error("Search audit turn identity requires an active decision");
+        }
+        return {
+            side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+            unitId: unit.getId(),
+            decisionOrdinal,
+        };
+    }
     private search(
         unit: Unit,
         candidates: IEnumeratedCandidate[],
@@ -772,10 +875,32 @@ export class SearchDriver {
         const deadlineAt = this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs;
         let scoredCandidates: readonly IEnumeratedCandidate[];
         let means: number[];
+        let bestIdx = 0;
+        let bestChallengerIdx = -1;
+        let validationMeans: number[] | null = null;
         try {
             scoredCandidates = this.shortlistCandidates(unit, candidates, seedBase, deadlineAt);
             means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
+            for (let i = 1; i < means.length; i += 1) {
+                if (means[i] > means[bestIdx]) {
+                    bestIdx = i;
+                }
+                if (bestChallengerIdx === -1 || means[i] > means[bestChallengerIdx]) {
+                    bestChallengerIdx = i;
+                }
+            }
+            if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
+                const validationSeedBase = hashSimulationParts("search-validation-v1", seedBase);
+                validationMeans = this.scoreCandidates(
+                    unit,
+                    [scoredCandidates[0], scoredCandidates[bestChallengerIdx]],
+                    validationSeedBase,
+                    "turns",
+                    this.validationRollouts,
+                    deadlineAt,
+                );
+            }
         } catch (error) {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
             this.counters.deadlineFallbacks += 1;
@@ -788,6 +913,7 @@ export class SearchDriver {
                         seed: this.match.seed,
                         green: this.match.greenVersion,
                         red: this.match.redVersion,
+                        ...this.auditTurnIdentity(unit),
                         lap: this.deps.fightProperties.getCurrentLap(),
                         unit: unit.getName(),
                         nc: candidates.length,
@@ -798,16 +924,19 @@ export class SearchDriver {
                         d: null,
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
+                        ...(this.observeOnly
+                            ? {
+                                  observeOnly: 1,
+                                  validationRollouts: this.validationRollouts,
+                                  validationDelta: null,
+                                  selectedKind: null,
+                                  selectedSignature: null,
+                              }
+                            : {}),
                     }),
                 );
             }
             return incumbent;
-        }
-        let bestIdx = 0;
-        for (let i = 1; i < means.length; i += 1) {
-            if (means[i] > means[bestIdx]) {
-                bestIdx = i;
-            }
         }
         const incumbentIllegal = means[0] === -Infinity;
         if (incumbentIllegal) {
@@ -815,15 +944,28 @@ export class SearchDriver {
         }
         // The GATE: trust the policy unless a challenger clearly beats it on mean rollout value. An
         // incumbent that is illegal in sim is always replaced by the best legal candidate.
-        const overridden =
+        const wouldOverride =
             bestIdx !== 0 &&
             means[bestIdx] !== -Infinity &&
             (incumbentIllegal || means[bestIdx] - means[0] >= this.gate);
+        const overridden = wouldOverride && !this.observeOnly;
+        if (wouldOverride && this.observeOnly) {
+            this.counters.shadowRecommendations += 1;
+        }
         if (overridden) {
             this.counters.overrides += 1;
             bump(this.counters.overridesByIncumbentKind, incumbentKind);
             bump(this.counters.overridesToKind, scoredCandidates[bestIdx].kind);
         }
+        const selectedChallenger = bestChallengerIdx === -1 ? null : scoredCandidates[bestChallengerIdx];
+        const discoveryDelta =
+            bestChallengerIdx === -1 || means[0] === -Infinity || means[bestChallengerIdx] === -Infinity
+                ? null
+                : means[bestChallengerIdx] - means[0];
+        const validationDelta =
+            validationMeans === null || validationMeans[0] === -Infinity || validationMeans[1] === -Infinity
+                ? null
+                : validationMeans[1] - validationMeans[0];
         if (ilState) {
             const chosenIdx = overridden ? bestIdx : 0;
             this.ilRows.push(
@@ -873,6 +1015,7 @@ export class SearchDriver {
                     seed: this.match.seed,
                     green: this.match.greenVersion,
                     red: this.match.redVersion,
+                    ...this.auditTurnIdentity(unit),
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     nc: candidates.length,
@@ -885,6 +1028,19 @@ export class SearchDriver {
                             ? null
                             : Number((means[bestIdx] - means[0]).toFixed(4)),
                     ms: Math.round(ms * 10) / 10,
+                    ...(this.observeOnly
+                        ? {
+                              observeOnly: 1,
+                              wouldOverride: wouldOverride ? 1 : 0,
+                              selectedKind: selectedChallenger?.kind ?? null,
+                              selectedSignature: selectedChallenger
+                                  ? ilActionSignature(selectedChallenger.actions)
+                                  : null,
+                              discoveryDelta: discoveryDelta === null ? null : Number(discoveryDelta.toFixed(4)),
+                              validationRollouts: this.validationRollouts,
+                              validationDelta: validationDelta === null ? null : Number(validationDelta.toFixed(4)),
+                          }
+                        : {}),
                 }),
             );
         }
@@ -977,6 +1133,7 @@ export class SearchDriver {
                     seed: this.match.seed,
                     green: this.match.greenVersion,
                     red: this.match.redVersion,
+                    ...this.auditTurnIdentity(unit),
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     nc: candidates.length,
@@ -1160,6 +1317,7 @@ export class SearchDriver {
                     seed: this.match.seed,
                     green: this.match.greenVersion,
                     red: this.match.redVersion,
+                    ...this.auditTurnIdentity(unit),
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     inc: incumbentKind,

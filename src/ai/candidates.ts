@@ -31,6 +31,7 @@ import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
+import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -574,13 +575,7 @@ class CandidateGenerator {
         }
         const base = this.unit.getBaseCell();
         const myCells = this.unit.getCells();
-        const sel = this.unit.getAttackTypeSelection();
-        // select_attack_type MELEE also selects MELEE_MAGIC on those units (Unit.selectAttackType), and
-        // handleMeleeAttack accepts either selection — so one MELEE prefix covers both unit kinds.
-        const prefix: GameAction[] =
-            sel !== MELEE && sel !== MELEE_MAGIC
-                ? [{ type: "select_attack_type", unitId: this.unit.getId(), attackType: MELEE }]
-                : [];
+        const prefix = meleeAttackTypeSelectionPrefix(this.unit);
 
         interface IMeleePair {
             target: Unit;
