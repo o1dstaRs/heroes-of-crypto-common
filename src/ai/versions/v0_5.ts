@@ -23,6 +23,7 @@ import {
     analyzeEngagement,
     auraCoverageScore,
     type AuraWeightFn,
+    canUnitLandAt,
     countMeleeThreatsToCell,
     findMountainMeleeStrike,
     isLineBlockedByObstacle,
@@ -420,7 +421,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!wBias && !wInPlace && !wClose && !wGroup && !wOutRange && !wLaneBlocked && !wProgress) {
             return decision; // untrained: exact v0.4 mountain behaviour (its own heuristic still runs in super)
         }
-        if (unit.getAttackType() === RANGE || !unit.canMove()) {
+        const forcedTarget = context.unitsHolder.getAllUnits().get(unit.getTarget());
+        if (unit.getAttackType() === RANGE || !unit.canMove() || (forcedTarget && !forcedTarget.isDead())) {
             return decision;
         }
         const { grid, matrix, unitsHolder, pathHelper } = context;
@@ -608,7 +610,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const stands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: bc }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
-            if (r?.route.length) {
+            if (r?.route.length && canUnitLandAt(unit, grid, r.cell)) {
                 stands.push({ cell: r.cell, route: r });
             }
         }

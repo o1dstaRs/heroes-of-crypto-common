@@ -162,4 +162,76 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         expect(attack.attackFrom).toEqual({ x: 6, y: 6 });
         expect(splash.getBaseCell()).toEqual({ x: 6, y: 8 });
     });
+
+    it("does not score a large flying AOE attack from an unoccupiable lava footprint", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
+        const dragon = createTestUnit({
+            name: "Black Dragon",
+            team: LOWER,
+            abilities: ["Fire Breath"],
+            movementType: PBTypes.MovementVals.FLY,
+            size: PBTypes.UnitSizeVals.LARGE,
+            speed: 4,
+        });
+        const incumbentTarget = createTestUnit({ team: UPPER, name: "Incumbent Target" });
+        const lavaTarget = createTestUnit({ team: UPPER, name: "Lava Target" });
+        const lavaSplash1 = createTestUnit({ team: UPPER, name: "Lava Splash 1" });
+        const lavaSplash2 = createTestUnit({ team: UPPER, name: "Lava Splash 2" });
+        placeUnit(combat.grid, combat.unitsHolder, dragon, { x: 9, y: 11 });
+        placeUnit(combat.grid, combat.unitsHolder, incumbentTarget, { x: 8, y: 9 });
+        placeUnit(combat.grid, combat.unitsHolder, lavaTarget, { x: 8, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, lavaSplash1, { x: 8, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, lavaSplash2, { x: 8, y: 3 });
+
+        const lavaAttackFrom = { x: 8, y: 7 };
+        const lavaFootprint = [
+            { x: 8, y: 7 },
+            { x: 8, y: 6 },
+            { x: 7, y: 7 },
+            { x: 7, y: 6 },
+        ];
+        const context = decisionContext(combat);
+        context.pathHelper = {
+            getMovePath: () => ({
+                cells: [],
+                hashes: new Set(),
+                knownPaths: new Map([
+                    [
+                        (lavaAttackFrom.x << 4) | lavaAttackFrom.y,
+                        [
+                            {
+                                cell: lavaAttackFrom,
+                                route: [dragon.getBaseCell(), lavaAttackFrom],
+                                weight: 1,
+                                firstAggrMet: false,
+                                hasLavaCell: true,
+                                hasWaterCell: false,
+                            },
+                        ],
+                    ],
+                ]),
+            }),
+        } as PathHelper;
+        const weights = new Array(DEFAULT_V05_W.length).fill(0);
+        weights[41] = 1;
+
+        expect(combat.grid.areAllCellsEmpty(lavaFootprint, dragon.getId())).toBe(false);
+        expect(combat.grid.canOccupyCells(lavaFootprint, false, false)).toBe(false);
+
+        const actions = new StrategyV0_5(weights)["aoeMeleeByPolicy"](dragon, context, [
+            {
+                type: "melee_attack",
+                attackerId: dragon.getId(),
+                targetId: incumbentTarget.getId(),
+                attackFrom: dragon.getBaseCell(),
+            },
+        ]);
+        const attack = actions.find((action) => action.type === "melee_attack");
+
+        expect(attack).toMatchObject({
+            targetId: incumbentTarget.getId(),
+            attackFrom: dragon.getBaseCell(),
+        });
+        expect(attack).not.toMatchObject({ attackFrom: lavaAttackFrom });
+    });
 });

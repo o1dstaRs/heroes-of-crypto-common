@@ -8,7 +8,11 @@ import {
 import { parseConditionalRules } from "../../src/ai/setup/setup_conditional";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { runRankedConditionalPickGame } from "../../src/simulation/measure_setup_conditional";
-import { candidatesForLane, setupSearchLanes } from "../../src/simulation/optimizer/v0_7_setup_overnight";
+import {
+    candidatesForLane,
+    evaluateSetupPair,
+    setupSearchLanes,
+} from "../../src/simulation/optimizer/v0_7_setup_overnight";
 import {
     augmentPlanCost,
     augmentPlanId,
@@ -78,6 +82,22 @@ describe("v0.7 setup overnight search core", () => {
             "aura-heavy",
         ]);
         expect(shippedNonFightPolicy().placementAugmentTiming).toBe("setup-before-placement");
+    });
+
+    test("keeps large flying AOE melee landings legal on the deterministic LAVA_CENTER rejection seed", () => {
+        const pair = evaluateSetupPair(shippedNonFightPolicy(), 1_393_533_046);
+
+        expect(pair.gridType).toBe(PBTypes.GridVals.LAVA_CENTER);
+        expect(
+            pair.games.map(({ candidateSide, candidateRejections, baselineRejections }) => ({
+                candidateSide,
+                candidateRejections,
+                baselineRejections,
+            })),
+        ).toEqual([
+            { candidateSide: "green", candidateRejections: 0, baselineRejections: 0 },
+            { candidateSide: "red", candidateRejections: 0, baselineRejections: 0 },
+        ]);
     });
 
     test("keeps train, selection, and untouched guard seed blocks disjoint", () => {

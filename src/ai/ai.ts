@@ -802,6 +802,26 @@ export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], en
 }
 
 /**
+ * Whether the engine can place this unit's full footprint at `baseCell`. Pathfinding may route flyers
+ * and Lava Striders across hazards they cannot finish a move on, so attack-from selection must apply
+ * the execution-time landing rule separately without restricting transit.
+ */
+export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
+    const cells = [baseCell];
+    if (!unit.isSmallSize()) {
+        cells.push(
+            { x: baseCell.x, y: baseCell.y - 1 },
+            { x: baseCell.x - 1, y: baseCell.y },
+            { x: baseCell.x - 1, y: baseCell.y - 1 },
+        );
+    }
+    return (
+        grid.areAllCellsEmpty(cells, unit.getId()) ||
+        grid.canOccupyCells(cells, unit.hasAbilityActive("Made of Fire"), unit.hasAbilityActive("Made of Water"))
+    );
+}
+
+/**
  * Snapshot of the unit's team situation: how many allies are melee vs ranged,
  * how many melee allies are already adjacent to an enemy ("engaged" / tanking),
  * the centroid of melee allies (for grouping), the distance from this unit to
@@ -954,6 +974,9 @@ export function findMountainMeleeStrike(
 
     let best: { attackFrom: HoCMath.XY; targetCell: HoCMath.XY; weight: number } | undefined;
     const consider = (standCell: HoCMath.XY, weight: number): void => {
+        if (!canUnitLandAt(unit, grid, standCell)) {
+            return;
+        }
         for (const oc of outerCells) {
             if (Math.abs(standCell.x - oc.x) <= 1 && Math.abs(standCell.y - oc.y) <= 1) {
                 if (!best || weight < best.weight) {
@@ -993,9 +1016,17 @@ function evaluateMountainStrategy(
     if (mountainHitsLeft(grid) <= 0) {
         return undefined;
     }
+    const forcedTarget = unitsHolder.getAllUnits().get(unit.getTarget());
     // Only melee units mine; ranged units stay on shooting/holding duty. Never mine with enemies
-    // pressing — deal with the incoming fight (or reach safety) first.
-    if (unit.getAttackType() === PBTypes.AttackVals.RANGE || !unit.canMove() || engagement.enemiesPressing) {
+    // pressing or while compelled to attack a living unit — deal with that fight first. The obstacle
+    // handler rejects mountain attacks while a live forced target exists, so selecting one here would
+    // waste the proposal and fall through to recovery movement.
+    if (
+        unit.getAttackType() === PBTypes.AttackVals.RANGE ||
+        !unit.canMove() ||
+        engagement.enemiesPressing ||
+        (forcedTarget && !forcedTarget.isDead())
+    ) {
         return undefined;
     }
 
@@ -1504,6 +1535,10 @@ function doFindTarget(
                                 );
                             }
 
+                            if (!canUnitLandAt(unit, grid, layerCell)) {
+                                continue;
+                            }
+
                             const cellK = cellKey(layerCell);
 
                             if (!knownPaths.has(cellK)) {
@@ -1656,6 +1691,10 @@ function doFindTarget(
                                 );
                             }
 
+                            if (!canUnitLandAt(unit, grid, layerCell)) {
+                                continue;
+                            }
+
                             const cellK = cellKey(layerCell);
 
                             if (knownPaths.has(cellK)) {
@@ -1723,26 +1762,13 @@ function doFindTarget(
 
                                     while (currentRouteIndex >= 0) {
                                         const cellToGo = currentRoute?.route[currentRouteIndex];
-                                        if (cellToGo) {
-                                            if (unit.isSmallSize()) {
-                                                if (!isFree(cellToGo, matrix, unit)) {
-                                                    currentRouteIndex--;
-                                                } else {
-                                                    break;
-                                                }
-                                            } else if (
-                                                !isFree(cellToGo, matrix, unit) ||
-                                                !isFree({ x: cellToGo.x - 1, y: cellToGo.y }, matrix, unit) ||
-                                                !isFree({ x: cellToGo.x - 1, y: cellToGo.y - 1 }, matrix, unit) ||
-                                                !isFree({ x: cellToGo.x, y: cellToGo.y - 1 }, matrix, unit)
-                                            ) {
-                                                currentRouteIndex--;
-                                            } else {
-                                                break;
-                                            }
-                                        } else {
+                                        if (!cellToGo) {
                                             break;
                                         }
+                                        if (canUnitLandAt(unit, grid, cellToGo)) {
+                                            break;
+                                        }
+                                        currentRouteIndex--;
                                     }
                                     let currentRouteIndiciesLeft = currentRoute.route.length - 1 - currentRouteIndex;
                                     let cellToMoveTo = currentRoute.route[currentRouteIndex];

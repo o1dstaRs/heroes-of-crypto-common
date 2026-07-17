@@ -11,9 +11,10 @@
 
 import { describe, it, expect } from "bun:test";
 
-import { AIActionType, findTarget } from "../../src/ai/ai";
+import { AIActionType, canUnitLandAt, findMountainMeleeStrike, findTarget } from "../../src/ai/ai";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { IWeightedRoute } from "../../src/grid/path_definitions";
 import { PathHelper } from "../../src/grid/path_helper";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -50,6 +51,36 @@ function act(ctx: CombatTestContext, unit: Unit): AIActionType | undefined {
 }
 
 describe("AI mountain (BLOCK_CENTER) strategy", () => {
+    it("skips a cheaper mountain route whose large-unit footprint is occupied", () => {
+        const ctx = setupMountain();
+        const large = createTestUnit({ team: LOWER, attackType: MELEE, size: PBTypes.UnitSizeVals.LARGE });
+        const blocker = createTestUnit({ team: LOWER });
+        placeUnit(ctx.grid, ctx.unitsHolder, large, { x: 2, y: 11 });
+        placeUnit(ctx.grid, ctx.unitsHolder, blocker, { x: 3, y: 6 });
+
+        const blocked = { x: 4, y: 7 };
+        const legal = { x: 4, y: 9 };
+        const route = (cell: XY, weight: number): IWeightedRoute => ({
+            cell,
+            route: [{ ...cell }],
+            weight,
+            firstAggrMet: false,
+            hasLavaCell: false,
+            hasWaterCell: false,
+        });
+        const knownPaths = new Map<number, IWeightedRoute[]>([
+            [(blocked.x << 4) | blocked.y, [route(blocked, 1)]],
+            [(legal.x << 4) | legal.y, [route(legal, 2)]],
+        ]);
+        const pathHelper = {
+            getMovePath: () => ({ cells: [blocked, legal], hashes: new Set(knownPaths.keys()), knownPaths }),
+        } as unknown as PathHelper;
+
+        expect(canUnitLandAt(large, ctx.grid, blocked)).toBe(false);
+        expect(canUnitLandAt(large, ctx.grid, legal)).toBe(true);
+        expect(findMountainMeleeStrike(large, ctx.grid, ctx.grid.getMatrix(), pathHelper)?.attackFrom).toEqual(legal);
+    });
+
     it("we out-range the enemy → idle melee breaks the mountain", () => {
         const ctx = setupMountain();
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
@@ -141,6 +172,25 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
         // Enemy within the press radius (3 cells) of our melee unit but not adjacent (no melee target).
         const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Orc" });
         placeUnit(ctx.grid, ctx.unitsHolder, enemy, { x: 5, y: 4 });
+
+        expect(act(ctx, melee)).not.toBe(AIActionType.OBSTACLE_ATTACK);
+    });
+
+    it("a live forced target prevents an engine-rejected mountain strike", () => {
+        const ctx = setupMountain();
+        const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Griffin" });
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        const rangedAlly = createTestUnit({
+            team: LOWER,
+            attackType: RANGE,
+            rangeShots: 5,
+            damageMax: 10,
+            name: "Archer",
+        });
+        placeUnit(ctx.grid, ctx.unitsHolder, rangedAlly, { x: 3, y: 3 });
+        const forcedTarget = createTestUnit({ team: UPPER, attackType: MELEE, name: "Pikeman" });
+        placeUnit(ctx.grid, ctx.unitsHolder, forcedTarget, { x: 12, y: 12 });
+        melee.setTarget(forcedTarget.getId());
 
         expect(act(ctx, melee)).not.toBe(AIActionType.OBSTACLE_ATTACK);
     });

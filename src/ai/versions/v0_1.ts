@@ -16,7 +16,7 @@ import { getCellsAroundPosition, getPositionForCell } from "../../grid/grid_math
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
-import { findTarget, AIActionType, type IAIAction } from "../ai";
+import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 
 export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
@@ -267,6 +267,9 @@ export class StrategyV0_1 implements IAIStrategy {
             }
             const cell = route.cell;
             if (cell.x === base.x && cell.y === base.y) {
+                continue;
+            }
+            if (!canUnitLandAt(unit, grid, cell)) {
                 continue;
             }
             const score = Math.min(

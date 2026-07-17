@@ -24,6 +24,7 @@ import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
+import { canUnitLandAt } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
 import { teamRangedFirepower } from "./v0_2";
@@ -501,11 +502,10 @@ export class StrategyV0_4 extends StrategyV0_3 {
      * arc. Only swaps when it strictly increases the stacks the chain reaches.
      */
     /**
-     * Footprint guard (V04_MVGUARD): the move-emitting tactics use getMovePath, whose reachability model is
-     * slightly looser than the engine's execution-time check, so a few proposed moves land on an occupied
-     * footprint and get rejected `move_blocked` (wasting the turn). If the tuned decision's move would be
-     * blocked, fall back to the validated core decision; if that is also blocked, hold instead of emitting a
-     * rejected move. Mirrors the engine's own areAllCellsEmpty / canOccupyCells gate.
+     * Footprint guard: the move-emitting tactics use getMovePath, whose reachability model is slightly looser
+     * than the engine's execution-time landing check. If a tuned move or path-bearing melee would stop on an
+     * illegal footprint, preserve the validated core decision; if that is also blocked, hold. V04_MVGUARD still
+     * controls the historical pure-move check, while attack legality is unconditional.
      */
     private preferValidMove(
         unit: Unit,
@@ -513,15 +513,27 @@ export class StrategyV0_4 extends StrategyV0_3 {
         decision: GameAction[],
         fallback: GameAction[],
     ): GameAction[] {
-        if (!mvGuardOn || !this.moveIsBlocked(unit, context, decision)) {
+        if (!this.decisionLandingIsBlocked(unit, context, decision)) {
             return decision;
         }
-        if (!this.moveIsBlocked(unit, context, fallback)) {
+        if (!this.decisionLandingIsBlocked(unit, context, fallback)) {
             return fallback;
         }
         return this.canHourglass(unit, context)
             ? [{ type: "wait_turn", unitId: unit.getId() }]
             : [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+    }
+    private decisionLandingIsBlocked(unit: Unit, context: IDecisionContext, decision: GameAction[]): boolean {
+        const strike = decision.find((action) => action.type === "melee_attack");
+        if (
+            strike?.type === "melee_attack" &&
+            strike.path?.length &&
+            strike.attackFrom &&
+            !canUnitLandAt(unit, context.grid, strike.attackFrom)
+        ) {
+            return true;
+        }
+        return mvGuardOn && this.moveIsBlocked(unit, context, decision);
     }
     private moveIsBlocked(unit: Unit, context: IDecisionContext, decision: GameAction[]): boolean {
         const mv = decision.find((a) => a.type === "move_unit");

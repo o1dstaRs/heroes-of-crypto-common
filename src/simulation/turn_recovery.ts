@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../engine/actions";
+import { canUnitLandAt } from "../ai/ai";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Grid } from "../grid/grid";
 import type { IWeightedRoute } from "../grid/path_definitions";
@@ -63,6 +64,9 @@ export function advanceTowardEnemyAction(
     for (const routeList of movePath.knownPaths.values()) {
         const route = routeList[0];
         if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
+            continue;
+        }
+        if (!canUnitLandAt(unit, grid, route.cell)) {
             continue;
         }
         const score = Math.min(
