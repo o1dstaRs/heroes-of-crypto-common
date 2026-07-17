@@ -87,3 +87,41 @@ retained as evidence and does not change the incumbent.
   checkpoints, and never writes production policy files.
 - Sleep prevention is owned by the detached campaign process; successful launch
   requires advancing heartbeats and the expected worker count after detachment.
+
+## Pilot interruption amendment (2026-07-16)
+
+Run `9cd9f708-e691-4649-a022-f8f16f89a5a4` started from clean commit
+`9e3d5ce2da9ab661abe2d81abcc46486de939c2f` at 22:40:57 PDT. It was stopped
+cleanly at 22:53:52 PDT and its signed terminal artifact records
+`interrupted_research_only`. This run is pilot evidence only and none of its
+selection or guard panels may qualify a policy.
+
+The pilot exposed deterministic engine-declined v0.7 commands on the live
+`LAVA_CENTER` and `BLOCK_CENTER` maps. The absolute-zero rejection bar above is
+not relaxed. A replacement run may start only after the underlying legality
+defects have exact-seed regressions and the pilot's frozen 6,400-game validation
+panel reports zero rejected actions for both arms.
+
+The replacement run uses seed domains disjoint from every pilot draft domain:
+
+| Purpose                     | Replacement base | End exclusive |
+| --------------------------- | ---------------: | ------------: |
+| Draft training reserve      |       50,331,648 |    52,131,648 |
+| Draft selection             |    1,627,389,952 | 1,627,394,752 |
+| Draft final guard           |    3,238,002,688 | 3,238,026,688 |
+| Draft targeted cohort guard |    3,556,769,792 | 3,604,769,792 |
+| Draft deterministic replay  |    4,043,309,056 | 4,043,309,068 |
+
+The replacement setup base is `623981622`. Relative to pilot base `87110710`,
+this advances each top-bit-separated setup panel by exactly `2^29` positions in
+its full-period modulo-`2^30` permutation. The replacement is capped at 12
+search passes; even the harness's maximum scan allowance keeps every replacement
+cursor below `2^29` (training 24,576,000; selection 393,216,000; guard
+32,780,292). The stopped pilot remained at pass 0 with cursors 288,997,
+65,123, and 0 respectively. The two setup streams therefore cannot overlap.
+The replacement draft CEM seed is `1506473542`.
+
+The replacement supervisor's hard deadline must be no later than the original
+09:40:57 PDT deadline. Diagnosis and repair time consumes search time; it does
+not extend the 11-hour wall-clock budget. All other search surfaces, worker
+limits, promotion bars, and the no-bake/no-deploy rule remain unchanged.
