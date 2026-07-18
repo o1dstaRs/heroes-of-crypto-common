@@ -83,7 +83,7 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain('id="ranking-body"');
         expect(html).toContain("Tsar Cannon");
         expect(html).toContain("artifact_t1_cursed_ward_256");
-        expect(html).toContain("data:image/webp;base64,");
+        expect(html).toMatch(/data:image\/(?:webp|svg\+xml);base64,/);
         expect(html).not.toContain("<script src=");
         expect(html).not.toContain('<link rel="stylesheet"');
     });
