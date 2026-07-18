@@ -12,8 +12,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION } from "../../src/ai";
-import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
-import { StrategyV0_7S } from "../../src/ai/versions/v0_7s";
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
+import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
 
@@ -32,26 +32,26 @@ afterEach(() => {
     }
 });
 
-describe("v0.7 search measurement alias", () => {
-    it("remains immediately before v0.7 without changing the shipped default or latest candidate", () => {
-        const alias = getAIStrategy("v0.7s");
-        expect(alias).toBeInstanceOf(StrategyV0_7);
-        expect(alias.version).toBe("v0.7s");
-        expect(Object.getOwnPropertyNames(StrategyV0_7S.prototype)).toEqual(["constructor"]);
-        expect(AI_VERSIONS.indexOf("v0.7s")).toBe(AI_VERSIONS.indexOf("v0.7") - 1);
+describe("v0.8 search measurement alias", () => {
+    it("is registered immediately before v0.8 without becoming latest or default", () => {
+        const alias = getAIStrategy("v0.8s");
+        expect(alias).toBeInstanceOf(StrategyV0_8);
+        expect(alias.version).toBe("v0.8s");
+        expect(Object.getOwnPropertyNames(StrategyV0_8S.prototype)).toEqual(["constructor"]);
+        expect(AI_VERSIONS.indexOf("v0.8s")).toBe(AI_VERSIONS.indexOf("v0.8") - 1);
         expect(LATEST_AI_VERSION).toBe("v0.8");
         expect(DEFAULT_AI_VERSION).toBe("v0.7");
     });
 
-    it("plays an unsearched seeded match byte-identically to v0.7 apart from version identity", () => {
-        const seed = 20260716;
+    it("plays an unsearched seeded match byte-identically to v0.8 apart from version identity", () => {
+        const seed = 20260719;
         const roster = buildRoster(makeRng(seed));
-        const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
-        const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
-        const aliased = runMatch({ ...structuredClone(config), greenVersion: "v0.7s" });
+        const config = { redVersion: "v0.7", roster, seed, maxLaps: 60 } as const;
+        const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
+        const aliased = runMatch({ ...structuredClone(config), greenVersion: "v0.8s" });
 
-        expect(aliased.outcome.green.version).toBe("v0.7s");
-        aliased.outcome.green.version = "v0.7";
+        expect(aliased.outcome.green.version).toBe("v0.8s");
+        aliased.outcome.green.version = "v0.8";
         expect(aliased).toEqual(baseline);
     });
 });

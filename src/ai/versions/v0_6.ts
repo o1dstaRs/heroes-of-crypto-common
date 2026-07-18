@@ -21,6 +21,7 @@ import { otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 import { routeAreaThrow } from "./area_throw_router";
 import { routeUniversalCaster } from "./caster_router";
+import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import { routeMeleeRiderEV } from "./rider_ev_router";
 import { applyWaitScorer } from "./wait_scorer";
 
@@ -105,14 +106,8 @@ export function meleeDimsOverlay(version: string): [number, number] | undefined 
         return undefined;
     }
     const scope = process.env.V06_MELEE_DIMS_VERSIONS;
-    if (scope) {
-        const allowed = scope
-            .split(",")
-            .map((entry) => entry.trim())
-            .filter(Boolean);
-        if (!allowed.includes(version)) {
-            return undefined;
-        }
+    if (!strategyVersionMatchesExperimentScope(version, scope)) {
+        return undefined;
     }
     const entries = raw.split(",").map((entry) => entry.trim());
     if (entries.length !== 2 || entries.some((entry) => entry === "")) {

@@ -17,7 +17,7 @@ import {
     symlinkSync,
     writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
@@ -26,6 +26,7 @@ import {
     runV07AlignedV2Supervisor,
     validateV07AlignedV2ComposedSeal,
     validateV07AlignedV2PreparedBundleLaunch,
+    validateV07AlignedV2SupervisorThroughputAttestation,
     type IV07AlignedV2HostAssessment,
     type IV07AlignedV2LinuxProcessIdentity,
     type IV07AlignedV2OptimizerHandle,
@@ -34,10 +35,19 @@ import {
     type IV07AlignedV2SupervisorDependencies,
     type IV07AlignedV2SupervisorProvenance,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_supervisor";
+import { V08_ALIGNED_96H_V1_VERSION_PROFILE } from "../../src/simulation/optimizer/aligned_96h_version_profile";
+import { V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
 import {
     canonicalV07AlignedV2Json,
     fingerprintV07AlignedV2,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_protocol";
+import {
+    buildV08AlignedV1ThroughputCodeLedger,
+    V07_ALIGNED_V2_THROUGHPUT_BATCHES,
+    V07_ALIGNED_V2_THROUGHPUT_GAMES,
+    V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL,
+    V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256,
+} from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_throughput";
 
 const HOUR_MS = 3_600_000;
 const RUN_FINGERPRINT = "a".repeat(64);
@@ -322,6 +332,108 @@ function temporaryDirectory(): string {
 }
 
 describe("v0.7 aligned v2 durable supervisor", () => {
+    it("keeps initial-launch and restart throughput validation bound to the exact runner profile", () => {
+        const digest = "a".repeat(64);
+        const throughput = {
+            logicalCpus: availableParallelism(),
+            reservedCpus: 0,
+            workersPerShard: 1,
+            concurrentShards: 1,
+            maxScenarioPairsPerShard: 1,
+            gamesPerWorkerHour: 1,
+            utilization: 0.8,
+            safetyFactor: 1,
+            panelStartupMinutes: 1,
+            shardTimeoutMinutes: 1,
+            rateAttestationPath: "throughput.json",
+            rateAttestationBytesSha256: digest,
+            rateAttestationSha256: digest,
+        };
+        const common = {
+            schemaVersion: 2,
+            status: "research_only_no_bake",
+            automaticBake: false,
+            automaticDeploy: false,
+            measuredAtMs: -1,
+            commit: "b".repeat(40),
+            sourceTreeSha256: digest,
+            bunVersion: process.versions.bun ?? "test-bun",
+            bunRevision: "test-revision",
+            bunExecutableSha256: digest,
+            dependencyManifestSha256: digest,
+            lockfileSha256: null,
+            hostFingerprintSha256: digest,
+            logicalCpus: availableParallelism(),
+            reservedCpus: 0,
+            workersPerShard: 1,
+            concurrentShards: 1,
+            maxScenarioPairsPerShard: 1,
+            shardTimeoutMinutes: 1,
+            sampleProtocol: "all_12_cells_two_seats_8_sequential_batches_persisted_replay",
+            sampleGamesPerCellSeat: V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL,
+            sampleGames: V07_ALIGNED_V2_THROUGHPUT_GAMES,
+            batchCount: V07_ALIGNED_V2_THROUGHPUT_BATCHES,
+            totalElapsedMs: 1,
+            persistedReplayVerified: true,
+            workerAttestationsVerified: true,
+            gamesPerWorkerHour: 1,
+            evidenceRootPath: "evidence",
+            evidenceManifestBytesSha256: digest,
+            evidenceManifestSha256: digest,
+            attestationSha256: digest,
+        };
+        const v08Attestation = {
+            ...common,
+            artifactKind: "v0_8_aligned_96h_v1_throughput_attestation",
+            versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
+            catalogSha256: V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+            worstCostGenomeSha256: V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256,
+            code: buildV08AlignedV1ThroughputCodeLedger(),
+        };
+        const v07Attestation = {
+            ...common,
+            artifactKind: "v0_7_aligned_96h_v2_throughput_attestation",
+            throughputBytesSha256: digest,
+            runnerBytesSha256: digest,
+            evaluatorBytesSha256: digest,
+            workerBytesSha256: digest,
+            gameAdapterBytesSha256: digest,
+            persistenceBytesSha256: digest,
+            protocolBytesSha256: digest,
+            seedAllocatorBytesSha256: digest,
+            catalogBytesSha256: digest,
+        };
+        const v07Runner = { mode: "production" as const, throughput };
+        const v08Runner = {
+            ...v07Runner,
+            versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
+        };
+
+        const initialLaunchValidation = () =>
+            validateV07AlignedV2SupervisorThroughputAttestation(v08Attestation, v08Runner, ".");
+        const immutableRestartValidation = () =>
+            validateV07AlignedV2SupervisorThroughputAttestation(structuredClone(v08Attestation), v08Runner, ".");
+        expect(initialLaunchValidation).toThrow("production throughput measuredAtMs must be an integer >= 0");
+        expect(immutableRestartValidation).toThrow("production throughput measuredAtMs must be an integer >= 0");
+        expect(() => validateV07AlignedV2SupervisorThroughputAttestation(v07Attestation, v08Runner, ".")).toThrow(
+            "production throughput attestation header/fields are invalid",
+        );
+        expect(() => validateV07AlignedV2SupervisorThroughputAttestation(v08Attestation, v07Runner, ".")).toThrow(
+            "production throughput attestation header/fields are invalid",
+        );
+
+        const supervisorSource = readFileSync(
+            join(import.meta.dir, "../../src/simulation/optimizer/v0_7_aligned_96h_v2_supervisor.ts"),
+            "utf8",
+        );
+        expect(supervisorSource).toContain(
+            "const rateAttestation = validateV07AlignedV2SupervisorThroughputAttestation(",
+        );
+        expect(supervisorSource).toContain(
+            "const currentRateAttestation = validateV07AlignedV2SupervisorThroughputAttestation(",
+        );
+    });
+
     it("requires the exact prepared-bundle inventory and binds every launch input", () => {
         const root = temporaryDirectory();
         const prepared = join(root, "prepared");

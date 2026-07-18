@@ -19,6 +19,8 @@ import { STRATEGY_V0_6 } from "./versions/v0_6";
 import { STRATEGY_V0_6S } from "./versions/v0_6s";
 import { STRATEGY_V0_7 } from "./versions/v0_7";
 import { STRATEGY_V0_7S } from "./versions/v0_7s";
+import { STRATEGY_V0_8 } from "./versions/v0_8";
+import { STRATEGY_V0_8S } from "./versions/v0_8s";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
@@ -40,7 +42,8 @@ export type {
 /**
  * Registry of every in-game AI version. Add the next generation here — the battle engine and
  * tournament runner discover versions through this map, so a new version is comparable against the
- * baseline the moment it is registered. The latest entry is the default.
+ * baseline the moment it is registered. The latest entry identifies the newest candidate; the shipped
+ * default is selected independently below.
  */
 const STRATEGIES: readonly IAIStrategy[] = [
     STRATEGY_V0_1,
@@ -56,9 +59,15 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // v0.7s is the equivalent measurement alias for seat-scoped rollout-search A/Bs. Keep it before v0.7
     // so registering the alias cannot change LATEST_AI_VERSION; DEFAULT_AI_VERSION is explicit below.
     STRATEGY_V0_7S,
-    // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts). Registered LAST:
-    // LATEST_AI_VERSION resolves to v0.7.
+    // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts).
+    // It remains the explicitly shipped default below while v0.8 is evaluated.
     STRATEGY_V0_7,
+    // v0.8s is a measurement-only seat alias for future search A/Bs. Keep it immediately before v0.8 so
+    // the alias can never become LATEST_AI_VERSION.
+    STRATEGY_V0_8S,
+    // v0.8 starts as an exact clean-default clone of v0.7. Register it last so training and tournaments can
+    // target the next generation without changing the shipped DEFAULT_AI_VERSION.
+    STRATEGY_V0_8,
 ];
 
 const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));

@@ -20,7 +20,10 @@ import {
 import type {
     IV07AlignedV2ShardEvaluation,
     IV07AlignedV2WorkerAttestation,
+    IV08AlignedV1ShardEvaluation,
+    IV08AlignedV1WorkerAttestation,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator";
+import { fingerprintAligned96h } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator";
 import {
     compactV07AlignedV2Observation,
     type IV07AlignedV2BattleRecord,
@@ -57,6 +60,7 @@ import {
 import {
     bindV07AlignedV2Candidate,
     bindV07AlignedV2SeedPlan,
+    buildAligned96hCheckpointShardSpecs,
     buildV07AlignedV2CandidateEnvironment,
     buildV07AlignedV2CheckpointShardSpecs,
     canonicalV07AlignedV2Json,
@@ -71,6 +75,14 @@ import {
     type V07AlignedV2PanelPurpose,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_protocol";
 import { validateV07AlignedV2TerminalReplay } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_supervisor";
+import {
+    V08_ALIGNED_96H_V1_VERSION_PROFILE,
+    cloneAligned96hVersionProfile,
+} from "../../src/simulation/optimizer/aligned_96h_version_profile";
+import {
+    bindV08AlignedV1Candidate,
+    buildV08AlignedV1CandidateEnvironment,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -466,6 +478,80 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                 }),
             ).toThrow("manifest changed from its exact evidence reference");
             expect(persistV07AlignedV2ShardEvaluation(root, evaluation, seedPlan).reused).toBe(true);
+
+            const v08Binding = bindV08AlignedV1Candidate(evaluation.binding.genome);
+            const v08Shard = buildAligned96hCheckpointShardSpecs({
+                runFingerprint: evaluation.shard.runFingerprint,
+                seedPlan,
+                binding: v08Binding,
+                maxScenarioPairsPerShard: evaluation.shard.maxScenarioPairsPerShard,
+            })[0];
+            const v08Records = evaluation.records.map((record) => ({
+                ...record,
+                greenVersion: record.candidateIsGreen ? ("v0.8s" as const) : ("v0.7" as const),
+                redVersion: record.candidateIsGreen ? ("v0.7" as const) : ("v0.8s" as const),
+            }));
+            const v08Audits = v08Records.map((record) =>
+                auditFor(record as unknown as IV07AlignedV2BattleRecord, v08Binding.genome),
+            );
+            const v08Observations = v08Records.map((record, index) =>
+                compactV07AlignedV2Observation(record, v08Binding, v08Audits[index]),
+            );
+            const v08SourcePath = "/synthetic/v08-worker-0.audit.jsonl";
+            const v08Contents = `${v08Audits.map((row) => canonicalV07AlignedV2Json(row)).join("\n")}\n`;
+            const v08Environment = buildV08AlignedV1CandidateEnvironment(v08Binding.genome, v08SourcePath);
+            const v08Attestation: IV08AlignedV1WorkerAttestation = {
+                artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
+                versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+                workerIndex: 0,
+                runFingerprint: v08Shard.runFingerprint,
+                genomeSha256: v08Binding.genomeSha256,
+                behaviorEnvironmentSha256: v08Binding.behaviorEnvironmentSha256,
+                environmentSha256: fingerprintAligned96h(v08Binding, v08Environment),
+                removedEnvironmentKeys: Object.keys(v08Environment).sort(),
+                transpilerCacheDisabled: "0",
+                auditPath: v08SourcePath,
+            };
+            const v08Evaluation: IV08AlignedV1ShardEvaluation = {
+                shard: v08Shard,
+                binding: v08Binding,
+                checkpoint: createV07AlignedV2Checkpoint(v08Shard, v08Observations),
+                records: v08Records,
+                attestations: [v08Attestation],
+                auditArtifacts: [
+                    {
+                        workerIndex: 0,
+                        sourcePath: v08SourcePath,
+                        taskKeys: v08Records.map((record) => record.taskKey),
+                        contents: v08Contents,
+                        contentsSha256: sha256(v08Contents),
+                        bytes: Buffer.byteLength(v08Contents),
+                        rows: v08Audits.length,
+                    },
+                ],
+            };
+            const persistedV08 = persistV07AlignedV2ShardEvaluation(root, v08Evaluation, seedPlan);
+            expect(
+                loadV07AlignedV2PersistedShard(persistedV08.directory, {
+                    shard: v08Shard,
+                    binding: v08Binding,
+                    seedPlan,
+                }).evaluation.binding.candidate,
+            ).toBe("v0.8s");
+            expect(() =>
+                loadV07AlignedV2PersistedShard(persisted.directory, {
+                    shard: v08Shard,
+                    binding: v08Binding,
+                    seedPlan,
+                }),
+            ).toThrow();
+            expect(() =>
+                loadV07AlignedV2PersistedShard(persistedV08.directory, {
+                    shard: evaluation.shard,
+                    binding: evaluation.binding,
+                    seedPlan,
+                }),
+            ).toThrow();
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
@@ -940,7 +1026,7 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                 expect(validateV07AlignedV2TerminalReplay(directory, fixture.definition, fixture.resolvers)).toEqual(
                     accepted,
                 );
-                if (beforeColdRestart) expect(beforeColdRestart).toEqual(accepted);
+                if (beforeColdRestart) expect(beforeColdRestart).toEqual(accepted!);
             } finally {
                 rmSync(root, { recursive: true, force: true });
             }

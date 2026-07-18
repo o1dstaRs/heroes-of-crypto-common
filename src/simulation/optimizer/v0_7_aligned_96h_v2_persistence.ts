@@ -23,19 +23,15 @@ import {
 import { basename, dirname, join } from "node:path";
 
 import type { IV07ComposedAuditRow } from "../v0_7_composed_ranked_ladder";
-import { compactV07AlignedV2Observation, type IV07AlignedV2BattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
+import { compactV07AlignedV2Observation, type IAligned96hBattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
 import {
     canonicalV07AlignedV2Json,
-    buildV07AlignedV2CandidateEnvironment,
-    buildV07AlignedV2CheckpointShardSpecs,
-    fingerprintV07AlignedV2,
+    buildAligned96hCheckpointShardSpecs,
     flattenV07AlignedV2SeedPlan,
-    validateV07AlignedV2CandidateBinding,
     validateV07AlignedV2Checkpoint,
     validateV07AlignedV2CheckpointShardSpec,
     v07AlignedV2TaskIdentity,
     v07AlignedV2TaskKey,
-    type IV07AlignedV2CandidateBinding,
     type IV07AlignedV2Checkpoint,
     type IV07AlignedV2CheckpointShardSpec,
     type IV07AlignedV2ExecutionTask,
@@ -43,10 +39,20 @@ import {
 } from "./v0_7_aligned_96h_v2_protocol";
 import { quarantineV07AlignedV2Path, type V07AlignedV2QuarantineReason } from "./v0_7_aligned_96h_v2_quarantine";
 import type {
+    Aligned96hCandidateBinding,
+    Aligned96hWorkerAttestation,
+    IAligned96hShardEvaluation,
     IV07AlignedV2ShardEvaluation,
-    IV07AlignedV2WorkerAttestation,
     IV07AlignedV2WorkerAuditArtifact,
 } from "./v0_7_aligned_96h_v2_evaluator";
+import {
+    buildAligned96hCandidateEnvironment,
+    canonicalAligned96hJson,
+    fingerprintAligned96h,
+    validateAligned96hCandidateBinding,
+    validateAligned96hWorkerAttestation,
+} from "./v0_7_aligned_96h_v2_evaluator";
+import type { IV07AlignedV2CandidateBinding } from "./v0_7_aligned_96h_v2_protocol";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SAFE_ARTIFACT_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
@@ -102,27 +108,36 @@ export interface IV07AlignedV2PersistenceFaultInjector {
     afterDurableStep(step: string): void;
 }
 
-export interface IV07AlignedV2PersistedShard {
+export interface IAligned96hPersistedShard<Binding extends Aligned96hCandidateBinding> {
     directory: string;
     manifest: IV07AlignedV2ShardArtifactManifest;
     manifestSha256: string;
-    evaluation: IV07AlignedV2ShardEvaluation;
+    evaluation: IAligned96hShardEvaluation<Binding>;
     reused: boolean;
 }
 
-export interface IV07AlignedV2ShardLoadExpectations {
+export interface IV07AlignedV2PersistedShard extends IAligned96hPersistedShard<IV07AlignedV2CandidateBinding> {
+    evaluation: IV07AlignedV2ShardEvaluation;
+}
+
+export interface IAligned96hShardLoadExpectations<Binding extends Aligned96hCandidateBinding> {
     shard: IV07AlignedV2CheckpointShardSpec;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: Binding;
     seedPlan: IV07AlignedV2InjectedSeedPlan;
     manifestSha256?: string;
 }
 
-export interface IV07AlignedV2PanelShardLoadExpectations {
+export type IV07AlignedV2ShardLoadExpectations = IAligned96hShardLoadExpectations<IV07AlignedV2CandidateBinding>;
+
+export interface IAligned96hPanelShardLoadExpectations<Binding extends Aligned96hCandidateBinding> {
     runFingerprint: string;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: Binding;
     seedPlan: IV07AlignedV2InjectedSeedPlan;
     manifestSha256: string;
 }
+
+export type IV07AlignedV2PanelShardLoadExpectations =
+    IAligned96hPanelShardLoadExpectations<IV07AlignedV2CandidateBinding>;
 
 interface IArtifactBundle {
     manifest: IV07AlignedV2ShardArtifactManifest;
@@ -344,14 +359,14 @@ function validateAuditIndex(value: unknown): IV07AlignedV2PersistedAuditIndex {
     return { schemaVersion: 1, artifactKind: "v0_7_aligned_96h_v2_audit_index", workers };
 }
 
-function expectedExecutionTasks(
+function expectedExecutionTasks<Binding extends Aligned96hCandidateBinding>(
     shard: IV07AlignedV2CheckpointShardSpec,
-    binding: IV07AlignedV2CandidateBinding,
+    binding: Binding,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
 ): IV07AlignedV2ExecutionTask[] {
     validateV07AlignedV2CheckpointShardSpec(shard);
-    validateV07AlignedV2CandidateBinding(binding);
-    const expectedShards = buildV07AlignedV2CheckpointShardSpecs({
+    validateAligned96hCandidateBinding(binding);
+    const expectedShards = buildAligned96hCheckpointShardSpecs({
         runFingerprint: shard.runFingerprint,
         seedPlan,
         binding,
@@ -364,8 +379,8 @@ function expectedExecutionTasks(
     return flattenV07AlignedV2SeedPlan(seedPlan).slice(shard.pairStart * 2, shard.pairEndExclusive * 2);
 }
 
-function validateRecordAgainstTask(
-    record: IV07AlignedV2BattleRecord,
+function validateRecordAgainstTask<Binding extends Aligned96hCandidateBinding>(
+    record: IAligned96hBattleRecord<Binding>,
     task: IV07AlignedV2ExecutionTask,
     index: number,
 ): void {
@@ -391,10 +406,11 @@ function validateRecordAgainstTask(
 }
 
 /** Strictly replay a completed shard from raw records and worker audit rows. */
-export function validateV07AlignedV2ShardEvidence(
-    evaluation: IV07AlignedV2ShardEvaluation,
+export function validateV07AlignedV2ShardEvidence<Binding extends Aligned96hCandidateBinding>(
+    evaluation: IAligned96hShardEvaluation<Binding>,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
 ): void {
+    const binding = validateAligned96hCandidateBinding(evaluation.binding) as Binding;
     const tasks = expectedExecutionTasks(evaluation.shard, evaluation.binding, seedPlan);
     validateV07AlignedV2Checkpoint(evaluation.checkpoint, evaluation.shard);
     if (
@@ -415,11 +431,9 @@ export function validateV07AlignedV2ShardEvidence(
     const auditByTask = new Map<string, IV07ComposedAuditRow | undefined>();
     for (const [workerIndex, attestation] of attestations.entries()) {
         const artifact = auditArtifacts[workerIndex];
-        const expectedEnvironment = buildV07AlignedV2CandidateEnvironment(
-            evaluation.binding.genome,
-            artifact.sourcePath,
-        );
+        const expectedEnvironment = buildAligned96hCandidateEnvironment(binding, artifact.sourcePath);
         const expectedRemovedEnvironmentKeys = Object.keys(expectedEnvironment).sort();
+        validateAligned96hWorkerAttestation(binding, attestation);
         if (
             attestation.workerIndex !== workerIndex ||
             artifact.workerIndex !== workerIndex ||
@@ -428,10 +442,10 @@ export function validateV07AlignedV2ShardEvidence(
             attestation.behaviorEnvironmentSha256 !== evaluation.shard.behaviorEnvironmentSha256 ||
             attestation.transpilerCacheDisabled !== "0" ||
             attestation.auditPath !== artifact.sourcePath ||
-            attestation.environmentSha256 !== fingerprintV07AlignedV2(expectedEnvironment) ||
+            attestation.environmentSha256 !== fingerprintAligned96h(binding, expectedEnvironment) ||
             !Array.isArray(attestation.removedEnvironmentKeys) ||
-            canonicalV07AlignedV2Json(attestation.removedEnvironmentKeys) !==
-                canonicalV07AlignedV2Json(expectedRemovedEnvironmentKeys) ||
+            canonicalAligned96hJson(binding, attestation.removedEnvironmentKeys) !==
+                canonicalAligned96hJson(binding, expectedRemovedEnvironmentKeys) ||
             artifact.contentsSha256 !== sha256Bytes(artifact.contents) ||
             artifact.bytes !== Buffer.byteLength(artifact.contents)
         ) {
@@ -459,7 +473,7 @@ export function validateV07AlignedV2ShardEvidence(
     tasks.forEach((task, index) => {
         const record = evaluation.records[index];
         validateRecordAgainstTask(record, task, index);
-        const observation = compactV07AlignedV2Observation(record, evaluation.binding, auditByTask.get(record.taskKey));
+        const observation = compactV07AlignedV2Observation(record, binding, auditByTask.get(record.taskKey));
         if (
             canonicalV07AlignedV2Json(observation) !==
                 canonicalV07AlignedV2Json(evaluation.checkpoint.observations[index]) ||
@@ -471,8 +485,8 @@ export function validateV07AlignedV2ShardEvidence(
     });
 }
 
-function buildArtifactBundle(
-    evaluation: IV07AlignedV2ShardEvaluation,
+function buildArtifactBundle<Binding extends Aligned96hCandidateBinding>(
+    evaluation: IAligned96hShardEvaluation<Binding>,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
 ): IArtifactBundle {
     validateV07AlignedV2ShardEvidence(evaluation, seedPlan);
@@ -571,10 +585,11 @@ function expectedInventory(manifest: IV07AlignedV2ShardArtifactManifest): string
     ].sort();
 }
 
-export function loadV07AlignedV2PersistedShard(
+export function loadV07AlignedV2PersistedShard<Binding extends Aligned96hCandidateBinding>(
     directory: string,
-    expectations: IV07AlignedV2ShardLoadExpectations,
-): IV07AlignedV2PersistedShard {
+    expectations: IAligned96hShardLoadExpectations<Binding>,
+): IAligned96hPersistedShard<Binding> {
+    validateAligned96hCandidateBinding(expectations.binding);
     if (!existsSync(directory) || !lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) {
         throw new Error(`aligned v2 persisted shard directory is missing: ${directory}`);
     }
@@ -603,10 +618,11 @@ export function loadV07AlignedV2PersistedShard(
     const attestationContents = verifyFile(directory, manifest.files.attestations);
     const auditIndexContents = verifyFile(directory, manifest.files.auditIndex);
     const checkpointContents = verifyFile(directory, manifest.files.checkpoint);
-    const binding = parseCanonicalJsonFile<IV07AlignedV2CandidateBinding>(bindingContents, "aligned v2 binding");
-    const records = strictJsonLines<IV07AlignedV2BattleRecord>(rawContents, "aligned v2 raw records");
+    const parsedBinding = parseCanonicalJsonFile<Aligned96hCandidateBinding>(bindingContents, "aligned v2 binding");
+    const binding = validateAligned96hCandidateBinding(parsedBinding) as Binding;
+    const records = strictJsonLines<IAligned96hBattleRecord<Binding>>(rawContents, "aligned v2 raw records");
     if (rawContents !== canonicalJsonLines(records)) throw new Error("aligned v2 raw records are not canonical JSONL");
-    const attestations = parseCanonicalJsonFile<IV07AlignedV2WorkerAttestation[]>(
+    const attestations = parseCanonicalJsonFile<Aligned96hWorkerAttestation<Binding>[]>(
         attestationContents,
         "aligned v2 attestations",
     );
@@ -646,7 +662,7 @@ export function loadV07AlignedV2PersistedShard(
             rows: auditDescriptor.rows,
         };
     });
-    validateV07AlignedV2CandidateBinding(binding);
+    validateAligned96hCandidateBinding(binding);
     if (
         canonicalV07AlignedV2Json(binding) !== canonicalV07AlignedV2Json(expectations.binding) ||
         canonicalV07AlignedV2Json(checkpoint.shard) !== canonicalV07AlignedV2Json(expectations.shard) ||
@@ -658,7 +674,7 @@ export function loadV07AlignedV2PersistedShard(
     ) {
         throw new Error("aligned v2 persisted shard does not match its expected run/panel/genome binding");
     }
-    const evaluation: IV07AlignedV2ShardEvaluation = {
+    const evaluation: IAligned96hShardEvaluation<Binding> = {
         shard: expectations.shard,
         binding,
         checkpoint,
@@ -677,13 +693,13 @@ export function loadV07AlignedV2PersistedShard(
 }
 
 /** Discover the committed shard spec, then verify it against the exact run, binding, and injected panel. */
-export function loadV07AlignedV2PersistedPanelShard(
+export function loadV07AlignedV2PersistedPanelShard<Binding extends Aligned96hCandidateBinding>(
     directory: string,
-    expectations: IV07AlignedV2PanelShardLoadExpectations,
-): IV07AlignedV2PersistedShard {
+    expectations: IAligned96hPanelShardLoadExpectations<Binding>,
+): IAligned96hPersistedShard<Binding> {
     requireSha256(expectations.runFingerprint, "panel shard runFingerprint");
     requireSha256(expectations.manifestSha256, "panel shard manifestSha256");
-    validateV07AlignedV2CandidateBinding(expectations.binding);
+    validateAligned96hCandidateBinding(expectations.binding);
     const manifestPath = join(directory, "manifest.json");
     if (!existsSync(manifestPath) || !lstatSync(manifestPath).isFile() || lstatSync(manifestPath).isSymbolicLink()) {
         throw new Error("aligned v2 persisted panel shard has no safe commit manifest");
@@ -757,12 +773,12 @@ export function v07AlignedV2ShardArtifactDirectoryName(shard: IV07AlignedV2Check
     return `shard-${String(shard.shardIndex).padStart(5, "0")}-${shard.shardSha256.slice(0, 16)}`;
 }
 
-export function persistV07AlignedV2ShardEvaluation(
+export function persistV07AlignedV2ShardEvaluation<Binding extends Aligned96hCandidateBinding>(
     rootDirectory: string,
-    evaluation: IV07AlignedV2ShardEvaluation,
+    evaluation: IAligned96hShardEvaluation<Binding>,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
     faultInjector?: IV07AlignedV2PersistenceFaultInjector,
-): IV07AlignedV2PersistedShard {
+): IAligned96hPersistedShard<Binding> {
     const bundle = buildArtifactBundle(evaluation, seedPlan);
     ensureDurableDirectory(rootDirectory);
     fsyncDirectory(rootDirectory);

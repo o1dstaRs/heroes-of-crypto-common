@@ -25,10 +25,16 @@ import {
     evaluatorCellV07AlignedV2,
     fingerprintV07AlignedV2,
     V07_ALIGNED_V2_TAXONOMY_SETUP_ATTEMPTS,
+    validateV07AlignedV2CandidateBinding,
     v07AlignedV2TaskKey,
+    type IAligned96hCandidateBinding,
     type IV07AlignedV2CandidateBinding,
     type IV07AlignedV2ExecutionTask,
 } from "./v0_7_aligned_96h_v2_protocol";
+import {
+    validateV08AlignedV1CandidateBinding,
+    type IV08AlignedV1CandidateBinding,
+} from "./v0_8_aligned_96h_v1_protocol";
 
 interface IV07AlignedV2ArmySetup {
     creatureIds: number[];
@@ -68,6 +74,14 @@ export interface IV07AlignedV2BattleRecord {
     rejectedRed?: number;
     resultFingerprint: string;
 }
+
+export type IAligned96hBattleRecord<Binding extends IAligned96hCandidateBinding> = Omit<
+    IV07AlignedV2BattleRecord,
+    "greenVersion" | "redVersion"
+> & {
+    greenVersion: Binding["candidate"] | Binding["opponent"];
+    redVersion: Binding["candidate"] | Binding["opponent"];
+};
 
 export interface IV07AlignedV2GameDependencies {
     matchRunner?: (config: IMatchConfig) => IMatchResult;
@@ -217,19 +231,44 @@ function resultFingerprint(result: IMatchResult): string {
         .digest("hex");
 }
 
+type Aligned96hGameAdapterBinding = IV07AlignedV2CandidateBinding | IV08AlignedV1CandidateBinding;
+
+function validateAligned96hGameAdapterBinding(binding: IAligned96hCandidateBinding): Aligned96hGameAdapterBinding {
+    if (binding.candidate === "v0.7s") {
+        return validateV07AlignedV2CandidateBinding(binding as IV07AlignedV2CandidateBinding);
+    }
+    if (binding.candidate === "v0.8s") {
+        return validateV08AlignedV1CandidateBinding(binding as IV08AlignedV1CandidateBinding);
+    }
+    throw new Error(`unsupported aligned game-adapter candidate ${binding.candidate}`);
+}
+
 export function playV07AlignedV2Task(
     task: IV07AlignedV2ExecutionTask,
+    dependencies?: IV07AlignedV2GameDependencies,
+): IV07AlignedV2BattleRecord;
+export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding>(
+    task: IV07AlignedV2ExecutionTask,
+    dependencies: IV07AlignedV2GameDependencies | undefined,
+    binding: Binding,
+): IAligned96hBattleRecord<Binding>;
+export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding>(
+    task: IV07AlignedV2ExecutionTask,
     dependencies: IV07AlignedV2GameDependencies = {},
-): IV07AlignedV2BattleRecord {
+    binding?: Binding,
+): IV07AlignedV2BattleRecord | IAligned96hBattleRecord<Binding> {
     validateExecutionTask(task);
     const cell = evaluatorCellV07AlignedV2(task.cellId);
-    if (cell.candidate !== "v0.7s" || cell.opponent !== "v0.6") {
+    if (!binding && (cell.candidate !== "v0.7s" || cell.opponent !== "v0.6")) {
         throw new Error(`${cell.id}: aligned evaluator version isolation drifted`);
     }
+    const validatedBinding = binding ? validateAligned96hGameAdapterBinding(binding) : undefined;
+    const candidateVersion = validatedBinding?.candidate ?? cell.candidate;
+    const opponentVersion = validatedBinding?.opponent ?? cell.opponent;
     const selected = selectSetup(task, dependencies);
     const candidateIsGreen = task.candidateSeat === "candidate_green";
-    const greenVersion = candidateIsGreen ? cell.candidate : cell.opponent;
-    const redVersion = candidateIsGreen ? cell.opponent : cell.candidate;
+    const greenVersion = candidateIsGreen ? candidateVersion : opponentVersion;
+    const redVersion = candidateIsGreen ? opponentVersion : candidateVersion;
     const matchRunner =
         dependencies.matchRunner ??
         ((config: IMatchConfig): IMatchResult => {
@@ -297,15 +336,15 @@ export function playV07AlignedV2Task(
     };
 }
 
-function expectedAuditLeaf(binding: IV07AlignedV2CandidateBinding): "learned_v2" | "material" {
+function expectedAuditLeaf(binding: IAligned96hCandidateBinding): "learned_v2" | "material" {
     if (binding.genome.search.leafMode === "off") throw new Error("search-off binding has no search audit leaf");
     return binding.genome.search.leafMode === "model" ? "learned_v2" : "material";
 }
 
 function validateAudit(
-    record: IV07AlignedV2BattleRecord,
+    record: IAligned96hBattleRecord<IAligned96hCandidateBinding>,
     audit: IV07ComposedAuditRow,
-    binding: IV07AlignedV2CandidateBinding,
+    binding: IAligned96hCandidateBinding,
 ): void {
     if (
         audit.t !== "game" ||
@@ -355,13 +394,21 @@ export function compactV07AlignedV2Observation(
     record: IV07AlignedV2BattleRecord,
     binding: IV07AlignedV2CandidateBinding,
     audit?: IV07ComposedAuditRow,
+): IV07AlignedV2GameObservation;
+export function compactV07AlignedV2Observation<Binding extends IAligned96hCandidateBinding>(
+    record: IAligned96hBattleRecord<Binding>,
+    binding: Binding,
+    audit?: IV07ComposedAuditRow,
+): IV07AlignedV2GameObservation;
+export function compactV07AlignedV2Observation<Binding extends IAligned96hCandidateBinding>(
+    record: IV07AlignedV2BattleRecord | IAligned96hBattleRecord<Binding>,
+    binding: IV07AlignedV2CandidateBinding | Binding,
+    audit?: IV07ComposedAuditRow,
 ): IV07AlignedV2GameObservation {
-    if (binding.candidate !== "v0.7s" || binding.opponent !== "v0.6") {
-        throw new Error("compact observation requires exact v0.7s versus v0.6 binding");
-    }
+    const validatedBinding = validateAligned96hGameAdapterBinding(binding);
     const candidateIsGreen = record.candidateSeat === "candidate_green";
-    const expectedGreenVersion = candidateIsGreen ? binding.candidate : binding.opponent;
-    const expectedRedVersion = candidateIsGreen ? binding.opponent : binding.candidate;
+    const expectedGreenVersion = candidateIsGreen ? validatedBinding.candidate : validatedBinding.opponent;
+    const expectedRedVersion = candidateIsGreen ? validatedBinding.opponent : validatedBinding.candidate;
     const expectedWinnerSlot =
         record.winner === "draw"
             ? "draw"
@@ -375,12 +422,14 @@ export function compactV07AlignedV2Observation(
         record.redVersion !== expectedRedVersion ||
         record.winnerSlot !== expectedWinnerSlot
     ) {
-        throw new Error(`${record.taskKey}: battle record is not an exact v0.7s versus v0.6 candidate-seat result`);
+        throw new Error(
+            `${record.taskKey}: battle record is not an exact ${validatedBinding.candidate} versus ${validatedBinding.opponent} candidate-seat result`,
+        );
     }
-    if (binding.searchEnabled !== (audit !== undefined)) {
+    if (validatedBinding.searchEnabled !== (audit !== undefined)) {
         throw new Error(`${record.taskKey}: audit presence disagrees with candidate search mode`);
     }
-    if (audit) validateAudit(record, audit, binding);
+    if (audit) validateAudit(record, audit, validatedBinding);
     if ((record.rejectedGreen === undefined) !== (record.rejectedRed === undefined)) {
         throw new Error(`${record.taskKey}: match result provided only one side's rejection count`);
     }

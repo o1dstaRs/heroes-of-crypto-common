@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 /** Keep this bootstrap free of game/policy imports until the environment is scrubbed and attested. */
 
 interface IWorkerEnvelope {
-    marker: "v0_7_aligned_96h_v2_worker";
+    marker: "v0_7_aligned_96h_v2_worker" | "v0_8_aligned_96h_v1_worker";
     workerIndex: number;
     runFingerprint: string;
     auditPath: string;
@@ -51,7 +51,10 @@ const data = await new Promise<IWorkerEnvelope>((resolveData, rejectData) => {
         resolveData((message as IInitializeMessage).data);
     });
 });
-if (data.marker !== "v0_7_aligned_96h_v2_worker") throw new Error("aligned v2 worker marker mismatch");
+if (data.marker !== "v0_7_aligned_96h_v2_worker" && data.marker !== "v0_8_aligned_96h_v1_worker") {
+    throw new Error("aligned worker marker mismatch");
+}
+const isV08 = data.marker === "v0_8_aligned_96h_v1_worker";
 if (process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH !== "0") {
     throw new Error("aligned v2 worker requires BUN_RUNTIME_TRANSPILER_CACHE_PATH=0");
 }
@@ -72,7 +75,7 @@ for (const key of forbiddenRuntimeEnvironment) {
     if (process.env[key]) throw new Error(`aligned v2 worker inherited forbidden runtime environment ${key}`);
 }
 
-const behaviorPrefixes = ["V04_", "V05_", "V06_", "V07_", "SEARCH_", "Q2_", "CEM_"] as const;
+const behaviorPrefixes = ["V04_", "V05_", "V06_", "V07_", "V08_", "SEARCH_", "Q2_", "CEM_"] as const;
 const behaviorExact = new Set([
     "AUGCA_NOVISION",
     "BASE_VERSION",
@@ -92,6 +95,9 @@ const behaviorExact = new Set([
     "SIM_NO_ACTIONS",
     "SYNERGY_DUMP",
     "TEAM_WR_RANDOM",
+    "V07_AURA_CASTER_ROUTER_VERSIONS",
+    "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS",
+    "V07_PLACEMENT_REVEAL_VERSIONS",
     "VALUE_DATA",
     "VALUE_DATA_FEATURES",
 ]);
@@ -117,11 +123,76 @@ if (environmentSha256 !== data.environmentSha256 || JSON.stringify(effective) !=
 mkdirSync(dirname(data.auditPath), { recursive: true });
 writeFileSync(data.auditPath, "");
 
-const protocol = await import("./v0_7_aligned_96h_v2_protocol");
-const binding = protocol.validateV07AlignedV2CandidateBinding(
-    data.binding as Parameters<typeof protocol.validateV07AlignedV2CandidateBinding>[0],
-);
-const gameAdapter = await import("./v0_7_aligned_96h_v2_game_adapter");
+interface IWorkerBinding {
+    genomeSha256: string;
+    behaviorEnvironmentSha256: string;
+    searchEnabled: boolean;
+    versionProfile?: unknown;
+}
+
+let binding: IWorkerBinding;
+let taskKey: (task: unknown) => string;
+let playTask: (task: unknown) => unknown;
+let compactObservation: (record: unknown, audit: unknown) => unknown;
+let readAuditAppend: (path: string, byteOffset: number) => { nextByteOffset: number; rows: unknown[] };
+
+if (isV08) {
+    const protocol = await import("./v0_8_aligned_96h_v1_protocol");
+    const validated = protocol.validateV08AlignedV1CandidateBinding(
+        data.binding as Parameters<typeof protocol.validateV08AlignedV1CandidateBinding>[0],
+    );
+    const sharedGameAdapter = await import("./v0_7_aligned_96h_v2_game_adapter");
+    const v08GameAdapter = await import("./v0_8_aligned_96h_v1_game_adapter");
+    binding = validated;
+    taskKey = (task) => protocol.v08AlignedV1TaskKey(task as Parameters<typeof protocol.v08AlignedV1TaskKey>[0]);
+    playTask = (task) =>
+        typeof task === "object" &&
+        task !== null &&
+        "artifactKind" in task &&
+        task.artifactKind === "v0_8_aligned_96h_v1_execution_task"
+            ? v08GameAdapter.playV08AlignedV1Task(
+                  task as Parameters<typeof v08GameAdapter.playV08AlignedV1Task>[0],
+                  validated,
+              )
+            : sharedGameAdapter.playV07AlignedV2Task(
+                  task as Parameters<typeof sharedGameAdapter.playV07AlignedV2Task>[0],
+                  undefined,
+                  validated,
+              );
+    compactObservation = (record, audit) =>
+        typeof record === "object" &&
+        record !== null &&
+        "artifactKind" in record &&
+        record.artifactKind === "v0_8_aligned_96h_v1_battle_record"
+            ? v08GameAdapter.compactV08AlignedV1Observation(
+                  record as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[0],
+                  validated,
+                  audit as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[2],
+              )
+            : sharedGameAdapter.compactV07AlignedV2Observation(
+                  record as Parameters<typeof sharedGameAdapter.compactV07AlignedV2Observation>[0],
+                  validated,
+                  audit as Parameters<typeof sharedGameAdapter.compactV07AlignedV2Observation>[2],
+              );
+    readAuditAppend = sharedGameAdapter.readV07AlignedV2AuditAppend;
+} else {
+    const protocol = await import("./v0_7_aligned_96h_v2_protocol");
+    const validated = protocol.validateV07AlignedV2CandidateBinding(
+        data.binding as Parameters<typeof protocol.validateV07AlignedV2CandidateBinding>[0],
+    );
+    const gameAdapter = await import("./v0_7_aligned_96h_v2_game_adapter");
+    binding = validated;
+    taskKey = (task) => protocol.v07AlignedV2TaskKey(task as Parameters<typeof protocol.v07AlignedV2TaskKey>[0]);
+    playTask = (task) =>
+        gameAdapter.playV07AlignedV2Task(task as Parameters<typeof gameAdapter.playV07AlignedV2Task>[0]);
+    compactObservation = (record, audit) =>
+        gameAdapter.compactV07AlignedV2Observation(
+            record as Parameters<typeof gameAdapter.compactV07AlignedV2Observation>[0],
+            validated,
+            audit as Parameters<typeof gameAdapter.compactV07AlignedV2Observation>[2],
+        );
+    readAuditAppend = gameAdapter.readV07AlignedV2AuditAppend;
+}
 
 const send = (message: unknown): void => {
     if (!process.send || !process.connected) throw new Error("aligned v2 worker IPC parent is unavailable");
@@ -150,20 +221,20 @@ process.on("message", (message: { type: "evaluate"; task: unknown } | { type: "s
     }
     busy = true;
     try {
-        const task = message.task as Parameters<typeof gameAdapter.playV07AlignedV2Task>[0];
-        const record = gameAdapter.playV07AlignedV2Task(task);
-        const appended = gameAdapter.readV07AlignedV2AuditAppend(data.auditPath, auditByteOffset);
+        const task = message.task;
+        const record = playTask(task);
+        const appended = readAuditAppend(data.auditPath, auditByteOffset);
         auditByteOffset = appended.nextByteOffset;
         const expectedRows = binding.searchEnabled ? 1 : 0;
         if (appended.rows.length !== expectedRows) {
             throw new Error(
-                `${protocol.v07AlignedV2TaskKey(task)}: expected ${expectedRows} exact audit rows, received ${appended.rows.length}`,
+                `${taskKey(task)}: expected ${expectedRows} exact audit rows, received ${appended.rows.length}`,
             );
         }
-        const observation = gameAdapter.compactV07AlignedV2Observation(record, binding, appended.rows[0]);
+        const observation = compactObservation(record, appended.rows[0]);
         send({
             type: "result",
-            taskKey: protocol.v07AlignedV2TaskKey(task),
+            taskKey: taskKey(task),
             record,
             observation,
         });
@@ -188,5 +259,11 @@ send({
         removedEnvironmentKeys,
         transpilerCacheDisabled: "0",
         auditPath: data.auditPath,
+        ...(isV08
+            ? {
+                  artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
+                  versionProfile: binding.versionProfile,
+              }
+            : {}),
     },
 });

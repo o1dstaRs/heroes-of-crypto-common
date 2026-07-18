@@ -20,10 +20,16 @@ import { arch, availableParallelism, hostname, platform, release, tmpdir } from 
 import { basename, dirname, join, resolve } from "node:path";
 
 import { V07_COMPOSED_SEED_SCAN_POLICY } from "../../src/simulation/v0_7_composed_seed_scan";
+import { V08_ALIGNED_96H_V1_VERSION_PROFILE } from "../../src/simulation/optimizer/aligned_96h_version_profile";
 import {
     buildV07AlignedV2ProductionCandidateCatalog,
     buildV07AlignedV2ProductionIncumbentGenome,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_catalog";
+import {
+    V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+    buildV08AlignedV1ProductionCandidateCatalog,
+    buildV08AlignedV1ProductionIncumbentGenome,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
 import { createV07AlignedV2FilesystemReplayResolvers } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_filesystem_resolvers";
 import type { IV07AlignedV2OrchestratorDefinition } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_orchestrator";
 import { loadV07AlignedV2PersistedOrchestrator } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_orchestrator_persistence";
@@ -31,6 +37,13 @@ import {
     canonicalV07AlignedV2Json,
     fingerprintV07AlignedV2,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_protocol";
+import {
+    buildV08AlignedV1ThroughputCodeLedger,
+    V07_ALIGNED_V2_THROUGHPUT_BATCHES,
+    V07_ALIGNED_V2_THROUGHPUT_GAMES,
+    V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL,
+    V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256,
+} from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_throughput";
 import {
     parseV07AlignedV2RunnerArgs,
     prepareV07AlignedV2DefinitionBundle,
@@ -111,7 +124,8 @@ interface IRunnerFixture {
     startAtMs: number;
 }
 
-function runnerFixture(): IRunnerFixture {
+function runnerFixture(versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE): IRunnerFixture {
+    const v08Profile = versionProfile !== undefined;
     const root = mkdtempSync(join(tmpdir(), "aligned-v2-runner-"));
     const inputs = join(root, "inputs");
     mkdirSync(inputs);
@@ -125,7 +139,15 @@ function runnerFixture(): IRunnerFixture {
     const gamesPerWorkerHour = (sampleGames * HOUR_MS) / (elapsedMs * workerCount);
     const unsignedAttestation = {
         schemaVersion: 1 as const,
-        artifactKind: "v0_7_aligned_96h_v2_throughput_attestation" as const,
+        artifactKind: v08Profile
+            ? ("v0_8_aligned_96h_v1_throughput_attestation" as const)
+            : ("v0_7_aligned_96h_v2_throughput_attestation" as const),
+        ...(v08Profile
+            ? {
+                  versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
+                  catalogSha256: V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+              }
+            : {}),
         status: "research_only_no_bake" as const,
         automaticBake: false as const,
         automaticDeploy: false as const,
@@ -152,11 +174,17 @@ function runnerFixture(): IRunnerFixture {
         evaluatorBytesSha256: sourceSha256("v0_7_aligned_96h_v2_evaluator.ts"),
         workerBytesSha256: sourceSha256("v0_7_aligned_96h_v2_worker.ts"),
         gameAdapterBytesSha256: sourceSha256("v0_7_aligned_96h_v2_game_adapter.ts"),
+        ...(v08Profile
+            ? {
+                  v08GameAdapterBytesSha256: sourceSha256("v0_8_aligned_96h_v1_game_adapter.ts"),
+                  v08ProtocolBytesSha256: sourceSha256("v0_8_aligned_96h_v1_protocol.ts"),
+              }
+            : {}),
     };
     const attestation: IV07AlignedV2ThroughputAttestation = {
         ...unsignedAttestation,
         attestationSha256: fingerprintV07AlignedV2(unsignedAttestation),
-    };
+    } as IV07AlignedV2ThroughputAttestation;
     const attestationContents = writeCanonical(join(inputs, "throughput.json"), attestation);
 
     const allocationRequest: IV07AlignedV2SeedAllocationRequest = {
@@ -174,6 +202,7 @@ function runnerFixture(): IRunnerFixture {
     const unsignedConfig = {
         schemaVersion: 1 as const,
         artifactKind: "v0_7_aligned_96h_v2_runner_config" as const,
+        ...(v08Profile ? { versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE } } : {}),
         status: "research_only_no_bake" as const,
         automaticBake: false as const,
         automaticDeploy: false as const,
@@ -223,11 +252,14 @@ function runnerFixture(): IRunnerFixture {
         artifactKind: "synthetic_composed_seal",
         status: "research_only_no_bake",
     });
-    const genomes = buildV07AlignedV2ProductionCandidateCatalog().slice(0, 2);
+    const genomes = (
+        v08Profile ? buildV08AlignedV1ProductionCandidateCatalog() : buildV07AlignedV2ProductionCandidateCatalog()
+    ).slice(0, 2);
     const startAtMs = 1_000_000;
     const unsignedRequest = {
         schemaVersion: 1 as const,
         artifactKind: "v0_7_aligned_96h_v2_definition_bootstrap_request" as const,
+        ...(v08Profile ? { versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE } } : {}),
         status: "research_only_no_bake" as const,
         automaticBake: false as const,
         automaticDeploy: false as const,
@@ -241,7 +273,9 @@ function runnerFixture(): IRunnerFixture {
             finalDeadlineAtMs: startAtMs + 96 * HOUR_MS,
         },
         candidateGenomes: genomes,
-        incumbentGenome: buildV07AlignedV2ProductionIncumbentGenome(),
+        incumbentGenome: v08Profile
+            ? buildV08AlignedV1ProductionIncumbentGenome()
+            : buildV07AlignedV2ProductionIncumbentGenome(),
         composedSealPath: "composed-seal.json",
         composedSealBytesSha256: sha256(composedSealContents),
     };
@@ -305,6 +339,97 @@ function auditSourcePaths(outputRoot: string): string[] {
 }
 
 describe("v0.7 aligned 96-hour v2 exact runner", () => {
+    it("dispatches schema-2 throughput evidence only to its exact version profile", () => {
+        const digest = "a".repeat(64);
+        const budget = {
+            logicalCpus: availableParallelism(),
+            reservedCpus: 0,
+            workersPerShard: 1,
+            concurrentShards: 1,
+            maxScenarioPairsPerShard: 1,
+            gamesPerWorkerHour: 1,
+            utilization: 0.8,
+            safetyFactor: 1,
+            panelStartupMinutes: 1,
+            shardTimeoutMinutes: 1,
+            rateAttestationPath: "throughput.json",
+            rateAttestationBytesSha256: digest,
+            rateAttestationSha256: digest,
+        };
+        const common = {
+            schemaVersion: 2,
+            status: "research_only_no_bake",
+            automaticBake: false,
+            automaticDeploy: false,
+            measuredAtMs: -1,
+            commit: "b".repeat(40),
+            sourceTreeSha256: digest,
+            bunVersion: process.versions.bun ?? "test-bun",
+            bunRevision: "test-revision",
+            bunExecutableSha256: digest,
+            dependencyManifestSha256: digest,
+            lockfileSha256: null,
+            hostFingerprintSha256: digest,
+            logicalCpus: availableParallelism(),
+            reservedCpus: 0,
+            workersPerShard: 1,
+            concurrentShards: 1,
+            maxScenarioPairsPerShard: 1,
+            shardTimeoutMinutes: 1,
+            sampleProtocol: "all_12_cells_two_seats_8_sequential_batches_persisted_replay",
+            sampleGamesPerCellSeat: V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL,
+            sampleGames: V07_ALIGNED_V2_THROUGHPUT_GAMES,
+            batchCount: V07_ALIGNED_V2_THROUGHPUT_BATCHES,
+            totalElapsedMs: 1,
+            persistedReplayVerified: true,
+            workerAttestationsVerified: true,
+            gamesPerWorkerHour: 1,
+            evidenceRootPath: "evidence",
+            evidenceManifestBytesSha256: digest,
+            evidenceManifestSha256: digest,
+            attestationSha256: digest,
+        };
+        const v08Attestation = {
+            ...common,
+            artifactKind: "v0_8_aligned_96h_v1_throughput_attestation",
+            versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
+            catalogSha256: V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+            worstCostGenomeSha256: V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256,
+            code: buildV08AlignedV1ThroughputCodeLedger(),
+        };
+        const v07Attestation = {
+            ...common,
+            artifactKind: "v0_7_aligned_96h_v2_throughput_attestation",
+            throughputBytesSha256: digest,
+            runnerBytesSha256: digest,
+            evaluatorBytesSha256: digest,
+            workerBytesSha256: digest,
+            gameAdapterBytesSha256: digest,
+            persistenceBytesSha256: digest,
+            protocolBytesSha256: digest,
+            seedAllocatorBytesSha256: digest,
+            catalogBytesSha256: digest,
+        };
+        const v07Context = { mode: "production" as const, configRoot: "." };
+        const v08Context = {
+            ...v07Context,
+            versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
+        };
+
+        expect(() => validateV07AlignedV2ThroughputAttestation(v08Attestation, budget, v08Context)).toThrow(
+            "production throughput measuredAtMs must be an integer >= 0",
+        );
+        expect(() => validateV07AlignedV2ThroughputAttestation(v07Attestation, budget, v07Context)).toThrow(
+            "production throughput measuredAtMs must be an integer >= 0",
+        );
+        expect(() => validateV07AlignedV2ThroughputAttestation(v07Attestation, budget, v08Context)).toThrow(
+            "production throughput attestation header/fields are invalid",
+        );
+        expect(() => validateV07AlignedV2ThroughputAttestation(v08Attestation, budget, v07Context)).toThrow(
+            "production throughput attestation header/fields are invalid",
+        );
+    });
+
     it("atomically prepares the commitment and definition without revealing final seeds or starting work", () => {
         const fixture = runnerFixture();
         try {
@@ -319,6 +444,23 @@ describe("v0.7 aligned 96-hour v2 exact runner", () => {
             });
             expect(fixture.bundle.configBytesSha256).toBe(sha256(readFileSync(fixture.configPath)));
             const config = validateV07AlignedV2RunnerConfig(JSON.parse(readFileSync(fixture.configPath, "utf8")));
+            const v08UnsignedConfig = { ...config, versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE } };
+            delete (v08UnsignedConfig as Partial<IV07AlignedV2RunnerConfig>).configSha256;
+            const v08Config = {
+                ...v08UnsignedConfig,
+                configSha256: fingerprintV07AlignedV2(v08UnsignedConfig),
+            };
+            expect(validateV07AlignedV2RunnerConfig(v08Config).versionProfile).toEqual(
+                V08_ALIGNED_96H_V1_VERSION_PROFILE,
+            );
+            const wrongProfile = structuredClone(v08UnsignedConfig);
+            (wrongProfile.versionProfile as { opponent: string }).opponent = "v0.6";
+            expect(() =>
+                validateV07AlignedV2RunnerConfig({
+                    ...wrongProfile,
+                    configSha256: fingerprintV07AlignedV2(wrongProfile),
+                }),
+            ).toThrow("v0.8s/v0.8 versus v0.7");
             expect(
                 validateV07AlignedV2ThroughputAttestation(
                     JSON.parse(readFileSync(join(dirname(fixture.configPath), "throughput.json"), "utf8")),
@@ -456,6 +598,92 @@ describe("v0.7 aligned 96-hour v2 exact runner", () => {
                 fixture.definition,
             );
             expect(replay.state.terminal?.terminalSha256).toBe(first.terminalSha256);
+            expect(
+                validateV07AlignedV2TerminalReplay(fixture.orchestratorDirectory, fixture.definition, resolvers)
+                    ?.terminalSha256,
+            ).toBe(first.terminalSha256);
+        } finally {
+            rmSync(fixture.root, { recursive: true, force: true });
+        }
+    });
+
+    it("runs the complete v0.8 bootstrap, synthetic lifecycle, terminal replay, and restart with zero games", async () => {
+        const fixture = runnerFixture(V08_ALIGNED_96H_V1_VERSION_PROFILE);
+        let evaluatorCalls = 0;
+        const invoke = () =>
+            runV07AlignedV2Runner({
+                configPath: fixture.configPath,
+                definitionPath: join(fixture.preparedDirectory, fixture.bundle.definitionPath),
+                orchestratorDirectory: fixture.orchestratorDirectory,
+                preflight: true,
+                environment: fixture.environment,
+                dependencies: {
+                    nowMs: () => fixture.startAtMs + 1,
+                    evaluateShard: async () => {
+                        evaluatorCalls += 1;
+                        throw new Error("v0.8 synthetic lifecycle must not invoke the evaluator");
+                    },
+                },
+            });
+        try {
+            expect(fixture.definition).toMatchObject({
+                artifactKind: "v0_8_aligned_96h_v1_orchestrator_definition",
+                versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
+            });
+            expect(
+                [...fixture.definition.candidates, fixture.definition.incumbent].every(
+                    (binding) => binding.candidate === "v0.8s" && binding.opponent === "v0.7",
+                ),
+            ).toBe(true);
+
+            const first = await invoke();
+            expect(first).toMatchObject({
+                invocationGamesExecuted: 0,
+                invocationWorkersStarted: 0,
+                persistedGames: 0,
+                persistedShards: 5,
+                remainingCapacity: { phase: "terminal" },
+            });
+            expect(evaluatorCalls).toBe(0);
+            const bindingPaths = nestedFiles(fixture.outputRoot, "binding.json");
+            expect(bindingPaths).toHaveLength(5);
+            expect(
+                bindingPaths.every((path) => {
+                    const binding = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+                    return (
+                        binding.artifactKind === "v0_8_aligned_96h_v1_candidate_binding" &&
+                        binding.candidate === "v0.8s" &&
+                        binding.opponent === "v0.7"
+                    );
+                }),
+            ).toBe(true);
+            const evidenceDirectories = bindingPaths.map((path) => path.split("/evidence/")[1] ?? "");
+            expect(evidenceDirectories.some((path) => path.startsWith("train/"))).toBe(true);
+            expect(evidenceDirectories.some((path) => path.startsWith("confirm/"))).toBe(true);
+            expect(evidenceDirectories.some((path) => path.startsWith("final/"))).toBe(true);
+
+            const second = await invoke();
+            expect(second.terminalSha256).toBe(first.terminalSha256);
+            expect(second.persistedShards).toBe(first.persistedShards);
+            expect(second.invocationGamesExecuted).toBe(0);
+            expect(evaluatorCalls).toBe(0);
+
+            const resolvers = createV07AlignedV2FilesystemReplayResolvers({
+                artifactRoot: fixture.outputRoot,
+                definition: fixture.definition,
+            });
+            const replay = loadV07AlignedV2PersistedOrchestrator(
+                fixture.orchestratorDirectory,
+                resolvers,
+                fixture.definition,
+            );
+            expect(replay.state.terminal).toMatchObject({
+                terminalSha256: first.terminalSha256,
+                reason: "confirm_hold",
+                verdict: "HOLD",
+                final: null,
+            });
+            expect(replay.state.terminal?.promotion).not.toBeNull();
             expect(
                 validateV07AlignedV2TerminalReplay(fixture.orchestratorDirectory, fixture.definition, resolvers)
                     ?.terminalSha256,

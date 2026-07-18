@@ -31,16 +31,21 @@ import { fileURLToPath } from "node:url";
 
 import type { IV07ComposedAuditRow } from "../v0_7_composed_ranked_ladder";
 import type { V07AlignedV2Outcome } from "./v0_7_aligned_96h_v2_core";
+import { V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 } from "./v0_8_aligned_96h_v1_catalog";
 import {
+    aligned96hCandidateVersions,
+    buildAligned96hCandidateEnvironment,
     evaluateV07AlignedV2Shard,
-    type IV07AlignedV2ShardEvaluation,
-    type IV07AlignedV2ShardEvaluationOptions,
+    fingerprintAligned96h,
+    type Aligned96hCandidateBinding,
+    type Aligned96hWorkerAttestation,
+    type IAligned96hShardEvaluation,
 } from "./v0_7_aligned_96h_v2_evaluator";
 import {
     createV07AlignedV2FilesystemReplayResolvers,
     type IV07AlignedV2FilesystemResolverOptions,
 } from "./v0_7_aligned_96h_v2_filesystem_resolvers";
-import { compactV07AlignedV2Observation, type IV07AlignedV2BattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
+import { compactV07AlignedV2Observation, type IAligned96hBattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
 import {
     createV07AlignedV2OrchestratorDefinition,
     type IV07AlignedV2OrchestratorCommand,
@@ -65,20 +70,23 @@ import {
 } from "./v0_7_aligned_96h_v2_persistence";
 import {
     bindV07AlignedV2SeedPlan,
-    buildV07AlignedV2CandidateEnvironment,
-    buildV07AlignedV2CheckpointShardSpecs,
+    buildAligned96hCheckpointShardSpecs,
     canonicalV07AlignedV2Json,
     createV07AlignedV2Checkpoint,
     fingerprintV07AlignedV2,
     flattenV07AlignedV2SeedPlan,
     v07AlignedV2TaskKey,
-    type IV07AlignedV2CandidateBinding,
     type IV07AlignedV2CandidateGenome,
     type IV07AlignedV2CheckpointPanelBinding,
     type IV07AlignedV2CheckpointShardSpec,
     type IV07AlignedV2ExecutionTask,
     type IV07AlignedV2InjectedSeedPlan,
 } from "./v0_7_aligned_96h_v2_protocol";
+import {
+    V08_ALIGNED_96H_V1_VERSION_PROFILE,
+    assertAligned96hVersionProfile,
+    cloneAligned96hVersionProfile,
+} from "./aligned_96h_version_profile";
 import { quarantineV07AlignedV2Path } from "./v0_7_aligned_96h_v2_quarantine";
 import {
     commitV07AlignedV2SeedAllocation,
@@ -94,7 +102,9 @@ import {
 } from "./v0_7_aligned_96h_v2_seed_allocator";
 import {
     validateV07AlignedV2ProductionThroughputAttestation,
+    validateV08AlignedV1ProductionThroughputAttestation,
     type IV07AlignedV2ProductionThroughputAttestation,
+    type IV08AlignedV1ProductionThroughputAttestation,
 } from "./v0_7_aligned_96h_v2_throughput";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -172,12 +182,28 @@ export interface IV07AlignedV2SyntheticThroughputAttestation {
     attestationSha256: string;
 }
 
+export interface IV08AlignedV1SyntheticThroughputAttestation extends Omit<
+    IV07AlignedV2SyntheticThroughputAttestation,
+    "artifactKind"
+> {
+    artifactKind: "v0_8_aligned_96h_v1_throughput_attestation";
+    versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    catalogSha256: typeof V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256;
+    v08GameAdapterBytesSha256: string;
+    v08ProtocolBytesSha256: string;
+}
+
 export type IV07AlignedV2ThroughputAttestation =
-    IV07AlignedV2SyntheticThroughputAttestation | IV07AlignedV2ProductionThroughputAttestation;
+    | IV07AlignedV2SyntheticThroughputAttestation
+    | IV08AlignedV1SyntheticThroughputAttestation
+    | IV07AlignedV2ProductionThroughputAttestation
+    | IV08AlignedV1ProductionThroughputAttestation;
 
 export interface IV07AlignedV2DefinitionBootstrapRequest {
     schemaVersion: 1;
     artifactKind: "v0_7_aligned_96h_v2_definition_bootstrap_request";
+    /** Omitted for the byte-stable historical v0.7 bootstrap request. */
+    versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
     status: "research_only_no_bake";
     automaticBake: false;
     automaticDeploy: false;
@@ -235,6 +261,8 @@ export interface IV07AlignedV2RunnerHeartbeat {
 export interface IV07AlignedV2RunnerConfig {
     schemaVersion: 1;
     artifactKind: "v0_7_aligned_96h_v2_runner_config";
+    /** Omitted for the byte-stable historical v0.7 runner config. */
+    versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
     status: "research_only_no_bake";
     automaticBake: false;
     automaticDeploy: false;
@@ -302,7 +330,7 @@ export interface IV07AlignedV2RunnerPreparation {
 
 export interface IV07AlignedV2RunnerDependencies {
     nowMs(): number;
-    evaluateShard(options: IV07AlignedV2ShardEvaluationOptions): Promise<IV07AlignedV2ShardEvaluation>;
+    evaluateShard: typeof evaluateV07AlignedV2Shard;
 }
 
 export interface IV07AlignedV2RunnerInvocation {
@@ -759,11 +787,13 @@ function validateScanFiles(value: unknown, label: string): IV07AlignedV2RunnerSc
 }
 
 export function validateV07AlignedV2RunnerConfig(value: unknown): IV07AlignedV2RunnerConfig {
+    const hasVersionProfile = isObject(value) && Object.hasOwn(value, "versionProfile");
     if (
         !isObject(value) ||
         !exactKeys(value, [
             "schemaVersion",
             "artifactKind",
+            ...(hasVersionProfile ? ["versionProfile"] : []),
             "status",
             "automaticBake",
             "automaticDeploy",
@@ -781,6 +811,9 @@ export function validateV07AlignedV2RunnerConfig(value: unknown): IV07AlignedV2R
         !(value.mode === "production" || value.mode === "synthetic_preflight")
     ) {
         throw new Error("aligned v2 runner config header/fields are invalid");
+    }
+    if (hasVersionProfile) {
+        assertAligned96hVersionProfile(value.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
     }
     if (
         !isObject(value.seedInputs) ||
@@ -889,11 +922,13 @@ export function validateV07AlignedV2RunnerConfig(value: unknown): IV07AlignedV2R
 }
 
 function validateDefinitionBootstrapRequest(value: unknown): IV07AlignedV2DefinitionBootstrapRequest {
+    const hasVersionProfile = isObject(value) && Object.hasOwn(value, "versionProfile");
     if (
         !isObject(value) ||
         !exactKeys(value, [
             "schemaVersion",
             "artifactKind",
+            ...(hasVersionProfile ? ["versionProfile"] : []),
             "status",
             "automaticBake",
             "automaticDeploy",
@@ -919,6 +954,9 @@ function validateDefinitionBootstrapRequest(value: unknown): IV07AlignedV2Defini
         !isObject(value.incumbentGenome)
     ) {
         throw new Error("aligned v2 definition bootstrap request header/fields are invalid");
+    }
+    if (hasVersionProfile) {
+        assertAligned96hVersionProfile(value.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
     }
     requireInteger(value.createdAtMs, "definition bootstrap createdAtMs");
     requireInteger(value.candidateLimit, "definition bootstrap candidateLimit", 1);
@@ -960,13 +998,21 @@ function currentHostFingerprintSha256(): string {
 export function validateV07AlignedV2ThroughputAttestation(
     value: unknown,
     throughput: IV07AlignedV2RunnerThroughputBudget,
-    context?: { mode: V07AlignedV2RunnerMode; configRoot: string },
+    context?: {
+        mode: V07AlignedV2RunnerMode;
+        configRoot: string;
+        versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    },
 ): IV07AlignedV2ThroughputAttestation {
+    const v08Profile = context?.versionProfile !== undefined;
+    if (v08Profile) {
+        assertAligned96hVersionProfile(context.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+    }
     if (isObject(value) && value.schemaVersion === 2) {
         if (context?.mode !== "production") {
             throw new Error("replayable production throughput evidence is valid only in production mode");
         }
-        return validateV07AlignedV2ProductionThroughputAttestation(value, {
+        const options = {
             configRoot: context.configRoot,
             expected: {
                 logicalCpus: throughput.logicalCpus,
@@ -978,7 +1024,10 @@ export function validateV07AlignedV2ThroughputAttestation(
                 gamesPerWorkerHour: throughput.gamesPerWorkerHour,
             },
             expectedAttestationSha256: throughput.rateAttestationSha256,
-        }).attestation;
+        };
+        return v08Profile
+            ? validateV08AlignedV1ProductionThroughputAttestation(value, options).attestation
+            : validateV07AlignedV2ProductionThroughputAttestation(value, options).attestation;
     }
     if (context?.mode === "production") {
         throw new Error("production mode requires schema-2 replayable throughput evidence");
@@ -988,6 +1037,7 @@ export function validateV07AlignedV2ThroughputAttestation(
         !exactKeys(value, [
             "schemaVersion",
             "artifactKind",
+            ...(v08Profile ? ["versionProfile", "catalogSha256"] : []),
             "status",
             "automaticBake",
             "automaticDeploy",
@@ -1014,10 +1064,14 @@ export function validateV07AlignedV2ThroughputAttestation(
             "evaluatorBytesSha256",
             "workerBytesSha256",
             "gameAdapterBytesSha256",
+            ...(v08Profile ? ["v08GameAdapterBytesSha256", "v08ProtocolBytesSha256"] : []),
             "attestationSha256",
         ]) ||
         value.schemaVersion !== 1 ||
-        value.artifactKind !== "v0_7_aligned_96h_v2_throughput_attestation" ||
+        value.artifactKind !==
+            (v08Profile
+                ? "v0_8_aligned_96h_v1_throughput_attestation"
+                : "v0_7_aligned_96h_v2_throughput_attestation") ||
         value.status !== "research_only_no_bake" ||
         value.automaticBake !== false ||
         value.automaticDeploy !== false ||
@@ -1026,6 +1080,12 @@ export function validateV07AlignedV2ThroughputAttestation(
         value.workerAttestationsVerified !== true
     ) {
         throw new Error("aligned v2 throughput attestation header/fields are invalid");
+    }
+    if (v08Profile) {
+        assertAligned96hVersionProfile(value.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+        if (value.catalogSha256 !== V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256) {
+            throw new Error("v0.8 aligned throughput attestation catalog identity is invalid");
+        }
     }
     if (
         typeof value.commit !== "string" ||
@@ -1058,6 +1118,7 @@ export function validateV07AlignedV2ThroughputAttestation(
         "evaluatorBytesSha256",
         "workerBytesSha256",
         "gameAdapterBytesSha256",
+        ...(v08Profile ? (["v08GameAdapterBytesSha256", "v08ProtocolBytesSha256"] as const) : []),
         "attestationSha256",
     ] as const) {
         requireSha256(value[key], `throughput attestation ${key}`);
@@ -1088,11 +1149,15 @@ export function validateV07AlignedV2ThroughputAttestation(
         value.runnerBytesSha256 !== sourceBytesSha256("v0_7_aligned_96h_v2_runner.ts") ||
         value.evaluatorBytesSha256 !== sourceBytesSha256("v0_7_aligned_96h_v2_evaluator.ts") ||
         value.workerBytesSha256 !== sourceBytesSha256("v0_7_aligned_96h_v2_worker.ts") ||
-        value.gameAdapterBytesSha256 !== sourceBytesSha256("v0_7_aligned_96h_v2_game_adapter.ts")
+        value.gameAdapterBytesSha256 !== sourceBytesSha256("v0_7_aligned_96h_v2_game_adapter.ts") ||
+        (v08Profile &&
+            (value.v08GameAdapterBytesSha256 !== sourceBytesSha256("v0_8_aligned_96h_v1_game_adapter.ts") ||
+                value.v08ProtocolBytesSha256 !== sourceBytesSha256("v0_8_aligned_96h_v1_protocol.ts")))
     ) {
         throw new Error("aligned v2 throughput attestation does not bind this exact code, host, and shard geometry");
     }
-    return value as unknown as IV07AlignedV2SyntheticThroughputAttestation;
+    return value as unknown as
+        IV07AlignedV2SyntheticThroughputAttestation | IV08AlignedV1SyntheticThroughputAttestation;
 }
 
 function loadThroughputAttestation(
@@ -1108,7 +1173,7 @@ function loadThroughputAttestation(
     return validateV07AlignedV2ThroughputAttestation(
         parseCanonicalJsonBytes<unknown>(bytes, "aligned v2 throughput attestation"),
         throughput,
-        { mode: config.mode, configRoot },
+        { mode: config.mode, configRoot, versionProfile: config.versionProfile },
     );
 }
 
@@ -1382,10 +1447,14 @@ export function prepareV07AlignedV2DefinitionBundle(
         throw new Error("aligned v2 definition bootstrap composed seal bytes changed");
     }
     const preparation = prepareV07AlignedV2Runner(invocation.configPath);
+    if (!sameValue(request.versionProfile ?? null, preparation.config.versionProfile ?? null)) {
+        throw new Error("aligned bootstrap request and runner config version profiles do not match");
+    }
     if (preparation.config.mode === "production" && Date.now() >= request.schedule.startAtMs) {
         throw new Error("aligned v2 production definition must be prepared before its immutable start time");
     }
     const definition = createV07AlignedV2OrchestratorDefinition({
+        versionProfile: request.versionProfile,
         mode: preparation.config.mode === "production" ? "formal" : "synthetic_dry_run",
         runId: request.runId,
         createdAtMs: request.createdAtMs,
@@ -1474,13 +1543,18 @@ function validateComposition(
     preparation: IV07AlignedV2RunnerPreparation,
     definition: IV07AlignedV2OrchestratorDefinition,
 ): IV07AlignedV2RunnerBudgetReport {
+    const definitionVersionProfile =
+        definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition"
+            ? definition.versionProfile
+            : undefined;
     if (
         (invocation.preflight && preparation.config.mode !== "synthetic_preflight") ||
         (!invocation.preflight && preparation.config.mode !== "production") ||
         (invocation.preflight && definition.mode !== "synthetic_dry_run") ||
-        (!invocation.preflight && definition.mode !== "formal")
+        (!invocation.preflight && definition.mode !== "formal") ||
+        !sameValue(preparation.config.versionProfile ?? null, definitionVersionProfile ?? null)
     ) {
-        throw new Error("aligned v2 runner/config/definition modes do not match");
+        throw new Error("aligned runner config and definition mode/version profile do not match");
     }
     if (
         !sameValue(bindV07AlignedV2SeedPlan(preparation.commitment.trainPlan), definition.panels.train) ||
@@ -1493,7 +1567,10 @@ function validateComposition(
     return validateV07AlignedV2RunnerBudget(preparation.config, definition);
 }
 
-function auditRow(record: IV07AlignedV2BattleRecord, binding: IV07AlignedV2CandidateBinding): IV07ComposedAuditRow {
+function auditRow<Binding extends Aligned96hCandidateBinding>(
+    record: IAligned96hBattleRecord<Binding>,
+    binding: Binding,
+): IV07ComposedAuditRow {
     return {
         t: "game",
         mode: "search",
@@ -1522,11 +1599,16 @@ function auditRow(record: IV07AlignedV2BattleRecord, binding: IV07AlignedV2Candi
     };
 }
 
-function syntheticRecord(task: IV07AlignedV2ExecutionTask, outcome: V07AlignedV2Outcome): IV07AlignedV2BattleRecord {
+function syntheticRecord<Binding extends Aligned96hCandidateBinding>(
+    task: IV07AlignedV2ExecutionTask,
+    outcome: V07AlignedV2Outcome,
+    binding: Binding,
+): IAligned96hBattleRecord<Binding> {
     const candidateIsGreen = task.candidateSeat === "candidate_green";
     const candidateWon = outcome === "candidate_win";
     const winner = outcome === "draw" ? "draw" : candidateWon === candidateIsGreen ? "green" : "red";
-    return {
+    const versions = aligned96hCandidateVersions(binding);
+    const common = {
         schemaVersion: 1,
         taskKey: v07AlignedV2TaskKey(task),
         panelId: task.panelId,
@@ -1538,9 +1620,9 @@ function syntheticRecord(task: IV07AlignedV2ExecutionTask, outcome: V07AlignedV2
         setupAttempt: 0,
         combatSeed: task.combatSeed,
         candidateIsGreen,
-        greenVersion: candidateIsGreen ? "v0.7s" : "v0.6",
-        redVersion: candidateIsGreen ? "v0.6" : "v0.7s",
-        physicalSetupSha256: fingerprintV07AlignedV2({ task: v07AlignedV2TaskKey(task), physical: true }),
+        greenVersion: candidateIsGreen ? versions.candidate : versions.opponent,
+        redVersion: candidateIsGreen ? versions.opponent : versions.candidate,
+        physicalSetupSha256: fingerprintAligned96h(binding, { task: v07AlignedV2TaskKey(task), physical: true }),
         lowerRoster: "synthetic-preflight-lower",
         upperRoster: "synthetic-preflight-upper",
         winner,
@@ -1551,43 +1633,52 @@ function syntheticRecord(task: IV07AlignedV2ExecutionTask, outcome: V07AlignedV2
         decidedByArmageddon: false,
         rejectedGreen: 0,
         rejectedRed: 0,
-        resultFingerprint: fingerprintV07AlignedV2({ task: v07AlignedV2TaskKey(task), outcome }),
+        resultFingerprint: fingerprintAligned96h(binding, { task: v07AlignedV2TaskKey(task), outcome }),
     };
+    return common as IAligned96hBattleRecord<Binding>;
 }
 
-function syntheticShardEvaluation(
+function syntheticShardEvaluation<Binding extends Aligned96hCandidateBinding>(
     shard: IV07AlignedV2CheckpointShardSpec,
-    binding: IV07AlignedV2CandidateBinding,
+    binding: Binding,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
     auditDirectory: string,
     outcome: V07AlignedV2Outcome,
-): IV07AlignedV2ShardEvaluation {
+): IAligned96hShardEvaluation<Binding> {
     const tasks = flattenV07AlignedV2SeedPlan(seedPlan).slice(shard.pairStart * 2, shard.pairEndExclusive * 2);
-    const records = tasks.map((task) => syntheticRecord(task, outcome));
+    const records = tasks.map((task) => syntheticRecord(task, outcome, binding));
     const audits = binding.searchEnabled ? records.map((record) => auditRow(record, binding)) : [];
     const observations = records.map((record, index) =>
         compactV07AlignedV2Observation(record, binding, binding.searchEnabled ? audits[index] : undefined),
     );
     const sourcePath = join(auditDirectory, "synthetic-worker-0.jsonl");
     const contents = audits.length ? `${audits.map((row) => canonicalV07AlignedV2Json(row)).join("\n")}\n` : "";
-    const environment = buildV07AlignedV2CandidateEnvironment(binding.genome, sourcePath);
+    const environment = buildAligned96hCandidateEnvironment(binding, sourcePath);
+    const baseAttestation = {
+        workerIndex: 0,
+        runFingerprint: shard.runFingerprint,
+        genomeSha256: binding.genomeSha256,
+        behaviorEnvironmentSha256: binding.behaviorEnvironmentSha256,
+        environmentSha256: fingerprintAligned96h(binding, environment),
+        removedEnvironmentKeys: Object.keys(environment).sort(),
+        transpilerCacheDisabled: "0" as const,
+        auditPath: sourcePath,
+    };
+    const attestation = (
+        binding.candidate === "v0.8s"
+            ? {
+                  ...baseAttestation,
+                  artifactKind: "v0_8_aligned_96h_v1_worker_attestation" as const,
+                  versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+              }
+            : baseAttestation
+    ) as Aligned96hWorkerAttestation<Binding>;
     return {
         shard,
         binding,
         checkpoint: createV07AlignedV2Checkpoint(shard, observations),
         records,
-        attestations: [
-            {
-                workerIndex: 0,
-                runFingerprint: shard.runFingerprint,
-                genomeSha256: binding.genomeSha256,
-                behaviorEnvironmentSha256: binding.behaviorEnvironmentSha256,
-                environmentSha256: fingerprintV07AlignedV2(environment),
-                removedEnvironmentKeys: Object.keys(environment).sort(),
-                transpilerCacheDisabled: "0",
-                auditPath: sourcePath,
-            },
-        ],
+        attestations: [attestation],
         auditArtifacts: [
             {
                 workerIndex: 0,
@@ -1625,23 +1716,25 @@ async function mapConcurrent<T, R>(
     return results;
 }
 
-interface IPanelEvaluationContext {
+interface IPanelEvaluationContext<Binding extends Aligned96hCandidateBinding> {
     artifactRoot: string;
     definition: IV07AlignedV2OrchestratorDefinition;
     config: IV07AlignedV2RunnerConfig;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: Binding;
     seedPlan: IV07AlignedV2InjectedSeedPlan;
     preflight: boolean;
     outcome: V07AlignedV2Outcome;
-    evaluateShard(options: IV07AlignedV2ShardEvaluationOptions): Promise<IV07AlignedV2ShardEvaluation>;
+    evaluateShard: typeof evaluateV07AlignedV2Shard;
     deadlineAtMs: number;
     eventHeadSha256: string | null;
     heartbeat: V07AlignedV2RunnerHeartbeatWriter;
     metrics: IV07AlignedV2RunnerExecutionMetrics;
 }
 
-async function evaluatePanel(context: IPanelEvaluationContext): Promise<IV07AlignedV2PanelEvidenceInput> {
-    const shards = buildV07AlignedV2CheckpointShardSpecs({
+async function evaluatePanel<Binding extends Aligned96hCandidateBinding>(
+    context: IPanelEvaluationContext<Binding>,
+): Promise<IV07AlignedV2PanelEvidenceInput> {
+    const shards = buildAligned96hCheckpointShardSpecs({
         runFingerprint: context.definition.definitionSha256,
         seedPlan: context.seedPlan,
         binding: context.binding,
@@ -1687,7 +1780,7 @@ async function evaluatePanel(context: IPanelEvaluationContext): Promise<IV07Alig
             context.deadlineAtMs,
             Date.now() + context.config.throughput.shardTimeoutMinutes * 60 * 1000,
         );
-        let evaluation: IV07AlignedV2ShardEvaluation;
+        let evaluation: IAligned96hShardEvaluation<Binding>;
         if (context.preflight) {
             evaluation = syntheticShardEvaluation(
                 shard,
@@ -1761,10 +1854,10 @@ function remainingPanelWork(
     artifactRoot: string,
     definition: IV07AlignedV2OrchestratorDefinition,
     config: IV07AlignedV2RunnerConfig,
-    binding: IV07AlignedV2CandidateBinding,
+    binding: Aligned96hCandidateBinding,
     seedPlan: IV07AlignedV2InjectedSeedPlan,
 ): IV07AlignedV2RemainingPanelWork {
-    const shards = buildV07AlignedV2CheckpointShardSpecs({
+    const shards = buildAligned96hCheckpointShardSpecs({
         runFingerprint: definition.definitionSha256,
         seedPlan,
         binding,
@@ -2203,6 +2296,40 @@ export async function runV07AlignedV2Runner(
                           incumbent: incumbentEvidence,
                       });
         }
+    }
+
+    if (
+        invocation.preflight &&
+        definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition" &&
+        ledger.state.phase === "terminal" &&
+        ledger.state.terminal?.reason === "confirm_hold" &&
+        ledger.state.frozen &&
+        ledger.state.revealedSeedArtifacts
+    ) {
+        // Rehearse final-panel execution without weakening the underpowered preflight promotion gate.
+        const revealPath = join(artifactRoot, ...ledger.state.revealedSeedArtifacts.finalReveal.path.split("/"));
+        const reveal = readCanonicalJson<IV07AlignedV2FinalSeedReveal>(
+            revealPath,
+            "v0.8 aligned synthetic final seed reveal",
+        );
+        const challenger = definition.candidates.find(
+            (candidate) => candidate.genomeSha256 === ledger.state.frozen!.genomeSha256,
+        );
+        if (!challenger) throw new Error("v0.8 aligned synthetic final candidate is absent from the catalog");
+        await evaluatePanel({
+            artifactRoot,
+            definition,
+            config: preparation.config,
+            binding: challenger,
+            seedPlan: reveal.finalPlan,
+            preflight: true,
+            outcome: "candidate_win",
+            evaluateShard: dependencies.evaluateShard,
+            deadlineAtMs: definition.schedule.finalDeadlineAtMs,
+            eventHeadSha256: ledger.current.eventHeadSha256,
+            heartbeat,
+            metrics,
+        });
     }
 
     if (ledger.state.phase === "final" && ledger.state.frozen && ledger.state.revealedSeedArtifacts) {

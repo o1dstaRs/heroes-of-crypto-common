@@ -39,6 +39,25 @@ import {
     type IV07AlignedV2CheckpointPanelBinding,
     type IV07AlignedV2InjectedSeedPlan,
 } from "./v0_7_aligned_96h_v2_protocol";
+import {
+    V07_ALIGNED_96H_V2_VERSION_PROFILE,
+    V08_ALIGNED_96H_V1_VERSION_PROFILE,
+    assertAligned96hVersionProfile,
+    cloneAligned96hVersionProfile,
+    type IAligned96hVersionProfile,
+} from "./aligned_96h_version_profile";
+import {
+    V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+    V08_ALIGNED_V1_PRODUCTION_CANDIDATE_LIMIT,
+    assertV08AlignedV1ProductionCatalogInput,
+    buildV08AlignedV1ProductionCatalogIdentity,
+} from "./v0_8_aligned_96h_v1_catalog";
+import {
+    bindV08AlignedV1Candidate,
+    validateV08AlignedV1CandidateBinding,
+    type IV08AlignedV1CandidateBinding,
+} from "./v0_8_aligned_96h_v1_protocol";
+import { assessV08AlignedV1Final, type IV08AlignedV1ResearchTerminal } from "./v0_8_aligned_96h_v1_core";
 
 const HOUR_MS = 60 * 60 * 1000;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -68,7 +87,9 @@ export interface IV07AlignedV2RevealedSeedArtifacts {
 
 export interface IV07AlignedV2OrchestratorDefinition {
     schemaVersion: 1;
-    artifactKind: "v0_7_aligned_96h_v2_orchestrator_definition";
+    artifactKind: "v0_7_aligned_96h_v2_orchestrator_definition" | "v0_8_aligned_96h_v1_orchestrator_definition";
+    /** Omitted only for the byte-stable historical v0.7 definition profile. */
+    versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
     status: "research_only_no_bake";
     automaticBake: false;
     automaticDeploy: false;
@@ -78,8 +99,8 @@ export interface IV07AlignedV2OrchestratorDefinition {
     composedSealSha256: string;
     candidateLimit: number;
     schedule: IV07AlignedV2OrchestratorSchedule;
-    candidates: IV07AlignedV2CandidateBinding[];
-    incumbent: IV07AlignedV2CandidateBinding;
+    candidates: Array<IV07AlignedV2CandidateBinding | IV08AlignedV1CandidateBinding>;
+    incumbent: IV07AlignedV2CandidateBinding | IV08AlignedV1CandidateBinding;
     panels: {
         train: IV07AlignedV2CheckpointPanelBinding;
         confirm: IV07AlignedV2CheckpointPanelBinding;
@@ -90,6 +111,8 @@ export interface IV07AlignedV2OrchestratorDefinition {
 }
 
 export interface IV07AlignedV2OrchestratorDefinitionInput {
+    /** Omission preserves the historical v0.7 definition bytes exactly. */
+    versionProfile?: typeof V07_ALIGNED_96H_V2_VERSION_PROFILE | typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
     mode: V07AlignedV2OrchestratorMode;
     runId: string;
     createdAtMs: number;
@@ -154,7 +177,7 @@ export interface IV07AlignedV2OrchestratorTerminal {
     reason: V07AlignedV2TerminalReason;
     verdict: "PASS" | "FAIL" | "HOLD" | "INCOMPLETE";
     promotion: IV07AlignedV2PromotionVerdict | null;
-    final: IV07AlignedV2ResearchTerminal | null;
+    final: IV07AlignedV2ResearchTerminal | IV08AlignedV1ResearchTerminal | null;
     terminalSha256: string;
 }
 
@@ -394,9 +417,37 @@ function expectedPanelScenarios(mode: V07AlignedV2OrchestratorMode, purpose: "co
     return purpose === "confirm" ? 1000 : 2000;
 }
 
+function definitionVersionProfile(
+    value: IAligned96hVersionProfile | undefined,
+): typeof V07_ALIGNED_96H_V2_VERSION_PROFILE | typeof V08_ALIGNED_96H_V1_VERSION_PROFILE {
+    if (value === undefined) return V07_ALIGNED_96H_V2_VERSION_PROFILE;
+    if (value.candidate === V07_ALIGNED_96H_V2_VERSION_PROFILE.candidate) {
+        assertAligned96hVersionProfile(value, V07_ALIGNED_96H_V2_VERSION_PROFILE);
+        return V07_ALIGNED_96H_V2_VERSION_PROFILE;
+    }
+    assertAligned96hVersionProfile(value, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+    return V08_ALIGNED_96H_V1_VERSION_PROFILE;
+}
+
+const isV08AlignedV1Profile = (
+    profile: typeof V07_ALIGNED_96H_V2_VERSION_PROFILE | typeof V08_ALIGNED_96H_V1_VERSION_PROFILE,
+): profile is typeof V08_ALIGNED_96H_V1_VERSION_PROFILE =>
+    profile.candidate === V08_ALIGNED_96H_V1_VERSION_PROFILE.candidate;
+
+function assessDefinitionFinal(
+    definition: IV07AlignedV2OrchestratorDefinition,
+    observations: readonly IV07AlignedV2GameObservation[],
+): IV07AlignedV2ResearchTerminal | IV08AlignedV1ResearchTerminal {
+    return definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition"
+        ? assessV08AlignedV1Final(observations)
+        : assessV07AlignedV2Final(observations);
+}
+
 export function createV07AlignedV2OrchestratorDefinition(
     input: IV07AlignedV2OrchestratorDefinitionInput,
 ): IV07AlignedV2OrchestratorDefinition {
+    const versionProfile = definitionVersionProfile(input.versionProfile);
+    const v08Profile = isV08AlignedV1Profile(versionProfile);
     if (!(["formal", "synthetic_dry_run"] as const).includes(input.mode)) {
         throw new Error("aligned v2 orchestrator mode is invalid");
     }
@@ -412,20 +463,31 @@ export function createV07AlignedV2OrchestratorDefinition(
         throw new Error("aligned v2 definition cannot be created after its immutable start time");
     }
     if (input.mode === "formal") {
-        assertV07AlignedV2ProductionCatalogInput({
-            candidateLimit: input.candidateLimit,
-            candidateGenomes: input.candidateGenomes,
-            incumbentGenome: input.incumbentGenome,
-            trainScenariosPerCell: input.trainSeedPlan.scenariosPerCell,
-        });
+        if (v08Profile) {
+            assertV08AlignedV1ProductionCatalogInput({
+                versionProfile,
+                candidateLimit: input.candidateLimit,
+                candidateGenomes: input.candidateGenomes,
+                incumbentGenome: input.incumbentGenome,
+                trainScenariosPerCell: input.trainSeedPlan.scenariosPerCell,
+            });
+        } else {
+            assertV07AlignedV2ProductionCatalogInput({
+                candidateLimit: input.candidateLimit,
+                candidateGenomes: input.candidateGenomes,
+                incumbentGenome: input.incumbentGenome,
+                trainScenariosPerCell: input.trainSeedPlan.scenariosPerCell,
+            });
+        }
     }
     if (!input.candidateGenomes.length || input.candidateGenomes.length > input.candidateLimit) {
         throw new Error("aligned v2 candidate catalog is empty or exceeds its finite limit");
     }
+    const bindCandidate = v08Profile ? bindV08AlignedV1Candidate : bindV07AlignedV2Candidate;
     const candidates = input.candidateGenomes
-        .map(bindV07AlignedV2Candidate)
+        .map((genome) => bindCandidate(genome))
         .sort((left, right) => left.genomeSha256.localeCompare(right.genomeSha256));
-    const incumbent = bindV07AlignedV2Candidate(input.incumbentGenome);
+    const incumbent = bindCandidate(input.incumbentGenome);
     const genomeHashes = candidates.map((candidate) => candidate.genomeSha256);
     if (new Set(genomeHashes).size !== genomeHashes.length || genomeHashes.includes(incumbent.genomeSha256)) {
         throw new Error("aligned v2 candidate catalog and incumbent genome hashes must be unique");
@@ -451,7 +513,28 @@ export function createV07AlignedV2OrchestratorDefinition(
         throw new Error("aligned v2 train, confirm, and final panels must be separate immutable panels");
     }
     assertV07AlignedV2InjectedPlansDisjoint([input.trainSeedPlan, input.confirmSeedPlan]);
-    const unsigned = {
+    if (v08Profile) {
+        const unsigned = {
+            schemaVersion: 1 as const,
+            artifactKind: "v0_8_aligned_96h_v1_orchestrator_definition" as const,
+            versionProfile: cloneAligned96hVersionProfile(versionProfile),
+            status: "research_only_no_bake" as const,
+            automaticBake: false as const,
+            automaticDeploy: false as const,
+            mode: input.mode,
+            runId: input.runId,
+            createdAtMs: input.createdAtMs,
+            composedSealSha256: input.composedSealSha256,
+            candidateLimit: input.candidateLimit,
+            schedule: { ...input.schedule },
+            candidates,
+            incumbent,
+            panels: { train, confirm, finalCommitment },
+            seedCommitment,
+        };
+        return { ...unsigned, definitionSha256: fingerprintV07AlignedV2(unsigned) };
+    }
+    const legacyUnsigned = {
         schemaVersion: 1 as const,
         artifactKind: "v0_7_aligned_96h_v2_orchestrator_definition" as const,
         status: "research_only_no_bake" as const,
@@ -468,7 +551,7 @@ export function createV07AlignedV2OrchestratorDefinition(
         panels: { train, confirm, finalCommitment },
         seedCommitment,
     };
-    return { ...unsigned, definitionSha256: fingerprintV07AlignedV2(unsigned) };
+    return { ...legacyUnsigned, definitionSha256: fingerprintV07AlignedV2(legacyUnsigned) };
 }
 
 export function validateV07AlignedV2OrchestratorDefinition(
@@ -647,7 +730,7 @@ function createTerminal(
     reason: V07AlignedV2TerminalReason,
     verdict: IV07AlignedV2OrchestratorTerminal["verdict"],
     promotion: IV07AlignedV2PromotionVerdict | null = null,
-    final: IV07AlignedV2ResearchTerminal | null = null,
+    final: IV07AlignedV2ResearchTerminal | IV08AlignedV1ResearchTerminal | null = null,
 ): IV07AlignedV2OrchestratorTerminal {
     const unsigned = {
         schemaVersion: 1 as const,
@@ -1051,28 +1134,34 @@ function validateResolvedSeedCommitment(
 }
 
 function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2OrchestratorDefinition): void {
+    const v08Definition = definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition";
+    const expectedDefinitionKeys = [
+        "schemaVersion",
+        "artifactKind",
+        ...(v08Definition ? ["versionProfile"] : []),
+        "status",
+        "automaticBake",
+        "automaticDeploy",
+        "mode",
+        "runId",
+        "createdAtMs",
+        "composedSealSha256",
+        "candidateLimit",
+        "schedule",
+        "candidates",
+        "incumbent",
+        "panels",
+        "seedCommitment",
+        "definitionSha256",
+    ];
     if (
         !isObjectRecord(definition) ||
-        !hasExactKeys(definition, [
-            "schemaVersion",
-            "artifactKind",
-            "status",
-            "automaticBake",
-            "automaticDeploy",
-            "mode",
-            "runId",
-            "createdAtMs",
-            "composedSealSha256",
-            "candidateLimit",
-            "schedule",
-            "candidates",
-            "incumbent",
-            "panels",
-            "seedCommitment",
-            "definitionSha256",
-        ]) ||
+        !hasExactKeys(definition, expectedDefinitionKeys) ||
         definition.schemaVersion !== 1 ||
-        definition.artifactKind !== "v0_7_aligned_96h_v2_orchestrator_definition" ||
+        !(
+            definition.artifactKind === "v0_7_aligned_96h_v2_orchestrator_definition" ||
+            definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition"
+        ) ||
         definition.status !== "research_only_no_bake" ||
         definition.automaticBake !== false ||
         definition.automaticDeploy !== false ||
@@ -1081,6 +1170,12 @@ function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2Orchestrato
         !definition.runId.trim()
     ) {
         throw new Error("aligned v2 orchestrator definition header/fields are invalid");
+    }
+    const versionProfile = v08Definition
+        ? definitionVersionProfile(definition.versionProfile)
+        : definitionVersionProfile(undefined);
+    if (v08Definition !== isV08AlignedV1Profile(versionProfile)) {
+        throw new Error("aligned orchestrator definition artifact kind and version profile disagree");
     }
     requireSafeInteger(definition.createdAtMs, "createdAtMs");
     requireSafeInteger(definition.candidateLimit, "candidateLimit");
@@ -1111,16 +1206,31 @@ function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2Orchestrato
     requireSha256(definition.composedSealSha256, "composedSealSha256");
     requireSha256(definition.definitionSha256, "definitionSha256");
     validateSeedArtifactRef(definition.seedCommitment, "seedCommitment");
-    definition.candidates.forEach(validateV07AlignedV2CandidateBinding);
-    validateV07AlignedV2CandidateBinding(definition.incumbent);
+    if (v08Definition) {
+        definition.candidates.forEach((candidate) =>
+            validateV08AlignedV1CandidateBinding(candidate as IV08AlignedV1CandidateBinding),
+        );
+        validateV08AlignedV1CandidateBinding(definition.incumbent as IV08AlignedV1CandidateBinding);
+    } else {
+        definition.candidates.forEach((candidate) =>
+            validateV07AlignedV2CandidateBinding(candidate as IV07AlignedV2CandidateBinding),
+        );
+        validateV07AlignedV2CandidateBinding(definition.incumbent as IV07AlignedV2CandidateBinding);
+    }
     for (const panel of Object.values(definition.panels)) validateV07AlignedV2CheckpointPanelBinding(panel);
     const candidateHashes = definition.candidates.map((candidate) => candidate.genomeSha256);
     if (definition.mode === "formal") {
-        const production = buildV07AlignedV2ProductionCatalogIdentity();
+        const production = v08Definition
+            ? buildV08AlignedV1ProductionCatalogIdentity()
+            : buildV07AlignedV2ProductionCatalogIdentity();
         const expectedSorted = [...production.orderedCandidateGenomeSha256].sort();
         if (
-            production.catalogSha256 !== V07_ALIGNED_V2_PRODUCTION_CATALOG_SHA256 ||
-            definition.candidateLimit !== V07_ALIGNED_V2_PRODUCTION_CANDIDATE_LIMIT ||
+            production.catalogSha256 !==
+                (v08Definition ? V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 : V07_ALIGNED_V2_PRODUCTION_CATALOG_SHA256) ||
+            definition.candidateLimit !==
+                (v08Definition
+                    ? V08_ALIGNED_V1_PRODUCTION_CANDIDATE_LIMIT
+                    : V07_ALIGNED_V2_PRODUCTION_CANDIDATE_LIMIT) ||
             definition.panels.train.scenariosPerCell !== V07_ALIGNED_V2_PRODUCTION_TRAIN_SCENARIOS_PER_CELL ||
             definition.incumbent.genomeSha256 !== production.incumbentGenomeSha256 ||
             canonicalV07AlignedV2Json(candidateHashes) !== canonicalV07AlignedV2Json(expectedSorted)
@@ -1213,7 +1323,7 @@ function validateResolvedEventEvidence(
     } else if (event.eventType === "final_recorded") {
         if (!resolvers.evidence) return;
         const observations = validateResolvedSummary(event.payload.evidence, resolvers.evidence);
-        const final = assessV07AlignedV2Final(observations);
+        const final = assessDefinitionFinal(definition, observations);
         if (canonicalV07AlignedV2Json(final) !== canonicalV07AlignedV2Json(event.payload.terminal.final)) {
             throw new Error("aligned v2 persisted final terminal does not replay exactly");
         }
@@ -1430,7 +1540,7 @@ export function applyV07AlignedV2OrchestratorCommand(
             definition.panels.finalCommitment,
             state.frozen.genomeSha256,
         );
-        const final = assessV07AlignedV2Final(evidence.observations);
+        const final = assessDefinitionFinal(definition, evidence.observations);
         const terminal = createTerminal(
             definition,
             state.frozen.genomeSha256,

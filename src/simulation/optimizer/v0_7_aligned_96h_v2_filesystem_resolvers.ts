@@ -19,12 +19,12 @@ import {
     type V07AlignedV2EvidenceResolver,
 } from "./v0_7_aligned_96h_v2_orchestrator";
 import { loadV07AlignedV2PersistedPanelShard } from "./v0_7_aligned_96h_v2_persistence";
+import type { Aligned96hCandidateBinding } from "./v0_7_aligned_96h_v2_evaluator";
 import {
     bindV07AlignedV2SeedPlan,
     canonicalV07AlignedV2Json,
     validateV07AlignedV2CheckpointPanelBinding,
     V07_ALIGNED_V2_EVALUATOR_CELLS,
-    type IV07AlignedV2CandidateBinding,
     type IV07AlignedV2CheckpointPanelBinding,
     type IV07AlignedV2InjectedSeedPlan,
 } from "./v0_7_aligned_96h_v2_protocol";
@@ -100,7 +100,7 @@ function samePanel(left: IV07AlignedV2CheckpointPanelBinding, right: IV07Aligned
 function bindingForGenome(
     definition: IV07AlignedV2OrchestratorDefinition,
     genomeSha256: string,
-): IV07AlignedV2CandidateBinding {
+): Aligned96hCandidateBinding {
     const matches = [...definition.candidates, definition.incumbent].filter(
         (candidate) => candidate.genomeSha256 === genomeSha256,
     );

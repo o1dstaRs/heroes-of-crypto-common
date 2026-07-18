@@ -41,7 +41,9 @@ import {
     validateV07AlignedV2RunnerHeartbeat,
     validateV07AlignedV2ThroughputAttestation,
     type IV07AlignedV2RunnerBudgetReport,
+    type IV07AlignedV2RunnerConfig,
     type IV07AlignedV2RunnerHeartbeat,
+    type IV07AlignedV2ThroughputAttestation,
 } from "./v0_7_aligned_96h_v2_runner";
 
 const HOUR_MS = 3_600_000;
@@ -3069,6 +3071,18 @@ function parseCli(args: readonly string[]): ICliOptions {
     };
 }
 
+export function validateV07AlignedV2SupervisorThroughputAttestation(
+    value: unknown,
+    runnerConfig: Pick<IV07AlignedV2RunnerConfig, "mode" | "throughput" | "versionProfile">,
+    runnerConfigRoot: string,
+): IV07AlignedV2ThroughputAttestation {
+    return validateV07AlignedV2ThroughputAttestation(value, runnerConfig.throughput, {
+        mode: runnerConfig.mode,
+        configRoot: runnerConfigRoot,
+        versionProfile: runnerConfig.versionProfile,
+    });
+}
+
 function envInteger(name: string, fallback: number, minimum: number): number {
     const value = process.env[name] === undefined ? fallback : Number(process.env[name]);
     requireInteger(value, name, minimum);
@@ -3173,10 +3187,10 @@ async function main(): Promise<void> {
     if (sha256(rateAttestationRaw) !== runnerConfig.throughput.rateAttestationBytesSha256) {
         throw new Error("throughput attestation raw SHA-256 does not match the runner config");
     }
-    const rateAttestation = validateV07AlignedV2ThroughputAttestation(
+    const rateAttestation = validateV07AlignedV2SupervisorThroughputAttestation(
         parseCanonicalJsonBytes(rateAttestationRaw, "aligned v2 throughput attestation"),
-        runnerConfig.throughput,
-        { mode: runnerConfig.mode, configRoot: runnerConfigRoot },
+        runnerConfig,
+        runnerConfigRoot,
     );
     const requestedPreparedBundle = resolve(repositoryRoot, parsed.preparedBundle);
     const budget = validateV07AlignedV2RunnerBudget(runnerConfig, definition);
@@ -3295,10 +3309,10 @@ async function main(): Promise<void> {
             parseCanonicalJsonBytes(currentRunnerConfigRaw, "current aligned v2 runner config"),
         );
         const currentRateAttestationRaw = readFileSync(rateAttestationPath);
-        const currentRateAttestation = validateV07AlignedV2ThroughputAttestation(
+        const currentRateAttestation = validateV07AlignedV2SupervisorThroughputAttestation(
             parseCanonicalJsonBytes(currentRateAttestationRaw, "current aligned v2 throughput attestation"),
-            currentRunnerConfig.throughput,
-            { mode: currentRunnerConfig.mode, configRoot: runnerConfigRoot },
+            currentRunnerConfig,
+            runnerConfigRoot,
         );
         const currentBudget = validateV07AlignedV2RunnerBudget(currentRunnerConfig, currentDefinition);
         const currentPreparedBundle = validateV07AlignedV2PreparedBundleLaunch({

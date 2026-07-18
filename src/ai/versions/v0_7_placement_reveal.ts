@@ -20,9 +20,12 @@ import {
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IPlacementContext } from "../ai_strategy";
+import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 
 /**
- * REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL=on, DEFAULT OFF). The historical A/B references
+ * REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL=on, DEFAULT OFF). Optional
+ * V07_PLACEMENT_REVEAL_VERSIONS is an exact comma-list seat scope; absent preserves the historical
+ * all-v0.7-family experiment behavior. The historical A/B references
  * untracked scratchpad preregistration/result files, so its reported numbers are diagnostic, not admissible
  * release evidence. Keep this experiment default-off until those artifacts and hashes are preserved.
  *
@@ -49,10 +52,12 @@ import type { IPlacementContext } from "../ai_strategy";
  */
 
 export const REVEAL_PLACEMENT_ENV = "V07_PLACEMENT_REVEAL";
+export const REVEAL_PLACEMENT_VERSIONS_ENV = "V07_PLACEMENT_REVEAL_VERSIONS";
 
-export const revealPlacementEnabled = (policy?: PlacementPolicyVariant): boolean =>
+export const revealPlacementEnabled = (policy?: PlacementPolicyVariant, strategyVersion?: string): boolean =>
     policy === undefined
-        ? process.env[REVEAL_PLACEMENT_ENV] === "on"
+        ? process.env[REVEAL_PLACEMENT_ENV] === "on" &&
+          strategyVersionMatchesExperimentScope(strategyVersion, process.env[REVEAL_PLACEMENT_VERSIONS_ENV])
         : policy === "legitimate-reveal" ||
           policy === "public-roster" ||
           policy === COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT;
@@ -80,8 +85,11 @@ function creatureIdForUnit(unit: Unit): number | undefined {
  * field even when it is an explicitly empty list; the legacy alias is only a compatibility fallback when the
  * new field is absent.
  */
-export function opponentCreatureIdsForPlacement(context: IPlacementContext): readonly number[] | undefined {
-    if (!revealPlacementEnabled(context.setupPlacementPolicy)) {
+export function opponentCreatureIdsForPlacement(
+    context: IPlacementContext,
+    strategyVersion?: string,
+): readonly number[] | undefined {
+    if (!revealPlacementEnabled(context.setupPlacementPolicy, strategyVersion)) {
         return undefined;
     }
     if (context.setupPlacementPolicy === undefined) return context.revealedOpponentCreatures;
@@ -285,8 +293,12 @@ export function enemyFieldsSplashAoe(context: IPlacementContext): boolean {
  * seat's legitimate reveals justify one heuristic; undefined in every other case (caller keeps today's
  * placement byte-identical).
  */
-export function revealConditionedPlacement(units: Unit[], context: IPlacementContext): Map<string, XY> | undefined {
-    const opponentCreatureIds = opponentCreatureIdsForPlacement(context);
+export function revealConditionedPlacement(
+    units: Unit[],
+    context: IPlacementContext,
+    strategyVersion?: string,
+): Map<string, XY> | undefined {
+    const opponentCreatureIds = opponentCreatureIdsForPlacement(context, strategyVersion);
     if (!opponentCreatureIds?.length || !units.length) {
         return undefined;
     }

@@ -147,6 +147,9 @@ export const V07_ALIGNED_V2_BEHAVIOR_ENV_EXACT = [
     "SIM_NO_ACTIONS",
     "SYNERGY_DUMP",
     "TEAM_WR_RANDOM",
+    "V07_AURA_CASTER_ROUTER_VERSIONS",
+    "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS",
+    "V07_PLACEMENT_REVEAL_VERSIONS",
     "VALUE_DATA",
     "VALUE_DATA_FEATURES",
 ] as const;
@@ -326,12 +329,13 @@ export function fingerprintV07AlignedV2CandidateGenome(genome: IV07AlignedV2Cand
     return fingerprintV07AlignedV2({ search, controls: normalized.controls });
 }
 
-export interface IV07AlignedV2CandidateBinding {
+/** Structural contract shared by preserved aligned protocol profiles. */
+export interface IAligned96hCandidateBinding {
     schemaVersion: 3;
-    candidate: "v0.7s";
-    candidateBase: "v0.7";
-    opponent: "v0.6";
-    profile: "candidate_scoped_aligned_controls_melee57_fixed_275";
+    candidate: string;
+    candidateBase: string;
+    opponent: string;
+    profile: string;
     genome: IV07AlignedV2CandidateGenome;
     genomeSha256: string;
     searchEnabled: boolean;
@@ -339,18 +343,37 @@ export interface IV07AlignedV2CandidateBinding {
     behaviorEnvironmentSha256: string;
 }
 
-/** Build the exact worker environment. auditPath is the only worker-local behavior value. */
+export interface IV07AlignedV2CandidateBinding extends IAligned96hCandidateBinding {
+    candidate: "v0.7s";
+    candidateBase: "v0.7";
+    opponent: "v0.6";
+    profile: "candidate_scoped_aligned_controls_melee57_fixed_275";
+}
+
+/**
+ * Build the exact worker environment. auditPath is the only worker-local behavior value. Omitting
+ * candidateVersion reproduces the historical v0.7s binding; an explicit version arms seat scopes for a
+ * derived candidate protocol such as v0.8s versus v0.7.
+ */
 export function buildV07AlignedV2CandidateEnvironment(
     genome: IV07AlignedV2CandidateGenome,
     auditPath: string,
+    candidateVersion?: string,
 ): Record<string, string> {
     if (!auditPath.trim()) throw new Error("auditPath must not be empty");
+    if (
+        candidateVersion !== undefined &&
+        (!candidateVersion || candidateVersion !== candidateVersion.trim() || candidateVersion.includes(","))
+    ) {
+        throw new Error("candidateVersion must be one exact, non-empty strategy version");
+    }
     const normalized = normalizeV07AlignedV2CandidateGenome(genome);
     const { search, controls } = normalized;
     const searchEnabled = search.leafMode !== "off";
+    const effectiveCandidateVersion = candidateVersion ?? "v0.7s";
     return stableEnvironment({
         V07_SEARCH: searchEnabled ? "1" : "0",
-        SEARCH_VERSIONS: "v0.7s",
+        SEARCH_VERSIONS: effectiveCandidateVersion,
         SEARCH_GATE: String(search.gate),
         SEARCH_HORIZON: String(search.horizon),
         SEARCH_ROLLOUTS: String(search.rollouts),
@@ -369,7 +392,7 @@ export function buildV07AlignedV2CandidateEnvironment(
         SEARCH_LATE_RANGED_FINISH_WEIGHT: String(controls.lateRangedFinishWeight),
         SEARCH_PURE_RANGED_TERMINAL_WEIGHT: String(controls.pureRangedTerminalWeight),
         V06_MELEE_DIMS: controls.meleeRangedTargetWeight === 0 ? "" : `0,${controls.meleeRangedTargetWeight}`,
-        V06_MELEE_DIMS_VERSIONS: controls.meleeRangedTargetWeight === 0 ? "" : "v0.7s",
+        V06_MELEE_DIMS_VERSIONS: controls.meleeRangedTargetWeight === 0 ? "" : effectiveCandidateVersion,
         V07_PLACEMENT_REVEAL: controls.placementReveal ? "on" : "off",
         V07_DENSE_MM_SALVAGE_ISOLATION: controls.denseMeleeMagicIsolation ? "1" : "0",
         V07_AURA_CASTER_ROUTER: controls.auraCasterMode === "off" ? "off" : "on",
@@ -379,6 +402,13 @@ export function buildV07AlignedV2CandidateEnvironment(
                 : controls.auraCasterMode === "resurrection_windflow"
                   ? "resurrection,windflow"
                   : "",
+        ...(candidateVersion === undefined
+            ? {}
+            : {
+                  V07_PLACEMENT_REVEAL_VERSIONS: effectiveCandidateVersion,
+                  V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS: effectiveCandidateVersion,
+                  V07_AURA_CASTER_ROUTER_VERSIONS: effectiveCandidateVersion,
+              }),
         ...(search.leafMode === "material" ? { V07_VALUE_WEIGHTS: "material" } : {}),
         ...(search.leafMode === "model" && search.leaf ? { V07_VALUE_WEIGHTS_V2: JSON.stringify(search.leaf) } : {}),
         Q2_ORACLE: "0",
@@ -798,11 +828,22 @@ export function validateV07AlignedV2CheckpointPanelBinding(value: unknown): IV07
 function buildCheckpointShardSpecs(options: {
     runFingerprint: string;
     panel: IV07AlignedV2CheckpointPanelBinding;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: IAligned96hCandidateBinding;
     tasks: readonly IV07AlignedV2TaskIdentity[];
     maxScenarioPairsPerShard: number;
 }): IV07AlignedV2CheckpointShardSpec[] {
-    validateV07AlignedV2CandidateBinding(options.binding);
+    if (
+        options.binding.schemaVersion !== 3 ||
+        !options.binding.candidate.trim() ||
+        !options.binding.candidateBase.trim() ||
+        !options.binding.opponent.trim() ||
+        options.binding.candidate === options.binding.opponent ||
+        typeof options.binding.searchEnabled !== "boolean"
+    ) {
+        throw new Error("aligned checkpoint candidate binding identity is invalid");
+    }
+    requireSha256(options.binding.genomeSha256, "binding.genomeSha256");
+    requireSha256(options.binding.behaviorEnvironmentSha256, "binding.behaviorEnvironmentSha256");
     validateV07AlignedV2CheckpointPanelBinding(options.panel);
     requireSha256(options.runFingerprint, "runFingerprint");
     if (!Number.isSafeInteger(options.maxScenarioPairsPerShard) || options.maxScenarioPairsPerShard < 1) {
@@ -878,6 +919,17 @@ export function buildV07AlignedV2CheckpointShardSpecs(options: {
     runFingerprint: string;
     seedPlan: IV07AlignedV2InjectedSeedPlan;
     binding: IV07AlignedV2CandidateBinding;
+    maxScenarioPairsPerShard: number;
+}): IV07AlignedV2CheckpointShardSpec[] {
+    validateV07AlignedV2CandidateBinding(options.binding);
+    return buildAligned96hCheckpointShardSpecs(options);
+}
+
+/** Shared v0.7 geometry/checkpoint partition after the caller strictly validates its versioned binding. */
+export function buildAligned96hCheckpointShardSpecs(options: {
+    runFingerprint: string;
+    seedPlan: IV07AlignedV2InjectedSeedPlan;
+    binding: IAligned96hCandidateBinding;
     maxScenarioPairsPerShard: number;
 }): IV07AlignedV2CheckpointShardSpec[] {
     const executionTasks = flattenV07AlignedV2SeedPlan(options.seedPlan);

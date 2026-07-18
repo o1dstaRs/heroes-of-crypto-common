@@ -14,7 +14,11 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 
-import { readV07AlignedV2AuditAppend, type IV07AlignedV2BattleRecord } from "./v0_7_aligned_96h_v2_game_adapter";
+import {
+    readV07AlignedV2AuditAppend,
+    type IAligned96hBattleRecord,
+    type IV07AlignedV2BattleRecord,
+} from "./v0_7_aligned_96h_v2_game_adapter";
 import {
     aggregateV07AlignedV2,
     defaultV07AlignedV2DryRunConfig,
@@ -25,6 +29,7 @@ import {
 import { buildV07AlignedV2ProductionIncumbentGenome } from "./v0_7_aligned_96h_v2_catalog";
 import {
     bindV07AlignedV2Candidate,
+    buildAligned96hCheckpointShardSpecs,
     buildV07AlignedV2CandidateEnvironment,
     buildV07AlignedV2CheckpointShardSpecs,
     buildV07AlignedV2SyntheticPreflightShardSpecs,
@@ -39,6 +44,7 @@ import {
     V07_ALIGNED_V2_BEHAVIOR_ENV_EXACT,
     V07_ALIGNED_V2_BEHAVIOR_ENV_PREFIXES,
     V07_ALIGNED_V2_FORBIDDEN_RUNTIME_ENV,
+    type IAligned96hCandidateBinding,
     type IV07AlignedV2CandidateBinding,
     type IV07AlignedV2CandidateGenome,
     type IV07AlignedV2Checkpoint,
@@ -47,6 +53,14 @@ import {
     type IV07AlignedV2InjectedSeedPlan,
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
+import { V08_ALIGNED_96H_V1_VERSION_PROFILE, assertAligned96hVersionProfile } from "./aligned_96h_version_profile";
+import {
+    buildV08AlignedV1CandidateEnvironment,
+    canonicalV08AlignedV1Json,
+    fingerprintV08AlignedV1,
+    validateV08AlignedV1CandidateBinding,
+    type IV08AlignedV1CandidateBinding,
+} from "./v0_8_aligned_96h_v1_protocol";
 
 const WORKER_GRACEFUL_STOP_TIMEOUT_MS = 5_000;
 const WORKER_SIGTERM_TIMEOUT_MS = 5_000;
@@ -64,14 +78,31 @@ export interface IV07AlignedV2WorkerAttestation {
     auditPath: string;
 }
 
-export interface IV07AlignedV2ShardEvaluation {
+export interface IV08AlignedV1WorkerAttestation extends IV07AlignedV2WorkerAttestation {
+    artifactKind: "v0_8_aligned_96h_v1_worker_attestation";
+    versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+}
+
+export type Aligned96hCandidateBinding = IV07AlignedV2CandidateBinding | IV08AlignedV1CandidateBinding;
+
+export type Aligned96hWorkerAttestation<Binding extends Aligned96hCandidateBinding> =
+    Binding extends IV08AlignedV1CandidateBinding ? IV08AlignedV1WorkerAttestation : IV07AlignedV2WorkerAttestation;
+
+export interface IAligned96hShardEvaluation<Binding extends Aligned96hCandidateBinding> {
     shard: IV07AlignedV2CheckpointShardSpec;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: Binding;
     checkpoint: IV07AlignedV2Checkpoint;
-    records: IV07AlignedV2BattleRecord[];
-    attestations: IV07AlignedV2WorkerAttestation[];
+    records: IAligned96hBattleRecord<Binding>[];
+    attestations: Aligned96hWorkerAttestation<Binding>[];
     auditArtifacts: IV07AlignedV2WorkerAuditArtifact[];
 }
+
+export interface IV07AlignedV2ShardEvaluation extends IAligned96hShardEvaluation<IV07AlignedV2CandidateBinding> {
+    records: IV07AlignedV2BattleRecord[];
+    attestations: IV07AlignedV2WorkerAttestation[];
+}
+
+export type IV08AlignedV1ShardEvaluation = IAligned96hShardEvaluation<IV08AlignedV1CandidateBinding>;
 
 export interface IV07AlignedV2WorkerAuditArtifact {
     workerIndex: number;
@@ -83,15 +114,102 @@ export interface IV07AlignedV2WorkerAuditArtifact {
     rows: number;
 }
 
-export interface IV07AlignedV2ShardEvaluationOptions {
+export interface IAligned96hShardEvaluationOptions<Binding extends Aligned96hCandidateBinding> {
     shard: IV07AlignedV2CheckpointShardSpec;
     seedPlan: IV07AlignedV2InjectedSeedPlan;
-    binding: IV07AlignedV2CandidateBinding;
+    binding: Binding;
     workers: number;
     auditDirectory: string;
     sourceEnvironment?: NodeJS.ProcessEnv;
     deadlineAtMs?: number;
     onWorkerStarted?: () => void;
+}
+
+export type IV07AlignedV2ShardEvaluationOptions = IAligned96hShardEvaluationOptions<IV07AlignedV2CandidateBinding>;
+
+export type IV08AlignedV1ShardEvaluationOptions = IAligned96hShardEvaluationOptions<IV08AlignedV1CandidateBinding>;
+
+export function validateAligned96hCandidateBinding(binding: IAligned96hCandidateBinding): Aligned96hCandidateBinding {
+    if (binding.candidate === "v0.7s") {
+        return validateV07AlignedV2CandidateBinding(binding as IV07AlignedV2CandidateBinding);
+    }
+    if (binding.candidate === "v0.8s") {
+        return validateV08AlignedV1CandidateBinding(binding as IV08AlignedV1CandidateBinding);
+    }
+    throw new Error(`unsupported aligned candidate binding ${binding.candidate}`);
+}
+
+export function aligned96hCandidateVersions(binding: IAligned96hCandidateBinding): {
+    candidate: string;
+    candidateBase: string;
+    opponent: string;
+} {
+    const validated = validateAligned96hCandidateBinding(binding);
+    return {
+        candidate: validated.candidate,
+        candidateBase: validated.candidateBase,
+        opponent: validated.opponent,
+    };
+}
+
+export function buildAligned96hCandidateEnvironment(
+    binding: IAligned96hCandidateBinding,
+    auditPath: string,
+): Record<string, string> {
+    const validated = validateAligned96hCandidateBinding(binding);
+    return validated.candidate === "v0.8s"
+        ? buildV08AlignedV1CandidateEnvironment(validated.genome, auditPath)
+        : buildV07AlignedV2CandidateEnvironment(validated.genome, auditPath);
+}
+
+export function aligned96hWorkerMarker(
+    binding: IAligned96hCandidateBinding,
+): "v0_7_aligned_96h_v2_worker" | "v0_8_aligned_96h_v1_worker" {
+    return validateAligned96hCandidateBinding(binding).candidate === "v0.8s"
+        ? "v0_8_aligned_96h_v1_worker"
+        : "v0_7_aligned_96h_v2_worker";
+}
+
+export function canonicalAligned96hJson(binding: Aligned96hCandidateBinding, value: unknown): string {
+    return binding.candidate === "v0.8s" ? canonicalV08AlignedV1Json(value) : canonicalV07AlignedV2Json(value);
+}
+
+export function fingerprintAligned96h(binding: Aligned96hCandidateBinding, value: unknown): string {
+    return binding.candidate === "v0.8s" ? fingerprintV08AlignedV1(value) : fingerprintV07AlignedV2(value);
+}
+
+export function validateAligned96hWorkerAttestation<Binding extends Aligned96hCandidateBinding>(
+    binding: Binding,
+    attestation: IV07AlignedV2WorkerAttestation | IV08AlignedV1WorkerAttestation,
+): Aligned96hWorkerAttestation<Binding> {
+    const validated = validateAligned96hCandidateBinding(binding);
+    if (validated.candidate === "v0.7s") {
+        if ("artifactKind" in attestation || "versionProfile" in attestation) {
+            throw new Error("v0.7 aligned worker attestation contains a foreign version marker");
+        }
+        return attestation as Aligned96hWorkerAttestation<Binding>;
+    }
+    if (
+        !("artifactKind" in attestation) ||
+        attestation.artifactKind !== "v0_8_aligned_96h_v1_worker_attestation" ||
+        !("versionProfile" in attestation)
+    ) {
+        throw new Error("v0.8 aligned worker attestation omits its exact version marker");
+    }
+    assertAligned96hVersionProfile(attestation.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+    return attestation as Aligned96hWorkerAttestation<Binding>;
+}
+
+function attestationMatchesAligned96hVersion(
+    binding: Aligned96hCandidateBinding,
+    attestation: IV07AlignedV2WorkerAttestation | IV08AlignedV1WorkerAttestation,
+): boolean {
+    try {
+        validateAligned96hWorkerAttestation(binding, attestation);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function decodeUtf8Exact(bytes: Buffer, label: string): string {
@@ -105,7 +223,7 @@ function decodeUtf8Exact(bytes: Buffer, label: string): string {
     return decoded;
 }
 
-function workerBaseEnvironment(source: NodeJS.ProcessEnv): Record<string, string> {
+export function alignedV2WorkerBaseEnvironment(source: NodeJS.ProcessEnv): Record<string, string> {
     const forbidden = new Set<string>(V07_ALIGNED_V2_FORBIDDEN_RUNTIME_ENV);
     const exact = new Set<string>(V07_ALIGNED_V2_BEHAVIOR_ENV_EXACT);
     const environment = Object.fromEntries(
@@ -114,6 +232,7 @@ function workerBaseEnvironment(source: NodeJS.ProcessEnv): Record<string, string
                 entry[1] !== undefined &&
                 !forbidden.has(entry[0]) &&
                 !exact.has(entry[0]) &&
+                !entry[0].startsWith("V08_") &&
                 !V07_ALIGNED_V2_BEHAVIOR_ENV_PREFIXES.some((prefix) => entry[0].startsWith(prefix)),
         ),
     );
@@ -121,9 +240,11 @@ function workerBaseEnvironment(source: NodeJS.ProcessEnv): Record<string, string
     return environment;
 }
 
-function validateShardRequest(options: IV07AlignedV2ShardEvaluationOptions): IV07AlignedV2ExecutionTask[] {
+function validateShardRequest<Binding extends Aligned96hCandidateBinding>(
+    options: IAligned96hShardEvaluationOptions<Binding>,
+): IV07AlignedV2ExecutionTask[] {
     validateV07AlignedV2CheckpointShardSpec(options.shard);
-    validateV07AlignedV2CandidateBinding(options.binding);
+    const binding = validateAligned96hCandidateBinding(options.binding);
     if (!Number.isSafeInteger(options.workers) || options.workers < 1) {
         throw new RangeError("aligned v2 shard workers must be a positive integer");
     }
@@ -134,12 +255,20 @@ function validateShardRequest(options: IV07AlignedV2ShardEvaluationOptions): IV0
     ) {
         throw new Error("aligned v2 shard deadlineAtMs must be a nonnegative safe integer");
     }
-    const expectedShards = buildV07AlignedV2CheckpointShardSpecs({
-        runFingerprint: options.shard.runFingerprint,
-        seedPlan: options.seedPlan,
-        binding: options.binding,
-        maxScenarioPairsPerShard: options.shard.maxScenarioPairsPerShard,
-    });
+    const expectedShards =
+        binding.candidate === "v0.8s"
+            ? buildAligned96hCheckpointShardSpecs({
+                  runFingerprint: options.shard.runFingerprint,
+                  seedPlan: options.seedPlan,
+                  binding,
+                  maxScenarioPairsPerShard: options.shard.maxScenarioPairsPerShard,
+              })
+            : buildV07AlignedV2CheckpointShardSpecs({
+                  runFingerprint: options.shard.runFingerprint,
+                  seedPlan: options.seedPlan,
+                  binding,
+                  maxScenarioPairsPerShard: options.shard.maxScenarioPairsPerShard,
+              });
     const expectedShard = expectedShards[options.shard.shardIndex];
     if (!expectedShard || canonicalV07AlignedV2Json(expectedShard) !== canonicalV07AlignedV2Json(options.shard)) {
         throw new Error("aligned v2 shard is not the deterministic partition of its exact injected seed plan");
@@ -150,9 +279,9 @@ function validateShardRequest(options: IV07AlignedV2ShardEvaluationOptions): IV0
     );
 }
 
-export function snapshotV07AlignedV2ShardEvaluationOptions(
-    options: IV07AlignedV2ShardEvaluationOptions,
-): IV07AlignedV2ShardEvaluationOptions & { sourceEnvironment: NodeJS.ProcessEnv } {
+export function snapshotV07AlignedV2ShardEvaluationOptions<Binding extends Aligned96hCandidateBinding>(
+    options: IAligned96hShardEvaluationOptions<Binding>,
+): IAligned96hShardEvaluationOptions<Binding> & { sourceEnvironment: NodeJS.ProcessEnv } {
     const sourceEnvironment = options.sourceEnvironment ?? process.env;
     return {
         shard: structuredClone(options.shard),
@@ -170,18 +299,18 @@ export function snapshotV07AlignedV2ShardEvaluationOptions(
  * Execute one already-preregistered shard. This function never derives seeds and
  * has no CLI entry point; callers must inject the complete validated seed plan.
  */
-export async function evaluateV07AlignedV2Shard(
-    options: IV07AlignedV2ShardEvaluationOptions,
-): Promise<IV07AlignedV2ShardEvaluation> {
+export async function evaluateV07AlignedV2Shard<Binding extends Aligned96hCandidateBinding>(
+    options: IAligned96hShardEvaluationOptions<Binding>,
+): Promise<IAligned96hShardEvaluation<Binding>> {
     const input = snapshotV07AlignedV2ShardEvaluationOptions(options);
     const tasks = validateShardRequest(input);
     await mkdir(input.auditDirectory, { recursive: true });
     const workerCount = Math.min(input.workers, tasks.length);
     const workers = new Set<ChildProcess>();
-    const records = new Map<string, IV07AlignedV2BattleRecord>();
+    const records = new Map<string, IAligned96hBattleRecord<Binding>>();
     const observations = new Map<string, IV07AlignedV2GameObservation>();
     const expectedTasks = new Map(tasks.map((task) => [v07AlignedV2TaskKey(task), task]));
-    const attestations: IV07AlignedV2WorkerAttestation[] = [];
+    const attestations: Aligned96hWorkerAttestation<Binding>[] = [];
     const workerTaskKeys = new Map<number, string[]>();
     const readyWorkers = new Set<ChildProcess>();
     const stoppingWorkers = new Set<ChildProcess>();
@@ -192,7 +321,7 @@ export async function evaluateV07AlignedV2Shard(
     let cleanupPromise: Promise<void> | null = null;
     let cleanupExitCheck: (() => void) | null = null;
 
-    return new Promise<IV07AlignedV2ShardEvaluation>((resolvePromise, rejectPromise) => {
+    return new Promise<IAligned96hShardEvaluation<Binding>>((resolvePromise, rejectPromise) => {
         const cleanup = (): Promise<void> => {
             if (cleanupPromise) return cleanupPromise;
             if (deadlineTimer !== null) clearTimeout(deadlineTimer);
@@ -299,7 +428,7 @@ export async function evaluateV07AlignedV2Shard(
                         rows: parsed.rows.length,
                     };
                 });
-                const result: IV07AlignedV2ShardEvaluation = {
+                const result: IAligned96hShardEvaluation<Binding> = {
                     shard: input.shard,
                     binding: input.binding,
                     checkpoint,
@@ -325,11 +454,12 @@ export async function evaluateV07AlignedV2Shard(
                 input.auditDirectory,
                 `shard-${input.shard.shardIndex}-worker-${workerIndex}.jsonl`,
             );
-            const behaviorEnvironment = buildV07AlignedV2CandidateEnvironment(input.binding.genome, auditPath);
-            const environmentSha256 = fingerprintV07AlignedV2(behaviorEnvironment);
+            const validatedBinding = validateAligned96hCandidateBinding(input.binding);
+            const behaviorEnvironment = buildAligned96hCandidateEnvironment(validatedBinding, auditPath);
+            const environmentSha256 = fingerprintAligned96h(validatedBinding, behaviorEnvironment);
             const expectedRemovedEnvironmentKeys = Object.keys(behaviorEnvironment).sort();
             const environment = {
-                ...workerBaseEnvironment(input.sourceEnvironment),
+                ...alignedV2WorkerBaseEnvironment(input.sourceEnvironment),
                 ...behaviorEnvironment,
             };
             let worker: ChildProcess;
@@ -353,9 +483,9 @@ export async function evaluateV07AlignedV2Shard(
                 "message",
                 (message: {
                     type: "ready" | "result" | "error" | "stopped";
-                    attestation?: IV07AlignedV2WorkerAttestation;
+                    attestation?: IV07AlignedV2WorkerAttestation | IV08AlignedV1WorkerAttestation;
                     taskKey?: string;
-                    record?: IV07AlignedV2BattleRecord;
+                    record?: IAligned96hBattleRecord<Binding>;
                     observation?: IV07AlignedV2GameObservation;
                     error?: string;
                 }) => {
@@ -382,15 +512,16 @@ export async function evaluateV07AlignedV2Shard(
                             message.attestation.genomeSha256 !== input.shard.genomeSha256 ||
                             message.attestation.behaviorEnvironmentSha256 !== input.shard.behaviorEnvironmentSha256 ||
                             message.attestation.environmentSha256 !== environmentSha256 ||
-                            canonicalV07AlignedV2Json(message.attestation.removedEnvironmentKeys) !==
-                                canonicalV07AlignedV2Json(expectedRemovedEnvironmentKeys) ||
+                            canonicalAligned96hJson(validatedBinding, message.attestation.removedEnvironmentKeys) !==
+                                canonicalAligned96hJson(validatedBinding, expectedRemovedEnvironmentKeys) ||
                             message.attestation.transpilerCacheDisabled !== "0" ||
-                            message.attestation.auditPath !== auditPath
+                            message.attestation.auditPath !== auditPath ||
+                            !attestationMatchesAligned96hVersion(validatedBinding, message.attestation)
                         ) {
                             fail(new Error("aligned v2 worker attestation does not match its shard"));
                             return;
                         }
-                        attestations.push(message.attestation);
+                        attestations.push(message.attestation as Aligned96hWorkerAttestation<Binding>);
                         readyWorkers.add(worker);
                         if (readyWorkers.size === workerCount) {
                             poolStarted = true;
@@ -453,7 +584,7 @@ export async function evaluateV07AlignedV2Shard(
                 worker.send({
                     type: "initialize",
                     data: {
-                        marker: "v0_7_aligned_96h_v2_worker",
+                        marker: aligned96hWorkerMarker(input.binding),
                         workerIndex,
                         runFingerprint: input.shard.runFingerprint,
                         auditPath,

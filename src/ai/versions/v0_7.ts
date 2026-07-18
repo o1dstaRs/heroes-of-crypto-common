@@ -21,6 +21,7 @@ import {
     routeUniversalCasterWithPolicy,
     V07_CASTER_ROUTER_POLICY,
 } from "./caster_router";
+import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
 import { revealConditionedPlacement } from "./v0_7_placement_reveal";
@@ -64,7 +65,17 @@ interface IV07ArmyProfile {
     meleeMagicAnchor: boolean;
 }
 
-const denseMeleeMagicIsolationEnabled = (): boolean => process.env.V07_DENSE_MM_SALVAGE_ISOLATION === "1";
+export const DENSE_MELEE_MAGIC_ISOLATION_VERSIONS_ENV = "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS";
+export const AURA_CASTER_ROUTER_VERSIONS_ENV = "V07_AURA_CASTER_ROUTER_VERSIONS";
+
+/** Candidate-only scope is optional so historical one-seat experiments keep their original behavior. */
+export const denseMeleeMagicIsolationEnabled = (strategyVersion?: string): boolean =>
+    process.env.V07_DENSE_MM_SALVAGE_ISOLATION === "1" &&
+    strategyVersionMatchesExperimentScope(strategyVersion, process.env[DENSE_MELEE_MAGIC_ISOLATION_VERSIONS_ENV]);
+
+export const auraCasterRouterEnabled = (strategyVersion?: string): boolean =>
+    process.env.V07_AURA_CASTER_ROUTER === "on" &&
+    strategyVersionMatchesExperimentScope(strategyVersion, process.env[AURA_CASTER_ROUTER_VERSIONS_ENV]);
 
 /**
  * W17 gaps #2/#3 (V07_CASTER_EXTRA, default OFF): extra caster-router tokens layered onto the shipped S3
@@ -104,8 +115,8 @@ function casterPolicyWithExtras(version: string): ICasterRouterPolicy {
     };
 }
 
-function auraCasterRouterPolicy(): ICasterRouterPolicy | undefined {
-    if (process.env.V07_AURA_CASTER_ROUTER !== "on") {
+function auraCasterRouterPolicy(strategyVersion?: string): ICasterRouterPolicy | undefined {
+    if (!auraCasterRouterEnabled(strategyVersion)) {
         return undefined;
     }
     const scope = process.env.V07_AURA_CASTER_SPELLS ?? "resurrection,windflow";
@@ -165,7 +176,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
         const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
         if (profile?.auraSaturated) {
             const incumbent = this.archetypeAnchor.decideTurn(unit, context);
-            const policy = auraCasterRouterPolicy();
+            const policy = auraCasterRouterPolicy(this.version);
             const decision = policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
             return normalizeMeleeMagicSelection(unit, decision);
         }
@@ -187,7 +198,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
         // policy selects either partial pick-phase reveals or the full placement-public roster. The measured
         // archetype anchors above keep precedence; gate off / no public information / no relevant threat leaves
         // today's placement byte-identical (see v0_7_placement_reveal.ts).
-        const revealPlaced = revealConditionedPlacement(units, context);
+        const revealPlaced = revealConditionedPlacement(units, context, this.version);
         if (revealPlaced) {
             return revealPlaced;
         }
@@ -215,7 +226,11 @@ export class StrategyV0_7 extends StrategyV0_6 {
         const profile = this.armyProfile(context.unitsHolder, unit.getTeam());
         // A late takeover has no trustworthy initial-roster classifier input. Keep the incumbent v0.6 action
         // rather than applying the scorer outside a known profile; guarded caster salvage ran before this seam.
-        if (!profile || profile.meleeMagicAnchor || (profile.denseMeleeMagic && denseMeleeMagicIsolationEnabled())) {
+        if (
+            !profile ||
+            profile.meleeMagicAnchor ||
+            (profile.denseMeleeMagic && denseMeleeMagicIsolationEnabled(this.version))
+        ) {
             return decision;
         }
         // Action-aware V3 is research-only and initially owns RANGE actors only. Other classes continue
