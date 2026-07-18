@@ -10,3 +10,4 @@ tsconfig.build.tsbuildinfo
 
 # AI battle-engine tournament outputs
 sim-out/
+sim-out-*/
