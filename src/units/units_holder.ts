@@ -568,7 +568,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_NON_PRIMARY_PERCENT);
                     break;
                 case Tier2Artifact.FARSIGHT_QUIVER:
-                    applyArtifactBuff("Farsight Quiver", 0);
+                    applyArtifactBuff("Farsight Quiver", AP.FARSIGHT_QUIVER_RANGE_PERCENT);
                     break;
                 case Tier2Artifact.TOME_OF_AMPLIFICATION:
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);

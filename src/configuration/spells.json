@@ -383,7 +383,7 @@
         "Warlords Edge": {
             "name": "Warlords Edge",
             "level": 0,
-            "desc": ["Artifact. Increases the army's attack by {}%.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Grants the whole army an additional {}% attack.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -400,7 +400,10 @@
         "Titan Plate": {
             "name": "Titan Plate",
             "level": 0,
-            "desc": ["Artifact. Increases the army's defense by {}%.", "Lasts till the end of the fight."],
+            "desc": [
+                "Artifact. Grants the whole army an additional {}% defense (melee and ranged).",
+                "Lasts till the end of the fight."
+            ],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -580,7 +583,7 @@
             "name": "Farsight Quiver",
             "level": 0,
             "desc": [
-                "Artifact. Allied archers shoot at full arrow (no distance penalty).",
+                "Artifact. Extends allied archers' basic shot range by an additional {}%.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

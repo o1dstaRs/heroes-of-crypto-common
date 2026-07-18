@@ -99,8 +99,8 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
 export const ARTIFACT_POWER = {
     VETERAN_HELM_PERCENT: 4,
-    WARLORDS_EDGE_PERCENT: 15,
-    TITAN_PLATE_PERCENT: 15,
+    WARLORDS_EDGE_PERCENT: 12,
+    TITAN_PLATE_PERCENT: 12,
     KEEN_BLADE_FLAT: 0.7,
     IRON_PLATE_FLAT: 0.7,
     BERSERKERS_BOND_FLAT: 3,
@@ -126,6 +126,9 @@ export const ARTIFACT_POWER = {
     RIME_PROC_PERCENT: 30,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
+    // Farsight Quiver extends an archer's BASIC shot range by this % (additive off base shot_distance; it
+    // pushes the range-falloff threshold out rather than removing falloff, and does NOT compound with Sniper Augment).
+    FARSIGHT_QUIVER_RANGE_PERCENT: 50,
     TOME_BUFF_POWER_PERCENT: 50,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
     WOUNDING_CHARM_DEEP_WOUNDS_PERCENT: 50,
@@ -272,14 +275,14 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "warlords_edge",
         "Warlord's Edge",
         "Warlords Edge",
-        "Increases the army's attack by {}%.",
+        "Grants the whole army an additional {}% attack.",
     ),
     [Tier2Artifact.TITAN_PLATE]: t2(
         Tier2Artifact.TITAN_PLATE,
         "titan_plate",
         "Titan Plate",
         "Titan Plate",
-        "Increases the army's defense by {}%.",
+        "Grants the whole army an additional {}% defense (melee and ranged).",
     ),
     [Tier2Artifact.HOLY_CROSS]: t2(
         Tier2Artifact.HOLY_CROSS,
@@ -321,7 +324,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "farsight_quiver",
         "Farsight Quiver",
         "Farsight Quiver",
-        "All allied archers shoot at full arrow (no distance penalty).",
+        "Extends all allied archers' basic shot range by an additional {}%.",
     ),
     [Tier2Artifact.BERSERKERS_BOND]: t2(
         Tier2Artifact.BERSERKERS_BOND,
@@ -358,7 +361,7 @@ export const getTier2ArtifactProperties = (id: Tier2Artifact): ArtifactPropertie
 
 // Concrete power values (in order) that fill each description's placeholders: `{}` = first value,
 // `[]` = second value. Keyed by slug so it spans both tiers. Sourced from ARTIFACT_POWER — keep in sync
-// if a power constant changes. Artifacts with no numeric effect (farsight_quiver, lava_striders) are omitted.
+// if a power constant changes. Artifacts with no numeric effect (lava_striders) are omitted.
 const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
@@ -375,6 +378,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],
+    farsight_quiver: [AP.FARSIGHT_QUIVER_RANGE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
     clover_of_fortune: [AP.CLOVER_LUCK],
     crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE],

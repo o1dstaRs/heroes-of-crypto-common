@@ -1142,11 +1142,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
         // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
         // unless a caller explicitly wants to extend it.
-        if (
-            chanceToBreak > 0 &&
-            (extendBreak || !this.hasEffectActive("Break")) &&
-            getRandomInt(0, 100) < Math.min(chanceToBreak, 100)
-        ) {
+        // The break RNG is drawn ONCE (only when a break is actually possible), then used for both the live
+        // decision and the diagnostic below — so the two can never disagree, and production's draw count is
+        // unchanged (the draw still happens iff chance>0 and the unit isn't already Broken / we're extending).
+        const breakPossible = chanceToBreak > 0 && (extendBreak || !this.hasEffectActive("Break"));
+        const breakRoll = breakPossible ? getRandomInt(0, 100) : -1;
+
+        // Diagnostic (env-gated, off by default): trace every break-on-attack decision so a live ranked game
+        // can show whether Break was even ATTEMPTED (chance>0 => the attacker's team really has Broken Aegis /
+        // Chaos BREAK_ON_ATTACK), the exact RNG roll, and the outcome. Answers "break didn't apply to X":
+        // chance=0 => seeding gap; roll>=chance => just RNG; applied=true => it worked (a VFX/log gap, not a
+        // mechanics bug). Magic immunity is intentionally irrelevant here — see break_magic_immunity.test.
+        if (typeof process !== "undefined" && process.env?.HOC_BREAK_DEBUG === "1") {
+            console.warn(
+                `[BREAK-DEBUG] target=${this.getName()} magicResist=${this.getMagicResist()} ` +
+                    `chance=${chanceToBreak} alreadyBroken=${this.hasEffectActive("Break")} roll=${breakRoll} ` +
+                    `applied=${breakPossible && breakRoll < Math.min(chanceToBreak, 100)}`,
+            );
+        }
+        if (breakPossible && breakRoll < Math.min(chanceToBreak, 100)) {
             const breakEffect = this.effectFactory.makeEffect("Break");
             if (breakEffect) {
                 if (extendBreak) {
@@ -2223,12 +2237,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // ARTIFACTS: armor / defense. NOTE: Veteran Helm is applied later as an ADDITIONAL stat (armor_mod),
         // not folded into base_armor — see the armor_mod section below.
+        // Titan Plate: +% defense as an ADDITIONAL stat (armor_mod), not folded into base_armor — so it never
+        // compounds with the armor multiplier or other % defense buffs, and (feeding armor_mod) it guards melee
+        // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
         const titanPlateBuff = this.getBuff("Titan Plate");
-        if (titanPlateBuff) {
-            this.unitProperties.base_armor += Number(
-                ((this.unitProperties.base_armor / 100) * ampArtifact(titanPlateBuff.getPower())).toFixed(2),
-            );
-        }
+        const titanPlateArmorBonus = titanPlateBuff
+            ? Number(((this.unitProperties.base_armor / 100) * ampArtifact(titanPlateBuff.getPower())).toFixed(2))
+            : 0;
         const ironPlateBuff = this.getBuff("Iron Plate");
         if (ironPlateBuff) {
             this.unitProperties.base_armor += ampArtifact(ironPlateBuff.getPower());
@@ -2313,6 +2328,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod += Number(
                 ((this.unitProperties.base_armor / 100) * ampArtifact(veteranHelmArmorBuff.getPower())).toFixed(2),
             );
+        }
+
+        // Titan Plate's +% defense (captured pre-multiplier above) lands here as an additional armor_mod, exactly
+        // like Veteran Helm — additive off base, non-compounding, guarding melee + ranged.
+        if (titanPlateArmorBonus) {
+            this.unitProperties.armor_mod = Number((this.unitProperties.armor_mod + titanPlateArmorBonus).toFixed(2));
         }
 
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
@@ -2475,6 +2496,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
+        // ARTIFACT Farsight Quiver: extend an archer's BASIC shot range by +% as an ADDITIONAL modifier. Added
+        // off the INITIAL shot_distance (not the Sniper-Augment-boosted value above), so it doesn't compound with
+        // Sniper Augment. This pushes out the range-falloff threshold (attack_handler.getRangeAttackDivisor)
+        // rather than removing falloff entirely (which is what it used to do).
+        const farsightQuiverBuff = this.getBuff("Farsight Quiver");
+        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
+            this.unitProperties.shot_distance += Number(
+                ((this.initialUnitProperties.shot_distance / 100) * ampArtifact(farsightQuiverBuff.getPower())).toFixed(
+                    2,
+                ),
+            );
+        }
+
         // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
         const keenBladeBuff = this.getBuff("Keen Blade");
         if (keenBladeBuff) {
@@ -2485,12 +2519,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.base_attack += ampArtifact(berserkersBondAttackBuff.getPower());
         }
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
+        // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
+        // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
+        // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
         const warlordsEdgeBuff = this.getBuff("Warlords Edge");
-        if (warlordsEdgeBuff) {
-            this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * ampArtifact(warlordsEdgeBuff.getPower())).toFixed(2),
-            );
-        }
+        const warlordsEdgeAttackBonus = warlordsEdgeBuff
+            ? Number(((this.unitProperties.base_attack / 100) * ampArtifact(warlordsEdgeBuff.getPower())).toFixed(2))
+            : 0;
         const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.
@@ -2550,7 +2585,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // Veteran Helm is a DEFENSE-ONLY artifact (see the armor_mod block above); it grants no attack.
 
-        this.unitProperties.attack_mod = Number(this.unitProperties.attack_mod.toFixed(2));
+        // Warlord's Edge's +% attack (captured pre-aura above) lands here as an additional attack_mod — additive
+        // off base, non-compounding, surviving the Riot/Weakness attack_mod overwrites; getAttack = base + mod.
+        this.unitProperties.attack_mod = Number((this.unitProperties.attack_mod + warlordsEdgeAttackBonus).toFixed(2));
         this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));
         this.unitProperties.shot_distance = Number(this.unitProperties.shot_distance.toFixed(2));
 

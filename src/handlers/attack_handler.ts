@@ -99,8 +99,10 @@ export class AttackHandler {
     public getRangeAttackDivisor(attackerUnit: Unit, attackPosition: HoCMath.XY): number {
         let rangeAttackDivisor = 1;
 
-        // ARTIFACT Farsight Quiver: allied archers shoot at full arrow (no distance falloff), like Sniper.
-        if (!attackerUnit.hasAbilityActive("Sniper") && !attackerUnit.getBuff("Farsight Quiver")) {
+        // Range falloff: damage halves for every full shot-distance of range. Only the Sniper ability negates
+        // it entirely. Farsight Quiver no longer removes falloff — instead it extends the archer's basic
+        // shot_distance (adjustBaseStats), pushing this threshold out so full-damage range is larger.
+        if (!attackerUnit.hasAbilityActive("Sniper")) {
             const shotDistancePixels = Math.ceil(attackerUnit.getRangeShotDistance() * this.gridSettings.getStep());
             let distance = HoCMath.getDistance(attackerUnit.getPosition(), attackPosition);
             while (distance >= shotDistancePixels) {
