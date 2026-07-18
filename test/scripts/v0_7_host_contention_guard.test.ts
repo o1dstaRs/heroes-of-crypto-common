@@ -221,12 +221,25 @@ describe("v0.7 guarded supervisor lifecycle", () => {
             V07_96H_HOST_GUARD_CHECK_SECONDS: "1",
             V07_96H_HOST_GUARD_TEST_MODE: "1",
             V07_96H_HOST_GUARD_FIXTURE: fixturePath,
+            V07_96H_HOST_GUARD_TEST_PRESPAWN_SECONDS: "5",
             V07_96H_HEARTBEAT_SECONDS: "1",
             V07_96H_STOP_GRACE_SECONDS: "2",
             V07_96H_HOURS: "1",
             V07_96H_OPTIMIZER: optimizer,
         };
         const child = spawn("/bin/bash", [supervisor, out], { cwd: repoRoot, env, stdio: "ignore" });
+
+        await waitFor(
+            () =>
+                existsSync(join(out, "supervisor.host_guard.cpu_baseline.json")) &&
+                existsSync(join(out, "supervisor.host_guard.config")) &&
+                existsSync(join(out, "SUPERVISOR_HOST_GUARD_ARMED")) &&
+                !existsSync(join(out, "optimizer.pid")),
+        );
+        // Give any immediate post-spawn probe a monotonic healthy endpoint. The final endpoint below is
+        // busy relative to either this value or the preflight baseline, which removes a scheduler race
+        // where a delayed runner could sample the preflight endpoint twice and report zero elapsed time.
+        atomicJson(fixturePath, fixture(snapshot(0, 0), snapshot(0, 200)));
 
         try {
             await waitFor(
@@ -240,7 +253,7 @@ describe("v0.7 guarded supervisor lifecycle", () => {
         }
         // The persisted baseline is idle=100. This next endpoint represents a fully busy
         // cumulative interval, including a foreign burst that ended before this poll.
-        atomicJson(fixturePath, fixture(snapshot(0, 0), snapshot(100, 100)));
+        atomicJson(fixturePath, fixture(snapshot(0, 0), snapshot(200, 200)));
         const exited = await waitForExit(child);
         expect(exited).toEqual({ code: 80, signal: null });
         const marker = readFileSync(join(out, "SUPERVISOR_HOST_CONTENTION_QUARANTINE"), "utf8");
