@@ -1302,7 +1302,17 @@ export class GameActionEngine {
         }
 
         const matchingRoute = routes.find((route) => this.routeMatchesActionPath(unit, route.route, path));
-        return matchingRoute ?? new Error("invalid_move");
+        if (matchingRoute) {
+            return matchingRoute;
+        }
+        // Same reasoning as resolveKnownPaths: the DESTINATION is reachable (`routes` is non-empty and was
+        // fetched by the destination's own key, so the server itself found a legal route there), but the
+        // client's intermediate `path` doesn't match cell-for-cell — a benign client/server pather divergence
+        // on which equal-cost detour to take. Refusing here (invalid_move) wrongly rejects a legal move that
+        // the client correctly shows as reachable. Fall back to the server's canonical route to that cell,
+        // which is authoritative for terrain flags. Note this does NOT weaken reachability enforcement: an
+        // UNreachable destination has no entry in knownPaths, so line 1300 above still rejects it.
+        return this.canonicalRoute(routes) ?? new Error("invalid_move");
     }
     private findKnownRouteForLargeFootprint(
         targetCells: XY[],
@@ -1329,6 +1339,27 @@ export class GameActionEngine {
             this.getTravelledMovePath(unit, knownRoute),
             this.getTravelledMovePath(unit, actionPath),
         );
+    }
+    /**
+     * The server's preferred (authoritative) route among all known routes to a single reachable cell: the
+     * lowest-weight one (shortest travelled distance), tie-broken by iteration order for determinism. Used
+     * as the fallback when the client's animated path to a reachable attack-from / move destination doesn't
+     * match any known route cell-for-cell — we accept the move but substitute the server's own route (with
+     * its authoritative terrain flags) so no client-supplied path is ever trusted. Every route in the list
+     * is already a legal, fully-reachable route produced by the pather, so any choice is safe; shortest is
+     * the most conservative.
+     */
+    private canonicalRoute(routes?: IWeightedRoute[]): IWeightedRoute | undefined {
+        if (!routes?.length) {
+            return undefined;
+        }
+        let best = routes[0];
+        for (const route of routes) {
+            if (route.weight < best.weight) {
+                best = route;
+            }
+        }
+        return best;
     }
     private isContinuousMovePath(unit: Unit, travelledPath: XY[]): boolean {
         let previous = unit.getBaseCell();
@@ -1450,7 +1481,26 @@ export class GameActionEngine {
         const knownRoutes = currentKnownPaths?.get(key);
         if (currentKnownPaths) {
             const matchingRoute = knownRoutes?.find((route) => this.routeMatchesActionPath(unit, route.route, path));
-            return matchingRoute ? new Map([[key, [matchingRoute]]]) : undefined;
+            if (matchingRoute) {
+                return new Map([[key, [matchingRoute]]]);
+            }
+            // CORRECTNESS (legit move-attack refused as attack_not_available): reaching HERE means the
+            // attack-from cell IS reachable — the server's own authoritative reach (getCurrentActiveKnownPaths)
+            // has one or more routes to `key` — but NONE of them matches the client's supplied `path`
+            // cell-for-cell. That happens routinely and legitimately: the client and server pathers can pick
+            // DIFFERENT equal-cost detours around a threatened cell / obstacle, so the client animates
+            // e.g. (2,5)->(1,5)->(2,4) while the server's canonical route is (2,5)->(2,4). The old code
+            // returned `undefined` here, which made handleMeleeAttack's move-then-strike fail and the whole
+            // turn get rejected — even though the destination is provably reachable and adjacent to the target.
+            //
+            // The path check exists ONLY to stop a tampered client from spoofing the route it travelled (e.g.
+            // faking hasLavaCell/hasWaterCell for a free terrain buff, or claiming a cell it can't actually
+            // reach). Reachability is already guaranteed by `knownRoutes` being non-empty, so we do NOT need
+            // the client's path to be legal — we substitute the SERVER's own canonical route to that cell
+            // (its authoritative terrain flags, never the client's). This preserves the full anti-spoof
+            // guarantee while accepting a genuinely-legal move whose animation route merely differed.
+            const canonical = this.canonicalRoute(knownRoutes);
+            return canonical ? new Map([[key, [canonical]]]) : undefined;
         }
 
         const knownPaths = new Map<number, IWeightedRoute[]>();

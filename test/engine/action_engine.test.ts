@@ -643,6 +643,167 @@ describe("GameActionEngine", () => {
         expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
     });
 
+    // -------------------------------------------------------------------------------------------------
+    // Regression: a LEGIT move-attack must not be refused (attack_not_available) just because the client
+    // animated a DIFFERENT equal-cost route to a reachable attack-from cell than the server's canonical one.
+    // Live repro (ranked, Leprechaun): server reach had a route to the attack-from cell (afReachable=true,
+    // adjacent=true) but the client walked (2,5)->(1,5)->(2,4) while the server's route was (2,5)->(2,4);
+    // the old exact-path match returned undefined -> the move-then-strike failed -> the turn was rejected.
+    // The fix keeps full reachability + anti-spoof enforcement (destination must be in known paths; the
+    // SERVER's route/terrain flags are used, never the client's) but stops gating on the exact path.
+    // -------------------------------------------------------------------------------------------------
+    it("performs a move-melee attack when the attack-from cell is reachable but the client's path differs from the server's canonical route", () => {
+        const currentCell = { x: 3, y: 3 };
+        const attackFrom = { x: 4, y: 3 };
+        // Server's canonical (authoritative) route to the attack-from cell: a direct one-step move.
+        const canonical = [currentCell, attackFrom];
+        // Client animated a longer, equally-legal detour to the SAME cell (benign pather divergence).
+        const clientDetour = [currentCell, { x: 3, y: 4 }, attackFrom];
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 5, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(attackFrom), [weightedRoute(canonical)]]]),
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+            attackFrom,
+            path: clientDetour,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "unit_attacked",
+                attackType: "melee",
+                attackerId: setup.lower.getId(),
+                targetId: setup.upper.getId(),
+            }),
+        );
+        // The unit moved to the (reachable) attack-from cell and the strike landed.
+        expect(setup.lower.getBaseCell()).toEqual(attackFrom);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
+    });
+
+    it("SECURITY: still refuses a move-melee whose attack-from cell is adjacent to the target but NOT reachable (no teleport-melee)", () => {
+        const currentCell = { x: 3, y: 3 };
+        const reachableButIrrelevant = { x: 3, y: 4 };
+        const attackFrom = { x: 4, y: 3 }; // adjacent to the target at (5,3) but absent from known paths
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 5, y: 3 },
+            // Known paths only reach a different cell — the attack-from cell has NO known route, so it is
+            // unreachable this turn. The fallback must NOT invent a route to it.
+            currentActiveKnownPaths: new Map([
+                [cellKey(reachableButIrrelevant), [weightedRoute([currentCell, reachableButIrrelevant])]],
+            ]),
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+            attackFrom,
+            path: [currentCell, attackFrom],
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("attack_not_available");
+        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+        expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
+    });
+
+    it("chooses the server's lowest-weight canonical route when several known routes reach the attack-from cell and none matches the client path", () => {
+        const currentCell = { x: 3, y: 3 };
+        const attackFrom = { x: 4, y: 3 };
+        const longRoute = weightedRoute([currentCell, { x: 3, y: 2 }, { x: 4, y: 2 }, attackFrom]); // weight 3
+        const shortRoute = weightedRoute([currentCell, attackFrom]); // weight 1 -> canonical
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            upperCell: { x: 5, y: 3 },
+            // Order deliberately puts the longer route first to prove selection is by weight, not position.
+            currentActiveKnownPaths: new Map([[cellKey(attackFrom), [longRoute, shortRoute]]]),
+        });
+        setup.lower.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+            attackFrom,
+            path: [currentCell, { x: 4, y: 4 }, attackFrom], // matches neither known route
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getBaseCell()).toEqual(attackFrom);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
+    });
+
+    it("performs a move_unit to a reachable destination when the client's path differs from the server's canonical route", () => {
+        const currentCell = { x: 3, y: 3 };
+        const destination = { x: 3, y: 6 };
+        const canonical = [currentCell, { x: 3, y: 4 }, { x: 3, y: 5 }, destination];
+        const clientDetour = [currentCell, { x: 4, y: 4 }, { x: 4, y: 5 }, destination];
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(destination), [weightedRoute(canonical)]]]),
+        });
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path: clientDetour,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events[0]).toMatchObject({ type: "unit_moved", unitId: setup.lower.getId() });
+        expect(setup.lower.getBaseCell()).toEqual(destination);
+    });
+
+    it("SECURITY: still rejects a move_unit whose DESTINATION is not in known paths (path relaxation does not weaken reachability)", () => {
+        const currentCell = { x: 3, y: 3 };
+        const reachable = { x: 3, y: 4 };
+        const unreachableDestination = { x: 3, y: 7 };
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(reachable), [weightedRoute([currentCell, reachable])]]]),
+        });
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path: [currentCell, { x: 3, y: 5 }, { x: 3, y: 6 }, unreachableDestination],
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("invalid_move");
+        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+    });
+
+    it("selects the lowest-weight canonical route for a move_unit when several routes reach the destination and none matches the client path", () => {
+        const currentCell = { x: 3, y: 3 };
+        const destination = { x: 3, y: 5 };
+        const longRoute = weightedRoute([currentCell, { x: 2, y: 4 }, { x: 2, y: 5 }, destination]); // weight 3
+        const shortRoute = weightedRoute([currentCell, { x: 3, y: 4 }, destination]); // weight 2 -> canonical
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(destination), [longRoute, shortRoute]]]),
+        });
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path: [currentCell, { x: 4, y: 4 }, destination], // matches neither known route
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getBaseCell()).toEqual(destination);
+    });
+
     it("performs a range attack and consumes a shot through common mechanics", () => {
         const setup = setupActionFight({
             lowerAttackType: PBTypes.AttackVals.RANGE,
