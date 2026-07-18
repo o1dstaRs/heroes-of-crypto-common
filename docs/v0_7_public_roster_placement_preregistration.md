@@ -94,3 +94,29 @@ stream:
 No replacement outcome may be opened until this amendment is committed and
 pushed. The replacement becomes ineligible if its final source diff exceeds the
 allowlist above.
+
+## Second mainline rebalance amendment
+
+Common commit `12b62c8666c0cf5e95124d95d68e435f389f58c2` subsequently
+changed Crown of Command, Pendant of Vitality, and Lava Striders. The first
+replacement was stopped before completion as soon as that combat-changing
+commit appeared. Its partial logs and any partial result are non-qualifying and
+must not be pooled with another attempt.
+
+The final replacement retains every behavior and promotion bar above with these
+source and stream changes:
+
+- Behavior source starts at `12b62c8666c0cf5e95124d95d68e435f389f58c2`.
+  The same non-combat allowlist applies to later source commits.
+- Base seed is `367271678`, panel `guard`. This is the original base advanced
+  by exactly 600,000,000 board indices. Its natural and target lanes occupy the
+  original stream's bounded ranges starting at 600m, 650m, 700m, 750m, 800m,
+  and 850m. They do not overlap the original guard or the interrupted first
+  replacement.
+- Natural and target sample sizes, candidate-seat reconstruction, safety bars,
+  and raw-report retention remain unchanged.
+
+No final-replacement outcome may be opened until this second amendment is
+committed and pushed. Any later combat-affecting mainline change invalidates the
+run and requires a new untouched stream; no result may be grandfathered across
+an engine or artifact-effect change.
