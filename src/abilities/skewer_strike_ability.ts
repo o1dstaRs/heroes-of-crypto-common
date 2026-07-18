@@ -31,6 +31,7 @@ import { processMinerAbility } from "./miner_ability";
 import { processParalysisAbility } from "./paralysis_ability";
 import { processPegasusLightAbility } from "./pegasus_light_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
+import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processShatterArmorAbility } from "./shatter_armor_ability";
 import { processStunAbility } from "./stun_ability";
 
@@ -159,6 +160,7 @@ export function processSkewerStrikeAbility(
         // just in case if we have more inherited/stolen abilities
         processMinerAbility(fromUnit, nextStandingTarget, sceneLog);
         processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+        processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
         processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
         processPetrifyingGazeAbility(fromUnit, nextStandingTarget, damageFromAttack, sceneLog, damageStatisticHolder);
         processBoarSalivaAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);

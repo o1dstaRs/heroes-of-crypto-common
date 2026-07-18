@@ -23,6 +23,7 @@ import type { ISecondaryDamage } from "../scene/animations";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
+import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -182,6 +183,7 @@ export function processRangeAOEAbility(
                 wasDead.push(unit);
             } else {
                 processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
+                processRimeCharmAbility(attackerUnit, unit, sceneLog);
                 processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
             }
         }

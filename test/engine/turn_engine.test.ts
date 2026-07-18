@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { getSpellConfig } from "../../src/configuration/config_provider";
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../src/constants";
 import { TurnEngine } from "../../src/engine/turn_engine";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
@@ -20,6 +21,7 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 const queuedZeros = (count: number): number[] => Array.from({ length: count }, () => 0);
@@ -184,6 +186,45 @@ describe("TurnEngine", () => {
         });
         expect(setup.lower.hasBuffActive("Morale")).toBe(true);
         expect(setup.upper.hasDebuffActive("Dismorale")).toBe(true);
+    });
+
+    it("rolls fresh morale off a unit's TRUE morale, not the ±20 locked by last lap's Dismorale", () => {
+        // Regression: a unit with real +morale that carried a Dismorale from the previous lap. That debuff
+        // makes adjustBaseStats lock live morale to -MORALE_MAX (-20). The lap transition drops the debuff
+        // then rolls — it must recompute first so applyMoraleRolls reads the true +2, NOT the stale -20.
+        // Before the fix this re-rolled Dismorale (kind "minus") even though the unit's morale was positive.
+        const setup = setupStartedFight({ lowerMorale: 2 });
+        setup.lower.applyDebuff(new Spell({ spellProperties: getSpellConfig("System", "Dismorale"), amount: 1 }));
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        // Sanity: the active Dismorale has locked the live morale negative even though base morale is +2.
+        expect(setup.lower.getMorale()).toBeLessThan(0);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(16), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        // rng is all-zeros so the +2 morale always procs — as Morale (plus), never Dismorale.
+        expect(result.events).toContainEqual({
+            type: "morale_applied",
+            unitId: setup.lower.getId(),
+            kind: "plus",
+            lap: 1,
+        });
+        expect(
+            result.events.some(
+                (event) =>
+                    event.type === "morale_applied" && event.unitId === setup.lower.getId() && event.kind === "minus",
+            ),
+        ).toBe(false);
+        expect(setup.lower.hasBuffActive("Morale")).toBe(true);
+        expect(setup.lower.hasDebuffActive("Dismorale")).toBe(false);
     });
 
     it("flips completed laps and applies non-rendering narrowing mechanics", () => {

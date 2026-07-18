@@ -24,6 +24,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
+import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 
@@ -183,6 +184,7 @@ export function processThroughShotAbility(
                 (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
         } else {
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }
     }

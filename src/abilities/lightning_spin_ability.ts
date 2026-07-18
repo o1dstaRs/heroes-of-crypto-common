@@ -23,6 +23,7 @@ import type { ISecondaryDamage } from "../scene/animations";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";
+import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processStunAbility } from "./stun_ability";
 import { processBlindnessAbility } from "./blindness_ability";
 import { processBoarSalivaAbility } from "./boar_saliva_ability";
@@ -180,6 +181,7 @@ export function processLightningSpinAbility(
                 // just in case if we have more inherited/stolen abilities
                 processMinerAbility(fromUnit, enemy, sceneLog);
                 processStunAbility(fromUnit, enemy, fromUnit, sceneLog);
+                processRimeCharmAbility(fromUnit, enemy, sceneLog);
                 processDullingDefenseAblity(enemy, fromUnit, sceneLog);
                 processPetrifyingGazeAbility(
                     fromUnit,
