@@ -21,7 +21,10 @@ const runObservedMatch = (seed: number, maxLaps: number) => {
 
 describe("battle engine turn execution observer", () => {
     test("emits exactly once per decision with detached actions and explicit skip events", () => {
-        const { decisions, turns } = runObservedMatch(25, 5);
+        // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
+        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps. 31
+        // reproduces that exact skip scenario.
+        const { decisions, turns } = runObservedMatch(31, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
