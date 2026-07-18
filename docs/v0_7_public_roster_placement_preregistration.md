@@ -173,13 +173,17 @@ This amendment supersedes the prior provisional source freeze after the final
 Tier-2 Pendant adjustment and fixes the complete executable protocol:
 
 - Source commit: `ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17`.
+- Fight-free replay verifier commit:
+  `058d434b8a4d04c0c436bfce6e189e713b19bbde`. Measurements run from the
+  clean source checkout above; reduction and replay verification run from a
+  separate clean checkout of this non-behavior verifier commit.
 - Candidate runtime setup spec: `v07-nonfight-5ae5533cea45`, full canonical
   behavior SHA-256
   `5ae5533cea4598be8e205a63681572180b6f06679b234ae4d242ff61dbeacd88`.
 - Control remains `v07-nonfight-4eda84635fe7`. The production default remains
   the control while this guard runs.
-- Base seed is `130934206`, start board is `0`, panel is `guard`, and the lap
-  cap is `60` for every report.
+- Base seed is `130934206`, start board is `2000000`, panel is `guard`, and the
+  lap cap is `60` for every report.
 - The natural report contains exactly 5,000 boards. Each of the five target
   reports contains exactly 1,000 outcome-blind accepted boards. The committed
   reducers must reconstruct every ledger and enforce the frozen artifact,
@@ -188,67 +192,118 @@ Tier-2 Pendant adjustment and fixes the complete executable protocol:
 The exact Zinc report commands are:
 
 ```bash
+set -Eeuo pipefail
 ROOT="$HOME/hoc-cohort-safe-placement-20260718"
-OUT="$ROOT/sim-out/cohort-safe-placement-ddeaffbf9daf"
+VERIFY_ROOT="$HOME/hoc-public-roster-verifier-058d434"
+OUT="$ROOT/sim-out/cohort-safe-placement-ddeaffbf9daf-s2000000"
 BUN="/usr/local/bin/bun"
 PATH_CLEAN="$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin"
 cd "$ROOT"
 test "$(git rev-parse HEAD)" = "ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17"
 test -z "$(git status --porcelain)"
-mkdir -p "$OUT"
+test "$(git -C "$VERIFY_ROOT" rev-parse HEAD)" = "058d434b8a4d04c0c436bfce6e189e713b19bbde"
+test -z "$(git -C "$VERIFY_ROOT" status --porcelain)"
+test ! -e "$OUT"
+mkdir "$OUT"
+
+(
+  cd "$VERIFY_ROOT"
+  env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" test \
+    test/ai/setup_public_context.test.ts \
+    test/ai/v0_7_placement_reveal.test.ts \
+    test/simulation/measure_public_roster_placement.test.ts \
+    test/simulation/pool_public_roster_natural_guard.test.ts \
+    test/simulation/summarize_public_roster_target_evidence.test.ts \
+    test/simulation/verify_public_roster_guard_replay.test.ts
+)
 
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 5000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 5000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target natural --workers 40 --max-laps 60 \
   --output "$OUT/report-natural.json"
 
+pids=()
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target ranged --workers 8 --max-laps 60 \
   --output "$OUT/report-ranged.json" &
+pids+=("$!")
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target mage --workers 8 --max-laps 60 \
   --output "$OUT/report-mage.json" &
+pids+=("$!")
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target melee-magic --workers 8 --max-laps 60 \
   --output "$OUT/report-melee-magic.json" &
+pids+=("$!")
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target aura-heavy --workers 8 --max-laps 60 \
   --output "$OUT/report-aura-heavy.json" &
+pids+=("$!")
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
   src/simulation/measure_public_roster_placement.ts \
-  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 2000000 \
   --panel guard --target melee-other --workers 8 --max-laps 60 \
   --output "$OUT/report-melee-other.json" &
-wait
+pids+=("$!")
+status=0
+for pid in "${pids[@]}"; do
+  wait "$pid" || status=1
+done
+((status == 0))
+
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 10 --base-seed 130934206 --start-board 2000000 \
+  --panel guard --target natural --workers 10 --max-laps 60 \
+  --output "$OUT/report-natural-replay-10.json"
 
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" \
   src/simulation/pool_public_roster_natural_guard.ts \
   --source-commit ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17 \
-  --expected-original-base-seed 130934206 --expected-start-board 0 \
+  --expected-original-base-seed 130934206 --expected-start-board 2000000 \
   --expected-total-boards 5000 "$OUT/report-natural.json" \
   > "$OUT/natural-pooled.json"
 env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" \
   src/simulation/summarize_public_roster_target_evidence.ts \
   --source-commit ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17 \
-  --expected-base-seed 130934206 --expected-start-board 0 \
+  --expected-base-seed 130934206 --expected-start-board 2000000 \
   "$OUT/report-ranged.json" "$OUT/report-mage.json" \
   "$OUT/report-melee-magic.json" "$OUT/report-aura-heavy.json" \
   "$OUT/report-melee-other.json" > "$OUT/target-summary.json"
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" \
+  "$VERIFY_ROOT/src/simulation/verify_public_roster_guard_replay.ts" \
+  --source-commit ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17 \
+  "$OUT/report-natural.json" "$OUT/report-natural-replay-10.json" \
+  > "$OUT/replay-verification.json"
 sha256sum "$OUT"/report-*.json > "$OUT/raw-report-sha256.txt"
 jq -e '.gate.passed == true' "$OUT/natural-pooled.json"
 jq -e '.promotionGate.passed == true' "$OUT/target-summary.json"
+jq -e \
+  '.status == "verified" and .fullReport.boards == 5000 and .replayReport.boards == 10 and .recordsCompared == 80' \
+  "$OUT/replay-verification.json"
 ```
 
 The five target processes may finish in any order; their seed ledgers and
 reducer order are fixed above. A nonzero process or reducer exit, either failed
 gate, any later combat-affecting source commit, or a dirty runtime checkout
 invalidates the attempt. The raw reports stay immutable even on failure.
+
+The initially documented `start-board 0` attempt was stopped before it wrote a
+report after a launch audit found that bare Bash `wait` could mask a failed
+background child. That attempt is non-qualifying and its maximum possible
+two-million-board range in each lane is burned. `start-board 2000000` begins
+immediately after those bounded ranges. Requiring a fresh output directory and
+checking each child PID prevent any stale report from entering a reducer.
+For each target offset `O`, the stopped attempt reserves `[O, O + 2000000)`
+and the qualifying attempt can scan only `[O + 2000000, O + 4000000)`; the
+half-open ranges cannot overlap. The natural reports use only the first 5,000
+and 10 boards of the qualifying range.
