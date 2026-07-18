@@ -2545,7 +2545,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityAttackBuff) {
-            const pendantAttackPenaltyPercent = parseInt(this.getBuffProperties("Pendant of Vitality")[1] || "0", 10);
+            // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
+            const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
             this.unitProperties.base_attack -= Number(
                 ((this.unitProperties.base_attack / 100) * ampArtifact(pendantAttackPenaltyPercent)).toFixed(2),
             );
