@@ -318,7 +318,9 @@ describe("UnitsHolder", () => {
         expect(fightProperties.getArtifactTier2(PBTypes.TeamVals.LOWER)).toBe(Tier2Artifact.WARLORDS_EDGE);
 
         melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        const baseAttack = melee.getUnitProperties().base_attack;
+        const baseAttackBefore = melee.getUnitProperties().base_attack;
+        const attackBefore = melee.getAttack();
+        const armorBefore = melee.getArmor();
 
         unitsHolder.applyArtifacts();
 
@@ -327,9 +329,13 @@ describe("UnitsHolder", () => {
         expect(ranged.hasBuffActive("Veteran Helm")).toBe(true);
         expect(melee.hasBuffActive("Warlords Edge")).toBe(true);
 
-        // Veteran Helm (+5%) + Warlord's Edge (+15%) raise the melee unit's base attack once recomputed.
+        // Warlord's Edge (+% attack) lands in attack_mod and Veteran Helm (+% defense) in armor_mod — both are
+        // ADDITIONAL stats, deliberately NOT folded into base_attack/base_armor (so they don't compound with
+        // aura multipliers). After a recompute the effective attack and armor rise while the base stays put.
         melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(melee.getUnitProperties().base_attack).toBeGreaterThan(baseAttack);
+        expect(melee.getUnitProperties().base_attack).toBe(baseAttackBefore);
+        expect(melee.getAttack()).toBeGreaterThan(attackBefore);
+        expect(melee.getArmor()).toBeGreaterThan(armorBefore);
     });
 
     it("applies movement artifacts only to eligible units", () => {
