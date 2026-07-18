@@ -364,6 +364,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.abilities.push(ability);
         if (!this.unitProperties.abilities.includes(abilityName)) {
             this.unitProperties.abilities.push(abilityName);
+            // Keep the parallel wire arrays aligned with `abilities` so the client actually DRAWS the granted
+            // ability's icon + tooltip — RenderableUnit requires abilities / _descriptions / _stack_powered /
+            // _auras to be equal length, and getAbilities-based icon rendering reads these per index.
+            this.unitProperties.abilities_descriptions.push(
+                ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString()),
+            );
+            this.unitProperties.abilities_stack_powered.push(ability.isStackPowered());
+            this.unitProperties.abilities_auras.push(!!ability.getAuraEffect());
         }
     }
     public addAbility(ability: Ability): void {
@@ -1311,6 +1319,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
+        // Made of Fire's central-lava boost (+10% all stats/abilities). Lava Striders grants the actual ability
+        // to the whole army (units_holder), so this single hasAbilityActive gate covers both innate Fire units
+        // and Lava-Striders armies uniformly.
         if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
             const spellProperties = getSpellConfig("System", "Made of Fire");
             this.applyBuff(

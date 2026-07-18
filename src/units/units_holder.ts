@@ -577,7 +577,13 @@ export class UnitsHolder {
                     applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
                     break;
                 case Tier2Artifact.LAVA_STRIDERS:
+                    // Grant the Made of Fire ability to the WHOLE army (like an innate Fire creature, e.g. the
+                    // Wounding Charm -> Deep Wounds pattern). This makes EVERY hasAbilityActive("Made of Fire")
+                    // checkpoint treat them uniformly — lava pathing, AI occupy-cell checks, combat/move handlers,
+                    // the central-lava +10% boost (applyLavaWaterModifier), AND the ability icon drawn in the UI.
+                    // The marker buff stays for legacy isMadeOfFire callers.
                     applyArtifactBuff("Lava Striders", 0);
+                    unit.grantAbility("Made of Fire");
                     break;
                 default:
                     break;

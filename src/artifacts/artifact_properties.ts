@@ -104,13 +104,13 @@ export const ARTIFACT_POWER = {
     KEEN_BLADE_FLAT: 0.7,
     IRON_PLATE_FLAT: 0.7,
     BERSERKERS_BOND_FLAT: 3,
-    PENDANT_HP_PERCENT: 25,
-    PENDANT_ATTACK_PENALTY_PERCENT: 20,
+    PENDANT_HP_PERCENT: 30,
+    PENDANT_ATTACK_PENALTY_PERCENT: 15,
     CURSED_WARD_LUCK: 3,
     CURSED_WARD_MORALE_PENALTY: 6,
     CLOVER_LUCK: 10,
     CROWN_STEPS: 1,
-    CROWN_MORALE: 2,
+    CROWN_MORALE: 5,
     // Swift Boots is now a PERCENT of base steps (not a flat +1), applied to melee units.
     SWIFT_BOOTS_STEPS: 25,
     WINGED_BOOTS_STEPS: 1,
@@ -352,7 +352,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "lava_striders",
         "Lava Striders",
         "Lava Striders",
-        "All of the army's units may move over lava.",
+        "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
     ),
 };
 
