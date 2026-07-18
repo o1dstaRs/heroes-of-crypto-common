@@ -45,7 +45,10 @@ describe("battle engine turn execution observer", () => {
     });
 
     test("reports a rejected strategy action separately from the recovery shield", () => {
-        const { decisions, turns } = runObservedMatch(1603, 40);
+        // Seed re-pinned from 1603 -> 952 after the lap-start morale-roll fix (applyMoraleRolls now reads
+        // true accumulated morale, not the stale ±20 lock) shifted the seeded trajectory so 1603 no longer
+        // produced a rejected-melee -> defend-recovery turn. 952 reproduces the exact scenario.
+        const { decisions, turns } = runObservedMatch(952, 40);
 
         expect(turns).toHaveLength(decisions.length);
         const recovered = turns.find((turn) => turn.recovery.source === "defend");

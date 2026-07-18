@@ -10,7 +10,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Clean-source isolation showed 4a68de8 alone changed only both traces for seed 2147598935 (whose roster
 // contains Behemoth/Unyielding Power), while 9845c43 independently changed roster/combat traces. Two
 // exact-9845c43 runs produced this byte-identical digest; this fixture is intentionally balance sensitive.
-const EXPECTED_REPLAY_SHA256 = "6681c00cb61091e4be8fb28035039ccbc2d517b3d87b0cbf49279a191922624c";
+// Re-pinned again after the lap-start morale-roll fix: applyMoraleRolls now reads each unit's true
+// accumulated morale instead of the stale ±20 that a Morale/Dismorale buff locks live morale to. That
+// shifts which units proc Morale/Dismorale each lap, so the seeded combat traces legitimately change.
+// Two runs on the fixed engine produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "90d7dd4116bf7330bcf4959738512e3d12b0d4b5f6b5f936c6a06e2cceb1df6d";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

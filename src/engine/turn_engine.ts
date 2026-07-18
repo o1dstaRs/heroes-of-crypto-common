@@ -251,6 +251,14 @@ export class TurnEngine {
             }
         }
 
+        // Recompute derived stats now that the Morale/Dismorale buffs are gone. adjustBaseStats LOCKS a
+        // buffed unit's live morale to ±MORALE_MAX (that's the Morale/Dismorale combat effect); the earlier
+        // refresh above ran while last lap's buff was still active, so getMorale() still reads that stale
+        // ±20. Without this recompute applyMoraleRolls would roll on ±20 instead of the unit's real
+        // accumulated morale — a unit that had Dismorale last lap kept re-rolling Dismorale even at, say,
+        // +2 real morale (the "dismorale procced at +2 morale" bug).
+        this.unitsHolder.refreshStackPowerForAllUnits();
+
         events.push(...this.applyMoraleRolls(refreshed.allUnits));
 
         this.fightProperties.prefetchNextUnitsToTurn(
