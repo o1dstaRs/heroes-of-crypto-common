@@ -165,3 +165,90 @@ No outcome from this cohort-safe guard may be opened until its runtime variant,
 immutable behavior hash, source commit, and exact report commands are recorded
 in a subsequent result-free amendment that is committed and pushed. Any
 combat-affecting change after that source freeze invalidates the guard.
+
+## Cohort-safe source freeze and execution amendment
+
+Recorded before starting or opening any outcome from the cohort-safe guard.
+This amendment supersedes the prior provisional source freeze after the final
+Tier-2 Pendant adjustment and fixes the complete executable protocol:
+
+- Source commit: `ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17`.
+- Candidate runtime setup spec: `v07-nonfight-5ae5533cea45`, full canonical
+  behavior SHA-256
+  `5ae5533cea4598be8e205a63681572180b6f06679b234ae4d242ff61dbeacd88`.
+- Control remains `v07-nonfight-4eda84635fe7`. The production default remains
+  the control while this guard runs.
+- Base seed is `130934206`, start board is `0`, panel is `guard`, and the lap
+  cap is `60` for every report.
+- The natural report contains exactly 5,000 boards. Each of the five target
+  reports contains exactly 1,000 outcome-blind accepted boards. The committed
+  reducers must reconstruct every ledger and enforce the frozen artifact,
+  protocol, sample size, failure, safety, and `melee-other` equivalence bars.
+
+The exact Zinc report commands are:
+
+```bash
+ROOT="$HOME/hoc-cohort-safe-placement-20260718"
+OUT="$ROOT/sim-out/cohort-safe-placement-ddeaffbf9daf"
+BUN="$HOME/.bun/bin/bun"
+PATH_CLEAN="$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+cd "$ROOT"
+test "$(git rev-parse HEAD)" = "ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17"
+test -z "$(git status --porcelain)"
+mkdir -p "$OUT"
+
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 5000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target natural --workers 40 --max-laps 60 \
+  --output "$OUT/report-natural.json"
+
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target ranged --workers 8 --max-laps 60 \
+  --output "$OUT/report-ranged.json" &
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target mage --workers 8 --max-laps 60 \
+  --output "$OUT/report-mage.json" &
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target melee-magic --workers 8 --max-laps 60 \
+  --output "$OUT/report-melee-magic.json" &
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target aura-heavy --workers 8 --max-laps 60 \
+  --output "$OUT/report-aura-heavy.json" &
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 LIVETWIN=1 V07_SEARCH=0 "$BUN" \
+  src/simulation/measure_public_roster_placement.ts \
+  --arm cohort-safe --boards 1000 --base-seed 130934206 --start-board 0 \
+  --panel guard --target melee-other --workers 8 --max-laps 60 \
+  --output "$OUT/report-melee-other.json" &
+wait
+
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" \
+  src/simulation/pool_public_roster_natural_guard.ts \
+  --source-commit ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17 \
+  --expected-original-base-seed 130934206 --expected-start-board 0 \
+  --expected-total-boards 5000 "$OUT/report-natural.json" \
+  > "$OUT/natural-pooled.json"
+env -i HOME="$HOME" PATH="$PATH_CLEAN" LANG=C.UTF-8 "$BUN" \
+  src/simulation/summarize_public_roster_target_evidence.ts \
+  --source-commit ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17 \
+  --expected-base-seed 130934206 --expected-start-board 0 \
+  "$OUT/report-ranged.json" "$OUT/report-mage.json" \
+  "$OUT/report-melee-magic.json" "$OUT/report-aura-heavy.json" \
+  "$OUT/report-melee-other.json" > "$OUT/target-summary.json"
+sha256sum "$OUT"/report-*.json > "$OUT/raw-report-sha256.txt"
+jq -e '.gate.passed == true' "$OUT/natural-pooled.json"
+jq -e '.promotionGate.passed == true' "$OUT/target-summary.json"
+```
+
+The five target processes may finish in any order; their seed ledgers and
+reducer order are fixed above. A nonzero process or reducer exit, either failed
+gate, any later combat-affecting source commit, or a dirty runtime checkout
+invalidates the attempt. The raw reports stay immutable even on failure.
