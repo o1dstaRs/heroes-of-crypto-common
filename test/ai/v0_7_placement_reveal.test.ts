@@ -14,6 +14,7 @@ import type { PlacementPolicyVariant } from "../../src/ai/setup/setup_ship";
 import {
     classifyRevealedThreats,
     FLYER_SCREEN_THRESHOLD,
+    opponentCreatureIdsForPlacement,
     REVEAL_PLACEMENT_ENV,
 } from "../../src/ai/versions/v0_7_placement_reveal";
 import type { Unit } from "../../src/units/unit";
@@ -52,7 +53,7 @@ interface IPlacementScenario {
 
 function buildScenario(scenario: IPlacementScenario): {
     units: Unit[];
-    context: Omit<IPlacementContext, "revealedOpponentCreatures">;
+    context: Omit<IPlacementContext, "publicOpponentCreatureIds" | "revealedOpponentCreatures">;
 } {
     const c = createCombatTestContext();
     const enemy = createTestUnit({
@@ -91,11 +92,13 @@ function place(
     scenario: IPlacementScenario,
     revealed?: readonly number[],
     setupPlacementPolicy?: PlacementPolicyVariant,
+    publicOpponentCreatureIds?: readonly number[],
 ): XY[] {
     const { units, context } = buildScenario(scenario);
     const placed = v07.placeArmy(units, {
         ...context,
         ...(revealed ? { revealedOpponentCreatures: revealed } : {}),
+        ...(publicOpponentCreatureIds ? { publicOpponentCreatureIds } : {}),
         ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
     });
     expect(placed.size).toBe(units.length);
@@ -182,6 +185,58 @@ describe("V07_PLACEMENT_REVEAL gating (byte-identical defaults)", () => {
             "legitimate-reveal",
         );
         expect(samePlacement(baseline, withFlyerReveals)).toBe(false);
+    });
+
+    it("legitimate-reveal ignores the full public roster and preserves its partial-reveal behavior", () => {
+        const flyers = [CREATURES.GRIFFIN, CREATURES.BLACK_DRAGON];
+        const baseline = place({ shooters: 1, groundMelee: 3 }, [], "legitimate-reveal");
+        const publicOnly = place({ shooters: 1, groundMelee: 3 }, [], "legitimate-reveal", flyers);
+
+        expect(samePlacement(baseline, publicOnly)).toBe(true);
+    });
+
+    it("public-roster is explicit and the new field wins over the legacy alias", () => {
+        const scenario = { shooters: 1, groundMelee: 3 };
+        const flyers = [CREATURES.GRIFFIN, CREATURES.BLACK_DRAGON];
+        const baseline = place(scenario, [], "public-roster", []);
+        const publicFlyers = place(scenario, [CREATURES.PEASANT], "public-roster", flyers);
+        const emptyPublicOverridesLegacyFlyers = place(scenario, flyers, "public-roster", []);
+
+        expect(samePlacement(baseline, publicFlyers)).toBe(false);
+        expect(samePlacement(baseline, emptyPublicOverridesLegacyFlyers)).toBe(true);
+    });
+});
+
+describe("placement opponent-information source", () => {
+    it("selects only the list authorized by the explicit placement policy", () => {
+        const { context } = buildScenario({ shooters: 1, groundMelee: 3 });
+        const revealed = [CREATURES.PEASANT];
+        const publicRoster = [CREATURES.NOMAD];
+
+        expect(
+            opponentCreatureIdsForPlacement({
+                ...context,
+                setupPlacementPolicy: "legitimate-reveal",
+                revealedOpponentCreatures: revealed,
+                publicOpponentCreatureIds: publicRoster,
+            }),
+        ).toBe(revealed);
+        expect(
+            opponentCreatureIdsForPlacement({
+                ...context,
+                setupPlacementPolicy: "public-roster",
+                revealedOpponentCreatures: revealed,
+                publicOpponentCreatureIds: publicRoster,
+            }),
+        ).toBe(publicRoster);
+        expect(
+            opponentCreatureIdsForPlacement({
+                ...context,
+                setupPlacementPolicy: "baseline",
+                revealedOpponentCreatures: revealed,
+                publicOpponentCreatureIds: publicRoster,
+            }),
+        ).toBeUndefined();
     });
 });
 

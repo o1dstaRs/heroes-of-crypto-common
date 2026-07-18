@@ -11,7 +11,29 @@
 
 import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { GridType } from "../../generated/protobuf/v1/types_gen";
 import { LifeSynergy, ChaosSynergy, MightSynergy, NatureSynergy } from "../../synergies/synergy_properties";
+
+/**
+ * Fair, phase-local information that a ranked setup policy may use in addition to its decision's explicit
+ * arguments. This is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement,
+ * artifacts, perk, augments, synergies, stack sizes, or positions through this boundary.
+ */
+export interface ISetupDecisionContext {
+    /**
+     * Deduplicated opponent creature identities publicly known to this seat at the current phase. During
+     * placement the complete drafted roster is public; during earlier picks this may be only a public subset.
+     */
+    readonly publicOpponentCreatureIds: readonly number[];
+    /** Public map topology selected for this match. */
+    readonly gridType: GridType;
+    /** Number of cells along one side of the square combat grid. */
+    readonly gridSize: number;
+    /** This seat's selected perk, when the phase has one. Opponent perk information is intentionally absent. */
+    readonly ownPerk?: number;
+    /** This seat's selected artifact ids in pick/tier order. Opponent artifacts are intentionally absent. */
+    readonly ownArtifactIds?: readonly number[];
+}
 
 /**
  * The setup AI's decision contract — the draft/placement counterpart to the in-fight IAIStrategy. A policy

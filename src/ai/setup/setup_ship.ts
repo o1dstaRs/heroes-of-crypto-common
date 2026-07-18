@@ -25,7 +25,7 @@ import {
     type ConditionalSetupRule,
 } from "./setup_conditional";
 import frozenV07NonFightArtifact from "./setup_policies/v07_nonfight_4eda84635fe7.json";
-import { TIER2_ARTIFACT_WINRATE } from "./setup_strategy";
+import { TIER2_ARTIFACT_WINRATE, type ISetupDecisionContext } from "./setup_strategy";
 import { SETUP_POLICY_V0 } from "./setup_v0";
 import { pickSynergiesSituational, SYNERGY_ANCHOR_W, SYNERGY_OPTIONS } from "./synergy_score";
 
@@ -267,7 +267,7 @@ export function pickSynergiesForVariant(
     return pickSynergiesSituational(creatureIds, synergyWeights(variant));
 }
 
-export type PlacementPolicyVariant = "baseline" | "legitimate-reveal";
+export type PlacementPolicyVariant = "baseline" | "legitimate-reveal" | "public-roster";
 export type PlacementAugmentTiming = "current-live" | "setup-before-placement";
 
 export interface ISetupPolicyBehavior {
@@ -362,7 +362,11 @@ export function parseSetupPolicyBehavior(value: unknown): ISetupPolicyBehavior {
     if (!SYNERGY_POLICY_VARIANTS.includes(record.synergy as SynergyPolicyVariant)) {
         throw new TypeError(`setup policy has unknown synergy variant ${String(record.synergy)}`);
     }
-    if (record.placement !== "baseline" && record.placement !== "legitimate-reveal") {
+    if (
+        record.placement !== "baseline" &&
+        record.placement !== "legitimate-reveal" &&
+        record.placement !== "public-roster"
+    ) {
         throw new TypeError(`setup policy has unknown placement variant ${String(record.placement)}`);
     }
     if (record.placementAugmentTiming !== "setup-before-placement") {
@@ -482,9 +486,23 @@ export interface IResolvedSetupPolicy {
     readonly rules: readonly ConditionalSetupRule[];
     readonly placement: PlacementPolicyVariant;
     readonly placementAugmentTiming: "setup-before-placement";
-    pickArtifactT2(offered: readonly number[], ownCreatureIds: readonly number[]): number;
-    pickAugments(budget: number, ownCreatureIds: readonly number[]): ISetupAugmentChoice[];
-    pickSynergies(ownCreatureIds: readonly number[]): ISetupSynergyChoice[];
+    /** Own roster identities are deduplicated; context contains only the fair opponent/map view. */
+    pickArtifactT2(
+        offered: readonly number[],
+        ownCreatureIds: readonly number[],
+        context?: Readonly<ISetupDecisionContext>,
+    ): number;
+    /** Own roster identities are deduplicated; context contains only the fair opponent/map view. */
+    pickAugments(
+        budget: number,
+        ownCreatureIds: readonly number[],
+        context?: Readonly<ISetupDecisionContext>,
+    ): ISetupAugmentChoice[];
+    /** One entry per own physical stack; duplicate creature ids created by a legal split remain significant. */
+    pickSynergies(
+        ownCreatureStackIds: readonly number[],
+        context?: Readonly<ISetupDecisionContext>,
+    ): ISetupSynergyChoice[];
 }
 
 const behaviorFromCandidate = (policy: Readonly<INonFightCandidatePolicy>): ISetupPolicyBehavior => ({

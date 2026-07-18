@@ -23,10 +23,10 @@ import type { IPlacementContext } from "../ai_strategy";
  * release evidence. Keep this experiment default-off until those artifacts and hashes are preserved.
  *
  * Unlike v0.6's baked splash dispersion (which inspects the ACTUAL enemy holder — information a live
- * seat may not fairly have), these heuristics act only on `IPlacementContext.revealedOpponentCreatures`
- * — the creature ids this seat LEGITIMATELY learned during the pick phase (perk reveals + pick
- * collisions). At most ONE heuristic fires per game, and each degrades gracefully to the packed
- * layout when the zone is full:
+ * seat may not fairly have), these heuristics classify only the creature-id list selected by the explicit
+ * placement policy. `legitimate-reveal` retains the historical partial pick-phase reveal list;
+ * `public-roster` opts into the complete roster that both seats legitimately see before placement. At most
+ * ONE heuristic fires per game, and each degrades gracefully to the packed layout when the zone is full:
  *
  *  (PRECEDENCE GUARD) when the enemy actually fields splash AOE ("Area Throw"/"Large Caliber"), the
  *      reveal layer NO-OPS — the baked v0.6 dispersed placement always wins. A reveal-driven WIDE
@@ -47,7 +47,25 @@ import type { IPlacementContext } from "../ai_strategy";
 export const REVEAL_PLACEMENT_ENV = "V07_PLACEMENT_REVEAL";
 
 export const revealPlacementEnabled = (policy?: PlacementPolicyVariant): boolean =>
-    policy === undefined ? process.env[REVEAL_PLACEMENT_ENV] === "on" : policy === "legitimate-reveal";
+    policy === undefined
+        ? process.env[REVEAL_PLACEMENT_ENV] === "on"
+        : policy === "legitimate-reveal" || policy === "public-roster";
+
+/**
+ * Select only the opponent identities authorized by the active placement policy. The legacy env gate and
+ * shipped `legitimate-reveal` mode intentionally ignore the new full roster. `public-roster` prefers the new
+ * field even when it is an explicitly empty list; the legacy alias is only a compatibility fallback when the
+ * new field is absent.
+ */
+export function opponentCreatureIdsForPlacement(context: IPlacementContext): readonly number[] | undefined {
+    if (!revealPlacementEnabled(context.setupPlacementPolicy)) {
+        return undefined;
+    }
+    if (context.setupPlacementPolicy === "public-roster") {
+        return context.publicOpponentCreatureIds ?? context.revealedOpponentCreatures;
+    }
+    return context.revealedOpponentCreatures;
+}
 
 /** Adjacent-splash ranged AOE abilities (same measured set as v0.6's baked dispersion trigger). */
 export const SPLASH_AOE_ABILITIES: readonly string[] = ["Area Throw", "Large Caliber"];
@@ -238,11 +256,8 @@ export function enemyFieldsSplashAoe(context: IPlacementContext): boolean {
  * placement byte-identical).
  */
 export function revealConditionedPlacement(units: Unit[], context: IPlacementContext): Map<string, XY> | undefined {
-    if (!revealPlacementEnabled(context.setupPlacementPolicy)) {
-        return undefined;
-    }
-    const revealed = context.revealedOpponentCreatures;
-    if (!revealed?.length || !units.length) {
+    const opponentCreatureIds = opponentCreatureIdsForPlacement(context);
+    if (!opponentCreatureIds?.length || !units.length) {
         return undefined;
     }
     // Precedence guard (measured, amendment 1): vs an actual splash-AOE enemy the baked v0.6 dispersed
@@ -252,7 +267,7 @@ export function revealConditionedPlacement(units: Unit[], context: IPlacementCon
     if (enemyFieldsSplashAoe(context)) {
         return undefined;
     }
-    const threats = classifyRevealedThreats(revealed);
+    const threats = classifyRevealedThreats(opponentCreatureIds);
     const hasShooter = units.some(isRangeUnit);
     const hasGroundGuard = units.some((u) => isMeleeUnit(u) && !u.canFly());
     if (threats.flyers >= FLYER_SCREEN_THRESHOLD && hasShooter && hasGroundGuard) {

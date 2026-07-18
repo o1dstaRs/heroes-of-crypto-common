@@ -183,6 +183,10 @@ export interface IMatchConfig {
     greenRevealedCreatures?: readonly number[];
     /** Creature ids of GREEN stacks legitimately revealed to RED. Same contract, RED's placement context. */
     redRevealedCreatures?: readonly number[];
+    /** Deduplicated identities from RED's complete roster, public to GREEN during placement. No positions/setup. */
+    greenPublicOpponentCreatures?: readonly number[];
+    /** Deduplicated identities from GREEN's complete roster, public to RED during placement. No positions/setup. */
+    redPublicOpponentCreatures?: readonly number[];
     /** Explicit per-side placement modes. When present they override the legacy V07_PLACEMENT_REVEAL env gate. */
     greenSetupPlacementPolicy?: PlacementPolicyVariant;
     redSetupPlacementPolicy?: PlacementPolicyVariant;
@@ -608,6 +612,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             config.greenRevealedCreatures,
             config.greenSetupPlacementPolicy,
+            config.greenPublicOpponentCreatures,
         ),
         red: placeArmy(
             redUnits,
@@ -621,6 +626,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             config.redRevealedCreatures,
             config.redSetupPlacementPolicy,
+            config.redPublicOpponentCreatures,
         ),
     };
 
@@ -1187,6 +1193,7 @@ function placeArmy(
     pathHelper: PathHelper,
     revealedOpponentCreatures?: readonly number[],
     setupPlacementPolicy?: PlacementPolicyVariant,
+    publicOpponentCreatureIds?: readonly number[],
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
@@ -1199,6 +1206,7 @@ function placeArmy(
         pathHelper,
         placement: zone,
         ...(revealedOpponentCreatures?.length ? { revealedOpponentCreatures } : {}),
+        ...(publicOpponentCreatureIds ? { publicOpponentCreatureIds } : {}),
         ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
     });
 

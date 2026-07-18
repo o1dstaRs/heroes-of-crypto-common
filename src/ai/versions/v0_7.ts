@@ -183,10 +183,10 @@ export class StrategyV0_7 extends StrategyV0_6 {
         if (shouldUseArchetypePlacementAnchor(allies, context.unitsHolder.getAllEnemyUnits(context.team))) {
             return this.archetypeAnchor.placeArmy(units, context);
         }
-        // Env-gated experiment (V07_PLACEMENT_REVEAL=on, default OFF): reveal-conditioned deployment
-        // driven ONLY by context.revealedOpponentCreatures — what this seat legitimately learned during
-        // picks. The measured archetype anchors above keep precedence; gate off / no reveals / no
-        // relevant threat leaves today's placement byte-identical (see v0_7_placement_reveal.ts).
+        // Explicit setup placement experiment (with the legacy V07_PLACEMENT_REVEAL env fallback): the
+        // policy selects either partial pick-phase reveals or the full placement-public roster. The measured
+        // archetype anchors above keep precedence; gate off / no public information / no relevant threat leaves
+        // today's placement byte-identical (see v0_7_placement_reveal.ts).
         const revealPlaced = revealConditionedPlacement(units, context);
         if (revealPlaced) {
             return revealPlaced;

@@ -84,7 +84,7 @@ export type {
 } from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
-export type { ISetupPolicy } from "./ai/setup/setup_strategy";
+export type { ISetupDecisionContext, ISetupPolicy } from "./ai/setup/setup_strategy";
 export { scoreCreature, creatureInfo } from "./ai/setup/creature_score";
 export {
     compileNonFightSetupPolicy,

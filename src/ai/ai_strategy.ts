@@ -39,10 +39,17 @@ export interface IPlacementContext {
     /** The legal deployment rectangle for this team (cells the strategy may place onto). */
     placement: IPlacement;
     /**
-     * Optional: creature ids of OPPONENT stacks this team LEGITIMATELY learned during the pick phase
-     * (perk reveals + pick collisions — pick_sim's getKnownOpponentCreatures; live equivalent: the
-     * server session's knownOpponentCreatureIdsByPlayer). Absent/empty = the seat knows nothing it
-     * could fairly act on. Consumed only by reveal-conditioned placement when setupPlacementPolicy selects it.
+     * Deduplicated creature identities from the opponent's complete, placement-visible drafted roster. This
+     * deliberately carries no opponent positions, stack sizes, artifacts, perk, augments, or synergies. It is
+     * consumed only when setupPlacementPolicy explicitly selects the `public-roster` experiment.
+     */
+    publicOpponentCreatureIds?: readonly number[];
+    /**
+     * Legacy partial pick-phase knowledge (perk reveals + pick collisions). Kept separate from the complete
+     * placement-visible roster so the shipped `legitimate-reveal` policy remains byte-identical while a
+     * `public-roster` candidate is measured independently.
+     *
+     * @deprecated New full-roster policies should use publicOpponentCreatureIds.
      */
     revealedOpponentCreatures?: readonly number[];
     /** Explicit setup-policy placement mode. When present it overrides the legacy process env gate. */
