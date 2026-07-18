@@ -120,3 +120,48 @@ No final-replacement outcome may be opened until this second amendment is
 committed and pushed. Any later combat-affecting mainline change invalidates the
 run and requires a new untouched stream; no result may be grandfathered across
 an engine or artifact-effect change.
+
+## Seed arithmetic correction and cohort-safe selection
+
+An audit before deployment found that the two replacement amendments advanced
+the seed-channel stream, not the board stream. `publicRosterPlacementBoard`
+consumes three consecutive `setupPanelSeed` indices per board, so changing a
+base by `PANEL_STEP * K` advances only `K / 3` boards. Consequently:
+
+- base `232221694` is the original base advanced by 300,000,000 seed channels,
+  or 100,000,000 boards, not 300,000,000 boards;
+- base `367271678` is the original base advanced by 600,000,000 seed channels,
+  or 200,000,000 boards, not 600,000,000 boards.
+
+Those replacement lanes overlap previously opened lanes at multiples of
+50,000,000 board indices. Their reports remain deterministic selection and
+diagnostic evidence, but are ineligible for promotion. The completed global
+public-roster selection run also failed its frozen `melee-other` point-estimate
+bar (`-0.40pp`, clustered 95% CI `-1.78pp` to `+0.98pp`), independently
+rejecting global activation.
+
+The selection evidence fixes the next candidate before a new result is opened:
+
+- `ranged`, `mage`, `melee-magic`, and `aura-heavy` own-roster cohorts receive
+  complete public opponent creature ids during placement;
+- the exact exclusive `melee-other` cohort remains on the incumbent
+  `legitimate-reveal` placement path;
+- a roster carrying multiple inclusive diagnostic tags receives complete
+  public opponent ids; only the exact `melee-other` fallback is excluded;
+- draft, artifact, augment, synergy, combat, and all other placement behavior
+  remain byte-for-byte identical to the incumbent.
+
+The next untouched guard uses base `130934206`, which equals original base
+`97171710` advanced by `3 * 25,000,000` seed channels. Its six lanes therefore
+start at original board indices 25m, 75m, 125m, 175m, 225m, and 275m: the
+midpoints between all previously opened 50m lanes. Target scans are bounded to
+at most 2,000,000 boards, so these ranges are disjoint from every prior run.
+Sample sizes, crossover design, target reconstruction, safety checks, raw
+retention, and promotion bars stay unchanged. For `melee-other`, candidate and
+control must additionally have identical placement decisions and complete
+behavior traces.
+
+No outcome from this cohort-safe guard may be opened until its runtime variant,
+immutable behavior hash, source commit, and exact report commands are recorded
+in a subsequent result-free amendment that is committed and pushed. Any
+combat-affecting change after that source freeze invalidates the guard.
