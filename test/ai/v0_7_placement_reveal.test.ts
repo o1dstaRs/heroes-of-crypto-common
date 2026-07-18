@@ -22,7 +22,7 @@ import type { XY } from "../../src/utils/math";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
-import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
@@ -46,6 +46,8 @@ afterEach(() => {
 interface IPlacementScenario {
     /** Enemy stacks on the board (the omniscient holder view the baked v0.6 trigger uses). */
     enemyAbilities?: string[];
+    enemyArmor?: number;
+    enemyAttack?: number;
     /** Own army roles. */
     shooters?: number;
     groundMelee?: number;
@@ -53,6 +55,7 @@ interface IPlacementScenario {
 
 function buildScenario(scenario: IPlacementScenario): {
     units: Unit[];
+    enemy: Unit;
     context: Omit<IPlacementContext, "publicOpponentCreatureIds" | "revealedOpponentCreatures">;
 } {
     const c = createCombatTestContext();
@@ -61,6 +64,8 @@ function buildScenario(scenario: IPlacementScenario): {
         name: "Threat",
         attackType: RANGE,
         abilities: scenario.enemyAbilities ?? [],
+        armor: scenario.enemyArmor,
+        attack: scenario.enemyAttack,
         amountAlive: 8,
     });
     c.unitsHolder.addUnit(enemy);
@@ -77,6 +82,7 @@ function buildScenario(scenario: IPlacementScenario): {
     const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5);
     return {
         units,
+        enemy,
         context: {
             team: LOWER,
             grid: c.grid,
@@ -237,6 +243,55 @@ describe("placement opponent-information source", () => {
                 publicOpponentCreatureIds: publicRoster,
             }),
         ).toBeUndefined();
+    });
+
+    it("keeps public-roster placement invariant to private opponent board and setup state", () => {
+        const publicRoster = [CREATURES.GRIFFIN, CREATURES.BLACK_DRAGON];
+        const placeVariant = (privateState: boolean): { cells: XY[]; enemy: Unit } => {
+            const { units, enemy, context } = buildScenario({
+                shooters: 2,
+                groundMelee: 3,
+                enemyArmor: privateState ? 210 : 10,
+                enemyAttack: privateState ? 90 : 10,
+            });
+            placeUnit(context.grid, context.unitsHolder, enemy, privateState ? { x: 14, y: 14 } : { x: 1, y: 12 });
+            enemy.setAmountAlive(privateState ? 73 : 3);
+            enemy.setStackPower(privateState ? 5 : 1);
+            if (privateState) {
+                enemy.increaseAttackMod(80);
+                enemy.setRangeShotDistance(3);
+                enemy.setSynergies(["Nature:PLUS_FLY_ARMOR"]);
+                enemy.applyAuraEffect("Armor Augment", "private setup", true, 3, "");
+                enemy.applyAuraEffect("Movement Augment", "private setup", true, 3, "");
+                enemy.setOnHourglass(true);
+                enemy.setResponded(true);
+                enemy.setMovedThisTurn(true);
+                enemy.setTarget("private-target");
+            }
+
+            const placement = v07.placeArmy(units, {
+                ...context,
+                setupPlacementPolicy: "public-roster",
+                publicOpponentCreatureIds: publicRoster,
+            });
+            return { cells: units.map((unit) => placement.get(unit.getId())!), enemy };
+        };
+
+        const control = placeVariant(false);
+        const privateVariant = placeVariant(true);
+
+        expect(control.enemy.getBaseCell()).not.toEqual(privateVariant.enemy.getBaseCell());
+        expect(control.enemy.getAmountAlive()).not.toBe(privateVariant.enemy.getAmountAlive());
+        expect(control.enemy.getStackPower()).not.toBe(privateVariant.enemy.getStackPower());
+        expect(control.enemy.getBaseArmor()).not.toBe(privateVariant.enemy.getBaseArmor());
+        expect(control.enemy.getAttack()).not.toBe(privateVariant.enemy.getAttack());
+        expect(privateVariant.enemy.hasBuffActive("Armor Augment")).toBe(true);
+        expect(privateVariant.enemy.hasBuffActive("Movement Augment")).toBe(true);
+        expect(privateVariant.enemy.isOnHourglass()).toBe(true);
+        expect(privateVariant.enemy.getResponded()).toBe(true);
+        expect(privateVariant.enemy.hasMovedThisTurn()).toBe(true);
+        expect(privateVariant.enemy.getTarget()).toBe("private-target");
+        expect(samePlacement(control.cells, privateVariant.cells)).toBe(true);
     });
 });
 
