@@ -14,26 +14,92 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { GridType } from "../../generated/protobuf/v1/types_gen";
 import { LifeSynergy, ChaosSynergy, MightSynergy, NatureSynergy } from "../../synergies/synergy_properties";
 
-/**
- * Fair, phase-local information that a ranked setup policy may use in addition to its decision's explicit
- * arguments. This is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement,
- * artifacts, perk, augments, synergies, stack sizes, or positions through this boundary.
- */
-export interface ISetupDecisionContext {
+interface ISetupDecisionContextBase {
     /**
      * Deduplicated opponent creature identities publicly known to this seat at the current phase. During
      * placement the complete drafted roster is public; during earlier picks this may be only a public subset.
      */
     readonly publicOpponentCreatureIds: readonly number[];
-    /** Public map topology selected for this match. */
-    readonly gridType: GridType;
-    /** Number of cells along one side of the square combat grid. */
-    readonly gridSize: number;
+    /** Public map topology, once the ranked pick has revealed it. */
+    readonly gridType?: GridType;
+    /** Number of cells along one side of the square combat grid, when map topology is available. */
+    readonly gridSize?: number;
     /** This seat's selected perk, when the phase has one. Opponent perk information is intentionally absent. */
     readonly ownPerk?: number;
     /** This seat's selected artifact ids in pick/tier order. Opponent artifacts are intentionally absent. */
     readonly ownArtifactIds?: readonly number[];
 }
+
+/**
+ * Fair information available while selecting the Tier-2 artifact. The final level-4 picks have not happened
+ * yet, so the opponent roster is necessarily partial. Map topology is present only when ranked has revealed it.
+ */
+export interface ITier2ArtifactDecisionContext extends ISetupDecisionContextBase {
+    readonly decisionPhase: "tier2-artifact";
+    readonly opponentRosterVisibility: "partial";
+}
+
+/**
+ * Fair information available during placement. Both final rosters and the selected map are public, while
+ * opponent placement, stack sizes, setup choices, and live engine objects remain outside this boundary.
+ */
+export interface IPlacementSetupDecisionContext extends ISetupDecisionContextBase {
+    readonly decisionPhase: "placement";
+    readonly opponentRosterVisibility: "complete";
+    /** Public map topology selected for this match. */
+    readonly gridType: GridType;
+    /** Number of cells along one side of the square combat grid. */
+    readonly gridSize: number;
+}
+
+/**
+ * Fair, phase-local information that a ranked setup policy may use in addition to its decision's explicit
+ * arguments. The discriminants make it impossible to treat an earlier pick as a complete roster view. This
+ * is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement, artifacts, perk,
+ * augments, synergies, stack sizes, or positions through this boundary.
+ */
+export type ISetupDecisionContext = ITier2ArtifactDecisionContext | IPlacementSetupDecisionContext;
+
+type Tier2ArtifactDecisionContextInput = Omit<
+    ITier2ArtifactDecisionContext,
+    "decisionPhase" | "opponentRosterVisibility"
+>;
+type PlacementSetupDecisionContextInput = Omit<
+    IPlacementSetupDecisionContext,
+    "decisionPhase" | "opponentRosterVisibility"
+>;
+
+const freezePublicSetupFields = (context: ISetupDecisionContextBase): Readonly<ISetupDecisionContextBase> =>
+    Object.freeze({
+        publicOpponentCreatureIds: Object.freeze([...new Set(context.publicOpponentCreatureIds)]),
+        ...(context.gridType !== undefined && context.gridSize !== undefined
+            ? { gridType: context.gridType, gridSize: context.gridSize }
+            : {}),
+        ...(context.ownPerk !== undefined ? { ownPerk: context.ownPerk } : {}),
+        ...(context.ownArtifactIds ? { ownArtifactIds: Object.freeze([...context.ownArtifactIds]) } : {}),
+    });
+
+/** Construct the only legal earlier-pick context: partial opponent identities and no placement topology. */
+export const createTier2ArtifactDecisionContext = (
+    context: Tier2ArtifactDecisionContextInput,
+): Readonly<ITier2ArtifactDecisionContext> =>
+    Object.freeze({
+        ...freezePublicSetupFields(context),
+        decisionPhase: "tier2-artifact",
+        opponentRosterVisibility: "partial",
+    });
+
+/** Construct the complete public-roster context used after the ranked draft reaches placement. */
+export const createPlacementSetupDecisionContext = (
+    context: PlacementSetupDecisionContextInput,
+): Readonly<IPlacementSetupDecisionContext> =>
+    Object.freeze({
+        ...freezePublicSetupFields(context),
+        decisionPhase: "placement",
+        opponentRosterVisibility: "complete",
+        gridType: context.gridType,
+        gridSize: context.gridSize,
+    });
 
 /**
  * The setup AI's decision contract — the draft/placement counterpart to the in-fight IAIStrategy. A policy

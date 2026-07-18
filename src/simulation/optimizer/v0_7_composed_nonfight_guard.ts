@@ -511,7 +511,11 @@ function parseSetupPolicy(value: unknown): INonFightCandidatePolicy {
     if (typeof policy.synergy !== "string" || !SYNERGY_POLICY_VARIANTS.includes(policy.synergy as never)) {
         throw new Error("setup final policy has an invalid synergy variant");
     }
-    if (policy.placement !== "baseline" && policy.placement !== "legitimate-reveal") {
+    if (
+        policy.placement !== "baseline" &&
+        policy.placement !== "legitimate-reveal" &&
+        policy.placement !== "public-roster"
+    ) {
         throw new Error("setup final policy has an invalid placement variant");
     }
     if (policy.placementAugmentTiming !== "setup-before-placement") {
@@ -1192,12 +1196,17 @@ function composedCohorts(creatureIds: readonly number[]): V07ComposedNonfightCoh
     return classifyRankedDraftCohorts(creatureIds).map((cohort) => (cohort === "aura_heavy" ? "aura" : cohort));
 }
 
-function armySetup(policy: INonFightCandidatePolicy, army: IConditionalArmy) {
+function armySetup(policy: INonFightCandidatePolicy, army: IConditionalArmy, opponent: IConditionalArmy) {
     const resolved = compileNonFightSetupPolicy(policy, policy.id);
+    const placementUsesOpponentIds =
+        resolved.placement === "legitimate-reveal" || resolved.placement === "public-roster";
     return {
         augments: resolved.pickAugments(V07_SETUP_BUDGET, army.creatureIds),
         synergies: resolved.pickSynergies(army.creatureIds),
-        revealedCreatures: resolved.placement === "legitimate-reveal" ? army.revealedOpponentCreatures : undefined,
+        revealedCreatures: placementUsesOpponentIds ? army.revealedOpponentCreatures : undefined,
+        ...(resolved.placement === "public-roster"
+            ? { publicOpponentCreatures: [...new Set(opponent.creatureIds)] }
+            : {}),
         placement: resolved.placement,
     };
 }
@@ -1255,6 +1264,8 @@ export interface IV07ComposedPreparedMatch {
     baselineSynergies: IMatchConfig["greenSynergies"];
     candidateRevealedCreatures: IMatchConfig["greenRevealedCreatures"];
     baselineRevealedCreatures: IMatchConfig["greenRevealedCreatures"];
+    candidatePublicOpponentCreatures: IMatchConfig["greenPublicOpponentCreatures"];
+    baselinePublicOpponentCreatures: IMatchConfig["greenPublicOpponentCreatures"];
     setupFingerprint: string;
 }
 
@@ -1273,8 +1284,8 @@ export function prepareV07ComposedMatch(
         throw new Error("composed guard entrants must both use setup-before-placement");
     }
     const { pick, lowerArm, upperArm } = pickForAssignment(candidate, baseline, board, candidatePickedLower);
-    const lowerSetup = armySetup(lowerArm.policy, pick.lower);
-    const upperSetup = armySetup(upperArm.policy, pick.upper);
+    const lowerSetup = armySetup(lowerArm.policy, pick.lower, pick.upper);
+    const upperSetup = armySetup(upperArm.policy, pick.upper, pick.lower);
     const greenArmy = battleMirror === 0 ? pick.lower : pick.upper;
     const redArmy = battleMirror === 0 ? pick.upper : pick.lower;
     const greenSetup = battleMirror === 0 ? lowerSetup : upperSetup;
@@ -1305,6 +1316,10 @@ export function prepareV07ComposedMatch(
         redSynergies: redSetup.synergies,
         greenRevealedCreatures: greenSetup.revealedCreatures,
         redRevealedCreatures: redSetup.revealedCreatures,
+        ...(greenSetup.publicOpponentCreatures
+            ? { greenPublicOpponentCreatures: greenSetup.publicOpponentCreatures }
+            : {}),
+        ...(redSetup.publicOpponentCreatures ? { redPublicOpponentCreatures: redSetup.publicOpponentCreatures } : {}),
         greenSetupPlacementPolicy: greenSetup.placement,
         redSetupPlacementPolicy: redSetup.placement,
         placementAugmentTiming: "setup-before-placement",
@@ -1322,6 +1337,8 @@ export function prepareV07ComposedMatch(
         baselineSynergies: baselineSetup.synergies,
         candidateRevealedCreatures: candidateSetup.revealedCreatures,
         baselineRevealedCreatures: baselineSetup.revealedCreatures,
+        candidatePublicOpponentCreatures: candidateSetup.publicOpponentCreatures,
+        baselinePublicOpponentCreatures: baselineSetup.publicOpponentCreatures,
         setupFingerprint: fingerprintRankedDraftArtifact({
             lower: { army: pick.lower, setup: lowerSetup, policy: lowerArm.policy.id },
             upper: { army: pick.upper, setup: upperSetup, policy: upperArm.policy.id },

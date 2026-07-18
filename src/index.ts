@@ -84,7 +84,13 @@ export type {
 } from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
-export type { ISetupDecisionContext, ISetupPolicy } from "./ai/setup/setup_strategy";
+export { createPlacementSetupDecisionContext, createTier2ArtifactDecisionContext } from "./ai/setup/setup_strategy";
+export type {
+    IPlacementSetupDecisionContext,
+    ISetupDecisionContext,
+    ISetupPolicy,
+    ITier2ArtifactDecisionContext,
+} from "./ai/setup/setup_strategy";
 export { scoreCreature, creatureInfo } from "./ai/setup/creature_score";
 export {
     compileNonFightSetupPolicy,
@@ -94,6 +100,9 @@ export {
     V07_NONFIGHT_BEHAVIOR_SHA256,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
+    V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_PUBLIC_ROSTER_SETUP_SPEC,
 } from "./ai/setup/setup_ship";
 export type {
     IResolvedSetupPolicy,
@@ -102,6 +111,8 @@ export type {
     ISetupSynergyChoice,
     PlacementPolicyVariant,
     SetupCohort,
+    V07SetupPolicyBehaviorSha256,
+    V07SetupPolicySpec,
 } from "./ai/setup/setup_ship";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";

@@ -38,6 +38,9 @@ export {
     V07_NONFIGHT_BEHAVIOR_SHA256,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
+    V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_PUBLIC_ROSTER_SETUP_SPEC,
 } from "../../ai/setup/setup_ship";
 export type {
     IAugmentPlan,
@@ -54,6 +57,8 @@ export type {
     SetupCohort,
     SynergyPolicyVariant,
     T2PolicyVariant,
+    V07SetupPolicyBehaviorSha256,
+    V07SetupPolicySpec,
 } from "../../ai/setup/setup_ship";
 
 export const V07_SETUP_OVERNIGHT_SCHEMA_VERSION = 3;

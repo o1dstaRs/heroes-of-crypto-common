@@ -54,6 +54,11 @@ describe("v0.7 setup overnight search core", () => {
         expect(augmentCandidates.some(({ policy }) => policy.augmentsByCohort[augmentLane.cohort!].placement > 0)).toBe(
             true,
         );
+        const publicRosterLane = setupSearchLanes().find((lane) => lane.id === "placement/public-roster")!;
+        const publicRosterCandidates = candidatesForLane(publicRosterLane, shippedNonFightPolicy(), 0);
+        expect(publicRosterCandidates).toHaveLength(2);
+        expect(publicRosterCandidates[0].control).toBe(true);
+        expect(publicRosterCandidates[1].policy.placement).toBe("public-roster");
     });
 
     test("reproduces shipped conditional augments and classifies named risk surfaces", () => {

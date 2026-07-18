@@ -24,8 +24,13 @@ import {
     TIER2_ARTIFACT_WINRATE_RANGED,
     type ConditionalSetupRule,
 } from "./setup_conditional";
+import frozenV07PublicRosterArtifact from "./setup_policies/v07_nonfight_0847c0fa7739.json";
 import frozenV07NonFightArtifact from "./setup_policies/v07_nonfight_4eda84635fe7.json";
-import { TIER2_ARTIFACT_WINRATE, type ISetupDecisionContext } from "./setup_strategy";
+import {
+    TIER2_ARTIFACT_WINRATE,
+    type IPlacementSetupDecisionContext,
+    type ITier2ArtifactDecisionContext,
+} from "./setup_strategy";
 import { SETUP_POLICY_V0 } from "./setup_v0";
 import { pickSynergiesSituational, SYNERGY_ANCHOR_W, SYNERGY_OPTIONS } from "./synergy_score";
 
@@ -411,8 +416,8 @@ const deepFreeze = <T>(value: T): Readonly<T> => {
 };
 
 /**
- * Independent compiled copy of the only approved behavior. Keeping this separate from the JSON import makes
- * parseSetupPolicyArtifact a semantic boundary: a valid-looking policy cannot reuse the approved hash.
+ * Independent compiled copies of every approved behavior. Keeping these separate from the JSON imports makes
+ * parseSetupPolicyArtifact a semantic boundary: a valid-looking policy cannot reuse another artifact's hash.
  */
 const APPROVED_V07_NONFIGHT_BEHAVIOR = deepFreeze<ISetupPolicyBehavior>({
     augmentsByCohort: {
@@ -439,41 +444,92 @@ const APPROVED_V07_NONFIGHT_BEHAVIOR = deepFreeze<ISetupPolicyBehavior>({
 });
 const APPROVED_V07_NONFIGHT_CANONICAL = canonicalSetupPolicyBehavior(APPROVED_V07_NONFIGHT_BEHAVIOR);
 
+const APPROVED_V07_PUBLIC_ROSTER_BEHAVIOR = deepFreeze<ISetupPolicyBehavior>({
+    augmentsByCohort: {
+        "ranged-4plus": { placement: 0, armor: 3, might: 1, sniper: 3, movement: 0 },
+        "ranged-2to3": { placement: 0, armor: 2, might: 2, sniper: 3, movement: 0 },
+        "ranged-1": { placement: 0, armor: 3, might: 3, sniper: 1, movement: 0 },
+        "melee-magic": { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
+        mage: { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
+        "aura-heavy": { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
+        "melee-other": { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
+    },
+    tier2ByCohort: {
+        "ranged-4plus": "baseline",
+        "ranged-2to3": "promote:10",
+        "ranged-1": "promote:1",
+        "melee-magic": "baseline",
+        mage: "baseline",
+        "aura-heavy": "baseline",
+        "melee-other": "promote:4",
+    },
+    synergy: "flip-chaos",
+    placement: "public-roster",
+    placementAugmentTiming: "setup-before-placement",
+});
+const APPROVED_V07_PUBLIC_ROSTER_CANONICAL = canonicalSetupPolicyBehavior(APPROVED_V07_PUBLIC_ROSTER_BEHAVIOR);
+
 export const V07_NONFIGHT_SETUP_SPEC = "v07-nonfight-4eda84635fe7";
 export const V07_NONFIGHT_BEHAVIOR_SHA256 = "4eda84635fe7e3e9054e1d8161328ce61d45719734adf16acf98006eb3f88f57";
+export const V07_PUBLIC_ROSTER_SETUP_SPEC = "v07-nonfight-0847c0fa7739";
+export const V07_PUBLIC_ROSTER_BEHAVIOR_SHA256 = "0847c0fa77398a806f1e67da0760b619dde4ae5210304cdcfaad1d8daa2ead84";
 export const CONDITIONAL_SETUP_V1_SPEC = "conditional-v1";
 export const SETUP_V0_SPEC = "setup-v0";
 
+export type V07SetupPolicySpec = typeof V07_NONFIGHT_SETUP_SPEC | typeof V07_PUBLIC_ROSTER_SETUP_SPEC;
+export type V07SetupPolicyBehaviorSha256 =
+    typeof V07_NONFIGHT_BEHAVIOR_SHA256 | typeof V07_PUBLIC_ROSTER_BEHAVIOR_SHA256;
+
 export interface ISetupPolicyArtifact {
     schemaVersion: 1;
-    spec: typeof V07_NONFIGHT_SETUP_SPEC;
-    behaviorSha256: typeof V07_NONFIGHT_BEHAVIOR_SHA256;
+    spec: V07SetupPolicySpec;
+    behaviorSha256: V07SetupPolicyBehaviorSha256;
     policy: ISetupPolicyBehavior;
 }
+
+interface IApprovedSetupPolicy {
+    behaviorSha256: V07SetupPolicyBehaviorSha256;
+    canonicalBehavior: string;
+}
+
+const APPROVED_SETUP_POLICIES: Readonly<Record<V07SetupPolicySpec, Readonly<IApprovedSetupPolicy>>> = deepFreeze({
+    [V07_NONFIGHT_SETUP_SPEC]: {
+        behaviorSha256: V07_NONFIGHT_BEHAVIOR_SHA256,
+        canonicalBehavior: APPROVED_V07_NONFIGHT_CANONICAL,
+    },
+    [V07_PUBLIC_ROSTER_SETUP_SPEC]: {
+        behaviorSha256: V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+        canonicalBehavior: APPROVED_V07_PUBLIC_ROSTER_CANONICAL,
+    },
+});
 
 export function parseSetupPolicyArtifact(value: unknown): Readonly<ISetupPolicyArtifact> {
     const record = asRecord(value, "setup policy artifact");
     assertExactKeys(record, ["schemaVersion", "spec", "behaviorSha256", "policy"], "setup policy artifact");
     if (record.schemaVersion !== 1)
         throw new TypeError(`unsupported setup policy schema ${String(record.schemaVersion)}`);
-    if (record.spec !== V07_NONFIGHT_SETUP_SPEC)
+    if (typeof record.spec !== "string" || !Object.hasOwn(APPROVED_SETUP_POLICIES, record.spec)) {
         throw new TypeError(`unknown setup policy spec ${String(record.spec)}`);
-    if (record.behaviorSha256 !== V07_NONFIGHT_BEHAVIOR_SHA256) {
+    }
+    const spec = record.spec as V07SetupPolicySpec;
+    const approved = APPROVED_SETUP_POLICIES[spec];
+    if (record.behaviorSha256 !== approved.behaviorSha256) {
         throw new TypeError(`unknown setup policy behavior hash ${String(record.behaviorSha256)}`);
     }
     const policy = parseSetupPolicyBehavior(record.policy);
-    if (canonicalSetupPolicyBehavior(policy) !== APPROVED_V07_NONFIGHT_CANONICAL) {
-        throw new TypeError(`setup policy behavior does not match approved spec ${V07_NONFIGHT_SETUP_SPEC}`);
+    if (canonicalSetupPolicyBehavior(policy) !== approved.canonicalBehavior) {
+        throw new TypeError(`setup policy behavior does not match approved spec ${spec}`);
     }
     return deepFreeze({
         schemaVersion: 1,
-        spec: V07_NONFIGHT_SETUP_SPEC,
-        behaviorSha256: V07_NONFIGHT_BEHAVIOR_SHA256,
+        spec,
+        behaviorSha256: approved.behaviorSha256,
         policy,
     });
 }
 
 export const V07_NONFIGHT_SETUP_ARTIFACT = parseSetupPolicyArtifact(frozenV07NonFightArtifact);
+export const V07_PUBLIC_ROSTER_SETUP_ARTIFACT = parseSetupPolicyArtifact(frozenV07PublicRosterArtifact);
 
 export type ResolvedSetupPolicyMode = "setup-v0" | "conditional-v1" | "optimized-v07";
 
@@ -490,18 +546,18 @@ export interface IResolvedSetupPolicy {
     pickArtifactT2(
         offered: readonly number[],
         ownCreatureIds: readonly number[],
-        context?: Readonly<ISetupDecisionContext>,
+        context?: Readonly<ITier2ArtifactDecisionContext>,
     ): number;
     /** Own roster identities are deduplicated; context contains only the fair opponent/map view. */
     pickAugments(
         budget: number,
         ownCreatureIds: readonly number[],
-        context?: Readonly<ISetupDecisionContext>,
+        context?: Readonly<IPlacementSetupDecisionContext>,
     ): ISetupAugmentChoice[];
     /** One entry per own physical stack; duplicate creature ids created by a legal split remain significant. */
     pickSynergies(
         ownCreatureStackIds: readonly number[],
-        context?: Readonly<ISetupDecisionContext>,
+        context?: Readonly<IPlacementSetupDecisionContext>,
     ): ISetupSynergyChoice[];
 }
 
@@ -592,10 +648,13 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
     if (normalized === V07_NONFIGHT_SETUP_SPEC) {
         return compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
     }
+    if (normalized === V07_PUBLIC_ROSTER_SETUP_SPEC) {
+        return compileNonFightSetupPolicy(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy, V07_PUBLIC_ROSTER_SETUP_SPEC);
+    }
     const rules = conditionalRulesForSpec(normalized);
     if (rules) return conditionalPolicy(rules);
     throw new Error(
-        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${V07_NONFIGHT_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
+        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${V07_NONFIGHT_SETUP_SPEC}, ${V07_PUBLIC_ROSTER_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
     );
 }
 

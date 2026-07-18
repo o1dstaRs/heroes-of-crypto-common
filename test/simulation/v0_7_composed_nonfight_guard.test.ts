@@ -296,6 +296,17 @@ describe("v0.7 composed non-fight guard inputs", () => {
         expect(setup.policy.placementAugmentTiming).toBe("setup-before-placement");
     });
 
+    test("accepts public-roster as an explicit completed setup candidate", () => {
+        const runId = "composed-public-roster-input-test";
+        const fixture = validArtifacts(runId);
+        writeJson(fixture.setupPath, {
+            ...fixture.setup,
+            policy: { ...fixture.setup.policy, placement: "public-roster" },
+        });
+
+        expect(loadV07ComposedSetupCandidate(fixture.setupPath, runId).policy.placement).toBe("public-roster");
+    });
+
     test("fails closed on a reconstructed draft mismatch and a setup auto-bake marker", () => {
         const runId = "composed-rejection-test";
         const fixture = validArtifacts(runId);
@@ -1028,6 +1039,32 @@ describe("v0.7 composed four-game evaluator", () => {
         expect(prepared.every((match) => match.candidateRevealedCreatures !== undefined)).toBe(true);
         expect(prepared.every((match) => match.baselineRevealedCreatures === undefined)).toBe(true);
         expect(new Set(prepared.map((match) => match.candidateSide))).toEqual(new Set(["green", "red"]));
+    });
+
+    test("supplies the complete opposing roster only to a public-roster placement arm", () => {
+        const baseline = controlArm();
+        const policy = cloneNonFightPolicy(shippedNonFightPolicy("public-roster-final-setup"));
+        policy.placement = "public-roster";
+        const candidate: IV07ComposedArm = {
+            id: "public-roster-final",
+            genome: projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC)),
+            policy,
+        };
+        const ledger = buildV07ComposedSeedLedger(
+            "public-roster-wiring",
+            "a".repeat(64),
+            { naturalBoards: 2, cohortBoards: 2, cohortScanMaxBoards: 10, symmetryBoards: 2, replayBoards: 1 },
+            () => true,
+        );
+        const board = ledger.boards.find((entry) => entry.panel === "natural")!;
+        const prepared = prepareV07ComposedMatch(candidate, baseline, board, true, 0);
+
+        expect(prepared.candidateSide).toBe("green");
+        expect(prepared.candidatePublicOpponentCreatures).toEqual(prepared.baselineArmyCreatureIds);
+        expect(prepared.baselinePublicOpponentCreatures).toBeUndefined();
+        expect(prepared.config.greenPublicOpponentCreatures).toEqual(prepared.baselineArmyCreatureIds);
+        expect(prepared.config.redPublicOpponentCreatures).toBeUndefined();
+        expect(prepared.candidateRevealedCreatures).toBeDefined();
     });
 });
 

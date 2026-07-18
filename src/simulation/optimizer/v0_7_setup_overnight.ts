@@ -87,6 +87,7 @@ export function setupSearchLanes(): ISetupSearchLane[] {
         ...SETUP_COHORTS.map((cohort) => ({ id: `tier2/${cohort}`, family: "tier2" as const, cohort, eligible: true })),
         { id: "synergy/situational", family: "synergy", eligible: true },
         { id: "placement/legitimate-reveal", family: "placement-reveal", eligible: true },
+        { id: "placement/public-roster", family: "placement-reveal", eligible: true },
     ];
 }
 
@@ -134,7 +135,7 @@ export function candidatesForLane(
     } else {
         const policy = cloneNonFightPolicy(incumbent);
         policy.id = `${lane.id}/on`;
-        policy.placement = "legitimate-reveal";
+        policy.placement = lane.id === "placement/public-roster" ? "public-roster" : "legitimate-reveal";
         candidates.push({ policy, control: false });
     }
     if (candidateLimit > 0 && candidates.length > candidateLimit) {
@@ -274,8 +275,14 @@ function playCandidateSide(
         },
     });
     const candidateArmy = candidateTeam === LOWER ? pick.lower : pick.upper;
+    const opponentArmy = candidateTeam === LOWER ? pick.upper : pick.lower;
     const setup = candidateArmySetup(policy, candidateArmy);
-    const candidateReveals = policy.placement === "legitimate-reveal" ? candidateArmy.revealedOpponentCreatures : [];
+    const candidateReveals =
+        policy.placement === "legitimate-reveal" || policy.placement === "public-roster"
+            ? candidateArmy.revealedOpponentCreatures
+            : [];
+    const candidatePublicOpponentCreatures =
+        policy.placement === "public-roster" ? [...new Set(opponentArmy.creatureIds)] : undefined;
     const candidateIsLower = candidateTeam === LOWER;
     const config: IMatchConfig = {
         greenVersion: V07_SETUP_FIGHT_VERSION,
@@ -296,6 +303,12 @@ function playCandidateSide(
         redSynergies: candidateIsLower ? pick.upper.synergies : setup.synergies,
         greenRevealedCreatures: candidateIsLower ? candidateReveals : undefined,
         redRevealedCreatures: candidateIsLower ? undefined : candidateReveals,
+        ...(candidateIsLower && candidatePublicOpponentCreatures
+            ? { greenPublicOpponentCreatures: candidatePublicOpponentCreatures }
+            : {}),
+        ...(!candidateIsLower && candidatePublicOpponentCreatures
+            ? { redPublicOpponentCreatures: candidatePublicOpponentCreatures }
+            : {}),
         greenSetupPlacementPolicy: candidateIsLower ? setup.placement : "baseline",
         redSetupPlacementPolicy: candidateIsLower ? "baseline" : setup.placement,
         placementAugmentTiming: policy.placementAugmentTiming,

@@ -19,6 +19,9 @@ import {
     V07_NONFIGHT_BEHAVIOR_SHA256,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
+    V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_PUBLIC_ROSTER_SETUP_SPEC,
     type ISetupPolicyBehavior,
     type SetupCohort,
 } from "../../src/ai/setup/setup_ship";
@@ -140,6 +143,52 @@ describe("frozen v0.7 non-fight setup artifact", () => {
             }),
         ).toThrow("does not match approved spec");
     });
+
+    test("freezes the public-roster candidate as a placement-only delta", () => {
+        expect(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.spec).toBe(V07_PUBLIC_ROSTER_SETUP_SPEC);
+        expect(
+            createHash("sha256")
+                .update(canonicalSetupPolicyBehavior(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy))
+                .digest("hex"),
+        ).toBe(V07_PUBLIC_ROSTER_BEHAVIOR_SHA256);
+        expect(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.placement).toBe("public-roster");
+        expect({
+            ...V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy,
+            placement: V07_NONFIGHT_SETUP_ARTIFACT.policy.placement,
+        }).toEqual(V07_NONFIGHT_SETUP_ARTIFACT.policy);
+        expect(Object.isFrozen(V07_PUBLIC_ROSTER_SETUP_ARTIFACT)).toBe(true);
+        expect(Object.isFrozen(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy)).toBe(true);
+        expect(Object.isFrozen(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.tier2ByCohort)).toBe(true);
+    });
+
+    test("rejects cross-spec hash and behavior substitution", () => {
+        expect(() =>
+            parseSetupPolicyArtifact({
+                ...V07_NONFIGHT_SETUP_ARTIFACT,
+                spec: V07_PUBLIC_ROSTER_SETUP_SPEC,
+                behaviorSha256: V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+            }),
+        ).toThrow(`does not match approved spec ${V07_PUBLIC_ROSTER_SETUP_SPEC}`);
+        expect(() =>
+            parseSetupPolicyArtifact({
+                ...V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+                spec: V07_NONFIGHT_SETUP_SPEC,
+                behaviorSha256: V07_NONFIGHT_BEHAVIOR_SHA256,
+            }),
+        ).toThrow(`does not match approved spec ${V07_NONFIGHT_SETUP_SPEC}`);
+        expect(() =>
+            parseSetupPolicyArtifact({
+                ...V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+                spec: V07_NONFIGHT_SETUP_SPEC,
+            }),
+        ).toThrow("unknown setup policy behavior hash");
+        expect(() =>
+            parseSetupPolicyArtifact({
+                ...V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
+                spec: "v07-nonfight-unknown",
+            }),
+        ).toThrow("unknown setup policy spec");
+    });
 });
 
 describe("v0.7 setup ship resolver", () => {
@@ -156,6 +205,16 @@ describe("v0.7 setup ship resolver", () => {
         expect(resolveSetupPolicy("conditional-setup-v1:sniper+t2").rules).toEqual(["sniper", "t2"]);
         expect(optimized.mode).toBe("optimized-v07");
         expect(optimized.placement).toBe("legitimate-reveal");
+        const publicRoster = resolveSetupPolicy(V07_PUBLIC_ROSTER_SETUP_SPEC);
+        expect(publicRoster).toMatchObject({
+            mode: "optimized-v07",
+            spec: V07_PUBLIC_ROSTER_SETUP_SPEC,
+            journalVersion: V07_PUBLIC_ROSTER_SETUP_SPEC,
+            placement: "public-roster",
+        });
+        expect(publicRoster.pickAugments(7, rosterForCohort("ranged-2to3"))).toEqual(
+            optimized.pickAugments(7, rosterForCohort("ranged-2to3")),
+        );
         expect(() => resolveSetupPolicy("latest")).toThrow("Invalid setup policy spec");
         expect(() => resolveSetupPolicy("snper")).toThrow("Invalid setup policy spec");
     });
