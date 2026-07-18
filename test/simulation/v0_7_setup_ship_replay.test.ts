@@ -6,11 +6,11 @@ import { V07_NONFIGHT_SETUP_ARTIFACT, type INonFightCandidatePolicy } from "../.
 import { evaluateSetupPair } from "../../src/simulation/optimizer/v0_7_setup_overnight";
 
 const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
-// Re-pinned after 4490607 (balance: nerf Cursed Ward/Iron Plate/Keen Blade, boost Swift Boots, halve
-// Longbow def penalty). Bisect confirmed the replay digest changes at exactly that commit and nowhere
-// else — the drift is entirely the intended artifact rebalance flowing into evaluateSetupPair, not a
-// resolver regression (the commit's army.ts COHORT filter is env-gated off and does not affect this).
-const EXPECTED_REPLAY_SHA256 = "70e0621e0ac524bdd5b0060861a6d6e781576918a54115735099c3ae15f0e966";
+// Re-pinned after 4a68de8 fixed full-unit HP-cap refreshes and 9845c43 adjusted three creature stats.
+// Clean-source isolation showed 4a68de8 alone changed only both traces for seed 2147598935 (whose roster
+// contains Behemoth/Unyielding Power), while 9845c43 independently changed roster/combat traces. Two
+// exact-9845c43 runs produced this byte-identical digest; this fixture is intentionally balance sensitive.
+const EXPECTED_REPLAY_SHA256 = "6681c00cb61091e4be8fb28035039ccbc2d517b3d87b0cbf49279a191922624c";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

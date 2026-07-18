@@ -290,6 +290,42 @@ describe("Unit", () => {
             expect(mechanism.getHp()).toBe(wounded);
         });
 
+        it("keeps a full unit full when a max-HP buff raises its cap", () => {
+            const unit = createTestUnit({ maxHp: 100 });
+            const pendant = spell("System", "Pendant of Vitality");
+            pendant.setPower(25);
+
+            unit.applyBuff(pendant);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(unit.getMaxHp()).toBe(125);
+            expect(unit.getHp()).toBe(125);
+        });
+
+        it("preserves a wounded unit's current HP when a max-HP buff raises its cap", () => {
+            const unit = createTestUnit({ maxHp: 100 });
+            const pendant = spell("System", "Pendant of Vitality");
+            pendant.setPower(25);
+            unit.applyDamage(20, 0, new SceneLogMock());
+
+            unit.applyBuff(pendant);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(unit.getMaxHp()).toBe(125);
+            expect(unit.getHp()).toBe(80);
+        });
+
+        it("clamps current HP when a max-HP debuff lowers the cap below it", () => {
+            const unit = createTestUnit({ maxHp: 100 });
+            unit.applyDamage(20, 0, new SceneLogMock());
+
+            unit.applyDebuff(spell("Life", "Helping Hand"), 100, 10);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(unit.getMaxHp()).toBe(70);
+            expect(unit.getHp()).toBe(70);
+        });
+
         it("adjusts morale, armor, attack modifiers, and armageddon damage", () => {
             const unit = createTestUnit({
                 amountAlive: 10,
