@@ -37,7 +37,7 @@ export enum Tier1Artifact {
     DUAL_STRIKE_CHARM = 7, // +50% damage on a unit's second attack
     WOUNDING_CHARM = 8, // +1 Deep Wounds stack to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
-    HUNTERS_LONGBOW = 10, // +1 flat ranged atk / -15% ranged def, or +2 flat ranged atk if 3+ archers
+    HUNTERS_LONGBOW = 10, // +1 flat ranged atk / -7.5% ranged def, or +2 atk / -15% def with 3+ archers
     HELM_OF_FOCUS = 11, // +25% mind resist
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
 }
@@ -251,7 +251,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "hunters_longbow",
         "Hunter's Longbow",
         "Hunters Longbow",
-        "Ranged units gain +{} attack and -[]% defense (or +2 attack and -30% defense with 3+ archers).",
+        "Ranged units gain +{} attack and -[]% defense (or +2 attack and -15% defense with 3+ archers).",
     ),
     [Tier1Artifact.HELM_OF_FOCUS]: t1(
         Tier1Artifact.HELM_OF_FOCUS,

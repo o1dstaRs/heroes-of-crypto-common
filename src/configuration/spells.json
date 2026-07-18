@@ -332,7 +332,7 @@
         "Hunters Longbow": {
             "name": "Hunters Longbow",
             "level": 0,
-            "desc": ["Artifact. Ranged units gain +{}% attack and -[]% defense.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Ranged units gain +{} attack and -[]% defense.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
