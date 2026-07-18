@@ -14,6 +14,7 @@ import { describe, expect, it } from "bun:test";
 import {
     AI_META_COHORTS,
     AI_META_MAPS,
+    AI_META_RECORDED_MAPS,
     cohortArchetypes,
     cohortMap,
     generateMetaMatchup,
@@ -24,7 +25,12 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "../../src/simulation/ai_meta_cohorts_core";
-import { AiMetaAccumulator, sanitizedAiMetaEnvironment } from "../../src/simulation/measure_ai_meta_cohorts";
+import {
+    AiMetaAccumulator,
+    AiMetaAggregation,
+    sanitizedAiMetaEnvironment,
+    validateAiMetaGamesPerCohort,
+} from "../../src/simulation/measure_ai_meta_cohorts";
 
 const options = (cohort: (typeof AI_META_COHORTS)[number], games = 32): IAiMetaRunOptions => ({
     cohort,
@@ -71,7 +77,8 @@ describe("AI meta cohort generation", () => {
 
         const mapsByMatchup = new Map<string, Set<number>>();
         const mapCounts = new Map<number, number>();
-        for (let pair = 0; pair < 48; pair += 1) {
+        const completeCycle = 12 * AI_META_MAPS.length;
+        for (let pair = 0; pair < completeCycle; pair += 1) {
             const matchup = cohortArchetypes("cross-archetype", pair).join(":");
             const map = cohortMap("cross-archetype", pair);
             const seen = mapsByMatchup.get(matchup) ?? new Set<number>();
@@ -80,7 +87,9 @@ describe("AI meta cohort generation", () => {
             mapCounts.set(map, (mapCounts.get(map) ?? 0) + 1);
         }
         expect([...mapsByMatchup.values()].every((maps) => maps.size === AI_META_MAPS.length)).toBe(true);
-        expect(AI_META_MAPS.map((map) => mapCounts.get(map))).toEqual([12, 12, 12, 12]);
+        expect(AI_META_MAPS.map((map) => mapCounts.get(map))).toEqual([12, 12, 12]);
+        expect(AI_META_MAPS).toEqual([1, 3, 4]);
+        expect(AI_META_RECORDED_MAPS).toEqual([1, 2, 3, 4]);
     });
 
     it("makes contextual setup deterministic while retaining exploration support", () => {
@@ -133,9 +142,44 @@ describe("AI meta cohort generation", () => {
         expect(environment.LIVETWIN).toBe("1");
         expect(environment.FIGHT_MELEE_ROSTERS).toBe("0");
     });
+
+    it("only accepts complete three-map seat-swap cycles", () => {
+        for (const games of [6, 72, 150_000]) expect(() => validateAiMetaGamesPerCohort(games)).not.toThrow();
+        for (const games of [0, 2, 4, 8, 12.5, Number.NaN]) {
+            expect(() => validateAiMetaGamesPerCohort(games)).toThrow("divisible by 6");
+        }
+    });
 });
 
 describe("AI meta aggregation", () => {
+    it("builds pooled, cohort, live, and recorded-map dimensions", () => {
+        const first = prepareMetaPair(options("uniform-mixed", 4), 0);
+        const second = prepareMetaPair(options("uniform-mixed", 4), 1);
+        const aggregation = new AiMetaAggregation();
+        aggregation.add({
+            ...first,
+            map: 1,
+            games: [outcome(true, "a"), outcome(false, "a")],
+        });
+        aggregation.add({
+            ...second,
+            map: 2,
+            games: [outcome(true, "b"), outcome(false, "b")],
+        });
+
+        expect(aggregation.get("all", "all")?.pairs).toBe(2);
+        expect(aggregation.get("uniform-mixed", "all")?.pairs).toBe(2);
+        expect(aggregation.get("all", "live")?.pairs).toBe(1);
+        expect(aggregation.get("uniform-mixed", "live")?.pairs).toBe(1);
+        expect(aggregation.get("all", 1)?.pairs).toBe(1);
+        expect(aggregation.get("all", 2)?.pairs).toBe(1);
+        expect(aggregation.get("uniform-mixed", 2)?.pairs).toBe(1);
+
+        const tier1Rows = aggregation.rows().artifactsT1;
+        expect(new Set(tier1Rows.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 2]));
+        expect(tier1Rows.every((row) => row.map !== undefined)).toBe(true);
+    });
+
     it("uses the two-game matchup as one confidence cluster and attributes physical seat swaps", () => {
         const prepared = prepareMetaPair(options("uniform-mixed", 2), 0);
         const record: IAiMetaPairRecord = {

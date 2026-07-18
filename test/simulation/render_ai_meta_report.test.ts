@@ -45,6 +45,7 @@ describe("render_ai_meta_report", () => {
                         imageKey: "tsar_cannon_512",
                         cohort: "melee",
                         games: 11_000,
+                        pairs: 5_500,
                         scoreRate: 0.48,
                     },
                 ],
@@ -55,6 +56,7 @@ describe("render_ai_meta_report", () => {
                         imageKey: "artifact_t1_cursed_ward_256",
                         cohort: "ranged",
                         games: 9_000,
+                        pairs: 4_500,
                         scoreRate: 0.52,
                         winRate: 53,
                         ciLow: 0.52,
@@ -63,9 +65,19 @@ describe("render_ai_meta_report", () => {
                     },
                 ],
                 artifactsT2: [],
-                augmentPlans: [{ key: "A2-M2-S3", name: "Balanced marksmen", cohort: "ranged", winRate: 0.51 }],
+                augmentPlans: [
+                    { key: "A2-M2-S3", name: "Balanced marksmen", cohort: "ranged", pairs: 200, winRate: 0.51 },
+                ],
                 augmentLevels: [
-                    { key: "sniper-3", kind: "Sniper", level: 3, cohort: "ranged", winRate: 0.55, pickRate: 0.7 },
+                    {
+                        key: "sniper-3",
+                        kind: "Sniper",
+                        level: 3,
+                        cohort: "ranged",
+                        pairs: 300,
+                        winRate: 0.55,
+                        pickRate: 0.7,
+                    },
                 ],
             },
         });
@@ -78,14 +90,108 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain('data-sort="winRate">Win rate');
         expect(html).toContain('"scoreRate":0.52,"winRate":0.53,"rate":0.52');
         expect(html).toContain('id="cohort-tabs"');
+        expect(html).toContain('id="map-filter"');
+        expect(html).toContain('id="filter-coverage"');
         expect(html).toContain('id="scatter"');
         expect(html).toContain('id="heatmap"');
         expect(html).toContain('id="ranking-body"');
         expect(html).toContain("Tsar Cannon");
         expect(html).toContain("artifact_t1_cursed_ward_256");
+        expect(html).toContain('"map":"all"');
         expect(html).toMatch(/data:image\/(?:webp|svg\+xml);base64,/);
         expect(html).not.toContain("<script src=");
         expect(html).not.toContain('<link rel="stylesheet"');
+    });
+
+    test("filters orthogonal cohort and map rankings with live maps as the default", () => {
+        const liveUnits = Array.from({ length: 18 }, (_, index) => ({
+            key: `live-unit-${index + 1}`,
+            name: `Live Unit ${index + 1}`,
+            cohort: "all",
+            map: "live",
+            level: (index % 4) + 1,
+            pairs: 2_000 - index,
+            scoreRate: 0.7 - index / 100,
+        }));
+        const html = renderAiMetaReport({
+            cohorts: [
+                {
+                    cohort: "ranked-draft",
+                    games: 150_000,
+                    mapGames: { 1: 37_500, 2: 37_500, 3: 37_500, 4: 37_500 },
+                },
+            ],
+            rankings: {
+                units: [
+                    ...liveUnits,
+                    { key: "all-unit", name: "All Simulated Unit", cohort: "all", map: "all", scoreRate: 0.51 },
+                    { key: "normal-unit", name: "Normal Unit", cohort: "all", map: 1, scoreRate: 0.52 },
+                    { key: "lava-unit", name: "Lava Unit", cohort: "all", map: 3, scoreRate: 0.53 },
+                    { key: "block-unit", name: "Block Unit", cohort: "all", map: 4, scoreRate: 0.54 },
+                    { key: "water-unit", name: "Water Unit", cohort: "all", map: 2, scoreRate: 0.55 },
+                    { key: "legacy-unit", name: "Legacy Unit", cohort: "all", scoreRate: 0.5 },
+                ],
+            },
+        });
+
+        expect(html).toContain('"map":"live"');
+        expect(html).toContain('"map":"1"');
+        expect(html).toContain('"map":"2"');
+        expect(html).toContain('"key":"legacy-unit","name":"Legacy Unit"');
+        expect(html).toContain('"mapGames":{"1":37500,"2":37500,"3":37500,"4":37500}');
+        expect(html).toContain("Live rankings exclude Water");
+        expect(html).toContain("Water · NON-LIVE");
+        expect(html).toContain('var defaultMap=reportedMaps.has("live")?"live"');
+        expect(html).toContain('if(category.key!=="units")candidates=candidates.slice(0,12)');
+        expect(html).not.toContain('slice(0,category.key==="units"?16:12)');
+        expect(html).toContain('var unitLevel=row.category==="units"&&row.level?"L"+row.level+" · ":""');
+        expect(html).toContain("selectedMapRows(rows).forEach");
+        expect(html).toContain('data-sort="map">Map');
+        expect(html).toContain("empty.colSpan=13");
+        expect(html).toContain(".filter-row{display:flex;flex-wrap:wrap");
+        expect(html).toContain(".cohort-tabs{display:flex;flex:1 1 100%;flex-wrap:wrap");
+        expect(html).toContain("flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px");
+    });
+
+    test("keeps zero-support buckets auditable without allowing them into comparative views", () => {
+        const html = renderAiMetaReport({
+            rankings: {
+                artifactsT2: [
+                    { key: "unsupported", name: "Unsupported", cohort: "all", pairs: 0, scoreRate: 0.99 },
+                    { key: "supported", name: "Supported", cohort: "all", pairs: 12, scoreRate: 0.6 },
+                ],
+            },
+        });
+
+        expect(html).toContain("Unsupported");
+        expect(html).toMatch(/"key":"unsupported"[^}]+"pairs":0[^}]+"scoreRate":0\.99[^}]+"rate":null/);
+        expect(html).toMatch(/"key":"supported"[^}]+"pairs":12[^}]+"rate":0\.6/);
+        expect(html).toContain("function supported(row){return finite(row.pairs)&&row.pairs>0}");
+        expect(html).toContain(".filter(supported)");
+        expect(html).toContain("if(!supported(row)||!finite(row.rate)");
+    });
+
+    test("labels a direct legacy four-map aggregate as non-live evidence", () => {
+        const html = renderAiMetaReport({
+            provenance: { maps: [1, 2, 3, 4] },
+            cohorts: [
+                {
+                    cohort: "ranked-draft",
+                    games: 150_000,
+                    mapGames: { 1: 37_500, 2: 37_500, 3: 37_500, 4: 37_500 },
+                },
+            ],
+            rankings: {
+                units: [{ key: "legacy", name: "Legacy aggregate", cohort: "all", pairs: 75_000, scoreRate: 0.51 }],
+            },
+        });
+
+        expect(html).toContain("Aggregate includes NON-LIVE Water");
+        expect(html).toContain("This legacy summary includes Water");
+        expect(html).toContain("All simulated · includes NON-LIVE Water");
+        expect(html).toContain('"key":"legacy","name":"Legacy aggregate"');
+        expect(html).toContain('"map":"all"');
+        expect(html).not.toContain("Live rankings exclude Water");
     });
 
     test("missing and hostile optional fields cannot break or escape the embedded JSON", () => {

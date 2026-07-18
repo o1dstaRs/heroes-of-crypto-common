@@ -62,12 +62,20 @@ export const AI_META_AUGMENT_BUDGET = 7;
 
 export const AI_META_MAPS = [
     PBTypes.GridVals.NORMAL,
+    PBTypes.GridVals.LAVA_CENTER,
+    PBTypes.GridVals.BLOCK_CENTER,
+] as const;
+
+/** All protocol map ids accepted when re-reading historical cohort records. Water is no longer live. */
+export const AI_META_RECORDED_MAPS = [
+    PBTypes.GridVals.NORMAL,
     PBTypes.GridVals.WATER_CENTER,
     PBTypes.GridVals.LAVA_CENTER,
     PBTypes.GridVals.BLOCK_CENTER,
 ] as const;
 
 export type AiMetaMap = (typeof AI_META_MAPS)[number];
+export type AiMetaRecordedMap = (typeof AI_META_RECORDED_MAPS)[number];
 
 export const AI_META_COHORTS = [
     "ranked-draft",
@@ -161,7 +169,7 @@ export interface IAiMetaPairRecord {
     pair: number;
     setupSeed: number;
     combatSeed: number;
-    map: AiMetaMap;
+    map: AiMetaRecordedMap;
     armyA: IAiMetaArmy;
     armyB: IAiMetaArmy;
     games: [IAiMetaGameOutcome, IAiMetaGameOutcome];
@@ -338,7 +346,7 @@ export function cohortMap(cohort: AiMetaCohort, pair: number): AiMetaMap {
     if (cohort !== "cross-archetype") return AI_META_MAPS[pair % AI_META_MAPS.length];
 
     // Rotate every ordered matchup through every map. Adding the matchup index keeps
-    // each complete 12-matchup block exactly balanced across the four maps.
+    // each complete 12-matchup block exactly balanced across the live maps.
     const matchupIndex = pair % CROSS_ORDERED_MATCHUPS.length;
     const block = Math.floor(pair / CROSS_ORDERED_MATCHUPS.length);
     return AI_META_MAPS[(block + matchupIndex) % AI_META_MAPS.length];
@@ -409,7 +417,7 @@ function tier2ContextScore(
     id: number,
     own: IAiMetaArmyFeatures,
     opponent: IAiMetaArmyFeatures,
-    map: AiMetaMap,
+    map: AiMetaRecordedMap,
 ): number {
     const ownRanged = fraction(own.ranged, own.total);
     const ownGround = fraction(own.groundMelee, own.total);
@@ -450,7 +458,7 @@ function chooseArtifact(
     tier: 1 | 2,
     own: IAiMetaArmyFeatures,
     opponent: IAiMetaArmyFeatures,
-    map: AiMetaMap,
+    map: AiMetaRecordedMap,
     rng: () => number,
 ): IAiMetaArtifactChoice {
     const ids = tier === 1 ? TIER1_IDS : TIER2_IDS;
@@ -540,7 +548,7 @@ export function chooseMetaArmy(
     archetype: AiMetaArchetype,
     roster: IArmyUnitSpec[],
     opponentRoster: readonly IArmyUnitSpec[],
-    map: AiMetaMap,
+    map: AiMetaRecordedMap,
     seed: number,
 ): IAiMetaArmy {
     const creatureIds = creatureIdsForRoster(roster);

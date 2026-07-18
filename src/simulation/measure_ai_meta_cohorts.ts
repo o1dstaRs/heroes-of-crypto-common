@@ -26,6 +26,7 @@ import {
     AI_META_GAMES_PER_MATCHUP,
     AI_META_MAPS,
     AI_META_POLICY,
+    AI_META_RECORDED_MAPS,
     AI_META_SCHEMA_VERSION,
     allAugmentPlans,
     artifactImageKey,
@@ -33,6 +34,7 @@ import {
     rosterSignature,
     rostersAreStrictlyDistinct,
     type AiMetaCohort,
+    type AiMetaRecordedMap,
     type IAiMetaArmy,
     type IAiMetaGameOutcome,
     type IAiMetaPairRecord,
@@ -137,6 +139,7 @@ interface IMetricBucket {
 
 export interface IAiMetaMetricRow {
     cohort: string;
+    map: AiMetaMapDimension;
     key: string;
     name: string;
     imageKey?: string;
@@ -168,7 +171,9 @@ export interface IAiMetaMetricRow {
     policyCiHigh: number;
 }
 
-interface ICohortQuality {
+export type AiMetaMapDimension = "all" | "live" | AiMetaRecordedMap;
+
+export interface ICohortQuality {
     cohort: string;
     description: string;
     pairs: number;
@@ -187,19 +192,21 @@ interface ICohortQuality {
     rawPath: string;
 }
 
-interface IAiMetaSummary {
+export interface IAiMetaRankings {
+    units: IAiMetaMetricRow[];
+    artifactsT1: IAiMetaMetricRow[];
+    artifactsT2: IAiMetaMetricRow[];
+    augmentPlans: IAiMetaMetricRow[];
+    augmentLevels: IAiMetaMetricRow[];
+}
+
+export interface IAiMetaSummary {
     schemaVersion: typeof AI_META_SCHEMA_VERSION;
     complete: boolean;
     generatedAt: string;
     provenance: Record<string, unknown>;
     cohorts: ICohortQuality[];
-    rankings: {
-        units: IAiMetaMetricRow[];
-        artifactsT1: IAiMetaMetricRow[];
-        artifactsT2: IAiMetaMetricRow[];
-        augmentPlans: IAiMetaMetricRow[];
-        augmentLevels: IAiMetaMetricRow[];
-    };
+    rankings: IAiMetaRankings;
 }
 
 const emptyBucket = (): IMetricBucket => ({
@@ -275,7 +282,10 @@ export class AiMetaAccumulator {
     public overlappingCreatureViolations = 0;
     public readonly mapGames: Record<string, number> = {};
     public readonly endReasons: Record<string, number> = {};
-    public constructor(public readonly cohort: string) {
+    public constructor(
+        public readonly cohort: string,
+        public readonly map: AiMetaMapDimension = "all",
+    ) {
         for (const artifact of TIER1_ARTIFACT_LIST) this.artifactsT1.set(String(artifact.id), emptyBucket());
         for (const artifact of TIER2_ARTIFACT_LIST) this.artifactsT2.set(String(artifact.id), emptyBucket());
         for (const plan of allAugmentPlans()) this.augmentPlans.set(planKey(plan), emptyBucket());
@@ -451,6 +461,7 @@ export class AiMetaAccumulator {
         const policy = bucket.policy.row();
         return {
             cohort: this.cohort,
+            map: this.map,
             key,
             name,
             ...strength,
@@ -512,6 +523,71 @@ function planKey(plan: { placement: number; armor: number; might: number; sniper
 function primeUnitLevels(record: IAiMetaPairRecord): void {
     for (const army of [record.armyA, record.armyB]) {
         for (const unit of army.roster) UNIT_LEVEL_BY_NAME.set(unit.creatureName, unit.level);
+    }
+}
+
+export function isAiMetaRecordedMap(map: number): map is AiMetaRecordedMap {
+    return (AI_META_RECORDED_MAPS as readonly number[]).includes(map);
+}
+
+export function isAiMetaLiveMap(map: number): map is (typeof AI_META_MAPS)[number] {
+    return (AI_META_MAPS as readonly number[]).includes(map);
+}
+
+const dimensionKey = (cohort: string, map: AiMetaMapDimension): string => `${cohort}\u0000${map}`;
+
+/** Aggregate every record across cohort and map dimensions without changing the pair-cluster statistics. */
+export class AiMetaAggregation {
+    private readonly dimensions = new Map<string, AiMetaAccumulator>();
+    private accumulator(cohort: string, map: AiMetaMapDimension): AiMetaAccumulator {
+        const key = dimensionKey(cohort, map);
+        let accumulator = this.dimensions.get(key);
+        if (!accumulator) {
+            accumulator = new AiMetaAccumulator(cohort, map);
+            this.dimensions.set(key, accumulator);
+        }
+        return accumulator;
+    }
+    public add(record: IAiMetaPairRecord): void {
+        if (!AI_META_COHORTS.includes(record.cohort)) {
+            throw new Error(`Unknown AI meta cohort in pair record: ${record.cohort}`);
+        }
+        if (!isAiMetaRecordedMap(record.map)) {
+            throw new Error(`Unknown AI meta map in pair record: ${record.map}`);
+        }
+        primeUnitLevels(record);
+        for (const [cohort, map] of [
+            ["all", "all"],
+            [record.cohort, "all"],
+            ["all", record.map],
+            [record.cohort, record.map],
+        ] as const) {
+            this.accumulator(cohort, map).add(record);
+        }
+        if (isAiMetaLiveMap(record.map)) {
+            this.accumulator("all", "live").add(record);
+            this.accumulator(record.cohort, "live").add(record);
+        }
+    }
+    public get(cohort: string, map: AiMetaMapDimension): AiMetaAccumulator | undefined {
+        return this.dimensions.get(dimensionKey(cohort, map));
+    }
+    public accumulators(): AiMetaAccumulator[] {
+        const cohortOrder = (cohort: string): number =>
+            cohort === "all" ? -1 : AI_META_COHORTS.indexOf(cohort as AiMetaCohort);
+        const mapOrder = (map: AiMetaMapDimension): number =>
+            map === "all"
+                ? -2
+                : map === "live"
+                  ? -1
+                  : AI_META_RECORDED_MAPS.indexOf(map as (typeof AI_META_RECORDED_MAPS)[number]);
+        return [...this.dimensions.values()].sort(
+            (left, right) =>
+                mapOrder(left.map) - mapOrder(right.map) || cohortOrder(left.cohort) - cohortOrder(right.cohort),
+        );
+    }
+    public rows(): IAiMetaRankings {
+        return mergeRankings(this.accumulators());
     }
 }
 
@@ -656,7 +732,7 @@ function sourceFingerprint(): string {
     return hash.digest("hex");
 }
 
-interface IRunIdentity {
+export interface IAiMetaSourceIdentity {
     commonCommit: string;
     commonDirty: boolean;
     commonStatus: string[];
@@ -664,7 +740,7 @@ interface IRunIdentity {
     runtime: string;
 }
 
-function captureRunIdentity(): IRunIdentity {
+export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
     const status = git(["status", "--short"]);
     return {
         commonCommit: git(["rev-parse", "HEAD"]),
@@ -675,8 +751,8 @@ function captureRunIdentity(): IRunIdentity {
     };
 }
 
-function mergeRankings(accumulators: readonly AiMetaAccumulator[]): IAiMetaSummary["rankings"] {
-    const merged: IAiMetaSummary["rankings"] = {
+function mergeRankings(accumulators: readonly AiMetaAccumulator[]): IAiMetaRankings {
+    const merged: IAiMetaRankings = {
         units: [],
         artifactsT1: [],
         artifactsT2: [],
@@ -703,9 +779,9 @@ function writeSummary(
     baseSeed: number,
     concurrency: number,
     parallelCohorts: number,
-    runIdentity: IRunIdentity,
+    runIdentity: IAiMetaSourceIdentity,
     qualities: ICohortQuality[],
-    accumulators: readonly AiMetaAccumulator[],
+    aggregation: AiMetaAggregation,
 ): void {
     const summary: IAiMetaSummary = {
         schemaVersion: AI_META_SCHEMA_VERSION,
@@ -735,7 +811,7 @@ function writeSummary(
             ...runIdentity,
         },
         cohorts: qualities,
-        rankings: mergeRankings(accumulators),
+        rankings: aggregation.rows(),
     };
     writeFileSync(path, `${JSON.stringify(summary, null, 2)}\n`);
 }
@@ -751,7 +827,7 @@ async function runCohort(
     baseSeed: number,
     workers: number,
     outDir: string,
-    pooled: AiMetaAccumulator,
+    aggregation: AiMetaAggregation,
 ): Promise<ICohortRunResult> {
     const options: IAiMetaRunOptions = { cohort, games: gamesPerCohort, baseSeed };
     const accumulator = new AiMetaAccumulator(cohort);
@@ -763,9 +839,8 @@ async function runCohort(
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
     await runWorkerPool(options, workers, (record, completed, total) => {
-        primeUnitLevels(record);
         accumulator.add(record);
-        pooled.add(record);
+        aggregation.add(record);
         gzip.write(`${JSON.stringify(record)}\n`);
         const now = Date.now();
         if (completed === total || now - lastPrinted >= 10_000) {
@@ -810,12 +885,22 @@ const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts]";
 
+export function validateAiMetaGamesPerCohort(games: number): void {
+    const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
+    if (!Number.isSafeInteger(games) || games < mapCycleGames || games % mapCycleGames !== 0) {
+        throw new RangeError(
+            `gamesPerCohort must be a positive safe integer divisible by ${mapCycleGames}; got ${games}`,
+        );
+    }
+}
+
 async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
     if (argv[0] === "--help" || argv[0] === "-h") {
         console.log(AI_META_USAGE);
         return;
     }
     const gamesPerCohort = Number(argv[0] ?? 150_000);
+    validateAiMetaGamesPerCohort(gamesPerCohort);
     const baseSeed = Number(argv[1] ?? 85_000_717);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outDir = resolve(argv[2] ?? join(process.cwd(), "sim-out", `ai-meta-${stamp}`));
@@ -831,9 +916,6 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         return value as AiMetaCohort;
     });
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
-    if (!Number.isSafeInteger(gamesPerCohort) || gamesPerCohort < 2 || gamesPerCohort % 2 !== 0) {
-        throw new RangeError(`gamesPerCohort must be a positive even integer; got ${gamesPerCohort}`);
-    }
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError(`baseSeed must be a safe integer; got ${baseSeed}`);
     if (!Number.isInteger(concurrency) || concurrency < 1) {
         throw new RangeError(`concurrency must be a positive integer; got ${concurrency}`);
@@ -846,9 +928,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     const startedAt = new Date().toISOString();
     // Freeze identity before workers load the simulation. A shared main working tree may
     // keep changing while this multi-hour run is in progress.
-    const runIdentity = captureRunIdentity();
-    const pooled = new AiMetaAccumulator("all");
-    const accumulators: AiMetaAccumulator[] = [pooled];
+    const runIdentity = captureAiMetaSourceIdentity();
+    const aggregation = new AiMetaAggregation();
     const qualities: ICohortQuality[] = [];
 
     console.log(
@@ -865,11 +946,17 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         const extraWorkers = concurrency % wave.length;
         const results = await Promise.all(
             wave.map((cohort, index) =>
-                runCohort(cohort, gamesPerCohort, baseSeed, workersBase + Number(index < extraWorkers), outDir, pooled),
+                runCohort(
+                    cohort,
+                    gamesPerCohort,
+                    baseSeed,
+                    workersBase + Number(index < extraWorkers),
+                    outDir,
+                    aggregation,
+                ),
             ),
         );
         for (const result of results) {
-            accumulators.push(result.accumulator);
             qualities.push(result.quality);
         }
         writeSummary(
@@ -883,7 +970,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
             parallelCohorts,
             runIdentity,
             qualities,
-            accumulators,
+            aggregation,
         );
     }
 
@@ -898,7 +985,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         parallelCohorts,
         runIdentity,
         qualities,
-        accumulators,
+        aggregation,
     );
     console.log(`\nComplete: ${qualities.reduce((sum, quality) => sum + quality.games, 0).toLocaleString()} fights.`);
     console.log(`Summary: ${summaryPath}`);
