@@ -2098,6 +2098,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
+        // A unit sitting at full HP must STAY full when its max HP changes below. HP-cap buffs applied at
+        // fight start — Pendant of Vitality's +% max HP, HP synergies — raise max_hp but never touch current
+        // hp, so without this a fresh stack with an HP artifact would start already "damaged" (e.g. a 170-HP
+        // Gargantuan with Pendant would start 170/212 instead of a full 212/212). Captured against the
+        // PRE-recompute max_hp so a genuinely damaged unit (hp below its current max) is never free-healed.
+        const wasAtFullHp = this.unitProperties.hp >= this.unitProperties.max_hp;
+
         this.unitProperties.max_hp =
             this.refreshAndGetAdjustedMaxHp(currentLap, synergyAbilityPowerIncrease, madeOfFireBuff) +
             baseStatsDiff.baseStats.hp;
@@ -2118,7 +2125,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.hp += 5;
         }
 
-        if (this.unitProperties.max_hp < this.unitProperties.hp) {
+        // Reconcile current hp with the (possibly changed) max: keep a full unit full when max_hp ROSE
+        // (wasAtFullHp — the HP-artifact/synergy refill), and never let current hp exceed max_hp when it
+        // DROPPED (a max-hp debuff). A partially-damaged unit keeps its exact hp.
+        if (wasAtFullHp || this.unitProperties.max_hp < this.unitProperties.hp) {
             this.unitProperties.hp = this.unitProperties.max_hp;
         }
 
