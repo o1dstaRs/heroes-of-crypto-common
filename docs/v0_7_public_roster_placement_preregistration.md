@@ -62,3 +62,35 @@ Failure remains research evidence and leaves the incumbent unchanged. Passing
 permits review, a separately committed immutable artifact, full common/server/
 client gates, and a staged deployment in which code is deployed before the
 production policy environment is changed.
+
+## Mainline rebalance amendment
+
+Before the targeted result was used for promotion, common commit
+`99360a273ed30c6aab4415f8f7ba77b18795e183` changed the combat effects of three
+Tier-2 artifacts. The panels above are therefore retained as historical
+diagnostic evidence only. They cannot promote a policy on or after that commit.
+
+A replacement guard keeps every bar above and changes only the source and seed
+stream:
+
+- Behavior source starts at `99360a273ed30c6aab4415f8f7ba77b18795e183`.
+  Later source commits are allowed only when their diff is limited to this
+  preregistration, setup-context types/constructors, the explicit frozen
+  placement candidate, and research/test plumbing. No combat, draft, scoring,
+  placement, artifact-effect, or roster-generation change is allowed.
+- Replacement base seed is `232221694`, panel `guard`. Under the panel's
+  modulo-`2^30` permutation this is the old base advanced by exactly
+  300,000,000 board indices. Replacement natural and target lanes therefore
+  occupy the old stream's bounded ranges starting at 300m, 350m, 400m, 450m,
+  500m, and 550m, disjoint from every opened range above.
+- Sample sizes remain 5,000 natural boards and 1,000 accepted boards for each
+  target. Sharding may change execution order but not the board ledger.
+- Target qualification is calculated only from the candidate-seat records
+  whose reconstructed drafted roster carries the requested inclusive
+  diagnostic tag. `melee-other` remains the exact exclusive setup cohort.
+  Draft reconstruction is outcome-blind and must match every persisted board,
+  pick seed, pick seat, and control record before scoring.
+
+No replacement outcome may be opened until this amendment is committed and
+pushed. The replacement becomes ineligible if its final source diff exceeds the
+allowlist above.
