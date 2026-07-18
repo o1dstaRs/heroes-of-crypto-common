@@ -59,10 +59,9 @@ export function processRangeAOEAbility(
     if (aoeAbility) {
         const wasDead: Unit[] = [];
         let increaseMoraleTotal = 0;
-        // ARTIFACT Giant's Maul: mass/area units deal extra damage to every non-primary target. The
-        // primary target is the first live unit in the affected set (the unit the attack was aimed at).
+        // ARTIFACT Giant's Maul: +% non-magical AOE damage to EVERY struck unit, applied at impact below
+        // and then reduced by each victim's status resistance.
         const giantsMaulBuff = attackerUnit.getBuff("Giants Maul");
-        const primaryTargetId = affectedUnits.find((u) => !u.isDead())?.getId();
         for (const unit of affectedUnits) {
             if (unit.isDead()) {
                 unitIdsDied.push(unit.getId());
@@ -93,10 +92,6 @@ export function processRangeAOEAbility(
                     abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;
                 }
 
-                if (giantsMaulBuff && unit.getId() !== primaryTargetId) {
-                    abilityMultiplier *= 1 + giantsMaulBuff.getPower() / 100;
-                }
-
                 let damageFromAttack = processLuckyStrikeAbility(
                     attackerUnit,
                     attackerUnit.calculateAttackDamage(
@@ -111,6 +106,12 @@ export function processRangeAOEAbility(
                     ),
                     sceneLog,
                 );
+
+                // ARTIFACT Giant's Maul: +% non-magical AOE damage at impact (every struck unit), before the
+                // status-resistance reduction below.
+                if (giantsMaulBuff) {
+                    damageFromAttack = Math.floor(damageFromAttack * (1 + giantsMaulBuff.getPower() / 100));
+                }
 
                 // ARTIFACT Broken Aegis: the victim takes reduced damage from area attacks.
                 const aegisShieldBuff = unit.getBuff("Broken Aegis");

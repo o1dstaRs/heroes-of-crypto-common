@@ -556,8 +556,8 @@ export class UnitsHolder {
                         "Berserkers Bond",
                         "+{} attack for the whole army.",
                         "-{} defense for the whole army.",
-                        AP.BERSERKERS_BOND_FLAT,
-                        AP.BERSERKERS_BOND_FLAT,
+                        AP.BERSERKERS_BOND_ATTACK,
+                        AP.BERSERKERS_BOND_DEFENSE_PENALTY,
                     );
                     break;
                 // Combat-time / terrain markers (checked by the relevant hook via unit.getBuff).
@@ -565,7 +565,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Holy Cross", AP.HOLY_CROSS_HEAL_RES_PERCENT);
                     break;
                 case Tier2Artifact.GIANTS_MAUL:
-                    applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_NON_PRIMARY_PERCENT);
+                    applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_AOE_PERCENT);
                     break;
                 case Tier2Artifact.FARSIGHT_QUIVER:
                     applyArtifactBuff("Farsight Quiver", AP.FARSIGHT_QUIVER_RANGE_PERCENT);

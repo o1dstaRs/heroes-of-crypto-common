@@ -563,7 +563,7 @@
             "name": "Giants Maul",
             "level": 0,
             "desc": [
-                "Artifact. Mass/area units deal +{}% damage to non-primary targets.",
+                "Artifact. Increases non-magical (physical) AOE damage by {}% at impact, then reduced by status resistance.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

@@ -102,11 +102,8 @@ export function processFireBreathAbility(
                 multiplier,
         );
 
-        // ARTIFACT Giant's Maul: +damage to non-primary breath targets (toUnit is the primary target).
-        const giantsMaulBuff = fromUnit.getBuff("Giants Maul");
-        if (giantsMaulBuff && nextStandingTarget.getId() !== toUnit.getId()) {
-            fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 + giantsMaulBuff.getPower() / 100));
-        }
+        // ARTIFACT Giant's Maul does NOT apply here: Fire Breath is MAGICAL AOE (uses magic resist, not the
+        // physical status-resistance path), and Giant's Maul only boosts non-magical AOE damage.
         // ARTIFACT Broken Aegis: the victim takes reduced damage from area attacks.
         const aegisShieldBuff = nextStandingTarget.getBuff("Broken Aegis");
         if (aegisShieldBuff) {

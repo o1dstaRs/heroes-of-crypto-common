@@ -49,10 +49,10 @@ export enum Tier2Artifact {
     HOLY_CROSS = 3, // +50% heal & resurrection; cast Troll ability without consuming it
     CLOVER_OF_FORTUNE = 4, // +10 luck
     CROWN_OF_COMMAND = 5, // +1 movement (all) & +2 morale
-    GIANTS_MAUL = 6, // +35% attack for mass/area units vs all non-primary targets
+    GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
     FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
-    BERSERKERS_BOND = 9, // +3 attack / -3 defense (flat)
+    BERSERKERS_BOND = 9, // +3 attack / -2 defense (flat)
     TOME_OF_AMPLIFICATION = 10, // +50% buff power
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
@@ -103,7 +103,8 @@ export const ARTIFACT_POWER = {
     TITAN_PLATE_PERCENT: 12,
     KEEN_BLADE_FLAT: 0.7,
     IRON_PLATE_FLAT: 0.7,
-    BERSERKERS_BOND_FLAT: 3,
+    BERSERKERS_BOND_ATTACK: 3,
+    BERSERKERS_BOND_DEFENSE_PENALTY: 2,
     PENDANT_HP_PERCENT: 28,
     PENDANT_ATTACK_PENALTY_PERCENT: 14,
     CURSED_WARD_LUCK: 3,
@@ -122,7 +123,7 @@ export const ARTIFACT_POWER = {
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
-    GIANTS_MAUL_NON_PRIMARY_PERCENT: 35,
+    GIANTS_MAUL_AOE_PERCENT: 50,
     RIME_PROC_PERCENT: 30,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
@@ -310,7 +311,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "giants_maul",
         "Giant's Maul",
         "Giants Maul",
-        "Mass/area units deal +{}% damage to all non-primary targets.",
+        "Increases non-magical (physical) AOE damage by {}% at impact, then reduced by the target's status resistance.",
     ),
     [Tier2Artifact.PENDANT_OF_VITALITY]: t2(
         Tier2Artifact.PENDANT_OF_VITALITY,
@@ -382,9 +383,9 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
     clover_of_fortune: [AP.CLOVER_LUCK],
     crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE],
-    giants_maul: [AP.GIANTS_MAUL_NON_PRIMARY_PERCENT],
+    giants_maul: [AP.GIANTS_MAUL_AOE_PERCENT],
     pendant_of_vitality: [AP.PENDANT_HP_PERCENT, AP.PENDANT_ATTACK_PENALTY_PERCENT],
-    berserkers_bond: [AP.BERSERKERS_BOND_FLAT, AP.BERSERKERS_BOND_FLAT],
+    berserkers_bond: [AP.BERSERKERS_BOND_ATTACK, AP.BERSERKERS_BOND_DEFENSE_PENALTY],
     tome_of_amplification: [AP.TOME_BUFF_POWER_PERCENT],
     rime_charm: [AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS],
 };

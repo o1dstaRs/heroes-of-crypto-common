@@ -127,8 +127,8 @@ export function processLightningSpinAbility(
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
 
-            // ARTIFACT Giant's Maul: a Lightning Spin has no single primary target, so every struck unit
-            // counts as a non-primary target and takes the bonus damage.
+            // ARTIFACT Giant's Maul: +% non-magical AOE damage at impact to every struck unit (Lightning Spin
+            // hits many), before the status-resistance reduction below.
             const giantsMaulBuff = fromUnit.getBuff("Giants Maul");
             if (giantsMaulBuff) {
                 damageFromAttack = Math.floor(damageFromAttack * (1 + giantsMaulBuff.getPower() / 100));

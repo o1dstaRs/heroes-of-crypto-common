@@ -113,6 +113,12 @@ export function processSkewerStrikeAbility(
             ),
         );
 
+        // ARTIFACT Giant's Maul: +% non-magical AOE damage at impact (every struck unit), before status resist.
+        const giantsMaulBuff = fromUnit.getBuff("Giants Maul");
+        if (giantsMaulBuff) {
+            damageFromAttack = Math.floor(damageFromAttack * (1 + giantsMaulBuff.getPower() / 100));
+        }
+
         // Skewer Strike is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
         damageFromAttack = Math.floor(damageFromAttack * nextStandingTarget.getPhysicalAoeDamageMultiplier());
 

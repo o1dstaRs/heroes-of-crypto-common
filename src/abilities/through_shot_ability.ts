@@ -117,6 +117,11 @@ export function processThroughShotAbility(
                 ),
                 sceneLog,
             );
+            // ARTIFACT Giant's Maul: +% non-magical AOE damage at impact (every struck unit), before status resist.
+            const giantsMaulBuff = attackerUnit.getBuff("Giants Maul");
+            if (giantsMaulBuff) {
+                damageFromAttack = Math.floor(damageFromAttack * (1 + giantsMaulBuff.getPower() / 100));
+            }
             // Through Shot is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * targetUnit.getPhysicalAoeDamageMultiplier());
             sceneLog.updateLog(
