@@ -1048,7 +1048,7 @@
             "hp": 180,
             "steps": 4.2,
             "speed": 5.5,
-            "armor": 30,
+            "armor": 28,
             "attack_type": "MELEE_MAGIC",
             "attack": 32,
             "attack_damage_min": 55,

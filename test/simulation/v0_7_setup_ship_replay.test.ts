@@ -13,8 +13,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned again after the lap-start morale-roll fix: applyMoraleRolls now reads each unit's true
 // accumulated morale instead of the stale ±20 that a Morale/Dismorale buff locks live morale to. That
 // shifts which units proc Morale/Dismorale each lap, so the seeded combat traces legitimately change.
-// Two runs on the fixed engine produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "90d7dd4116bf7330bcf4959738512e3d12b0d4b5f6b5f936c6a06e2cceb1df6d";
+// Re-pinned again after Behemoth's armor -2 (30 -> 28): seed 2147598935's roster fields Behemoth, so its
+// combat trace legitimately changes. Two runs on the fixed engine produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "3aa7ec584e6f4509cd544ee8c4beca9156f9a75369c11033eafd471bf47c6b46";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
