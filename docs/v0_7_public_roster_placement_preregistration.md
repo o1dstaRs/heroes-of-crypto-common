@@ -190,7 +190,7 @@ The exact Zinc report commands are:
 ```bash
 ROOT="$HOME/hoc-cohort-safe-placement-20260718"
 OUT="$ROOT/sim-out/cohort-safe-placement-ddeaffbf9daf"
-BUN="$HOME/.bun/bin/bun"
+BUN="/usr/local/bin/bun"
 PATH_CLEAN="$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin"
 cd "$ROOT"
 test "$(git rev-parse HEAD)" = "ddeaffbf9daf8743d93bb9cd57975f9d74bb6c17"
