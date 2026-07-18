@@ -825,7 +825,11 @@ export class AttackHandler {
                         [`${targetUnit.getName()}:${targetUnit.getTeam()}`]: HoCConstants.MORALE_CHANGE_FOR_KILL,
                     });
                 }
-            } else {
+            } else if (!isAttackMissed) {
+                // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
+                // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
+                // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
+                // and still Stun it).
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
@@ -877,7 +881,9 @@ export class AttackHandler {
                         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
                         return { completed: true, unitIdsDied, animationData };
                     }
-                } else {
+                } else if (!isResponseMissed) {
+                    // Same rule for the return shot: a dodged/missed counter lands no on-hit effects
+                    // (mirrors the melee response path's isResponseMissed gate).
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
                     AllAbilities.processPetrifyingGazeAbility(
