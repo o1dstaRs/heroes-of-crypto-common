@@ -6,6 +6,7 @@ import {
     pairedPublicRosterPlacementDelta,
     publicRosterPlacementBoard,
     publicRosterPlacementContext,
+    publicRosterPlacementRosterTargets,
     type IPublicRosterPlacementRecord,
 } from "../../src/simulation/measure_public_roster_placement";
 import { SETUP_LIVE_GRID_TYPES } from "../../src/simulation/optimizer/v0_7_setup_overnight_core";
@@ -91,6 +92,17 @@ describe("public-roster placement measurement", () => {
         const natural = collectPublicRosterPlacementBoards(97071710, "train", 2, "natural");
         expect(natural.boards).toEqual([first, second]);
         expect(natural.scannedBoards).toBe(2);
+    });
+
+    test("roster evidence uses inclusive diagnostic tags while melee-other stays exact", () => {
+        expect(publicRosterPlacementRosterTargets([C.ARBALESTER, C.SATYR, C.ANGEL, C.ANGEL])).toEqual([
+            "natural",
+            "ranged",
+            "mage",
+            "melee-magic",
+            "aura-heavy",
+        ]);
+        expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "melee-other"]);
     });
 
     test("matched-control delta compares the same selected game slice", () => {

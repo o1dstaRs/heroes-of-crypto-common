@@ -195,10 +195,47 @@ function rankedPick(board: IPublicRosterPlacementBoard) {
     });
 }
 
+export interface IPublicRosterPlacementDraftSeat {
+    creatureIds: number[];
+    cohort: SetupCohort;
+    targets: PublicRosterPlacementTarget[];
+}
+
+export interface IPublicRosterPlacementDraftEvidence {
+    pickSeed: number;
+    lower: IPublicRosterPlacementDraftSeat;
+    upper: IPublicRosterPlacementDraftSeat;
+}
+
+/** Inclusive public setup tags for one roster; melee-other deliberately remains the exact fallback cohort. */
+export function publicRosterPlacementRosterTargets(creatureIds: readonly number[]): PublicRosterPlacementTarget[] {
+    const targets: PublicRosterPlacementTarget[] = ["natural"];
+    for (const tag of setupDiagnosticTags(creatureIds)) {
+        if (tag !== "aggregate") targets.push(tag);
+    }
+    if (setupCohort(creatureIds) === "melee-other") targets.push("melee-other");
+    return targets;
+}
+
+/** Reconstruct only the ranked draft for a report board; no placement or fight is evaluated. */
+export function publicRosterPlacementDraftEvidence(
+    board: IPublicRosterPlacementBoard,
+): IPublicRosterPlacementDraftEvidence {
+    const pick = rankedPick(board);
+    const evidenceForArmy = (army: IConditionalArmy): IPublicRosterPlacementDraftSeat => ({
+        creatureIds: [...army.creatureIds],
+        cohort: setupCohort(army.creatureIds),
+        targets: publicRosterPlacementRosterTargets(army.creatureIds),
+    });
+    return {
+        pickSeed: board.pickSeed,
+        lower: evidenceForArmy(pick.lower),
+        upper: evidenceForArmy(pick.upper),
+    };
+}
+
 function armyMatchesTarget(creatureIds: readonly number[], target: PublicRosterPlacementTarget): boolean {
-    if (target === "natural") return true;
-    if (target === "melee-other") return setupCohort(creatureIds) === "melee-other";
-    return setupDiagnosticTags(creatureIds).includes(target);
+    return publicRosterPlacementRosterTargets(creatureIds).includes(target);
 }
 
 export interface ICollectedPublicRosterBoards {
