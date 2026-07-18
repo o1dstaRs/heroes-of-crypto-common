@@ -41,13 +41,13 @@ export interface IPlacementContext {
     /**
      * Deduplicated creature identities from the opponent's complete, placement-visible drafted roster. This
      * deliberately carries no opponent positions, stack sizes, artifacts, perk, augments, or synergies. It is
-     * consumed only when setupPlacementPolicy explicitly selects the `public-roster` experiment.
+     * consumed only when setupPlacementPolicy explicitly selects a complete-public-roster experiment.
      */
     publicOpponentCreatureIds?: readonly number[];
     /**
      * Legacy partial pick-phase knowledge (perk reveals + pick collisions). Kept separate from the complete
      * placement-visible roster so the shipped `legitimate-reveal` policy remains byte-identical while a
-     * `public-roster` candidate is measured independently.
+     * complete-roster candidate is measured independently.
      *
      * @deprecated New full-roster policies should use publicOpponentCreatureIds.
      */

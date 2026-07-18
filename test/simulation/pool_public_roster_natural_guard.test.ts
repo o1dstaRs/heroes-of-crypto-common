@@ -5,10 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
-import { SETUP_COHORTS, V07_NONFIGHT_SETUP_SPEC } from "../../src/ai/setup/setup_ship";
+import {
+    SETUP_COHORTS,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+    V07_NONFIGHT_SETUP_SPEC,
+} from "../../src/ai/setup/setup_ship";
 import {
     publicRosterPlacementBoard,
     publicRosterPlacementDraftEvidence,
+    PUBLIC_ROSTER_COHORT_SAFE_ARM,
     type IPublicRosterPlacementBoard,
     type IPublicRosterPlacementDelta,
     type IPublicRosterPlacementRecord,
@@ -25,6 +31,7 @@ import {
 const BASE_SEED = 367271678;
 const SOURCE_COMMIT = "69fc030000000000000000000000000000000000";
 const temporaryDirectories: string[] = [];
+const CANDIDATE_ARM = PUBLIC_ROSTER_COHORT_SAFE_ARM;
 afterAll(() => temporaryDirectories.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
 
 const sha256 = (value: unknown): string =>
@@ -39,7 +46,7 @@ function sealReport(report: Record<string, unknown>): Record<string, unknown> {
 }
 
 function fixtureRecord(
-    arm: "control" | "both",
+    arm: "control" | typeof CANDIDATE_ARM,
     board: IPublicRosterPlacementBoard,
     game: 0 | 1 | 2 | 3,
 ): IPublicRosterPlacementRecord {
@@ -47,9 +54,10 @@ function fixtureRecord(
     const pickedLower = game < 2;
     const seat = pickedLower ? draft.lower : draft.upper;
     const opponent = pickedLower ? draft.upper : draft.lower;
-    const actionable = arm === "both" && game % 2 === 0;
+    const treated = arm === CANDIDATE_ARM && seat.cohort !== "melee-other";
+    const actionable = treated && game % 2 === 0;
     const candidateAction = actionable ? (game === 0 ? "flyer-screen" : "corner-shift") : "unchanged";
-    const candidateResult = arm === "both" ? (game === 1 ? "draw" : "win") : "loss";
+    const candidateResult = treated ? (game === 1 ? "draw" : "win") : "loss";
     return {
         arm,
         boardIndex: board.index,
@@ -68,14 +76,14 @@ function fixtureRecord(
         candidateAction,
         actionable,
         legitimateRevealCount: 0,
-        addedPublicCount: arm === "both" ? 5 : 0,
+        addedPublicCount: treated ? 5 : 0,
         candidateRejections: 0,
         baselineRejections: 0,
-        laps: arm === "both" ? 8 : 7,
-        endReason: arm === "both" && game === 1 ? "turn_cap" : "elimination",
-        decidedByArmageddon: arm === "both" && game === 3,
+        laps: treated ? 8 : 7,
+        endReason: treated && game === 1 ? "turn_cap" : "elimination",
+        decidedByArmageddon: treated && game === 3,
         setupFingerprint: sha256(`setup/${arm}/${board.pairSeed}/${game}`),
-        behaviorTraceSha256: sha256(`trace/${arm}/${board.pairSeed}/${game}`),
+        behaviorTraceSha256: sha256(`trace/${treated ? CANDIDATE_ARM : "control"}/${board.pairSeed}/${game}`),
     };
 }
 
@@ -83,11 +91,10 @@ function writeShard(globalStartIndex: number, boards: number): string {
     const directory = mkdtempSync(join(tmpdir(), "public-roster-natural-shard-"));
     temporaryDirectories.push(directory);
     const path = join(directory, `shard-${globalStartIndex}.json`);
-    const reportBaseSeed = publicRosterPlacementBoard(BASE_SEED, "guard", globalStartIndex).pairSeed;
     const boardLedger = Array.from({ length: boards }, (_, localIndex) =>
-        publicRosterPlacementBoard(reportBaseSeed, "guard", localIndex),
+        publicRosterPlacementBoard(BASE_SEED, "guard", globalStartIndex + localIndex),
     );
-    const cluster = (arm: "control" | "both", board: IPublicRosterPlacementBoard) => ({
+    const cluster = (arm: "control" | typeof CANDIDATE_ARM, board: IPublicRosterPlacementBoard) => ({
         arm,
         board,
         records: ([0, 1, 2, 3] as const).map((game) => fixtureRecord(arm, board, game)),
@@ -96,12 +103,15 @@ function writeShard(globalStartIndex: number, boards: number): string {
         schemaVersion: 1,
         status: "research_only_no_bake",
         setupSpec: V07_NONFIGHT_SETUP_SPEC,
+        cohortSafeSetupSpec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        cohortSafeBehaviorSha256: V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
         draftSpec: LEAGUE_ROUND1_DRAFT_SPEC,
         fightVersion: "v0.7",
-        arms: ["control", "both"],
+        arms: ["control", CANDIDATE_ARM],
         panel: "guard",
         target: "natural",
-        baseSeed: reportBaseSeed,
+        baseSeed: BASE_SEED,
+        startBoard: globalStartIndex,
         boards,
         scannedBoards: boards,
         games: boards * 8,
@@ -111,7 +121,7 @@ function writeShard(globalStartIndex: number, boards: number): string {
         summaries: {},
         comparisons: {},
         boardLedger,
-        clusters: boardLedger.flatMap((board) => [cluster("control", board), cluster("both", board)]),
+        clusters: boardLedger.flatMap((board) => [cluster("control", board), cluster(CANDIDATE_ARM, board)]),
     });
     writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
     return path;
@@ -234,6 +244,17 @@ describe("public-roster natural guard shard pooler", () => {
         expect(reportSha256).toBe(sha256(withoutHash));
     });
 
+    test("binds shards to an explicit nonzero global start board without rebasing the seed", () => {
+        const paths = [writeShard(1_000, 2), writeShard(1_002, 2)];
+        const report = poolPublicRosterNaturalGuardShards(paths, SOURCE_COMMIT, BASE_SEED, 4, 1_000);
+
+        expect(report.sourceBinding.expectedStartBoard).toBe(1_000);
+        expect(report.shards.map(({ startBoard }) => startBoard)).toEqual([1_000, 1_002]);
+        expect(() => poolPublicRosterNaturalGuardShards(paths, SOURCE_COMMIT, BASE_SEED, 4)).toThrow(
+            "start board does not continue",
+        );
+    });
+
     test("encodes every strict and inclusive preregistered natural threshold", () => {
         const passing = passingGateInput();
         expect(evaluatePublicRosterNaturalGate(passing).passed).toBe(true);
@@ -263,7 +284,7 @@ describe("public-roster natural guard shard pooler", () => {
         const first = writeShard(0, 2);
         const second = writeShard(2, 2);
         expect(() => poolPublicRosterNaturalGuardShards([second, first], SOURCE_COMMIT, BASE_SEED, 4)).toThrow(
-            "shard base does not continue",
+            "start board does not continue",
         );
         expect(() => poolPublicRosterNaturalGuardShards([first], SOURCE_COMMIT, BASE_SEED, 4)).toThrow(
             "2/4 expected natural boards",
@@ -303,6 +324,11 @@ describe("public-roster natural guard shard pooler", () => {
             message: string;
         }> = [
             { name: "spec", mutate: (report) => void (report.setupSpec = "setup-v0"), message: "uses setup spec" },
+            {
+                name: "cohort-safe-artifact",
+                mutate: (report) => void (report.cohortSafeBehaviorSha256 = "0".repeat(64)),
+                message: "does not bind the frozen cohort-safe placement artifact",
+            },
             { name: "draft", mutate: (report) => void (report.draftSpec = "off"), message: "uses draft spec" },
             { name: "fight", mutate: (report) => void (report.fightVersion = "v0.6"), message: "not a v0.7" },
             { name: "panel", mutate: (report) => void (report.panel = "selection"), message: "not a guard-panel" },
@@ -341,7 +367,7 @@ describe("public-roster natural guard shard pooler", () => {
                             arm: string;
                             records: Array<Record<string, unknown>>;
                         }>;
-                        clusters.find(({ arm }) => arm === "both")!.records[0].candidateSide = "red";
+                        clusters.find(({ arm }) => arm === CANDIDATE_ARM)!.records[0].candidateSide = "red";
                     }),
                 ],
                 SOURCE_COMMIT,
@@ -354,7 +380,7 @@ describe("public-roster natural guard shard pooler", () => {
                 [
                     mutateShard(first, "game.json", (report) => {
                         const clusters = report.clusters as Array<{ arm: string; records: unknown[] }>;
-                        clusters.find(({ arm }) => arm === "both")!.records.pop();
+                        clusters.find(({ arm }) => arm === CANDIDATE_ARM)!.records.pop();
                     }),
                 ],
                 SOURCE_COMMIT,

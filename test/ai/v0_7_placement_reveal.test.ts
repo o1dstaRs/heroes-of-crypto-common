@@ -10,12 +10,14 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy } from "../../src/ai";
 import type { IPlacementContext } from "../../src/ai/ai_strategy";
-import type { PlacementPolicyVariant } from "../../src/ai/setup/setup_ship";
+import { creatureIdForName, creatureInfo } from "../../src/ai/setup/creature_score";
+import { COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, type PlacementPolicyVariant } from "../../src/ai/setup/setup_ship";
 import {
     classifyRevealedThreats,
     FLYER_SCREEN_THRESHOLD,
     opponentCreatureIdsForPlacement,
     REVEAL_PLACEMENT_ENV,
+    selectOpponentCreatureIdsForPlacement,
 } from "../../src/ai/versions/v0_7_placement_reveal";
 import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -51,6 +53,7 @@ interface IPlacementScenario {
     /** Own army roles. */
     shooters?: number;
     groundMelee?: number;
+    ownNames?: readonly string[];
 }
 
 function buildScenario(scenario: IPlacementScenario): {
@@ -70,11 +73,27 @@ function buildScenario(scenario: IPlacementScenario): {
     });
     c.unitsHolder.addUnit(enemy);
     const units: Unit[] = [];
+    let ownNameIndex = 0;
     for (let i = 0; i < (scenario.shooters ?? 0); i += 1) {
-        units.push(createTestUnit({ team: LOWER, name: `S${i}`, attackType: RANGE, rangeShots: 5, amountAlive: 10 }));
+        units.push(
+            createTestUnit({
+                team: LOWER,
+                name: scenario.ownNames?.[ownNameIndex++] ?? `S${i}`,
+                attackType: RANGE,
+                rangeShots: 5,
+                amountAlive: 10,
+            }),
+        );
     }
     for (let i = 0; i < (scenario.groundMelee ?? 3); i += 1) {
-        units.push(createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, amountAlive: 20 }));
+        units.push(
+            createTestUnit({
+                team: LOWER,
+                name: scenario.ownNames?.[ownNameIndex++] ?? `M${i}`,
+                attackType: MELEE,
+                amountAlive: 20,
+            }),
+        );
     }
     for (const u of units) {
         c.unitsHolder.addUnit(u);
@@ -130,6 +149,15 @@ const minPairChebyshev = (cells: XY[]): number => {
 };
 
 describe("classifyRevealedThreats", () => {
+    it("round-trips every enabled configured creature name through the runtime id lookup", () => {
+        for (const creatureId of Object.values(CREATURES)) {
+            if (typeof creatureId !== "number" || creatureId <= 0) continue;
+            const info = creatureInfo(creatureId);
+            if (!info) continue;
+            expect(creatureIdForName(info.name)).toBe(creatureId);
+        }
+    });
+
     it("classifies splash AOE, flyers and chargers from the catalog and ignores unknown ids", () => {
         const threats = classifyRevealedThreats([
             CREATURES.GARGANTUAN, // Area Throw -> splash
@@ -243,6 +271,52 @@ describe("placement opponent-information source", () => {
                 publicOpponentCreatureIds: publicRoster,
             }),
         ).toBeUndefined();
+    });
+
+    it("cohort-safe source selection exposes public ids to every tagged cohort and excludes exact melee-other", () => {
+        const revealed = [CREATURES.PEASANT];
+        const publicRoster = [CREATURES.GRIFFIN, CREATURES.NOMAD];
+        for (const ownRoster of [[CREATURES.ARBALESTER], [CREATURES.SATYR], [CREATURES.ANGEL], [CREATURES.PEASANT]]) {
+            expect(
+                selectOpponentCreatureIdsForPlacement(
+                    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+                    ownRoster,
+                    revealed,
+                    publicRoster,
+                ),
+            ).toBe(publicRoster);
+        }
+        expect(
+            selectOpponentCreatureIdsForPlacement(
+                COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+                [CREATURES.SQUIRE],
+                revealed,
+                publicRoster,
+            ),
+        ).toBe(revealed);
+        expect(
+            selectOpponentCreatureIdsForPlacement(
+                COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+                [CREATURES.ARBALESTER, 999999],
+                revealed,
+                publicRoster,
+            ),
+        ).toBe(revealed);
+        expect(
+            selectOpponentCreatureIdsForPlacement(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, [], revealed, publicRoster),
+        ).toBe(revealed);
+    });
+
+    it("keeps exact melee-other placement decision-identical to legitimate-reveal", () => {
+        const scenario = { groundMelee: 2, ownNames: ["Squire", "Pikeman"] };
+        const revealed = [CREATURES.PEASANT];
+        const publicRoster = [CREATURES.NOMAD];
+        const incumbent = place(scenario, revealed, "legitimate-reveal", publicRoster);
+        const cohortSafe = place(scenario, revealed, COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, publicRoster);
+        const globalPublic = place(scenario, revealed, "public-roster", publicRoster);
+
+        expect(cohortSafe).toEqual(incumbent);
+        expect(samePlacement(globalPublic, incumbent)).toBe(false);
     });
 
     it("keeps public-roster placement invariant to private opponent board and setup state", () => {

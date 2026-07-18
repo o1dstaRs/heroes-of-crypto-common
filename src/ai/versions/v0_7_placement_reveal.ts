@@ -11,8 +11,12 @@
 
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
-import { creatureInfo } from "../setup/creature_score";
-import type { PlacementPolicyVariant } from "../setup/setup_ship";
+import { creatureIdForName, creatureInfo } from "../setup/creature_score";
+import {
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+    placementOpponentVisibility,
+    type PlacementPolicyVariant,
+} from "../setup/setup_ship";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IPlacementContext } from "../ai_strategy";
@@ -49,7 +53,26 @@ export const REVEAL_PLACEMENT_ENV = "V07_PLACEMENT_REVEAL";
 export const revealPlacementEnabled = (policy?: PlacementPolicyVariant): boolean =>
     policy === undefined
         ? process.env[REVEAL_PLACEMENT_ENV] === "on"
-        : policy === "legitimate-reveal" || policy === "public-roster";
+        : policy === "legitimate-reveal" ||
+          policy === "public-roster" ||
+          policy === COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT;
+
+/** Pure source selector shared by the live placement path and the ranked measurement harness. */
+export function selectOpponentCreatureIdsForPlacement(
+    policy: PlacementPolicyVariant,
+    ownCreatureIds: readonly number[],
+    legitimateReveals: readonly number[] | undefined,
+    publicOpponentCreatureIds: readonly number[] | undefined,
+): readonly number[] | undefined {
+    const visibility = placementOpponentVisibility(policy, ownCreatureIds);
+    if (visibility === "none") return undefined;
+    if (visibility === "public-roster") return publicOpponentCreatureIds ?? legitimateReveals;
+    return legitimateReveals;
+}
+
+function creatureIdForUnit(unit: Unit): number | undefined {
+    return creatureIdForName(unit.getName());
+}
 
 /**
  * Select only the opponent identities authorized by the active placement policy. The legacy env gate and
@@ -61,10 +84,17 @@ export function opponentCreatureIdsForPlacement(context: IPlacementContext): rea
     if (!revealPlacementEnabled(context.setupPlacementPolicy)) {
         return undefined;
     }
-    if (context.setupPlacementPolicy === "public-roster") {
-        return context.publicOpponentCreatureIds ?? context.revealedOpponentCreatures;
-    }
-    return context.revealedOpponentCreatures;
+    if (context.setupPlacementPolicy === undefined) return context.revealedOpponentCreatures;
+    const mappedOwnCreatureIds = context.unitsHolder.getAllAllies(context.team).map(creatureIdForUnit);
+    const ownCreatureIds = mappedOwnCreatureIds.every((id): id is number => id !== undefined)
+        ? [...new Set(mappedOwnCreatureIds)]
+        : [];
+    return selectOpponentCreatureIdsForPlacement(
+        context.setupPlacementPolicy,
+        ownCreatureIds,
+        context.revealedOpponentCreatures,
+        context.publicOpponentCreatureIds,
+    );
 }
 
 /** Adjacent-splash ranged AOE abilities (same measured set as v0.6's baked dispersion trigger). */

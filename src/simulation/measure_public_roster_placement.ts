@@ -22,8 +22,11 @@ import { parseConditionalRules } from "../ai/setup/setup_conditional";
 import { creatureInfo } from "../ai/setup/creature_score";
 import {
     compileNonFightSetupPolicy,
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     SETUP_OPTIMIZED_BUDGET,
     setupCohort,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
     type PlacementPolicyVariant,
@@ -33,6 +36,7 @@ import {
     CHARGER_ABILITY,
     classifyRevealedThreats,
     FLYER_SCREEN_THRESHOLD,
+    selectOpponentCreatureIdsForPlacement,
     SPLASH_AOE_ABILITIES,
 } from "../ai/versions/v0_7_placement_reveal";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -48,7 +52,14 @@ import {
     type SetupSeedPanel,
 } from "./optimizer/v0_7_setup_overnight_core";
 
-export const PUBLIC_ROSTER_PLACEMENT_ARMS = ["control", "flyers", "chargers", "both"] as const;
+export const PUBLIC_ROSTER_COHORT_SAFE_ARM = "cohort-safe" as const;
+export const PUBLIC_ROSTER_PLACEMENT_ARMS = [
+    "control",
+    "flyers",
+    "chargers",
+    "both",
+    PUBLIC_ROSTER_COHORT_SAFE_ARM,
+] as const;
 export type PublicRosterPlacementArm = (typeof PUBLIC_ROSTER_PLACEMENT_ARMS)[number];
 export type PublicRosterPlacementAction = "unchanged" | "flyer-screen" | "corner-shift";
 export const PUBLIC_ROSTER_PLACEMENT_TARGETS = [
@@ -95,7 +106,7 @@ export interface IPublicRosterPlacementContext {
 const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];
 
 function isArmThreat(arm: PublicRosterPlacementArm, creatureId: number): boolean {
-    if (arm === "both") return true;
+    if (arm === "both" || arm === PUBLIC_ROSTER_COHORT_SAFE_ARM) return true;
     const info = creatureInfo(creatureId);
     if (!info || arm === "control") return false;
     if (arm === "flyers" && info.canFly) return true;
@@ -148,18 +159,33 @@ export function publicRosterPlacementContext(
             actionable: false,
         };
     }
-    // `both` is the ship-shaped arm: the exact complete, deduplicated final roster exposed by the server.
-    // The single-family arms are masked ablations and retain incumbent reveals plus only their threat family.
-    const publicOpponentCreatureIds =
-        arm === "both"
+    // `both` retains the historical global-public arm. `cohort-safe` supplies that same complete roster only
+    // when the shared runtime selector authorizes it for the candidate's own exact setup cohort.
+    const requestedPublicOpponentCreatureIds =
+        arm === "both" || arm === PUBLIC_ROSTER_COHORT_SAFE_ARM
             ? unique(opponentCreatureIds)
             : unique([...revealedOpponentCreatureIds, ...addedPublicCreatureIds]);
-    const candidateAction = placementAction(ownCreatureIds, opponentCreatureIds, publicOpponentCreatureIds);
+    const placementPolicy =
+        arm === PUBLIC_ROSTER_COHORT_SAFE_ARM ? COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT : ("public-roster" as const);
+    const visibleOpponentCreatureIds = selectOpponentCreatureIdsForPlacement(
+        placementPolicy,
+        ownCreatureIds,
+        revealedOpponentCreatureIds,
+        requestedPublicOpponentCreatureIds,
+    );
+    const usesPublicRoster = visibleOpponentCreatureIds === requestedPublicOpponentCreatureIds;
+    const publicOpponentCreatureIds = usesPublicRoster ? requestedPublicOpponentCreatureIds : undefined;
+    const effectiveAddedPublicCreatureIds = usesPublicRoster ? addedPublicCreatureIds : [];
+    const candidateAction = placementAction(
+        ownCreatureIds,
+        opponentCreatureIds,
+        visibleOpponentCreatureIds ?? revealedOpponentCreatureIds,
+    );
     return {
-        placementPolicy: "public-roster",
+        placementPolicy,
         revealedOpponentCreatureIds,
         publicOpponentCreatureIds,
-        addedPublicCreatureIds,
+        addedPublicCreatureIds: effectiveAddedPublicCreatureIds,
         incumbentAction,
         candidateAction,
         actionable: candidateAction !== incumbentAction,
@@ -249,9 +275,13 @@ export function collectPublicRosterPlacementBoards(
     panel: SetupSeedPanel,
     count: number,
     target: PublicRosterPlacementTarget,
+    startBoard: number = 0,
 ): ICollectedPublicRosterBoards {
+    if (!Number.isInteger(startBoard) || startBoard < 0) {
+        throw new RangeError(`start board must be a non-negative integer; got ${startBoard}`);
+    }
     const boards: IPublicRosterPlacementBoard[] = [];
-    const start = TARGET_SCAN_OFFSETS[target];
+    const start = TARGET_SCAN_OFFSETS[target] + startBoard;
     const maximumScans = target === "natural" ? count : Math.max(20_000, count * 2_000);
     let scannedBoards = 0;
     while (boards.length < count && scannedBoards < maximumScans) {
@@ -740,6 +770,7 @@ export async function main(): Promise<void> {
             arm: { type: "string", default: "all" },
             boards: { type: "string", default: "200" },
             "base-seed": { type: "string", default: "97071710" },
+            "start-board": { type: "string", default: "0" },
             panel: { type: "string", default: "train" },
             target: { type: "string", default: "natural" },
             workers: { type: "string", default: String(Math.min(12, availableParallelism())) },
@@ -753,7 +784,8 @@ export async function main(): Promise<void> {
     if (values.help) {
         console.log(
             "usage: bun src/simulation/measure_public_roster_placement.ts " +
-                "[--arm all|control,flyers,chargers,both] [--boards 200] [--base-seed N] " +
+                "[--arm all|control,flyers,chargers,both,cohort-safe] [--boards 200] [--base-seed N] " +
+                "[--start-board N] " +
                 "[--panel train|selection|guard] [--target natural|ranged|mage|melee-magic|aura-heavy|melee-other] " +
                 "[--workers 12] [--max-laps 60] [--output path.json]",
         );
@@ -764,19 +796,23 @@ export async function main(): Promise<void> {
     const workers = Number(values.workers);
     const maxLaps = Number(values["max-laps"]);
     const baseSeed = Number(values["base-seed"]);
+    const startBoard = Number(values["start-board"]);
     const panel = values.panel as SetupSeedPanel;
     const target = values.target as PublicRosterPlacementTarget;
     if (!Number.isInteger(boards) || boards < 1) throw new RangeError("boards must be a positive integer");
     if (!Number.isInteger(workers) || workers < 1) throw new RangeError("workers must be a positive integer");
     if (!Number.isInteger(maxLaps) || maxLaps < 1) throw new RangeError("max-laps must be a positive integer");
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError("base-seed must be a safe integer");
+    if (!Number.isSafeInteger(startBoard) || startBoard < 0) {
+        throw new RangeError("start-board must be a non-negative safe integer");
+    }
     if (!["train", "selection", "guard"].includes(panel)) throw new Error("panel must be train, selection, or guard");
     if (!PUBLIC_ROSTER_PLACEMENT_TARGETS.includes(target)) {
         throw new Error(`target must be one of ${PUBLIC_ROSTER_PLACEMENT_TARGETS.join(",")}`);
     }
     process.env.LIVETWIN = "1";
     process.env.V07_SEARCH = "0";
-    const collected = collectPublicRosterPlacementBoards(baseSeed, panel, boards, target);
+    const collected = collectPublicRosterPlacementBoards(baseSeed, panel, boards, target, startBoard);
     const boardLedger = collected.boards;
     const jobs = arms.flatMap((arm) => boardLedger.map((board) => ({ arm, board, maxLaps })));
     const start = Date.now();
@@ -808,6 +844,8 @@ export async function main(): Promise<void> {
         status: "research_only_no_bake",
         question: "public final roster placement vs shipped legitimate pick reveals",
         setupSpec: V07_NONFIGHT_SETUP_SPEC,
+        cohortSafeSetupSpec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        cohortSafeBehaviorSha256: V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
         draftSpec: LEAGUE_ROUND1_DRAFT_SPEC,
         fightVersion: "v0.7",
         informationBoundary:
@@ -816,6 +854,7 @@ export async function main(): Promise<void> {
         panel,
         target,
         baseSeed,
+        startBoard,
         boards,
         scannedBoards: collected.scannedBoards,
         games: clusters.length * 4,

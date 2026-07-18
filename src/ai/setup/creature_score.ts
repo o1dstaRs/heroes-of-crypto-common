@@ -65,10 +65,17 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
     >
 >;
 
+const CREATURE_IDS_BY_ENUM_KEY = PBTypes.CreatureVals as unknown as Readonly<Record<string, number>>;
+
+/** Browser-safe display-name lookup shared by runtime placement and simulation setup paths. */
+export const creatureIdForName = (name: string): number | undefined => {
+    const id = CREATURE_IDS_BY_ENUM_KEY[name.toUpperCase().replace(/ /g, "_")];
+    return typeof id === "number" && id > 0 ? id : undefined;
+};
+
 /** id -> creature info, built once by inverting the CreatureVals enum against creatures.json (enum key =
  * NAME_UPPER_SNAKE, e.g. "Black Dragon" -> BLACK_DRAGON). Only creatures with a real enum id are indexed. */
 const buildIndex = (): Map<number, ICreatureInfo> => {
-    const idByEnumKey = PBTypes.CreatureVals as unknown as Record<string, number>;
     const index = new Map<number, ICreatureInfo>();
     for (const [, creatures] of Object.entries(CreatureJsonShape)) {
         if (!creatures || typeof creatures !== "object") {
@@ -78,9 +85,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
             if (!cfg || typeof cfg !== "object") {
                 continue;
             }
-            const enumKey = name.toUpperCase().replace(/ /g, "_");
-            const id = idByEnumKey[enumKey];
-            if (typeof id !== "number" || id <= 0) {
+            const id = creatureIdForName(name);
+            if (id === undefined) {
                 continue;
             }
             const abilityList = cfg.abilities ?? [];

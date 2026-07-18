@@ -28,6 +28,7 @@ import {
     compileNonFightSetupPolicy,
     enumerateFullBudgetAugmentPlans,
     pairedSetupEstimate,
+    placementOpponentVisibility,
     SETUP_COHORTS,
     SETUP_DIAGNOSTIC_TAGS,
     SETUP_GUARD_THRESHOLDS,
@@ -277,12 +278,10 @@ function playCandidateSide(
     const candidateArmy = candidateTeam === LOWER ? pick.lower : pick.upper;
     const opponentArmy = candidateTeam === LOWER ? pick.upper : pick.lower;
     const setup = candidateArmySetup(policy, candidateArmy);
-    const candidateReveals =
-        policy.placement === "legitimate-reveal" || policy.placement === "public-roster"
-            ? candidateArmy.revealedOpponentCreatures
-            : [];
+    const placementVisibility = placementOpponentVisibility(policy.placement, candidateArmy.creatureIds);
+    const candidateReveals = placementVisibility === "none" ? [] : candidateArmy.revealedOpponentCreatures;
     const candidatePublicOpponentCreatures =
-        policy.placement === "public-roster" ? [...new Set(opponentArmy.creatureIds)] : undefined;
+        placementVisibility === "public-roster" ? [...new Set(opponentArmy.creatureIds)] : undefined;
     const candidateIsLower = candidateTeam === LOWER;
     const config: IMatchConfig = {
         greenVersion: V07_SETUP_FIGHT_VERSION,

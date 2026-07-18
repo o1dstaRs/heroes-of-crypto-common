@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     parseSetupPolicyBehavior,
     resolveSetupPolicy,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
     V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
@@ -104,7 +107,13 @@ describe("fair setup decision context", () => {
             gridSize: 16,
         });
 
-        for (const spec of [undefined, "conditional-v1", V07_NONFIGHT_SETUP_SPEC, V07_PUBLIC_ROSTER_SETUP_SPEC]) {
+        for (const spec of [
+            undefined,
+            "conditional-v1",
+            V07_NONFIGHT_SETUP_SPEC,
+            V07_PUBLIC_ROSTER_SETUP_SPEC,
+            V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        ]) {
             const policy = resolveSetupPolicy(spec);
             const baseline = decisions(policy);
             expect(decisions(policy, firstTier2, firstPlacement)).toEqual(baseline);
@@ -123,5 +132,9 @@ describe("fair setup decision context", () => {
         expect(V07_NONFIGHT_SETUP_ARTIFACT.policy.placement).toBe("legitimate-reveal");
         expect(resolveSetupPolicy(V07_NONFIGHT_SETUP_SPEC).placement).toBe("legitimate-reveal");
         expect(resolveSetupPolicy(V07_PUBLIC_ROSTER_SETUP_SPEC).placement).toBe("public-roster");
+        expect(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.placement).toBe(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT);
+        expect(resolveSetupPolicy(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC).placement).toBe(
+            COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+        );
     });
 });

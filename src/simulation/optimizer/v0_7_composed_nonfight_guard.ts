@@ -65,7 +65,9 @@ import {
     assertAugmentPlan,
     cloneNonFightPolicy,
     compileNonFightSetupPolicy,
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     pairedSetupEstimate,
+    placementOpponentVisibility,
     SETUP_COHORTS,
     SETUP_GUARD_THRESHOLDS,
     SETUP_LIVE_GRID_TYPES,
@@ -514,7 +516,8 @@ function parseSetupPolicy(value: unknown): INonFightCandidatePolicy {
     if (
         policy.placement !== "baseline" &&
         policy.placement !== "legitimate-reveal" &&
-        policy.placement !== "public-roster"
+        policy.placement !== "public-roster" &&
+        policy.placement !== COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT
     ) {
         throw new Error("setup final policy has an invalid placement variant");
     }
@@ -1198,13 +1201,12 @@ function composedCohorts(creatureIds: readonly number[]): V07ComposedNonfightCoh
 
 function armySetup(policy: INonFightCandidatePolicy, army: IConditionalArmy, opponent: IConditionalArmy) {
     const resolved = compileNonFightSetupPolicy(policy, policy.id);
-    const placementUsesOpponentIds =
-        resolved.placement === "legitimate-reveal" || resolved.placement === "public-roster";
+    const placementVisibility = placementOpponentVisibility(resolved.placement, army.creatureIds);
     return {
         augments: resolved.pickAugments(V07_SETUP_BUDGET, army.creatureIds),
         synergies: resolved.pickSynergies(army.creatureIds),
-        revealedCreatures: placementUsesOpponentIds ? army.revealedOpponentCreatures : undefined,
-        ...(resolved.placement === "public-roster"
+        revealedCreatures: placementVisibility !== "none" ? army.revealedOpponentCreatures : undefined,
+        ...(placementVisibility === "public-roster"
             ? { publicOpponentCreatures: [...new Set(opponent.creatureIds)] }
             : {}),
         placement: resolved.placement,

@@ -5,16 +5,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
-import { V07_NONFIGHT_SETUP_SPEC } from "../../src/ai/setup/setup_ship";
 import {
-    publicRosterPlacementBoard,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+    V07_NONFIGHT_SETUP_SPEC,
+} from "../../src/ai/setup/setup_ship";
+import {
+    collectPublicRosterPlacementBoards,
     publicRosterPlacementDraftEvidence,
+    PUBLIC_ROSTER_COHORT_SAFE_ARM,
     type IPublicRosterPlacementBoard,
     type IPublicRosterPlacementRecord,
     type PublicRosterPlacementTarget,
 } from "../../src/simulation/measure_public_roster_placement";
 import { SETUP_LIVE_GRID_TYPES } from "../../src/simulation/optimizer/v0_7_setup_overnight_core";
 import {
+    evaluatePublicRosterTargetGate,
     PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS,
     summarizePublicRosterTargetDiagnostics,
     summarizePublicRosterTargetEvidence,
@@ -23,6 +29,7 @@ import {
 const TEST_BASE_SEED = 232221694;
 const TEST_SOURCE_COMMIT = "3585b7c07e1249ee6d671f9e9f397af72e090804";
 const temporaryDirectories: string[] = [];
+const CANDIDATE_ARM = PUBLIC_ROSTER_COHORT_SAFE_ARM;
 afterAll(() => temporaryDirectories.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
 
 const sha256 = (value: unknown): string =>
@@ -36,18 +43,8 @@ function sealReport(report: Record<string, unknown>): Record<string, unknown> {
     return { ...withoutHash, reportSha256: sha256(withoutHash) };
 }
 
-function singleSeatBoard(target: Exclude<PublicRosterPlacementTarget, "natural">): IPublicRosterPlacementBoard {
-    for (let index = 0; index < 5_000; index += 1) {
-        const board = publicRosterPlacementBoard(TEST_BASE_SEED, "guard", index);
-        const draft = publicRosterPlacementDraftEvidence(board);
-        const matches = Number(draft.lower.targets.includes(target)) + Number(draft.upper.targets.includes(target));
-        if (matches === 1) return board;
-    }
-    throw new Error(`could not find a single-seat ${target} fixture board`);
-}
-
 function fixtureRecord(
-    arm: "control" | "both",
+    arm: "control" | typeof CANDIDATE_ARM,
     board: IPublicRosterPlacementBoard,
     game: 0 | 1 | 2 | 3,
     target: Exclude<PublicRosterPlacementTarget, "natural">,
@@ -58,8 +55,9 @@ function fixtureRecord(
     const opponent = pickedLower ? draft.upper : draft.lower;
     const selected = seat.targets.includes(target);
     const secondMirror = game % 2 === 1;
+    const treated = arm === CANDIDATE_ARM && seat.cohort !== "melee-other";
     const candidateResult = selected
-        ? arm === "both"
+        ? treated
             ? secondMirror
                 ? "draw"
                 : "win"
@@ -82,17 +80,17 @@ function fixtureRecord(
         candidateCohort: seat.cohort,
         opponentCohort: opponent.cohort,
         incumbentAction: "unchanged",
-        candidateAction: arm === "both" ? "corner-shift" : "unchanged",
-        actionable: arm === "both" && selected,
+        candidateAction: treated && selected ? "corner-shift" : "unchanged",
+        actionable: treated && selected,
         legitimateRevealCount: 0,
-        addedPublicCount: arm === "both" ? 1 : 0,
+        addedPublicCount: treated ? 1 : 0,
         candidateRejections: 0,
         baselineRejections: 0,
-        laps: selected ? (arm === "both" ? (secondMirror ? 7 : 5) : secondMirror ? 6 : 4) : 3,
+        laps: selected ? (treated ? (secondMirror ? 7 : 5) : secondMirror ? 6 : 4) : 3,
         endReason: candidateResult === "draw" ? "turn_cap" : "elimination",
-        decidedByArmageddon: arm === "both" && selected && secondMirror,
+        decidedByArmageddon: treated && selected && secondMirror,
         setupFingerprint: sha256(`setup/${arm}/${board.pairSeed}/${game}`),
-        behaviorTraceSha256: sha256(`trace/${arm}/${board.pairSeed}/${game}`),
+        behaviorTraceSha256: sha256(`trace/${treated ? CANDIDATE_ARM : "control"}/${board.pairSeed}/${game}`),
     };
 }
 
@@ -100,8 +98,9 @@ function writeFixture(target: Exclude<PublicRosterPlacementTarget, "natural"> = 
     const directory = mkdtempSync(join(tmpdir(), "public-roster-target-evidence-"));
     temporaryDirectories.push(directory);
     const path = join(directory, `${target}.json`);
-    const board = singleSeatBoard(target);
-    const cluster = (arm: "control" | "both") => ({
+    const collected = collectPublicRosterPlacementBoards(TEST_BASE_SEED, "guard", 1, target);
+    const board = collected.boards[0];
+    const cluster = (arm: "control" | typeof CANDIDATE_ARM) => ({
         arm,
         board,
         records: ([0, 1, 2, 3] as const).map((game) => fixtureRecord(arm, board, game, target)),
@@ -111,14 +110,17 @@ function writeFixture(target: Exclude<PublicRosterPlacementTarget, "natural"> = 
         status: "research_only_no_bake",
         question: "public final roster placement vs shipped legitimate pick reveals",
         setupSpec: V07_NONFIGHT_SETUP_SPEC,
+        cohortSafeSetupSpec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        cohortSafeBehaviorSha256: V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
         draftSpec: LEAGUE_ROUND1_DRAFT_SPEC,
         fightVersion: "v0.7",
-        arms: ["control", "both"],
+        arms: ["control", CANDIDATE_ARM],
+        startBoard: 0,
         panel: "guard",
         target,
         baseSeed: TEST_BASE_SEED,
         boards: 1,
-        scannedBoards: 1,
+        scannedBoards: collected.scannedBoards,
         games: 8,
         maxLaps: 60,
         maps: SETUP_LIVE_GRID_TYPES,
@@ -126,7 +128,7 @@ function writeFixture(target: Exclude<PublicRosterPlacementTarget, "natural"> = 
         summaries: {},
         comparisons: {},
         boardLedger: [board],
-        clusters: [cluster("control"), cluster("both")],
+        clusters: [cluster("control"), cluster(CANDIDATE_ARM)],
     });
     writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`);
     return path;
@@ -207,25 +209,48 @@ describe("public-roster target evidence summarizer", () => {
         expect(() => summarizePublicRosterTargetEvidence(paths, TEST_SOURCE_COMMIT, 1.5)).toThrow(
             "expected base seed must be a safe integer",
         );
+        expect(() => summarizePublicRosterTargetEvidence(paths, TEST_SOURCE_COMMIT, TEST_BASE_SEED + 1)).toThrow(
+            `promotion evidence requires caller-attested base seed ${TEST_BASE_SEED + 1}`,
+        );
         const wrongBasePaths = paths.map((path, index) =>
             mutateFixture(path, `wrong-base-${index}.json`, (report) => {
                 report.baseSeed = TEST_BASE_SEED + 1;
             }),
         );
         expect(() => summarizePublicRosterTargetEvidence(wrongBasePaths, TEST_SOURCE_COMMIT, TEST_BASE_SEED)).toThrow(
-            `promotion evidence requires caller-attested base seed ${TEST_BASE_SEED}`,
+            "board ledger does not match the reconstructed outcome-blind target scan",
         );
 
-        const summary = summarizePublicRosterTargetEvidence([...paths].reverse(), TEST_SOURCE_COMMIT, TEST_BASE_SEED);
-        expect(summary.status).toBe("derived_evidence_no_fights_rerun");
+        expect(() =>
+            summarizePublicRosterTargetEvidence([...paths].reverse(), TEST_SOURCE_COMMIT, TEST_BASE_SEED),
+        ).toThrow("requires exactly 1000 accepted boards per target");
+
+        const summary = summarizePublicRosterTargetDiagnostics([...paths].reverse());
+        expect(summary.status).toBe("diagnostic_only_non_qualifying");
         expect(summary.completeTargetSet).toBe(true);
         expect(summary.baseSeed).toBe(TEST_BASE_SEED);
-        expect(summary.sourceBinding).toEqual({
-            sourceCommit: TEST_SOURCE_COMMIT,
-            expectedBaseSeed: TEST_BASE_SEED,
-            provenance: "caller-attested; source commit is not embedded in raw reports",
-        });
+        expect(summary.sourceBinding).toBeNull();
         expect(summary.targets.map(({ target }) => target)).toEqual(PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS);
+
+        const passingTargets = structuredClone(summary.targets);
+        for (const target of passingTargets) {
+            target.sourceBoards = 1_000;
+            target.matchedControlDelta.scoreGainPp = 0;
+            target.matchedControlDelta.confidence95GainPp = { low: -1.499_999, high: 1 };
+            target.safety.candidate.candidateRejections = 0;
+            target.safety.candidate.opposingRejections = 0;
+            target.safety.control.candidateRejections = 0;
+            target.safety.control.opposingRejections = 0;
+            target.safety.matchedExcess.drawPp = 1;
+            target.safety.matchedExcess.armageddonPp = 1;
+            target.safety.matchedExcess.avgLaps = 1;
+        }
+        expect(evaluatePublicRosterTargetGate(passingTargets).passed).toBe(true);
+        passingTargets[0].matchedControlDelta.confidence95GainPp!.low = -1.5;
+        expect(evaluatePublicRosterTargetGate(passingTargets).checksByTarget.ranged.confidence).toBe(false);
+        passingTargets[0].matchedControlDelta.confidence95GainPp!.low = -1.499_999;
+        passingTargets[0].safety.matchedExcess.drawPp = 1.000_001;
+        expect(evaluatePublicRosterTargetGate(passingTargets).checksByTarget.ranged.drawSafety).toBe(false);
     });
 
     test("fails closed on raw hash, guard/spec/arm, and reconstructed control-pair tampering", () => {
@@ -258,11 +283,32 @@ describe("public-roster target evidence summarizer", () => {
         ).toThrow("expected v07-nonfight-4eda84635fe7");
         expect(() =>
             summarizePublicRosterTargetDiagnostics([
+                mutateFixture(path, "cohort-safe-artifact.json", (report) => {
+                    report.cohortSafeSetupSpec = "v07-nonfight-unknown";
+                }),
+            ]),
+        ).toThrow("does not bind the frozen cohort-safe placement artifact");
+        expect(() =>
+            summarizePublicRosterTargetDiagnostics([
                 mutateFixture(path, "arms.json", (report) => {
                     report.arms = ["both", "control"];
                 }),
             ]),
-        ).toThrow("must pair exactly control with candidate arm both");
+        ).toThrow(`must pair exactly control with candidate arm ${CANDIDATE_ARM}`);
+        expect(() =>
+            summarizePublicRosterTargetDiagnostics([
+                mutateFixture(path, "lap-cap.json", (report) => {
+                    report.maxLaps = 59;
+                }),
+            ]),
+        ).toThrow("must use the preregistered 60-lap cap");
+        expect(() =>
+            summarizePublicRosterTargetDiagnostics([
+                mutateFixture(path, "base-seed.json", (report) => {
+                    report.baseSeed = TEST_BASE_SEED + 1;
+                }),
+            ]),
+        ).toThrow("board ledger does not match the reconstructed outcome-blind target scan");
         expect(() =>
             summarizePublicRosterTargetDiagnostics([
                 mutateFixture(path, "pairing.json", (report) => {
@@ -272,6 +318,16 @@ describe("public-roster target evidence summarizer", () => {
                         control.records[0].candidateCohort === "mage" ? "melee-other" : "mage";
                 }),
             ]),
-        ).toThrow("cohort mismatch for reconstructed game");
+        ).toThrow("candidate/control metadata mismatch");
+
+        const rejectedOffSlice = mutateFixture(path, "off-slice-rejection.json", (report) => {
+            const clusters = report.clusters as Array<{ arm: string; records: Array<Record<string, unknown>> }>;
+            const candidate = clusters.find((cluster) => cluster.arm === CANDIDATE_ARM)!;
+            const offSlice = candidate.records.find((record) => record.actionable === false)!;
+            offSlice.candidateRejections = 1;
+        });
+        const rejectedSummary = summarizePublicRosterTargetDiagnostics([rejectedOffSlice]);
+        expect(rejectedSummary.targets[0].allRecordRejections.candidateArmCandidate).toBe(1);
+        expect(rejectedSummary.promotionGate.checksByTarget.ranged.zeroRejections).toBe(false);
     });
 });

@@ -8,14 +8,19 @@ import { conditionalAugments, parseConditionalRules } from "../../src/ai/setup/s
 import {
     canonicalSetupPolicyBehavior,
     compileNonFightSetupPolicy,
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     parseSetupPolicyArtifact,
     parseSetupPolicyBehavior,
+    placementOpponentVisibility,
     pickSynergiesForVariant,
     pickTier2ForVariant,
     resolveSetupPolicy,
     SETUP_COHORTS,
     setupAugmentsForPlan,
     setupCohort,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
     V07_NONFIGHT_BEHAVIOR_SHA256,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,
@@ -161,6 +166,23 @@ describe("frozen v0.7 non-fight setup artifact", () => {
         expect(Object.isFrozen(V07_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.tier2ByCohort)).toBe(true);
     });
 
+    test("freezes the cohort-safe candidate as a distinct placement-only delta", () => {
+        expect(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.spec).toBe(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC);
+        expect(
+            createHash("sha256")
+                .update(canonicalSetupPolicyBehavior(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy))
+                .digest("hex"),
+        ).toBe(V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256);
+        expect(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.placement).toBe(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT);
+        expect({
+            ...V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy,
+            placement: V07_NONFIGHT_SETUP_ARTIFACT.policy.placement,
+        }).toEqual(V07_NONFIGHT_SETUP_ARTIFACT.policy);
+        expect(Object.isFrozen(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT)).toBe(true);
+        expect(Object.isFrozen(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy)).toBe(true);
+        expect(Object.isFrozen(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy.augmentsByCohort.mage)).toBe(true);
+    });
+
     test("rejects cross-spec hash and behavior substitution", () => {
         expect(() =>
             parseSetupPolicyArtifact({
@@ -215,8 +237,34 @@ describe("v0.7 setup ship resolver", () => {
         expect(publicRoster.pickAugments(7, rosterForCohort("ranged-2to3"))).toEqual(
             optimized.pickAugments(7, rosterForCohort("ranged-2to3")),
         );
+        const cohortSafe = resolveSetupPolicy(V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC);
+        expect(cohortSafe).toMatchObject({
+            mode: "optimized-v07",
+            spec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+            journalVersion: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+            placement: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+        });
+        expect(cohortSafe.pickAugments(7, rosterForCohort("ranged-2to3"))).toEqual(
+            optimized.pickAugments(7, rosterForCohort("ranged-2to3")),
+        );
         expect(() => resolveSetupPolicy("latest")).toThrow("Invalid setup policy spec");
         expect(() => resolveSetupPolicy("snper")).toThrow("Invalid setup policy spec");
+    });
+
+    test("parses the cohort-safe placement mode and resolves only exact melee-other to incumbent visibility", () => {
+        const behavior = structuredClone(V07_NONFIGHT_SETUP_ARTIFACT.policy) as ISetupPolicyBehavior;
+        behavior.placement = COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT;
+        expect(parseSetupPolicyBehavior(behavior).placement).toBe(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT);
+        expect(compileNonFightSetupPolicy(behavior).placement).toBe(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT);
+        expect(placementOpponentVisibility(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, rosterForCohort("melee-other"))).toBe(
+            "legitimate-reveal",
+        );
+        for (const cohort of SETUP_COHORTS.filter((value) => value !== "melee-other")) {
+            expect(placementOpponentVisibility(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, rosterForCohort(cohort))).toBe(
+                "public-roster",
+            );
+        }
+        expect(placementOpponentVisibility(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT, [])).toBe("legitimate-reveal");
     });
 
     test("does not expose the Set used by conditional decision closures", () => {

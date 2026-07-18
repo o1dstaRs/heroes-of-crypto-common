@@ -91,12 +91,17 @@ export type {
     ISetupPolicy,
     ITier2ArtifactDecisionContext,
 } from "./ai/setup/setup_strategy";
-export { scoreCreature, creatureInfo } from "./ai/setup/creature_score";
+export { creatureIdForName, creatureInfo, scoreCreature } from "./ai/setup/creature_score";
 export {
     compileNonFightSetupPolicy,
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+    placementOpponentVisibility,
     resolveSetupPolicy,
     SETUP_COHORTS,
     setupCohort,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
     V07_NONFIGHT_BEHAVIOR_SHA256,
     V07_NONFIGHT_SETUP_ARTIFACT,
     V07_NONFIGHT_SETUP_SPEC,

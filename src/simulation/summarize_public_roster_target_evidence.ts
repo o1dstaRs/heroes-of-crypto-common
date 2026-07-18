@@ -10,13 +10,16 @@ import { parseArgs } from "node:util";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../ai/setup/draft_ship";
 import {
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     SETUP_COHORTS,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
     V07_NONFIGHT_SETUP_SPEC,
-    V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
-    V07_PUBLIC_ROSTER_SETUP_SPEC,
 } from "../ai/setup/setup_ship";
 import {
+    collectPublicRosterPlacementBoards,
     pairedPublicRosterPlacementDelta,
+    PUBLIC_ROSTER_COHORT_SAFE_ARM,
     PUBLIC_ROSTER_PLACEMENT_TARGETS,
     publicRosterPlacementDraftEvidence,
     type IPublicRosterPlacementBoard,
@@ -29,12 +32,23 @@ export const PUBLIC_ROSTER_TARGET_EVIDENCE_SCHEMA_VERSION = 1;
 export const PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS = PUBLIC_ROSTER_PLACEMENT_TARGETS.filter(
     (target): target is Exclude<PublicRosterPlacementTarget, "natural"> => target !== "natural",
 );
+export const PUBLIC_ROSTER_TARGET_GATE = {
+    requiredBoardsPerTarget: 1_000,
+    minimumScoreGainPp: 0,
+    minimumConfidence95LowGainPpExclusive: -1.5,
+    maximumDrawExcessPp: 1,
+    maximumArmageddonExcessPp: 1,
+    maximumAverageLapExcess: 1,
+    maximumRejections: 0,
+} as const;
 
-const CANDIDATE_ARM = "both";
+const CANDIDATE_ARM = PUBLIC_ROSTER_COHORT_SAFE_ARM;
 const CONTROL_ARM = "control";
 const EXPECTED_ARMS = [CONTROL_ARM, CANDIDATE_ARM] as const;
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
 const HEX_COMMIT = /^[0-9a-f]{40}$/;
+const PLACEMENT_ACTIONS = ["unchanged", "flyer-screen", "corner-shift"] as const;
+const END_REASONS = ["elimination", "turn_cap", "stuck"] as const;
 
 type TargetEvidenceTarget = (typeof PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS)[number];
 type ReportArm = (typeof EXPECTED_ARMS)[number];
@@ -58,6 +72,7 @@ interface ILoadedTargetReport {
     sourceBytesSha256: string;
     sourceReportSha256: string;
     baseSeed: number;
+    startBoard: number;
     boards: number;
     scannedBoards: number;
     maxLaps: number;
@@ -118,6 +133,7 @@ function parseRecord(
     value: unknown,
     arm: ReportArm,
     board: IPublicRosterPlacementBoard,
+    maxLaps: number,
     label: string,
 ): IPublicRosterPlacementRecord {
     const record = asRecord(value, label);
@@ -153,9 +169,20 @@ function parseRecord(
     if (!SETUP_COHORTS.includes(record.opponentCohort as never)) {
         throw new TypeError(`${label}.opponentCohort is invalid`);
     }
+    if (!PLACEMENT_ACTIONS.includes(record.incumbentAction as never)) {
+        throw new TypeError(`${label}.incumbentAction is invalid`);
+    }
+    if (!PLACEMENT_ACTIONS.includes(record.candidateAction as never)) {
+        throw new TypeError(`${label}.candidateAction is invalid`);
+    }
+    if (typeof record.actionable !== "boolean") throw new TypeError(`${label}.actionable must be boolean`);
+    asSafeInteger(record.legitimateRevealCount, `${label}.legitimateRevealCount`);
+    asSafeInteger(record.addedPublicCount, `${label}.addedPublicCount`);
     asSafeInteger(record.candidateRejections, `${label}.candidateRejections`);
     asSafeInteger(record.baselineRejections, `${label}.baselineRejections`);
-    asSafeInteger(record.laps, `${label}.laps`, 1);
+    const laps = asSafeInteger(record.laps, `${label}.laps`, 1);
+    if (laps > maxLaps) throw new Error(`${label}.laps exceeds the report lap cap`);
+    if (!END_REASONS.includes(record.endReason as never)) throw new TypeError(`${label}.endReason is invalid`);
     if (typeof record.decidedByArmageddon !== "boolean") {
         throw new TypeError(`${label}.decidedByArmageddon must be boolean`);
     }
@@ -195,6 +222,12 @@ function loadTargetReport(path: string): ILoadedTargetReport {
     if (report.setupSpec !== V07_NONFIGHT_SETUP_SPEC) {
         throw new Error(`${path} uses setup spec ${String(report.setupSpec)}, expected ${V07_NONFIGHT_SETUP_SPEC}`);
     }
+    if (
+        report.cohortSafeSetupSpec !== V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC ||
+        report.cohortSafeBehaviorSha256 !== V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256
+    ) {
+        throw new Error(`${path} does not bind the frozen cohort-safe placement artifact`);
+    }
     if (report.draftSpec !== LEAGUE_ROUND1_DRAFT_SPEC) {
         throw new Error(`${path} uses draft spec ${String(report.draftSpec)}, expected ${LEAGUE_ROUND1_DRAFT_SPEC}`);
     }
@@ -212,9 +245,11 @@ function loadTargetReport(path: string): ILoadedTargetReport {
     }
     const target = report.target as TargetEvidenceTarget;
     const baseSeed = asSafeInteger(report.baseSeed, `${path}.baseSeed`);
+    const startBoard = asSafeInteger(report.startBoard, `${path}.startBoard`);
     const boards = asSafeInteger(report.boards, `${path}.boards`, 1);
     const scannedBoards = asSafeInteger(report.scannedBoards, `${path}.scannedBoards`, boards);
     const maxLaps = asSafeInteger(report.maxLaps, `${path}.maxLaps`, 1);
+    if (maxLaps !== 60) throw new Error(`${path} must use the preregistered 60-lap cap`);
     const maps = asArray(report.maps, `${path}.maps`);
     if (
         maps.length !== SETUP_LIVE_GRID_TYPES.length ||
@@ -226,6 +261,15 @@ function loadTargetReport(path: string): ILoadedTargetReport {
         parseBoard(board, `${path}.boardLedger[${index}]`),
     );
     if (boardLedger.length !== boards) throw new Error(`${path} board count does not match its ledger`);
+    const expectedCollection = collectPublicRosterPlacementBoards(baseSeed, "guard", boards, target, startBoard);
+    if (scannedBoards !== expectedCollection.scannedBoards) {
+        throw new Error(`${path} scanned-board count does not match the reconstructed outcome-blind target scan`);
+    }
+    for (const [index, board] of boardLedger.entries()) {
+        if (!sameBoard(board, expectedCollection.boards[index])) {
+            throw new Error(`${path} board ledger does not match the reconstructed outcome-blind target scan`);
+        }
+    }
     const boardByIndex = new Map<number, IPublicRosterPlacementBoard>();
     const boardByPairSeed = new Map<number, IPublicRosterPlacementBoard>();
     for (const board of boardLedger) {
@@ -236,7 +280,10 @@ function loadTargetReport(path: string): ILoadedTargetReport {
         boardByPairSeed.set(board.pairSeed, board);
     }
 
-    const recordsByArm: Record<ReportArm, IPublicRosterPlacementRecord[]> = { control: [], both: [] };
+    const recordsByArm: Record<ReportArm, IPublicRosterPlacementRecord[]> = {
+        [CONTROL_ARM]: [],
+        [CANDIDATE_ARM]: [],
+    };
     const seenClusters = new Set<string>();
     const clusters = asArray(report.clusters, `${path}.clusters`);
     if (clusters.length !== boards * EXPECTED_ARMS.length) {
@@ -260,7 +307,7 @@ function loadTargetReport(path: string): ILoadedTargetReport {
         const records = asArray(cluster.records, `${label}.records`);
         if (records.length !== 4) throw new Error(`${label} must contain the four crossover games`);
         const parsedRecords = records.map((record, game) =>
-            parseRecord(record, arm, clusterBoard, `${label}.records[${game}]`),
+            parseRecord(record, arm, clusterBoard, maxLaps, `${label}.records[${game}]`),
         );
         if (new Set(parsedRecords.map((record) => record.game)).size !== 4) {
             throw new Error(`${label} must contain each crossover game exactly once`);
@@ -281,12 +328,13 @@ function loadTargetReport(path: string): ILoadedTargetReport {
         sourceBytesSha256: sha256Bytes(bytes),
         sourceReportSha256,
         baseSeed,
+        startBoard,
         boards,
         scannedBoards,
         maxLaps,
         maps: maps as SetupLiveGridType[],
         boardLedger,
-        candidateRecords: recordsByArm.both,
+        candidateRecords: recordsByArm[CANDIDATE_ARM],
         controlRecords: recordsByArm.control,
     };
 }
@@ -311,6 +359,33 @@ function armSafety(records: readonly IPublicRosterPlacementRecord[]): IArmSafety
         candidateRejections: records.reduce((sum, record) => sum + record.candidateRejections, 0),
         opposingRejections: records.reduce((sum, record) => sum + record.baselineRejections, 0),
     };
+}
+
+function validateArmPair(
+    candidate: IPublicRosterPlacementRecord,
+    control: IPublicRosterPlacementRecord,
+    label: string,
+): void {
+    if (
+        candidate.pickSeed !== control.pickSeed ||
+        candidate.battleSeed !== control.battleSeed ||
+        candidate.gridType !== control.gridType ||
+        candidate.pickSeat !== control.pickSeat ||
+        candidate.battleMirror !== control.battleMirror ||
+        candidate.candidateSide !== control.candidateSide ||
+        candidate.candidateCohort !== control.candidateCohort ||
+        candidate.opponentCohort !== control.opponentCohort ||
+        candidate.incumbentAction !== control.incumbentAction ||
+        candidate.legitimateRevealCount !== control.legitimateRevealCount
+    ) {
+        throw new Error(`${label} candidate/control metadata mismatch`);
+    }
+    if (control.actionable || control.candidateAction !== control.incumbentAction || control.addedPublicCount !== 0) {
+        throw new Error(`${label} control record is not the unchanged placement arm`);
+    }
+    if (candidate.actionable !== (candidate.candidateAction !== candidate.incumbentAction)) {
+        throw new Error(`${label} candidate actionable flag does not match its placement action`);
+    }
 }
 
 function summarizeTarget(report: ILoadedTargetReport) {
@@ -349,6 +424,7 @@ function summarizeTarget(report: ILoadedTargetReport) {
             const candidate = candidateByKey.get(key);
             const control = controlByKey.get(key);
             if (!candidate || !control) throw new Error(`target ${report.target} missing paired game ${key}`);
+            validateArmPair(candidate, control, `target ${report.target} game ${key}`);
             const seat = candidate.pickSeat === "candidate-lower" ? draft.lower : draft.upper;
             const opponent = candidate.pickSeat === "candidate-lower" ? draft.upper : draft.lower;
             if (
@@ -358,6 +434,24 @@ function summarizeTarget(report: ILoadedTargetReport) {
                 control.opponentCohort !== opponent.cohort
             ) {
                 throw new Error(`target ${report.target} cohort mismatch for reconstructed game ${key}`);
+            }
+            if (seat.cohort === "melee-other") {
+                const placementEquivalent =
+                    !candidate.actionable &&
+                    candidate.candidateAction === control.candidateAction &&
+                    candidate.candidateAction === candidate.incumbentAction &&
+                    candidate.addedPublicCount === 0;
+                const behaviorEquivalent =
+                    candidate.behaviorTraceSha256 === control.behaviorTraceSha256 &&
+                    candidate.candidateResult === control.candidateResult &&
+                    candidate.laps === control.laps &&
+                    candidate.endReason === control.endReason &&
+                    candidate.decidedByArmageddon === control.decidedByArmageddon &&
+                    candidate.candidateRejections === control.candidateRejections &&
+                    candidate.baselineRejections === control.baselineRejections;
+                if (!placementEquivalent || !behaviorEquivalent) {
+                    throw new Error(`target ${report.target} melee-other game ${key} is not incumbent-equivalent`);
+                }
             }
             if (!seat.targets.includes(report.target)) continue;
             selectedCandidate.push(candidate);
@@ -376,6 +470,8 @@ function summarizeTarget(report: ILoadedTargetReport) {
     const delta = pairedPublicRosterPlacementDelta(selectedCandidate, selectedControl);
     const candidateSafety = armSafety(selectedCandidate);
     const controlSafety = armSafety(selectedControl);
+    const allCandidateSafety = armSafety(report.candidateRecords);
+    const allControlSafety = armSafety(report.controlRecords);
     return {
         target: report.target,
         sourceBytesSha256: report.sourceBytesSha256,
@@ -389,6 +485,12 @@ function summarizeTarget(report: ILoadedTargetReport) {
         bothSeatsMatchedBoards,
         selectionSha256: sha256Json(selectionRows),
         matchedControlDelta: delta,
+        allRecordRejections: {
+            candidateArmCandidate: allCandidateSafety.candidateRejections,
+            candidateArmOpponent: allCandidateSafety.opposingRejections,
+            controlArmCandidate: allControlSafety.candidateRejections,
+            controlArmOpponent: allControlSafety.opposingRejections,
+        },
         safety: {
             candidate: candidateSafety,
             control: controlSafety,
@@ -404,6 +506,62 @@ function summarizeTarget(report: ILoadedTargetReport) {
     };
 }
 
+type PublicRosterTargetSummary = ReturnType<typeof summarizeTarget>;
+
+export function evaluatePublicRosterTargetGate(targets: readonly PublicRosterTargetSummary[]) {
+    const checksByTarget = Object.fromEntries(
+        PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS.map((target) => {
+            const summary = targets.find((entry) => entry.target === target);
+            const delta = summary?.matchedControlDelta;
+            const excess = summary?.safety.matchedExcess;
+            const allRecordRejections = summary?.allRecordRejections;
+            const checks = {
+                present: summary !== undefined,
+                exactSourceBoards: summary?.sourceBoards === PUBLIC_ROSTER_TARGET_GATE.requiredBoardsPerTarget,
+                hasMatchedGames: (summary?.selectedGames ?? 0) > 0,
+                pointEstimate: (delta?.scoreGainPp ?? -Infinity) >= PUBLIC_ROSTER_TARGET_GATE.minimumScoreGainPp,
+                confidence:
+                    (delta?.confidence95GainPp?.low ?? -Infinity) >
+                    PUBLIC_ROSTER_TARGET_GATE.minimumConfidence95LowGainPpExclusive,
+                zeroRejections:
+                    (allRecordRejections?.candidateArmCandidate ?? Infinity) <=
+                        PUBLIC_ROSTER_TARGET_GATE.maximumRejections &&
+                    (allRecordRejections?.candidateArmOpponent ?? Infinity) <=
+                        PUBLIC_ROSTER_TARGET_GATE.maximumRejections &&
+                    (allRecordRejections?.controlArmCandidate ?? Infinity) <=
+                        PUBLIC_ROSTER_TARGET_GATE.maximumRejections &&
+                    (allRecordRejections?.controlArmOpponent ?? Infinity) <=
+                        PUBLIC_ROSTER_TARGET_GATE.maximumRejections,
+                drawSafety: (excess?.drawPp ?? Infinity) <= PUBLIC_ROSTER_TARGET_GATE.maximumDrawExcessPp,
+                armageddonSafety:
+                    (excess?.armageddonPp ?? Infinity) <= PUBLIC_ROSTER_TARGET_GATE.maximumArmageddonExcessPp,
+                averageLapSafety: (excess?.avgLaps ?? Infinity) <= PUBLIC_ROSTER_TARGET_GATE.maximumAverageLapExcess,
+            };
+            return [target, checks];
+        }),
+    ) as Record<
+        TargetEvidenceTarget,
+        {
+            present: boolean;
+            exactSourceBoards: boolean;
+            hasMatchedGames: boolean;
+            pointEstimate: boolean;
+            confidence: boolean;
+            zeroRejections: boolean;
+            drawSafety: boolean;
+            armageddonSafety: boolean;
+            averageLapSafety: boolean;
+        }
+    >;
+    return {
+        thresholds: PUBLIC_ROSTER_TARGET_GATE,
+        checksByTarget,
+        passed: PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS.every((target) =>
+            Object.values(checksByTarget[target]).every(Boolean),
+        ),
+    };
+}
+
 function loadTargetReportSet(paths: readonly string[]): ILoadedTargetReport[] {
     if (!paths.length) throw new Error("at least one raw target report path is required");
     const reports = paths.map(loadTargetReport);
@@ -416,6 +574,7 @@ function loadTargetReportSet(paths: readonly string[]): ILoadedTargetReport[] {
     for (const report of reports.slice(1)) {
         if (
             report.baseSeed !== first.baseSeed ||
+            report.startBoard !== first.startBoard ||
             report.boards !== first.boards ||
             report.maxLaps !== first.maxLaps ||
             JSON.stringify(report.maps) !== JSON.stringify(first.maps)
@@ -437,11 +596,14 @@ function buildSummary(
     sourceBinding: null | {
         sourceCommit: string;
         expectedBaseSeed: number;
+        expectedStartBoard: number;
         provenance: "caller-attested; source commit is not embedded in raw reports";
     },
 ) {
     const first = reports[0];
     const seenTargets = new Set(reports.map((report) => report.target));
+    const targets = reports.map(summarizeTarget);
+    const promotionGate = evaluatePublicRosterTargetGate(targets);
     const withoutHash = {
         schemaVersion: PUBLIC_ROSTER_TARGET_EVIDENCE_SCHEMA_VERSION,
         status,
@@ -450,19 +612,22 @@ function buildSummary(
         setupDiagnosticSemantics: "inclusive tags; melee-other is the exact fallback cohort",
         control: { setupSpec: V07_NONFIGHT_SETUP_SPEC, arm: CONTROL_ARM },
         candidate: {
-            setupSpec: V07_PUBLIC_ROSTER_SETUP_SPEC,
-            behaviorSha256: V07_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+            setupSpec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+            behaviorSha256: V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+            placementPolicy: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
             arm: CANDIDATE_ARM,
         },
         draftSpec: LEAGUE_ROUND1_DRAFT_SPEC,
         fightVersion: "v0.7",
         panel: "guard",
         baseSeed: first.baseSeed,
+        startBoard: first.startBoard,
         boardsPerTarget: first.boards,
         maxLaps: first.maxLaps,
         maps: first.maps,
         completeTargetSet: PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS.every((target) => seenTargets.has(target)),
-        targets: reports.map(summarizeTarget),
+        targets,
+        promotionGate,
     };
     return { ...withoutHash, summarySha256: sha256Json(withoutHash) };
 }
@@ -477,11 +642,13 @@ export function summarizePublicRosterTargetEvidence(
     paths: readonly string[],
     sourceCommit: string,
     expectedBaseSeed: number,
+    expectedStartBoard: number = 0,
 ) {
     if (!HEX_COMMIT.test(sourceCommit)) {
         throw new Error("source commit must be exactly 40 lowercase hexadecimal characters");
     }
     asSafeInteger(expectedBaseSeed, "expected base seed");
+    asSafeInteger(expectedStartBoard, "expected start board");
     const reports = loadTargetReportSet(paths);
     if (
         reports.length !== PUBLIC_ROSTER_TARGET_EVIDENCE_TARGETS.length ||
@@ -494,9 +661,18 @@ export function summarizePublicRosterTargetEvidence(
     if (reports.some((report) => report.baseSeed !== expectedBaseSeed)) {
         throw new Error(`promotion evidence requires caller-attested base seed ${expectedBaseSeed}`);
     }
+    if (reports.some((report) => report.startBoard !== expectedStartBoard)) {
+        throw new Error(`promotion evidence requires caller-attested start board ${expectedStartBoard}`);
+    }
+    if (reports.some((report) => report.boards !== PUBLIC_ROSTER_TARGET_GATE.requiredBoardsPerTarget)) {
+        throw new Error(
+            `promotion evidence requires exactly ${PUBLIC_ROSTER_TARGET_GATE.requiredBoardsPerTarget} accepted boards per target`,
+        );
+    }
     return buildSummary(reports, "derived_evidence_no_fights_rerun", {
         sourceCommit,
         expectedBaseSeed,
+        expectedStartBoard,
         provenance: "caller-attested; source commit is not embedded in raw reports",
     });
 }
@@ -506,6 +682,7 @@ export function main(): void {
         args: process.argv.slice(2),
         options: {
             "expected-base-seed": { type: "string" },
+            "expected-start-board": { type: "string" },
             "source-commit": { type: "string" },
             help: { type: "boolean", short: "h", default: false },
         },
@@ -515,16 +692,23 @@ export function main(): void {
     if (values.help) {
         console.log(
             "usage: bun src/simulation/summarize_public_roster_target_evidence.ts " +
-                "--source-commit <40-hex> --expected-base-seed <integer> <five raw target reports>",
+                "--source-commit <40-hex> --expected-base-seed <integer> --expected-start-board <integer> " +
+                "<five raw target reports>",
         );
         return;
     }
     if (!values["source-commit"]) throw new Error("--source-commit is required");
     if (!values["expected-base-seed"]) throw new Error("--expected-base-seed is required");
+    if (!values["expected-start-board"]) throw new Error("--expected-start-board is required");
     const expectedBaseSeed = Number(values["expected-base-seed"]);
     console.log(
         JSON.stringify(
-            summarizePublicRosterTargetEvidence(positionals, values["source-commit"], expectedBaseSeed),
+            summarizePublicRosterTargetEvidence(
+                positionals,
+                values["source-commit"],
+                expectedBaseSeed,
+                Number(values["expected-start-board"]),
+            ),
             null,
             2,
         ),

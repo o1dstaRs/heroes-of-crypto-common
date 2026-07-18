@@ -59,6 +59,7 @@ import {
 } from "../../src/simulation/optimizer/ranked_draft_cem_core";
 import {
     cloneNonFightPolicy,
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     pairedSetupEstimate,
     SETUP_COHORTS,
     SETUP_GUARD_THRESHOLDS,
@@ -305,6 +306,18 @@ describe("v0.7 composed non-fight guard inputs", () => {
         });
 
         expect(loadV07ComposedSetupCandidate(fixture.setupPath, runId).policy.placement).toBe("public-roster");
+    });
+
+    test("accepts the frozen cohort-safe placement candidate without changing its other setup behavior", () => {
+        const runId = "composed-cohort-safe-input-test";
+        const fixture = validArtifacts(runId);
+        writeJson(fixture.setupPath, {
+            ...fixture.setup,
+            policy: { ...fixture.setup.policy, placement: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT },
+        });
+
+        const loaded = loadV07ComposedSetupCandidate(fixture.setupPath, runId).policy;
+        expect(loaded).toEqual({ ...fixture.setup.policy, placement: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT });
     });
 
     test("fails closed on a reconstructed draft mismatch and a setup auto-bake marker", () => {

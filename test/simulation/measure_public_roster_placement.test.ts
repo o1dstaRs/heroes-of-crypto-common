@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT } from "../../src/ai/setup/setup_ship";
 import {
     collectPublicRosterPlacementBoards,
     pairedPublicRosterPlacementDelta,
@@ -81,6 +82,37 @@ describe("public-roster placement measurement", () => {
         expect(context.actionable).toBe(false);
     });
 
+    test("cohort-safe arm shares the runtime visibility rule and excludes only exact melee-other", () => {
+        const taggedRosters = [[C.ARBALESTER], [C.SATYR], [C.ANGEL], [C.PEASANT]];
+        for (const ownRoster of taggedRosters) {
+            const context = publicRosterPlacementContext(
+                "cohort-safe",
+                ownRoster,
+                [C.GRIFFIN, C.BLACK_DRAGON, C.NOMAD],
+                [C.GRIFFIN],
+            );
+            expect(context.placementPolicy).toBe(COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT);
+            expect(context.publicOpponentCreatureIds).toEqual([C.GRIFFIN, C.BLACK_DRAGON, C.NOMAD]);
+            expect(context.addedPublicCreatureIds).toEqual([C.BLACK_DRAGON, C.NOMAD]);
+        }
+
+        const meleeOther = publicRosterPlacementContext(
+            "cohort-safe",
+            [C.SQUIRE],
+            [C.GRIFFIN, C.BLACK_DRAGON, C.NOMAD],
+            [C.GRIFFIN],
+        );
+        expect(meleeOther).toMatchObject({
+            placementPolicy: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+            revealedOpponentCreatureIds: [C.GRIFFIN],
+            addedPublicCreatureIds: [],
+            incumbentAction: "unchanged",
+            candidateAction: "unchanged",
+            actionable: false,
+        });
+        expect(meleeOther.publicOpponentCreatureIds).toBeUndefined();
+    });
+
     test("board allocator uses three deterministic, disjoint panel channels", () => {
         const first = publicRosterPlacementBoard(97071710, "train", 0);
         const replay = publicRosterPlacementBoard(97071710, "train", 0);
@@ -92,6 +124,9 @@ describe("public-roster placement measurement", () => {
         const natural = collectPublicRosterPlacementBoards(97071710, "train", 2, "natural");
         expect(natural.boards).toEqual([first, second]);
         expect(natural.scannedBoards).toBe(2);
+
+        const offset = collectPublicRosterPlacementBoards(97071710, "train", 1, "natural", 1_000);
+        expect(offset.boards).toEqual([publicRosterPlacementBoard(97071710, "train", 1_000)]);
     });
 
     test("roster evidence uses inclusive diagnostic tags while melee-other stays exact", () => {

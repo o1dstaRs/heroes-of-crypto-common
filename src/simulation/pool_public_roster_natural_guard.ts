@@ -9,9 +9,17 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../ai/setup/draft_ship";
-import { SETUP_COHORTS, V07_NONFIGHT_SETUP_SPEC, type SetupCohort } from "../ai/setup/setup_ship";
+import {
+    COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
+    SETUP_COHORTS,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+    V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+    V07_NONFIGHT_SETUP_SPEC,
+    type SetupCohort,
+} from "../ai/setup/setup_ship";
 import {
     pairedPublicRosterPlacementDelta,
+    PUBLIC_ROSTER_COHORT_SAFE_ARM,
     publicRosterPlacementBoard,
     publicRosterPlacementDraftEvidence,
     type IPublicRosterPlacementBoard,
@@ -38,11 +46,10 @@ export const PUBLIC_ROSTER_NATURAL_GATE = {
 } as const;
 
 const CONTROL_ARM = "control";
-const CANDIDATE_ARM = "both";
+const CANDIDATE_ARM = PUBLIC_ROSTER_COHORT_SAFE_ARM;
 const EXPECTED_ARMS = [CONTROL_ARM, CANDIDATE_ARM] as const;
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
 const HEX_COMMIT = /^[0-9a-f]{40}$/;
-const PANEL_MASK = 0x3fffffff;
 const PLACEMENT_ACTIONS = ["unchanged", "flyer-screen", "corner-shift"] as const;
 const END_REASONS = ["elimination", "turn_cap", "stuck"] as const;
 
@@ -92,7 +99,7 @@ interface ILoadedShard {
     shardIndex: number;
     sourceBytesSha256: string;
     sourceReportSha256: string;
-    reportBaseSeed: number;
+    startBoard: number;
     localBoards: number;
     globalStartIndex: number;
     globalEndIndexExclusive: number;
@@ -251,6 +258,24 @@ function validateArmPair(
     if (candidate.actionable !== (candidate.candidateAction !== candidate.incumbentAction)) {
         throw new Error(`${label} candidate actionable flag does not match its placement action`);
     }
+    if (candidate.candidateCohort === "melee-other") {
+        const placementEquivalent =
+            !candidate.actionable &&
+            candidate.candidateAction === control.candidateAction &&
+            candidate.candidateAction === candidate.incumbentAction &&
+            candidate.addedPublicCount === 0;
+        const behaviorEquivalent =
+            candidate.behaviorTraceSha256 === control.behaviorTraceSha256 &&
+            candidate.candidateResult === control.candidateResult &&
+            candidate.laps === control.laps &&
+            candidate.endReason === control.endReason &&
+            candidate.decidedByArmageddon === control.decidedByArmageddon &&
+            candidate.candidateRejections === control.candidateRejections &&
+            candidate.baselineRejections === control.baselineRejections;
+        if (!placementEquivalent || !behaviorEquivalent) {
+            throw new Error(`${label} melee-other candidate is not incumbent-equivalent`);
+        }
+    }
 }
 
 function loadShard(path: string, shardIndex: number, originalBaseSeed: number, globalStartIndex: number): ILoadedShard {
@@ -267,6 +292,12 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
         throw new Error(`${path} has unsupported report schema ${String(report.schemaVersion)}`);
     if (report.setupSpec !== V07_NONFIGHT_SETUP_SPEC) {
         throw new Error(`${path} uses setup spec ${String(report.setupSpec)}, expected ${V07_NONFIGHT_SETUP_SPEC}`);
+    }
+    if (
+        report.cohortSafeSetupSpec !== V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC ||
+        report.cohortSafeBehaviorSha256 !== V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256
+    ) {
+        throw new Error(`${path} does not bind the frozen cohort-safe placement artifact`);
     }
     if (report.draftSpec !== LEAGUE_ROUND1_DRAFT_SPEC) {
         throw new Error(`${path} uses draft spec ${String(report.draftSpec)}, expected ${LEAGUE_ROUND1_DRAFT_SPEC}`);
@@ -292,21 +323,19 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
         throw new Error(`${path} does not name the exact live-map panel`);
     }
     const reportBaseSeed = asSafeInteger(report.baseSeed, `${path}.baseSeed`);
+    if (reportBaseSeed !== originalBaseSeed) {
+        throw new Error(`${path} base seed does not match the caller-attested original seed`);
+    }
+    const reportStartBoard = asSafeInteger(report.startBoard, `${path}.startBoard`);
+    if (reportStartBoard !== globalStartIndex) {
+        throw new Error(`${path} start board does not continue the caller-attested global ledger`);
+    }
     const localBoards = asSafeInteger(report.boards, `${path}.boards`, 1);
     if (report.scannedBoards !== localBoards) throw new Error(`${path} natural scan must accept every local board`);
-    const expectedFirstBoard = publicRosterPlacementBoard(originalBaseSeed, "guard", globalStartIndex);
-    if ((reportBaseSeed & PANEL_MASK) !== (expectedFirstBoard.pairSeed & PANEL_MASK)) {
-        throw new Error(`${path} shard base does not continue the caller-attested global seed ledger`);
-    }
     const boardLedger = asArray(report.boardLedger, `${path}.boardLedger`).map((value, localIndex) => {
         const board = parseBoard(value, `${path}.boardLedger[${localIndex}]`);
-        const localExpected = publicRosterPlacementBoard(reportBaseSeed, "guard", localIndex);
         const globalExpected = publicRosterPlacementBoard(originalBaseSeed, "guard", globalStartIndex + localIndex);
-        if (
-            board.index !== localIndex ||
-            !sameBoard(board, localExpected) ||
-            !sameBoard(board, globalExpected, false)
-        ) {
+        if (!sameBoard(board, globalExpected)) {
             throw new Error(`${path} board ${localIndex} breaks the contiguous global seed ledger`);
         }
         return board;
@@ -314,7 +343,10 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
     if (boardLedger.length !== localBoards) throw new Error(`${path} board count does not match its ledger`);
 
     const boardByIndex = new Map(boardLedger.map((board) => [board.index, board]));
-    const recordsByArm: Record<ReportArm, IPublicRosterPlacementRecord[]> = { control: [], both: [] };
+    const recordsByArm: Record<ReportArm, IPublicRosterPlacementRecord[]> = {
+        [CONTROL_ARM]: [],
+        [CANDIDATE_ARM]: [],
+    };
     const clusters = asArray(report.clusters, `${path}.clusters`);
     if (clusters.length !== localBoards * EXPECTED_ARMS.length) {
         throw new Error(`${path} must contain one control and candidate cluster per local board`);
@@ -347,7 +379,9 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
     const expectedGames = localBoards * EXPECTED_ARMS.length * 4;
     if (report.games !== expectedGames) throw new Error(`${path}.games must equal ${expectedGames}`);
 
-    const candidateByKey = new Map(recordsByArm.both.map((record) => [`${record.pairSeed}/${record.game}`, record]));
+    const candidateByKey = new Map(
+        recordsByArm[CANDIDATE_ARM].map((record) => [`${record.pairSeed}/${record.game}`, record]),
+    );
     const controlByKey = new Map(recordsByArm.control.map((record) => [`${record.pairSeed}/${record.game}`, record]));
     if (candidateByKey.size !== localBoards * 4 || controlByKey.size !== localBoards * 4) {
         throw new Error(`${path} contains omitted or duplicate crossover games`);
@@ -378,11 +412,11 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
         shardIndex,
         sourceBytesSha256: sha256Bytes(bytes),
         sourceReportSha256,
-        reportBaseSeed,
+        startBoard: reportStartBoard,
         localBoards,
         globalStartIndex,
         globalEndIndexExclusive: globalStartIndex + localBoards,
-        candidateRecords: recordsByArm.both,
+        candidateRecords: recordsByArm[CANDIDATE_ARM],
         controlRecords: recordsByArm.control,
     };
 }
@@ -505,6 +539,7 @@ export function poolPublicRosterNaturalGuardShards(
     sourceCommit: string,
     originalBaseSeed: number,
     expectedTotalBoards: number,
+    expectedStartBoard: number = 0,
 ) {
     if (!orderedPaths.length) throw new Error("at least one ordered natural shard report is required");
     if (!HEX_COMMIT.test(sourceCommit)) {
@@ -512,15 +547,19 @@ export function poolPublicRosterNaturalGuardShards(
     }
     asSafeInteger(originalBaseSeed, "expected original base seed");
     asSafeInteger(expectedTotalBoards, "expected total boards", 1);
+    asSafeInteger(expectedStartBoard, "expected start board");
     const shards: ILoadedShard[] = [];
-    let globalIndex = 0;
+    let globalIndex = expectedStartBoard;
     for (const [shardIndex, path] of orderedPaths.entries()) {
         const shard = loadShard(path, shardIndex, originalBaseSeed, globalIndex);
         shards.push(shard);
         globalIndex = shard.globalEndIndexExclusive;
     }
-    if (globalIndex !== expectedTotalBoards) {
-        throw new Error(`ordered shards contain ${globalIndex}/${expectedTotalBoards} expected natural boards`);
+    const expectedEndBoard = expectedStartBoard + expectedTotalBoards;
+    if (globalIndex !== expectedEndBoard) {
+        throw new Error(
+            `ordered shards contain ${globalIndex - expectedStartBoard}/${expectedTotalBoards} expected natural boards`,
+        );
     }
     const candidateRecords = shards.flatMap((shard) => shard.candidateRecords);
     const controlRecords = shards.flatMap((shard) => shard.controlRecords);
@@ -576,8 +615,9 @@ export function poolPublicRosterNaturalGuardShards(
         sourceBinding: {
             sourceCommit,
             expectedOriginalBaseSeed: originalBaseSeed,
+            expectedStartBoard,
             expectedTotalBoards,
-            provenance: "caller-attested; source commit and original base seed are not embedded in raw reports",
+            provenance: "caller-attested; source commit is not embedded in raw reports",
         },
         protocol: {
             setupSpec: V07_NONFIGHT_SETUP_SPEC,
@@ -586,6 +626,9 @@ export function poolPublicRosterNaturalGuardShards(
             panel: "guard",
             target: "natural",
             candidateArm: CANDIDATE_ARM,
+            candidateSetupSpec: V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+            candidateBehaviorSha256: V07_COHORT_SAFE_PUBLIC_ROSTER_BEHAVIOR_SHA256,
+            candidatePlacementPolicy: COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
             controlArm: CONTROL_ARM,
             maps: SETUP_LIVE_GRID_TYPES,
             maxLaps: 60,
@@ -603,7 +646,7 @@ export function poolPublicRosterNaturalGuardShards(
             shardIndex: shard.shardIndex,
             sourceBytesSha256: shard.sourceBytesSha256,
             sourceReportSha256: shard.sourceReportSha256,
-            reportBaseSeed: shard.reportBaseSeed,
+            startBoard: shard.startBoard,
             localBoards: shard.localBoards,
             globalStartIndex: shard.globalStartIndex,
             globalEndIndexExclusive: shard.globalEndIndexExclusive,
@@ -620,6 +663,7 @@ export function main(): void {
         options: {
             "expected-original-base-seed": { type: "string" },
             "expected-total-boards": { type: "string" },
+            "expected-start-board": { type: "string" },
             "source-commit": { type: "string" },
             help: { type: "boolean", short: "h", default: false },
         },
@@ -630,18 +674,20 @@ export function main(): void {
         console.log(
             "usage: bun src/simulation/pool_public_roster_natural_guard.ts " +
                 "--source-commit <40-hex> --expected-original-base-seed <integer> " +
-                "--expected-total-boards <integer> <ordered shard reports>",
+                "--expected-start-board <integer> --expected-total-boards <integer> <ordered shard reports>",
         );
         return;
     }
     if (!values["source-commit"]) throw new Error("--source-commit is required");
     if (!values["expected-original-base-seed"]) throw new Error("--expected-original-base-seed is required");
+    if (!values["expected-start-board"]) throw new Error("--expected-start-board is required");
     if (!values["expected-total-boards"]) throw new Error("--expected-total-boards is required");
     const report = poolPublicRosterNaturalGuardShards(
         positionals,
         values["source-commit"],
         Number(values["expected-original-base-seed"]),
         Number(values["expected-total-boards"]),
+        Number(values["expected-start-board"]),
     );
     console.log(JSON.stringify(report, null, 2));
 }
