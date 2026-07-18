@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    collectPublicRosterPlacementBoards,
     pairedPublicRosterPlacementDelta,
     publicRosterPlacementBoard,
     publicRosterPlacementContext,
@@ -87,6 +88,9 @@ describe("public-roster placement measurement", () => {
         expect(new Set([first.pairSeed, first.pickSeed, first.battleSeed])).toHaveLength(3);
         expect([first.pairSeed, first.pickSeed, first.battleSeed]).not.toContain(second.pairSeed);
         expect(first.gridType).toBe(SETUP_LIVE_GRID_TYPES[first.battleSeed % SETUP_LIVE_GRID_TYPES.length]);
+        const natural = collectPublicRosterPlacementBoards(97071710, "train", 2, "natural");
+        expect(natural.boards).toEqual([first, second]);
+        expect(natural.scannedBoards).toBe(2);
     });
 
     test("matched-control delta compares the same selected game slice", () => {

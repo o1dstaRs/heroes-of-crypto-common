@@ -41,6 +41,7 @@ import { runRankedConditionalPickGame, type IConditionalArmy } from "./measure_s
 import { clusteredRankedDraftConfidence95, rankedDraftBehaviorTraceSha256 } from "./ranked_draft_eval";
 import {
     SETUP_LIVE_GRID_TYPES,
+    setupDiagnosticTags,
     setupLiveGridType,
     setupPanelSeed,
     type SetupLiveGridType,
@@ -50,11 +51,28 @@ import {
 export const PUBLIC_ROSTER_PLACEMENT_ARMS = ["control", "flyers", "chargers", "both"] as const;
 export type PublicRosterPlacementArm = (typeof PUBLIC_ROSTER_PLACEMENT_ARMS)[number];
 export type PublicRosterPlacementAction = "unchanged" | "flyer-screen" | "corner-shift";
+export const PUBLIC_ROSTER_PLACEMENT_TARGETS = [
+    "natural",
+    "ranged",
+    "mage",
+    "melee-magic",
+    "aura-heavy",
+    "melee-other",
+] as const;
+export type PublicRosterPlacementTarget = (typeof PUBLIC_ROSTER_PLACEMENT_TARGETS)[number];
 
 const RULES = parseConditionalRules("all");
 const CURRENT_SETUP = compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
 const SHIPPED_DRAFT = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC));
 const MAX_SEED_INDEX = 0x3fffffff;
+const TARGET_SCAN_OFFSETS: Record<PublicRosterPlacementTarget, number> = {
+    natural: 0,
+    ranged: 50_000_000,
+    mage: 100_000_000,
+    "melee-magic": 150_000_000,
+    "aura-heavy": 200_000_000,
+    "melee-other": 250_000_000,
+};
 
 type CreatureConfig = { attack_type?: string };
 const ATTACK_TYPE_BY_NAME = new Map<string, string>();
@@ -169,6 +187,52 @@ export function publicRosterPlacementBoard(
     const pickSeed = setupPanelSeed(baseSeed, panel, index * 3 + 1);
     const battleSeed = setupPanelSeed(baseSeed, panel, index * 3 + 2);
     return { index, pairSeed, pickSeed, battleSeed, gridType: setupLiveGridType(battleSeed) };
+}
+
+function rankedPick(board: IPublicRosterPlacementBoard) {
+    return runRankedConditionalPickGame(board.pickSeed, RULES, SHIPPED_DRAFT, {
+        pickArtifactT2: (_team, offered, ownCreatureIds) => CURRENT_SETUP.pickArtifactT2(offered, ownCreatureIds),
+    });
+}
+
+function armyMatchesTarget(creatureIds: readonly number[], target: PublicRosterPlacementTarget): boolean {
+    if (target === "natural") return true;
+    if (target === "melee-other") return setupCohort(creatureIds) === "melee-other";
+    return setupDiagnosticTags(creatureIds).includes(target);
+}
+
+export interface ICollectedPublicRosterBoards {
+    boards: IPublicRosterPlacementBoard[];
+    scannedBoards: number;
+}
+
+/** Outcome-blind roster targeting. Every rejected pick board is burned by advancing the target's seed lane. */
+export function collectPublicRosterPlacementBoards(
+    baseSeed: number,
+    panel: SetupSeedPanel,
+    count: number,
+    target: PublicRosterPlacementTarget,
+): ICollectedPublicRosterBoards {
+    const boards: IPublicRosterPlacementBoard[] = [];
+    const start = TARGET_SCAN_OFFSETS[target];
+    const maximumScans = target === "natural" ? count : Math.max(20_000, count * 2_000);
+    let scannedBoards = 0;
+    while (boards.length < count && scannedBoards < maximumScans) {
+        const board = publicRosterPlacementBoard(baseSeed, panel, start + scannedBoards);
+        scannedBoards += 1;
+        if (target === "natural") {
+            boards.push(board);
+            continue;
+        }
+        const pick = rankedPick(board);
+        if (armyMatchesTarget(pick.lower.creatureIds, target) || armyMatchesTarget(pick.upper.creatureIds, target)) {
+            boards.push(board);
+        }
+    }
+    if (boards.length !== count) {
+        throw new Error(`target ${target} found ${boards.length}/${count} boards after ${scannedBoards} scans`);
+    }
+    return { boards, scannedBoards };
 }
 
 interface IArmySetup {
@@ -342,9 +406,7 @@ export function evaluatePublicRosterPlacementCluster(
     board: IPublicRosterPlacementBoard,
     maxLaps: number = 60,
 ): IPublicRosterPlacementCluster {
-    const pick = runRankedConditionalPickGame(board.pickSeed, RULES, SHIPPED_DRAFT, {
-        pickArtifactT2: (_team, offered, ownCreatureIds) => CURRENT_SETUP.pickArtifactT2(offered, ownCreatureIds),
-    });
+    const pick = rankedPick(board);
     const records = ([true, false] as const).flatMap((candidatePickedLower) =>
         ([0, 1] as const).map((battleMirror) =>
             playPublicRosterPlacementGame(
@@ -642,6 +704,7 @@ export async function main(): Promise<void> {
             boards: { type: "string", default: "200" },
             "base-seed": { type: "string", default: "97071710" },
             panel: { type: "string", default: "train" },
+            target: { type: "string", default: "natural" },
             workers: { type: "string", default: String(Math.min(12, availableParallelism())) },
             "max-laps": { type: "string", default: "60" },
             output: { type: "string", default: "sim-out/public_roster_placement.json" },
@@ -654,7 +717,8 @@ export async function main(): Promise<void> {
         console.log(
             "usage: bun src/simulation/measure_public_roster_placement.ts " +
                 "[--arm all|control,flyers,chargers,both] [--boards 200] [--base-seed N] " +
-                "[--panel train|selection|guard] [--workers 12] [--max-laps 60] [--output path.json]",
+                "[--panel train|selection|guard] [--target natural|ranged|mage|melee-magic|aura-heavy|melee-other] " +
+                "[--workers 12] [--max-laps 60] [--output path.json]",
         );
         return;
     }
@@ -664,16 +728,19 @@ export async function main(): Promise<void> {
     const maxLaps = Number(values["max-laps"]);
     const baseSeed = Number(values["base-seed"]);
     const panel = values.panel as SetupSeedPanel;
+    const target = values.target as PublicRosterPlacementTarget;
     if (!Number.isInteger(boards) || boards < 1) throw new RangeError("boards must be a positive integer");
     if (!Number.isInteger(workers) || workers < 1) throw new RangeError("workers must be a positive integer");
     if (!Number.isInteger(maxLaps) || maxLaps < 1) throw new RangeError("max-laps must be a positive integer");
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError("base-seed must be a safe integer");
     if (!["train", "selection", "guard"].includes(panel)) throw new Error("panel must be train, selection, or guard");
+    if (!PUBLIC_ROSTER_PLACEMENT_TARGETS.includes(target)) {
+        throw new Error(`target must be one of ${PUBLIC_ROSTER_PLACEMENT_TARGETS.join(",")}`);
+    }
     process.env.LIVETWIN = "1";
     process.env.V07_SEARCH = "0";
-    const boardLedger = Array.from({ length: boards }, (_, index) =>
-        publicRosterPlacementBoard(baseSeed, panel, index),
-    );
+    const collected = collectPublicRosterPlacementBoards(baseSeed, panel, boards, target);
+    const boardLedger = collected.boards;
     const jobs = arms.flatMap((arm) => boardLedger.map((board) => ({ arm, board, maxLaps })));
     const start = Date.now();
     let lastProgress = 0;
@@ -710,8 +777,10 @@ export async function main(): Promise<void> {
             "opponent creature ids only; no positions, amounts, perk, artifacts, augments, synergies, or hidden state",
         arms,
         panel,
+        target,
         baseSeed,
         boards,
+        scannedBoards: collected.scannedBoards,
         games: clusters.length * 4,
         maxLaps,
         maps: SETUP_LIVE_GRID_TYPES,
