@@ -308,6 +308,14 @@ export class FightProperties {
     public getStepsMoraleMultiplier(): number {
         return this.stepsMoraleMultiplier;
     }
+    /** Restore the server-authoritative no-progress movement multiplier from a ranked snapshot. */
+    public restoreStepsMoraleMultiplier(value: number): void {
+        if (!Number.isFinite(value) || value < 0) {
+            throw new RangeError("Steps morale multiplier must be a finite non-negative number");
+        }
+
+        this.stepsMoraleMultiplier = value;
+    }
     public getHasAdditionalTimeRequestedPerTeam(): Map<TeamType, boolean> {
         return this.hasAdditionalTimeRequestedPerTeam;
     }

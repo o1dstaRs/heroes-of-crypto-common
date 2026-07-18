@@ -93,6 +93,30 @@ describe("FightProperties", () => {
             expect(fightProperties.getHourglassQueueSize()).toBe(0);
         });
 
+        it("restores the authoritative steps morale multiplier", () => {
+            const fightProperties = new FightProperties();
+
+            fightProperties.increaseStepsMoraleMultiplier();
+            fightProperties.restoreStepsMoraleMultiplier(0.35);
+
+            expect(fightProperties.getStepsMoraleMultiplier()).toBe(0.35);
+
+            fightProperties.restoreStepsMoraleMultiplier(0);
+
+            expect(fightProperties.getStepsMoraleMultiplier()).toBe(0);
+        });
+
+        it("rejects invalid authoritative steps morale multipliers without changing state", () => {
+            const fightProperties = new FightProperties();
+
+            fightProperties.restoreStepsMoraleMultiplier(0.2);
+
+            for (const invalidValue of [-0.05, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+                expect(() => fightProperties.restoreStepsMoraleMultiplier(invalidValue)).toThrow(RangeError);
+                expect(fightProperties.getStepsMoraleMultiplier()).toBe(0.2);
+            }
+        });
+
         it("adds, removes, and dequeues turn priority queues in order", () => {
             const fightProperties = new FightProperties();
 
