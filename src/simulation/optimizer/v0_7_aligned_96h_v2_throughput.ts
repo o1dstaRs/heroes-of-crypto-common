@@ -1053,6 +1053,7 @@ const V08_ALIGNED_V1_THROUGHPUT_SOURCE_FILES = Object.freeze([
     "src/ai/versions/v0_7.ts",
     "src/ai/versions/v0_7_placement_reveal.ts",
     "src/ai/versions/v0_8.ts",
+    "src/ai/versions/v0_8_dominant_finish.ts",
     "src/ai/versions/v0_8s.ts",
     "src/artifacts/artifact_properties.ts",
     "src/configuration/abilities.json",

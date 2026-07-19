@@ -372,6 +372,7 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             "src/ai/setup/setup_strategy.ts",
             "src/ai/setup/setup_v0.ts",
             "src/ai/setup/synergy_score.ts",
+            "src/ai/versions/v0_8_dominant_finish.ts",
             "src/artifacts/artifact_properties.ts",
             "src/configuration/creatures.json",
             "src/perks/perk_properties.ts",
