@@ -508,7 +508,7 @@
         "Arachna Queen": {
             "name": "Arachna Queen",
             "hp": 180,
-            "steps": 8,
+            "steps": 6.3,
             "speed": 5.4,
             "armor": 31,
             "attack_type": "MELEE",
