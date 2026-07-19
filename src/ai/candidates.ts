@@ -720,7 +720,6 @@ class CandidateGenerator {
         const best = strikes[0];
         return best ? { attackFrom: best.attackFrom, targetCell: best.targetCell, route: best.route } : undefined;
     }
-
     /** One deterministic, engine-legal melee strike against an intact BLOCK_CENTER mountain. */
     private addMountainAttack(): void {
         if (!this.options.includeMountainAttacks) {
