@@ -83,6 +83,14 @@ import {
     bindV08AlignedV1Candidate,
     buildV08AlignedV1CandidateEnvironment,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
+import {
+    emptyV08AlignedV1ExecutionAudit,
+    gridTypeV08AlignedV1,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_core";
+import {
+    compactV08AlignedV1Observation,
+    type IV08AlignedV1BattleRecord,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -486,16 +494,27 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                 binding: v08Binding,
                 maxScenarioPairsPerShard: evaluation.shard.maxScenarioPairsPerShard,
             })[0];
-            const v08Records = evaluation.records.map((record) => ({
-                ...record,
-                greenVersion: record.candidateIsGreen ? ("v0.8s" as const) : ("v0.7" as const),
-                redVersion: record.candidateIsGreen ? ("v0.7" as const) : ("v0.8s" as const),
-            }));
+            const v08Records = evaluation.records.map((record): IV08AlignedV1BattleRecord => {
+                const execution = emptyV08AlignedV1ExecutionAudit();
+                execution.candidate.observedTurns = 1;
+                execution.candidate.completedAttacksOrSpells = 1;
+                execution.opponent.observedTurns = 1;
+                execution.opponent.completedAttacksOrSpells = 1;
+                return {
+                    ...record,
+                    artifactKind: "v0_8_aligned_96h_v1_battle_record",
+                    versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+                    gridType: gridTypeV08AlignedV1(record.scenarioOrdinal),
+                    execution,
+                    greenVersion: record.candidateIsGreen ? "v0.8s" : "v0.7",
+                    redVersion: record.candidateIsGreen ? "v0.7" : "v0.8s",
+                };
+            });
             const v08Audits = v08Records.map((record) =>
                 auditFor(record as unknown as IV07AlignedV2BattleRecord, v08Binding.genome),
             );
             const v08Observations = v08Records.map((record, index) =>
-                compactV07AlignedV2Observation(record, v08Binding, v08Audits[index]),
+                compactV08AlignedV1Observation(record, v08Binding, v08Audits[index]),
             );
             const v08SourcePath = "/synthetic/v08-worker-0.audit.jsonl";
             const v08Contents = `${v08Audits.map((row) => canonicalV07AlignedV2Json(row)).join("\n")}\n`;

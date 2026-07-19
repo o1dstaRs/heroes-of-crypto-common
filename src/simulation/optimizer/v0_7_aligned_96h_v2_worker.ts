@@ -141,40 +141,21 @@ if (isV08) {
     const validated = protocol.validateV08AlignedV1CandidateBinding(
         data.binding as Parameters<typeof protocol.validateV08AlignedV1CandidateBinding>[0],
     );
-    const sharedGameAdapter = await import("./v0_7_aligned_96h_v2_game_adapter");
     const v08GameAdapter = await import("./v0_8_aligned_96h_v1_game_adapter");
     binding = validated;
-    taskKey = (task) => protocol.v08AlignedV1TaskKey(task as Parameters<typeof protocol.v08AlignedV1TaskKey>[0]);
-    playTask = (task) =>
-        typeof task === "object" &&
-        task !== null &&
-        "artifactKind" in task &&
-        task.artifactKind === "v0_8_aligned_96h_v1_execution_task"
-            ? v08GameAdapter.playV08AlignedV1Task(
-                  task as Parameters<typeof v08GameAdapter.playV08AlignedV1Task>[0],
-                  validated,
-              )
-            : sharedGameAdapter.playV07AlignedV2Task(
-                  task as Parameters<typeof sharedGameAdapter.playV07AlignedV2Task>[0],
-                  undefined,
-                  validated,
-              );
+    const upgradeTask = (task: unknown) =>
+        protocol.upgradeV08AlignedV1ExecutionTask(
+            task as Parameters<typeof protocol.upgradeV08AlignedV1ExecutionTask>[0],
+        );
+    taskKey = (task) => protocol.v08AlignedV1TaskKey(upgradeTask(task));
+    playTask = (task) => v08GameAdapter.playV08AlignedV1Task(upgradeTask(task), validated);
     compactObservation = (record, audit) =>
-        typeof record === "object" &&
-        record !== null &&
-        "artifactKind" in record &&
-        record.artifactKind === "v0_8_aligned_96h_v1_battle_record"
-            ? v08GameAdapter.compactV08AlignedV1Observation(
-                  record as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[0],
-                  validated,
-                  audit as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[2],
-              )
-            : sharedGameAdapter.compactV07AlignedV2Observation(
-                  record as Parameters<typeof sharedGameAdapter.compactV07AlignedV2Observation>[0],
-                  validated,
-                  audit as Parameters<typeof sharedGameAdapter.compactV07AlignedV2Observation>[2],
-              );
-    readAuditAppend = sharedGameAdapter.readV07AlignedV2AuditAppend;
+        v08GameAdapter.compactV08AlignedV1Observation(
+            record as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[0],
+            validated,
+            audit as Parameters<typeof v08GameAdapter.compactV08AlignedV1Observation>[2],
+        );
+    readAuditAppend = v08GameAdapter.readV08AlignedV1AuditAppend;
 } else {
     const protocol = await import("./v0_7_aligned_96h_v2_protocol");
     const validated = protocol.validateV07AlignedV2CandidateBinding(

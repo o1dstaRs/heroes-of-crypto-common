@@ -32,6 +32,9 @@ import { fileURLToPath } from "node:url";
 import type { IV07ComposedAuditRow } from "../v0_7_composed_ranked_ladder";
 import type { V07AlignedV2Outcome } from "./v0_7_aligned_96h_v2_core";
 import { V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 } from "./v0_8_aligned_96h_v1_catalog";
+import { emptyV08AlignedV1ExecutionAudit, gridTypeV08AlignedV1 } from "./v0_8_aligned_96h_v1_core";
+import { compactV08AlignedV1Observation, type IV08AlignedV1BattleRecord } from "./v0_8_aligned_96h_v1_game_adapter";
+import type { IV08AlignedV1CandidateBinding } from "./v0_8_aligned_96h_v1_protocol";
 import {
     aligned96hCandidateVersions,
     buildAligned96hCandidateEnvironment,
@@ -1635,6 +1638,20 @@ function syntheticRecord<Binding extends Aligned96hCandidateBinding>(
         rejectedRed: 0,
         resultFingerprint: fingerprintAligned96h(binding, { task: v07AlignedV2TaskKey(task), outcome }),
     };
+    if (binding.candidate === "v0.8s") {
+        const execution = emptyV08AlignedV1ExecutionAudit();
+        execution.candidate.observedTurns = 1;
+        execution.candidate.completedAttacksOrSpells = 1;
+        execution.opponent.observedTurns = 1;
+        execution.opponent.completedAttacksOrSpells = 1;
+        return {
+            ...common,
+            artifactKind: "v0_8_aligned_96h_v1_battle_record",
+            versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+            gridType: gridTypeV08AlignedV1(task.scenarioOrdinal),
+            execution,
+        } as IAligned96hBattleRecord<Binding>;
+    }
     return common as IAligned96hBattleRecord<Binding>;
 }
 
@@ -1649,7 +1666,13 @@ function syntheticShardEvaluation<Binding extends Aligned96hCandidateBinding>(
     const records = tasks.map((task) => syntheticRecord(task, outcome, binding));
     const audits = binding.searchEnabled ? records.map((record) => auditRow(record, binding)) : [];
     const observations = records.map((record, index) =>
-        compactV07AlignedV2Observation(record, binding, binding.searchEnabled ? audits[index] : undefined),
+        binding.candidate === "v0.8s"
+            ? compactV08AlignedV1Observation(
+                  record as IV08AlignedV1BattleRecord,
+                  binding as IV08AlignedV1CandidateBinding,
+                  binding.searchEnabled ? audits[index] : undefined,
+              )
+            : compactV07AlignedV2Observation(record, binding, binding.searchEnabled ? audits[index] : undefined),
     );
     const sourcePath = join(auditDirectory, "synthetic-worker-0.jsonl");
     const contents = audits.length ? `${audits.map((row) => canonicalV07AlignedV2Json(row)).join("\n")}\n` : "";

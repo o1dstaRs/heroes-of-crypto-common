@@ -15,7 +15,13 @@ import { SETUP_POLICY_V0 } from "../../ai/setup/setup_v0";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { getUpgradePoints } from "../../perks/perk_properties";
-import { runMatch, type IMatchConfig, type IMatchResult } from "../battle_engine";
+import {
+    runMatch,
+    type IDecisionObservation,
+    type IMatchConfig,
+    type IMatchResult,
+    type ITurnExecutionObservation,
+} from "../battle_engine";
 import { creatureIdForName } from "../draft";
 import { runRankedConditionalPickGame, shippedLeagueGenome, type IConditionalArmy } from "../measure_setup_conditional";
 import { rosterSignature, v07ArchetypeTemplate, V07_ARCHETYPE_TAXONOMY } from "../v0_7_archetype_battery";
@@ -86,6 +92,10 @@ export type IAligned96hBattleRecord<Binding extends IAligned96hCandidateBinding>
 export interface IV07AlignedV2GameDependencies {
     matchRunner?: (config: IMatchConfig) => IMatchResult;
     pickRunner?: (seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy };
+    /** Optional instrumentation/configuration hook for versioned wrappers. Unset preserves v0.7 exactly. */
+    gridType?: number;
+    decisionObserver?: (observation: IDecisionObservation) => void;
+    turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
 }
 
 function requireUint32(value: number, label: string): void {
@@ -269,6 +279,7 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
     const candidateIsGreen = task.candidateSeat === "candidate_green";
     const greenVersion = candidateIsGreen ? candidateVersion : opponentVersion;
     const redVersion = candidateIsGreen ? opponentVersion : candidateVersion;
+    const gridType = dependencies.gridType ?? PBTypes.GridVals.NORMAL;
     const matchRunner =
         dependencies.matchRunner ??
         ((config: IMatchConfig): IMatchResult => {
@@ -281,7 +292,7 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
         roster: selected.lower.roster,
         redRoster: selected.upper.roster,
         seed: task.combatSeed,
-        gridType: PBTypes.GridVals.NORMAL,
+        gridType,
         greenPerk: selected.lower.perk,
         redPerk: selected.upper.perk,
         greenAugments: selected.lower.augments,
@@ -294,9 +305,14 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
         redSynergies: selected.upper.synergies,
         greenRevealedCreatures: selected.lower.revealedOpponentCreatures,
         redRevealedCreatures: selected.upper.revealedOpponentCreatures,
+        ...(dependencies.decisionObserver === undefined ? {} : { decisionObserver: dependencies.decisionObserver }),
+        ...(dependencies.turnExecutionObserver === undefined
+            ? {}
+            : { turnExecutionObserver: dependencies.turnExecutionObserver }),
     });
     if (
         result.seed !== task.combatSeed ||
+        result.gridType !== gridType ||
         result.outcome.green.version !== greenVersion ||
         result.outcome.red.version !== redVersion
     ) {
@@ -320,7 +336,7 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
         physicalSetupSha256: fingerprintV07AlignedV2({
             lower: selected.lower,
             upper: selected.upper,
-            map: PBTypes.GridVals.NORMAL,
+            map: gridType,
         }),
         lowerRoster: rosterSignature(selected.lower.roster),
         upperRoster: rosterSignature(selected.upper.roster),

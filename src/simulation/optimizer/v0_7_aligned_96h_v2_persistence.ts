@@ -53,6 +53,8 @@ import {
     validateAligned96hWorkerAttestation,
 } from "./v0_7_aligned_96h_v2_evaluator";
 import type { IV07AlignedV2CandidateBinding } from "./v0_7_aligned_96h_v2_protocol";
+import { compactV08AlignedV1Observation, type IV08AlignedV1BattleRecord } from "./v0_8_aligned_96h_v1_game_adapter";
+import type { IV08AlignedV1CandidateBinding } from "./v0_8_aligned_96h_v1_protocol";
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const SAFE_ARTIFACT_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
@@ -473,7 +475,18 @@ export function validateV07AlignedV2ShardEvidence<Binding extends Aligned96hCand
     tasks.forEach((task, index) => {
         const record = evaluation.records[index];
         validateRecordAgainstTask(record, task, index);
-        const observation = compactV07AlignedV2Observation(record, binding, auditByTask.get(record.taskKey));
+        const observation =
+            binding.candidate === "v0.8s"
+                ? compactV08AlignedV1Observation(
+                      record as IV08AlignedV1BattleRecord,
+                      binding as IV08AlignedV1CandidateBinding,
+                      auditByTask.get(record.taskKey),
+                  )
+                : compactV07AlignedV2Observation(
+                      record as IAligned96hBattleRecord<IV07AlignedV2CandidateBinding>,
+                      binding as IV07AlignedV2CandidateBinding,
+                      auditByTask.get(record.taskKey),
+                  );
         if (
             canonicalV07AlignedV2Json(observation) !==
                 canonicalV07AlignedV2Json(evaluation.checkpoint.observations[index]) ||

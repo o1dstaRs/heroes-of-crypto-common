@@ -13,6 +13,7 @@ import { basename, dirname, join } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { V08_ALIGNED_96H_V1_VERSION_PROFILE } from "../../src/simulation/optimizer/aligned_96h_version_profile";
 import {
     buildV08AlignedV1ProductionCandidateCatalog,
@@ -22,6 +23,7 @@ import { evaluateV07AlignedV2Shard } from "../../src/simulation/optimizer/v0_7_a
 import {
     loadV07AlignedV2PersistedShard,
     persistV07AlignedV2ShardEvaluation,
+    validateV07AlignedV2ShardEvidence,
     v07AlignedV2ShardArtifactDirectoryName,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_persistence";
 import {
@@ -433,6 +435,24 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
                 workers: 1,
                 auditDirectory: join(root, "audit"),
             });
+            const rawTamper = structuredClone(evaluation);
+            (rawTamper.records[0] as unknown as { gridType: number }).gridType = PBTypes.GridVals.WATER_CENTER;
+            expect(() => validateV07AlignedV2ShardEvidence(rawTamper, seedPlan)).toThrow(
+                "gridType does not match its scenarioOrdinal",
+            );
+            const checkpointTamper = structuredClone(evaluation);
+            const observation = checkpointTamper.checkpoint.observations[0] as unknown as {
+                scenarioOrdinal: number;
+                gridType: number;
+            };
+            observation.scenarioOrdinal = 1;
+            observation.gridType = PBTypes.GridVals.WATER_CENTER;
+            checkpointTamper.checkpoint.observationsSha256 = fingerprintV07AlignedV2(
+                checkpointTamper.checkpoint.observations,
+            );
+            expect(() => validateV07AlignedV2ShardEvidence(checkpointTamper, seedPlan)).toThrow(
+                "persisted observation 0 does not replay exactly",
+            );
             const persisted = persistV07AlignedV2ShardEvaluation(join(root, "shards"), evaluation, seedPlan);
             const loaded = loadV07AlignedV2PersistedShard(persisted.directory, {
                 shard,
@@ -450,7 +470,25 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
                     ["v0.7", "v0.8s"],
                 ],
             );
-            expect(loaded.evaluation.records.every((record) => !("artifactKind" in record))).toBe(true);
+            expect(
+                loaded.evaluation.records.every(
+                    (record) =>
+                        "artifactKind" in record &&
+                        record.artifactKind === "v0_8_aligned_96h_v1_battle_record" &&
+                        "gridType" in record &&
+                        "execution" in record,
+                ),
+            ).toBe(true);
+            expect(
+                loaded.evaluation.checkpoint.observations.every(
+                    (observationRow) =>
+                        "scenarioOrdinal" in observationRow &&
+                        observationRow.scenarioOrdinal === 0 &&
+                        "gridType" in observationRow &&
+                        observationRow.gridType === PBTypes.GridVals.NORMAL &&
+                        "execution" in observationRow,
+                ),
+            ).toBe(true);
             expect(loaded.evaluation.attestations).toHaveLength(1);
             expect(loaded.evaluation.attestations[0]).toMatchObject({
                 artifactKind: "v0_8_aligned_96h_v1_worker_attestation",

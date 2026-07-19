@@ -54,6 +54,7 @@ import {
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
 import { V08_ALIGNED_96H_V1_VERSION_PROFILE, assertAligned96hVersionProfile } from "./aligned_96h_version_profile";
+import { gridTypeV08AlignedV1, type IV08AlignedV1GameObservation } from "./v0_8_aligned_96h_v1_core";
 import {
     buildV08AlignedV1CandidateEnvironment,
     canonicalV08AlignedV1Json,
@@ -547,7 +548,12 @@ export async function evaluateV07AlignedV2Shard<Binding extends Aligned96hCandid
                         message.record.combatSeed !== expectedTask.combatSeed ||
                         message.observation.cellId !== expectedTask.cellId ||
                         message.observation.scenarioId !== expectedTask.scenarioId ||
-                        message.observation.candidateSeat !== expectedTask.candidateSeat
+                        message.observation.candidateSeat !== expectedTask.candidateSeat ||
+                        (input.binding.candidate === "v0.8s" &&
+                            ((message.observation as IV08AlignedV1GameObservation).scenarioOrdinal !==
+                                expectedTask.scenarioOrdinal ||
+                                (message.observation as IV08AlignedV1GameObservation).gridType !==
+                                    gridTypeV08AlignedV1(expectedTask.scenarioOrdinal)))
                     ) {
                         fail(new Error("aligned v2 worker returned a missing or duplicate result"));
                         return;

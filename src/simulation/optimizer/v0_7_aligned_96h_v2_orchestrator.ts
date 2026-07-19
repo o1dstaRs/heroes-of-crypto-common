@@ -57,7 +57,16 @@ import {
     validateV08AlignedV1CandidateBinding,
     type IV08AlignedV1CandidateBinding,
 } from "./v0_8_aligned_96h_v1_protocol";
-import { assessV08AlignedV1Final, type IV08AlignedV1ResearchTerminal } from "./v0_8_aligned_96h_v1_core";
+import {
+    aggregateV08AlignedV1,
+    assessV08AlignedV1Final,
+    assessV08AlignedV1Promotion,
+    exactGridCountsV08AlignedV1,
+    evaluateV08AlignedV1OperationalEligibility,
+    type IV08AlignedV1Aggregate,
+    type IV08AlignedV1GameObservation,
+    type IV08AlignedV1ResearchTerminal,
+} from "./v0_8_aligned_96h_v1_core";
 
 const HOUR_MS = 60 * 60 * 1000;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -146,7 +155,7 @@ export interface IV07AlignedV2PanelEvidenceSummary {
     artifacts: IV07AlignedV2EvidenceArtifactRef[];
     observationsSha256: string;
     observations: number;
-    aggregate: IV07AlignedV2Aggregate;
+    aggregate: IV07AlignedV2Aggregate | IV08AlignedV1Aggregate;
     evidenceSha256: string;
 }
 
@@ -434,13 +443,25 @@ const isV08AlignedV1Profile = (
 ): profile is typeof V08_ALIGNED_96H_V1_VERSION_PROFILE =>
     profile.candidate === V08_ALIGNED_96H_V1_VERSION_PROFILE.candidate;
 
+const isV08AlignedV1Definition = (definition: IV07AlignedV2OrchestratorDefinition): boolean =>
+    definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition";
+
 function assessDefinitionFinal(
     definition: IV07AlignedV2OrchestratorDefinition,
     observations: readonly IV07AlignedV2GameObservation[],
 ): IV07AlignedV2ResearchTerminal | IV08AlignedV1ResearchTerminal {
     return definition.artifactKind === "v0_8_aligned_96h_v1_orchestrator_definition"
-        ? assessV08AlignedV1Final(observations)
+        ? assessV08AlignedV1Final(observations as IV08AlignedV1GameObservation[])
         : assessV07AlignedV2Final(observations);
+}
+
+function assessDefinitionPromotion(
+    definition: IV07AlignedV2OrchestratorDefinition,
+    pairs: readonly IV07AlignedV2ConfirmPair[],
+): IV07AlignedV2PromotionVerdict {
+    return isV08AlignedV1Definition(definition)
+        ? assessV08AlignedV1Promotion(pairs)
+        : assessV07AlignedV2Promotion(pairs);
 }
 
 export function createV07AlignedV2OrchestratorDefinition(
@@ -505,6 +526,11 @@ export function createV07AlignedV2OrchestratorDefinition(
         finalCommitment.scenariosPerCell !== expectedPanelScenarios(input.mode, "final")
     ) {
         throw new Error("aligned v2 definition panel purposes or formal sample sizes are invalid");
+    }
+    if (input.mode === "formal" && v08Profile) {
+        exactGridCountsV08AlignedV1(train.scenariosPerCell);
+        exactGridCountsV08AlignedV1(confirm.scenariosPerCell);
+        exactGridCountsV08AlignedV1(finalCommitment.scenariosPerCell);
     }
     if (
         new Set([train.panelId, confirm.panelId, finalCommitment.panelId]).size !== 3 ||
@@ -606,6 +632,7 @@ function prepareEvidence(
     input: IV07AlignedV2PanelEvidenceInput,
     expectedPanel: IV07AlignedV2CheckpointPanelBinding,
     expectedGenomeSha256: string,
+    v08Definition: boolean,
 ): IPreparedEvidence {
     if (
         canonicalV07AlignedV2Json(input.panel) !== canonicalV07AlignedV2Json(expectedPanel) ||
@@ -620,9 +647,14 @@ function prepareEvidence(
             (left.scenarioId < right.scenarioId ? -1 : left.scenarioId > right.scenarioId ? 1 : 0) ||
             OBSERVATION_SEAT_ORDER.get(left.candidateSeat)! - OBSERVATION_SEAT_ORDER.get(right.candidateSeat)!,
     );
-    const aggregate = aggregateV07AlignedV2(observations, {
-        expectedGamesPerCellSeat: expectedPanel.scenariosPerCell,
-    });
+    const aggregate = v08Definition
+        ? aggregateV08AlignedV1(observations as IV08AlignedV1GameObservation[], {
+              expectedGamesPerCellSeat: expectedPanel.scenariosPerCell,
+              requireExactGridCoverage: expectedPanel.scenariosPerCell !== 1,
+          })
+        : aggregateV07AlignedV2(observations, {
+              expectedGamesPerCellSeat: expectedPanel.scenariosPerCell,
+          });
     if (!aggregate.complete) throw new Error("aligned v2 panel evidence is incomplete");
     const unsigned = {
         schemaVersion: 1 as const,
@@ -643,8 +675,9 @@ function summarizeEvidence(
     input: IV07AlignedV2PanelEvidenceInput,
     expectedPanel: IV07AlignedV2CheckpointPanelBinding,
     expectedGenomeSha256: string,
+    v08Definition: boolean,
 ): IV07AlignedV2PanelEvidenceSummary {
-    return prepareEvidence(input, expectedPanel, expectedGenomeSha256).summary;
+    return prepareEvidence(input, expectedPanel, expectedGenomeSha256, v08Definition).summary;
 }
 
 function validateEvidenceSummary(summary: IV07AlignedV2PanelEvidenceSummary): void {
@@ -678,19 +711,23 @@ function validateEvidenceSummary(summary: IV07AlignedV2PanelEvidenceSummary): vo
     }
 }
 
-function evidenceEligible(summary: IV07AlignedV2PanelEvidenceSummary): boolean {
+function evidenceEligible(summary: IV07AlignedV2PanelEvidenceSummary, v08Definition: boolean): boolean {
+    const operational = v08Definition
+        ? evaluateV08AlignedV1OperationalEligibility(summary.aggregate as IV08AlignedV1Aggregate)
+        : evaluateV07AlignedV2OperationalEligibility(summary.aggregate as IV07AlignedV2Aggregate);
     return (
         summary.aggregate.complete &&
         summary.aggregate.integrity.passed &&
-        evaluateV07AlignedV2OperationalEligibility(summary.aggregate).passed &&
+        operational.passed &&
         summary.aggregate.objective.minimumCellSeatDecisiveWinRate !== null
     );
 }
 
 function selectBestTraining(
     training: readonly IV07AlignedV2PanelEvidenceSummary[],
+    v08Definition: boolean,
 ): IV07AlignedV2PanelEvidenceSummary | null {
-    const eligible = training.filter(evidenceEligible);
+    const eligible = training.filter((summary) => evidenceEligible(summary, v08Definition));
     eligible.sort((left, right) => {
         const leftMin = left.aggregate.objective.minimumCellSeatDecisiveWinRate!;
         const rightMin = right.aggregate.objective.minimumCellSeatDecisiveWinRate!;
@@ -903,7 +940,7 @@ function applyStoredEvent(
             break;
         }
         case "candidate_frozen": {
-            const best = selectBestTraining(state.training);
+            const best = selectBestTraining(state.training, isV08AlignedV1Definition(definition));
             const { frozen } = event.payload;
             if (
                 state.phase !== "training" ||
@@ -1032,7 +1069,7 @@ function applyStoredEvent(
             const legalReason =
                 (terminal.reason === "no_eligible_candidate" &&
                     state.phase === "training" &&
-                    selectBestTraining(state.training) === null &&
+                    selectBestTraining(state.training, isV08AlignedV1Definition(definition)) === null &&
                     noEligibleTiming &&
                     terminal.verdict === "INCOMPLETE" &&
                     terminal.promotion === null &&
@@ -1268,6 +1305,7 @@ function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2Orchestrato
 }
 
 function validateResolvedSummary(
+    definition: IV07AlignedV2OrchestratorDefinition,
     summary: IV07AlignedV2PanelEvidenceSummary,
     resolver: V07AlignedV2EvidenceResolver,
 ): readonly IV07AlignedV2GameObservation[] {
@@ -1281,6 +1319,7 @@ function validateResolvedSummary(
         },
         summary.panel,
         summary.genomeSha256,
+        isV08AlignedV1Definition(definition),
     );
     if (canonicalV07AlignedV2Json(rebuilt.summary) !== canonicalV07AlignedV2Json(summary)) {
         throw new Error(`aligned v2 resolved evidence ${summary.evidenceSha256} does not replay exactly`);
@@ -1295,7 +1334,7 @@ function validateResolvedEventEvidence(
     resolvers: IV07AlignedV2OrchestratorReplayResolvers,
 ): void {
     if (event.eventType === "train_recorded") {
-        if (resolvers.evidence) validateResolvedSummary(event.payload.evidence, resolvers.evidence);
+        if (resolvers.evidence) validateResolvedSummary(definition, event.payload.evidence, resolvers.evidence);
     } else if (event.eventType === "final_plan_revealed") {
         if (!resolvers.seedPlans) return;
         if (!state.frozen) throw new Error("aligned v2 seed reveal replay lacks its frozen candidate");
@@ -1314,15 +1353,15 @@ function validateResolvedEventEvidence(
         }
     } else if (event.eventType === "confirmation_recorded") {
         if (!resolvers.evidence) return;
-        const challenger = validateResolvedSummary(event.payload.challenger, resolvers.evidence);
-        const incumbent = validateResolvedSummary(event.payload.incumbent, resolvers.evidence);
-        const promotion = assessV07AlignedV2Promotion(pairConfirmObservations(challenger, incumbent));
+        const challenger = validateResolvedSummary(definition, event.payload.challenger, resolvers.evidence);
+        const incumbent = validateResolvedSummary(definition, event.payload.incumbent, resolvers.evidence);
+        const promotion = assessDefinitionPromotion(definition, pairConfirmObservations(challenger, incumbent));
         if (canonicalV07AlignedV2Json(promotion) !== canonicalV07AlignedV2Json(event.payload.promotion)) {
             throw new Error("aligned v2 persisted confirmation verdict does not replay exactly");
         }
     } else if (event.eventType === "final_recorded") {
         if (!resolvers.evidence) return;
-        const observations = validateResolvedSummary(event.payload.evidence, resolvers.evidence);
+        const observations = validateResolvedSummary(definition, event.payload.evidence, resolvers.evidence);
         const final = assessDefinitionFinal(definition, observations);
         if (canonicalV07AlignedV2Json(final) !== canonicalV07AlignedV2Json(event.payload.terminal.final)) {
             throw new Error("aligned v2 persisted final terminal does not replay exactly");
@@ -1420,7 +1459,7 @@ function freezeEvent(
     command: IV07AlignedV2OrchestratorCommand,
     reason: IV07AlignedV2FrozenCandidate["reason"],
 ): IV07AlignedV2OrchestratorEvent {
-    const best = selectBestTraining(state.training);
+    const best = selectBestTraining(state.training, isV08AlignedV1Definition(definition));
     if (!best) {
         const terminal = createTerminal(definition, null, "no_eligible_candidate", "INCOMPLETE");
         return makeEvent(definition, state, command, "terminal_recorded", { terminal });
@@ -1460,7 +1499,12 @@ export function applyV07AlignedV2OrchestratorCommand(
         if (!candidate || state.training.some((entry) => entry.genomeSha256 === candidate.genomeSha256)) {
             throw new Error("aligned v2 training candidate is unknown or already recorded");
         }
-        const evidence = summarizeEvidence(command.evidence, definition.panels.train, candidate.genomeSha256);
+        const evidence = summarizeEvidence(
+            command.evidence,
+            definition.panels.train,
+            candidate.genomeSha256,
+            isV08AlignedV1Definition(definition),
+        );
         event = makeEvent(definition, state, command, "train_recorded", { evidence });
     } else if (command.type === "freeze_candidate") {
         if (state.phase !== "training") throw new Error("aligned v2 candidate freeze arrived outside training");
@@ -1511,13 +1555,20 @@ export function applyV07AlignedV2OrchestratorCommand(
             throw new Error("aligned v2 confirmation arrived without a frozen candidate");
         }
         beforeDeadline(command.nowMs, definition.schedule.confirmDeadlineAtMs, "confirmation");
-        const challenger = prepareEvidence(command.challenger, definition.panels.confirm, state.frozen.genomeSha256);
+        const challenger = prepareEvidence(
+            command.challenger,
+            definition.panels.confirm,
+            state.frozen.genomeSha256,
+            isV08AlignedV1Definition(definition),
+        );
         const incumbent = prepareEvidence(
             command.incumbent,
             definition.panels.confirm,
             definition.incumbent.genomeSha256,
+            isV08AlignedV1Definition(definition),
         );
-        const promotion = assessV07AlignedV2Promotion(
+        const promotion = assessDefinitionPromotion(
+            definition,
             pairConfirmObservations(challenger.observations, incumbent.observations),
         );
         const terminal =
@@ -1539,6 +1590,7 @@ export function applyV07AlignedV2OrchestratorCommand(
             command.evidence,
             definition.panels.finalCommitment,
             state.frozen.genomeSha256,
+            isV08AlignedV1Definition(definition),
         );
         const final = assessDefinitionFinal(definition, evidence.observations);
         const terminal = createTerminal(

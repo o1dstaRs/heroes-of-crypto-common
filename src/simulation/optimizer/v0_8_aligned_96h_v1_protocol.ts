@@ -16,9 +16,11 @@ import {
 import {
     V08_ALIGNED_96H_V1_CELLS,
     V08_ALIGNED_96H_V1_SEATS,
+    gridTypeV08AlignedV1,
     type IV08AlignedV1GameObservation,
     type V08AlignedV1CandidateSeat,
     type V08AlignedV1CellId,
+    type V08AlignedV1GridType,
 } from "./v0_8_aligned_96h_v1_core";
 import type { IV07AlignedV2SearchAudit } from "./v0_7_aligned_96h_v2_core";
 import {
@@ -29,6 +31,7 @@ import {
     validateV07AlignedV2SeedPlan,
     type IV07AlignedV2CandidateControls,
     type IV07AlignedV2CandidateGenome,
+    type IV07AlignedV2ExecutionTask,
     type IV07AlignedV2InjectedSeedPlan,
     type IAligned96hCandidateBinding,
 } from "./v0_7_aligned_96h_v2_protocol";
@@ -265,6 +268,59 @@ export interface IV08AlignedV1ExecutionTask extends IV08AlignedV1TaskCoordinates
     purpose: V08AlignedV1PanelPurpose;
     setupSeeds: number[];
     combatSeed: number;
+    gridType: V08AlignedV1GridType;
+}
+
+function requireV08TaskUint32(value: number, label: string): void {
+    if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
+        throw new RangeError(`${label} must be a uint32`);
+    }
+}
+
+/** Canonically upgrade the legacy shared-geometry dispatch into a strict v0.8 execution task. */
+export function upgradeV08AlignedV1ExecutionTask(
+    task: IV07AlignedV2ExecutionTask | IV08AlignedV1ExecutionTask,
+): IV08AlignedV1ExecutionTask {
+    if ("artifactKind" in task) {
+        if (task.artifactKind !== "v0_8_aligned_96h_v1_execution_task") {
+            throw new Error("v0.8 aligned execution task artifact kind is invalid");
+        }
+        assertAligned96hVersionProfile(task.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+    }
+    const cell = evaluatorCellV08AlignedV1(task.cellId);
+    if (!task.panelId.trim() || !task.scenarioId.trim()) throw new Error("v0.8 execution task ids must not be empty");
+    if (!(["train", "confirm", "final"] as const).includes(task.purpose)) {
+        throw new Error("v0.8 execution task purpose is invalid");
+    }
+    const gridType = gridTypeV08AlignedV1(task.scenarioOrdinal);
+    if ("gridType" in task && task.gridType !== gridType) {
+        throw new Error("v0.8 execution task gridType does not match its scenarioOrdinal");
+    }
+    if (!(V08_ALIGNED_96H_V1_SEATS as readonly string[]).includes(task.candidateSeat)) {
+        throw new Error("v0.8 execution task candidate seat is invalid");
+    }
+    const expectedSetupSeeds = cell.distribution === "ranked_taxonomy" ? V07_ALIGNED_V2_TAXONOMY_SETUP_ATTEMPTS : 1;
+    if (task.setupSeeds.length !== expectedSetupSeeds) {
+        throw new Error(`${cell.id}: v0.8 execution task must contain ${expectedSetupSeeds} setup seeds`);
+    }
+    task.setupSeeds.forEach((seed, index) => requireV08TaskUint32(seed, `setupSeeds[${index}]`));
+    requireV08TaskUint32(task.combatSeed, "combatSeed");
+    if (new Set([...task.setupSeeds, task.combatSeed]).size !== task.setupSeeds.length + 1) {
+        throw new Error("v0.8 execution task contains an internal setup/combat seed collision");
+    }
+    return {
+        artifactKind: "v0_8_aligned_96h_v1_execution_task",
+        versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+        panelId: task.panelId,
+        purpose: task.purpose,
+        cellId: task.cellId,
+        scenarioOrdinal: task.scenarioOrdinal,
+        scenarioId: task.scenarioId,
+        candidateSeat: task.candidateSeat,
+        setupSeeds: [...task.setupSeeds],
+        combatSeed: task.combatSeed,
+        gridType,
+    };
 }
 
 const legacySeedPlan = (plan: IV08AlignedV1InjectedSeedPlan): IV07AlignedV2InjectedSeedPlan => ({
@@ -302,18 +358,18 @@ export function flattenV08AlignedV1SeedPlan(plan: IV08AlignedV1InjectedSeedPlan)
     validateV08AlignedV1SeedPlan(plan);
     return plan.pairs
         .flatMap((pair) =>
-            V08_ALIGNED_96H_V1_SEATS.map((candidateSeat): IV08AlignedV1ExecutionTask => ({
-                artifactKind: "v0_8_aligned_96h_v1_execution_task",
-                versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
-                panelId: plan.panelId,
-                purpose: plan.purpose,
-                cellId: pair.cellId,
-                scenarioOrdinal: pair.scenarioOrdinal,
-                scenarioId: pair.scenarioId,
-                candidateSeat,
-                setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
-                combatSeed: pair.seats[candidateSeat].combatSeed,
-            })),
+            V08_ALIGNED_96H_V1_SEATS.map((candidateSeat): IV08AlignedV1ExecutionTask =>
+                upgradeV08AlignedV1ExecutionTask({
+                    panelId: plan.panelId,
+                    purpose: plan.purpose,
+                    cellId: pair.cellId,
+                    scenarioOrdinal: pair.scenarioOrdinal,
+                    scenarioId: pair.scenarioId,
+                    candidateSeat,
+                    setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
+                    combatSeed: pair.seats[candidateSeat].combatSeed,
+                }),
+            ),
         )
         .sort(
             (left, right) =>
@@ -353,12 +409,10 @@ export function v08AlignedV1TaskIdentity(
         };
     }
     if (panelId === undefined) throw new Error("panelId is required for observation task identity");
-    const ordinal = /^(?:scenario-)?(\d+)$/.exec(task.scenarioId);
-    if (!ordinal) throw new Error(`observation scenarioId ${task.scenarioId} does not encode an ordinal`);
     return {
         panelId,
         cellId: task.cellId,
-        scenarioOrdinal: Number(ordinal[1]),
+        scenarioOrdinal: task.scenarioOrdinal,
         scenarioId: task.scenarioId,
         candidateSeat: task.candidateSeat,
         seedMaterialSha256: null,

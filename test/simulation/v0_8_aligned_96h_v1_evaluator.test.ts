@@ -28,45 +28,49 @@ import {
     type IV07AlignedV2InjectedSeedPlan,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_protocol";
 import { buildV08AlignedV1ProductionIncumbentGenome } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
+import type { IV08AlignedV1GameObservation } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_core";
+import type { IV08AlignedV1BattleRecord } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter";
 import {
     bindV08AlignedV1Candidate,
     type IV08AlignedV1CandidateBinding,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
 
-function legacyGeometrySeedPlan(): IV07AlignedV2InjectedSeedPlan {
+function legacyGeometrySeedPlan(scenariosPerCell = 1): IV07AlignedV2InjectedSeedPlan {
     let nextSeed = 70_000;
     const take = (): number => nextSeed++;
     return {
         schemaVersion: 1,
         panelId: "v0.8-real-both-seat-smoke",
         purpose: "train",
-        scenariosPerCell: 1,
+        scenariosPerCell,
         denysetSha256: "a".repeat(64),
-        pairs: V07_ALIGNED_V2_EVALUATOR_CELLS.map((cell) => {
-            if (cell.distribution === "fixed_template") {
-                const setupSeeds = [take()];
-                const combatSeed = take();
+        pairs: V07_ALIGNED_V2_EVALUATOR_CELLS.flatMap((cell) =>
+            Array.from({ length: scenariosPerCell }, (_, scenarioOrdinal) => {
+                if (cell.distribution === "fixed_template") {
+                    const setupSeeds = [take()];
+                    const combatSeed = take();
+                    return {
+                        cellId: cell.id,
+                        scenarioOrdinal,
+                        scenarioId: `scenario-${scenarioOrdinal}`,
+                        seats: {
+                            candidate_green: { setupSeeds: [...setupSeeds], combatSeed },
+                            candidate_red: { setupSeeds: [...setupSeeds], combatSeed },
+                        },
+                    };
+                }
+                const stream = () => ({
+                    setupSeeds: Array.from({ length: 128 }, take),
+                    combatSeed: take(),
+                });
                 return {
                     cellId: cell.id,
-                    scenarioOrdinal: 0,
-                    scenarioId: "scenario-0",
-                    seats: {
-                        candidate_green: { setupSeeds: [...setupSeeds], combatSeed },
-                        candidate_red: { setupSeeds: [...setupSeeds], combatSeed },
-                    },
+                    scenarioOrdinal,
+                    scenarioId: `scenario-${scenarioOrdinal}`,
+                    seats: { candidate_green: stream(), candidate_red: stream() },
                 };
-            }
-            const stream = () => ({
-                setupSeeds: Array.from({ length: 128 }, take),
-                combatSeed: take(),
-            });
-            return {
-                cellId: cell.id,
-                scenarioOrdinal: 0,
-                scenarioId: "scenario-0",
-                seats: { candidate_green: stream(), candidate_red: stream() },
-            };
-        }),
+            }),
+        ),
     };
 }
 
@@ -174,8 +178,29 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
                 "candidate_red",
             ]);
             expect(evaluation.records[0].physicalSetupSha256).toBe(evaluation.records[1].physicalSetupSha256);
-            expect(evaluation.records.every((record) => !("artifactKind" in record))).toBe(true);
+            expect(
+                evaluation.records.every(
+                    (record) =>
+                        "artifactKind" in record &&
+                        record.artifactKind === "v0_8_aligned_96h_v1_battle_record" &&
+                        "versionProfile" in record &&
+                        record.versionProfile.candidate === "v0.8s" &&
+                        "gridType" in record &&
+                        record.gridType === PBTypes.GridVals.NORMAL &&
+                        "execution" in record,
+                ),
+            ).toBe(true);
             expect(evaluation.checkpoint.observations).toHaveLength(2);
+            expect(
+                evaluation.checkpoint.observations.every(
+                    (observation) =>
+                        "scenarioOrdinal" in observation &&
+                        observation.scenarioOrdinal === 0 &&
+                        "gridType" in observation &&
+                        observation.gridType === PBTypes.GridVals.NORMAL &&
+                        "execution" in observation,
+                ),
+            ).toBe(true);
             expect(evaluation.auditArtifacts).toHaveLength(1);
             expect(evaluation.auditArtifacts[0].rows).toBe(0);
             expect(evaluation.attestations).toHaveLength(1);
@@ -187,6 +212,74 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
             rmSync(directory, { recursive: true, force: true });
         }
     }, 60_000);
+
+    it("runs search-on in both candidate seats with exact four-map execution telemetry", async () => {
+        const directory = mkdtempSync(join(tmpdir(), "hoc-v08-aligned-four-map-search-"));
+        const seedPlan = legacyGeometrySeedPlan(4);
+        const binding = bindV08AlignedV1Candidate(buildV08AlignedV1ProductionIncumbentGenome());
+        const shard = buildAligned96hCheckpointShardSpecs({
+            runFingerprint: "d".repeat(64),
+            seedPlan,
+            binding,
+            maxScenarioPairsPerShard: 4,
+        }).find((candidate) => candidate.tasks[0]?.cellId === "fixed_mage_frontline")!;
+
+        try {
+            const evaluation = await evaluateV07AlignedV2Shard({
+                shard,
+                seedPlan,
+                binding,
+                workers: 1,
+                auditDirectory: join(directory, "audit"),
+            });
+            const records = evaluation.records as IV08AlignedV1BattleRecord[];
+            const observations = evaluation.checkpoint.observations as IV08AlignedV1GameObservation[];
+            const expectedMaps = [
+                PBTypes.GridVals.NORMAL,
+                PBTypes.GridVals.NORMAL,
+                PBTypes.GridVals.WATER_CENTER,
+                PBTypes.GridVals.WATER_CENTER,
+                PBTypes.GridVals.LAVA_CENTER,
+                PBTypes.GridVals.LAVA_CENTER,
+                PBTypes.GridVals.BLOCK_CENTER,
+                PBTypes.GridVals.BLOCK_CENTER,
+            ];
+
+            expect(records.map((record) => record.gridType)).toEqual(expectedMaps);
+            expect(observations.map((observation) => observation.gridType)).toEqual(expectedMaps);
+            expect(observations.map((observation) => observation.scenarioOrdinal)).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
+            expect(records.map((record) => record.candidateSeat)).toEqual([
+                "candidate_green",
+                "candidate_red",
+                "candidate_green",
+                "candidate_red",
+                "candidate_green",
+                "candidate_red",
+                "candidate_green",
+                "candidate_red",
+            ]);
+            for (const record of records) {
+                expect(record).toMatchObject({
+                    artifactKind: "v0_8_aligned_96h_v1_battle_record",
+                    candidateIsGreen: record.candidateSeat === "candidate_green",
+                });
+                expect(record.candidateSeat === "candidate_green" ? record.greenVersion : record.redVersion).toBe(
+                    "v0.8s",
+                );
+                expect(
+                    record.execution.candidate.observedTurns + record.execution.opponent.observedTurns,
+                ).toBeGreaterThan(0);
+            }
+            for (let index = 0; index < records.length; index += 2) {
+                expect(records[index].physicalSetupSha256).toBe(records[index + 1].physicalSetupSha256);
+            }
+            expect(new Set(records.map((record) => record.physicalSetupSha256)).size).toBe(4);
+            expect(observations.every((observation) => observation.searchAudit !== undefined)).toBe(true);
+            expect(evaluation.auditArtifacts[0].rows).toBe(8);
+        } finally {
+            rmSync(directory, { recursive: true, force: true });
+        }
+    }, 120_000);
 
     it("rejects v0.7 audit versions and a relabeled v0.8 binding before execution", async () => {
         const seedPlan = legacyGeometrySeedPlan();
