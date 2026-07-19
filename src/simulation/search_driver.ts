@@ -26,6 +26,7 @@ import {
     extractWaitFeaturesV2Raw,
     waitIncumbentKindOf,
 } from "../ai/versions/wait_scorer";
+import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -111,6 +112,9 @@ import {
  * later incumbent unchanged. v0.8 still enumerates and engine-validates a bounded productive fallback so an
  * open circuit cannot turn the rest of the fight into waits, Luck Shields, or mountain attacks. The live wrapper
  * also includes call-site overhead outside this internal timer.
+ * v0.8 additionally treats a legal direct attack as lexicographically stronger than every non-combat action from
+ * lap 9 onward while its living, non-summoned army has at least twice the enemy's HP. This narrow dominant-finish
+ * tier bypasses probability saturation but still uses normal rollouts to choose among legal attacks.
  *
  * SCORING: each candidate is played through the REAL engine on the live battle state (battle_snapshot
  * save/restore around every rollout), then the game rolls forward — both sides playing their real
@@ -259,6 +263,7 @@ const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "area_throw_attack",
     "cast_spell",
 ]);
+const PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["wait_turn", "defend_turn", "obstacle_attack"]);
 
 /**
  * v0.8 never prefers waiting, Luck Shield, or mountain mining while a scored legal attack, spell, or move exists.
@@ -266,8 +271,26 @@ const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
  */
 function isProductiveCandidate(candidate: Pick<IEnumeratedCandidate, "kind" | "actions">): boolean {
     return candidate.kind === "incumbent"
-        ? candidate.actions.some((action) => PRODUCTIVE_ACTION_TYPES.has(action.type))
+        ? candidate.actions.some((action) => PRODUCTIVE_ACTION_TYPES.has(action.type)) &&
+              !candidate.actions.some((action) => PASSIVE_ACTION_TYPES.has(action.type))
         : PRODUCTIVE_ACTION_KINDS.has(candidate.kind);
+}
+
+function isDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
+    return isV08DirectCombatDecision(candidate.actions);
+}
+
+function isDominantFinishCombatReplacement(
+    prioritizeDominantFinish: boolean,
+    selected: Pick<IEnumeratedCandidate, "actions"> | undefined,
+    incumbent: readonly GameAction[],
+): boolean {
+    return (
+        prioritizeDominantFinish &&
+        selected !== undefined &&
+        isDirectCombatCandidate(selected) &&
+        !isV08DirectCombatDecision(incumbent)
+    );
 }
 
 function parseKindFilter<T extends string>(
@@ -333,6 +356,12 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
+    dominantFinishTurns: number;
+    /** Normal searched turns where the finish tier replaced a non-combat incumbent with direct combat. */
+    dominantFinishCombatOverrides: number;
+    /** Deadline/circuit fallbacks where the finish tier selected direct combat over a non-combat incumbent. */
+    dominantFinishCombatFallbacks: number;
     /** Leaf evaluations that reached the eligible late ranged finish calculation. */
     finishPressureLeaves: number;
     /** Enabled leaf evaluations whose bounded finish-pressure feature was positive. */
@@ -385,6 +414,9 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    dominantFinishTurns: 0,
+    dominantFinishCombatOverrides: 0,
+    dominantFinishCombatFallbacks: 0,
     finishPressureLeaves: 0,
     finishPressureNonzeroLeaves: 0,
     finishPressureLogitSum: 0,
@@ -682,9 +714,16 @@ export class SearchDriver {
             return incumbent;
         }
         const prioritizeProductiveActions = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
+        const prioritizeDominantFinish =
+            prioritizeProductiveActions &&
+            v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), this.deps.fightProperties.getCurrentLap())
+                .active;
         const useProductiveFallback = prioritizeProductiveActions && !this.observeOnly;
         if (this.incumbentKinds && !this.incumbentKinds.has(classifyActions(incumbent))) {
             return incumbent;
+        }
+        if (prioritizeDominantFinish) {
+            this.counters.dominantFinishTurns += 1;
         }
         if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
             this.onFightReady();
@@ -741,11 +780,14 @@ export class SearchDriver {
             // decision also probes here because it intentionally skips the expensive comparison below.
             const productiveFallback =
                 useProductiveFallback && (this.decisionDeadlineMs !== null || this.circuitOpen)
-                    ? this.firstEngineValidProductiveCandidate(unit, candidates, seedBase)
+                    ? this.firstEngineValidProductiveCandidate(unit, candidates, seedBase, prioritizeDominantFinish)
                     : undefined;
             if (this.circuitOpen) {
                 this.counters.circuitSkipped += 1;
                 this.counters.msTotal += performance.now() - t0;
+                if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
+                    this.counters.dominantFinishCombatFallbacks += 1;
+                }
                 return productiveFallback?.actions ?? incumbent;
             }
             this.counters.decisions += 1;
@@ -764,6 +806,7 @@ export class SearchDriver {
                 t0,
                 prioritizeProductiveActions,
                 productiveFallback,
+                prioritizeDominantFinish,
             );
         } finally {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
@@ -852,6 +895,9 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            dominantFinishTurns: c.dominantFinishTurns,
+            dominantFinishCombatOverrides: c.dominantFinishCombatOverrides,
+            dominantFinishCombatFallbacks: c.dominantFinishCombatFallbacks,
             lateRangedFinishWeight: this.lateRangedFinishWeight,
             initialBoardRangedness: this.finishPressureState?.initialBoardRangedness ?? 0,
             finishPressureLeaves: c.finishPressureLeaves,
@@ -925,6 +971,7 @@ export class SearchDriver {
         t0: number,
         prioritizeProductiveActions = false,
         productiveFallback?: IEnumeratedCandidate,
+        prioritizeDominantFinish = false,
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -954,6 +1001,7 @@ export class SearchDriver {
                 seedBase,
                 deadlineAt,
                 prioritizeProductiveActions,
+                prioritizeDominantFinish,
             );
             means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
@@ -961,10 +1009,15 @@ export class SearchDriver {
                 .map((candidate, index) => ({ candidate, index }))
                 .filter(({ candidate, index }) => means[index] !== -Infinity && isProductiveCandidate(candidate))
                 .map(({ index }) => index);
+            const legalDirectCombatIndices = legalProductiveIndices.filter((index) =>
+                isDirectCombatCandidate(scoredCandidates[index]),
+            );
             const selectionIndices =
-                prioritizeProductiveActions && legalProductiveIndices.length
-                    ? legalProductiveIndices
-                    : scoredCandidates.map((_candidate, index) => index);
+                prioritizeDominantFinish && legalDirectCombatIndices.length
+                    ? legalDirectCombatIndices
+                    : prioritizeProductiveActions && legalProductiveIndices.length
+                      ? legalProductiveIndices
+                      : scoredCandidates.map((_candidate, index) => index);
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (means[index] > means[bestIdx]) bestIdx = index;
@@ -987,6 +1040,9 @@ export class SearchDriver {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
             this.counters.deadlineFallbacks += 1;
             const fallbackActions = productiveFallback?.actions ?? incumbent;
+            if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
+                this.counters.dominantFinishCombatFallbacks += 1;
+            }
             const fallbackKind =
                 productiveFallback?.kind === "incumbent" ? incumbentKind : (productiveFallback?.kind ?? incumbentKind);
             const ms = performance.now() - t0;
@@ -1037,6 +1093,9 @@ export class SearchDriver {
                 (prioritizeProductiveActions &&
                     isProductiveCandidate(scoredCandidates[bestIdx]) &&
                     !isProductiveCandidate(scoredCandidates[0])) ||
+                (prioritizeDominantFinish &&
+                    isDirectCombatCandidate(scoredCandidates[bestIdx]) &&
+                    !isDirectCombatCandidate(scoredCandidates[0])) ||
                 means[bestIdx] - means[0] >= this.gate);
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
@@ -1044,6 +1103,9 @@ export class SearchDriver {
         }
         if (overridden) {
             this.counters.overrides += 1;
+            if (isDominantFinishCombatReplacement(prioritizeDominantFinish, scoredCandidates[bestIdx], incumbent)) {
+                this.counters.dominantFinishCombatOverrides += 1;
+            }
             bump(this.counters.overridesByIncumbentKind, incumbentKind);
             bump(this.counters.overridesToKind, scoredCandidates[bestIdx].kind);
         }
@@ -1146,9 +1208,16 @@ export class SearchDriver {
         unit: Unit,
         candidates: readonly IEnumeratedCandidate[],
         seedBase: number,
+        prioritizeDominantFinish = false,
     ): IEnumeratedCandidate | undefined {
-        for (const candidate of candidates) {
-            if (!isProductiveCandidate(candidate)) continue;
+        const productiveCandidates = candidates.filter(isProductiveCandidate);
+        const orderedCandidates = prioritizeDominantFinish
+            ? [
+                  ...productiveCandidates.filter(isDirectCombatCandidate),
+                  ...productiveCandidates.filter((candidate) => !isDirectCombatCandidate(candidate)),
+              ]
+            : productiveCandidates;
+        for (const candidate of orderedCandidates) {
             const strictCandidate: ISearchCandidate =
                 candidate.kind === "incumbent"
                     ? {
@@ -1168,6 +1237,7 @@ export class SearchDriver {
         seedBase: number,
         deadlineAt: number | null,
         prioritizeProductiveActions = false,
+        prioritizeDominantFinish = false,
     ): readonly IEnumeratedCandidate[] {
         if (this.shortlist === null || candidates.length <= this.shortlist) {
             return candidates;
@@ -1181,9 +1251,18 @@ export class SearchDriver {
         const productive = prioritizeProductiveActions
             ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
             : [];
-        const ordered = productive.length
-            ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
-            : rankedChallengers;
+        const directCombat = prioritizeDominantFinish
+            ? productive.filter(({ index }) => isDirectCombatCandidate(candidates[index]))
+            : [];
+        const ordered = directCombat.length
+            ? [
+                  ...directCombat,
+                  ...productive.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+                  ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index])),
+              ]
+            : productive.length
+              ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
+              : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
         return [candidates[0], ...challengers];
     }

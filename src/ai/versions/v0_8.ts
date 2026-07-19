@@ -12,7 +12,12 @@
 import type { GameAction } from "../../engine/actions";
 import type { Unit } from "../../units/unit";
 import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../candidates";
 import { StrategyV0_7 } from "./v0_7";
+import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
+
+const V08_PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["wait_turn", "defend_turn", "obstacle_attack"]);
+const V08_ATTACK_OR_SPELL_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw", "spell"]);
 
 /**
  * Replace a terminal policy no-op with an explicit engine-valid action. Search still owns the stronger priority:
@@ -25,11 +30,88 @@ export function ensureExplicitV08Action(unitId: string, decision: GameAction[]):
     return hasMeaningfulAction ? decision : [{ type: "defend_turn", unitId }];
 }
 
-/** v0.8 starts from v0.7 but never emits an empty/end-turn-only strategy decision. */
+/** Pick a real attack/cast before falling back to the enumerator's nearest-to-enemy legal move. */
+export function selectV08ProductiveCandidate(
+    candidates: readonly IEnumeratedCandidate[],
+): IEnumeratedCandidate | undefined {
+    return (
+        candidates.find((candidate) => V08_ATTACK_OR_SPELL_KINDS.has(candidate.kind)) ??
+        candidates.find((candidate) => candidate.kind === "move")
+    );
+}
+
+/** Direct enemy damage is the only action class that satisfies the late dominant-finish invariant. */
+export function selectV08DirectCombatCandidate(
+    candidates: readonly IEnumeratedCandidate[],
+): IEnumeratedCandidate | undefined {
+    return candidates.find((candidate) => isV08DirectCombatDecision(candidate.actions));
+}
+
+function enumerateV08BoundaryCandidates(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): readonly IEnumeratedCandidate[] {
+    return enumerateCandidates(unit, context, decision, {
+        // Bound the direct-policy repair to the same practical candidate census used by live search.
+        maxMoveDestinations: 1,
+        maxMeleePairs: 8,
+        maxShotAims: 6,
+        maxAreaThrowCells: 4,
+    }).candidates;
+}
+
+/**
+ * Keep v0.8 productive even when it is used directly, without the simulation/server SearchDriver wrapper.
+ * v0.7's strategic wait, Luck Shield, and mountain policies remain untouched; only an inherited v0.8 passive
+ * decision is reconsidered, and only when the shared legality enumerator exposes a real attack, cast, or move.
+ */
+export function prioritizeV08ProductiveAction(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    // A mountain decision may be encoded as move-then-obstacle-attack. The move does not make the consumed
+    // obstacle turn productive, so any passive action in the sequence must trigger the replacement census.
+    if (!decision.some((action) => V08_PASSIVE_ACTION_TYPES.has(action.type))) {
+        return decision;
+    }
+
+    const replacement = selectV08ProductiveCandidate(enumerateV08BoundaryCandidates(unit, context, decision));
+    return replacement?.actions ?? decision;
+}
+
+/**
+ * In the conservative late two-to-one-HP window, deal enemy damage now whenever the engine-valid census
+ * exposes it. Outside that window, or when no direct attack exists, retain the normal productive priority.
+ */
+export function prioritizeV08Decision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+    const dominantFinish = v08DominantFinishState(
+        context.unitsHolder,
+        unit.getTeam(),
+        context.fightProperties?.getCurrentLap() ?? 0,
+    ).active;
+    if (dominantFinish && !isV08DirectCombatDecision(decision)) {
+        const candidates = enumerateV08BoundaryCandidates(unit, context, decision);
+        const directCombat = selectV08DirectCombatCandidate(candidates);
+        if (directCombat) {
+            return directCombat.actions;
+        }
+
+        if (decision.some((action) => V08_PASSIVE_ACTION_TYPES.has(action.type))) {
+            return selectV08ProductiveCandidate(candidates)?.actions ?? decision;
+        }
+    }
+
+    return prioritizeV08ProductiveAction(unit, context, decision);
+}
+
+/** v0.8 starts from v0.7 but never leaves a legal productive action behind for a passive turn. */
 export class StrategyV0_8 extends StrategyV0_7 {
     public override readonly version: string = "v0.8";
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        return ensureExplicitV08Action(unit.getId(), super.decideTurn(unit, context));
+        const explicit = ensureExplicitV08Action(unit.getId(), super.decideTurn(unit, context));
+        return prioritizeV08Decision(unit, context, explicit);
     }
 }
 

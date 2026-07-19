@@ -207,15 +207,19 @@ describe("v0.8 aligned execution and map integrity", () => {
         );
     });
 
-    it("records a real BLOCK_CENTER wait with attack, move, and mining alternatives", () => {
+    it("repairs the seeded BLOCK_CENTER passive policy into clean productive actions", () => {
         const record = playV08AlignedV1Task(fixedTask(3), searchOffBinding());
-        const wait = record.execution.candidatePassiveAlternatives.explicitWait;
         expect(record.gridType).toBe(PBTypes.GridVals.BLOCK_CENTER);
-        expect(wait.withLegalProductiveAction > 0).toBe(true);
-        expect(wait.withLegalAttackOrSpell > 0).toBe(true);
-        expect(wait.withLegalMove > 0).toBe(true);
-        expect(wait.withLegalObstacleAttack > 0).toBe(true);
-        expect(record.execution.candidate.completedObstacleAttacks > 0).toBe(true);
+        expect(record.execution.candidate.completedMoves > 0).toBe(true);
+        expect(record.execution.candidate.completedAttacksOrSpells > 0).toBe(true);
+        expect(record.execution.candidate.explicitWaits).toBe(0);
+        expect(record.execution.candidate.explicitDefends).toBe(0);
+        expect(record.execution.candidate.completedObstacleAttacks).toBe(0);
+        expect(
+            Object.values(record.execution.candidatePassiveAlternatives).every(
+                (alternative) => alternative.turns === 0 && alternative.withLegalProductiveAction === 0,
+            ),
+        ).toBe(true);
     });
 
     it("pairs a search-overridden explicit defend with its incumbent attack and legal move", () => {

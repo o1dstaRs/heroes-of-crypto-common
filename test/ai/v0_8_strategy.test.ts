@@ -11,17 +11,78 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { AI_VERSIONS, DEFAULT_AI_VERSION, getAIStrategy, LATEST_AI_VERSION } from "../../src/ai";
+import {
+    AI_VERSIONS,
+    DEFAULT_AI_VERSION,
+    getAIStrategy,
+    LATEST_AI_VERSION,
+    type IDecisionContext,
+    type IEnumeratedCandidate,
+} from "../../src/ai";
 import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
-import { ensureExplicitV08Action, StrategyV0_8 } from "../../src/ai/versions/v0_8";
+import {
+    ensureExplicitV08Action,
+    prioritizeV08Decision,
+    prioritizeV08ProductiveAction,
+    selectV08ProductiveCandidate,
+    StrategyV0_8,
+} from "../../src/ai/versions/v0_8";
+import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import type { GameAction } from "../../src/engine/actions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { PathHelper } from "../../src/grid/path_helper";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 import { runMatch } from "../../src/simulation/battle_engine";
+import type { Unit } from "../../src/units/unit";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 const BEHAVIOR_ENV_PREFIXES = ["V04_", "V05_", "V06_", "V07_", "SEARCH_", "Q2_", "CEM_"] as const;
 const savedBehaviorEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => BEHAVIOR_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))),
 );
+
+const LOWER = PBTypes.TeamVals.LOWER;
+const UPPER = PBTypes.TeamVals.UPPER;
+const MELEE = PBTypes.AttackVals.MELEE;
+const RANGE = PBTypes.AttackVals.RANGE;
+
+function setupMountainDecision(
+    enemyCell: { x: number; y: number },
+    speed: number,
+): {
+    unit: Unit;
+    enemy: Unit;
+    context: IDecisionContext;
+} {
+    const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+    const unit = createTestUnit({ team: LOWER, attackType: MELEE, speed, name: "Miner" });
+    const rangedAlly = createTestUnit({
+        team: LOWER,
+        attackType: RANGE,
+        rangeShots: 5,
+        damageMax: 10,
+        name: "Archer",
+    });
+    const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Enemy" });
+    placeUnit(combat.grid, combat.unitsHolder, unit, { x: 5, y: 7 });
+    placeUnit(combat.grid, combat.unitsHolder, rangedAlly, { x: 1, y: 12 });
+    placeUnit(combat.grid, combat.unitsHolder, enemy, enemyCell);
+    return {
+        unit,
+        enemy,
+        context: {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties,
+        },
+    };
+}
 
 beforeEach(() => {
     for (const key of Object.keys(process.env)) {
@@ -59,15 +120,86 @@ describe("v0.8 candidate policy", () => {
         expect(ensureExplicitV08Action("u1", mixed)).toBe(mixed);
     });
 
-    it("plays a clean-default seeded match byte-identically to v0.7 apart from version identity", () => {
+    it("selects an attack or spell before a legal move regardless of enumeration order", () => {
+        const move: GameAction[] = [{ type: "move_unit", unitId: "u1", path: [{ x: 2, y: 2 }] }];
+        const spell: GameAction[] = [{ type: "cast_spell", casterId: "u1", spellName: "Courage" }];
+        const candidates = [
+            { kind: "move", actions: move },
+            { kind: "spell", actions: spell },
+        ] as unknown as IEnumeratedCandidate[];
+
+        expect(selectV08ProductiveCandidate(candidates)?.actions).toBe(spell);
+    });
+
+    it("replaces an inherited BLOCK_CENTER mountain hit with the nearest legal move and leaves v0.7 unchanged", () => {
+        const { unit, context } = setupMountainDecision({ x: 12, y: 12 }, 2);
+        const inherited = new StrategyV0_7().decideTurn(unit, context);
+
+        expect(inherited.map((action) => action.type)).toEqual(["obstacle_attack"]);
+        const decision = new StrategyV0_8().decideTurn(unit, context);
+        expect(decision.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(decision[0]).toMatchObject({ type: "move_unit", unitId: unit.getId() });
+
+        const moveThenMine: GameAction[] = [
+            { type: "move_unit", unitId: unit.getId(), path: [{ x: 5, y: 6 }] },
+            { type: "obstacle_attack", attackerId: unit.getId(), targetPosition: { x: 7, y: 7 } },
+        ];
+        const repairedSequence = prioritizeV08ProductiveAction(unit, context, moveThenMine);
+        expect(repairedSequence.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(repairedSequence).not.toBe(moveThenMine);
+    });
+
+    it("replaces legacy BLOCK_CENTER mining with a reachable enemy attack before considering movement", () => {
+        process.env.V06_LEGACY_MINE = "1";
+        const { unit, enemy, context } = setupMountainDecision({ x: 5, y: 3 }, 5);
+        expect(new StrategyV0_7().decideTurn(unit, context).map((action) => action.type)).toEqual(["obstacle_attack"]);
+
+        const decision = new StrategyV0_8().decideTurn(unit, context);
+        expect(decision.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        expect(decision[1]).toMatchObject({ type: "melee_attack", targetId: enemy.getId() });
+    });
+
+    it("repairs inherited wait and Luck Shield decisions but preserves a true passive fallback", () => {
+        const { unit, context } = setupMountainDecision({ x: 12, y: 12 }, 2);
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const defend: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
+
+        expect(prioritizeV08ProductiveAction(unit, context, wait).map((action) => action.type)).toEqual(["move_unit"]);
+        expect(prioritizeV08ProductiveAction(unit, context, defend).map((action) => action.type)).toEqual([
+            "move_unit",
+        ]);
+
+        unit.setWebMovementLocked(true);
+        expect(prioritizeV08ProductiveAction(unit, context, defend)).toBe(defend);
+        expect(new StrategyV0_8().decideTurn(unit, context)).toEqual(defend);
+    });
+
+    it("forces a legal direct attack in the dominant finish window and preserves inherited combat", () => {
+        const { unit, context } = setupMountainDecision({ x: 5, y: 3 }, 5);
+        const move: GameAction[] = [{ type: "move_unit", unitId: unit.getId(), path: [{ x: 5, y: 6 }] }];
+        const fightProperties = context.fightProperties!;
+
+        expect(prioritizeV08Decision(unit, context, move)).toBe(move);
+        while (fightProperties.getCurrentLap() < V08_DOMINANT_FINISH_START_LAP) {
+            fightProperties.flipLap();
+        }
+
+        const directCombat = prioritizeV08Decision(unit, context, move);
+        expect(directCombat.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        expect(prioritizeV08Decision(unit, context, directCombat)).toBe(directCombat);
+    });
+
+    it("leaves clean-default v0.7 replay behavior untouched while v0.8 diverges", () => {
         const seed = 20260718;
         const roster = buildRoster(makeRng(seed));
         const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
         const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
         const candidate = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
+        const repeatedBaseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
 
         expect(candidate.outcome.green.version).toBe("v0.8");
+        expect(repeatedBaseline).toEqual(baseline);
         candidate.outcome.green.version = "v0.7";
-        expect(candidate).toEqual(baseline);
+        expect(candidate).not.toEqual(baseline);
     });
 });

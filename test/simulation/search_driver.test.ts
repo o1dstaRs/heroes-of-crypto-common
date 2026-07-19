@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumeratedCandidate } from "../../src/ai";
+import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -540,6 +541,226 @@ describe("search driver — gating, hygiene, determinism", () => {
             ["incumbent", "wait", "mine", "spell", "move"],
             ["incumbent", "spell"],
         ]);
+    });
+
+    it("does not treat a move-then-mountain incumbent as productive", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const harness = buildBattle(91, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [
+            { type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] },
+            { type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } },
+        ];
+        const move: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "move", actions: move },
+        ] as unknown as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = (_unit, scored) => scored.map(({ kind }) => (kind === "incumbent" ? 0.99 : 0.01));
+
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(move);
+    });
+
+    it("v0.8 dominant-finish shortlisting and selection force legal combat through a saturated gate", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const harness = buildBattle(92, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] }];
+        const attack: GameAction[] = [
+            { type: "melee_attack", attackerId: id, targetId: "enemy", attackFrom: { x: 3, y: 4 } },
+        ];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            {
+                kind: "mine",
+                actions: [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }],
+            },
+            { kind: "spell", actions: [{ type: "cast_spell", casterId: id, spellName: "support" }] },
+            { kind: "move", actions: [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }] },
+            { kind: "melee", actions: attack },
+        ] as unknown as IEnumeratedCandidate[];
+        const calls: Array<{ mode: string; kinds: string[] }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            counters: { dominantFinishCombatOverrides: number };
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push({ mode, kinds: scored.map(({ kind }) => kind) });
+            return scored.map(({ kind }) => (kind === "melee" ? 0.01 : kind === "incumbent" ? 0.99 : 0.9));
+        };
+
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true, undefined, true)).toEqual(
+            attack,
+        );
+        expect(calls).toEqual([
+            { mode: "leaf", kinds: ["incumbent", "mine", "spell", "move", "melee"] },
+            { mode: "turns", kinds: ["incumbent", "melee"] },
+        ]);
+        expect(driver.counters.dominantFinishCombatOverrides).toBe(1);
+    });
+
+    it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.7", SEARCH_INCLUDE_MOVES: "1" });
+        const harness = buildBattle(93, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const enemyTeam = unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+        for (const enemy of harness.unitsHolder.getAllAllies(enemyTeam)) {
+            enemy.applyDamage(Math.floor(enemy.getCumulativeHp() * 0.75), 0, new SceneLogMock());
+        }
+        while (harness.fightProperties.getCurrentLap() < V08_DOMINANT_FINISH_START_LAP) {
+            harness.fightProperties.flipLap();
+        }
+
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
+        const flags: boolean[] = [];
+        const driver = harness.makeDriver() as unknown as {
+            counters: { dominantFinishTurns: number };
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+            ) => GameAction[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.search = (_unit, _candidates, current, _seed, _t0, _productive, _fallback, dominant = false) => {
+            flags.push(dominant);
+            return current;
+        };
+
+        expect(driver.chooseDecision(unit, "v0.8s", incumbent)).toBe(incumbent);
+        expect(driver.chooseDecision(unit, "v0.7", incumbent)).toBe(incumbent);
+        expect(flags).toEqual([true, false]);
+        expect(driver.counters.dominantFinishTurns).toBe(1);
+    });
+
+    it("orders direct combat first for dominant-finish deadline and circuit fallbacks", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const harness = buildBattle(94, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent = {
+            kind: "incumbent",
+            actions: [{ type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] }],
+        } as unknown as IEnumeratedCandidate;
+        const attack = {
+            kind: "shot",
+            actions: [{ type: "range_attack", attackerId: id, targetId: "enemy" }],
+        } as unknown as IEnumeratedCandidate;
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            firstEngineValidProductiveCandidate: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                prioritizeDominantFinish?: boolean,
+            ) => IEnumeratedCandidate | undefined;
+        };
+        const probed: string[] = [];
+        driver.scoreCandidates = (_unit, [candidate]) => {
+            probed.push(candidate.kind);
+            return [0.5];
+        };
+
+        expect(driver.firstEngineValidProductiveCandidate(unit, [incumbent, attack], 123, true)).toBe(attack);
+        expect(probed).toEqual(["shot"]);
+
+        probed.length = 0;
+        expect(driver.firstEngineValidProductiveCandidate(unit, [incumbent, attack], 123, false)).toBe(incumbent);
+        expect(probed).toEqual(["move"]);
+    });
+
+    it("skips a move-then-mountain incumbent in productive deadline and circuit fallbacks", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const harness = buildBattle(95, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const moveThenMine = {
+            kind: "incumbent",
+            actions: [
+                { type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] },
+                { type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } },
+            ],
+        } as unknown as IEnumeratedCandidate;
+        const move = {
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }],
+        } as unknown as IEnumeratedCandidate;
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            firstEngineValidProductiveCandidate: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+            ) => IEnumeratedCandidate | undefined;
+        };
+        const probed: string[] = [];
+        driver.scoreCandidates = (_unit, [candidate]) => {
+            probed.push(candidate.kind);
+            return [0.5];
+        };
+
+        expect(driver.firstEngineValidProductiveCandidate(unit, [moveThenMine, move], 123)).toBe(move);
+        expect(probed).toEqual(["move"]);
     });
 
     it("keeps v0.7 scoring unchanged and lets v0.8 use nonproductive actions only without a productive option", () => {
