@@ -65,8 +65,8 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // v0.8s is a measurement-only seat alias for future search A/Bs. Keep it immediately before v0.8 so
     // the alias can never become LATEST_AI_VERSION.
     STRATEGY_V0_8S,
-    // v0.8 starts as an exact clean-default clone of v0.7. Register it last so training and tournaments can
-    // target the next generation without changing the shipped DEFAULT_AI_VERSION.
+    // v0.8 starts from v0.7 but converts terminal policy no-ops into explicit actions. Register it last so
+    // training and tournaments can target the next generation without changing the shipped DEFAULT_AI_VERSION.
     STRATEGY_V0_8,
 ];
 
