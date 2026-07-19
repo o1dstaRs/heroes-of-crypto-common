@@ -35,7 +35,9 @@ import {
     getKnownOpponentCreatures,
     getVisibleCreatureChoices,
     isPickSimComplete,
+    SERVER_PERSISTED_CREATURE_ORDER,
     transitionPickSim,
+    transitionServerPersistedPickSim,
     type IPickSimState,
     type IPickTeamState,
     type PickRandomInt,
@@ -202,6 +204,7 @@ interface ITeamSetupOutcome {
 interface IConditionalPickDriverOptions {
     conditionalTeams: ReadonlySet<PickTeam>;
     preservePickOrder: boolean;
+    rankedCreatureOrder?: typeof SERVER_PERSISTED_CREATURE_ORDER;
     /** Ranked-composed evaluation may assign independent deployable draft genomes to the two pick seats. */
     genomeForTeam?: (team: PickTeam) => ILeagueGenome | undefined;
     /** Research-only per-seat Tier-2 override evaluated at the live ARTIFACT_2 timing (five creatures). */
@@ -219,6 +222,8 @@ export interface IRankedConditionalPickOverrides {
     upperGenome?: ILeagueGenome;
     /** Return undefined to retain CONDITIONAL_SETUP_V1 for this seat. */
     pickArtifactT2?: IConditionalPickDriverOptions["pickArtifactT2"];
+    /** Opt into the live server's stable level sort after every accepted bundle or creature write. */
+    rankedCreatureOrder?: typeof SERVER_PERSISTED_CREATURE_ORDER;
 }
 
 /**
@@ -239,9 +244,9 @@ export function runConditionalPickGame(
 }
 
 /**
- * Ranked-composed pick path: round-1 accepted draft plus CONDITIONAL_SETUP_V1 for both seats. Unlike the
- * historical setup A/B helper above, this preserves the pick service's persisted creature order because the
- * authoritative server's createRoster() iterates that array directly and same-size placement is order-sensitive.
+ * Ranked-composed pick path: round-1 accepted draft plus CONDITIONAL_SETUP_V1 for both seats. The historical
+ * default retains reducer arrival order; aligned callers can explicitly model the server's stable level-sorted
+ * persistence because createRoster() iterates that array directly and same-size placement is order-sensitive.
  */
 export function runRankedConditionalPickGame(
     seed: number,
@@ -249,9 +254,16 @@ export function runRankedConditionalPickGame(
     genome: ILeagueGenome,
     overrides: IRankedConditionalPickOverrides = {},
 ): { lower: IConditionalArmy; upper: IConditionalArmy } {
+    if (
+        overrides.rankedCreatureOrder !== undefined &&
+        overrides.rankedCreatureOrder !== SERVER_PERSISTED_CREATURE_ORDER
+    ) {
+        throw new Error(`Unsupported ranked creature order: ${String(overrides.rankedCreatureOrder)}`);
+    }
     return runConditionalPickGameWithOptions(seed, "league", rules, genome, {
         conditionalTeams: new Set([LOWER, UPPER]),
         preservePickOrder: true,
+        rankedCreatureOrder: overrides.rankedCreatureOrder,
         genomeForTeam: (team) =>
             team === LOWER ? (overrides.lowerGenome ?? genome) : (overrides.upperGenome ?? genome),
         pickArtifactT2: overrides.pickArtifactT2,
@@ -271,12 +283,16 @@ function runConditionalPickGameWithOptions(
     const setupOutcome = new Map<PickTeam, ITeamSetupOutcome>();
 
     const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
+    const transition = (action: Parameters<typeof transitionPickSim>[1]) =>
+        options.rankedCreatureOrder === SERVER_PERSISTED_CREATURE_ORDER
+            ? transitionServerPersistedPickSim(state, action, rngInt)
+            : transitionPickSim(state, action, rngInt);
     const accept = (action: Parameters<typeof transitionPickSim>[1]): void => {
-        const transition = transitionPickSim(state, action, rngInt);
-        if (transition.status !== "accepted") {
-            throw new Error(`Setup-conditional pick driver: non-accepted ${action.type} (${transition.reason})`);
+        const result = transition(action);
+        if (result.status !== "accepted") {
+            throw new Error(`Setup-conditional pick driver: non-accepted ${action.type} (${result.reason})`);
         }
-        state = transition.state;
+        state = result.state;
     };
 
     let guard = 0;
@@ -304,11 +320,11 @@ function runConditionalPickGameWithOptions(
         } else if (phase.phase === PBTypes.PickPhaseVals.PICK) {
             const team = phase.actors[0];
             const creatureId = chooseCreature(state, team, draft, options.genomeForTeam?.(team) ?? genome);
-            const transition = transitionPickSim(state, { type: "pick_creature", team, creatureId }, rngInt);
-            if (transition.status === "rejected") {
-                throw new Error(`Creature pick rejected (${transition.reason})`);
+            const result = transition({ type: "pick_creature", team, creatureId });
+            if (result.status === "rejected") {
+                throw new Error(`Creature pick rejected (${result.reason})`);
             }
-            state = transition.state; // collisions reveal a slot; the next iteration re-picks
+            state = result.state; // collisions reveal a slot; the next iteration re-picks
         } else if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
             for (const team of [LOWER, UPPER] as const) {
                 const own = teamState(team);

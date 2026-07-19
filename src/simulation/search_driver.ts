@@ -79,9 +79,10 @@ import {
  * Generalizes lookahead.ts (2-ply, <=5 melee-only candidates, single-sample scoring) into a SearchDriver
  * over the F4 enumerated candidate generator (ai/candidates.ts): alternative melee (target x stand-cell)
  * pairs, alternative shot aims, area throws, every castable spell, defend and wait — for EVERY unit type.
- * Candidate 0 is always the incumbent policy decision (the anchor). Plain MOVE (kite/retreat-cell)
- * candidates are EXCLUDED by default — that candidate class is ledger-dead twice (crude hold and
- * safe-frontier kiting both regressed); SEARCH_INCLUDE_MOVES=1 re-includes them for experiments only.
+ * Candidate 0 is always the incumbent policy decision (the anchor). For pre-v0.8 versions, plain MOVE
+ * (kite/retreat-cell) candidates are EXCLUDED by default — that candidate class is ledger-dead twice (crude
+ * hold and safe-frontier kiting both regressed). v0.8 always retains the nearest legal move as a productive
+ * fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured multi-destination move set.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
@@ -246,6 +247,24 @@ const CHALLENGER_KINDS = new Set<CandidateKind>([
     "mine",
 ]);
 const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
+const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
+const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
+    "move_unit",
+    "melee_attack",
+    "range_attack",
+    "area_throw_attack",
+    "cast_spell",
+]);
+
+/**
+ * v0.8 never prefers waiting, Luck Shield, or mountain mining while a scored legal attack, spell, or move exists.
+ * Candidate zero needs action-based classification because its enumerator kind is always `incumbent`.
+ */
+function isProductiveCandidate(candidate: Pick<IEnumeratedCandidate, "kind" | "actions">): boolean {
+    return candidate.kind === "incumbent"
+        ? candidate.actions.some((action) => PRODUCTIVE_ACTION_TYPES.has(action.type))
+        : PRODUCTIVE_ACTION_KINDS.has(candidate.kind);
+}
 
 function parseKindFilter<T extends string>(
     name: string,
@@ -698,7 +717,13 @@ export class SearchDriver {
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
-                if (!this.includeMoves && candidate.kind === "move") return false;
+                // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
+                // enable the broader move experiment. Otherwise a unit with no attack can still choose wait,
+                // defend, or a mountain hit while a real reposition is available. SEARCH_INCLUDE_MOVES continues
+                // to control the wider, multi-destination move set and all pre-v0.8 behavior.
+                if (!this.includeMoves && candidate.kind === "move" && !V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version)) {
+                    return false;
+                }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             });
             if (this.mode === "ablation") {
@@ -708,7 +733,14 @@ export class SearchDriver {
                 this.counters.singleCandidate += 1;
                 return incumbent;
             }
-            return this.search(unit, candidates, incumbent, seedBase, t0);
+            return this.search(
+                unit,
+                candidates,
+                incumbent,
+                seedBase,
+                t0,
+                V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version),
+            );
         } finally {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
                 this.circuitOpen = true;
@@ -867,6 +899,7 @@ export class SearchDriver {
         incumbent: GameAction[],
         seedBase: number,
         t0: number,
+        prioritizeProductiveActions = false,
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -890,15 +923,28 @@ export class SearchDriver {
         let bestChallengerIdx = -1;
         let validationMeans: number[] | null = null;
         try {
-            scoredCandidates = this.shortlistCandidates(unit, candidates, seedBase, deadlineAt);
+            scoredCandidates = this.shortlistCandidates(
+                unit,
+                candidates,
+                seedBase,
+                deadlineAt,
+                prioritizeProductiveActions,
+            );
             means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
-            for (let i = 1; i < means.length; i += 1) {
-                if (means[i] > means[bestIdx]) {
-                    bestIdx = i;
-                }
-                if (bestChallengerIdx === -1 || means[i] > means[bestChallengerIdx]) {
-                    bestChallengerIdx = i;
+            const legalProductiveIndices = scoredCandidates
+                .map((candidate, index) => ({ candidate, index }))
+                .filter(({ candidate, index }) => means[index] !== -Infinity && isProductiveCandidate(candidate))
+                .map(({ index }) => index);
+            const selectionIndices =
+                prioritizeProductiveActions && legalProductiveIndices.length
+                    ? legalProductiveIndices
+                    : scoredCandidates.map((_candidate, index) => index);
+            bestIdx = selectionIndices[0];
+            for (const index of selectionIndices) {
+                if (means[index] > means[bestIdx]) bestIdx = index;
+                if (index > 0 && (bestChallengerIdx === -1 || means[index] > means[bestChallengerIdx])) {
+                    bestChallengerIdx = index;
                 }
             }
             if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
@@ -958,7 +1004,11 @@ export class SearchDriver {
         const wouldOverride =
             bestIdx !== 0 &&
             means[bestIdx] !== -Infinity &&
-            (incumbentIllegal || means[bestIdx] - means[0] >= this.gate);
+            (incumbentIllegal ||
+                (prioritizeProductiveActions &&
+                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                    !isProductiveCandidate(scoredCandidates[0])) ||
+                means[bestIdx] - means[0] >= this.gate);
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
             this.counters.shadowRecommendations += 1;
@@ -1063,18 +1113,24 @@ export class SearchDriver {
         candidates: readonly IEnumeratedCandidate[],
         seedBase: number,
         deadlineAt: number | null,
+        prioritizeProductiveActions = false,
     ): readonly IEnumeratedCandidate[] {
         if (this.shortlist === null || candidates.length <= this.shortlist) {
             return candidates;
         }
         const scores = this.scoreCandidates(unit, candidates, seedBase, "leaf", 1, deadlineAt);
-        const challengers = scores
+        const rankedChallengers = scores
             .map((score, index) => ({ score, index }))
             .slice(1)
             .filter(({ score }) => score !== -Infinity)
-            .sort((left, right) => right.score - left.score || left.index - right.index)
-            .slice(0, this.shortlist - 1)
-            .map(({ index }) => candidates[index]);
+            .sort((left, right) => right.score - left.score || left.index - right.index);
+        const productive = prioritizeProductiveActions
+            ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
+            : [];
+        const ordered = productive.length
+            ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
+            : rankedChallengers;
+        const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
         return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------

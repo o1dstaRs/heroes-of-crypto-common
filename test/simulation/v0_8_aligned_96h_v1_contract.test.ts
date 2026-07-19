@@ -51,6 +51,10 @@ import {
     validateV08AlignedV1SeedPlan,
     type IV08AlignedV1InjectedSeedPlan,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
+import {
+    V08_ALIGNED_V1_NONFIGHT_BINDING,
+    V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight";
 
 function syntheticSeedPlan(): IV08AlignedV1InjectedSeedPlan {
     let nextSeed = 10_000;
@@ -170,6 +174,8 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
         expect(definition.definitionSha256).toBe("d279afd6e644a3ac688422e653a36750c2bf96bee260fe45e3f7a901744d23be");
         expect(bytesSha256).toBe("f917ac884eb6668c737b7eb5c557a02972dad116728728ae4cc8c5aa5350888c");
         expect(Buffer.byteLength(bytes)).toBe(6074);
+        expect("nonfightBinding" in definition).toBe(false);
+        expect(definition.candidates.every((binding) => !("nonfightBindingSha256" in binding))).toBe(true);
     });
 
     it("preserves the exact aligned production geometry and 390,912-game budget", () => {
@@ -238,6 +244,7 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
         expect(v08Definition).toMatchObject({
             artifactKind: "v0_8_aligned_96h_v1_orchestrator_definition",
             versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
+            nonfightBinding: V08_ALIGNED_V1_NONFIGHT_BINDING,
         });
         const v08WithV07Binding = structuredClone(v08Definition);
         v08WithV07Binding.candidates[0] = bindV07AlignedV2Candidate(v08CandidateGenome);
@@ -295,6 +302,7 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
             candidate: "v0.8s",
             candidateBase: "v0.8",
             opponent: "v0.7",
+            nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
         });
         expect(binding.behaviorEnvironment).toMatchObject({
             SEARCH_VERSIONS: "v0.8s",

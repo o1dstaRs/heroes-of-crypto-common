@@ -39,6 +39,7 @@ import {
     cloneAligned96hVersionProfile,
 } from "./aligned_96h_version_profile";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "./v0_8_aligned_96h_v1_nonfight";
 
 export const V08_ALIGNED_96H_V1_CELLS = Object.freeze(
     V07_ALIGNED_96H_V2_CELLS.map((cell) => Object.freeze({ ...cell })),
@@ -100,6 +101,7 @@ export interface IV08AlignedV1SideExecutionAudit {
 
 export interface IV08AlignedV1PassiveAlternativeAudit {
     turns: number;
+    withLegalProductiveAction: number;
     withLegalAttackOrSpell: number;
     withLegalMove: number;
     withLegalObstacleAttack: number;
@@ -108,6 +110,7 @@ export interface IV08AlignedV1PassiveAlternativeAudit {
 export interface IV08AlignedV1CandidatePassiveAlternatives {
     explicitWait: IV08AlignedV1PassiveAlternativeAudit;
     explicitDefend: IV08AlignedV1PassiveAlternativeAudit;
+    obstacleAttack: IV08AlignedV1PassiveAlternativeAudit;
     recovery: IV08AlignedV1PassiveAlternativeAudit;
     strategyNoOp: IV08AlignedV1PassiveAlternativeAudit;
 }
@@ -120,6 +123,7 @@ export interface IV08AlignedV1ExecutionAudit {
 
 export interface IV08AlignedV1GameObservation extends IV07AlignedV2GameObservation {
     scenarioOrdinal: number;
+    nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
     gridType: V08AlignedV1GridType;
     execution: IV08AlignedV1ExecutionAudit;
 }
@@ -157,6 +161,10 @@ export interface IV08AlignedV1Aggregate extends Omit<
         candidateRecoveryTurns: number;
         candidateRecoveryFailedTurns: number;
         candidateRejectedActions: number;
+        candidateAvoidableWaitTurns: number;
+        candidateAvoidableDefendTurns: number;
+        candidateAvoidableObstacleAttackTurns: number;
+        productiveActionPriorityPassed: boolean;
         mapCoveragePassed: boolean;
         executionPassed: boolean;
     };
@@ -236,6 +244,7 @@ const SIDE_EXECUTION_KEYS = [
 
 const PASSIVE_ALTERNATIVE_KEYS = [
     "turns",
+    "withLegalProductiveAction",
     "withLegalAttackOrSpell",
     "withLegalMove",
     "withLegalObstacleAttack",
@@ -276,9 +285,12 @@ function validatePassiveAlternativeAudit(value: IV08AlignedV1PassiveAlternativeA
     }
     for (const key of PASSIVE_ALTERNATIVE_KEYS) requireV08Count(value[key], `${label}.${key}`);
     if (
+        value.withLegalProductiveAction > value.turns ||
         value.withLegalAttackOrSpell > value.turns ||
         value.withLegalMove > value.turns ||
-        value.withLegalObstacleAttack > value.turns
+        value.withLegalObstacleAttack > value.turns ||
+        value.withLegalProductiveAction < Math.max(value.withLegalAttackOrSpell, value.withLegalMove) ||
+        value.withLegalProductiveAction > value.withLegalAttackOrSpell + value.withLegalMove
     ) {
         throw new Error(`${label} alternative counts exceed its passive turns`);
     }
@@ -290,6 +302,9 @@ export function validateV08AlignedV1GameObservation(
 ): IV08AlignedV1GameObservation {
     if (!Number.isSafeInteger(observation.scenarioOrdinal) || observation.scenarioOrdinal < 0) {
         throw new RangeError(`${label}.scenarioOrdinal must be a nonnegative integer`);
+    }
+    if (observation.nonfightBindingSha256 !== V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256) {
+        throw new Error(`${label}.nonfightBindingSha256 does not match the frozen non-fight policy`);
     }
     if (!(V08_ALIGNED_V1_GRID_TYPES as readonly number[]).includes(observation.gridType)) {
         throw new Error(`${label}.gridType is not registered`);
@@ -313,7 +328,7 @@ export function validateV08AlignedV1GameObservation(
         !alternatives ||
         typeof alternatives !== "object" ||
         JSON.stringify(Object.keys(alternatives).sort()) !==
-            JSON.stringify(["explicitDefend", "explicitWait", "recovery", "strategyNoOp"].sort())
+            JSON.stringify(["explicitDefend", "explicitWait", "obstacleAttack", "recovery", "strategyNoOp"].sort())
     ) {
         throw new Error(`${label}.execution.candidatePassiveAlternatives fields are not exact`);
     }
@@ -322,11 +337,16 @@ export function validateV08AlignedV1GameObservation(
         alternatives.explicitDefend,
         `${label}.candidatePassiveAlternatives.explicitDefend`,
     );
+    validatePassiveAlternativeAudit(
+        alternatives.obstacleAttack,
+        `${label}.candidatePassiveAlternatives.obstacleAttack`,
+    );
     validatePassiveAlternativeAudit(alternatives.recovery, `${label}.candidatePassiveAlternatives.recovery`);
     validatePassiveAlternativeAudit(alternatives.strategyNoOp, `${label}.candidatePassiveAlternatives.strategyNoOp`);
     if (
         alternatives.explicitWait.turns !== observation.execution.candidate.explicitWaits ||
         alternatives.explicitDefend.turns !== observation.execution.candidate.explicitDefends ||
+        alternatives.obstacleAttack.turns > observation.execution.candidate.completedObstacleAttacks ||
         alternatives.recovery.turns !== observation.execution.candidate.recoveryTurns ||
         alternatives.strategyNoOp.turns !== observation.execution.candidate.strategyNoOpTurns
     ) {
@@ -349,6 +369,7 @@ const emptySideExecutionAudit = (): IV08AlignedV1SideExecutionAudit =>
 
 const emptyPassiveAlternativeAudit = (): IV08AlignedV1PassiveAlternativeAudit => ({
     turns: 0,
+    withLegalProductiveAction: 0,
     withLegalAttackOrSpell: 0,
     withLegalMove: 0,
     withLegalObstacleAttack: 0,
@@ -361,6 +382,7 @@ export function emptyV08AlignedV1ExecutionAudit(): IV08AlignedV1ExecutionAudit {
         candidatePassiveAlternatives: {
             explicitWait: emptyPassiveAlternativeAudit(),
             explicitDefend: emptyPassiveAlternativeAudit(),
+            obstacleAttack: emptyPassiveAlternativeAudit(),
             recovery: emptyPassiveAlternativeAudit(),
             strategyNoOp: emptyPassiveAlternativeAudit(),
         },
@@ -371,7 +393,7 @@ function addExecutionAudit(target: IV08AlignedV1ExecutionAudit, source: IV08Alig
     for (const side of ["candidate", "opponent"] as const) {
         for (const key of SIDE_EXECUTION_KEYS) target[side][key] += source[side][key];
     }
-    for (const kind of ["explicitWait", "explicitDefend", "recovery", "strategyNoOp"] as const) {
+    for (const kind of ["explicitWait", "explicitDefend", "obstacleAttack", "recovery", "strategyNoOp"] as const) {
         for (const key of PASSIVE_ALTERNATIVE_KEYS) {
             target.candidatePassiveAlternatives[kind][key] += source.candidatePassiveAlternatives[kind][key];
         }
@@ -441,8 +463,19 @@ export function aggregateV08AlignedV1(
     for (const entry of executionCellSeats) addExecutionAudit(pooledExecution, entry);
     const mapCoveragePassed = mapErrors.length === 0 && mapCellSeats.every((entry) => entry.passed);
     const candidate = pooledExecution.candidate;
+    const candidateAlternatives = pooledExecution.candidatePassiveAlternatives;
+    const candidateAvoidableWaitTurns = candidateAlternatives.explicitWait.withLegalProductiveAction;
+    const candidateAvoidableDefendTurns = candidateAlternatives.explicitDefend.withLegalProductiveAction;
+    const candidateAvoidableObstacleAttackTurns = candidateAlternatives.obstacleAttack.withLegalProductiveAction;
+    const productiveActionPriorityPassed =
+        candidateAvoidableWaitTurns === 0 &&
+        candidateAvoidableDefendTurns === 0 &&
+        candidateAvoidableObstacleAttackTurns === 0;
     const executionPassed =
-        candidate.strategyNoOpTurns === 0 && candidate.recoveryTurns === 0 && candidate.rejectedActions === 0;
+        candidate.strategyNoOpTurns === 0 &&
+        candidate.recoveryTurns === 0 &&
+        candidate.rejectedActions === 0 &&
+        productiveActionPriorityPassed;
     const completenessErrors = [...base.completenessErrors, ...mapErrors];
     return {
         ...base,
@@ -460,6 +493,10 @@ export function aggregateV08AlignedV1(
             candidateRecoveryTurns: candidate.recoveryTurns,
             candidateRecoveryFailedTurns: candidate.recoveryFailedTurns,
             candidateRejectedActions: candidate.rejectedActions,
+            candidateAvoidableWaitTurns,
+            candidateAvoidableDefendTurns,
+            candidateAvoidableObstacleAttackTurns,
+            productiveActionPriorityPassed,
             mapCoveragePassed,
             executionPassed,
             passed: base.integrity.passed && mapCoveragePassed && executionPassed,
@@ -475,7 +512,9 @@ export function evaluateV08AlignedV1OperationalEligibility(
     const errors = [...base.errors];
     if (!aggregate.mapCoverage.passed) errors.push("v0.8 grid coverage is not exactly balanced");
     if (!aggregate.integrity.executionPassed) {
-        errors.push("candidate execution contains a rejected action, recovery, or strategy no-op");
+        errors.push(
+            "candidate execution contains a rejected action, recovery, strategy no-op, or nonproductive action with a legal productive alternative",
+        );
     }
     return { passed: errors.length === 0, errors: [...new Set(errors)] };
 }
@@ -553,7 +592,10 @@ export function assessV08AlignedV1Final(
         const executionPassed =
             execution.candidate.strategyNoOpTurns === 0 &&
             execution.candidate.recoveryTurns === 0 &&
-            execution.candidate.rejectedActions === 0;
+            execution.candidate.rejectedActions === 0 &&
+            execution.candidatePassiveAlternatives.explicitWait.withLegalProductiveAction === 0 &&
+            execution.candidatePassiveAlternatives.explicitDefend.withLegalProductiveAction === 0 &&
+            execution.candidatePassiveAlternatives.obstacleAttack.withLegalProductiveAction === 0;
         const checks = {
             ...claim.checks,
             operationalPassed: claim.checks.operationalPassed && map.passed && executionPassed,

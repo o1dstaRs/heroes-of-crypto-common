@@ -12,7 +12,7 @@
 import { ArtifactTier } from "../artifacts/artifact_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getPerkRevealMode, PERKS, Perk } from "../perks/perk_properties";
-import { CreatureLevelList, CreaturePoolByLevel } from "../units/unit_properties";
+import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 
 export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.UPPER;
 export type PickBundle = readonly [level1Creature: number, level2Creature: number, tier1Artifact: number];
@@ -22,6 +22,7 @@ export const LIVE_AUTO_BANS_BY_LEVEL = [5, 5, 3, 3] as const;
 export const LIVE_TIER1_ARTIFACT_COUNT = 12;
 export const LIVE_TIER2_ARTIFACT_COUNT = 12;
 export const LIVE_TIER2_OFFER_SIZE = 3;
+export const SERVER_PERSISTED_CREATURE_ORDER = "server-level-sort-after-each-accepted-pick" as const;
 
 export interface ILivePickPhase {
     readonly phase: PBTypes.PickPhaseVals;
@@ -501,6 +502,33 @@ export function transitionPickSim(state: IPickSimState, action: PickAction, rng:
         case "select_tier2":
             return applyTier2(state, action);
     }
+}
+
+const sortServerPersistedCreatures = (creatureIds: readonly number[]): number[] =>
+    creatureIds
+        .map((creatureId, index) => ({ creatureId, index }))
+        .sort(
+            (left, right) =>
+                (CreatureLevelMap[left.creatureId] ?? 99) - (CreatureLevelMap[right.creatureId] ?? 99) ||
+                left.index - right.index,
+        )
+        .map(({ creatureId }) => creatureId);
+
+/**
+ * Model the ranked server's accepted creature write and subsequent document reload. The pure reducer retains
+ * arrival order; Arango persists both creature arrays in stable level order after each accepted bundle/creature.
+ */
+export function transitionServerPersistedPickSim(
+    state: IPickSimState,
+    action: PickAction,
+    rng: PickRandomInt,
+): PickTransition {
+    const transition = transitionPickSim(state, action, rng);
+    if (transition.status === "accepted" && (action.type === "select_bundle" || action.type === "pick_creature")) {
+        transition.state.lower.creatures = sortServerPersistedCreatures(transition.state.lower.creatures);
+        transition.state.upper.creatures = sortServerPersistedCreatures(transition.state.upper.creatures);
+    }
+    return transition;
 }
 
 export function getKnownOpponentCreatures(state: IPickSimState, team: PickTeam): number[] {

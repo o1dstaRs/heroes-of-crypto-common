@@ -8,7 +8,15 @@
 
 import { enumerateCandidates } from "../../ai";
 import type { GameAction } from "../../engine/actions";
-import { GREEN_TEAM, type IDecisionObservation, type ITurnExecutionObservation, type Side } from "../battle_engine";
+import { FightStateManager } from "../../fights/fight_state_manager";
+import {
+    GREEN_TEAM,
+    runMatch,
+    type IDecisionObservation,
+    type IMatchConfig,
+    type ITurnExecutionObservation,
+    type Side,
+} from "../battle_engine";
 import type { IV07ComposedAuditRow } from "../v0_7_composed_ranked_ladder";
 import {
     V08_ALIGNED_96H_V1_VERSION_PROFILE,
@@ -36,23 +44,31 @@ import {
 } from "./v0_8_aligned_96h_v1_core";
 import {
     evaluatorCellV08AlignedV1,
+    fingerprintV08AlignedV1,
     upgradeV08AlignedV1ExecutionTask,
     v08AlignedV1TaskKey,
     validateV08AlignedV1CandidateBinding,
     type IV08AlignedV1CandidateBinding,
     type IV08AlignedV1ExecutionTask,
 } from "./v0_8_aligned_96h_v1_protocol";
+import {
+    V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
+    bindV08AlignedV1MatchConfig,
+    runV08AlignedV1BoundRankedPick,
+    v08AlignedV1PhysicalSetup,
+} from "./v0_8_aligned_96h_v1_nonfight";
 
 export interface IV08AlignedV1BattleRecord extends IAligned96hBattleRecord<IV08AlignedV1CandidateBinding> {
     artifactKind: "v0_8_aligned_96h_v1_battle_record";
     versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
     gridType: V08AlignedV1GridType;
     execution: IV08AlignedV1ExecutionAudit;
 }
 
 export type V08AlignedV1ExecutionTaskInput = IV07AlignedV2ExecutionTask | IV08AlignedV1ExecutionTask;
 
-export interface IV08AlignedV1GameDependencies extends IV07AlignedV2GameDependencies {
+export interface IV08AlignedV1GameDependencies extends Omit<IV07AlignedV2GameDependencies, "pickRunner"> {
     candidateEnumerator?: typeof enumerateCandidates;
 }
 
@@ -112,6 +128,7 @@ function incrementPassiveAlternatives(
     alternatives: IV08DecisionAlternatives,
 ): void {
     audit.turns += 1;
+    audit.withLegalProductiveAction += Number(alternatives.attackOrSpell || alternatives.move);
     audit.withLegalAttackOrSpell += Number(alternatives.attackOrSpell);
     audit.withLegalMove += Number(alternatives.move);
     audit.withLegalObstacleAttack += Number(alternatives.obstacleAttack);
@@ -141,6 +158,7 @@ function observeExecution(
     const strategyNoOp = !completed.some((execution) => MEANINGFUL_ACTION_TYPES.has(execution.action.type));
     const explicitWait = completed.some((execution) => execution.action.type === "wait_turn");
     const explicitDefend = completed.some((execution) => execution.action.type === "defend_turn");
+    const obstacleAttack = completed.some((execution) => execution.action.type === "obstacle_attack");
 
     side.observedTurns += 1;
     side.strategyNoOpTurns += Number(strategyNoOp);
@@ -164,6 +182,7 @@ function observeExecution(
     const passive: IV08AlignedV1CandidatePassiveAlternatives = audit.candidatePassiveAlternatives;
     if (explicitWait) incrementPassiveAlternatives(passive.explicitWait, pending.alternatives);
     if (explicitDefend) incrementPassiveAlternatives(passive.explicitDefend, pending.alternatives);
+    if (obstacleAttack) incrementPassiveAlternatives(passive.obstacleAttack, pending.alternatives);
     if (recoveries.length) incrementPassiveAlternatives(passive.recovery, pending.alternatives);
     if (strategyNoOp) incrementPassiveAlternatives(passive.strategyNoOp, pending.alternatives);
 }
@@ -188,11 +207,18 @@ export function playV08AlignedV1Task(
     validateV08AlignedV1ExecutionTask(task);
     validateV08AlignedV1CandidateBinding(binding);
     const upgraded = upgradeV08AlignedV1ExecutionTask(task);
+    const cell = evaluatorCellV08AlignedV1(upgraded.cellId);
     if (dependencies.gridType !== undefined && dependencies.gridType !== upgraded.gridType) {
         throw new Error("v0.8 aligned dependency gridType conflicts with the scenarioOrdinal map assignment");
     }
+    if ("pickRunner" in dependencies) {
+        throw new Error("v0.8 aligned ranked setup cannot be replaced by an injected pick runner");
+    }
     const candidateSide: Side = upgraded.candidateSeat === "candidate_green" ? "green" : "red";
-    const { candidateEnumerator: _candidateEnumerator, ...sharedDependencies } = dependencies;
+    const injectedMatchRunner = dependencies.matchRunner;
+    const sharedDependencies = { ...dependencies };
+    delete sharedDependencies.candidateEnumerator;
+    delete sharedDependencies.matchRunner;
     const pending: IV08PendingDecision[] = [];
     const execution = emptyV08AlignedV1ExecutionAudit();
     const decisionObserver = (observation: IDecisionObservation): void => {
@@ -214,11 +240,29 @@ export function playV08AlignedV1Task(
         observeExecution(execution, decision, observation, candidateSide);
         dependencies.turnExecutionObserver?.(observation);
     };
+    const upstreamMatchRunner =
+        injectedMatchRunner ??
+        ((config: IMatchConfig) => {
+            FightStateManager.getInstance();
+            return runMatch(config);
+        });
+    let physicalSetup: unknown;
+    const boundMatchRunner = (config: IMatchConfig) => {
+        const boundConfig = bindV08AlignedV1MatchConfig(config, {
+            candidateIsGreen: upgraded.candidateSeat === "candidate_green",
+            placementReveal: binding.genome.controls.placementReveal,
+            fixedTemplate: cell.distribution === "fixed_template",
+        });
+        physicalSetup = v08AlignedV1PhysicalSetup(boundConfig);
+        return upstreamMatchRunner(boundConfig);
+    };
     const record = playV07AlignedV2Task(
         upgraded,
         {
             ...sharedDependencies,
             gridType: upgraded.gridType,
+            matchRunner: boundMatchRunner,
+            pickRunner: runV08AlignedV1BoundRankedPick,
             decisionObserver,
             turnExecutionObserver,
         },
@@ -228,6 +272,7 @@ export function playV08AlignedV1Task(
     if (execution.candidate.observedTurns + execution.opponent.observedTurns < 1) {
         throw new Error("v0.8 match runner did not invoke the required turn execution observers");
     }
+    if (!physicalSetup) throw new Error("v0.8 match runner omitted its bound physical setup");
     if (record.taskKey !== v08AlignedV1TaskKey(upgraded)) {
         throw new Error("v0.8 aligned task key drifted while reconstructing the physical match");
     }
@@ -235,6 +280,8 @@ export function playV08AlignedV1Task(
         ...record,
         artifactKind: "v0_8_aligned_96h_v1_battle_record",
         versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+        nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
+        physicalSetupSha256: fingerprintV08AlignedV1(physicalSetup),
         gridType: upgraded.gridType,
         execution,
     };
@@ -250,6 +297,9 @@ export function compactV08AlignedV1Observation(
     }
     assertAligned96hVersionProfile(record.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
     validateV08AlignedV1CandidateBinding(binding);
+    if (record.nonfightBindingSha256 !== V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256) {
+        throw new Error(`${record.taskKey}: v0.8 battle record non-fight binding is invalid`);
+    }
     if (record.gridType !== gridTypeV08AlignedV1(record.scenarioOrdinal)) {
         throw new Error(`${record.taskKey}: v0.8 battle record gridType does not match its scenarioOrdinal`);
     }
@@ -257,6 +307,7 @@ export function compactV08AlignedV1Observation(
     return validateV08AlignedV1GameObservation({
         ...compact,
         scenarioOrdinal: record.scenarioOrdinal,
+        nonfightBindingSha256: record.nonfightBindingSha256,
         gridType: record.gridType,
         execution: structuredClone(record.execution),
     });

@@ -469,6 +469,95 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.counters.scoredCandidatesTotal).toBe(3);
     });
 
+    it("v0.8 prioritizes a scored legal attack, spell, or move over wait, Luck Shield, and mountain mining", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const harness = buildBattle(91, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: id }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "wait", actions: [{ type: "wait_turn", unitId: id }] },
+            {
+                kind: "mine",
+                actions: [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }],
+            },
+            { kind: "spell", actions: [{ type: "cast_spell", casterId: id, spellName: "productive" }] },
+            { kind: "move", actions: [{ type: "move_unit", unitId: id, cells: [] }] },
+        ] as unknown as IEnumeratedCandidate[];
+        const calls: string[][] = [];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push(scored.map(({ kind }) => kind));
+            if (mode === "leaf") return scored.map(({ kind }) => (kind === "wait" || kind === "mine" ? 0.99 : 0.1));
+            return scored.map(({ kind }) => (kind === "spell" ? 0.2 : 0.99));
+        };
+
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toEqual(candidates[3].actions);
+        expect(calls).toEqual([
+            ["incumbent", "wait", "mine", "spell", "move"],
+            ["incumbent", "spell"],
+        ]);
+    });
+
+    it("keeps v0.7 scoring unchanged and lets v0.8 use nonproductive actions only without a productive option", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6,v0.8s", SEARCH_GATE: "0" });
+        const harness = buildBattle(92, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: id }];
+        const mine: GameAction[] = [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }];
+        const productive: GameAction[] = [{ type: "move_unit", unitId: id, cells: [] }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "mine", actions: mine },
+            { kind: "move", actions: productive },
+        ] as unknown as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: () => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = () => [0.1, 0.9, 0.2];
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), false)).toEqual(mine);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toEqual(productive);
+
+        const noProductive = candidates.slice(0, 2);
+        driver.scoreCandidates = () => [0.1, 0.9];
+        expect(driver.search(unit, noProductive, incumbent, 123, performance.now(), true)).toEqual(mine);
+
+        // A generated move that the real engine rejects is not a valid productive escape hatch.
+        driver.scoreCandidates = () => [0.1, 0.9, -Infinity];
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toEqual(mine);
+    });
+
     it("validates SEARCH_SHORTLIST only when search mode is enabled", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_SHORTLIST: "1" });
         expect(() => buildBattle(89, "v0.6").makeDriver()).toThrow("SEARCH_SHORTLIST must be an integer >= 2");

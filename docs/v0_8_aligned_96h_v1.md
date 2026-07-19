@@ -19,10 +19,22 @@ selection maximizes the worst decisive win rate before considering pooled diagno
 
 ## Search Space And Budget
 
-The reviewed finite catalog contains the same 48 aligned behavior arms used by v0.7 aligned-v2, rebound to `v0.8s`
-on the current source tree. It covers search horizon, rollouts, leaf evaluation, decision deadline, shortlist,
-active-challenger filtering, ranged terminal overlays, reveal-conditioned placement, dense melee-magic isolation,
-aura caster routing, and the accepted melee-ranged targeting overlay.
+The reviewed finite catalog contains 48 v0.8-specific behavior arms derived from the aligned-v2 coverage anchors and
+rebound to `v0.8s` on the current source tree. Every candidate includes plain movement in search, capped to the
+nearest single destination by `SEARCH_MAX_MOVES=1`. The frozen v0.7 incumbent does not enable movement search.
+
+Unlike v0.7, v0.8 search applies a version-scoped productive-action priority after engine scoring. Whenever at least
+one scored legal attack, spell, or move exists, search may not choose an hourglass wait, Luck Shield, or mountain
+attack; those actions remain available only as true fallbacks when no productive candidate is legal. This priority
+also survives shortlist selection, so a high immediate score cannot crowd the only productive challenger out of a
+two-candidate shortlist. The v0.7 opponent and every pre-v0.8 search version retain their historical selection rules.
+
+The catalog deliberately mixes rollout depth with decision headroom: 14 arms use one rollout, 19 use two, and 15
+use three. The deadline census is 10 arms at 125ms, 20 at 150ms, and 18 at 175ms. Deep h12 candidates use at most
+two rollouts, while the three-rollout arms use h4 or h8; every deadline remains at least 100ms below the fixed 275ms
+circuit breaker. Coverage includes the committed, multicohort, b9ce, and midpoint leaf anchors; ranged terminal
+overlays; melee-mage isolation and targeting; aura routing; reveal-conditioned placement; shortlist and challenger
+controls; horizon; gate; and decision deadline.
 
 The exact production budget is 390,912 games:
 
@@ -53,7 +65,9 @@ cross-profile replay.
 
 The final qualification retains the aligned-v2 policy. Every one of the 24 strata needs a Bonferroni-adjusted
 two-sided Wilson lower bound of at least 90% decisive win rate, at least 90% decisive games, at most 10% draws or
-Armageddon, and clean operational evidence. A PASS is still research-only and does not change
+Armageddon, and clean operational evidence. Candidate turns are paired with their legal candidate set; any wait,
+Luck Shield, or mountain attack taken while an attack, spell, or move was legal fails candidate execution integrity,
+as do strategy no-ops, recovery turns, and rejected actions. A PASS is still research-only and does not change
 `DEFAULT_AI_VERSION`.
 
 ## Zinc Replacement Procedure

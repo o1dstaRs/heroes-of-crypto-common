@@ -81,6 +81,8 @@ export interface IV07AlignedV2ShardArtifactManifest {
     panelFingerprint: string;
     genomeSha256: string;
     behaviorEnvironmentSha256: string;
+    /** Omitted by historical v0.7 manifests. */
+    nonfightBindingSha256?: string;
     files: {
         binding: IV07AlignedV2ArtifactDescriptor;
         rawRecords: IV07AlignedV2ArtifactDescriptor;
@@ -251,6 +253,7 @@ function validateAuditDescriptor(value: unknown, label: string): IV07AlignedV2Pe
 }
 
 function validateManifest(value: unknown): IV07AlignedV2ShardArtifactManifest {
+    const hasNonfightBinding = isObjectRecord(value) && Object.hasOwn(value, "nonfightBindingSha256");
     if (
         !isObjectRecord(value) ||
         !hasExactKeys(value, [
@@ -264,6 +267,7 @@ function validateManifest(value: unknown): IV07AlignedV2ShardArtifactManifest {
             "panelFingerprint",
             "genomeSha256",
             "behaviorEnvironmentSha256",
+            ...(hasNonfightBinding ? ["nonfightBindingSha256"] : []),
             "files",
             "audits",
             "artifactSetSha256",
@@ -287,6 +291,7 @@ function validateManifest(value: unknown): IV07AlignedV2ShardArtifactManifest {
         panelFingerprint: value.panelFingerprint,
         genomeSha256: value.genomeSha256,
         behaviorEnvironmentSha256: value.behaviorEnvironmentSha256,
+        ...(hasNonfightBinding ? { nonfightBindingSha256: value.nonfightBindingSha256 } : {}),
         artifactSetSha256: value.artifactSetSha256,
         manifestSha256: value.manifestSha256,
     })) {
@@ -419,6 +424,7 @@ export function validateV07AlignedV2ShardEvidence<Binding extends Aligned96hCand
         evaluation.checkpoint.shard.shardSha256 !== evaluation.shard.shardSha256 ||
         evaluation.shard.genomeSha256 !== evaluation.binding.genomeSha256 ||
         evaluation.shard.behaviorEnvironmentSha256 !== evaluation.binding.behaviorEnvironmentSha256 ||
+        evaluation.shard.nonfightBindingSha256 !== evaluation.binding.nonfightBindingSha256 ||
         evaluation.shard.searchEnabled !== evaluation.binding.searchEnabled ||
         evaluation.records.length !== tasks.length ||
         evaluation.checkpoint.observations.length !== tasks.length
@@ -442,6 +448,9 @@ export function validateV07AlignedV2ShardEvidence<Binding extends Aligned96hCand
             attestation.runFingerprint !== evaluation.shard.runFingerprint ||
             attestation.genomeSha256 !== evaluation.shard.genomeSha256 ||
             attestation.behaviorEnvironmentSha256 !== evaluation.shard.behaviorEnvironmentSha256 ||
+            (binding.candidate === "v0.8s" &&
+                (!("nonfightBindingSha256" in attestation) ||
+                    attestation.nonfightBindingSha256 !== evaluation.shard.nonfightBindingSha256)) ||
             attestation.transpilerCacheDisabled !== "0" ||
             attestation.auditPath !== artifact.sourcePath ||
             attestation.environmentSha256 !== fingerprintAligned96h(binding, expectedEnvironment) ||
@@ -545,6 +554,9 @@ function buildArtifactBundle<Binding extends Aligned96hCandidateBinding>(
         panelFingerprint: evaluation.shard.panel.panelFingerprint,
         genomeSha256: evaluation.shard.genomeSha256,
         behaviorEnvironmentSha256: evaluation.shard.behaviorEnvironmentSha256,
+        ...(evaluation.shard.nonfightBindingSha256
+            ? { nonfightBindingSha256: evaluation.shard.nonfightBindingSha256 }
+            : {}),
         files,
         audits,
         artifactSetSha256: sha256Bytes(canonicalV07AlignedV2Json({ files, audits })),
@@ -683,7 +695,8 @@ export function loadV07AlignedV2PersistedShard<Binding extends Aligned96hCandida
         manifest.shardSha256 !== expectations.shard.shardSha256 ||
         manifest.panelFingerprint !== expectations.shard.panel.panelFingerprint ||
         manifest.genomeSha256 !== expectations.shard.genomeSha256 ||
-        manifest.behaviorEnvironmentSha256 !== expectations.shard.behaviorEnvironmentSha256
+        manifest.behaviorEnvironmentSha256 !== expectations.shard.behaviorEnvironmentSha256 ||
+        manifest.nonfightBindingSha256 !== expectations.shard.nonfightBindingSha256
     ) {
         throw new Error("aligned v2 persisted shard does not match its expected run/panel/genome binding");
     }
@@ -727,7 +740,8 @@ export function loadV07AlignedV2PersistedPanelShard<Binding extends Aligned96hCa
         manifest.manifestSha256 !== expectations.manifestSha256 ||
         manifest.runFingerprint !== expectations.runFingerprint ||
         manifest.genomeSha256 !== expectations.binding.genomeSha256 ||
-        manifest.behaviorEnvironmentSha256 !== expectations.binding.behaviorEnvironmentSha256
+        manifest.behaviorEnvironmentSha256 !== expectations.binding.behaviorEnvironmentSha256 ||
+        manifest.nonfightBindingSha256 !== expectations.binding.nonfightBindingSha256
     ) {
         throw new Error("aligned v2 persisted panel shard manifest does not match its evidence reference");
     }

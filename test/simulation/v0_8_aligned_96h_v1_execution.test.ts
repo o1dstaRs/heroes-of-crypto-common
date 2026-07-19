@@ -28,6 +28,7 @@ import {
     playV08AlignedV1Task,
     type IV08AlignedV1GameDependencies,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight";
 import {
     bindV08AlignedV1Candidate,
     upgradeV08AlignedV1ExecutionTask,
@@ -122,6 +123,7 @@ function cleanObservation(
         candidateSeat,
         scenarioOrdinal,
         scenarioId: `scenario-${scenarioOrdinal}`,
+        nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
         gridType: gridTypeV08AlignedV1(scenarioOrdinal),
         outcome,
         reachedArmageddon: false,
@@ -148,6 +150,26 @@ function exactPanel(scenariosPerCell: number, outcome: IV08AlignedV1GameObservat
             ),
         ),
     );
+}
+
+type CandidateNonproductiveKind = "explicitWait" | "explicitDefend" | "obstacleAttack";
+
+function markCandidateNonproductiveTurn(
+    row: IV08AlignedV1GameObservation,
+    kind: CandidateNonproductiveKind,
+    withLegalProductiveAction: boolean,
+): void {
+    row.execution.candidate.completedAttacksOrSpells = 0;
+    if (kind === "explicitWait") row.execution.candidate.explicitWaits = 1;
+    if (kind === "explicitDefend") row.execution.candidate.explicitDefends = 1;
+    if (kind === "obstacleAttack") row.execution.candidate.completedObstacleAttacks = 1;
+    row.execution.candidatePassiveAlternatives[kind] = {
+        turns: 1,
+        withLegalProductiveAction: Number(withLegalProductiveAction),
+        withLegalAttackOrSpell: Number(withLegalProductiveAction),
+        withLegalMove: 0,
+        withLegalObstacleAttack: Number(kind === "obstacleAttack"),
+    };
 }
 
 describe("v0.8 aligned execution and map integrity", () => {
@@ -189,6 +211,7 @@ describe("v0.8 aligned execution and map integrity", () => {
         const record = playV08AlignedV1Task(fixedTask(3), searchOffBinding());
         const wait = record.execution.candidatePassiveAlternatives.explicitWait;
         expect(record.gridType).toBe(PBTypes.GridVals.BLOCK_CENTER);
+        expect(wait.withLegalProductiveAction > 0).toBe(true);
         expect(wait.withLegalAttackOrSpell > 0).toBe(true);
         expect(wait.withLegalMove > 0).toBe(true);
         expect(wait.withLegalObstacleAttack > 0).toBe(true);
@@ -227,6 +250,7 @@ describe("v0.8 aligned execution and map integrity", () => {
         const record = playV08AlignedV1Task(fixedTask(), searchOffBinding(), dependencies);
         expect(record.execution.candidatePassiveAlternatives.explicitDefend).toEqual({
             turns: 1,
+            withLegalProductiveAction: 1,
             withLegalAttackOrSpell: 1,
             withLegalMove: 1,
             withLegalObstacleAttack: 0,
@@ -296,6 +320,67 @@ describe("v0.8 aligned execution and map integrity", () => {
         const opponentAggregate = aggregateV08AlignedV1(opponentNoOp, { expectedGamesPerCellSeat: 4 });
         expect(opponentAggregate.integrity.executionPassed).toBe(true);
         expect(evaluateV08AlignedV1OperationalEligibility(opponentAggregate).passed).toBe(true);
+    });
+
+    it("rejects avoidable waits, Luck Shields, and mountain attacks but permits them as true fallbacks", () => {
+        for (const kind of ["explicitWait", "explicitDefend", "obstacleAttack"] as const) {
+            const avoidable = exactPanel(4);
+            const row = avoidable[0];
+            markCandidateNonproductiveTurn(row, kind, true);
+            const aggregate = aggregateV08AlignedV1(avoidable, { expectedGamesPerCellSeat: 4 });
+            expect(aggregate.integrity.productiveActionPriorityPassed).toBe(false);
+            expect(evaluateV08AlignedV1OperationalEligibility(aggregate).passed).toBe(false);
+        }
+
+        const forcedWait = exactPanel(4);
+        markCandidateNonproductiveTurn(forcedWait[0], "explicitWait", false);
+        const aggregate = aggregateV08AlignedV1(forcedWait, { expectedGamesPerCellSeat: 4 });
+        expect(aggregate.integrity.productiveActionPriorityPassed).toBe(true);
+        expect(evaluateV08AlignedV1OperationalEligibility(aggregate).passed).toBe(true);
+    });
+
+    it("holds promotion and fails final on every avoidable nonproductive action while allowing true fallbacks", () => {
+        const kinds = ["explicitWait", "explicitDefend", "obstacleAttack"] as const;
+        const incumbent = exactPanel(1000, "opponent_win");
+
+        const avoidableChallenger = exactPanel(1000, "candidate_win");
+        kinds.forEach((kind, index) => markCandidateNonproductiveTurn(avoidableChallenger[index], kind, true));
+        const avoidablePairs = avoidableChallenger.map((challenger, index) => ({
+            challenger,
+            incumbent: incumbent[index],
+        }));
+        const held = assessV08AlignedV1Promotion(avoidablePairs);
+        expect(held.verdict).toBe("HOLD");
+        expect(held.challenger.integrity).toMatchObject({
+            candidateAvoidableWaitTurns: 1,
+            candidateAvoidableDefendTurns: 1,
+            candidateAvoidableObstacleAttackTurns: 1,
+            productiveActionPriorityPassed: false,
+        });
+
+        const fallbackChallenger = exactPanel(1000, "candidate_win");
+        kinds.forEach((kind, index) => markCandidateNonproductiveTurn(fallbackChallenger[index], kind, false));
+        const fallbackPairs = fallbackChallenger.map((challenger, index) => ({
+            challenger,
+            incumbent: incumbent[index],
+        }));
+        expect(assessV08AlignedV1Promotion(fallbackPairs).verdict).toBe("PROMOTE");
+
+        const avoidableFinal = exactPanel(2000);
+        kinds.forEach((kind, index) => markCandidateNonproductiveTurn(avoidableFinal[index], kind, true));
+        const failed = assessV08AlignedV1Final(avoidableFinal);
+        expect(failed.verdict).toBe("FAIL");
+        expect(failed.checks.integrityPassed).toBe(false);
+        expect(failed.aggregate.integrity).toMatchObject({
+            candidateAvoidableWaitTurns: 1,
+            candidateAvoidableDefendTurns: 1,
+            candidateAvoidableObstacleAttackTurns: 1,
+            productiveActionPriorityPassed: false,
+        });
+
+        const fallbackFinal = exactPanel(2000);
+        kinds.forEach((kind, index) => markCandidateNonproductiveTurn(fallbackFinal[index], kind, false));
+        expect(assessV08AlignedV1Final(fallbackFinal).verdict).toBe("PASS");
     });
 
     it("lets a clean challenger replace a passive incumbent but never promotes a passive challenger", () => {

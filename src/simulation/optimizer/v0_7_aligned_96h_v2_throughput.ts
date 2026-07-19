@@ -63,6 +63,7 @@ import {
     buildV08AlignedV1ProductionCandidateCatalog,
     V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
 } from "./v0_8_aligned_96h_v1_catalog";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "./v0_8_aligned_96h_v1_nonfight";
 import {
     bindV08AlignedV1Candidate,
     fingerprintV08AlignedV1,
@@ -163,6 +164,7 @@ export interface IV08AlignedV1ThroughputCodeLedger {
     schemaVersion: 1;
     artifactKind: "v0_8_aligned_96h_v1_throughput_code_ledger";
     versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
     files: IV08AlignedV1ThroughputSourceFileHash[];
     ledgerSha256: string;
 }
@@ -351,8 +353,12 @@ interface IV08AlignedV1ThroughputPersistedShardView {
             candidateBase: "v0.8";
             opponent: "v0.7";
             genomeSha256: string;
+            nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
         };
         records: Array<{
+            artifactKind: "v0_8_aligned_96h_v1_battle_record";
+            versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+            nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
             candidateSeat: "candidate_green" | "candidate_red";
             greenVersion: string;
             redVersion: string;
@@ -360,6 +366,7 @@ interface IV08AlignedV1ThroughputPersistedShardView {
         attestations: Array<{
             artifactKind: "v0_8_aligned_96h_v1_worker_attestation";
             versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+            nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
         }>;
     };
 }
@@ -1030,13 +1037,39 @@ function sourceCodeHashes(): IV07AlignedV2ThroughputCodeHashes {
 }
 
 const V08_ALIGNED_V1_THROUGHPUT_SOURCE_FILES = Object.freeze([
+    "src/ai/candidates.ts",
     "src/ai/index.ts",
+    "src/ai/setup/creature_score.ts",
+    "src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json",
+    "src/ai/setup/draft_ship.ts",
+    "src/ai/setup/setup_conditional.ts",
+    "src/ai/setup/setup_policies/v07_nonfight_4eda84635fe7.json",
+    "src/ai/setup/setup_ship.ts",
+    "src/ai/setup/setup_strategy.ts",
+    "src/ai/setup/setup_v0.ts",
+    "src/ai/setup/synergy_score.ts",
     "src/ai/versions/experiment_scope.ts",
     "src/ai/versions/v0_6.ts",
     "src/ai/versions/v0_7.ts",
     "src/ai/versions/v0_7_placement_reveal.ts",
     "src/ai/versions/v0_8.ts",
     "src/ai/versions/v0_8s.ts",
+    "src/artifacts/artifact_properties.ts",
+    "src/configuration/abilities.json",
+    "src/configuration/config_provider.ts",
+    "src/configuration/creatures.json",
+    "src/configuration/spells.json",
+    "src/generated/protobuf/v1/creature_gen.ts",
+    "src/generated/protobuf/v1/types.ts",
+    "src/perks/perk_properties.ts",
+    "src/picks/pick_sim.ts",
+    "src/simulation/army.ts",
+    "src/simulation/battle_engine.ts",
+    "src/simulation/draft.ts",
+    "src/simulation/league_genome.ts",
+    "src/simulation/livetwin.ts",
+    "src/simulation/measure_setup_conditional.ts",
+    "src/simulation/search_driver.ts",
     "src/simulation/optimizer/aligned_96h_version_profile.ts",
     "src/simulation/optimizer/v0_7_aligned_96h_v2_catalog.ts",
     "src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator.ts",
@@ -1050,6 +1083,7 @@ const V08_ALIGNED_V1_THROUGHPUT_SOURCE_FILES = Object.freeze([
     "src/simulation/optimizer/v0_8_aligned_96h_v1_catalog.ts",
     "src/simulation/optimizer/v0_8_aligned_96h_v1_core.ts",
     "src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter.ts",
+    "src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight.ts",
     "src/simulation/optimizer/v0_8_aligned_96h_v1_protocol.ts",
 ] as const);
 
@@ -1063,6 +1097,7 @@ export function buildV08AlignedV1ThroughputCodeLedger(): IV08AlignedV1Throughput
         schemaVersion: 1 as const,
         artifactKind: "v0_8_aligned_96h_v1_throughput_code_ledger" as const,
         versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+        nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
         files,
     };
     return { ...unsigned, ledgerSha256: fingerprintV08AlignedV1(unsigned) };
@@ -1565,7 +1600,8 @@ function assertV08PhysicalShardRecords(
         binding.candidate !== "v0.8s" ||
         binding.candidateBase !== "v0.8" ||
         binding.opponent !== "v0.7" ||
-        binding.genomeSha256 !== V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256
+        binding.genomeSha256 !== V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256 ||
+        binding.nonfightBindingSha256 !== V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256
     ) {
         throw new Error(`${label} is not bound to the exact v0.8 throughput worst-cost candidate`);
     }
@@ -1574,9 +1610,14 @@ function assertV08PhysicalShardRecords(
         throw new Error(`${label} did not persist its complete v0.8 physical game census`);
     }
     for (const [index, record] of persisted.evaluation.records.entries()) {
-        if (!isObject(record) || "artifactKind" in record || "versionProfile" in record) {
-            throw new Error(`${label} record ${index} is not an exact legacy-geometry battle row`);
+        if (
+            !isObject(record) ||
+            record.artifactKind !== "v0_8_aligned_96h_v1_battle_record" ||
+            record.nonfightBindingSha256 !== V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256
+        ) {
+            throw new Error(`${label} record ${index} is not bound to the exact v0.8 physical policy`);
         }
+        assertAligned96hVersionProfile(record.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
         const candidateIsGreen = record.candidateSeat === "candidate_green";
         if (
             !(candidateIsGreen || record.candidateSeat === "candidate_red") ||
@@ -1591,6 +1632,9 @@ function assertV08PhysicalShardRecords(
             throw new Error(`${label} worker attestation ${index} is not version-bound to v0.8`);
         }
         assertAligned96hVersionProfile(attestation.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+        if (attestation.nonfightBindingSha256 !== V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256) {
+            throw new Error(`${label} worker attestation ${index} changed the non-fight binding`);
+        }
     }
 }
 

@@ -341,6 +341,8 @@ export interface IAligned96hCandidateBinding {
     searchEnabled: boolean;
     behaviorEnvironment: Record<string, string>;
     behaviorEnvironmentSha256: string;
+    /** Required only by profiles that bind an exact deployed non-fight policy. */
+    nonfightBindingSha256?: string;
 }
 
 export interface IV07AlignedV2CandidateBinding extends IAligned96hCandidateBinding {
@@ -679,6 +681,8 @@ export interface IV07AlignedV2CheckpointShardSpec {
     panel: IV07AlignedV2CheckpointPanelBinding;
     genomeSha256: string;
     behaviorEnvironmentSha256: string;
+    /** Omitted by historical v0.7 shards so their canonical bytes remain unchanged. */
+    nonfightBindingSha256?: string;
     searchEnabled: boolean;
     tasks: IV07AlignedV2TaskIdentity[];
     tasksSha256: string;
@@ -844,6 +848,9 @@ function buildCheckpointShardSpecs(options: {
     }
     requireSha256(options.binding.genomeSha256, "binding.genomeSha256");
     requireSha256(options.binding.behaviorEnvironmentSha256, "binding.behaviorEnvironmentSha256");
+    if (options.binding.nonfightBindingSha256 !== undefined) {
+        requireSha256(options.binding.nonfightBindingSha256, "binding.nonfightBindingSha256");
+    }
     validateV07AlignedV2CheckpointPanelBinding(options.panel);
     requireSha256(options.runFingerprint, "runFingerprint");
     if (!Number.isSafeInteger(options.maxScenarioPairsPerShard) || options.maxScenarioPairsPerShard < 1) {
@@ -904,6 +911,9 @@ function buildCheckpointShardSpecs(options: {
             panel: { ...options.panel },
             genomeSha256: options.binding.genomeSha256,
             behaviorEnvironmentSha256: options.binding.behaviorEnvironmentSha256,
+            ...(options.binding.nonfightBindingSha256
+                ? { nonfightBindingSha256: options.binding.nonfightBindingSha256 }
+                : {}),
             searchEnabled: options.binding.searchEnabled,
             tasks: shardTasks,
             tasksSha256: fingerprintV07AlignedV2(shardTasks),
@@ -973,6 +983,7 @@ export function buildV07AlignedV2SyntheticPreflightShardSpecs(options: {
 
 export function validateV07AlignedV2CheckpointShardSpec(value: unknown): IV07AlignedV2CheckpointShardSpec {
     if (!isObjectRecord(value)) throw new Error("aligned v2 checkpoint shard must be an object");
+    const hasNonfightBinding = Object.hasOwn(value, "nonfightBindingSha256");
     if (
         !hasExactKeys(value, [
             "schemaVersion",
@@ -985,6 +996,7 @@ export function validateV07AlignedV2CheckpointShardSpec(value: unknown): IV07Ali
             "panel",
             "genomeSha256",
             "behaviorEnvironmentSha256",
+            ...(hasNonfightBinding ? ["nonfightBindingSha256"] : []),
             "searchEnabled",
             "tasks",
             "tasksSha256",
@@ -1016,6 +1028,7 @@ export function validateV07AlignedV2CheckpointShardSpec(value: unknown): IV07Ali
         "runFingerprint",
         "genomeSha256",
         "behaviorEnvironmentSha256",
+        ...(hasNonfightBinding ? (["nonfightBindingSha256"] as const) : []),
         "tasksSha256",
         "shardSha256",
     ] as const) {

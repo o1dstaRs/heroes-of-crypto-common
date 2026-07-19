@@ -13,6 +13,7 @@ import {
     assertAligned96hVersionProfile,
     cloneAligned96hVersionProfile,
 } from "./aligned_96h_version_profile";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "./v0_8_aligned_96h_v1_nonfight";
 import {
     V08_ALIGNED_96H_V1_CELLS,
     V08_ALIGNED_96H_V1_SEATS,
@@ -173,6 +174,7 @@ export interface IV08AlignedV1CandidateBinding extends IAligned96hCandidateBindi
     searchEnabled: boolean;
     behaviorEnvironment: Record<string, string>;
     behaviorEnvironmentSha256: string;
+    nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
 }
 
 export function buildV08AlignedV1CandidateEnvironment(
@@ -198,6 +200,7 @@ export function bindV08AlignedV1Candidate(genome: IV08AlignedV1CandidateGenome):
         searchEnabled: normalized.search.leafMode !== "off",
         behaviorEnvironment,
         behaviorEnvironmentSha256: fingerprintV08AlignedV1(behaviorEnvironment),
+        nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
     };
 }
 
@@ -206,7 +209,13 @@ export function validateV08AlignedV1CandidateBinding(
 ): IV08AlignedV1CandidateBinding {
     assertAligned96hVersionProfile(binding.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
     const expected = bindV08AlignedV1Candidate(binding.genome);
-    if (canonicalV08AlignedV1Json(binding) !== canonicalV08AlignedV1Json(expected)) {
+    if (
+        canonicalV08AlignedV1Json(Object.keys(binding).sort()) !==
+            canonicalV08AlignedV1Json(Object.keys(expected).sort()) ||
+        canonicalV08AlignedV1Json(Object.keys(binding.behaviorEnvironment).sort()) !==
+            canonicalV08AlignedV1Json(Object.keys(expected.behaviorEnvironment).sort()) ||
+        canonicalV08AlignedV1Json(binding) !== canonicalV08AlignedV1Json(expected)
+    ) {
         throw new Error("v0.8 aligned v1 candidate binding does not match its canonical genome and version profile");
     }
     return binding;

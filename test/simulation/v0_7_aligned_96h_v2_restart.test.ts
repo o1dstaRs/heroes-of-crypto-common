@@ -91,6 +91,7 @@ import {
     compactV08AlignedV1Observation,
     type IV08AlignedV1BattleRecord,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -468,6 +469,8 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             );
             const persisted = persistV07AlignedV2ShardEvaluation(root, evaluation, seedPlan);
             expect(persisted.reused).toBe(false);
+            expect("nonfightBindingSha256" in evaluation.shard).toBe(false);
+            expect("nonfightBindingSha256" in persisted.manifest).toBe(false);
             expect(persisted.manifest.files.rawRecords.rows).toBe(24);
             expect(persisted.manifest.audits[0].rows).toBe(24);
             const reopened = loadV07AlignedV2PersistedShard(persisted.directory, {
@@ -504,6 +507,7 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                     ...record,
                     artifactKind: "v0_8_aligned_96h_v1_battle_record",
                     versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+                    nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
                     gridType: gridTypeV08AlignedV1(record.scenarioOrdinal),
                     execution,
                     greenVersion: record.candidateIsGreen ? "v0.8s" : "v0.7",
@@ -522,6 +526,7 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
             const v08Attestation: IV08AlignedV1WorkerAttestation = {
                 artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
                 versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+                nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
                 workerIndex: 0,
                 runFingerprint: v08Shard.runFingerprint,
                 genomeSha256: v08Binding.genomeSha256,
@@ -550,6 +555,15 @@ describe("v0.7 aligned 96-hour v2 durable restart", () => {
                 ],
             };
             const persistedV08 = persistV07AlignedV2ShardEvaluation(root, v08Evaluation, seedPlan);
+            expect(v08Shard.nonfightBindingSha256).toBe(V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256);
+            expect(persistedV08.manifestSha256).toMatch(/^[0-9a-f]{64}$/);
+            expect(
+                loadV07AlignedV2PersistedShard(persistedV08.directory, {
+                    shard: v08Shard,
+                    binding: v08Binding,
+                    seedPlan,
+                }).manifest.nonfightBindingSha256,
+            ).toBe(V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256);
             expect(
                 loadV07AlignedV2PersistedShard(persistedV08.directory, {
                     shard: v08Shard,

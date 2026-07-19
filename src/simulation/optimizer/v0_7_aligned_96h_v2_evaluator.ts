@@ -54,7 +54,13 @@ import {
     type IV07AlignedV2TaskIdentity,
 } from "./v0_7_aligned_96h_v2_protocol";
 import { V08_ALIGNED_96H_V1_VERSION_PROFILE, assertAligned96hVersionProfile } from "./aligned_96h_version_profile";
-import { gridTypeV08AlignedV1, type IV08AlignedV1GameObservation } from "./v0_8_aligned_96h_v1_core";
+import {
+    gridTypeV08AlignedV1,
+    validateV08AlignedV1GameObservation,
+    type IV08AlignedV1GameObservation,
+} from "./v0_8_aligned_96h_v1_core";
+import type { IV08AlignedV1BattleRecord } from "./v0_8_aligned_96h_v1_game_adapter";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "./v0_8_aligned_96h_v1_nonfight";
 import {
     buildV08AlignedV1CandidateEnvironment,
     canonicalV08AlignedV1Json,
@@ -82,6 +88,7 @@ export interface IV07AlignedV2WorkerAttestation {
 export interface IV08AlignedV1WorkerAttestation extends IV07AlignedV2WorkerAttestation {
     artifactKind: "v0_8_aligned_96h_v1_worker_attestation";
     versionProfile: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    nonfightBindingSha256: typeof V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256;
 }
 
 export type Aligned96hCandidateBinding = IV07AlignedV2CandidateBinding | IV08AlignedV1CandidateBinding;
@@ -184,8 +191,35 @@ export function validateAligned96hWorkerAttestation<Binding extends Aligned96hCa
     attestation: IV07AlignedV2WorkerAttestation | IV08AlignedV1WorkerAttestation,
 ): Aligned96hWorkerAttestation<Binding> {
     const validated = validateAligned96hCandidateBinding(binding);
+    const baseKeys = [
+        "workerIndex",
+        "runFingerprint",
+        "genomeSha256",
+        "behaviorEnvironmentSha256",
+        "environmentSha256",
+        "removedEnvironmentKeys",
+        "transpilerCacheDisabled",
+        "auditPath",
+    ];
+    const expectedKeys = [
+        ...baseKeys,
+        ...(validated.candidate === "v0.8s" ? ["artifactKind", "versionProfile", "nonfightBindingSha256"] : []),
+    ].sort();
+    if (
+        !attestation ||
+        typeof attestation !== "object" ||
+        Array.isArray(attestation) ||
+        canonicalAligned96hJson(validated, Object.keys(attestation).sort()) !==
+            canonicalAligned96hJson(validated, expectedKeys)
+    ) {
+        throw new Error("aligned worker attestation fields are not exact for its version profile");
+    }
     if (validated.candidate === "v0.7s") {
-        if ("artifactKind" in attestation || "versionProfile" in attestation) {
+        if (
+            "artifactKind" in attestation ||
+            "versionProfile" in attestation ||
+            "nonfightBindingSha256" in attestation
+        ) {
             throw new Error("v0.7 aligned worker attestation contains a foreign version marker");
         }
         return attestation as Aligned96hWorkerAttestation<Binding>;
@@ -193,7 +227,9 @@ export function validateAligned96hWorkerAttestation<Binding extends Aligned96hCa
     if (
         !("artifactKind" in attestation) ||
         attestation.artifactKind !== "v0_8_aligned_96h_v1_worker_attestation" ||
-        !("versionProfile" in attestation)
+        !("versionProfile" in attestation) ||
+        !("nonfightBindingSha256" in attestation) ||
+        attestation.nonfightBindingSha256 !== validated.nonfightBindingSha256
     ) {
         throw new Error("v0.8 aligned worker attestation omits its exact version marker");
     }
@@ -211,6 +247,25 @@ function attestationMatchesAligned96hVersion(
     } catch {
         return false;
     }
+}
+
+export function validateV08AlignedV1WorkerIpcPayload(
+    binding: IV08AlignedV1CandidateBinding,
+    record: IV08AlignedV1BattleRecord,
+    observation: IV08AlignedV1GameObservation,
+): void {
+    const validated = validateV08AlignedV1CandidateBinding(binding);
+    if (
+        record.artifactKind !== "v0_8_aligned_96h_v1_battle_record" ||
+        record.nonfightBindingSha256 !== validated.nonfightBindingSha256 ||
+        record.gridType !== gridTypeV08AlignedV1(record.scenarioOrdinal) ||
+        record.scenarioOrdinal !== observation.scenarioOrdinal ||
+        record.gridType !== observation.gridType
+    ) {
+        throw new Error("v0.8 worker record changed its exact profile, map, or non-fight binding");
+    }
+    assertAligned96hVersionProfile(record.versionProfile, V08_ALIGNED_96H_V1_VERSION_PROFILE);
+    validateV08AlignedV1GameObservation(observation, "v0.8 worker observation");
 }
 
 function decodeUtf8Exact(bytes: Buffer, label: string): string {
@@ -531,6 +586,18 @@ export async function evaluateV07AlignedV2Shard<Binding extends Aligned96hCandid
                         return;
                     }
                     const expectedTask = message.taskKey ? expectedTasks.get(message.taskKey) : undefined;
+                    if (input.binding.candidate === "v0.8s" && message.record && message.observation) {
+                        try {
+                            validateV08AlignedV1WorkerIpcPayload(
+                                input.binding as IV08AlignedV1CandidateBinding,
+                                message.record as IV08AlignedV1BattleRecord,
+                                message.observation as IV08AlignedV1GameObservation,
+                            );
+                        } catch (error) {
+                            fail(error);
+                            return;
+                        }
+                    }
                     if (
                         !poolStarted ||
                         !readyWorkers.has(worker) ||

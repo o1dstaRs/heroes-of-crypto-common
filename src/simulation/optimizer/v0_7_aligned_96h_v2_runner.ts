@@ -33,6 +33,7 @@ import type { IV07ComposedAuditRow } from "../v0_7_composed_ranked_ladder";
 import type { V07AlignedV2Outcome } from "./v0_7_aligned_96h_v2_core";
 import { V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 } from "./v0_8_aligned_96h_v1_catalog";
 import { emptyV08AlignedV1ExecutionAudit, gridTypeV08AlignedV1 } from "./v0_8_aligned_96h_v1_core";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "./v0_8_aligned_96h_v1_nonfight";
 import { compactV08AlignedV1Observation, type IV08AlignedV1BattleRecord } from "./v0_8_aligned_96h_v1_game_adapter";
 import type { IV08AlignedV1CandidateBinding } from "./v0_8_aligned_96h_v1_protocol";
 import {
@@ -1648,6 +1649,7 @@ function syntheticRecord<Binding extends Aligned96hCandidateBinding>(
             ...common,
             artifactKind: "v0_8_aligned_96h_v1_battle_record",
             versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+            nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
             gridType: gridTypeV08AlignedV1(task.scenarioOrdinal),
             execution,
         } as IAligned96hBattleRecord<Binding>;
@@ -1693,6 +1695,7 @@ function syntheticShardEvaluation<Binding extends Aligned96hCandidateBinding>(
                   ...baseAttestation,
                   artifactKind: "v0_8_aligned_96h_v1_worker_attestation" as const,
                   versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+                  nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
               }
             : baseAttestation
     ) as Aligned96hWorkerAttestation<Binding>;

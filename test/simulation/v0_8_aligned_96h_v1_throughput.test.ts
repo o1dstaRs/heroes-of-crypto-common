@@ -68,6 +68,7 @@ import {
     flattenV08AlignedV1SeedPlan,
     type IV08AlignedV1InjectedSeedPlan,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight";
 
 const SOURCE_MANIFEST = join(
     import.meta.dir,
@@ -244,6 +245,9 @@ function createReplayFixture(): {
             evaluation: {
                 binding: expectations.binding,
                 records: expectations.shard.tasks.map((task) => ({
+                    artifactKind: "v0_8_aligned_96h_v1_battle_record" as const,
+                    versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
+                    nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
                     candidateSeat: task.candidateSeat,
                     greenVersion: task.candidateSeat === "candidate_green" ? "v0.8s" : "v0.7",
                     redVersion: task.candidateSeat === "candidate_green" ? "v0.7" : "v0.8s",
@@ -252,6 +256,7 @@ function createReplayFixture(): {
                     {
                         artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
                         versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
+                        nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
                     },
                 ],
             },
@@ -355,8 +360,42 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             worstCostGenomeSha256: V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256,
         });
         expect(new Set(ledger.files.map((file) => file.repositoryPath)).size).toBe(ledger.files.length);
+        expect(ledger.nonfightBindingSha256).toBe(V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256);
+        for (const repositoryPath of [
+            "src/ai/candidates.ts",
+            "src/ai/setup/creature_score.ts",
+            "src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json",
+            "src/ai/setup/draft_ship.ts",
+            "src/ai/setup/setup_conditional.ts",
+            "src/ai/setup/setup_policies/v07_nonfight_4eda84635fe7.json",
+            "src/ai/setup/setup_ship.ts",
+            "src/ai/setup/setup_strategy.ts",
+            "src/ai/setup/setup_v0.ts",
+            "src/ai/setup/synergy_score.ts",
+            "src/artifacts/artifact_properties.ts",
+            "src/configuration/creatures.json",
+            "src/perks/perk_properties.ts",
+            "src/picks/pick_sim.ts",
+            "src/simulation/army.ts",
+            "src/simulation/battle_engine.ts",
+            "src/simulation/draft.ts",
+            "src/simulation/league_genome.ts",
+            "src/simulation/livetwin.ts",
+            "src/simulation/measure_setup_conditional.ts",
+            "src/simulation/search_driver.ts",
+            "src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight.ts",
+        ]) {
+            const entry = ledger.files.find((file) => file.repositoryPath === repositoryPath);
+            expect(entry?.bytesSha256).toBe(sha256(readFileSync(join(import.meta.dir, "../..", repositoryPath))));
+        }
+        const unsignedLedger = { ...ledger };
+        delete (unsignedLedger as Partial<typeof ledger>).ledgerSha256;
+        expect(ledger.ledgerSha256).toBe(fingerprintV07AlignedV2(unsignedLedger));
         expect(ledger.files.map((file) => file.repositoryPath)).toContain(
             "src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter.ts",
+        );
+        expect(ledger.files.map((file) => file.repositoryPath)).toContain(
+            "src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight.ts",
         );
         expect(ledger.files.map((file) => file.repositoryPath)).toContain(
             "src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator.ts",
@@ -400,6 +439,20 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             expect(() => validateV07AlignedV2ProductionThroughputAttestation(attestation, options as never)).toThrow(
                 "header/fields are invalid",
             );
+            const tamperedDependencies: IV08AlignedV1ThroughputReplayDependencies = {
+                loadShard: (directory, expectations) => {
+                    const persisted = fixture.dependencies.loadShard!(directory, expectations);
+                    persisted.evaluation.records[0].nonfightBindingSha256 = "0".repeat(64) as never;
+                    return persisted;
+                },
+            };
+            expect(() =>
+                replayV08AlignedV1ThroughputEvidence(
+                    fixture.root,
+                    fixture.evidence.evidenceSha256,
+                    tamperedDependencies,
+                ),
+            ).toThrow("exact v0.8 physical policy");
         } finally {
             rmSync(fixture.root, { recursive: true, force: true });
         }
@@ -440,6 +493,10 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             expect(() => validateV07AlignedV2ShardEvidence(rawTamper, seedPlan)).toThrow(
                 "gridType does not match its scenarioOrdinal",
             );
+            const nonfightTamper = structuredClone(evaluation);
+            (nonfightTamper.records[0] as unknown as { nonfightBindingSha256: string }).nonfightBindingSha256 =
+                "0".repeat(64);
+            expect(() => validateV07AlignedV2ShardEvidence(nonfightTamper, seedPlan)).toThrow("non-fight binding");
             const checkpointTamper = structuredClone(evaluation);
             const observation = checkpointTamper.checkpoint.observations[0] as unknown as {
                 scenarioOrdinal: number;
@@ -475,6 +532,8 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
                     (record) =>
                         "artifactKind" in record &&
                         record.artifactKind === "v0_8_aligned_96h_v1_battle_record" &&
+                        "nonfightBindingSha256" in record &&
+                        record.nonfightBindingSha256 === V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 &&
                         "gridType" in record &&
                         "execution" in record,
                 ),
@@ -484,6 +543,8 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
                     (observationRow) =>
                         "scenarioOrdinal" in observationRow &&
                         observationRow.scenarioOrdinal === 0 &&
+                        "nonfightBindingSha256" in observationRow &&
+                        observationRow.nonfightBindingSha256 === V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 &&
                         "gridType" in observationRow &&
                         observationRow.gridType === PBTypes.GridVals.NORMAL &&
                         "execution" in observationRow,
@@ -493,6 +554,7 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             expect(loaded.evaluation.attestations[0]).toMatchObject({
                 artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
                 versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
+                nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
             });
         } finally {
             rmSync(root, { recursive: true, force: true });

@@ -15,6 +15,7 @@ import type { IV07ComposedAuditRow } from "../../src/simulation/v0_7_composed_ra
 import {
     evaluateV07AlignedV2Shard,
     validateAligned96hWorkerAttestation,
+    validateV08AlignedV1WorkerIpcPayload,
 } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator";
 import {
     compactV07AlignedV2Observation,
@@ -30,6 +31,7 @@ import {
 import { buildV08AlignedV1ProductionIncumbentGenome } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
 import type { IV08AlignedV1GameObservation } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_core";
 import type { IV08AlignedV1BattleRecord } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_game_adapter";
+import { V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_nonfight";
 import {
     bindV08AlignedV1Candidate,
     type IV08AlignedV1CandidateBinding,
@@ -184,7 +186,9 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
                         "artifactKind" in record &&
                         record.artifactKind === "v0_8_aligned_96h_v1_battle_record" &&
                         "versionProfile" in record &&
-                        record.versionProfile.candidate === "v0.8s" &&
+                        (record.versionProfile as { candidate?: unknown }).candidate === "v0.8s" &&
+                        "nonfightBindingSha256" in record &&
+                        record.nonfightBindingSha256 === V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 &&
                         "gridType" in record &&
                         record.gridType === PBTypes.GridVals.NORMAL &&
                         "execution" in record,
@@ -196,6 +200,8 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
                     (observation) =>
                         "scenarioOrdinal" in observation &&
                         observation.scenarioOrdinal === 0 &&
+                        "nonfightBindingSha256" in observation &&
+                        observation.nonfightBindingSha256 === V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256 &&
                         "gridType" in observation &&
                         observation.gridType === PBTypes.GridVals.NORMAL &&
                         "execution" in observation,
@@ -207,7 +213,24 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
             expect(validateAligned96hWorkerAttestation(binding, evaluation.attestations[0])).toMatchObject({
                 artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
                 versionProfile: { candidate: "v0.8s", candidateBase: "v0.8", opponent: "v0.7" },
+                nonfightBindingSha256: V08_ALIGNED_V1_NONFIGHT_BINDING_SHA256,
             });
+            const record = evaluation.records[0] as IV08AlignedV1BattleRecord;
+            const observation = evaluation.checkpoint.observations[0] as IV08AlignedV1GameObservation;
+            expect(() => validateV08AlignedV1WorkerIpcPayload(binding, record, observation)).not.toThrow();
+            expect(() =>
+                validateV08AlignedV1WorkerIpcPayload(
+                    binding,
+                    { ...record, nonfightBindingSha256: "0".repeat(64) as never },
+                    observation,
+                ),
+            ).toThrow("non-fight binding");
+            expect(() =>
+                validateV08AlignedV1WorkerIpcPayload(binding, record, {
+                    ...observation,
+                    nonfightBindingSha256: "0".repeat(64) as never,
+                }),
+            ).toThrow("nonfightBindingSha256");
         } finally {
             rmSync(directory, { recursive: true, force: true });
         }
@@ -234,7 +257,7 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
             });
             const records = evaluation.records as IV08AlignedV1BattleRecord[];
             const observations = evaluation.checkpoint.observations as IV08AlignedV1GameObservation[];
-            const expectedMaps = [
+            const expectedMaps: IV08AlignedV1GameObservation["gridType"][] = [
                 PBTypes.GridVals.NORMAL,
                 PBTypes.GridVals.NORMAL,
                 PBTypes.GridVals.WATER_CENTER,

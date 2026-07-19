@@ -53,6 +53,11 @@ import {
     buildV08AlignedV1ProductionCatalogIdentity,
 } from "./v0_8_aligned_96h_v1_catalog";
 import {
+    cloneV08AlignedV1NonfightBinding,
+    validateV08AlignedV1NonfightBinding,
+    type IV08AlignedV1NonfightBinding,
+} from "./v0_8_aligned_96h_v1_nonfight";
+import {
     bindV08AlignedV1Candidate,
     validateV08AlignedV1CandidateBinding,
     type IV08AlignedV1CandidateBinding,
@@ -99,6 +104,8 @@ export interface IV07AlignedV2OrchestratorDefinition {
     artifactKind: "v0_7_aligned_96h_v2_orchestrator_definition" | "v0_8_aligned_96h_v1_orchestrator_definition";
     /** Omitted only for the byte-stable historical v0.7 definition profile. */
     versionProfile?: typeof V08_ALIGNED_96H_V1_VERSION_PROFILE;
+    /** Omitted only for the byte-stable historical v0.7 definition profile. */
+    nonfightBinding?: IV08AlignedV1NonfightBinding;
     status: "research_only_no_bake";
     automaticBake: false;
     automaticDeploy: false;
@@ -544,6 +551,7 @@ export function createV07AlignedV2OrchestratorDefinition(
             schemaVersion: 1 as const,
             artifactKind: "v0_8_aligned_96h_v1_orchestrator_definition" as const,
             versionProfile: cloneAligned96hVersionProfile(versionProfile),
+            nonfightBinding: cloneV08AlignedV1NonfightBinding(),
             status: "research_only_no_bake" as const,
             automaticBake: false as const,
             automaticDeploy: false as const,
@@ -1176,6 +1184,7 @@ function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2Orchestrato
         "schemaVersion",
         "artifactKind",
         ...(v08Definition ? ["versionProfile"] : []),
+        ...(v08Definition ? ["nonfightBinding"] : []),
         "status",
         "automaticBake",
         "automaticDeploy",
@@ -1244,6 +1253,7 @@ function validateDefinitionWithoutSeedPlans(definition: IV07AlignedV2Orchestrato
     requireSha256(definition.definitionSha256, "definitionSha256");
     validateSeedArtifactRef(definition.seedCommitment, "seedCommitment");
     if (v08Definition) {
+        validateV08AlignedV1NonfightBinding(definition.nonfightBinding as IV08AlignedV1NonfightBinding);
         definition.candidates.forEach((candidate) =>
             validateV08AlignedV1CandidateBinding(candidate as IV08AlignedV1CandidateBinding),
         );

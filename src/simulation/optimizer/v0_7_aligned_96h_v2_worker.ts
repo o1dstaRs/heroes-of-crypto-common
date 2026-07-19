@@ -126,6 +126,7 @@ writeFileSync(data.auditPath, "");
 interface IWorkerBinding {
     genomeSha256: string;
     behaviorEnvironmentSha256: string;
+    nonfightBindingSha256?: string;
     searchEnabled: boolean;
     versionProfile?: unknown;
 }
@@ -244,6 +245,7 @@ send({
             ? {
                   artifactKind: "v0_8_aligned_96h_v1_worker_attestation",
                   versionProfile: binding.versionProfile,
+                  nonfightBindingSha256: binding.nonfightBindingSha256,
               }
             : {}),
     },
