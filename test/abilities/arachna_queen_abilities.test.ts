@@ -26,7 +26,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("Arachna Queen configuration", () => {
-    it("gives Arachna Spider exactly half the Queen stats and only Infest", () => {
+    it("configures Arachna Spider as a small level-3 Infest summon", () => {
         const queen = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Arachna Queen", "arachna_queen_512", 1);
         const spider = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Arachna Spider", "arachna_spider_512", 1);
 
@@ -35,19 +35,19 @@ describe("Arachna Queen configuration", () => {
         expect(spider.abilities).toEqual(["Infest"]);
         for (const [queenStat, spiderStat] of [
             [queen.max_hp, spider.max_hp],
-            [queen.steps, spider.steps],
-            [queen.speed, spider.speed],
-            [queen.base_armor, spider.base_armor],
             [queen.base_attack, spider.base_attack],
             [queen.attack_damage_min, spider.attack_damage_min],
             [queen.attack_damage_max, spider.attack_damage_max],
-            [queen.magic_resist, spider.magic_resist],
             [queen.exp, spider.exp],
         ]) {
             expect(spiderStat).toBe(queenStat / 2);
         }
+        expect(spider.steps).toBe(6);
+        expect(spider.speed).toBe(5.1);
+        expect(spider.base_armor).toBe(16);
+        expect(spider.magic_resist).toBe(10);
         expect(spider.size).toBe(PBTypes.UnitSizeVals.SMALL);
-        expect(spider.level).toBe(PBTypes.UnitLevelVals.FIRST);
+        expect(spider.level).toBe(PBTypes.UnitLevelVals.THIRD);
         expect(spider.movement_type).toBe(PBTypes.MovementVals.WALK);
     });
 });
