@@ -102,7 +102,7 @@ export const V07_ALIGNED_V2_THROUGHPUT_WORST_COST_LABEL = "aligned-prod-depth-b9
 export const V07_ALIGNED_V2_THROUGHPUT_WORST_COST_GENOME_SHA256 =
     "cd016da6a4ffa820df89e57de91f3a01a6f8493145fe17765b74ab51abafb2a7" as const;
 export const V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256 =
-    "efa0534f4956bec319465662bd50a3b2d8f4198d50d1edd2c6d59b22ee1e3091" as const;
+    "13ec7aee5e5793c93f584a366a6779916583a51448b11bdd0b05757bbbca73a5" as const;
 
 const ROOT_INVENTORY = [
     "batches",

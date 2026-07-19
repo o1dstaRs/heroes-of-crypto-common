@@ -371,6 +371,18 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
         const root = mkdtempSync(join(tmpdir(), "hoc-v08-throughput-physical-"));
         const seedPlan = oneScenarioLegacyPlan();
         const binding = bindV08AlignedV1Candidate(buildV08AlignedV1ThroughputWorstCostGenome());
+        expect(binding.genome).toMatchObject({
+            search: { horizon: 12, rollouts: 2, includeMoves: true },
+            controls: { shortlist: 3, decisionDeadlineMs: 175 },
+        });
+        expect(binding.behaviorEnvironment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_ROLLOUTS: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
+            SEARCH_DECISION_DEADLINE_MS: "175",
+            SEARCH_CIRCUIT_BREAKER_MS: "275",
+        });
         const shard = buildAligned96hCheckpointShardSpecs({
             runFingerprint: "e".repeat(64),
             seedPlan,

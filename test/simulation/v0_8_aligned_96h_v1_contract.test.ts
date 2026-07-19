@@ -298,6 +298,8 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
         });
         expect(binding.behaviorEnvironment).toMatchObject({
             SEARCH_VERSIONS: "v0.8s",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
             V07_PLACEMENT_REVEAL_VERSIONS: "v0.8s",
             V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS: "v0.8s",
             V07_AURA_CASTER_ROUTER_VERSIONS: "v0.8s",
@@ -325,10 +327,9 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
         const candidates = buildV08AlignedV1ProductionCandidateCatalog();
         const incumbent = buildV08AlignedV1ProductionIncumbentGenome();
         const identity = buildV08AlignedV1ProductionCatalogIdentity();
+        const hashes = candidates.map(fingerprintV08AlignedV1CandidateGenome);
         expect(candidates).toHaveLength(V08_ALIGNED_V1_PRODUCTION_CANDIDATE_COUNT);
-        expect(new Set(candidates.map(fingerprintV08AlignedV1CandidateGenome))).toHaveLength(
-            V08_ALIGNED_V1_PRODUCTION_CANDIDATE_COUNT,
-        );
+        expect(new Set(hashes)).toHaveLength(V08_ALIGNED_V1_PRODUCTION_CANDIDATE_COUNT);
         expect(identity).toMatchObject({
             versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
             candidateCount: 48,
@@ -336,6 +337,76 @@ describe("v0.8 aligned 96-hour v1 contract", () => {
             trainScenariosPerCell: 256,
             catalogSha256: V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
         });
+        expect(V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256).toBe(
+            "61d969139f574bf886820a5f0bd0b5c76677cda905b30a24e1fb0010c17eb64e",
+        );
+        expect(identity.orderedCandidateGenomeSha256).toEqual(hashes);
+        expect(identity.incumbentGenomeSha256).toBe(fingerprintV08AlignedV1CandidateGenome(incumbent));
+        expect(hashes).not.toContain(identity.incumbentGenomeSha256);
+        expect(incumbent).toEqual(buildV07AlignedV2ProductionIncumbentGenome());
+        expect(incumbent.search.includeMoves).toBe(false);
+        expect(buildV07AlignedV2ProductionCandidateCatalog().every((genome) => !genome.search.includeMoves)).toBe(true);
+
+        expect(candidates.every((genome) => genome.search.includeMoves)).toBe(true);
+        expect(
+            candidates.every((genome) => {
+                const environment = bindV08AlignedV1Candidate(genome).behaviorEnvironment;
+                return (
+                    environment.SEARCH_VERSIONS === "v0.8s" &&
+                    environment.SEARCH_INCLUDE_MOVES === "1" &&
+                    environment.SEARCH_MAX_MOVES === "1"
+                );
+            }),
+        ).toBe(true);
+        expect(
+            Object.fromEntries(
+                [1, 2, 3].map((rollouts) => [
+                    rollouts,
+                    candidates.filter((genome) => genome.search.rollouts === rollouts).length,
+                ]),
+            ),
+        ).toEqual({ 1: 14, 2: 19, 3: 15 });
+        expect(
+            Object.fromEntries(
+                [125, 150, 175].map((deadline) => [
+                    deadline,
+                    candidates.filter((genome) => genome.controls.decisionDeadlineMs === deadline).length,
+                ]),
+            ),
+        ).toEqual({ 125: 10, 150: 20, 175: 18 });
+        expect(
+            candidates.reduce<Record<string, number>>((census, genome) => {
+                const key = `r${genome.search.rollouts}-d${genome.controls.decisionDeadlineMs}`;
+                census[key] = (census[key] ?? 0) + 1;
+                return census;
+            }, {}),
+        ).toEqual({ "r1-d125": 10, "r1-d150": 4, "r2-d150": 16, "r2-d175": 3, "r3-d175": 15 });
+        expect(
+            candidates
+                .filter((genome) => genome.search.horizon === 12)
+                .every((genome) => genome.search.rollouts <= 2 && genome.controls.decisionDeadlineMs >= 150),
+        ).toBe(true);
+        expect(candidates.every((genome) => genome.controls.decisionDeadlineMs < 275)).toBe(true);
+
+        const labels = candidates.map((genome) => genome.search.label ?? "");
+        for (const coverage of ["core-committed", "core-multicohort", "core-b9ce", "core-midpoint"]) {
+            expect(labels.some((label) => label.includes(coverage))).toBe(true);
+        }
+        expect(
+            candidates.some(
+                (genome) => genome.controls.lateRangedFinishWeight > 0 || genome.controls.pureRangedTerminalWeight > 0,
+            ),
+        ).toBe(true);
+        expect(
+            candidates.some(
+                (genome) => genome.controls.denseMeleeMagicIsolation || genome.controls.meleeRangedTargetWeight > 0,
+            ),
+        ).toBe(true);
+        expect(new Set(candidates.map((genome) => genome.controls.auraCasterMode))).toEqual(
+            new Set(["off", "windflow", "resurrection_windflow"]),
+        );
+        expect(new Set(candidates.map((genome) => genome.controls.placementReveal))).toEqual(new Set([false, true]));
+        expect(candidates.some((genome) => !genome.controls.activeChallengers)).toBe(true);
         expect(() =>
             assertV08AlignedV1ProductionCatalogInput({
                 versionProfile: { ...V08_ALIGNED_96H_V1_VERSION_PROFILE },
