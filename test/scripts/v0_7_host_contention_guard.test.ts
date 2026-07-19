@@ -94,6 +94,26 @@ afterEach(() => {
 });
 
 describe("v0.7 host contention assessment", () => {
+    it("accepts Linux kernel threads with process group zero", () => {
+        const processes = parsePsSnapshot(" 2 0 S kthreadd [kthreadd]\n");
+        expect(processes).toEqual([
+            {
+                pid: 2,
+                pgid: 0,
+                state: "S",
+                comm: "kthreadd",
+                command: "[kthreadd]",
+            },
+        ]);
+        expect(
+            assessHostContention({
+                processes,
+                cpuSamples: [snapshot(0, 0), snapshot(0, 100)],
+                minimumIdleCpus: 1,
+            }),
+        ).toMatchObject({ ok: true, blockers: [] });
+    });
+
     it("uses an explicit idle-CPU boundary and rejects counter or CPU-count drift", () => {
         const before = snapshot(0, 0, 4);
         const boundary = snapshot(100, 100, 4);

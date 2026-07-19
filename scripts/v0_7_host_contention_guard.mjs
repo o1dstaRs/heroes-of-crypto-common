@@ -130,7 +130,8 @@ export const parsePsSnapshot = (text) => {
         if (!match) throw new Error(`unparseable ps row: ${line.slice(0, 160)}`);
         processes.push({
             pid: finiteInteger(match[1], "process pid", 1),
-            pgid: finiteInteger(match[2], "process pgid", 1),
+            // Linux kernel threads legitimately report PGID 0 in `ps`.
+            pgid: finiteInteger(match[2], "process pgid"),
             state: match[3],
             comm: match[4],
             command: match[5],
@@ -156,7 +157,7 @@ const normalizeProcesses = (raw) => {
         }
         return {
             pid: finiteInteger(process.pid, `processes[${index}].pid`, 1),
-            pgid: finiteInteger(process.pgid, `processes[${index}].pgid`, 1),
+            pgid: finiteInteger(process.pgid, `processes[${index}].pgid`),
             state,
             comm,
             command: process.command,
