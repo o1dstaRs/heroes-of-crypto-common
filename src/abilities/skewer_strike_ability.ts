@@ -99,7 +99,7 @@ export function processSkewerStrikeAbility(
             )
         ) {
             sceneLog.updateLog(
-                `${fromUnit.getName()} misses Skewer Strike ${isAttack ? "attk" : "resp"} on ${nextStandingTarget.getName()}`,
+                `${fromUnit.getName()} misses Skewer Strike ⚔️ ${isAttack ? "on" : "resp on"} ${nextStandingTarget.getName()}`,
             );
             continue;
         }

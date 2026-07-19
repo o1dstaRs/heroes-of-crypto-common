@@ -103,7 +103,7 @@ export function processThroughShotAbility(
                     .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
             );
         if (isAttackMissed) {
-            sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
+            sceneLog.updateLog(`${attackerUnit.getName()} misses 🏹 on ${targetUnit.getName()}`);
         } else {
             let throughShotMultiplier = attackerUnit.calculateAbilityMultiplier(
                 throughShotAbility,

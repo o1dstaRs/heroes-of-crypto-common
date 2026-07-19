@@ -90,7 +90,9 @@ export function processRangeAOEAbility(
                         .getAdditionalAbilityPowerPerTeam(unit.getTeam()),
                 );
             if (isAttackMissed) {
-                sceneLog.updateLog(`${attackerUnit.getName()} misses ${isAttack ? "attk" : "resp"} ${unit.getName()}`);
+                sceneLog.updateLog(
+                    `${attackerUnit.getName()} misses 🏹 ${isAttack ? "on" : "resp on"} ${unit.getName()}`,
+                );
             } else {
                 let abilityMultiplier = attackerUnit.calculateAbilityMultiplier(
                     aoeAbility,

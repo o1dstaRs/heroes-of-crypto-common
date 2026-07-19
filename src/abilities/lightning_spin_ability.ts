@@ -105,7 +105,9 @@ export function processLightningSpinAbility(
             }
 
             if (isAttackMissed) {
-                sceneLog.updateLog(`${fromUnit.getName()} misses ${actionString} ${enemy.getName()}`);
+                sceneLog.updateLog(
+                    `${fromUnit.getName()} misses ⚔️ ${actionString === "attk" ? "on" : "resp on"} ${enemy.getName()}`,
+                );
                 continue;
             }
 

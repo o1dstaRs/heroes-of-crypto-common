@@ -83,7 +83,7 @@ export function processDoubleShotAbility(
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(toUnit.getTeam()),
         );
     if (isSecondAttackMissed) {
-        sceneLog.updateLog(`${fromUnit.getName()} misses attk ${toUnit.getName()}`);
+        sceneLog.updateLog(`${fromUnit.getName()} misses 🏹 on ${toUnit.getName()}`);
         return {
             applied: false,
             aoeRangeAttackLanded: false,

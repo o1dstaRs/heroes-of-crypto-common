@@ -694,9 +694,9 @@ export class AttackHandler {
                 }));
             }
         } else if (isAttackMissed) {
-            this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
-            // Dodged ranged shot (Dodge / Small Specie / Boar Saliva): flag it so the client pops "MISS"
-            // over the target. render stays false — no damage number.
+            this.sceneLog.updateLog(`${attackerUnit.getName()} misses 🏹 on ${targetUnit.getName()}`);
+            // Dodged ranged shot (Dodge / Small Specie / Boar Saliva / Broken Aegis): flag it so the
+            // client pops "MISS" over the target. render stays false — no damage number.
             damageForAnimation.missed = true;
             damageForAnimation.unitId = targetUnit.getId();
             damageForAnimation.unitPosition = targetUnit.getPosition();
@@ -765,7 +765,7 @@ export class AttackHandler {
                     unitIdsDied.push(uId);
                 }
             } else if (isResponseMissed) {
-                this.sceneLog.updateLog(`${targetUnit.getName()} misses resp ${rangeResponseUnit.getName()}`);
+                this.sceneLog.updateLog(`${targetUnit.getName()} misses 🏹 resp on ${rangeResponseUnit.getName()}`);
             } else {
                 let abilityMultiplier = 1;
                 const paralysisTargetUnitEffect = targetUnit.getEffect("Paralysis");
@@ -1473,9 +1473,9 @@ export class AttackHandler {
         }
 
         if (isAttackMissed) {
-            this.sceneLog.updateLog(`${attackerUnit.getName()} misses attk ${targetUnit.getName()}`);
-            // Tell the client the blow was dodged (Dodge / Small Specie / Boar Saliva) so it can pop a
-            // "MISS" over the target. render stays false — there is no damage number to draw.
+            this.sceneLog.updateLog(`${attackerUnit.getName()} misses ⚔️ on ${targetUnit.getName()}`);
+            // Tell the client the blow was dodged (Dodge / Small Specie / Boar Saliva / Broken Aegis) so
+            // it can pop a "MISS" over the target. render stays false — there is no damage number to draw.
             damageForAnimation.missed = true;
             damageForAnimation.unitId = targetUnit.getId();
             damageForAnimation.unitPosition = targetUnit.getPosition();
@@ -1615,7 +1615,7 @@ export class AttackHandler {
                 }
 
                 if (isResponseMissed) {
-                    this.sceneLog.updateLog(`${targetUnit.getName()} misses resp ${attackerUnit.getName()}`);
+                    this.sceneLog.updateLog(`${targetUnit.getName()} misses ⚔️ resp on ${attackerUnit.getName()}`);
                 } else if (!hasLightningSpinResponseLanded && !attackerUnit.isDead()) {
                     abilityMultiplier = 1;
                     const abilitiesWithPositionCoeffResp = AbilityHelper.getAbilitiesWithPosisionCoefficient(

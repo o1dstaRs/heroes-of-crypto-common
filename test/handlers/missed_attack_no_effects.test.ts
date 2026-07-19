@@ -120,7 +120,7 @@ describe("missed attack lands no on-hit effects", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(sceneLog.getLog()).toContain("misses attk");
+        expect(sceneLog.getLog()).toContain("misses 🏹 on");
         expect(scavenger.getCumulativeHp()).toBe(hpBefore);
         expect(scavenger.getEffects().map((e) => e.getName())).not.toContain("Stun");
     });
