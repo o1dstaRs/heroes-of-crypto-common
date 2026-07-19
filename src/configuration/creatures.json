@@ -753,11 +753,11 @@
             "shot_distance": 0,
             "magic_resist": 15,
             "movement_type": "WALK",
-            "exp": 500,
+            "exp": 1000,
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Lightning Spin"]
+            "abilities": ["Dense Flesh", "Flesh Shield Aura"]
         }
     },
     "Death": {
