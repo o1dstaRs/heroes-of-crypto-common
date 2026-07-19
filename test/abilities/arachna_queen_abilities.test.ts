@@ -107,11 +107,12 @@ describe("Predatory Assimilation", () => {
         let index = 0;
         setDeterministicRandomSource(() => draws[index++] ?? 0);
     };
-    const setup = (targetAbilities: string[], targetAura = false, thiefStackPower = 1) => {
+    const setup = (targetAbilities: string[], targetAura = false, thiefStackPower = 1, thiefLuck = 0) => {
         const thief = createTestUnit({
             name: "Arachna Queen",
             abilities: ["Predatory Assimilation"],
             stackPower: thiefStackPower,
+            luck: thiefLuck,
         });
         const target = createTestUnit({
             name: "Target",
@@ -170,6 +171,19 @@ describe("Predatory Assimilation", () => {
             processPredatoryAssimilationAbility(fullStackFailure.thief, fullStackFailure.target, new SceneLogMock()),
         ).toBeUndefined();
         expect(fullStackFailure.target.hasAbilityActive("Dodge")).toBe(true);
+    });
+
+    it("adds one percentage point per Luck, ranging from 15% to 35% at full stack", () => {
+        for (const [luck, expectedChance] of [
+            [-10, 15],
+            [0, 25],
+            [10, 35],
+        ] as const) {
+            const { thief } = setup(["Dodge"], false, 5, luck);
+            expect(thief.calculateAbilityApplyChance(thief.getAbility("Predatory Assimilation")!, 0)).toBe(
+                expectedChance,
+            );
+        }
     });
 
     it("keeps the target card visible but disables its aura and grants a working persistent aura to the thief", () => {
