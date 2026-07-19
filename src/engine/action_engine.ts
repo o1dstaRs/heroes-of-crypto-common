@@ -1531,6 +1531,7 @@ export class GameActionEngine {
             unitPosition: { ...damage.unitPosition },
             hits: damage.hits?.map((hit) => ({ ...hit })),
             splash: damage.splash?.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            secondary: damage.secondary?.map((entry) => ({ ...entry, position: { ...entry.position } })),
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {

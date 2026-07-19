@@ -21,12 +21,14 @@ import { UnitsHolder } from "../units/units_holder";
 import * as AbilityHelper from "./ability_helper";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
+import type { ISecondaryDamage } from "../scene/animations";
 
 import { processAggrAbility } from "./aggr_ability";
 import { processBlindnessAbility } from "./blindness_ability";
 import { processBoarSalivaAbility } from "./boar_saliva_ability";
 import { processDeepWoundsAbility } from "./deep_wounds_ability";
 import { processDullingDefenseAblity } from "./dulling_defense_ability";
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processMinerAbility } from "./miner_ability";
 import { processParalysisAbility } from "./paralysis_ability";
 import { processPegasusLightAbility } from "./pegasus_light_ability";
@@ -59,6 +61,7 @@ export function processSkewerStrikeAbility(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     targetMovePosition?: HoCMath.XY,
     isAttack = true,
+    secondaryDamage?: ISecondaryDamage[],
 ): ISkewerStrikeResult {
     const unitIdsDied: string[] = [];
     const skewerStrikeAbility = fromUnit.getAbility("Skewer Strike");
@@ -123,6 +126,29 @@ export function processSkewerStrikeAbility(
         // Skewer Strike is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
         damageFromAttack = Math.floor(damageFromAttack * nextStandingTarget.getPhysicalAoeDamageMultiplier());
 
+        const fleshShieldResult = processFleshShieldAura(
+            fromUnit,
+            nextStandingTarget,
+            damageFromAttack,
+            false,
+            grid,
+            unitsHolder,
+            sceneLog,
+            damageStatisticHolder,
+            secondaryDamage,
+        );
+        damageFromAttack = fleshShieldResult.remainingDamage;
+        increaseMoraleTotal += fleshShieldResult.increaseMorale;
+        for (const unitId of fleshShieldResult.unitIdsDied) {
+            if (!unitIdsDied.includes(unitId)) {
+                unitIdsDied.push(unitId);
+            }
+        }
+        for (const [unitNameKey, moraleDecrease] of Object.entries(fleshShieldResult.moraleDecreaseForTheUnitTeam)) {
+            moraleDecreaseForTheUnitTeam[unitNameKey] =
+                (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+        }
+
         const amountBefore = nextStandingTarget.getAmountAlive();
         const damageDealt = nextStandingTarget.applyDamage(
             damageFromAttack,
@@ -176,12 +202,14 @@ export function processSkewerStrikeAbility(
     }
 
     for (const unitDead of unitsDead) {
-        sceneLog.updateLog(`${unitDead.getName()} died`);
-        unitIdsDied.push(unitDead.getId());
-        increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
-        const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
-        moraleDecreaseForTheUnitTeam[unitNameKey] =
-            (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+        if (!unitIdsDied.includes(unitDead.getId())) {
+            sceneLog.updateLog(`${unitDead.getName()} died`);
+            unitIdsDied.push(unitDead.getId());
+            increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
+            const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
+            moraleDecreaseForTheUnitTeam[unitNameKey] =
+                (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+        }
     }
 
     return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam, secondaryDamages };

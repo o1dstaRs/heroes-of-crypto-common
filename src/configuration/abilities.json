@@ -957,5 +957,33 @@
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
+    },
+    "Dense Flesh": {
+        "name": "Dense Flesh",
+        "type": "DEFENCE",
+        "desc": ["Enemy ranged attacks aimed at this unit consume {} shots instead of one"],
+        "power": 2,
+        "power_type": "SHOTS_COST",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Flesh Shield Aura": {
+        "name": "Flesh Shield Aura",
+        "type": "BUFF_AURA",
+        "desc": [
+            "Absorbs {}% of the attack damage dealt to allies within range.",
+            "The absorbed damage is recalculated against the owner's defense",
+            "and dealt to the owner instead."
+        ],
+        "power": 90,
+        "power_type": "ABSORB_DAMAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": "Flesh Shield",
+        "can_be_cast": false
     }
 }

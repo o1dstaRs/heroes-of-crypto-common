@@ -59,6 +59,8 @@ export enum AbilityPowerType {
     UNTARGETABLE = 46,
     REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK = 47,
     REJUVENATION = 48,
+    SHOTS_COST = 49,
+    ABSORB_DAMAGE = 50,
 }
 
 export const AllAbilityPowerTypes = [
@@ -111,6 +113,8 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.UNTARGETABLE,
     AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK,
     AbilityPowerType.REJUVENATION,
+    AbilityPowerType.SHOTS_COST,
+    AbilityPowerType.ABSORB_DAMAGE,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -166,6 +170,8 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     UNTARGETABLE: AbilityPowerType.UNTARGETABLE,
     REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK: AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK,
     REJUVENATION: AbilityPowerType.REJUVENATION,
+    SHOTS_COST: AbilityPowerType.SHOTS_COST,
+    ABSORB_DAMAGE: AbilityPowerType.ABSORB_DAMAGE,
 };
 
 export enum AbilityType {

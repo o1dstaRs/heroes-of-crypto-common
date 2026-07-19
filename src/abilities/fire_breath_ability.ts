@@ -23,6 +23,8 @@ import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
+
 export interface IFireBreathResult {
     increaseMorale: number;
     unitIdsDied: string[];
@@ -110,11 +112,36 @@ export function processFireBreathAbility(
             fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 - aegisShieldBuff.getPower() / 100));
         }
 
+        const fleshShieldResult = processFleshShieldAura(
+            fromUnit,
+            nextStandingTarget,
+            fireBreathAttackDamage,
+            false,
+            grid,
+            unitsHolder,
+            sceneLog,
+            damageStatisticHolder,
+            secondaryDamage,
+            "magic",
+        );
+        fireBreathAttackDamage = fleshShieldResult.remainingDamage;
+        increaseMoraleTotal += fleshShieldResult.increaseMorale;
+        for (const unitId of fleshShieldResult.unitIdsDied) {
+            if (!unitIdsDied.includes(unitId)) {
+                unitIdsDied.push(unitId);
+            }
+        }
+        for (const [unitNameKey, moraleDecrease] of Object.entries(fleshShieldResult.moraleDecreaseForTheUnitTeam)) {
+            moraleDecreaseForTheUnitTeam[unitNameKey] =
+                (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+        }
+
         const positionAtImpact = { ...nextStandingTarget.getPosition() };
         const amountAliveBefore = nextStandingTarget.getAmountAlive();
+        const damageDealt = nextStandingTarget.applyDamage(fireBreathAttackDamage, 0 /* magic attack */, sceneLog);
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
-            damage: nextStandingTarget.applyDamage(fireBreathAttackDamage, 0 /* magic attack */, sceneLog),
+            damage: damageDealt,
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
@@ -123,7 +150,7 @@ export function processFireBreathAbility(
             source: "fire_breath",
             unitId: nextStandingTarget.getId(),
             position: positionAtImpact,
-            amount: fireBreathAttackDamage,
+            amount: damageDealt,
             unitsDied: unitsKilled,
         });
 
@@ -138,12 +165,14 @@ export function processFireBreathAbility(
     }
 
     for (const unitDead of unitsDead) {
-        sceneLog.updateLog(`${unitDead.getName()} died`);
-        unitIdsDied.push(unitDead.getId());
-        increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
-        const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
-        moraleDecreaseForTheUnitTeam[unitNameKey] =
-            (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+        if (!unitIdsDied.includes(unitDead.getId())) {
+            sceneLog.updateLog(`${unitDead.getName()} died`);
+            unitIdsDied.push(unitDead.getId());
+            increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
+            const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
+            moraleDecreaseForTheUnitTeam[unitNameKey] =
+                (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+        }
     }
 
     return {

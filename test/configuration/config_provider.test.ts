@@ -74,6 +74,23 @@ describe("config_provider", () => {
         expect(creature.amount_alive).toBeGreaterThanOrEqual(1);
     });
 
+    it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Abomination", "abomination_512", 0, 1000);
+
+        expect(creature.max_hp).toBe(500);
+        expect(creature.steps).toBe(4.2);
+        expect(creature.speed).toBe(3.3);
+        expect(creature.base_armor).toBe(44);
+        expect(creature.base_attack).toBe(20);
+        expect(creature.exp).toBe(1000);
+        expect(creature.amount_alive).toBe(1);
+
+        const fleshShieldIndex = creature.abilities.indexOf("Flesh Shield Aura");
+        expect(fleshShieldIndex).toBeGreaterThanOrEqual(0);
+        expect(creature.abilities_stack_powered[fleshShieldIndex]).toBe(true);
+        expect(creature.abilities_descriptions[fleshShieldIndex]?.toLowerCase()).not.toContain("luck");
+    });
+
     it("loads every ability config", () => {
         for (const abilityName of catalogKeys(abilitiesJson)) {
             const ability = getAbilityConfig(abilityName);

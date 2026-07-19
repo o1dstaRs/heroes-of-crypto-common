@@ -559,6 +559,140 @@ describe("AttackHandler", () => {
             ]);
         });
 
+        it("does not hit a primary Abomination again after Fire Breath absorption kills it", () => {
+            const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            const attacker = createTestUnit({
+                name: "Fire Breather",
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.MELEE,
+                abilities: ["Fire Breath"],
+            });
+            const abomination = createTestUnit({
+                name: "Abomination",
+                team: PBTypes.TeamVals.LOWER,
+                maxHp: 50,
+                armor: 20,
+                luck: 10,
+                stackPower: 5,
+                abilities: ["Flesh Shield Aura"],
+                auraEffects: ["Flesh Shield"],
+                auraRanges: [1],
+                auraIsBuff: [true],
+            });
+            const protectedAlly = createTestUnit({
+                name: "Protected Rear Unit",
+                team: PBTypes.TeamVals.LOWER,
+                maxHp: 1000,
+                armor: 20,
+            });
+            attacker.calculateMissChance = () => 0;
+            attacker.calculateAttackDamage = () => 100;
+
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, abomination, { x: 2, y: 1 });
+            placeUnit(grid, unitsHolder, protectedAlly, { x: 3, y: 1 });
+            unitsHolder.refreshAuraEffectsForAllUnits();
+
+            const damageForAnimation = createVisibleDamage(abomination);
+            damageForAnimation.hits = [];
+            const result = attackHandler.handleMeleeAttack(
+                unitsHolder,
+                moveHandler,
+                damageForAnimation,
+                undefined,
+                attacker,
+                abomination,
+                { x: 1, y: 1 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(abomination.getAmountAlive()).toBe(0);
+            expect(abomination.getAmountDied()).toBe(1);
+            expect(protectedAlly.getCumulativeHp()).toBe(950);
+            expect(damageForAnimation.hits).toEqual([]);
+            expect(result.unitIdsDied.filter((unitId) => unitId === abomination.getId())).toHaveLength(1);
+            expect(damageForAnimation.secondary).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        source: "flesh_shield",
+                        unitId: abomination.getId(),
+                        amount: 50,
+                    }),
+                    expect.objectContaining({
+                        source: "fire_breath",
+                        unitId: protectedAlly.getId(),
+                        amount: 50,
+                    }),
+                ]),
+            );
+            expect(damageStatisticHolder.get().reduce((total, entry) => total + entry.damage, 0)).toBe(100);
+        });
+
+        it("does not apply a base response after response Fire Breath absorption kills the attacker", () => {
+            const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            const abomination = createTestUnit({
+                name: "Abomination",
+                team: PBTypes.TeamVals.UPPER,
+                maxHp: 50,
+                armor: 20,
+                luck: 10,
+                stackPower: 5,
+                abilities: ["Flesh Shield Aura"],
+                auraEffects: ["Flesh Shield"],
+                auraRanges: [1],
+                auraIsBuff: [true],
+            });
+            const protectedAlly = createTestUnit({
+                name: "Protected Rear Unit",
+                team: PBTypes.TeamVals.UPPER,
+                maxHp: 1000,
+                armor: 20,
+            });
+            const responder = createTestUnit({
+                name: "Responding Fire Breather",
+                team: PBTypes.TeamVals.LOWER,
+                maxHp: 1000,
+                armor: 20,
+                attackType: PBTypes.AttackVals.MELEE,
+                abilities: ["Fire Breath"],
+            });
+            abomination.calculateMissChance = () => 0;
+            abomination.calculateAttackDamage = () => 10;
+            responder.calculateMissChance = () => 0;
+            responder.calculateAttackDamage = () => 100;
+
+            placeUnit(grid, unitsHolder, protectedAlly, { x: 0, y: 1 });
+            placeUnit(grid, unitsHolder, abomination, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, responder, { x: 2, y: 1 });
+            unitsHolder.refreshAuraEffectsForAllUnits();
+
+            const damageForAnimation = createVisibleDamage(responder);
+            damageForAnimation.hits = [];
+            const result = attackHandler.handleMeleeAttack(
+                unitsHolder,
+                moveHandler,
+                damageForAnimation,
+                undefined,
+                abomination,
+                responder,
+                { x: 1, y: 1 },
+            );
+
+            expect(result.completed).toBe(true);
+            expect(abomination.getAmountAlive()).toBe(0);
+            expect(abomination.getAmountDied()).toBe(1);
+            expect(protectedAlly.getCumulativeHp()).toBe(950);
+            expect(responder.getCumulativeHp()).toBe(990);
+            expect(damageForAnimation.hits).toEqual([{ amount: 10, unitsDied: 0 }]);
+            expect(result.unitIdsDied.filter((unitId) => unitId === abomination.getId())).toHaveLength(1);
+            expect(damageStatisticHolder.get().reduce((total, entry) => total + entry.damage, 0)).toBe(110);
+
+            responder.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+            expect(responder.getMorale()).toBe(MORALE_CHANGE_FOR_KILL);
+        });
+
         it("returns incomplete for invalid melee attack preconditions", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);

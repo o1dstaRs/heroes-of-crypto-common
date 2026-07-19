@@ -10,6 +10,7 @@ export * from "./double_shot_ability";
 export * from "./dulling_defense_ability";
 export * from "./fire_breath_ability";
 export * from "./fire_shield_ability";
+export * from "./flesh_shield_aura_ability";
 export * from "./lightning_spin_ability";
 export * from "./lucky_strike_ability";
 export * from "./miner_ability";

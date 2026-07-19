@@ -22,6 +22,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
@@ -60,12 +61,22 @@ export function processRangeAOEAbility(
     if (aoeAbility) {
         const wasDead: Unit[] = [];
         let increaseMoraleTotal = 0;
+        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         // ARTIFACT Giant's Maul: +% non-magical AOE damage to EVERY struck unit, applied at impact below
         // and then reduced by each victim's status resistance.
         const giantsMaulBuff = attackerUnit.getBuff("Giants Maul");
-        for (const unit of affectedUnits) {
+        // Range splash is one simultaneous impact. Resolve any Flesh Shield owners caught in the blast
+        // before their protected allies so the owner's own hit reserves HP first; otherwise an allies-first
+        // array could fill/kill the owner through absorption and make its direct AOE hit disappear entirely.
+        const impactOrder = [
+            ...affectedUnits.filter((unit) => unit.hasAbilityActive("Flesh Shield Aura")),
+            ...affectedUnits.filter((unit) => !unit.hasAbilityActive("Flesh Shield Aura")),
+        ];
+        for (const unit of impactOrder) {
             if (unit.isDead()) {
-                unitIdsDied.push(unit.getId());
+                if (!unitIdsDied.includes(unit.getId())) {
+                    unitIdsDied.push(unit.getId());
+                }
                 wasDead.push(unit);
                 continue;
             }
@@ -123,6 +134,31 @@ export function processRangeAOEAbility(
                 // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
                 damageFromAttack = Math.floor(damageFromAttack * unit.getPhysicalAoeDamageMultiplier());
 
+                const fleshShieldResult = processFleshShieldAura(
+                    attackerUnit,
+                    unit,
+                    damageFromAttack,
+                    true,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    damageStatisticHolder,
+                    secondaryDamage,
+                );
+                damageFromAttack = fleshShieldResult.remainingDamage;
+                increaseMoraleTotal += fleshShieldResult.increaseMorale;
+                for (const unitId of fleshShieldResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(unitId)) {
+                        unitIdsDied.push(unitId);
+                    }
+                }
+                for (const [unitNameKey, moraleDecrease] of Object.entries(
+                    fleshShieldResult.moraleDecreaseForTheUnitTeam,
+                )) {
+                    moraleDecreaseForTheUnitTeam[unitNameKey] =
+                        (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+                }
+
                 // Snapshot position + stack BEFORE applying damage so the floating number lands where the
                 // unit stood when hit (it may die and be removed before the visuals play).
                 const unitPositionAtImpact = { ...unit.getPosition() };
@@ -169,23 +205,24 @@ export function processRangeAOEAbility(
             }
         }
 
-        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         for (const unit of affectedUnits) {
-            if (unit.isDead() && !wasDead.includes(unit)) {
-                sceneLog.updateLog(`${unit.getName()} died`);
-                if (!unitIdsDied.includes(unit.getId())) {
-                    unitIdsDied.push(unit.getId());
+            if (unit.isDead()) {
+                if (!wasDead.includes(unit)) {
+                    if (!unitIdsDied.includes(unit.getId())) {
+                        sceneLog.updateLog(`${unit.getName()} died`);
+                        unitIdsDied.push(unit.getId());
+                        increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
+                        const unitNameKey = `${unit.getName()}:${unit.getTeam()}`;
+                        moraleDecreaseForTheUnitTeam[unitNameKey] =
+                            (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+                    }
+                    wasDead.push(unit);
                 }
-                increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
-                const unitNameKey = `${unit.getName()}:${unit.getTeam()}`;
-                moraleDecreaseForTheUnitTeam[unitNameKey] =
-                    (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
-                wasDead.push(unit);
-            } else {
-                processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
-                processRimeCharmAbility(attackerUnit, unit, sceneLog);
-                processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
+                continue;
             }
+            processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog);
+            processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }
         attackerUnit.increaseMorale(
             increaseMoraleTotal,

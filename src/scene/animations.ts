@@ -25,6 +25,8 @@ export type SecondaryDamageSource =
     | "chain_lightning"
     | "petrifying_gaze"
     | "magic_mirror"
+    // Flesh Shield aura: the aura owner soaks most of the damage dealt to a protected ally.
+    | "flesh_shield"
     // Melee AOE: extra units struck by a sweeping/breath attack (Black Dragon Fire Breath,
     // Pikeman Lightning Spin, Hydra Skewer Strike) beyond the primary target.
     | "fire_breath"

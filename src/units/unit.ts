@@ -1419,6 +1419,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
+        // Flesh Shield is stack-powered: scale its base absorption by stack power, then apply the same
+        // luck/synergy adjustment used by other stack abilities. Clamp because absorption is a percentage.
+        if (auraEffect.getPowerType() === AbilityPowerType.ABSORB_DAMAGE) {
+            return Math.min(
+                100,
+                Math.max(
+                    0,
+                    (auraEffect.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                        this.getLuck() +
+                        synergyAbilityPowerIncrease,
+                ),
+            );
+        }
+
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR) {
             return auraEffect.getPower();
         }
@@ -1690,6 +1704,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
             if (decreaseNumberOfShots && !gotUnlimitedSupplies) {
                 this.decreaseNumberOfShots();
+                // Dense Flesh: a shot aimed at this target consumes ability-power shots total
+                if (enemyUnit.hasAbilityActive("Dense Flesh")) {
+                    const denseFleshAbility = enemyUnit.getAbility("Dense Flesh");
+                    const totalShotsCost = Math.max(1, Math.floor(denseFleshAbility?.getPower() ?? 1));
+                    for (let i = 1; i < totalShotsCost; i++) {
+                        this.decreaseNumberOfShots();
+                    }
+                }
             }
         }
 
@@ -2904,7 +2926,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
     protected handleDamageAnimation(_unitsDied: number): void {}
-    protected getEnemyArmor(enemyUnit: Unit, isRangeAttack: boolean, synergyAbilityPowerIncrease: number): number {
+    public getEnemyArmor(enemyUnit: Unit, isRangeAttack: boolean, synergyAbilityPowerIncrease: number): number {
         const piercingSpearAbility = this.getAbility("Piercing Spear");
         const armor = isRangeAttack ? enemyUnit.getRangeArmor() : enemyUnit.getArmor();
         if (piercingSpearAbility) {

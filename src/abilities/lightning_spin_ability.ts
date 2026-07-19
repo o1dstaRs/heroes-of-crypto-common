@@ -10,6 +10,7 @@
  */
 
 import { PBTypes } from "../generated/protobuf/v1/types";
+import type { Grid } from "../grid/grid";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -22,6 +23,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processStunAbility } from "./stun_ability";
@@ -53,6 +55,7 @@ export function processLightningSpinAbility(
     attackFromCell?: HoCMath.XY,
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
+    grid?: Grid,
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -61,7 +64,14 @@ export function processLightningSpinAbility(
     if (lightningSpinAbility) {
         const unitsDead: Unit[] = [];
         const wasDead: Unit[] = [];
-        const enemyList = unitsHolder.allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell);
+        const nearbyEnemies = unitsHolder.allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell);
+        // Lightning Spin is one radial impact. As with range splash, resolve any Flesh Shield owners
+        // caught in it before their protected allies so the owner's direct hit reserves HP and cannot
+        // disappear merely because grid-neighbour iteration returned an ally first.
+        const enemyList = [
+            ...nearbyEnemies.filter((unit) => unit.hasAbilityActive("Flesh Shield Aura")),
+            ...nearbyEnemies.filter((unit) => !unit.hasAbilityActive("Flesh Shield Aura")),
+        ];
         let actionString: string;
         if (isAttack) {
             actionString = "attk";
@@ -73,7 +83,7 @@ export function processLightningSpinAbility(
         const commonAbilityMultiplier = processRapidChargeAbility(fromUnit, rapidChargeCells);
         let increaseMoraleTotal = 0;
 
-        let moraleDecreaseForTheUnitTeam: Record<string, number> = {};
+        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
         for (const enemy of enemyList) {
             if (enemy.isDead()) {
@@ -143,15 +153,43 @@ export function processLightningSpinAbility(
             // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * enemy.getPhysicalAoeDamageMultiplier());
 
+            if (grid) {
+                const fleshShieldResult = processFleshShieldAura(
+                    fromUnit,
+                    enemy,
+                    damageFromAttack,
+                    false,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    damageStatisticHolder,
+                    secondaryDamage,
+                );
+                damageFromAttack = fleshShieldResult.remainingDamage;
+                increaseMoraleTotal += fleshShieldResult.increaseMorale;
+                for (const unitId of fleshShieldResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(unitId)) {
+                        unitIdsDied.push(unitId);
+                    }
+                }
+                for (const [unitNameKey, moraleDecrease] of Object.entries(
+                    fleshShieldResult.moraleDecreaseForTheUnitTeam,
+                )) {
+                    moraleDecreaseForTheUnitTeam[unitNameKey] =
+                        (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+                }
+            }
+
             const positionAtImpact = { ...enemy.getPosition() };
             const amountAliveBefore = enemy.getAmountAlive();
+            const damageDealt = enemy.applyDamage(
+                damageFromAttack,
+                FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
+                sceneLog,
+            );
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
-                damage: enemy.applyDamage(
-                    damageFromAttack,
-                    FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
-                    sceneLog,
-                ),
+                damage: damageDealt,
                 team: fromUnit.getTeam(),
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
             });
@@ -159,7 +197,7 @@ export function processLightningSpinAbility(
                 source: "lightning_spin",
                 unitId: enemy.getId(),
                 position: positionAtImpact,
-                amount: damageFromAttack,
+                amount: damageDealt,
                 unitsDied: Math.max(0, amountAliveBefore - enemy.getAmountAlive()),
             });
             const unitsKilled = Math.max(0, amountAliveBefore - enemy.getAmountAlive());
@@ -226,8 +264,11 @@ export function processLightningSpinAbility(
                         );
                     }
 
-                    if (Object.keys(fireShieldResult.moraleDecreaseForTheUnitTeam).length) {
-                        moraleDecreaseForTheUnitTeam = fireShieldResult.moraleDecreaseForTheUnitTeam;
+                    for (const [unitNameKey, moraleDecrease] of Object.entries(
+                        fireShieldResult.moraleDecreaseForTheUnitTeam,
+                    )) {
+                        moraleDecreaseForTheUnitTeam[unitNameKey] =
+                            (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
                     }
 
                     for (const uId in fireShieldResult.unitIdsDied) {
@@ -240,12 +281,14 @@ export function processLightningSpinAbility(
         }
 
         for (const unitDead of unitsDead) {
-            sceneLog.updateLog(`${unitDead.getName()} died`);
-            unitIdsDied.push(unitDead.getId());
-            increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
-            const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
-            moraleDecreaseForTheUnitTeam[unitNameKey] =
-                (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+            if (!unitIdsDied.includes(unitDead.getId())) {
+                sceneLog.updateLog(`${unitDead.getName()} died`);
+                unitIdsDied.push(unitDead.getId());
+                increaseMoraleTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
+                const unitNameKey = `${unitDead.getName()}:${unitDead.getTeam()}`;
+                moraleDecreaseForTheUnitTeam[unitNameKey] =
+                    (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+            }
         }
 
         if (!isAttack) {

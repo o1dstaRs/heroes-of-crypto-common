@@ -18,11 +18,12 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
-import type { IAnimationData } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
@@ -49,6 +50,7 @@ export function processThroughShotAbility(
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     decreaseNumberOfShots = true,
+    secondaryDamage?: ISecondaryDamage[],
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
@@ -62,6 +64,8 @@ export function processThroughShotAbility(
     let targetUnit: Unit | undefined = undefined;
 
     const unitsDamaged: Unit[] = [];
+    let moraleIncreaseTotal = 0;
+    const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
     while (targetUnitUndex < targetUnits.length) {
         const affectedUnits = targetUnits[targetUnitUndex];
@@ -72,6 +76,13 @@ export function processThroughShotAbility(
 
         targetUnit = affectedUnits[0];
         if (!targetUnit) {
+            targetUnitUndex++;
+            continue;
+        }
+        // An earlier pierced ally can redirect enough Flesh Shield damage to kill an Abomination that
+        // appears later on this same trajectory. Do not hit that now-dead stack a second time (or emit
+        // fake splash/stat damage for it); keep advancing the projectile through the lane.
+        if (targetUnit.isDead()) {
             targetUnitUndex++;
             continue;
         }
@@ -125,6 +136,30 @@ export function processThroughShotAbility(
             }
             // Through Shot is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * targetUnit.getPhysicalAoeDamageMultiplier());
+            const fleshShieldResult = processFleshShieldAura(
+                attackerUnit,
+                targetUnit,
+                damageFromAttack,
+                true,
+                grid,
+                unitsHolder,
+                sceneLog,
+                damageStatisticHolder,
+                secondaryDamage,
+            );
+            damageFromAttack = fleshShieldResult.remainingDamage;
+            moraleIncreaseTotal += fleshShieldResult.increaseMorale;
+            for (const unitId of fleshShieldResult.unitIdsDied) {
+                if (!unitIdsDied.includes(unitId)) {
+                    unitIdsDied.push(unitId);
+                }
+            }
+            for (const [unitNameKey, moraleDecrease] of Object.entries(
+                fleshShieldResult.moraleDecreaseForTheUnitTeam,
+            )) {
+                moraleDecreaseForTheUnitTeam[unitNameKey] =
+                    (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+            }
             sceneLog.updateLog(
                 `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})` +
                     HoCLib.killTag(targetUnit.calculatePossibleLosses(damageFromAttack)),
@@ -171,17 +206,16 @@ export function processThroughShotAbility(
         }
     }
 
-    let moraleIncreaseTotal = 0;
-    let moraleDecreaseForTheUnitTeam: Record<string, number> = {};
-
     for (const unit of unitsDamaged) {
         if (unit.isDead()) {
-            sceneLog.updateLog(`${unit.getName()} died`);
-            unitIdsDied.push(unit.getId());
-            moraleIncreaseTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
-            const unitNameKey = `${unit.getName()}:${unit.getTeam()}`;
-            moraleDecreaseForTheUnitTeam[unitNameKey] =
-                (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+            if (!unitIdsDied.includes(unit.getId())) {
+                sceneLog.updateLog(`${unit.getName()} died`);
+                unitIdsDied.push(unit.getId());
+                moraleIncreaseTotal += HoCConstants.MORALE_CHANGE_FOR_KILL;
+                const unitNameKey = `${unit.getName()}:${unit.getTeam()}`;
+                moraleDecreaseForTheUnitTeam[unitNameKey] =
+                    (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
+            }
         } else {
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog);

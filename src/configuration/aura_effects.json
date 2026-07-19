@@ -79,5 +79,13 @@
         "power": 0,
         "is_buff": true,
         "power_type": "UNTARGETABLE"
+    },
+    "Flesh Shield": {
+        "name": "Flesh Shield",
+        "range": 1,
+        "desc": "{}% of the attack damage dealt to this unit is absorbed by the aura's owner, recalculated against the owner's defense.",
+        "power": 90,
+        "is_buff": true,
+        "power_type": "ABSORB_DAMAGE"
     }
 }

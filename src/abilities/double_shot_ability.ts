@@ -23,6 +23,7 @@ import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { processRangeAOEAbility } from "./aoe_range_ability";
+import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 
 export interface IDoubleShotResult {
@@ -32,6 +33,7 @@ export interface IDoubleShotResult {
     unitIdsDied: string[];
     animationData: IAnimationData[];
     moraleIncrease: number;
+    moraleDecreaseForTheUnitTeam: Record<string, number>;
 }
 
 export function processDoubleShotAbility(
@@ -53,6 +55,7 @@ export function processDoubleShotAbility(
 
     let damageFromAttack = 0;
     let moraleIncrease = 0;
+    const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
     if (
         !doubleShotAbility ||
@@ -69,6 +72,7 @@ export function processDoubleShotAbility(
             unitIdsDied,
             animationData,
             moraleIncrease,
+            moraleDecreaseForTheUnitTeam,
         };
     }
 
@@ -87,6 +91,7 @@ export function processDoubleShotAbility(
             unitIdsDied,
             animationData,
             moraleIncrease,
+            moraleDecreaseForTheUnitTeam,
         };
     }
 
@@ -105,6 +110,7 @@ export function processDoubleShotAbility(
         sceneLog,
         damageStatisticHolder,
         true,
+        (damageForAnimation.secondary ??= []),
     );
     if (aoeRangeAttackResult.landed) {
         damageFromAttack = processLuckyStrikeAbility(fromUnit, aoeRangeAttackResult.maxDamage, sceneLog);
@@ -149,6 +155,28 @@ export function processDoubleShotAbility(
             ),
             sceneLog,
         );
+        const fleshShieldAbsorb = processFleshShieldAura(
+            fromUnit,
+            toUnit,
+            damageFromAttack,
+            true,
+            grid,
+            unitsHolder,
+            sceneLog,
+            damageStatisticHolder,
+            (damageForAnimation.secondary ??= []),
+        );
+        damageFromAttack = fleshShieldAbsorb.remainingDamage;
+        moraleIncrease += fleshShieldAbsorb.increaseMorale;
+        for (const uId of fleshShieldAbsorb.unitIdsDied) {
+            if (!aoeRangeAttackResult.unitIdsDied.includes(uId)) {
+                aoeRangeAttackResult.unitIdsDied.push(uId);
+            }
+        }
+        for (const [unitNameKey, moraleDecrease] of Object.entries(fleshShieldAbsorb.moraleDecreaseForTheUnitTeam)) {
+            moraleDecreaseForTheUnitTeam[unitNameKey] =
+                (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
+        }
         damageForAnimation.render = true;
         damageForAnimation.amount = damageFromAttack;
         damageForAnimation.unitPosition = toUnit.getPosition();
@@ -181,5 +209,6 @@ export function processDoubleShotAbility(
         unitIdsDied: aoeRangeAttackResult.unitIdsDied,
         animationData,
         moraleIncrease,
+        moraleDecreaseForTheUnitTeam,
     };
 }

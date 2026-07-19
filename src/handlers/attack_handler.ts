@@ -533,6 +533,7 @@ export class AttackHandler {
             this.sceneLog,
             this.damageStatisticHolder,
             decreaseNumberOfShots,
+            (damageForAnimation.secondary ??= []),
         );
         for (const uId of throughShotResult.unitIdsDied) {
             unitIdsDied.push(uId);
@@ -695,6 +696,7 @@ export class AttackHandler {
         // handle response damage
         let aoeRangeResponseResult: AllAbilities.IAOERangeAttackResult | undefined = undefined;
         let targetUnitPlusMorale = 0;
+        let rangeResponseFleshShieldAbsorb: AllAbilities.IFleshShieldResult | undefined = undefined;
 
         const increaseUnitMorale = (unitToIncreaseMoraleTo: Unit, increaseMoraleBy: number): void => {
             unitToIncreaseMoraleTo.increaseMorale(
@@ -750,6 +752,25 @@ export class AttackHandler {
                     this.sceneLog,
                 );
 
+                rangeResponseFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
+                    targetUnit,
+                    rangeResponseUnit,
+                    damageFromResponse,
+                    true,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                damageFromResponse = rangeResponseFleshShieldAbsorb.remainingDamage;
+                targetUnitPlusMorale += rangeResponseFleshShieldAbsorb.increaseMorale;
+                for (const uId of rangeResponseFleshShieldAbsorb.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+
                 this.sceneLog.updateLog(
                     `${targetUnit.getName()} resp ${rangeResponseUnit.getName()} (${damageFromResponse})` +
                         HoCLib.killTag(rangeResponseUnit.calculatePossibleLosses(damageFromResponse)),
@@ -780,10 +801,38 @@ export class AttackHandler {
 
         let attackerUnitPlusMorale = 0;
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
+        if (rangeResponseFleshShieldAbsorb) {
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                rangeResponseFleshShieldAbsorb.moraleDecreaseForTheUnitTeam,
+            );
+        }
 
         let switchTargetUnit = false;
         if (!aoeRangeAttackResult?.landed || !isAOE) {
             if (!attackDamageApplied) {
+                const fleshShieldAbsorb = AllAbilities.processFleshShieldAura(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    true,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                damageFromAttack = fleshShieldAbsorb.remainingDamage;
+                attackerUnitPlusMorale += fleshShieldAbsorb.increaseMorale;
+                for (const uId of fleshShieldAbsorb.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    fleshShieldAbsorb.moraleDecreaseForTheUnitTeam,
+                );
                 damageForAnimation.render = true;
                 damageForAnimation.amount = damageFromAttack;
                 damageForAnimation.hits = []; // Initialize hits as an array of objects
@@ -982,6 +1031,10 @@ export class AttackHandler {
             damageForAnimation,
             this.damageStatisticHolder,
             isAOE,
+        );
+        this.updateMoraleDecreaseForTheUnitTeam(
+            moraleDecreaseForTheUnitTeam,
+            secondShotResult.moraleDecreaseForTheUnitTeam,
         );
 
         if (secondShotResult.applied && secondShotResult.damage > 0 && damageForAnimation.hits) {
@@ -1293,7 +1346,7 @@ export class AttackHandler {
         attackerUnit.cleanupAttackModIncrease();
         attackerUnit.increaseAttackMod(unitsHolder.getUnitAuraAttackMod(attackerUnit));
 
-        const damageFromAttack =
+        let damageFromAttack =
             AllAbilities.processLuckyStrikeAbility(
                 attackerUnit,
                 attackerUnit.calculateAttackDamage(
@@ -1319,6 +1372,7 @@ export class AttackHandler {
             attackFromCell,
             true,
             (damageForAnimation.secondary ??= []),
+            this.grid,
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
@@ -1350,6 +1404,7 @@ export class AttackHandler {
             this.damageStatisticHolder,
             attackFromCell,
             true,
+            (damageForAnimation.secondary ??= []),
         );
         updateUnitsDied(skewerStrikeAttackResult.unitIdsDied);
         this.updateMoraleDecreaseForTheUnitTeam(
@@ -1375,7 +1430,25 @@ export class AttackHandler {
             damageForAnimation.unitId = targetUnit.getId();
             damageForAnimation.unitPosition = targetUnit.getPosition();
             damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
-        } else if (!hasLightningSpinAttackLanded) {
+        } else if (!hasLightningSpinAttackLanded && !targetUnit.isDead()) {
+            const fleshShieldAbsorb = AllAbilities.processFleshShieldAura(
+                attackerUnit,
+                targetUnit,
+                damageFromAttack,
+                false,
+                this.grid,
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            damageFromAttack = fleshShieldAbsorb.remainingDamage;
+            attackerUnitPlusMorale += fleshShieldAbsorb.increaseMorale;
+            updateUnitsDied(fleshShieldAbsorb.unitIdsDied);
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                fleshShieldAbsorb.moraleDecreaseForTheUnitTeam,
+            );
             // just log attack here,
             // to make sure that logs are in chronological order
             this.sceneLog.updateLog(
@@ -1405,6 +1478,7 @@ export class AttackHandler {
         const captureResponse = (): void => {
             hasLightningSpinResponseLanded = false;
             if (
+                !targetUnit.isDead() &&
                 !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
                 targetUnit.canRespond(PBTypes.AttackVals.MELEE) &&
                 !attackerUnit.canSkipResponse() &&
@@ -1440,6 +1514,7 @@ export class AttackHandler {
                     moraleDecreaseForTheUnitTeam,
                     fireBreathResponseResult.moraleDecreaseForTheUnitTeam,
                 );
+                targetUnitPlusMorale += fireBreathResponseResult.increaseMorale;
 
                 const skewerStrikeResponseResult = AllAbilities.processSkewerStrikeAbility(
                     targetUnit,
@@ -1450,12 +1525,14 @@ export class AttackHandler {
                     this.damageStatisticHolder,
                     GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
                     false,
+                    (damageForAnimation.secondary ??= []),
                 );
                 updateUnitsDied(skewerStrikeResponseResult.unitIdsDied);
                 this.updateMoraleDecreaseForTheUnitTeam(
                     moraleDecreaseForTheUnitTeam,
                     skewerStrikeResponseResult.moraleDecreaseForTheUnitTeam,
                 );
+                targetUnitPlusMorale += skewerStrikeResponseResult.increaseMorale;
                 for (const sd of skewerStrikeResponseResult.secondaryDamages) {
                     (damageForAnimation.secondary ??= []).push({
                         source: "skewer_strike",
@@ -1475,13 +1552,14 @@ export class AttackHandler {
                     attackFromCell,
                     false,
                     (damageForAnimation.secondary ??= []),
+                    this.grid,
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
 
                 if (isResponseMissed) {
                     this.sceneLog.updateLog(`${targetUnit.getName()} misses resp ${attackerUnit.getName()}`);
-                } else if (!hasLightningSpinResponseLanded) {
+                } else if (!hasLightningSpinResponseLanded && !attackerUnit.isDead()) {
                     abilityMultiplier = 1;
                     const abilitiesWithPositionCoeffResp = AbilityHelper.getAbilitiesWithPosisionCoefficient(
                         targetUnit.getAbilities(),
@@ -1517,7 +1595,7 @@ export class AttackHandler {
                         abilityMultiplier *= 1 + deepWoundsAttackerEffect.getPower() / 100;
                     }
 
-                    const damageFromResponse =
+                    let damageFromResponse =
                         AllAbilities.processLuckyStrikeAbility(
                             targetUnit,
                             targetUnit.calculateAttackDamage(
@@ -1531,6 +1609,25 @@ export class AttackHandler {
                             ),
                             this.sceneLog,
                         ) + AllAbilities.processPenetratingBiteAbility(targetUnit, attackerUnit);
+
+                    const responseFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
+                        targetUnit,
+                        attackerUnit,
+                        damageFromResponse,
+                        false,
+                        this.grid,
+                        unitsHolder,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    damageFromResponse = responseFleshShieldAbsorb.remainingDamage;
+                    targetUnitPlusMorale += responseFleshShieldAbsorb.increaseMorale;
+                    updateUnitsDied(responseFleshShieldAbsorb.unitIdsDied);
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        responseFleshShieldAbsorb.moraleDecreaseForTheUnitTeam,
+                    );
 
                     this.sceneLog.updateLog(
                         `${targetUnit.getName()} resp ${attackerUnit.getName()} (${damageFromResponse})` +
@@ -1623,7 +1720,7 @@ export class AttackHandler {
         // capture response
         captureResponse();
 
-        if (!hasLightningSpinAttackLanded && !isAttackMissed) {
+        if (!hasLightningSpinAttackLanded && !isAttackMissed && !targetUnit.isDead()) {
             // this code has to be here to make sure that respond damage has been applied as well
             damageForAnimation.render = true;
             damageForAnimation.amount = damageFromAttack;
@@ -1735,6 +1832,24 @@ export class AttackHandler {
         } else if (secondPunchResult.applied) {
             captureResponse();
             if (secondPunchResult.damage > 0) {
+                const secondPunchFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
+                    attackerUnit,
+                    targetUnit,
+                    secondPunchResult.damage,
+                    false,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                secondPunchResult.damage = secondPunchFleshShieldAbsorb.remainingDamage;
+                attackerUnitPlusMorale += secondPunchFleshShieldAbsorb.increaseMorale;
+                updateUnitsDied(secondPunchFleshShieldAbsorb.unitIdsDied);
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    secondPunchFleshShieldAbsorb.moraleDecreaseForTheUnitTeam,
+                );
                 if (damageForAnimation.hits) {
                     const damageDealtSecond = targetUnit.applyDamage(
                         secondPunchResult.damage,
