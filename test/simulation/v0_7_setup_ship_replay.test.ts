@@ -15,9 +15,13 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // shifts which units proc Morale/Dismorale each lap, so the seeded combat traces legitimately change.
 // Re-pinned again after Behemoth's armor -2 (30 -> 28): seed 2147598935's roster fields Behemoth, so its
 // combat trace legitimately changes. Two runs on the fixed engine produced this byte-identical digest.
-// Re-pinned after enabling Arachna Queen expanded the level-4 roster pool. Two isolated staged-index runs
-// produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "a24eb4039473ad15005507e40334ba2a3afe7b71e960b6518116bbe378c0185f";
+// Re-pinned again after enabling Abomination (catalog id 41): the larger L4 pool shifts every seeded
+// roster draw, so all traces legitimately change. Two runs produced this byte-identical digest.
+// Re-pinned again after enabling Champion (42) and Frenzied Boar (43) grew the L4 pool to 11 —
+// same legitimate roster-draw shift. Two runs produced this byte-identical digest.
+// Re-pinned again after enabling Arachna Queen (44) grew the L4 pool to 12 and shifted the same seeded
+// roster draws. Two runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "5c1786ddeb62e398a6e047eadef6d38a6c57188d93d119b306ea4c7ecdaa39b7";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

@@ -459,6 +459,20 @@ export class PathHelper {
         const yDown = unitPositionY - part;
         const yTop = unitPositionY + part;
 
+        // An attacker's own standing cell is a valid "attack in place" spot for a LARGE (2x2) unit even
+        // when its ANCHOR cell is out of attackRange of the target — its footprint may still be adjacent.
+        // But that only holds when the footprint actually reaches the TARGET: without this check, a melee
+        // unit standing next to enemy A "found" an attack-from cell for ANY hovered enemy B across the
+        // board, and the hover painted a full attack preview (arrow from the unit + damage) that read as
+        // a ranged shot (the Arachna Queen phantom-range bug).
+        const attackerReachesTarget = attackerUnitCells.some((attackerCell) =>
+            targetUnitCells.some(
+                (targetCell) =>
+                    Math.abs(attackerCell.x - targetCell.x) <= attackRange &&
+                    Math.abs(attackerCell.y - targetCell.y) <= attackRange,
+            ),
+        );
+
         // shuffle(attackCells); // Removed to prevent flickering
         const availableAttackCells: XY[] = [];
         const availableAttackCellHashes: Set<number> = new Set();
@@ -474,7 +488,7 @@ export class PathHelper {
             if (
                 (Math.abs(position.x - mouseCell.x) <= attackRange &&
                     Math.abs(position.y - mouseCell.y) <= attackRange) ||
-                isAttackerCell
+                (isAttackerCell && attackerReachesTarget)
             ) {
                 availableAttackCells.push(position);
                 availableAttackCellHashes.add((position.x << 4) | position.y);

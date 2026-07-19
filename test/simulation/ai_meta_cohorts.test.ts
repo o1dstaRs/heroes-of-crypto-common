@@ -15,6 +15,7 @@ import {
     AI_META_COHORTS,
     AI_META_MAPS,
     AI_META_RECORDED_MAPS,
+    armyFeatures,
     cohortArchetypes,
     cohortMap,
     generateMetaMatchup,
@@ -53,6 +54,21 @@ const outcome = (aIsGreen: boolean, winner: "a" | "b" | "draw"): IAiMetaGameOutc
 });
 
 describe("AI meta cohort generation", () => {
+    it("identifies only units with Tome-amplifiable castable buffs", () => {
+        const castableFeatures = armyFeatures([
+            { faction: "Life", creatureName: "Healer", level: 2, size: 1, amount: 1 },
+            { faction: "Chaos", creatureName: "Ogre Mage", level: 3, size: 1, amount: 1 },
+            { faction: "Life", creatureName: "Valkyrie", level: 2, size: 1, amount: 1 },
+        ]);
+        const passiveFeatures = armyFeatures([
+            { faction: "Life", creatureName: "Angel", level: 4, size: 2, amount: 1 },
+        ]);
+
+        expect(castableFeatures.buffers).toBe(3);
+        expect(passiveFeatures.buffers).toBe(0);
+        expect(passiveFeatures.auraCarriers).toBe(1);
+    });
+
     it("generates two globally exclusive, non-mirrored armies in every cohort", () => {
         for (const cohort of AI_META_COHORTS) {
             for (let pair = 0; pair < 8; pair += 1) {

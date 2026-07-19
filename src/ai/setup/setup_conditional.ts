@@ -89,9 +89,10 @@ export const T2_RANGED_TABLE_MIN_RANGED = 2;
 /**
  * Tier-2 marginal win rates on melee-heavy rosters (0-1 ranged stacks): v0.7 both sides, LIVETWIN=1 with
  * FIGHT_MELEE_ROSTERS=0 ROSTER_RANGED_MIN=0 ROSTER_RANGED_MAX=1, mirrored rosters, 12k games, seed 83015710
- * (measure_artifacts --tier=2, post artifact+augment seeding fix). Headline shift vs the blind v0.5-era
- * table: Tome of Amplification 41.7 -> 74.7 (under the live always-on augment buffs it amplifies them);
- * Crown of Command 43.1 -> 31.2.
+ * (measure_artifacts --tier=2, post artifact+augment seeding fix). Historical shift vs the blind v0.5-era
+ * table: Tome of Amplification 41.7 -> 74.7 under its former augment-amplifying mechanic; Crown of Command
+ * 43.1 -> 31.2. Tome's melee and ranged rows are stale after the 2026-07-18 castable-buffs-only change and
+ * must be remeasured before they are treated as current evidence.
  */
 export const TIER2_ARTIFACT_WINRATE_MELEE: Record<number, number> = {
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 74.7,

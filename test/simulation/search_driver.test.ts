@@ -1730,7 +1730,9 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
 
     it("armed scorer overrides v0.6s's act to a wait the ENGINE ACCEPTS (mirror/engine legality parity)", () => {
         setEnv({});
-        const h = buildBattle(3101, "v0.6s");
+        // Re-pinned 3101 -> 2 after enabling Arachna Queen expanded the L4 roster pool and shifted the
+        // seeded battle at 3101 to a caster decision that the scorer correctly leaves active.
+        const h = buildBattle(2, "v0.6s");
         const { unit } = findEligibleActPoint(h);
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(9) });
         const decided = h.decideActive();

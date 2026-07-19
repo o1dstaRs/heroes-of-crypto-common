@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -201,6 +202,84 @@ describe("AttackHandler", () => {
             expect(result.completed).toBe(true);
             expect(target.hasBuffActive("Helping Hand")).toBe(true);
             expect(caster.hasDebuffActive("Helping Hand")).toBe(true);
+        });
+
+        it("amplifies a Healer's Spiritual Armor cast without mutating the source spell", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const caster = createTestUnit({
+                name: "Healer",
+                team: PBTypes.TeamVals.UPPER,
+                spells: ["Life:Spiritual Armor"],
+            });
+            const target = createTestUnit({
+                name: "Armor Target",
+                team: PBTypes.TeamVals.UPPER,
+                armor: 20,
+            });
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
+            fightProperties.setArtifactPerTeam(
+                PBTypes.TeamVals.UPPER,
+                ArtifactTier.TIER_2,
+                Tier2Artifact.TOME_OF_AMPLIFICATION,
+            );
+            unitsHolder.applyArtifacts(fightProperties);
+
+            const sourceSpell = caster.getSpells()[0];
+            const result = attackHandler.handleMagicAttack(grid.getMatrix(), unitsHolder, sourceSpell, caster, target);
+
+            expect(result.completed).toBe(true);
+            expect(sourceSpell.getPower()).toBe(30);
+            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(45);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+            expect(target.getArmor()).toBeCloseTo(29);
+        });
+
+        it("amplifies Helping Hand's allied benefit but not its caster debuff", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const caster = createTestUnit({
+                name: "Satyr",
+                team: PBTypes.TeamVals.UPPER,
+                spells: ["Life:Helping Hand"],
+                stackPower: 4,
+                maxHp: 100,
+                armor: 20,
+            });
+            const target = createTestUnit({
+                name: "Helping Target",
+                team: PBTypes.TeamVals.UPPER,
+                stackPower: 4,
+                maxHp: 10,
+                armor: 10,
+            });
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
+            fightProperties.setArtifactPerTeam(
+                PBTypes.TeamVals.UPPER,
+                ArtifactTier.TIER_2,
+                Tier2Artifact.TOME_OF_AMPLIFICATION,
+            );
+            unitsHolder.applyArtifacts(fightProperties);
+
+            const sourceSpell = caster.getSpells()[0];
+            const result = attackHandler.handleMagicAttack(grid.getMatrix(), unitsHolder, sourceSpell, caster, target);
+
+            expect(result.completed).toBe(true);
+            expect(sourceSpell.getPower()).toBe(30);
+            expect(target.getBuff("Helping Hand")?.getPower()).toBe(45);
+            expect(caster.getDebuff("Helping Hand")?.getPower()).toBe(30);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+            caster.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+            expect(target.getMaxHp()).toBe(55);
+            expect(target.getBaseArmor()).toBe(19);
+            expect(caster.getMaxHp()).toBe(70);
+            expect(caster.getBaseArmor()).toBe(14);
         });
 
         it("swaps positions for Castling", () => {

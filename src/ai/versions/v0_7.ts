@@ -24,6 +24,7 @@ import {
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import { StrategyV0_4 } from "./v0_4";
 import { StrategyV0_6 } from "./v0_6";
+import { routeArachnaQueenAssimilation } from "./predatory_assimilation_router";
 import { revealConditionedPlacement } from "./v0_7_placement_reveal";
 import {
     applyWaitScorerWeights,
@@ -178,9 +179,12 @@ export class StrategyV0_7 extends StrategyV0_6 {
             const incumbent = this.archetypeAnchor.decideTurn(unit, context);
             const policy = auraCasterRouterPolicy(this.version);
             const decision = policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
-            return normalizeMeleeMagicSelection(unit, decision);
+            return normalizeMeleeMagicSelection(unit, routeArachnaQueenAssimilation(unit, context, decision));
         }
-        return normalizeMeleeMagicSelection(unit, super.decideTurn(unit, context));
+        return normalizeMeleeMagicSelection(
+            unit,
+            routeArachnaQueenAssimilation(unit, context, super.decideTurn(unit, context)),
+        );
     }
     /**
      * Pure-ranged armies use the measured v0.4 placement anchor only against Area Throw; combat remains

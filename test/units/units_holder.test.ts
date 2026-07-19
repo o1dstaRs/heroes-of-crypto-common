@@ -12,7 +12,13 @@
 import { describe, expect, it } from "bun:test";
 
 import { ArmorAugment, MightAugment, MovementAugment, SniperAugment } from "../../src/augments/augment_properties";
-import { ArtifactTier, Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import {
+    ArtifactTier,
+    formatArtifactDescription,
+    getTier2ArtifactProperties,
+    Tier1Artifact,
+    Tier2Artifact,
+} from "../../src/artifacts/artifact_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -289,6 +295,70 @@ describe("UnitsHolder", () => {
         expect(melee.hasBuffActive("Might Augment")).toBe(true);
         expect(melee.hasBuffActive("Sniper Augment")).toBe(false);
         expect(melee.hasBuffActive("Movement Augment")).toBe(true);
+    });
+
+    it("does not let Tome amplify augments or tier-1 artifact stats", () => {
+        const { unitsHolder, grid } = createCombatTestContext();
+        const melee = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            attack: 10,
+            armor: 10,
+        });
+        const ranged = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            attack: 10,
+            armor: 10,
+            rangeShots: 3,
+            shotDistance: 16,
+        });
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        placeUnit(grid, unitsHolder, melee, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, ranged, { x: 3, y: 2 });
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.KEEN_BLADE);
+        fightProperties.setArtifactPerTeam(
+            PBTypes.TeamVals.LOWER,
+            ArtifactTier.TIER_2,
+            Tier2Artifact.TOME_OF_AMPLIFICATION,
+        );
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            type: "Armor",
+            value: ArmorAugment.LEVEL_1,
+        });
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            type: "Might",
+            value: MightAugment.LEVEL_1,
+        });
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            type: "Sniper",
+            value: SniperAugment.LEVEL_1,
+        });
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            type: "Movement",
+            value: MovementAugment.LEVEL_1,
+        });
+
+        unitsHolder.applyArtifacts();
+        unitsHolder.applyAugments();
+        ranged.refreshPossibleAttackTypes(true);
+        melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        ranged.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+
+        expect(melee.hasBuffActive("Tome of Amplification")).toBe(true);
+        expect(melee.getBaseArmor()).toBeCloseTo(10.6);
+        expect(melee.getBaseAttack()).toBeCloseTo(11.5);
+        expect(melee.getSteps()).toBe(4);
+        expect(ranged.getBaseArmor()).toBeCloseTo(10.6);
+        expect(ranged.getBaseAttack()).toBeCloseTo(11.4);
+        expect(ranged.getUnitProperties().shot_distance).toBeCloseTo(19.2);
+        expect(ranged.getSteps()).toBe(4);
+    });
+
+    it("describes Tome as affecting only allied unit-cast buffs", () => {
+        expect(formatArtifactDescription(getTier2ArtifactProperties(Tier2Artifact.TOME_OF_AMPLIFICATION))).toBe(
+            "Increases the power of non-healing castable buffs allied units apply to allies by 50%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+        );
     });
 
     it("applies tier 1 & tier 2 artifact buffs to the right units", () => {

@@ -26,8 +26,9 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(2, levelTwo.slice(0, 2), [], [])).toBe(true);
         expect(canBanCreatureLevel(2, levelTwo.slice(0, 10), [], [])).toBe(false);
         expect(canBanCreatureLevel(4, [], [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 7), [], [])).toBe(false);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 8), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 9), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 10), [], [])).toBe(false);
     });
 
     it("uses the generated level buckets without the no-creature sentinel offset", () => {
@@ -40,9 +41,12 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(1, levelOne.slice(0, 7), [], [])).toBe(true);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 8), [], [])).toBe(false);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 10), [], [])).toBe(false);
+        // L4 now has a 12-creature pool after enabling Arachna Queen. Both teams reserve one pick,
+        // so a 10th ban is legal with 9 already banned; an 11th is refused with 10 already banned.
         expect(canBanCreatureLevel(4, levelFour.slice(0, 4), [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 7), [], [])).toBe(false);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 8), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 9), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 10), [], [])).toBe(false);
     });
 
     it("accounts for known creatures and each team's picked creatures", () => {

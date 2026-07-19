@@ -104,11 +104,10 @@ describe("conditional setup v1 — tier-2 rule", () => {
     });
 
     test("melee roster picks by the melee cohort table (Giant's Maul over the blind Rime Charm pick)", () => {
-        // Post the 2026-07-15 blind-table refresh (setup_strategy.ts), the blind and melee-cohort tables now
-        // AGREE that Tome of Amplification beats Titan Plate (the refresh's whole point — the blind table was
-        // stale pre-LIVETWIN/pre-augment-seeding-fix). Giant's Maul vs Rime Charm is a pair where the two
-        // tables still genuinely disagree: blind prefers Rime Charm (46.3 > 45.3), the melee cohort prefers
-        // Giant's Maul (44.2 > 42.0) — still a real conditional-vs-blind divergence to exercise here.
+        // The frozen 2026-07-15 blind and melee tables agree on their historical Tome ranking, but those Tome
+        // rows predate the castable-buffs-only mechanic. Giant's Maul vs Rime Charm is a pair whose unchanged
+        // rows still genuinely disagree: blind prefers Rime Charm (46.3 > 45.3), while the melee cohort prefers
+        // Giant's Maul (44.2 > 42.0) — a real conditional-vs-blind divergence to exercise here.
         const offered = [Tier2Artifact.RIME_CHARM, Tier2Artifact.GIANTS_MAUL];
         expect(SETUP_POLICY_V0.pickArtifactT2(offered)).toBe(Tier2Artifact.RIME_CHARM);
         expect(conditionalArtifactT2(offered, rosterWithRanged(0), ALL_RULES)).toBe(Tier2Artifact.GIANTS_MAUL);

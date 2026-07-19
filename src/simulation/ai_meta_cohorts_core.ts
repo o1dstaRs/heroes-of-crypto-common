@@ -54,7 +54,7 @@ import { creatureIdForName, draftRoster } from "./draft";
  */
 
 export const AI_META_SCHEMA_VERSION = 1;
-export const AI_META_POLICY = "contextual-oracle-v1-80x20";
+export const AI_META_POLICY = "contextual-oracle-v2-cast-buffs-80x20";
 export const AI_META_EXPLORATION_RATE = 0.2;
 export const AI_META_FIGHT_VERSION = "v0.7";
 export const AI_META_GAMES_PER_MATCHUP = 2;
@@ -260,7 +260,7 @@ export function armyFeatures(roster: readonly IArmyUnitSpec[]): IAiMetaArmyFeatu
             includesAny(info.abilities, ["area", "through shot", "large caliber", "chain", "splash", "spin"]),
         );
         out.doubleAttackers += Number(includesAny(info.abilities, ["double", "second attack", "rapid"]));
-        out.buffers += Number(includesAny(info.abilities, ["aura", "boost", "armor", "power", "morale"]));
+        out.buffers += Number(info.castsAmplifiableBuff);
     });
     return out;
 }
@@ -423,7 +423,9 @@ function tier2ContextScore(
     const ownGround = fraction(own.groundMelee, own.total);
     const opponentRanged = fraction(opponent.ranged, opponent.total);
     const opponentGround = fraction(opponent.groundMelee, opponent.total);
-    const base = TIER2_ARTIFACT_WINRATE[id] ?? 50;
+    // Tome's measured 68.8 baseline came from its former augment amplification. Keep the new mechanic neutral
+    // until it is remeasured, then add only the roster's actual castable-buff signal below.
+    const base = id === Tier2Artifact.TOME_OF_AMPLIFICATION ? 50 : (TIER2_ARTIFACT_WINRATE[id] ?? 50);
     switch (id) {
         case Tier2Artifact.WARLORDS_EDGE:
             return base + 3 * ownGround;
@@ -444,7 +446,7 @@ function tier2ContextScore(
         case Tier2Artifact.BERSERKERS_BOND:
             return base + 4 * ownGround;
         case Tier2Artifact.TOME_OF_AMPLIFICATION:
-            return base + 15 * fraction(own.buffers + own.auraCarriers, own.total);
+            return base + 15 * fraction(own.buffers, own.total);
         case Tier2Artifact.RIME_CHARM:
             return base + 13 * opponentGround;
         case Tier2Artifact.LAVA_STRIDERS:

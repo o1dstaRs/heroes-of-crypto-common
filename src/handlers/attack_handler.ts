@@ -15,6 +15,7 @@ import * as HoCMath from "../utils/math";
 import * as GridMath from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Grid } from "../grid/grid";
+import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
 import type { IWeightedRoute } from "../grid/path_definitions";
@@ -190,7 +191,9 @@ export class AttackHandler {
     }
     public canLandRangeAttack(unit: Unit, aggrMatrix?: number[][]): boolean {
         return (
-            unit.getAttackType() === PBTypes.AttackVals.RANGE &&
+            // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
+            // (Predatory Assimilation) is a legitimate shooter too.
+            unit.isRangeCapable() &&
             !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
@@ -288,8 +291,9 @@ export class AttackHandler {
                     }
                     unitsHolder.refreshStackPowerForAllUnits();
                 } else {
+                    const appliedBuff = amplifyCastBuffForTarget(currentActiveSpell, attackerUnit, targetUnit);
                     targetUnit.applyBuff(
-                        currentActiveSpell,
+                        appliedBuff,
                         attackerUnit.getMaxHp(),
                         attackerUnit.getBaseArmor(),
                         attackerUnit.getId() === targetUnit.getId(),

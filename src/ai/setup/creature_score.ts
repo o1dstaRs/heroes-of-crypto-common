@@ -10,8 +10,10 @@
  */
 
 import CREATURES_JSON from "../../configuration/creatures.json";
+import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { SpellPowerType } from "../../spells/spell_properties";
 
 /**
  * Draft-time creature evaluation shared by the setup AI (server draft) and the sim. A creature is
@@ -43,6 +45,8 @@ export interface ICreatureInfo {
     auraCount: number;
     /** # non-aura abilities — beneficiary for Might's +Stack-Abilities-Power synergy. */
     abilityCount: number;
+    /** Has at least one positive-power, non-healing buff that this unit can actively cast. */
+    castsAmplifiableBuff: boolean;
 }
 
 const CreatureJsonShape = CREATURES_JSON as unknown as Record<
@@ -59,6 +63,7 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             armor?: number;
             speed?: number;
             level?: number;
+            spells?: string[];
             abilities?: string[];
             movement_type?: string;
         }
@@ -66,6 +71,34 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
 >;
 
 const CREATURE_IDS_BY_ENUM_KEY = PBTypes.CreatureVals as unknown as Readonly<Record<string, number>>;
+
+const isAmplifiableBuffSpell = (faction: string, name: string): boolean => {
+    try {
+        const spell = getSpellConfig(faction, name);
+        return (
+            spell.is_buff &&
+            spell.power !== 0 &&
+            spell.power_type !== SpellPowerType.HEAL &&
+            spell.power_type !== SpellPowerType.RESURRECT
+        );
+    } catch {
+        return false;
+    }
+};
+
+const isAmplifiableSpellbookEntry = (entry: string): boolean => {
+    const separator = entry.indexOf(":");
+    if (separator < 0) return false;
+    return isAmplifiableBuffSpell(entry.slice(0, separator), entry.slice(separator + 1));
+};
+
+const isAmplifiableCastableAbility = (name: string): boolean => {
+    try {
+        return getAbilityConfig(name).can_be_cast && isAmplifiableBuffSpell("System", name);
+    } catch {
+        return false;
+    }
+};
 
 /** Browser-safe display-name lookup shared by runtime placement and simulation setup paths. */
 export const creatureIdForName = (name: string): number | undefined => {
@@ -90,6 +123,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 continue;
             }
             const abilityList = cfg.abilities ?? [];
+            const spellList = cfg.spells ?? [];
             index.set(id, {
                 id,
                 name,
@@ -108,6 +142,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 melee: (cfg.attack_type ?? "").includes("MELEE"),
                 auraCount: abilityList.filter((a) => a.includes("Aura")).length,
                 abilityCount: abilityList.filter((a) => !a.includes("Aura")).length,
+                castsAmplifiableBuff:
+                    spellList.some(isAmplifiableSpellbookEntry) || abilityList.some(isAmplifiableCastableAbility),
             });
         }
     }

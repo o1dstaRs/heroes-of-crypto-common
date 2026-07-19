@@ -53,7 +53,7 @@ export enum Tier2Artifact {
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
     FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
     BERSERKERS_BOND = 9, // +3 attack / -2 defense (flat)
-    TOME_OF_AMPLIFICATION = 10, // +50% buff power
+    TOME_OF_AMPLIFICATION = 10, // +50% power to non-healing castable buffs allied units apply to allies
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
 }
@@ -339,7 +339,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "tome_of_amplification",
         "Tome of Amplification",
         "Tome of Amplification",
-        "Increases the power of all buffs by {}%.",
+        "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
     ),
     [Tier2Artifact.RIME_CHARM]: t2(
         Tier2Artifact.RIME_CHARM,

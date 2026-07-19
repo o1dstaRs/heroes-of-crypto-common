@@ -231,12 +231,10 @@ describe("B1 full-game league genome", () => {
         expect(wiredConfig?.greenAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(["lower", "both"]).toContain(wiredGate);
 
-        const noVisionSeed = Array.from({ length: 500 }, (_, value) => value).find((value) => {
-            const setup = resolveLeaguePick(value, alternative, opponent, true);
-            return getKnownOpponentCreatures(setup.state, PBTypes.TeamVals.LOWER).length === 0;
-        });
-        expect(noVisionSeed).toBeDefined();
-        const noVision = resolveLeaguePick(noVisionSeed!, alternative, opponent, true);
+        // Re-pinned after Arachna Queen expanded the L4 offer pool: 925 is the first current seed where
+        // collision reveals still leave the lower player with no legitimate opponent-creature knowledge.
+        const noVision = resolveLeaguePick(925, alternative, opponent, true);
+        expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
         expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");
     });

@@ -22,9 +22,10 @@ const runObservedMatch = (seed: number, maxLaps: number) => {
 describe("battle engine turn execution observer", () => {
     test("emits exactly once per decision with detached actions and explicit skip events", () => {
         // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
-        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps. Re-pinned
-        // 31 -> 18 after enabling Arachna Queen expanded the level-4 roster pool.
-        const { decisions, turns } = runObservedMatch(18, 5);
+        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps.
+        // Re-pinned 31 -> 10 -> 20 after enabling Abomination (41), then Champion/Frenzied Boar (42/43),
+        // shifted roster draws the same way.
+        const { decisions, turns } = runObservedMatch(20, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
@@ -50,9 +51,10 @@ describe("battle engine turn execution observer", () => {
     test("reports a rejected strategy action separately from the recovery shield", () => {
         // Seed re-pinned from 1603 -> 952 after the lap-start morale-roll fix (applyMoraleRolls now reads
         // true accumulated morale, not the stale ±20 lock) shifted the seeded trajectory so 1603 no longer
-        // produced a rejected-melee -> defend-recovery turn. Re-pinned 952 -> 1250 after enabling Arachna Queen
-        // expanded the level-4 roster pool.
-        const { decisions, turns } = runObservedMatch(1250, 40);
+        // produced a rejected-melee -> defend-recovery turn. Re-pinned 952 -> 445 after enabling
+        // Abomination/Champion/Frenzied Boar (catalog ids 41-43) shifted roster draws. Re-pinned 445 -> 952
+        // after enabling Arachna Queen (44) shifted the L4 pool while preserving this observer seam.
+        const { decisions, turns } = runObservedMatch(952, 40);
 
         expect(turns).toHaveLength(decisions.length);
         const recovered = turns.find((turn) => turn.recovery.source === "defend");

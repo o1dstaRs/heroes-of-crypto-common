@@ -53,6 +53,11 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 // getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
 const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 
+// Shot range a natively-melee unit gains when it holds a stolen Endless Quiver (Predatory
+// Assimilation): the quiver's native owner's (Medusa's) shot_distance from creatures.json. Applied in
+// adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
+const STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE = 6.5;
+
 // SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
 // unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
 // and Assimilation must transfer only the remaining charges belonging to the stolen card.
@@ -971,8 +976,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.max_hp;
     }
     public getSteps(): number {
-        // Round: %-based buffs (augments/artifacts, amplified ×1.5 by Tome of Amplification) leave steps
-        // fractional, which breaks integer-only movement math. A no-op for un-buffed integer steps.
+        // Round: %-based buffs can leave steps fractional, which breaks integer-only movement math.
+        // A no-op for un-buffed integer steps.
         return Math.round(this.unitProperties.steps + this.unitProperties.steps_mod);
     }
     public getMorale(): number {
@@ -991,8 +996,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return morale;
     }
     public getLuck(): number {
-        // Round: luck feeds HoCLib.getRandomInt (throws on non-safe-integer args). Artifact/augment buffs
-        // (esp. Tome of Amplification's ×1.5) can leave it fractional. A no-op for un-buffed integer luck.
+        // Round: luck feeds HoCLib.getRandomInt (throws on non-safe-integer args). Artifact/augment buffs can
+        // leave it fractional. A no-op for un-buffed integer luck.
         const luck = Math.round(this.unitProperties.luck + this.unitProperties.luck_mod);
         if (luck > LUCK_MAX_VALUE_TOTAL) {
             return LUCK_MAX_VALUE_TOTAL;
@@ -1036,6 +1041,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.range_shots_mod
             ? this.unitProperties.range_shots_mod
             : this.unitProperties.range_shots;
+    }
+    /**
+     * True when this unit is a shooter AT ALL — natively ranged, or a melee unit that gained shooting
+     * at runtime (a stolen Endless Quiver: endless ammo via range_shots_mod plus a granted
+     * shot_distance in adjustBaseStats). Ammo, pin and debuff checks stay with the callers
+     * (AttackHandler.canLandRangeAttack); this only answers "does the unit have a bow to draw".
+     */
+    public isRangeCapable(): boolean {
+        return (
+            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE ||
+            (this.getRangeShots() > 0 && this.getRangeShotDistance() > 0)
+        );
     }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
@@ -1975,6 +1992,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
+        // A natively-melee unit that gained shooting at runtime — a stolen Endless Quiver keeps
+        // getRangeShots() > 0 through range_shots_mod, and adjustBaseStats grants it a shot_distance —
+        // gets RANGE as a SECONDARY selectable attack type. It is pushed AFTER melee on purpose: the
+        // unit's native melee remains the default selection (possibleAttackTypes[0]).
+        if (
+            !this.possibleAttackTypes.includes(PBTypes.AttackVals.RANGE) &&
+            this.getAttackType() !== PBTypes.AttackVals.RANGE &&
+            this.getRangeShots() > 0 &&
+            this.getRangeShotDistance() > 0 &&
+            canLandRangeAttack
+        ) {
+            this.possibleAttackTypes.push(PBTypes.AttackVals.RANGE);
+        }
+
         if (
             this.getSpellsCount() > 0 &&
             this.getCanCastSpells() &&
@@ -2034,9 +2065,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return true;
         }
 
+        // No attack_type === RANGE requirement here: possibleAttackTypes is the authority (it only ever
+        // contains RANGE for a legal shooter — natively ranged, or melee holding a stolen Endless Quiver).
         if (
             selectedAttackType === PBTypes.AttackVals.RANGE &&
-            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE &&
             this.getRangeShots() &&
             this.selectedAttackType !== selectedAttackType &&
             this.possibleAttackTypes.includes(PBTypes.AttackVals.RANGE)
@@ -2140,7 +2172,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .slice(0, buff.getDesc().length - 1)
                 .join(" ")};${firstBuffPropertyString};${secondBuffPropertyString}`,
         );
-        this.unitProperties.applied_buffs_powers.push(0);
+        // Keep the wire/snapshot representation aligned with the AppliedSpell. This matters for buffs whose
+        // cast-time power differs from configuration (for example, Tome-amplified castable buffs).
+        this.unitProperties.applied_buffs_powers.push(buff.getPower());
     }
     public getBuffProperties(buffName: string): [string, string] {
         const buffProperties: [string, string] = ["", ""];
@@ -2293,15 +2327,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.refreshAndGetAdjustedMaxHp(currentLap, synergyAbilityPowerIncrease, madeOfFireBuff) +
             baseStatsDiff.baseStats.hp;
 
-        // ARTIFACTS: Tome of Amplification scales the power of the team-wide System buffs
-        // (augments + artifacts) folded into effective stats below. Pendant of Vitality adds % HP here.
-        const tomeOfAmplificationBuff = this.getBuff("Tome of Amplification");
-        const artifactBuffAmp = tomeOfAmplificationBuff ? 1 + tomeOfAmplificationBuff.getPower() / 100 : 1;
-        const ampArtifact = (power: number): number => power * artifactBuffAmp;
+        // ARTIFACTS: Pendant of Vitality adds % HP here. Tome of Amplification is intentionally absent from
+        // base-stat recomputation: it applies only at the unit-cast buff boundary (spells/castable_buff.ts).
         const pendantOfVitalityBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityBuff) {
             this.unitProperties.max_hp += Number(
-                ((this.unitProperties.max_hp / 100) * ampArtifact(pendantOfVitalityBuff.getPower())).toFixed(2),
+                ((this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower()).toFixed(2),
             );
         }
 
@@ -2344,11 +2375,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 let artifactLuck = 0;
                 const cursedWardLuckBuff = this.getBuff("Cursed Ward");
                 if (cursedWardLuckBuff) {
-                    artifactLuck += ampArtifact(cursedWardLuckBuff.getPower());
+                    artifactLuck += cursedWardLuckBuff.getPower();
                 }
                 const cloverOfFortuneBuff = this.getBuff("Clover of Fortune");
                 if (cloverOfFortuneBuff) {
-                    artifactLuck += ampArtifact(cloverOfFortuneBuff.getPower());
+                    artifactLuck += cloverOfFortuneBuff.getPower();
                 }
                 this.unitProperties.luck_mod = this.luckPerTurn + synergyLuckIncrease + artifactLuck;
                 if (this.unitProperties.luck_mod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
@@ -2370,13 +2401,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Second buff property carries morale.
         const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
         if (cursedWardMoraleBuff) {
-            this.unitProperties.morale -= ampArtifact(parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10));
+            this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
         }
         const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
         if (crownOfCommandMoraleBuff) {
-            this.unitProperties.morale += ampArtifact(
-                parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10),
-            );
+            this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
         }
         if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
             this.unitProperties.morale = 0;
@@ -2436,7 +2465,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const armorAugmentBuff = this.getBuff("Armor Augment");
         if (armorAugmentBuff) {
             this.unitProperties.base_armor += Number(
-                ((this.unitProperties.base_armor / 100) * ampArtifact(armorAugmentBuff.getPower())).toFixed(2),
+                ((this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower()).toFixed(2),
             );
         }
 
@@ -2447,18 +2476,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
         const titanPlateBuff = this.getBuff("Titan Plate");
         const titanPlateArmorBonus = titanPlateBuff
-            ? Number(((this.unitProperties.base_armor / 100) * ampArtifact(titanPlateBuff.getPower())).toFixed(2))
+            ? Number(((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower()).toFixed(2))
             : 0;
         const ironPlateBuff = this.getBuff("Iron Plate");
         if (ironPlateBuff) {
-            this.unitProperties.base_armor += ampArtifact(ironPlateBuff.getPower());
+            this.unitProperties.base_armor += ironPlateBuff.getPower();
         }
         const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondArmorBuff) {
             this.unitProperties.base_armor = Math.max(
                 1,
-                this.unitProperties.base_armor -
-                    ampArtifact(parseInt(this.getBuffProperties("Berserkers Bond")[1] || "0", 10)),
+                this.unitProperties.base_armor - parseInt(this.getBuffProperties("Berserkers Bond")[1] || "0", 10),
             );
         }
         const huntersLongbowArmorBuff = this.getBuff("Hunters Longbow");
@@ -2466,7 +2494,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const longbowDefPenaltyPercent = parseInt(this.getBuffProperties("Hunters Longbow")[1] || "0", 10);
             if (longbowDefPenaltyPercent > 0) {
                 this.unitProperties.base_armor -= Number(
-                    ((this.unitProperties.base_armor / 100) * ampArtifact(longbowDefPenaltyPercent)).toFixed(2),
+                    ((this.unitProperties.base_armor / 100) * longbowDefPenaltyPercent).toFixed(2),
                 );
             }
         }
@@ -2506,12 +2534,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
-        if (this.hasBuffActive("Spiritual Armor")) {
-            const spell = new Spell({
-                spellProperties: getSpellConfig("Life", "Spiritual Armor"),
-                amount: 1,
-            });
-            armorModMultiplier = (spell.getPower() / 100) * (1 + armorModMultiplier);
+        const spiritualArmorBuff = this.getBuff("Spiritual Armor");
+        if (spiritualArmorBuff) {
+            armorModMultiplier = (spiritualArmorBuff.getPower() / 100) * (1 + armorModMultiplier);
         }
 
         if (armorModMultiplier) {
@@ -2531,7 +2556,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
         if (veteranHelmArmorBuff) {
             this.unitProperties.armor_mod += Number(
-                ((this.unitProperties.base_armor / 100) * ampArtifact(veteranHelmArmorBuff.getPower())).toFixed(2),
+                ((this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower()).toFixed(2),
             );
         }
 
@@ -2592,6 +2617,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const endlessQuiverAbility = this.getAbility("Endless Quiver");
         if (endlessQuiverAbility) {
             this.unitProperties.range_shots_mod = endlessQuiverAbility.getPower();
+        } else if (this.unitProperties.range_shots_mod) {
+            // The quiver is gone (e.g. re-assimilated by another thief) — drop the endless-ammo
+            // override so a natively-melee holder stops reading as a shooter.
+            this.unitProperties.range_shots_mod = 0;
         }
 
         // SPEED
@@ -2625,7 +2654,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const movementAugmentBuff = this.getBuff("Movement Augment");
         if (movementAugmentBuff) {
-            this.unitProperties.steps += ampArtifact(movementAugmentBuff.getPower());
+            this.unitProperties.steps += movementAugmentBuff.getPower();
         }
         // ARTIFACTS: movement. Swift Boots (melee) and Winged Boots (flyers) are only applied to eligible
         // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
@@ -2633,16 +2662,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (swiftBootsBuff) {
             // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
             this.unitProperties.steps += Number(
-                ((this.unitProperties.steps / 100) * ampArtifact(swiftBootsBuff.getPower())).toFixed(2),
+                ((this.unitProperties.steps / 100) * swiftBootsBuff.getPower()).toFixed(2),
             );
         }
         const wingedBootsBuff = this.getBuff("Winged Boots");
         if (wingedBootsBuff) {
-            this.unitProperties.steps += ampArtifact(wingedBootsBuff.getPower());
+            this.unitProperties.steps += wingedBootsBuff.getPower();
         }
         const crownOfCommandStepsBuff = this.getBuff("Crown of Command");
         if (crownOfCommandStepsBuff) {
-            this.unitProperties.steps += ampArtifact(crownOfCommandStepsBuff.getPower());
+            this.unitProperties.steps += crownOfCommandStepsBuff.getPower();
         }
         const battleRoarBuff = this.getBuff("Battle Roar");
         if (battleRoarBuff) {
@@ -2675,6 +2704,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.initialUnitProperties.shot_distance +
               this.initialUnitProperties.shot_distance / madeOfFireBuff.getPower()
             : this.initialUnitProperties.shot_distance;
+        // A stolen Endless Quiver (Predatory Assimilation) makes a natively-melee unit a real shooter:
+        // range_shots_mod above supplies the endless ammo, and this supplies the shot range — the
+        // quiver's native owner's (Medusa's) distance. Natural shooters keep their own distance, and the
+        // grant self-reverts because shot_distance is recomputed from initialUnitProperties every pass.
+        if (endlessQuiverAbility && this.initialUnitProperties.shot_distance <= 0) {
+            this.unitProperties.shot_distance = STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE;
+        }
         if (pegasusMightAura) {
             this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
@@ -2683,7 +2719,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * ampArtifact(mightAugmentBuff.getPower())).toFixed(2),
+                ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
             );
         }
 
@@ -2692,11 +2728,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
                 this.unitProperties.base_attack += Number(
-                    ((this.unitProperties.base_attack / 100) * ampArtifact(parseInt(buffProperties[0]))).toFixed(2),
+                    ((this.unitProperties.base_attack / 100) * parseInt(buffProperties[0])).toFixed(2),
                 );
                 // SHOT DISTANCE
                 this.unitProperties.shot_distance += Number(
-                    ((this.unitProperties.shot_distance / 100) * ampArtifact(parseInt(buffProperties[1]))).toFixed(2),
+                    ((this.unitProperties.shot_distance / 100) * parseInt(buffProperties[1])).toFixed(2),
                 );
             }
         }
@@ -2708,20 +2744,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const farsightQuiverBuff = this.getBuff("Farsight Quiver");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
             this.unitProperties.shot_distance += Number(
-                ((this.initialUnitProperties.shot_distance / 100) * ampArtifact(farsightQuiverBuff.getPower())).toFixed(
-                    2,
-                ),
+                ((this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower()).toFixed(2),
             );
         }
 
         // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
         const keenBladeBuff = this.getBuff("Keen Blade");
         if (keenBladeBuff) {
-            this.unitProperties.base_attack += ampArtifact(keenBladeBuff.getPower());
+            this.unitProperties.base_attack += keenBladeBuff.getPower();
         }
         const berserkersBondAttackBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondAttackBuff) {
-            this.unitProperties.base_attack += ampArtifact(berserkersBondAttackBuff.getPower());
+            this.unitProperties.base_attack += berserkersBondAttackBuff.getPower();
         }
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
@@ -2729,20 +2763,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
         const warlordsEdgeBuff = this.getBuff("Warlords Edge");
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
-            ? Number(((this.unitProperties.base_attack / 100) * ampArtifact(warlordsEdgeBuff.getPower())).toFixed(2))
+            ? Number(((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower()).toFixed(2))
             : 0;
         const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.
             const longbowAttackFlat = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
-            this.unitProperties.base_attack += ampArtifact(longbowAttackFlat);
+            this.unitProperties.base_attack += longbowAttackFlat;
         }
         const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityAttackBuff) {
             // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
             const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
             this.unitProperties.base_attack -= Number(
-                ((this.unitProperties.base_attack / 100) * ampArtifact(pendantAttackPenaltyPercent)).toFixed(2),
+                ((this.unitProperties.base_attack / 100) * pendantAttackPenaltyPercent).toFixed(2),
             );
         }
 
@@ -2760,18 +2794,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_damage_min = this.initialUnitProperties.attack_damage_min;
         }
 
-        if (this.hasBuffActive("Riot")) {
-            const spell = new Spell({
-                spellProperties: getSpellConfig("Chaos", "Riot"),
-                amount: 1,
-            });
-            this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
-        } else if (this.hasBuffActive("Mass Riot")) {
-            const spell = new Spell({
-                spellProperties: getSpellConfig("Chaos", "Mass Riot"),
-                amount: 1,
-            });
-            this.unitProperties.attack_mod = (this.unitProperties.base_attack * spell.getPower()) / 100;
+        const riotBuff = this.getBuff("Riot");
+        const massRiotBuff = this.getBuff("Mass Riot");
+        if (riotBuff) {
+            this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
+        } else if (massRiotBuff) {
+            this.unitProperties.attack_mod = (this.unitProperties.base_attack * massRiotBuff.getPower()) / 100;
         } else {
             this.unitProperties.attack_mod = this.initialUnitProperties.attack_mod;
         }

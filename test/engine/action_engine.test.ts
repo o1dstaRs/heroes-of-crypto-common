@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
@@ -1572,11 +1573,17 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
     });
 
-    it("casts a mass spell through common mechanics", () => {
+    it("does not amplify healing spells with Tome", () => {
         const setup = setupActionFight({
             lowerSpells: ["Life:Mass Heal"],
             lowerStackPower: 3,
         });
+        setup.fightProperties.setArtifactPerTeam(
+            PBTypes.TeamVals.LOWER,
+            ArtifactTier.TIER_2,
+            Tier2Artifact.TOME_OF_AMPLIFICATION,
+        );
+        setup.unitsHolder.applyArtifacts(setup.fightProperties);
         setup.lowerSupport.applyDamage(6, 0, setup.sceneLog);
         const hpBefore = setup.lowerSupport.getHp();
 
@@ -1594,18 +1601,55 @@ describe("GameActionEngine", () => {
                 spellName: "Mass Heal",
             }),
         );
-        expect(setup.lowerSupport.getHp()).toBeGreaterThan(hpBefore);
+        expect(setup.lowerSupport.getHp()).toBe(hpBefore + 2);
         expect(setup.lower.hasSpellRemaining("Mass Heal")).toBe(false);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
-    it("casts mass flying buffs through common mechanics", () => {
+    it("amplifies an Ogre Mage's Mass Riot once for every allied recipient", () => {
+        const setup = setupActionFight({
+            lowerSpells: ["Chaos:Mass Riot"],
+            lowerStackPower: 4,
+        });
+        setup.fightProperties.setArtifactPerTeam(
+            PBTypes.TeamVals.LOWER,
+            ArtifactTier.TIER_2,
+            Tier2Artifact.TOME_OF_AMPLIFICATION,
+        );
+        setup.unitsHolder.applyArtifacts(setup.fightProperties);
+        const sourceSpell = setup.lower.getSpells()[0];
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Mass Riot",
+        });
+
+        expect(result.completed).toBe(true);
+        expect(sourceSpell.getPower()).toBe(25);
+        expect(setup.lower.getBuff("Mass Riot")?.getPower()).toBe(37.5);
+        expect(setup.lowerSupport.getBuff("Mass Riot")?.getPower()).toBe(37.5);
+        expect(setup.lowerSupport.getUnitProperties().applied_buffs_powers).toContain(37.5);
+        expect(setup.lowerSupport.getBuff("Mass Riot")?.getPower()).not.toBe(56.25);
+        setup.lowerSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(setup.lowerSupport.getAttack()).toBeCloseTo(13.75);
+        setup.lowerSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(setup.lowerSupport.getAttack()).toBeCloseTo(13.75);
+    });
+
+    it("amplifies a cast Wind Flow only for allied flyers", () => {
         const setup = setupActionFight({
             lowerSpells: ["System:Wind Flow"],
             lowerStackPower: 5,
             supportMovementType: PBTypes.MovementVals.FLY,
             upperMovementType: PBTypes.MovementVals.FLY,
         });
+        setup.fightProperties.setArtifactPerTeam(
+            PBTypes.TeamVals.LOWER,
+            ArtifactTier.TIER_2,
+            Tier2Artifact.TOME_OF_AMPLIFICATION,
+        );
+        setup.unitsHolder.applyArtifacts(setup.fightProperties);
 
         const result = setup.engine.apply({
             type: "cast_spell",
@@ -1616,6 +1660,8 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.lowerSupport.hasBuffActive("Wind Flow")).toBe(true);
         expect(setup.upper.hasBuffActive("Wind Flow")).toBe(true);
+        expect(setup.lowerSupport.getBuff("Wind Flow")?.getPower()).toBe(6);
+        expect(setup.upper.getBuff("Wind Flow")?.getPower()).toBe(4);
         expect(setup.lower.hasSpellRemaining("Wind Flow")).toBe(false);
     });
 

@@ -602,7 +602,10 @@
         "Tome of Amplification": {
             "name": "Tome of Amplification",
             "level": 0,
-            "desc": ["Artifact. Increases the power of all buffs by {}%.", "Lasts till the end of the fight."],
+            "desc": [
+                "Artifact. Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+                "Lasts till the end of the fight."
+            ],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -765,7 +768,7 @@
             "level": 2,
             "desc": ["Gives 30% of max HP and base armor from caster to an ally.", "Lasts 3 laps."],
             "target": "ANY_ALLY",
-            "power": 0,
+            "power": 30,
             "power_type": "COMMON",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,

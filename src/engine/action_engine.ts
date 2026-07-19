@@ -28,6 +28,7 @@ import { getDistance } from "../utils/math";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import type { AttackHandler } from "../handlers/attack_handler";
 import type { IAnimationData, IVisibleDamage } from "../scene/animations";
+import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
@@ -478,7 +479,9 @@ export class GameActionEngine {
         let responseDivisor = 1;
         let responseUnits: Unit[] | undefined = undefined;
         if (
-            target.getAttackType() === PBTypes.AttackVals.RANGE &&
+            // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
+            // counter-shoots like any other shooter.
+            target.isRangeCapable() &&
             target.getRangeShots() > 0 &&
             !target.hasDebuffActive("Range Null Field Aura") &&
             !target.hasDebuffActive("Rangebane") &&
@@ -1030,7 +1033,12 @@ export class GameActionEngine {
                     continue;
                 }
                 if (!SpellHelper.hasAlreadyAppliedSpell(unit, spell)) {
-                    unit.applyBuff(spell, undefined, undefined, unit.getId() === caster.getId());
+                    unit.applyBuff(
+                        amplifyCastBuffForTarget(spell, caster, unit),
+                        undefined,
+                        undefined,
+                        unit.getId() === caster.getId(),
+                    );
                 }
             }
         };
@@ -1077,9 +1085,19 @@ export class GameActionEngine {
                         .getDesc()
                         .map((description) => description.replace(/\{\}/g, caster.getAmountAlive().toString())),
                 );
-                unit.applyBuff(scaledSpell, undefined, undefined, unit.getId() === caster.getId());
+                unit.applyBuff(
+                    amplifyCastBuffForTarget(scaledSpell, caster, unit),
+                    undefined,
+                    undefined,
+                    unit.getId() === caster.getId(),
+                );
             } else {
-                unit.applyBuff(spell, undefined, undefined, unit.getId() === caster.getId());
+                unit.applyBuff(
+                    amplifyCastBuffForTarget(spell, caster, unit),
+                    undefined,
+                    undefined,
+                    unit.getId() === caster.getId(),
+                );
             }
         }
     }

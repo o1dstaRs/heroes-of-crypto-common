@@ -162,9 +162,10 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
 /**
  * Measured marginal win-rate per Tier-2 artifact: v0.7 self-play, 20,000 games, LIVETWIN=1, seed 84001710.
  * See measure_artifacts.ts --tier=2. REFRESHED 2026-07-15 — see the TIER1_ARTIFACT_WINRATE docstring above
- * for the full provenance (same bugfix, same bake). Headline rerank: Tome of Amplification
- * #9(41.7%)->#1(68.8%) — it amplifies the always-on live augment buffs, invisible in the old no-augment
- * measurement; Farsight Quiver #4(62.5%)->#5(47.1%).
+ * for the full provenance (same bugfix, same bake). Historical headline rerank: Tome of Amplification
+ * #9(41.7%)->#1(68.8%) under its former augment-amplifying mechanic; Farsight Quiver
+ * #4(62.5%)->#5(47.1%). Tome's row is stale after the 2026-07-18 castable-buffs-only change and remains
+ * here only until the Tier-2 table is remeasured and re-gated.
  */
 export const TIER2_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 68.8,

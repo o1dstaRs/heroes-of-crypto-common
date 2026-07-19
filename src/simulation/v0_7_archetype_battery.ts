@@ -99,8 +99,8 @@ function rawCreatureConfigs(): Map<string, IRawCreatureConfig> {
 
 /**
  * v0.7 preregistration freeze: the archetype battery was preregistered when ANGEL=40 was the last
- * catalog id. Arachna Queen was enabled later, so exclude post-Angel creatures to keep the taxonomy—and
- * historical manifests that pin its sha256—stable.
+ * catalog id. Creatures enabled later (Abomination onward) are excluded so the taxonomy — and every
+ * historical manifest that pins its sha256 (composed-ladder taxonomySha256) — stays stable.
  */
 const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
 

@@ -261,6 +261,67 @@ describe("PathHelper Tests", () => {
             expect(result).toEqual({ x: 3, y: 5 });
         });
 
+        test("does NOT return the attacker's own cell for a far-away target (phantom-range regression)", () => {
+            // A melee attacker stands ADJACENT to enemy A, so its own standing cell is in attackCells
+            // (a legit "attack in place" spot FOR ENEMY A). Hovering far-away enemy B must yield no
+            // attack-from cell — the own-cell escape used to leak through, and the hover painted a
+            // full attack preview that read as a ranged shot (the Arachna Queen phantom-range bug).
+            const attackerCells = [{ x: 2, y: 13 }];
+            // Attack cells computed for adjacent enemy A at (1,12): include the attacker's own cell.
+            const attackCells = [
+                { x: 2, y: 13 },
+                { x: 1, y: 13 },
+                { x: 2, y: 12 },
+            ];
+            const farTargetCells = [
+                { x: 12, y: 5 },
+                { x: 11, y: 5 },
+                { x: 12, y: 4 },
+                { x: 11, y: 4 },
+            ];
+
+            expect(
+                pathHelper.calculateClosestAttackFrom(
+                    positionForCell({ x: 11, y: 4 }),
+                    attackCells,
+                    attackerCells,
+                    farTargetCells,
+                    true,
+                    1,
+                    false,
+                    PBTypes.TeamVals.NO_TEAM,
+                    new Map(),
+                ),
+            ).toBeUndefined();
+        });
+
+        test("keeps the in-place attack cell for a LARGE attacker whose anchor is out of range but footprint adjacent", () => {
+            // 2x2 attacker footprint; its top-right ANCHOR (3,14) is 2 cells from the small enemy at
+            // (1,12), but the footprint cell (2,13) touches it — the own-cell escape must still admit
+            // the anchor as an "attack in place" spot (the legit case the escape exists for).
+            const attackerCells = [
+                { x: 3, y: 14 },
+                { x: 2, y: 14 },
+                { x: 3, y: 13 },
+                { x: 2, y: 13 },
+            ];
+            const anchorHash = (3 << 4) | 14;
+
+            expect(
+                pathHelper.calculateClosestAttackFrom(
+                    positionForCell({ x: 1, y: 12 }),
+                    [{ x: 3, y: 14 }],
+                    attackerCells,
+                    [{ x: 1, y: 12 }],
+                    false,
+                    1,
+                    true,
+                    PBTypes.TeamVals.NO_TEAM,
+                    new Map([[anchorHash, [{ x: 3, y: 14 }]]]),
+                ),
+            ).toEqual({ x: 3, y: 14 });
+        });
+
         test("should reverse large-unit attack-cell choice when the pointer is on a target corner", () => {
             const helperAny = pathHelper as any;
             const mousePosition = positionForCell({ x: 4, y: 4 });

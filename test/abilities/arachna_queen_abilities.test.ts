@@ -12,6 +12,7 @@ import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
+import { createSequenceGameRuntime } from "../../src/engine/runtime";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -520,5 +521,129 @@ describe("Infest", () => {
         expect(events).toContainEqual(expect.objectContaining({ type: "unit_resurrected", unitId: victim.getId() }));
         expect(events.some((event) => event.type === "unit_summoned")).toBe(false);
         expect(unitsHolder.getAllUnits().get(victim.getId())?.isDead()).toBe(false);
+    });
+});
+
+describe("Stolen Endless Quiver", () => {
+    it("turns a natively-melee thief into a real shooter, with melee still the default attack type", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const thief = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Predatory Assimilation"],
+            shotDistance: 0,
+        });
+        const archer = createTestUnit({
+            name: "Medusa",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 9,
+            shotDistance: 6.5,
+            abilities: ["Endless Quiver"],
+        });
+        placeUnit(grid, unitsHolder, thief, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, archer, { x: 10, y: 10 });
+        setDeterministicRandomSource(() => 0);
+        expect(processPredatoryAssimilationAbility(thief, archer, new SceneLogMock())?.abilityName).toBe(
+            "Endless Quiver",
+        );
+
+        // Before the stat pass the thief still reads as a plain melee unit.
+        expect(thief.getRangeShots()).toBe(0);
+        thief.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+        // Endless ammo via range_shots_mod + the quiver's native owner's shot range.
+        expect(thief.getRangeShots()).toBe(99);
+        expect(thief.getRangeShotDistance()).toBe(6.5);
+        expect(thief.getAttackType()).toBe(PBTypes.AttackVals.MELEE);
+        expect(thief.isRangeCapable()).toBe(true);
+        expect(attackHandler.canLandRangeAttack(thief)).toBe(true);
+
+        // RANGE becomes selectable, but the unit's native MELEE stays the DEFAULT selection.
+        thief.refreshPossibleAttackTypes(true);
+        expect(thief.getPossibleAttackTypes()).toEqual([PBTypes.AttackVals.MELEE, PBTypes.AttackVals.RANGE]);
+        expect(thief.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+        expect(thief.selectAttackType(PBTypes.AttackVals.RANGE)).toBe(true);
+        expect(thief.getAttackTypeSelection()).toBe(PBTypes.AttackVals.RANGE);
+
+        // Shooting never depletes the endless quiver (decrement touches range_shots, not the mod).
+        thief.decreaseNumberOfShots();
+        expect(thief.getRangeShots()).toBe(99);
+
+        // Losing the quiver (e.g. re-assimilated by another thief) reverts the whole grant.
+        thief.disableAbilityAsStolen("Endless Quiver");
+        thief.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(thief.getRangeShots()).toBe(0);
+        expect(thief.getRangeShotDistance()).toBe(0);
+        expect(thief.isRangeCapable()).toBe(false);
+        thief.refreshPossibleAttackTypes(true);
+        expect(thief.getPossibleAttackTypes()).toEqual([PBTypes.AttackVals.MELEE]);
+    });
+
+    it("lets the quiver thief actually EXECUTE a ranged attack through the action engine", () => {
+        const context = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setGridType(PBTypes.GridVals.NORMAL);
+        fightProperties.startFight();
+
+        const thief = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Predatory Assimilation"],
+            shotDistance: 0,
+            attack: 40,
+            damageMin: 30,
+            damageMax: 30,
+            speed: 5,
+        });
+        const farEnemy = createTestUnit({
+            name: "Far Enemy",
+            team: PBTypes.TeamVals.UPPER,
+            maxHp: 400,
+            amountAlive: 20,
+            armor: 0,
+        });
+        placeUnit(context.grid, context.unitsHolder, thief, { x: 2, y: 5 });
+        placeUnit(context.grid, context.unitsHolder, farEnemy, { x: 8, y: 5 });
+
+        thief.grantStolenAbility("Endless Quiver");
+        thief.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        thief.refreshPossibleAttackTypes(true);
+        expect(thief.selectAttackType(PBTypes.AttackVals.RANGE)).toBe(true);
+
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => thief.getId(),
+            runtime: createSequenceGameRuntime({ nowMillis: [1400] }),
+        });
+
+        const hpBefore = farEnemy.getCumulativeHp();
+        const result = engine.apply({
+            type: "range_attack",
+            attackerId: thief.getId(),
+            targetId: farEnemy.getId(),
+            aimCell: { x: 8, y: 5 },
+        });
+        expect(result.completed).toBe(true);
+        expect(farEnemy.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(result.events.some((event) => event.type === "unit_attacked")).toBe(true);
+    });
+
+    it("never offers RANGE to a melee unit without the quiver", () => {
+        const melee = createTestUnit({ name: "Plain Melee", shotDistance: 0 });
+        melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        melee.refreshPossibleAttackTypes(true);
+        expect(melee.getPossibleAttackTypes()).toEqual([PBTypes.AttackVals.MELEE]);
+        expect(melee.selectAttackType(PBTypes.AttackVals.RANGE)).toBe(false);
+        expect(melee.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
     });
 });
