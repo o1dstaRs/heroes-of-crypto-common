@@ -71,6 +71,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_OBSERVE_ONLY",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
@@ -383,6 +384,26 @@ function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrate
 }
 
 describe("search driver — gating, hygiene, determinism", () => {
+    const productiveActionTypes = new Set<GameAction["type"]>([
+        "move_unit",
+        "melee_attack",
+        "range_attack",
+        "area_throw_attack",
+        "cast_spell",
+    ]);
+    const hasProductiveAction = (actions: readonly GameAction[]): boolean =>
+        actions.some((action) => productiveActionTypes.has(action.type));
+    const expectEngineAcceptsProductiveDecision = (harness: Harness, actions: readonly GameAction[]): void => {
+        const executions = actions.map((action) => ({ action, result: harness.engine.apply(action) }));
+        expect(
+            executions.some(({ action, result }) => result.completed && productiveActionTypes.has(action.type)),
+        ).toBe(true);
+        expect(
+            executions
+                .filter(({ action }) => action.type !== "select_attack_type")
+                .every(({ result }) => result.completed),
+        ).toBe(true);
+    };
     const stableSnapshot = (harness: Harness): unknown => {
         const snapshot = normalize(snapshotBattle(harness.unitsHolder, harness.grid, harness.fightProperties)) as {
             fight?: { id?: string };
@@ -528,7 +549,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const id = unit.getId();
         const incumbent: GameAction[] = [{ type: "defend_turn", unitId: id }];
         const mine: GameAction[] = [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }];
-        const productive: GameAction[] = [{ type: "move_unit", unitId: id, cells: [] }];
+        const productive: GameAction[] = [{ type: "move_unit", unitId: id, path: [] }];
         const candidates = [
             { kind: "incumbent", actions: incumbent },
             { kind: "mine", actions: mine },
@@ -846,6 +867,53 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
+    it("keeps v0.8 productive with an engine-valid fallback after its search circuit opens", () => {
+        const auditPath = join(mkdtempSync(join(tmpdir(), "search-v08-circuit-")), "audit.jsonl");
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.000001",
+            SEARCH_AUDIT: auditPath,
+        });
+        const h = buildBattle(204, "v0.8s");
+        h.playTurns(10);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const firstIncumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const secondIncumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const thirdIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit!.getId() }];
+        const firstResult: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        let searchCalls = 0;
+        const intercepted = driver as unknown as {
+            search(): GameAction[];
+        };
+        intercepted.search = () => {
+            searchCalls += 1;
+            return firstResult;
+        };
+
+        expect(driver.chooseDecision(unit!, "v0.8s", firstIncumbent)).toBe(firstResult);
+        const before = stableSnapshot(h);
+        const secondResult = driver.chooseDecision(unit!, "v0.8s", secondIncumbent);
+        const thirdResult = driver.chooseDecision(unit!, "v0.8s", thirdIncumbent);
+        expect(hasProductiveAction(secondResult)).toBe(true);
+        expect(hasProductiveAction(thirdResult)).toBe(true);
+        expect(stableSnapshot(h)).toEqual(before);
+        expect(searchCalls).toBe(1);
+
+        driver.onMatchEnd("v0.8s", "elimination");
+        const summary = JSON.parse(readFileSync(auditPath, "utf8").trim());
+        expect(summary).toMatchObject({
+            mode: "search",
+            decisions: 1,
+            circuitBreakerMs: 0.000001,
+            circuitOpened: true,
+            circuitSkipped: 2,
+        });
+        expectEngineAcceptsProductiveDecision(h, secondResult);
+    });
+
     it("a search does not consume (advance) the tournament's seeded RNG stream", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ROLLOUTS: "2", SEARCH_HORIZON: "6" });
         const h = buildBattle(4242, "v0.6");
@@ -943,6 +1011,105 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(after).toEqual(before);
         expect(counters.deadlineFallbacks).toBe(1);
         expect(counters.scoredCandidatesTotal).toBe(0);
+    });
+
+    it("uses an engine-valid productive v0.8 fallback when the decision deadline expires", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "6",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_DECISION_DEADLINE_MS: "0.000001",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const h = buildBattle(1313, "v0.8s");
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        const counters = (
+            driver as unknown as {
+                counters: { deadlineFallbacks: number; scoredCandidatesTotal: number };
+            }
+        ).counters;
+        const before = stableSnapshot(h);
+        setDeterministicRandomSource(makeRng(0x5eed));
+        const expectedNextRandom = getRandomInt(0, 1_000_000);
+        setDeterministicRandomSource(makeRng(0x5eed));
+
+        const chosen = driver.chooseDecision(unit!, "v0.8s", incumbent);
+
+        expect(chosen).not.toBe(incumbent);
+        expect(hasProductiveAction(chosen)).toBe(true);
+        expect(stableSnapshot(h)).toEqual(before);
+        expect(getRandomInt(0, 1_000_000)).toBe(expectedNextRandom);
+        expect(counters.deadlineFallbacks).toBe(1);
+        expect(counters.scoredCandidatesTotal).toBe(0);
+        expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("keeps v0.8 observe-only deadline and circuit fallbacks on the exact incumbent", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_OBSERVE_ONLY: "1",
+            SEARCH_DECISION_DEADLINE_MS: "0.000001",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.00001",
+        });
+        const h = buildBattle(1313, "v0.8s");
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const firstIncumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const secondIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        const counters = (
+            driver as unknown as {
+                counters: { decisions: number; deadlineFallbacks: number; circuitSkipped: number };
+            }
+        ).counters;
+
+        expect(driver.chooseDecision(unit!, "v0.8s", firstIncumbent)).toBe(firstIncumbent);
+        expect(driver.chooseDecision(unit!, "v0.8s", secondIncumbent)).toBe(secondIncumbent);
+        expect(counters).toMatchObject({ decisions: 1, deadlineFallbacks: 1, circuitSkipped: 1 });
+    });
+
+    it("skips a rejected productive probe and preserves a true no-productive fallback", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const h = buildBattle(1313, "v0.8s");
+        h.playTurns(8);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: unit!.getId() }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver);
+        expect(driver.chooseDecision(unit!, "v0.8s", incumbent)).toBe(incumbent);
+        const productive = calls[0].filter((candidate) => hasProductiveAction(candidate.actions));
+        expect(productive.length).toBeGreaterThan(0);
+        const invalid = {
+            ...productive[0],
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: unit!.getId(), path: [] }],
+        } as IEnumeratedCandidate;
+        const internal = driver as unknown as {
+            firstEngineValidProductiveCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+            ): IEnumeratedCandidate | undefined;
+        };
+        const before = stableSnapshot(h);
+
+        const fallback = internal.firstEngineValidProductiveCandidate(unit!, [invalid, ...productive], 123);
+        h.setActiveUnitId(unit!.getId());
+        expect(fallback).toBe(productive[0]);
+        expect(stableSnapshot(h)).toEqual(before);
+
+        expect(internal.firstEngineValidProductiveCandidate(unit!, [invalid], 123)).toBeUndefined();
+        h.setActiveUnitId(unit!.getId());
+        expect(stableSnapshot(h)).toEqual(before);
     });
 
     it("is deterministic: the same decision point yields the same choice twice", () => {

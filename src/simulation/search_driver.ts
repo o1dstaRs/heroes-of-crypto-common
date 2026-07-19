@@ -94,10 +94,12 @@ import {
  * SEARCH_SHORTLIST=<K> is an opt-in research cost control: score every candidate once at the immediate
  * post-action leaf, then run the configured horizon only for the incumbent plus the best K-1 legal
  * challengers. K includes the incumbent and must be >=2. Unset keeps the original full-candidate search.
- * SEARCH_DECISION_DEADLINE_MS=<positive ms> is an opt-in fail-closed work deadline. It is checked between
- * candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle and returns
- * the exact incumbent. When combined with the circuit breaker it must be strictly lower, leaving restore and
- * call-site headroom.
+ * SEARCH_DECISION_DEADLINE_MS=<positive ms> is an opt-in fail-closed rollout-comparison deadline. It is checked
+ * between candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle.
+ * Historical versions return the exact incumbent, while v0.8 first runs one bounded immediate-action validity
+ * probe and returns that prevalidated productive fallback when one exists. The probe is outside the comparison
+ * deadline but inside the circuit timer. The deadline must be strictly below the circuit breaker, leaving restore
+ * and call-site headroom.
  * SEARCH_LATE_RANGED_FINISH_WEIGHT=<0..16> is a default-zero research overlay on the leaf logit. It rewards
  * late damage to the enemy's original army in proportion to the post-setup board's HP-weighted rangedness,
  * ramping from zero through lap 3 to full strength at the first Armageddon lap. Summons are excluded.
@@ -105,8 +107,10 @@ import {
  * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
  * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
- * outer per-match circuit: the first over-budget result still applies, then this match's driver returns each
- * later incumbent unchanged. The live wrapper also includes call-site overhead outside this internal timer.
+ * outer per-match circuit: the first over-budget result still applies, then historical versions return each
+ * later incumbent unchanged. v0.8 still enumerates and engine-validates a bounded productive fallback so an
+ * open circuit cannot turn the rest of the fight into waits, Luck Shields, or mountain attacks. The live wrapper
+ * also includes call-site overhead outside this internal timer.
  *
  * SCORING: each candidate is played through the REAL engine on the live battle state (battle_snapshot
  * save/restore around every rollout), then the game rolls forward — both sides playing their real
@@ -677,18 +681,22 @@ export class SearchDriver {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
+        const prioritizeProductiveActions = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
+        const useProductiveFallback = prioritizeProductiveActions && !this.observeOnly;
         if (this.incumbentKinds && !this.incumbentKinds.has(classifyActions(incumbent))) {
             return incumbent;
         }
         if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
             this.onFightReady();
         }
-        if (this.circuitOpen) {
+        // Historical and observe-only searches preserve the exact fail-closed incumbent behavior. v0.8 must
+        // still enumerate its engine-valid productive fallback after the rollout circuit opens, otherwise every
+        // later policy wait/no-op/mine bypasses the priority that completed searches enforce.
+        if (this.circuitOpen && !useProductiveFallback) {
             this.counters.circuitSkipped += 1;
             return incumbent;
         }
         const t0 = performance.now();
-        this.counters.decisions += 1;
         const savedSource = getDeterministicRandomSource();
         const savedActive = this.deps.getActiveUnitId();
         const seedBase = this.simSeed(unit);
@@ -698,6 +706,7 @@ export class SearchDriver {
         setDeterministicRandomSource(makeRng(seedBase));
         try {
             if (this.mode === "oracle") {
+                this.counters.decisions += 1;
                 // Gate-1 never enumerates: the candidate pair is {incumbent, wait} by construction.
                 return this.oracle(unit, incumbent, seedBase, t0);
             }
@@ -726,12 +735,26 @@ export class SearchDriver {
                 }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             });
+            // Prepare a bounded, deterministic fallback before an expensive rollout can exhaust its deadline.
+            // The probe uses the real engine and full battle snapshot/restore, so "productive" means the action
+            // actually completes rather than merely passing the enumerator's legality mirror. A circuit-open
+            // decision also probes here because it intentionally skips the expensive comparison below.
+            const productiveFallback =
+                useProductiveFallback && (this.decisionDeadlineMs !== null || this.circuitOpen)
+                    ? this.firstEngineValidProductiveCandidate(unit, candidates, seedBase)
+                    : undefined;
+            if (this.circuitOpen) {
+                this.counters.circuitSkipped += 1;
+                this.counters.msTotal += performance.now() - t0;
+                return productiveFallback?.actions ?? incumbent;
+            }
+            this.counters.decisions += 1;
             if (this.mode === "ablation") {
                 return this.ablate(unit, candidates, incumbent, seedBase, t0);
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                return incumbent;
+                return productiveFallback?.actions ?? incumbent;
             }
             return this.search(
                 unit,
@@ -739,7 +762,8 @@ export class SearchDriver {
                 incumbent,
                 seedBase,
                 t0,
-                V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version),
+                prioritizeProductiveActions,
+                productiveFallback,
             );
         } finally {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
@@ -900,6 +924,7 @@ export class SearchDriver {
         seedBase: number,
         t0: number,
         prioritizeProductiveActions = false,
+        productiveFallback?: IEnumeratedCandidate,
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -961,6 +986,9 @@ export class SearchDriver {
         } catch (error) {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
             this.counters.deadlineFallbacks += 1;
+            const fallbackActions = productiveFallback?.actions ?? incumbent;
+            const fallbackKind =
+                productiveFallback?.kind === "incumbent" ? incumbentKind : (productiveFallback?.kind ?? incumbentKind);
             const ms = performance.now() - t0;
             this.counters.msTotal += ms;
             if (this.auditPath && this.auditTurns) {
@@ -976,11 +1004,12 @@ export class SearchDriver {
                         nc: candidates.length,
                         ns: 0,
                         inc: incumbentKind,
-                        chosen: incumbentKind,
-                        ov: 0,
+                        chosen: fallbackKind,
+                        ov: Number(fallbackActions !== incumbent),
                         d: null,
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
+                        productiveFallback: Number(productiveFallback !== undefined),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -993,7 +1022,7 @@ export class SearchDriver {
                     }),
                 );
             }
-            return incumbent;
+            return fallbackActions;
         }
         const incumbentIllegal = means[0] === -Infinity;
         if (incumbentIllegal) {
@@ -1106,6 +1135,31 @@ export class SearchDriver {
             );
         }
         return overridden ? scoredCandidates[bestIdx].actions : incumbent;
+    }
+    /**
+     * Return the first productive candidate that completes through the real action engine. The immediate-leaf
+     * probe has no rollout horizon and no decision deadline; it exists specifically so a deadline/circuit fallback
+     * is already known-valid. Candidate zero is reclassified for strict challenger semantics: any rejected
+     * meaningful action invalidates the probe instead of inheriting the incumbent's permissive recovery behavior.
+     */
+    private firstEngineValidProductiveCandidate(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        seedBase: number,
+    ): IEnumeratedCandidate | undefined {
+        for (const candidate of candidates) {
+            if (!isProductiveCandidate(candidate)) continue;
+            const strictCandidate: ISearchCandidate =
+                candidate.kind === "incumbent"
+                    ? {
+                          kind: classifyActions(candidate.actions) as CandidateKind,
+                          actions: candidate.actions,
+                      }
+                    : candidate;
+            const [score] = this.scoreCandidates(unit, [strictCandidate], seedBase, "leaf", 1, null);
+            if (score !== -Infinity) return candidate;
+        }
+        return undefined;
     }
     /** Immediate-leaf pre-pass used only when SEARCH_SHORTLIST is explicitly configured. */
     private shortlistCandidates(

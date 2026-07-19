@@ -27,7 +27,11 @@ Unlike v0.7, v0.8 search applies a version-scoped productive-action priority aft
 one scored legal attack, spell, or move exists, search may not choose an hourglass wait, Luck Shield, or mountain
 attack; those actions remain available only as true fallbacks when no productive candidate is legal. This priority
 also survives shortlist selection, so a high immediate score cannot crowd the only productive challenger out of a
-two-candidate shortlist. The v0.7 opponent and every pre-v0.8 search version retain their historical selection rules.
+two-candidate shortlist. Before a configured deadline search, v0.8 deterministically probes the first productive
+fallback through the real action engine with full snapshot/restore. A deadline or open search circuit returns that
+known-valid fallback instead of a passive incumbent; only a position with no engine-valid attack, spell, or move may
+fall back to wait, Luck Shield, or a mountain attack. The v0.7 opponent, observe-only searches, and every pre-v0.8
+search version retain their historical selection rules.
 
 The catalog deliberately mixes rollout depth with decision headroom: 14 arms use one rollout, 19 use two, and 15
 use three. The deadline census is 10 arms at 125ms, 20 at 150ms, and 18 at 175ms. Deep h12 candidates use at most
