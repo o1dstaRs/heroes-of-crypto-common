@@ -260,6 +260,97 @@ describe("Predatory Assimilation", () => {
         expect(restoredTarget.hasSpellRemaining("Resurrection")).toBe(false);
     });
 
+    it("does not recreate an already-spent castable ability charge when stealing its card", () => {
+        const { thief, target } = setup(["Wind Flow"]);
+        target.useSpell("Wind Flow");
+        expect(target.hasAbilityActive("Wind Flow")).toBe(true);
+        expect(target.getAllProperties().spells).toEqual([]);
+        setDeterministicRandomSource(() => 0);
+
+        expect(processPredatoryAssimilationAbility(thief, target, new SceneLogMock())?.abilityName).toBe("Wind Flow");
+        expect(target.hasAbilityActive("Wind Flow")).toBe(false);
+        expect(target.getAllProperties().spells).toEqual([]);
+        expect(thief.hasAbilityActive("Wind Flow")).toBe(true);
+        expect(thief.getAllProperties().spells).toEqual([]);
+        expect(thief.hasSpellRemaining("Wind Flow")).toBe(false);
+    });
+
+    it("keeps spent stolen direct-cast cards empty across serialized reconstruction", () => {
+        for (const abilityName of ["Wind Flow", "Battle Roar"]) {
+            const { thief, target } = setup([abilityName]);
+            target.useSpell(abilityName);
+            expect(target.hasSpellRemaining(abilityName)).toBe(false);
+            setDeterministicRandomSource(() => 0);
+
+            expect(processPredatoryAssimilationAbility(thief, target, new SceneLogMock())?.abilityName).toBe(
+                abilityName,
+            );
+            expect(thief.hasAbilityActive(abilityName)).toBe(true);
+            expect(thief.hasSpellRemaining(abilityName)).toBe(false);
+
+            const serializedProperties = JSON.parse(JSON.stringify(thief.getAllProperties()));
+            const effectFactory = new EffectFactory();
+            const restored = Unit.createUnit(
+                serializedProperties,
+                testGridSettings,
+                thief.getTeam(),
+                PBTypes.UnitVals.CREATURE,
+                new AbilityFactory(effectFactory),
+                effectFactory,
+                false,
+            );
+            expect(restored.hasAbilityActive(abilityName)).toBe(true);
+            expect(restored.getAllProperties().spells).toEqual([]);
+            expect(restored.hasSpellRemaining(abilityName)).toBe(false);
+        }
+    });
+
+    it("adds the initial direct-cast charge for ordinary native creature construction", () => {
+        for (const [faction, creatureName, textureName, abilityName] of [
+            ["Life", "Valkyrie", "valkyrie_512", "Wind Flow"],
+            ["Might", "Behemoth", "behemoth_512", "Battle Roar"],
+        ] as const) {
+            const properties = getCreatureConfig(PBTypes.TeamVals.LOWER, faction, creatureName, textureName, 1);
+            expect(properties.spell_entries_authoritative).toBeUndefined();
+            const effectFactory = new EffectFactory();
+            const unit = Unit.createUnit(
+                properties,
+                testGridSettings,
+                PBTypes.TeamVals.LOWER,
+                PBTypes.UnitVals.CREATURE,
+                new AbilityFactory(effectFactory),
+                effectFactory,
+                false,
+            );
+
+            expect(unit.hasAbilityActive(abilityName)).toBe(true);
+            expect(unit.getAllProperties().spells).toContain(`:${abilityName}`);
+            expect(unit.hasSpellRemaining(abilityName)).toBe(true);
+            expect(unit.getAllProperties().spell_entries_authoritative).toBe(true);
+        }
+    });
+
+    it("moves every remaining castable ability charge while retaining unrelated victim spells", () => {
+        const thief = createTestUnit({ name: "Arachna Queen", abilities: ["Predatory Assimilation"] });
+        const target = createTestUnit({
+            name: "Valkyrie with another spell source",
+            abilities: ["Wind Flow"],
+            spells: [":Wind Flow", "System:Wind Flow", "Life:Heal"],
+        });
+        setDeterministicRandomSource(() => 0);
+
+        expect(processPredatoryAssimilationAbility(thief, target, new SceneLogMock())?.abilityName).toBe("Wind Flow");
+        expect(target.getAllProperties().spells).toEqual(["Life:Heal"]);
+        expect(target.hasSpellRemaining("Wind Flow")).toBe(false);
+        expect(thief.getAllProperties().spells).toEqual([":Wind Flow", ":Wind Flow"]);
+        expect(
+            thief
+                .getSpells()
+                .find((spell) => spell.getName() === "Wind Flow")
+                ?.getAmount(),
+        ).toBe(2);
+    });
+
     it("transfers only the exact remaining duplicate charges owned by a stolen spellbook", () => {
         const thief = createTestUnit({ name: "Arachna Queen", abilities: ["Predatory Assimilation"] });
         const target = createTestUnit({

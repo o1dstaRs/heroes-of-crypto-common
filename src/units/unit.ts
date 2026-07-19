@@ -70,6 +70,14 @@ function isSpellOwnedBySpellbook(entry: string, abilityName: string): boolean {
     return !!spellName && !!SPELLBOOK_SPELL_NAMES[abilityName]?.has(spellName);
 }
 
+function isDirectAbilitySpellEntry(entry: string, spellName: string): boolean {
+    return entry === `:${spellName}` || entry === `System:${spellName}`;
+}
+
+function normalizeSpellEntry(entry: string): string {
+    return entry.startsWith("System:") ? entry.slice("System".length) : entry;
+}
+
 // ARTIFACT Broken Aegis (tier-1): the OFFENSIVE break (a chance to Break the ENEMY the wielder attacks)
 // lives in FightProperties.getBreakChancePerTeam and flows in as `chanceToBreak` — NOT here. This file
 // only applies the self-cost: a flat chance for the wielder's OWN attacks to miss (see the miss block
@@ -281,7 +289,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.maxRangeShots = this.unitProperties.range_shots;
         this.abilityFactory = abilityFactory;
         this.effects = [];
-        this.parseAbilities();
+        // Raw creature configuration omits the synthetic charge for direct-cast ability cards, so the first
+        // construction must add it. Once constructed, `spells` is the exact remaining runtime charge list:
+        // an absent entry then means "spent" and must stay absent through snapshots/reconstruction.
+        const addConfiguredAbilitySpells = this.unitProperties.spell_entries_authoritative !== true;
+        this.parseAbilities(addConfiguredAbilitySpells);
+        this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
     }
     public static createUnit(
@@ -381,7 +394,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             (stolenAbility) => stolenAbility !== abilityName,
         );
         const ability = this.abilityFactory.makeAbility(abilityName);
-        this.registerAbility(ability, !this.unitProperties.abilities.includes(abilityName));
+        this.registerAbility(
+            ability,
+            !this.unitProperties.abilities.includes(abilityName),
+            options.spellEntries === undefined,
+        );
         if (options.spellEntries?.length) {
             this.unitProperties.spells.push(...options.spellEntries);
             this.parseSpells();
@@ -398,7 +415,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.registerAbility(ability, !this.unitProperties.abilities.includes(ability.getName()));
     }
-    /** Force-installs a successfully stolen ability, including the exact remaining spellbook charges. */
+    /** Force-installs a successfully stolen ability, including its exact remaining cast charges. */
     public grantStolenAbility(abilityName: string, spellEntries: string[] = []): void {
         this.grantAbility(abilityName, { restoreStolen: true, spellEntries });
     }
@@ -427,23 +444,30 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getStolenAbilityNames(): string[] {
         return structuredClone(this.unitProperties.stolen_abilities ?? []);
     }
-    /** Removes and returns the remaining faction spell charges mechanically owned by a SPELLBOOK card. */
-    public takeSpellbookSpellEntries(abilityName: string): string[] {
+    /** Removes and returns every remaining spell charge mechanically owned by one ability card. */
+    public takeAbilitySpellEntries(abilityName: string): string[] {
         const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
-        if (!ability || ability.getPowerType() !== AbilityPowerType.SPELLBOOK) {
+        if (!ability) {
             return [];
         }
-        const transferred = this.unitProperties.spells.filter((entry) => isSpellOwnedBySpellbook(entry, abilityName));
+        const castableSpellName = ability.getSpell()?.getName();
+        const isOwnedEntry = (entry: string): boolean =>
+            ability.getPowerType() === AbilityPowerType.SPELLBOOK
+                ? isSpellOwnedBySpellbook(entry, abilityName)
+                : !!castableSpellName && isDirectAbilitySpellEntry(entry, castableSpellName);
+        const transferred = this.unitProperties.spells.filter(isOwnedEntry);
         if (!transferred.length) {
             return [];
         }
-        const retained = this.unitProperties.spells.filter((entry) => !isSpellOwnedBySpellbook(entry, abilityName));
+        const retained = this.unitProperties.spells.filter((entry) => !isOwnedEntry(entry));
         this.unitProperties.spells.splice(0, this.unitProperties.spells.length, ...retained);
         this.parseSpells();
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
-        return transferred;
+        return ability.getPowerType() === AbilityPowerType.SPELLBOOK
+            ? transferred
+            : transferred.map(() => `:${castableSpellName}`);
     }
-    private registerAbility(ability: Ability, addCardData: boolean): void {
+    private registerAbility(ability: Ability, addCardData: boolean, addDefaultSpell = true): void {
         this.abilities.push(ability);
         const cardAuraEffect = ability.getAuraEffect();
         if (addCardData) {
@@ -468,8 +492,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const spell = ability.getSpell();
-        const spellEntry = spell ? `:${spell.getName()}` : undefined;
-        if (spellEntry && !this.unitProperties.spells.includes(spellEntry)) {
+        const spellName = spell?.getName();
+        const spellEntry = spellName ? `:${spellName}` : undefined;
+        if (
+            addDefaultSpell &&
+            spellName &&
+            spellEntry &&
+            !this.unitProperties.spells.some((entry) => isDirectAbilitySpellEntry(entry, spellName))
+        ) {
             this.unitProperties.spells.push(spellEntry);
         }
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
@@ -497,9 +527,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const spellName = ability.getSpell()?.getName();
         if (spellName) {
-            const spellEntryIndex = this.unitProperties.spells.indexOf(`:${spellName}`);
-            if (spellEntryIndex >= 0) {
-                this.unitProperties.spells.splice(spellEntryIndex, 1);
+            for (let spellIndex = this.unitProperties.spells.length - 1; spellIndex >= 0; spellIndex--) {
+                if (isDirectAbilitySpellEntry(this.unitProperties.spells[spellIndex], spellName)) {
+                    this.unitProperties.spells.splice(spellIndex, 1);
+                }
             }
             this.parseSpells();
         }
@@ -2994,7 +3025,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             attackCellHashesToLargeCells: possibleAttackCellHashesToLargeCells,
         };
     }
-    protected parseAbilities(): boolean {
+    protected parseAbilities(addConfiguredAbilitySpells = true): boolean {
         let spellAdded = false;
         this.unitProperties.stolen_abilities ??= [];
         for (let i = 0; i < this.unitProperties.abilities.length; i++) {
@@ -3007,9 +3038,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (wasStolen) {
                 const castableSpellName = ability.getSpell()?.getName();
                 if (castableSpellName) {
-                    const spellEntry = `:${castableSpellName}`;
                     for (let spellIndex = this.unitProperties.spells.length - 1; spellIndex >= 0; spellIndex--) {
-                        if (this.unitProperties.spells[spellIndex] === spellEntry) {
+                        if (isDirectAbilitySpellEntry(this.unitProperties.spells[spellIndex], castableSpellName)) {
                             this.unitProperties.spells.splice(spellIndex, 1);
                         }
                     }
@@ -3031,7 +3061,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.aura_effects.push(auraEffectName);
             }
             const spell = ability.getSpell();
-            if (spell && !this.unitProperties.spells.includes(`:${spell.getName()}`)) {
+            if (
+                addConfiguredAbilitySpells &&
+                spell &&
+                !this.unitProperties.spells.some((entry) => isDirectAbilitySpellEntry(entry, spell.getName()))
+            ) {
                 this.unitProperties.spells.push(`:${spell.getName()}`);
                 this.unitProperties.can_cast_spells = true;
                 spellAdded = true;
@@ -3044,12 +3078,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     protected parseSpellData(spellData: string[]): Map<string, number> {
         const spells: Map<string, number> = new Map();
 
-        for (const sp of spellData) {
-            if (!spells.has(sp)) {
-                spells.set(sp, 1);
+        for (const rawSpellEntry of spellData) {
+            // `:Spell` is the current direct-ability form; ranked/legacy payloads may use
+            // `System:Spell`. They are the same charge source and must aggregate into one Spell amount.
+            const spellEntry = normalizeSpellEntry(rawSpellEntry);
+            if (!spells.has(spellEntry)) {
+                spells.set(spellEntry, 1);
             } else {
-                const amount = spells.get(sp);
-                spells.set(sp, (amount || 0) + 1);
+                const amount = spells.get(spellEntry);
+                spells.set(spellEntry, (amount || 0) + 1);
             }
         }
 
