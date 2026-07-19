@@ -338,6 +338,16 @@ const main = async () => {
         } else {
             before = readBaseline(options.cpuBaseline);
             after = fixture ? fixture.cpuSamples[1] : freshCpus();
+            // A STATIC cumulative fixture pins the stored baseline exactly at the fixture endpoint,
+            // so every repeat poll would read a zero-elapsed interval and fail the probe ("no
+            // elapsed scheduler time") — permanently quarantining runs purely by poll-timing luck
+            // (this flaked the supervisor lifecycle tests under host load). The fixture DECLARES
+            // the host's state: when its counters have not advanced past the stored baseline,
+            // assess the fixture's full declared interval instead. Live probes are unaffected and
+            // keep the fail-closed zero-elapsed error — real counters must advance between polls.
+            if (fixture && JSON.stringify(before) === JSON.stringify(after)) {
+                before = fixture.cpuSamples[0];
+            }
         }
         const processes = fixture ? fixture.processes : liveProcesses();
         const snapshot = { processes, cpuSamples: [before, after] };

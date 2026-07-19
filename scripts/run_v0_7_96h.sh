@@ -529,6 +529,12 @@ host_guard_check() {
     rm -f -- "${PROBE_OUTPUT}"
     PROBE_OUTPUT=""
     LAST_HOST_GUARD_EPOCH="$(date +%s)"
+    # The probe is reaped and its verdict captured: completion is no longer unknown, so a signal
+    # from here on must take the ordinary final-assessment path, not the signal-during-host-probe
+    # quarantine. Clearing the flag only at the tail of each branch below left a window covering
+    # the config persist + logging where a SIGTERM permanently quarantined a perfectly healthy
+    # run (flaked the "cleanly disarms" lifecycle test under host load).
+    PROBE_IN_FLIGHT=0
 
     if ((helper_status == 0)) && ! valid_healthy_assessment "${assessment}"; then
         helper_status=70
@@ -554,7 +560,6 @@ host_guard_check() {
             fi
             HOST_GUARD_CONFIG_PENDING=0
         fi
-        PROBE_IN_FLIGHT=0
         log "host guard healthy phase=${phase}: $(sanitize_marker_detail "${assessment}")"
         return 0
     fi
@@ -567,7 +572,6 @@ host_guard_check() {
         if ! disarm_after_verified_stop ""; then
             exit 80
         fi
-        PROBE_IN_FLIGHT=0
         if [[ "${HOST_GUARD_CONFIG_PENDING}" == "1" ]]; then
             rm -f -- "${START_EPOCH_FILE}" "${DEADLINE_EPOCH_FILE}" "${HOST_GUARD_CPU_BASELINE}"
         fi
@@ -577,7 +581,6 @@ host_guard_check() {
     fi
 
     promote_armed_to_quarantine "${phase}" "${helper_status}" "${assessment}"
-    PROBE_IN_FLIGHT=0
     if [[ "${STOP_IN_PROGRESS}" == "1" ]]; then
         return 80
     fi
