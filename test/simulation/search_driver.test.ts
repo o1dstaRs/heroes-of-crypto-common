@@ -584,7 +584,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(move);
     });
 
-    it("v0.8 dominant-finish shortlisting and selection force legal combat through a saturated gate", () => {
+    it("v0.8 dominant-finish shortlisting forces combat over an ordinary wait through a saturated gate", () => {
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8s",
@@ -595,7 +595,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const harness = buildBattle(92, "v0.8s");
         const unit = harness.activeUnit()!;
         const id = unit.getId();
-        const incumbent: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] }];
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: id }];
         const attack: GameAction[] = [
             { type: "melee_attack", attackerId: id, targetId: "enemy", attackFrom: { x: 3, y: 4 } },
         ];
@@ -634,7 +634,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             return scored.map(({ kind }) => (kind === "melee" ? 0.01 : kind === "incumbent" ? 0.99 : 0.9));
         };
 
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true, undefined, true)).toEqual(
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), false, undefined, true)).toEqual(
             attack,
         );
         expect(calls).toEqual([
@@ -1088,7 +1088,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
-    it("keeps v0.8 productive with an engine-valid fallback after its search circuit opens", () => {
+    it("repairs hard v0.8 passives but preserves a strategic wait after its search circuit opens", () => {
         const auditPath = join(mkdtempSync(join(tmpdir(), "search-v08-circuit-")), "audit.jsonl");
         setEnv({
             V07_SEARCH: "1",
@@ -1119,7 +1119,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const secondResult = driver.chooseDecision(unit!, "v0.8s", secondIncumbent);
         const thirdResult = driver.chooseDecision(unit!, "v0.8s", thirdIncumbent);
         expect(hasProductiveAction(secondResult)).toBe(true);
-        expect(hasProductiveAction(thirdResult)).toBe(true);
+        expect(thirdResult).toBe(thirdIncumbent);
         expect(stableSnapshot(h)).toEqual(before);
         expect(searchCalls).toBe(1);
 
@@ -1294,6 +1294,29 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         expect(driver.chooseDecision(unit!, "v0.8s", firstIncumbent)).toBe(firstIncumbent);
         expect(driver.chooseDecision(unit!, "v0.8s", secondIncumbent)).toBe(secondIncumbent);
+        expect(counters).toMatchObject({ decisions: 1, deadlineFallbacks: 1, circuitSkipped: 1 });
+    });
+
+    it("preserves a strategic v0.8 wait when the deadline expires and after its circuit opens", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_DECISION_DEADLINE_MS: "0.000001",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.00001",
+        });
+        const h = buildBattle(1313, "v0.8s");
+        h.playTurns(8);
+        const unit = h.activeUnit()!;
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        const counters = (
+            driver as unknown as {
+                counters: { decisions: number; deadlineFallbacks: number; circuitSkipped: number };
+            }
+        ).counters;
+
+        expect(driver.chooseDecision(unit, "v0.8s", wait)).toBe(wait);
+        expect(driver.chooseDecision(unit, "v0.8s", wait)).toBe(wait);
         expect(counters).toMatchObject({ decisions: 1, deadlineFallbacks: 1, circuitSkipped: 1 });
     });
 

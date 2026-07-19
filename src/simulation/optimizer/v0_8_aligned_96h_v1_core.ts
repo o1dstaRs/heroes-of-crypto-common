@@ -467,10 +467,10 @@ export function aggregateV08AlignedV1(
     const candidateAvoidableWaitTurns = candidateAlternatives.explicitWait.withLegalProductiveAction;
     const candidateAvoidableDefendTurns = candidateAlternatives.explicitDefend.withLegalProductiveAction;
     const candidateAvoidableObstacleAttackTurns = candidateAlternatives.obstacleAttack.withLegalProductiveAction;
+    // Kept as a legacy diagnostic field, but a legal alternative does not make an hourglass wait avoidable:
+    // the unit normally acts again later in the same lap. Search must compare waits; only hard passives fail here.
     const productiveActionPriorityPassed =
-        candidateAvoidableWaitTurns === 0 &&
-        candidateAvoidableDefendTurns === 0 &&
-        candidateAvoidableObstacleAttackTurns === 0;
+        candidateAvoidableDefendTurns === 0 && candidateAvoidableObstacleAttackTurns === 0;
     const executionPassed =
         candidate.strategyNoOpTurns === 0 &&
         candidate.recoveryTurns === 0 &&
@@ -593,7 +593,6 @@ export function assessV08AlignedV1Final(
             execution.candidate.strategyNoOpTurns === 0 &&
             execution.candidate.recoveryTurns === 0 &&
             execution.candidate.rejectedActions === 0 &&
-            execution.candidatePassiveAlternatives.explicitWait.withLegalProductiveAction === 0 &&
             execution.candidatePassiveAlternatives.explicitDefend.withLegalProductiveAction === 0 &&
             execution.candidatePassiveAlternatives.obstacleAttack.withLegalProductiveAction === 0;
         const checks = {

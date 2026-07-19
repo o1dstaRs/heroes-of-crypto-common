@@ -24,6 +24,7 @@ import {
     ensureExplicitV08Action,
     prioritizeV08Decision,
     prioritizeV08ProductiveAction,
+    selectV08DirectCombatCandidate,
     selectV08ProductiveCandidate,
     StrategyV0_8,
 } from "../../src/ai/versions/v0_8";
@@ -120,33 +121,47 @@ describe("v0.8 candidate policy", () => {
         expect(ensureExplicitV08Action("u1", mixed)).toBe(mixed);
     });
 
-    it("selects an attack or spell before a legal move regardless of enumeration order", () => {
+    it("selects the strongest immediate attack before a move and a move before a support spell", () => {
         const move: GameAction[] = [{ type: "move_unit", unitId: "u1", path: [{ x: 2, y: 2 }] }];
         const spell: GameAction[] = [{ type: "cast_spell", casterId: "u1", spellName: "Courage" }];
+        const highDamage: GameAction[] = [
+            { type: "melee_attack", attackerId: "u1", targetId: "enemy-1", attackFrom: { x: 2, y: 2 } },
+        ];
+        const kill: GameAction[] = [
+            { type: "melee_attack", attackerId: "u1", targetId: "enemy-2", attackFrom: { x: 2, y: 2 } },
+        ];
+        const movedHighDamage: GameAction[] = [
+            { type: "move_unit", unitId: "u1", path: [{ x: 2, y: 2 }] },
+            { type: "melee_attack", attackerId: "u1", targetId: "enemy-1", attackFrom: { x: 2, y: 2 } },
+        ];
         const candidates = [
             { kind: "move", actions: move },
             { kind: "spell", actions: spell },
+            { kind: "shot", actions: highDamage, features: { expectedKill: 1, expectedDamage: Number.NaN } },
+            { kind: "melee", actions: movedHighDamage, features: { expectedKill: 0, expectedDamage: 100 } },
+            { kind: "melee", actions: highDamage, features: { expectedKill: 0, expectedDamage: 100 } },
+            { kind: "melee", actions: kill, features: { expectedKill: 1, expectedDamage: 10 } },
         ] as unknown as IEnumeratedCandidate[];
 
-        expect(selectV08ProductiveCandidate(candidates)?.actions).toBe(spell);
+        expect(selectV08DirectCombatCandidate(candidates)?.actions).toBe(highDamage);
+        expect(selectV08ProductiveCandidate(candidates)?.actions).toBe(highDamage);
+        expect(selectV08ProductiveCandidate(candidates.slice(0, 2))?.actions).toBe(move);
     });
 
-    it("replaces an inherited BLOCK_CENTER mountain hit with the nearest legal move and leaves v0.7 unchanged", () => {
+    it("preserves BLOCK_CENTER mining when no immediately damaging attack proves a better direct action", () => {
         const { unit, context } = setupMountainDecision({ x: 12, y: 12 }, 2);
         const inherited = new StrategyV0_7().decideTurn(unit, context);
 
         expect(inherited.map((action) => action.type)).toEqual(["obstacle_attack"]);
         const decision = new StrategyV0_8().decideTurn(unit, context);
-        expect(decision.map((action) => action.type)).toEqual(["move_unit"]);
-        expect(decision[0]).toMatchObject({ type: "move_unit", unitId: unit.getId() });
+        expect(decision).toEqual(inherited);
 
         const moveThenMine: GameAction[] = [
             { type: "move_unit", unitId: unit.getId(), path: [{ x: 5, y: 6 }] },
             { type: "obstacle_attack", attackerId: unit.getId(), targetPosition: { x: 7, y: 7 } },
         ];
         const repairedSequence = prioritizeV08ProductiveAction(unit, context, moveThenMine);
-        expect(repairedSequence.map((action) => action.type)).toEqual(["move_unit"]);
-        expect(repairedSequence).not.toBe(moveThenMine);
+        expect(repairedSequence).toBe(moveThenMine);
     });
 
     it("replaces legacy BLOCK_CENTER mining with a reachable enemy attack before considering movement", () => {
@@ -157,17 +172,24 @@ describe("v0.8 candidate policy", () => {
         const decision = new StrategyV0_8().decideTurn(unit, context);
         expect(decision.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
         expect(decision[1]).toMatchObject({ type: "melee_attack", targetId: enemy.getId() });
+
+        const moveThenMine: GameAction[] = [
+            { type: "move_unit", unitId: unit.getId(), path: [{ x: 5, y: 6 }] },
+            { type: "obstacle_attack", attackerId: unit.getId(), targetPosition: { x: 7, y: 7 } },
+        ];
+        expect(prioritizeV08ProductiveAction(unit, context, moveThenMine).map((action) => action.type)).toEqual([
+            "move_unit",
+            "melee_attack",
+        ]);
     });
 
-    it("repairs inherited wait and Luck Shield decisions but preserves a true passive fallback", () => {
+    it("preserves strategic wait and Luck Shield decisions outside the searched or dominant-finish paths", () => {
         const { unit, context } = setupMountainDecision({ x: 12, y: 12 }, 2);
         const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
         const defend: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
 
-        expect(prioritizeV08ProductiveAction(unit, context, wait).map((action) => action.type)).toEqual(["move_unit"]);
-        expect(prioritizeV08ProductiveAction(unit, context, defend).map((action) => action.type)).toEqual([
-            "move_unit",
-        ]);
+        expect(prioritizeV08ProductiveAction(unit, context, wait)).toBe(wait);
+        expect(prioritizeV08ProductiveAction(unit, context, defend)).toBe(defend);
 
         unit.setWebMovementLocked(true);
         expect(prioritizeV08ProductiveAction(unit, context, defend)).toBe(defend);
@@ -189,7 +211,7 @@ describe("v0.8 candidate policy", () => {
         expect(prioritizeV08Decision(unit, context, directCombat)).toBe(directCombat);
     });
 
-    it("leaves clean-default v0.7 replay behavior untouched while v0.8 diverges", () => {
+    it("leaves clean-default non-mountain v0.7 replay behavior byte-identical", () => {
         const seed = 20260718;
         const roster = buildRoster(makeRng(seed));
         const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
@@ -200,6 +222,6 @@ describe("v0.8 candidate policy", () => {
         expect(candidate.outcome.green.version).toBe("v0.8");
         expect(repeatedBaseline).toEqual(baseline);
         candidate.outcome.green.version = "v0.7";
-        expect(candidate).not.toEqual(baseline);
+        expect(candidate).toEqual(baseline);
     });
 });

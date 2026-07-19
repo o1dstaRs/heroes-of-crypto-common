@@ -16,8 +16,7 @@ import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } fr
 import { StrategyV0_7 } from "./v0_7";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 
-const V08_PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["wait_turn", "defend_turn", "obstacle_attack"]);
-const V08_ATTACK_OR_SPELL_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw", "spell"]);
+const V08_DIRECT_COMBAT_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw"]);
 
 /**
  * Replace a terminal policy no-op with an explicit engine-valid action. Search still owns the stronger priority:
@@ -30,21 +29,34 @@ export function ensureExplicitV08Action(unitId: string, decision: GameAction[]):
     return hasMeaningfulAction ? decision : [{ type: "defend_turn", unitId }];
 }
 
-/** Pick a real attack/cast before falling back to the enumerator's nearest-to-enemy legal move. */
+/** Prefer immediate enemy damage, then the enumerator's nearest-to-enemy legal move. */
 export function selectV08ProductiveCandidate(
     candidates: readonly IEnumeratedCandidate[],
 ): IEnumeratedCandidate | undefined {
-    return (
-        candidates.find((candidate) => V08_ATTACK_OR_SPELL_KINDS.has(candidate.kind)) ??
-        candidates.find((candidate) => candidate.kind === "move")
-    );
+    return selectV08DirectCombatCandidate(candidates) ?? candidates.find((candidate) => candidate.kind === "move");
 }
 
 /** Direct enemy damage is the only action class that satisfies the late dominant-finish invariant. */
 export function selectV08DirectCombatCandidate(
     candidates: readonly IEnumeratedCandidate[],
 ): IEnumeratedCandidate | undefined {
-    return candidates.find((candidate) => isV08DirectCombatDecision(candidate.actions));
+    let best: IEnumeratedCandidate | undefined;
+    for (const candidate of candidates) {
+        if (!V08_DIRECT_COMBAT_KINDS.has(candidate.kind) || !isV08DirectCombatDecision(candidate.actions)) continue;
+        if (!Number.isFinite(candidate.features.expectedDamage) || candidate.features.expectedDamage <= 0) continue;
+        const candidateMoves = candidate.actions.some((action) => action.type === "move_unit");
+        const bestMoves = best?.actions.some((action) => action.type === "move_unit") ?? false;
+        if (
+            !best ||
+            candidate.features.expectedDamage > best.features.expectedDamage ||
+            (candidate.features.expectedDamage === best.features.expectedDamage &&
+                (candidate.features.expectedKill > best.features.expectedKill ||
+                    (candidate.features.expectedKill === best.features.expectedKill && bestMoves && !candidateMoves)))
+        ) {
+            best = candidate;
+        }
+    }
+    return best;
 }
 
 function enumerateV08BoundaryCandidates(
@@ -62,28 +74,29 @@ function enumerateV08BoundaryCandidates(
 }
 
 /**
- * Keep v0.8 productive even when it is used directly, without the simulation/server SearchDriver wrapper.
- * v0.7's strategic wait, Luck Shield, and mountain policies remain untouched; only an inherited v0.8 passive
- * decision is reconsidered, and only when the shared legality enumerator exposes a real attack, cast, or move.
+ * Keep direct v0.8 from spending a turn on a mountain when an immediately damaging enemy attack exists. Strategic
+ * wait/Luck Shield choices require comparative search to judge safely, so SearchDriver owns those replacements.
  */
 export function prioritizeV08ProductiveAction(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
 ): GameAction[] {
-    // A mountain decision may be encoded as move-then-obstacle-attack. The move does not make the consumed
-    // obstacle turn productive, so any passive action in the sequence must trigger the replacement census.
-    if (!decision.some((action) => V08_PASSIVE_ACTION_TYPES.has(action.type))) {
+    // A mountain decision may be encoded as move-then-obstacle-attack. The setup move does not make the
+    // consumed obstacle turn productive, so either encoding must trigger the replacement census.
+    if (!decision.some((action) => action.type === "obstacle_attack")) {
         return decision;
     }
 
-    const replacement = selectV08ProductiveCandidate(enumerateV08BoundaryCandidates(unit, context, decision));
+    // Without a rollout, an arbitrary advance/support cast is not proven better than opening a lane. Restrict
+    // the direct-policy override to an immediately damaging enemy attack; SearchDriver can compare everything.
+    const replacement = selectV08DirectCombatCandidate(enumerateV08BoundaryCandidates(unit, context, decision));
     return replacement?.actions ?? decision;
 }
 
 /**
- * In the conservative late two-to-one-HP window, deal enemy damage now whenever the engine-valid census
- * exposes it. Outside that window, or when no direct attack exists, retain the normal productive priority.
+ * In the conservative late two-to-one-HP window, deal enemy damage now whenever the enumerator-legal census
+ * exposes it. Outside that window, or when no direct attack exists, retain the conservative direct policy.
  */
 export function prioritizeV08Decision(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
     const dominantFinish = v08DominantFinishState(
@@ -97,16 +110,12 @@ export function prioritizeV08Decision(unit: Unit, context: IDecisionContext, dec
         if (directCombat) {
             return directCombat.actions;
         }
-
-        if (decision.some((action) => V08_PASSIVE_ACTION_TYPES.has(action.type))) {
-            return selectV08ProductiveCandidate(candidates)?.actions ?? decision;
-        }
     }
 
     return prioritizeV08ProductiveAction(unit, context, decision);
 }
 
-/** v0.8 starts from v0.7 but never leaves a legal productive action behind for a passive turn. */
+/** v0.8 starts from v0.7, repairs mountain turns directly, and leaves comparative passive choices to search. */
 export class StrategyV0_8 extends StrategyV0_7 {
     public override readonly version: string = "v0.8";
     public override decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {

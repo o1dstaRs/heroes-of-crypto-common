@@ -82,8 +82,8 @@ import {
  * pairs, alternative shot aims, area throws, every castable spell, defend and wait — for EVERY unit type.
  * Candidate 0 is always the incumbent policy decision (the anchor). For pre-v0.8 versions, plain MOVE
  * (kite/retreat-cell) candidates are EXCLUDED by default — that candidate class is ledger-dead twice (crude
- * hold and safe-frontier kiting both regressed). v0.8 always retains the nearest legal move as a productive
- * fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured multi-destination move set.
+ * hold and safe-frontier kiting both regressed). v0.8 always retains the nearest legal move for scored search
+ * and hard-passive fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured move set.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
@@ -97,10 +97,10 @@ import {
  * challengers. K includes the incumbent and must be >=2. Unset keeps the original full-candidate search.
  * SEARCH_DECISION_DEADLINE_MS=<positive ms> is an opt-in fail-closed rollout-comparison deadline. It is checked
  * between candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle.
- * Historical versions return the exact incumbent, while v0.8 first runs one bounded immediate-action validity
- * probe and returns that prevalidated productive fallback when one exists. The probe is outside the comparison
- * deadline but inside the circuit timer. The deadline must be strictly below the circuit breaker, leaving restore
- * and call-site headroom.
+ * Historical versions and ordinary v0.8 waits return the exact incumbent. A v0.8 hard passive or dominant-finish
+ * turn first runs one bounded immediate-action validity probe and returns that prevalidated fallback when one
+ * exists. The probe is outside the comparison deadline but inside the circuit timer. The deadline must be
+ * strictly below the circuit breaker, leaving restore and call-site headroom.
  * SEARCH_LATE_RANGED_FINISH_WEIGHT=<0..16> is a default-zero research overlay on the leaf logit. It rewards
  * late damage to the enemy's original army in proportion to the post-setup board's HP-weighted rangedness,
  * ramping from zero through lap 3 to full strength at the first Armageddon lap. Summons are excluded.
@@ -108,10 +108,9 @@ import {
  * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
  * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
- * outer per-match circuit: the first over-budget result still applies, then historical versions return each
- * later incumbent unchanged. v0.8 still enumerates and engine-validates a bounded productive fallback so an
- * open circuit cannot turn the rest of the fight into waits, Luck Shields, or mountain attacks. The live wrapper
- * also includes call-site overhead outside this internal timer.
+ * outer per-match circuit: the first over-budget result still applies, then historical versions and strategic
+ * v0.8 waits retain each later incumbent. v0.8 still engine-validates a bounded fallback for no-ops, Luck Shields,
+ * mountain attacks, and dominant-finish turns. The live wrapper adds call-site overhead outside this timer.
  * v0.8 additionally treats a legal direct attack as lexicographically stronger than every non-combat action from
  * lap 9 onward while its living, non-summoned army has at least twice the enemy's HP. This narrow dominant-finish
  * tier bypasses probability saturation but still uses normal rollouts to choose among legal attacks.
@@ -255,6 +254,7 @@ const CHALLENGER_KINDS = new Set<CandidateKind>([
     "mine",
 ]);
 const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
+const V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS = new Set<IncumbentKind>(["idle", "defend", "mine"]);
 const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
 const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "move_unit",
@@ -266,7 +266,7 @@ const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
 const PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["wait_turn", "defend_turn", "obstacle_attack"]);
 
 /**
- * v0.8 never prefers waiting, Luck Shield, or mountain mining while a scored legal attack, spell, or move exists.
+ * Classify whether a candidate completes real activity without also consuming the turn on a passive action.
  * Candidate zero needs action-based classification because its enumerator kind is always `incumbent`.
  */
 function isProductiveCandidate(candidate: Pick<IEnumeratedCandidate, "kind" | "actions">): boolean {
@@ -713,13 +713,18 @@ export class SearchDriver {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
-        const prioritizeProductiveActions = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
+        const incumbentKind = classifyActions(incumbent);
+        const isV08Search = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
+        // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
+        // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. Ordinary waits must beat
+        // the rollout gate, while the separate dominant-finish tier may still force immediate combat late.
+        const prioritizeProductiveActions = isV08Search && V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind);
         const prioritizeDominantFinish =
-            prioritizeProductiveActions &&
+            isV08Search &&
             v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), this.deps.fightProperties.getCurrentLap())
                 .active;
-        const useProductiveFallback = prioritizeProductiveActions && !this.observeOnly;
-        if (this.incumbentKinds && !this.incumbentKinds.has(classifyActions(incumbent))) {
+        const useProductiveFallback = (prioritizeProductiveActions || prioritizeDominantFinish) && !this.observeOnly;
+        if (this.incumbentKinds && !this.incumbentKinds.has(incumbentKind)) {
             return incumbent;
         }
         if (prioritizeDominantFinish) {
@@ -728,9 +733,8 @@ export class SearchDriver {
         if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
             this.onFightReady();
         }
-        // Historical and observe-only searches preserve the exact fail-closed incumbent behavior. v0.8 must
-        // still enumerate its engine-valid productive fallback after the rollout circuit opens, otherwise every
-        // later policy wait/no-op/mine bypasses the priority that completed searches enforce.
+        // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
+        // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
         if (this.circuitOpen && !useProductiveFallback) {
             this.counters.circuitSkipped += 1;
             return incumbent;
@@ -759,7 +763,7 @@ export class SearchDriver {
             };
             const set = enumerateCandidates(unit, context, incumbent, {
                 ...this.caps,
-                includeMountainAttacks: this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version),
+                includeMountainAttacks: isV08Search,
                 enrichIncumbentMetadata: this.ilPath !== undefined,
             });
             const candidates = set.candidates.filter((candidate) => {
@@ -769,7 +773,7 @@ export class SearchDriver {
                 // enable the broader move experiment. Otherwise a unit with no attack can still choose wait,
                 // defend, or a mountain hit while a real reposition is available. SEARCH_INCLUDE_MOVES continues
                 // to control the wider, multi-destination move set and all pre-v0.8 behavior.
-                if (!this.includeMoves && candidate.kind === "move" && !V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version)) {
+                if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
@@ -1248,18 +1252,14 @@ export class SearchDriver {
             .slice(1)
             .filter(({ score }) => score !== -Infinity)
             .sort((left, right) => right.score - left.score || left.index - right.index);
+        const directCombat = prioritizeDominantFinish
+            ? rankedChallengers.filter(({ index }) => isDirectCombatCandidate(candidates[index]))
+            : [];
         const productive = prioritizeProductiveActions
             ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
             : [];
-        const directCombat = prioritizeDominantFinish
-            ? productive.filter(({ index }) => isDirectCombatCandidate(candidates[index]))
-            : [];
         const ordered = directCombat.length
-            ? [
-                  ...directCombat,
-                  ...productive.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
-                  ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index])),
-              ]
+            ? [...directCombat, ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index]))]
             : productive.length
               ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
               : rankedChallengers;
