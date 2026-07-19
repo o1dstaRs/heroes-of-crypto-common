@@ -100,7 +100,7 @@ proto.PBTypes.StringList.prototype.toObject = function(opt_includeInstance) {
  */
 proto.PBTypes.StringList.toObject = function(includeInstance, msg) {
   var f, obj = {
-    valuesList: (f = jspb.Message.getRepeatedField(msg, 1)) == null ? undefined : f
+valuesList: (f = jspb.Message.getRepeatedField(msg, 1)) == null ? undefined : f
   };
 
   if (includeInstance) {
@@ -293,7 +293,8 @@ proto.PBTypes.PickPhaseVals = {
   ARTIFACT_1: 5,
   ARTIFACT_2: 6,
   AUGMENTS: 7,
-  AUGMENTS_SCOUT: 8
+  AUGMENTS_SCOUT: 8,
+  PERK: 9
 };
 
 /**
@@ -306,7 +307,8 @@ proto.PBTypes.PickPhaseActionVals = {
   BAN_UNIT: 3,
   SELECT_ARTIFACT: 4,
   AUGMENT: 5,
-  REVEAL: 6
+  REVEAL: 6,
+  SELECT_PERK: 7
 };
 
 /**
@@ -398,6 +400,9 @@ proto.PBTypes.CreatureVals = {
   CRUSADER: 38,
   TSAR_CANNON: 39,
   ANGEL: 40,
+  ABOMINATION: 41,
+  CHAMPION: 42,
+  FRENZIED_BOAR: 43,
   ARACHNA_QUEEN: 44,
   ARACHNA_SPIDER: 45
 };

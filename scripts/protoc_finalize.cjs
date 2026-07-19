@@ -114,6 +114,12 @@ for (const file of fds.getFileList()) {
     const baseName = protoName.replace(/\.proto$/, ""); // e.g. "confirm_code" or "google/protobuf/descriptor"
 
     const messages = file.getMessageTypeList().map((m) => m.getName());
+    // top-level non-Vals enums (e.g. LobbyStatus) are reexported per-file alongside the messages;
+    // the *Vals enums go through enums_reexports/types_gen instead.
+    const plainEnums = file
+        .getEnumTypeList()
+        .map((ed) => ed.getName())
+        .filter((n) => !n.endsWith("Vals"));
 
     // top-level enums
     for (const ed of file.getEnumTypeList()) enumNames.add(ed.getName());
@@ -122,7 +128,7 @@ for (const file of fds.getFileList()) {
         for (const ed of md.getEnumTypeList()) enumNames.add(ed.getName());
     }
 
-    files.push({ protoName, baseName, messages });
+    files.push({ protoName, baseName, messages, plainEnums });
 }
 
 const sortedEnumNames = Array.from(enumNames).sort();
@@ -179,6 +185,11 @@ for (const f of publicProtoFiles) {
     const modAlias = `m_${f.baseName.replace(/[^a-zA-Z0-9_]/g, "_")}`;
     // Your app runtime JS stubs are "*_pb"
     msgBody += `import * as ${modAlias} from "./${f.baseName}";\n`;
+    for (const e of f.plainEnums ?? []) {
+        // enum: value export + type alias (an enum is both)
+        msgBody += `export const ${e} = ${modAlias}.PBTypes.${e};\n`;
+        msgBody += `export type ${e} = ${modAlias}.PBTypes.${e};\n`;
+    }
     for (const m of f.messages) {
         // value export: the constructor (class)
         msgBody += `export const ${m} = ${modAlias}.PBTypes.${m};\n`;

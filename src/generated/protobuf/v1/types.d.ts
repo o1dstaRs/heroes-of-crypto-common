@@ -128,6 +128,9 @@ export declare namespace PBTypes {
         CRUSADER = 38,
         TSAR_CANNON = 39,
         ANGEL = 40,
+        ABOMINATION = 41,
+        CHAMPION = 42,
+        FRENZIED_BOAR = 43,
         ARACHNA_QUEEN = 44,
         ARACHNA_SPIDER = 45
     }
@@ -151,4 +154,3 @@ export declare namespace PBTypes {
         static deserializeBinary(bytes: Uint8Array): StringList;
     }
 }
-//# sourceMappingURL=types.d.ts.map
