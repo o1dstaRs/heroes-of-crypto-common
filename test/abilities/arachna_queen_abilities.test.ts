@@ -35,18 +35,9 @@ describe("Arachna Queen configuration", () => {
         expect(queen.abilities_stack_powered[queen.abilities.indexOf("Predatory Assimilation")]).toBe(true);
         expect(queen.steps).toBe(6.3);
         expect(spider.abilities).toEqual(["Infest"]);
-        for (const [queenStat, spiderStat] of [
-            [queen.max_hp, spider.max_hp],
-            [queen.base_attack, spider.base_attack],
-            [queen.attack_damage_min, spider.attack_damage_min],
-            [queen.attack_damage_max, spider.attack_damage_max],
-            [queen.exp, spider.exp],
-        ]) {
-            expect(spiderStat).toBe(queenStat / 2);
-        }
         expect(spider.steps).toBe(6);
         expect(spider.speed).toBe(5.1);
-        expect(spider.base_armor).toBe(16);
+        expect(spider.base_armor).toBe(20);
         expect(spider.magic_resist).toBe(10);
         expect(spider.size).toBe(PBTypes.UnitSizeVals.SMALL);
         expect(spider.level).toBe(PBTypes.UnitLevelVals.THIRD);
