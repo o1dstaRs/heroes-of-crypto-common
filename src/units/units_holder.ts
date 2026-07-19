@@ -358,7 +358,7 @@ export class UnitsHolder {
     public applyArtifacts(
         fightProperties: FightProperties = FightStateManager.getInstance().getFightProperties(),
     ): void {
-        // Pre-compute archer counts per team (Hunter's Longbow's bonus depends on having 3+ archers).
+        // Pre-compute archer counts per team (Hunter's Longbow's bonus scales with the number of archers).
         const archersPerTeam: Map<TeamType, number> = new Map();
         for (const unit of this.getAllUnitsIterator()) {
             if (unit.getAttackType() === PBTypes.AttackVals.RANGE) {
@@ -473,21 +473,16 @@ export class UnitsHolder {
                     break;
                 case Tier1Artifact.HUNTERS_LONGBOW:
                     if (isRange) {
-                        if ((archersPerTeam.get(team) ?? 0) >= AP.LONGBOW_ARCHER_THRESHOLD) {
+                        // Scales with army composition: every ranged unit on the team contributes +1 attack and
+                        // -7.5% defense to each ranged unit, so N archers => +N attack / -7.5N% defense.
+                        const archerCount = archersPerTeam.get(team) ?? 0;
+                        if (archerCount > 0) {
                             applyDualArtifact(
                                 "Hunters Longbow",
                                 "Ranged units gain +{} attack.",
                                 "Ranged units suffer -{}% defense.",
-                                AP.LONGBOW_ATTACK_FLAT_MANY_ARCHERS,
-                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT_MANY_ARCHERS,
-                            );
-                        } else {
-                            applyDualArtifact(
-                                "Hunters Longbow",
-                                "Ranged units gain +{} attack.",
-                                "Ranged units suffer -{}% defense.",
-                                AP.LONGBOW_ATTACK_FLAT,
-                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT,
+                                AP.LONGBOW_ATTACK_FLAT_PER_ARCHER * archerCount,
+                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT_PER_ARCHER * archerCount,
                             );
                         }
                     }

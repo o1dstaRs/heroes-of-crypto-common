@@ -403,7 +403,9 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
         case Tier1Artifact.CURSED_WARD:
             return base;
         case Tier1Artifact.HUNTERS_LONGBOW:
-            return base + 36 * ownRanged + (own.ranged >= 3 ? 8 : 0);
+            // Bonus scales per archer (each ranged unit grants every ranged unit +1 atk / -7.5% def), so value
+            // grows with the ranged share of the army — there is no fixed archer threshold anymore.
+            return base + 44 * ownRanged;
         case Tier1Artifact.HELM_OF_FOCUS:
             return base + 18 * fraction(opponent.mindControllers, opponent.total);
         case Tier1Artifact.BROKEN_AEGIS:
