@@ -154,4 +154,8 @@ enum CreatureVals {
     CRUSADER = 38 [(creature_level) = THIRD, (creature_faction) = LIFE];
     TSAR_CANNON = 39 [(creature_level) = FOURTH, (creature_faction) = LIFE];
     ANGEL = 40 [(creature_level) = FOURTH, (creature_faction) = LIFE];
+    ARACHNA_QUEEN = 44 [(creature_level) = FOURTH, (creature_faction) = NATURE];
+    // Summon-only offspring. Runtime creature config uses level 1 for Infest branching, while the
+    // protobuf NO_LEVEL marker keeps Arachna Spider out of normal level-based draft pools.
+    ARACHNA_SPIDER = 45 [(creature_level) = NO_LEVEL, (creature_faction) = NATURE];
 }

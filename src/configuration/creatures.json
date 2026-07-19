@@ -524,7 +524,28 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": []
+            "abilities": ["Web Aura", "Infest", "Predatory Assimilation"]
+        },
+        "Arachna Spider": {
+            "name": "Arachna Spider",
+            "hp": 90,
+            "steps": 4,
+            "speed": 2.7,
+            "armor": 15.5,
+            "attack_type": "MELEE",
+            "attack": 16,
+            "attack_damage_min": 27,
+            "attack_damage_max": 39,
+            "attack_range": 1,
+            "range_shots": 0,
+            "shot_distance": 0,
+            "magic_resist": 7.5,
+            "movement_type": "WALK",
+            "exp": 250,
+            "size": 1,
+            "level": 1,
+            "spells": [],
+            "abilities": ["Infest"]
         }
     },
     "Chaos": {

@@ -106,6 +106,10 @@ export class UnitProperties {
     public large_texture_name: string;
     public stack_power: number;
     public target: string;
+    /** Abilities that remain visible on the card but were permanently disabled by Predatory Assimilation. */
+    public stolen_abilities: string[];
+    /** Turn-start snapshot. A flyer may cross/land in Web this turn and is locked only on its next activation. */
+    public web_movement_locked: boolean;
     // When set, luck is supplied authoritatively (e.g. the ranked server's per-turn roll + auras) and
     // adjustBaseStats must NOT recompute/re-randomize it — the client would otherwise roll its own
     // luck spread that diverges from the server. Left undefined for locally-simulated units (sandbox),
@@ -161,6 +165,8 @@ export class UnitProperties {
         large_texture_name: string,
         stack_power: number,
         target: string,
+        stolenAbilities: string[] = [],
+        webMovementLocked = false,
     ) {
         this.id = createSecureUuid();
         this.faction = faction;
@@ -223,6 +229,8 @@ export class UnitProperties {
         this.large_texture_name = large_texture_name;
         this.stack_power = stack_power;
         this.target = target;
+        this.stolen_abilities = structuredClone(stolenAbilities);
+        this.web_movement_locked = webMovementLocked;
     }
 }
 

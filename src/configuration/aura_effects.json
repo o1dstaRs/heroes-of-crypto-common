@@ -87,5 +87,13 @@
         "power": 90,
         "is_buff": true,
         "power_type": "ABSORB_DAMAGE"
+    },
+    "Web": {
+        "name": "Web",
+        "range": 1,
+        "desc": "A flying unit standing in this web when its turn starts cannot move that turn.",
+        "power": 0,
+        "is_buff": false,
+        "power_type": "DISABLE_FLY_MOVEMENT"
     }
 }

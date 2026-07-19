@@ -22,9 +22,9 @@ const runObservedMatch = (seed: number, maxLaps: number) => {
 describe("battle engine turn execution observer", () => {
     test("emits exactly once per decision with detached actions and explicit skip events", () => {
         // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
-        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps. 31
-        // reproduces that exact skip scenario.
-        const { decisions, turns } = runObservedMatch(31, 5);
+        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps. Re-pinned
+        // 31 -> 18 after enabling Arachna Queen expanded the level-4 roster pool.
+        const { decisions, turns } = runObservedMatch(18, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
@@ -50,8 +50,9 @@ describe("battle engine turn execution observer", () => {
     test("reports a rejected strategy action separately from the recovery shield", () => {
         // Seed re-pinned from 1603 -> 952 after the lap-start morale-roll fix (applyMoraleRolls now reads
         // true accumulated morale, not the stale ±20 lock) shifted the seeded trajectory so 1603 no longer
-        // produced a rejected-melee -> defend-recovery turn. 952 reproduces the exact scenario.
-        const { decisions, turns } = runObservedMatch(952, 40);
+        // produced a rejected-melee -> defend-recovery turn. Re-pinned 952 -> 1250 after enabling Arachna Queen
+        // expanded the level-4 roster pool.
+        const { decisions, turns } = runObservedMatch(1250, 40);
 
         expect(turns).toHaveLength(decisions.length);
         const recovered = turns.find((turn) => turn.recovery.source === "defend");

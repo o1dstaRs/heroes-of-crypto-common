@@ -26,7 +26,8 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(2, levelTwo.slice(0, 2), [], [])).toBe(true);
         expect(canBanCreatureLevel(2, levelTwo.slice(0, 10), [], [])).toBe(false);
         expect(canBanCreatureLevel(4, [], [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(false);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 7), [], [])).toBe(false);
     });
 
     it("uses the generated level buckets without the no-creature sentinel offset", () => {
@@ -40,7 +41,8 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(1, levelOne.slice(0, 8), [], [])).toBe(false);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 10), [], [])).toBe(false);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 4), [], [])).toBe(true);
-        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(false);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 6), [], [])).toBe(true);
+        expect(canBanCreatureLevel(4, levelFour.slice(0, 7), [], [])).toBe(false);
     });
 
     it("accounts for known creatures and each team's picked creatures", () => {

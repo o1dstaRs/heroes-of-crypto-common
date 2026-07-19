@@ -19,6 +19,7 @@ export * from "./paralysis_ability";
 export * from "./pegasus_light_ability";
 export * from "./penetrating_bite_ability";
 export * from "./petrifying_gaze_ability";
+export * from "./predatory_assimilation_ability";
 export * from "./rapid_charge_ability";
 export * from "./rime_charm_ability";
 export * from "./shatter_armor_ability";

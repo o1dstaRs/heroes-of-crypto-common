@@ -454,6 +454,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             fightProperties,
         });
     };
+    let summonedUnitSequence = 0;
     const engineContext = {
         fightProperties,
         grid,
@@ -482,6 +483,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             unitName: string;
             amount: number;
             caster: Unit;
+            sourceAbility?: string;
         }) => {
             const factionName = ToFactionName[opts.faction];
             if (!factionName) {
@@ -502,6 +504,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         opts.faction,
                         opts.unitName,
                         opts.caster.getId(),
+                        opts.sourceAbility ?? "spell",
+                        summonedUnitSequence++,
                     ),
                 );
             } catch {

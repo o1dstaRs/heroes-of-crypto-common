@@ -53,6 +53,23 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 // getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
 const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 
+// SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
+// unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
+// and Assimilation must transfer only the remaining charges belonging to the stolen card.
+const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
+    "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
+    "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
+    "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
+};
+
+function isSpellOwnedBySpellbook(entry: string, abilityName: string): boolean {
+    if (entry.startsWith(":")) {
+        return false;
+    }
+    const spellName = entry.split(":", 2)[1];
+    return !!spellName && !!SPELLBOOK_SPELL_NAMES[abilityName]?.has(spellName);
+}
+
 // ARTIFACT Broken Aegis (tier-1): the OFFENSIVE break (a chance to Break the ENEMY the wielder attacks)
 // lives in FightProperties.getBreakChancePerTeam and flows in as `chanceToBreak` — NOT here. This file
 // only applies the self-cost: a flat chance for the wielder's OWN attacks to miss (see the miss block
@@ -319,16 +336,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties as Readonly<UnitProperties>;
     }
     public deleteAbility(abilityName: string): Ability | undefined {
-        let abilityToDelete: Ability | undefined = undefined;
-        const updatedAbilities: Ability[] = [];
-        for (const a of this.abilities) {
-            if (a.getName() === abilityName) {
-                abilityToDelete = a;
-            } else {
-                updatedAbilities.push(a);
-            }
-        }
-        this.abilities = updatedAbilities;
+        const abilityToDelete =
+            this.abilities.find((ability) => ability.getName() === abilityName) ??
+            (this.unitProperties.abilities.includes(abilityName)
+                ? this.abilityFactory.makeAbility(abilityName)
+                : undefined);
+        this.abilities = this.abilities.filter((ability) => ability.getName() !== abilityName);
 
         for (let i = this.unitProperties.abilities.length - 1; i >= 0; i--) {
             if (this.unitProperties.abilities[i] === abilityName) {
@@ -336,18 +349,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.abilities_descriptions.splice(i, 1);
                 this.unitProperties.abilities_stack_powered.splice(i, 1);
                 this.unitProperties.abilities_auras.splice(i, 1);
+                this.unitProperties.aura_ranges.splice(i, 1);
+                this.unitProperties.aura_is_buff.splice(i, 1);
             }
         }
-
-        const spellName = abilityName.substring(1, abilityName.length);
-        this.spells = this.spells.filter((s: Spell) => s.getName() !== spellName);
-        for (let i = this.unitProperties.spells.length - 1; i >= 0; i--) {
-            if (this.unitProperties.spells[i] === spellName) {
-                this.unitProperties.spells.splice(i, 1);
-            }
-        }
-        if (this.unitProperties.spells.length <= 0) {
-            this.unitProperties.can_cast_spells = false;
+        this.unitProperties.stolen_abilities ??= [];
+        this.unitProperties.stolen_abilities = this.unitProperties.stolen_abilities.filter(
+            (stolenAbility) => stolenAbility !== abilityName,
+        );
+        if (abilityToDelete) {
+            this.removeAbilityMechanics(abilityToDelete);
         }
 
         return abilityToDelete;
@@ -356,53 +367,163 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // to a unit that doesn't natively have it). Idempotent — no-op if the unit already has it. Builds the
     // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
     // hasAbilityActive / processDeepWoundsAbility all see it.
-    public grantAbility(abilityName: string): void {
-        if (this.hasAbilityActive(abilityName)) {
+    public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
+        if (this.abilities.some((ability) => ability.getName() === abilityName)) {
             return;
         }
+        this.unitProperties.stolen_abilities ??= [];
+        // Repeated artifact/synergy refreshes must not undo a permanent theft. Only another explicit
+        // Assimilation transfer may reactivate a card the receiving unit previously lost.
+        if (this.unitProperties.stolen_abilities.includes(abilityName) && !options.restoreStolen) {
+            return;
+        }
+        this.unitProperties.stolen_abilities = this.unitProperties.stolen_abilities.filter(
+            (stolenAbility) => stolenAbility !== abilityName,
+        );
         const ability = this.abilityFactory.makeAbility(abilityName);
-        this.abilities.push(ability);
-        if (!this.unitProperties.abilities.includes(abilityName)) {
-            this.unitProperties.abilities.push(abilityName);
-            // Keep the parallel wire arrays aligned with `abilities` so the client actually DRAWS the granted
-            // ability's icon + tooltip — RenderableUnit requires abilities / _descriptions / _stack_powered /
-            // _auras to be equal length, and getAbilities-based icon rendering reads these per index.
-            this.unitProperties.abilities_descriptions.push(
-                ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString()),
-            );
-            this.unitProperties.abilities_stack_powered.push(ability.isStackPowered());
-            this.unitProperties.abilities_auras.push(!!ability.getAuraEffect());
+        this.registerAbility(ability, !this.unitProperties.abilities.includes(abilityName));
+        if (options.spellEntries?.length) {
+            this.unitProperties.spells.push(...options.spellEntries);
+            this.parseSpells();
+            this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
         }
     }
     public addAbility(ability: Ability): void {
-        this.unitProperties.abilities.push(ability.getName());
+        if (this.abilities.some((currentAbility) => currentAbility.getName() === ability.getName())) {
+            return;
+        }
+        this.unitProperties.stolen_abilities ??= [];
+        if (this.unitProperties.stolen_abilities.includes(ability.getName())) {
+            return;
+        }
+        this.registerAbility(ability, !this.unitProperties.abilities.includes(ability.getName()));
+    }
+    /** Force-installs a successfully stolen ability, including the exact remaining spellbook charges. */
+    public grantStolenAbility(abilityName: string, spellEntries: string[] = []): void {
+        this.grantAbility(abilityName, { restoreStolen: true, spellEntries });
+    }
+    /**
+     * Permanently disables an ability without deleting its card data. This distinction lets the client draw
+     * the native card with a STOLEN overlay while every mechanical lookup, aura and castable spell is removed.
+     */
+    public disableAbilityAsStolen(abilityName: string): Ability | undefined {
+        const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
+        if (!ability) {
+            return undefined;
+        }
+        this.unitProperties.stolen_abilities ??= [];
+        if (!this.unitProperties.stolen_abilities.includes(abilityName)) {
+            this.unitProperties.stolen_abilities.push(abilityName);
+        }
+        const cardIndex = this.unitProperties.abilities.indexOf(abilityName);
+        if (cardIndex >= 0 && ability.getAuraEffectName()) {
+            this.unitProperties.aura_ranges[cardIndex] = 0;
+            this.unitProperties.aura_is_buff[cardIndex] = true;
+        }
+        this.abilities = this.abilities.filter((candidate) => candidate.getName() !== abilityName);
+        this.removeAbilityMechanics(ability);
+        return ability;
+    }
+    public getStolenAbilityNames(): string[] {
+        return structuredClone(this.unitProperties.stolen_abilities ?? []);
+    }
+    /** Removes and returns the remaining faction spell charges mechanically owned by a SPELLBOOK card. */
+    public takeSpellbookSpellEntries(abilityName: string): string[] {
+        const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
+        if (!ability || ability.getPowerType() !== AbilityPowerType.SPELLBOOK) {
+            return [];
+        }
+        const transferred = this.unitProperties.spells.filter((entry) => isSpellOwnedBySpellbook(entry, abilityName));
+        if (!transferred.length) {
+            return [];
+        }
+        const retained = this.unitProperties.spells.filter((entry) => !isSpellOwnedBySpellbook(entry, abilityName));
+        this.unitProperties.spells.splice(0, this.unitProperties.spells.length, ...retained);
+        this.parseSpells();
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
+        return transferred;
+    }
+    private registerAbility(ability: Ability, addCardData: boolean): void {
+        this.abilities.push(ability);
+        const cardAuraEffect = ability.getAuraEffect();
+        if (addCardData) {
+            this.unitProperties.abilities.push(ability.getName());
+            this.unitProperties.abilities_descriptions.push(this.getAbilityDescription(ability));
+            this.unitProperties.abilities_stack_powered.push(ability.isStackPowered());
+            this.unitProperties.abilities_auras.push(!!ability.getAuraEffectName());
+            this.unitProperties.aura_ranges.push(cardAuraEffect?.getRange() ?? 0);
+            this.unitProperties.aura_is_buff.push(cardAuraEffect?.getProperties().is_buff ?? true);
+        } else {
+            const cardIndex = this.unitProperties.abilities.indexOf(ability.getName());
+            if (cardIndex >= 0) {
+                this.unitProperties.aura_ranges[cardIndex] = cardAuraEffect?.getRange() ?? 0;
+                this.unitProperties.aura_is_buff[cardIndex] = cardAuraEffect?.getProperties().is_buff ?? true;
+            }
+        }
+
+        const auraEffect = cardAuraEffect;
+        if (auraEffect && !this.unitProperties.aura_effects.includes(auraEffect.getName())) {
+            this.unitProperties.aura_effects.push(auraEffect.getName());
+            this.auraEffects.push(auraEffect);
+        }
+
+        const spell = ability.getSpell();
+        const spellEntry = spell ? `:${spell.getName()}` : undefined;
+        if (spellEntry && !this.unitProperties.spells.includes(spellEntry)) {
+            this.unitProperties.spells.push(spellEntry);
+        }
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
+        if (spell) {
+            this.parseSpells();
+        }
+    }
+    private removeAbilityMechanics(ability: Ability): void {
+        const auraEffectName = ability.getAuraEffectName();
+        const auraStillProvided = auraEffectName
+            ? this.abilities.some((candidate) => candidate.getAuraEffectName() === auraEffectName)
+            : false;
+        if (auraEffectName && !auraStillProvided) {
+            for (let i = this.unitProperties.aura_effects.length - 1; i >= 0; i--) {
+                if (this.unitProperties.aura_effects[i] === auraEffectName) {
+                    this.unitProperties.aura_effects.splice(i, 1);
+                }
+            }
+            for (let i = this.auraEffects.length - 1; i >= 0; i--) {
+                if (this.auraEffects[i].getName() === auraEffectName) {
+                    this.auraEffects.splice(i, 1);
+                }
+            }
+        }
+
+        const spellName = ability.getSpell()?.getName();
+        if (spellName) {
+            const spellEntryIndex = this.unitProperties.spells.indexOf(`:${spellName}`);
+            if (spellEntryIndex >= 0) {
+                this.unitProperties.spells.splice(spellEntryIndex, 1);
+            }
+            this.parseSpells();
+        }
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
+    }
+    private getAbilityDescription(ability: Ability): string {
         if (ability.getName() === "Chain Lightning") {
             const percentage = Number((this.calculateAbilityMultiplier(ability, 0) * 100).toFixed(2));
             const description = ability.getDesc().join("\n");
-            const updatedDescription = description
+            return description
                 .replace("{}", Number(percentage.toFixed()).toString())
                 .replace("{}", Number(((percentage * 7) / 8).toFixed()).toString())
                 .replace("{}", Number(((percentage * 6) / 8).toFixed()).toString())
                 .replace("{}", Number(((percentage * 5) / 8).toFixed()).toString());
-            this.unitProperties.abilities_descriptions.push(updatedDescription);
-        } else if (ability.getName() === "Paralysis") {
+        }
+        if (ability.getName() === "Paralysis") {
             const description = ability.getDesc().join("\n");
             const reduction = this.calculateAbilityApplyChance(ability, 0);
             const chance = Math.min(100, reduction * 2);
-            const updatedDescription = description
+            return description
                 .replace("{}", Number(chance.toFixed(2)).toString())
                 .replace("{}", Number(reduction.toFixed(2)).toString());
-            this.unitProperties.abilities_descriptions.push(updatedDescription);
-        } else {
-            this.unitProperties.abilities_descriptions.push(
-                ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString()),
-            );
         }
-        this.unitProperties.abilities_stack_powered.push(ability.isStackPowered());
-        this.unitProperties.abilities_auras.push(!!ability.getAuraEffect());
-        if (this.parseAbilities()) {
-            this.parseSpells();
-        }
+        return ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString());
     }
     public getTarget(): string {
         return this.unitProperties.target;
@@ -516,6 +637,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
     public refreshPreTurnState(sceneLog: ISceneLog) {
+        // Snapshot Web only at activation. The live aura can change while a flyer crosses or lands inside
+        // it, but movement remains legal until that flyer's next turn starts.
+        this.unitProperties.web_movement_locked = this.canFly() && this.hasDebuffActive("Web Aura");
         if (this.unitProperties.hp !== this.unitProperties.max_hp && this.hasAbilityActive("Wild Regeneration")) {
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
             this.unitProperties.hp = this.unitProperties.max_hp;
@@ -1063,8 +1187,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getLevel(): number {
         return this.unitProperties.level;
     }
+    public isWebMovementLocked(): boolean {
+        return this.unitProperties.web_movement_locked ?? false;
+    }
+    /** Restore the authoritative turn-start Web lock without recomputing the live aura mid-turn. */
+    public setWebMovementLocked(locked: boolean): void {
+        this.unitProperties.web_movement_locked = locked;
+    }
     public canMove(): boolean {
-        return !this.hasEffectActive("Paralysis");
+        return !this.hasEffectActive("Paralysis") && !this.isWebMovementLocked();
     }
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
@@ -2865,16 +2996,45 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     protected parseAbilities(): boolean {
         let spellAdded = false;
-        for (const abilityName of this.unitProperties.abilities) {
-            if (!this.hasAbilityActive(abilityName)) {
-                const ability = this.abilityFactory.makeAbility(abilityName);
-                this.abilities.push(ability);
-                const spell = ability.getSpell();
-                if (spell && !this.unitProperties.spells.includes(`:${spell.getName()}`)) {
-                    this.unitProperties.spells.push(`:${spell.getName()}`);
-                    this.unitProperties.can_cast_spells = true;
-                    spellAdded = true;
+        this.unitProperties.stolen_abilities ??= [];
+        for (let i = 0; i < this.unitProperties.abilities.length; i++) {
+            const abilityName = this.unitProperties.abilities[i];
+            const ability = this.abilityFactory.makeAbility(abilityName);
+            const auraEffect = ability.getAuraEffect();
+            const wasStolen = this.unitProperties.stolen_abilities.includes(abilityName);
+            this.unitProperties.aura_ranges[i] = wasStolen ? 0 : (auraEffect?.getRange() ?? 0);
+            this.unitProperties.aura_is_buff[i] = wasStolen ? true : (auraEffect?.getProperties().is_buff ?? true);
+            if (wasStolen) {
+                const castableSpellName = ability.getSpell()?.getName();
+                if (castableSpellName) {
+                    const spellEntry = `:${castableSpellName}`;
+                    for (let spellIndex = this.unitProperties.spells.length - 1; spellIndex >= 0; spellIndex--) {
+                        if (this.unitProperties.spells[spellIndex] === spellEntry) {
+                            this.unitProperties.spells.splice(spellIndex, 1);
+                        }
+                    }
                 }
+                if (ability.getPowerType() === AbilityPowerType.SPELLBOOK) {
+                    const retained = this.unitProperties.spells.filter(
+                        (entry) => !isSpellOwnedBySpellbook(entry, abilityName),
+                    );
+                    this.unitProperties.spells.splice(0, this.unitProperties.spells.length, ...retained);
+                }
+                continue;
+            }
+            if (this.abilities.some((activeAbility) => activeAbility.getName() === abilityName)) {
+                continue;
+            }
+            this.abilities.push(ability);
+            const auraEffectName = ability.getAuraEffectName();
+            if (auraEffectName && !this.unitProperties.aura_effects.includes(auraEffectName)) {
+                this.unitProperties.aura_effects.push(auraEffectName);
+            }
+            const spell = ability.getSpell();
+            if (spell && !this.unitProperties.spells.includes(`:${spell.getName()}`)) {
+                this.unitProperties.spells.push(`:${spell.getName()}`);
+                this.unitProperties.can_cast_spells = true;
+                spellAdded = true;
             }
         }
 
@@ -2918,7 +3078,26 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.spells = newSpells;
     }
     protected parseAuraEffects(): void {
+        const activeAuraEffectNames = new Set(
+            this.abilities
+                .map((ability) => ability.getAuraEffectName())
+                .filter((auraEffectName): auraEffectName is string => !!auraEffectName),
+        );
+        const stolenAuraEffectNames = new Set(
+            (this.unitProperties.stolen_abilities ?? [])
+                .map((abilityName) => this.abilityFactory.makeAbility(abilityName).getAuraEffectName())
+                .filter((auraEffectName): auraEffectName is string => !!auraEffectName),
+        );
+        // Preserve standalone/raw aura effects used by tests and non-card sources. Only remove an aura known
+        // to belong to a stolen card, unless another still-active ability also provides that same aura.
+        const retained = this.unitProperties.aura_effects.filter(
+            (auraEffectName) => !stolenAuraEffectNames.has(auraEffectName) || activeAuraEffectNames.has(auraEffectName),
+        );
+        this.unitProperties.aura_effects.splice(0, this.unitProperties.aura_effects.length, ...retained);
         for (const auraEffectName of this.unitProperties.aura_effects) {
+            if (this.auraEffects.some((auraEffect) => auraEffect.getName() === auraEffectName)) {
+                continue;
+            }
             const auraEffect = this.effectFactory.makeAuraEffect(auraEffectName);
             if (auraEffect) {
                 this.auraEffects.push(auraEffect);

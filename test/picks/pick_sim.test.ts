@@ -101,9 +101,9 @@ describe("pick_sim", () => {
             8,
             7,
             6, // L3 bans
+            9,
             8,
-            7,
-            6, // L4 bans
+            7, // L4 bans (nine-creature pool after enabling Arachna Queen)
         ]);
 
         const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);

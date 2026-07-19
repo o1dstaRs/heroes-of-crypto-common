@@ -59,7 +59,9 @@ export type GameEvent =
           position: XY;
           cells: XY[];
           merged: boolean;
+          sourceAbility?: string;
       }
+    | { type: "ability_stolen"; thiefId: string; targetId: string; abilityName: string }
     | {
           type: "unit_attacked";
           attackType: "melee" | "range";

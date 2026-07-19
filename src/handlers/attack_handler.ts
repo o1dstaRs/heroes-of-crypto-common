@@ -45,6 +45,7 @@ export interface IAttackResult {
     completed: boolean;
     unitIdsDied: string[];
     animationData?: IAnimationData[];
+    abilityStolen?: AllAbilities.IAbilityStolen[];
 }
 
 export interface IAttackObstacle {
@@ -465,6 +466,7 @@ export class AttackHandler {
     ): IAttackResult {
         const unitIdsDied: string[] = [];
         const animationData: IAnimationData[] = [];
+        const abilityStolen: AllAbilities.IAbilityStolen[] = [];
         if (
             !attackerUnit ||
             attackerUnit.isDead() ||
@@ -501,6 +503,37 @@ export class AttackHandler {
             this.sceneLog.updateLog(`${attackerUnit.getName()} miss aoe`);
             return { completed: true, unitIdsDied, animationData };
         }
+
+        const initialTargetUnit = targetUnit;
+        let primaryAssimilationLanded = false;
+        let responseAssimilationTarget: Unit | undefined;
+        let assimilationResolved = false;
+        const resolveAssimilation = (): void => {
+            if (assimilationResolved) {
+                return;
+            }
+            assimilationResolved = true;
+            if (responseAssimilationTarget) {
+                const responseStolen = AllAbilities.processPredatoryAssimilationAbility(
+                    initialTargetUnit,
+                    responseAssimilationTarget,
+                    this.sceneLog,
+                );
+                if (responseStolen) {
+                    abilityStolen.push(responseStolen);
+                }
+            }
+            if (primaryAssimilationLanded) {
+                const attackStolen = AllAbilities.processPredatoryAssimilationAbility(
+                    attackerUnit,
+                    initialTargetUnit,
+                    this.sceneLog,
+                );
+                if (attackStolen) {
+                    abilityStolen.push(attackStolen);
+                }
+            }
+        };
 
         if (targetUnits.length === 1 && targetUnit && targetUnit.hasBuffActive("Hidden")) {
             return { completed: false, unitIdsDied, animationData };
@@ -552,8 +585,10 @@ export class AttackHandler {
         }
 
         if (throughShotResult.landed) {
+            primaryAssimilationLanded = true;
+            resolveAssimilation();
             unitsHolder.refreshStackPowerForAllUnits();
-            return { completed: true, unitIdsDied, animationData };
+            return { completed: true, unitIdsDied, animationData, abilityStolen };
         }
 
         if (
@@ -799,6 +834,10 @@ export class AttackHandler {
             AllAbilities.processOneInTheFieldAbility(targetUnit);
         }
 
+        if (rangeResponseUnit && (aoeRangeResponseResult?.landed || !isResponseMissed)) {
+            responseAssimilationTarget = rangeResponseUnit;
+        }
+
         let attackerUnitPlusMorale = 0;
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         if (rangeResponseFleshShieldAbsorb) {
@@ -901,6 +940,10 @@ export class AttackHandler {
             }
         }
 
+        if (aoeRangeAttackResult?.landed || !isAttackMissed) {
+            primaryAssimilationLanded = true;
+        }
+
         if (rangeResponseUnit) {
             if (aoeRangeResponseResult?.landed) {
                 if (rangeResponseUnit.isDead() && attackerUnit.getId() === rangeResponseUnit.getId()) {
@@ -908,7 +951,8 @@ export class AttackHandler {
                     increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                     increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                     unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                    return { completed: true, unitIdsDied, animationData };
+                    resolveAssimilation();
+                    return { completed: true, unitIdsDied, animationData, abilityStolen };
                 }
             } else {
                 if (rangeResponseUnit.isDead()) {
@@ -928,7 +972,8 @@ export class AttackHandler {
                         increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                         increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                        return { completed: true, unitIdsDied, animationData };
+                        resolveAssimilation();
+                        return { completed: true, unitIdsDied, animationData, abilityStolen };
                     }
                 } else if (!isResponseMissed) {
                     // Same rule for the return shot: a dodged/missed counter lands no on-hit effects
@@ -982,7 +1027,8 @@ export class AttackHandler {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                return { completed: true, unitIdsDied, animationData };
+                resolveAssimilation();
+                return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
 
             const previousTargetUnit = targetUnit;
@@ -1005,13 +1051,15 @@ export class AttackHandler {
                 }
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                return { completed: true, unitIdsDied, animationData };
+                resolveAssimilation();
+                return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
             hoverRangeAttackDivisor = hoverRangeAttackDivisors.at(targetUnitUndex);
             if (!hoverRangeAttackDivisor) {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                return { completed: true, unitIdsDied, animationData };
+                resolveAssimilation();
+                return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
         }
 
@@ -1092,9 +1140,10 @@ export class AttackHandler {
         );
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
 
+        resolveAssimilation();
         unitsHolder.refreshStackPowerForAllUnits();
 
-        return { completed: true, unitIdsDied, animationData };
+        return { completed: true, unitIdsDied, animationData, abilityStolen };
     }
     public handleMeleeAttack(
         unitsHolder: UnitsHolder,
@@ -1107,6 +1156,7 @@ export class AttackHandler {
     ): IAttackResult {
         const animationData: IAnimationData[] = [];
         const unitIdsDied: string[] = [];
+        const abilityStolen: AllAbilities.IAbilityStolen[] = [];
 
         const updateUnitsDied = (updateBy: string[]): void => {
             for (const s of updateBy) {
@@ -1474,6 +1524,8 @@ export class AttackHandler {
         }
 
         let hasLightningSpinResponseLanded = false;
+        let assimilationResponseProcessed = false;
+        let responseAssimilationLanded = false;
 
         const captureResponse = (): void => {
             hasLightningSpinResponseLanded = false;
@@ -1556,6 +1608,11 @@ export class AttackHandler {
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
+
+                if (!isResponseMissed && !assimilationResponseProcessed) {
+                    assimilationResponseProcessed = true;
+                    responseAssimilationLanded = true;
+                }
 
                 if (isResponseMissed) {
                     this.sceneLog.updateLog(`${targetUnit.getName()} misses resp ${attackerUnit.getName()}`);
@@ -1972,12 +2029,32 @@ export class AttackHandler {
             FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(attackerUnit.getTeam()),
         );
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
+        if (responseAssimilationLanded) {
+            const responseStolen = AllAbilities.processPredatoryAssimilationAbility(
+                targetUnit,
+                attackerUnit,
+                this.sceneLog,
+            );
+            if (responseStolen) {
+                abilityStolen.push(responseStolen);
+            }
+        }
+        if (!isAttackMissed) {
+            const attackStolen = AllAbilities.processPredatoryAssimilationAbility(
+                attackerUnit,
+                targetUnit,
+                this.sceneLog,
+            );
+            if (attackStolen) {
+                abilityStolen.push(attackStolen);
+            }
+        }
         unitsHolder.refreshStackPowerForAllUnits();
 
         AllAbilities.processDevourEssenceAbility(attackerUnit, unitIdsDied, unitsHolder, this.sceneLog);
         AllAbilities.processDevourEssenceAbility(targetUnit, unitIdsDied, unitsHolder, this.sceneLog);
 
-        return { completed: true, unitIdsDied, animationData };
+        return { completed: true, unitIdsDied, animationData, abilityStolen };
     }
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,

@@ -281,7 +281,8 @@ describe("ranked conditional dual-genome compatibility", () => {
             upperGenome: round1,
         });
         expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
-        expect(mixed.lower.creatureIds).toEqual([22, 36, 23, 26, 38, 40]);
+        // Arachna Queen expands the level-4 pool and shifts this deterministic final pick from Angel to Behemoth.
+        expect(mixed.lower.creatureIds).toEqual([22, 36, 23, 26, 38, 20]);
     });
 });
 

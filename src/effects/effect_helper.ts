@@ -21,6 +21,10 @@ import type { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
 export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectProperties): boolean {
+    if (auraEffectProperties.power_type === AbilityPowerType.DISABLE_FLY_MOVEMENT) {
+        return unit.canFly();
+    }
+
     if (
         auraEffectProperties.power_type === AbilityPowerType.UNTARGETABLE &&
         unit.hasAuraEffect("Disguise") &&

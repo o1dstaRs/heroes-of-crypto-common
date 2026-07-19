@@ -165,6 +165,7 @@ interface ICatalogEntry {
 let catalogCache: ICatalogEntry[] | undefined;
 
 const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
+const SUMMON_ONLY_CREATURES = new Set(["Arachna Spider"]);
 
 /**
  * Only creatures that have a CreatureVals enum id are actually ENABLED in the game — creatures.json
@@ -172,6 +173,9 @@ const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
  * the server's creature_lookup (it keys names to the enum), so rosters never field a disabled unit.
  */
 function isCreatureEnabled(creatureName: string): boolean {
+    if (SUMMON_ONLY_CREATURES.has(creatureName)) {
+        return false;
+    }
     const enumKey = creatureName.toUpperCase().replace(/ /g, "_");
     const id = creatureEnum[enumKey];
     return typeof id === "number" && id > 0;

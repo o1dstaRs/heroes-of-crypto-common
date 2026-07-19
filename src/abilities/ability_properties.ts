@@ -61,6 +61,9 @@ export enum AbilityPowerType {
     REJUVENATION = 48,
     SHOTS_COST = 49,
     ABSORB_DAMAGE = 50,
+    DISABLE_FLY_MOVEMENT = 51,
+    INFEST = 52,
+    STEAL_ABILITY = 53,
 }
 
 export const AllAbilityPowerTypes = [
@@ -115,6 +118,9 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.REJUVENATION,
     AbilityPowerType.SHOTS_COST,
     AbilityPowerType.ABSORB_DAMAGE,
+    AbilityPowerType.DISABLE_FLY_MOVEMENT,
+    AbilityPowerType.INFEST,
+    AbilityPowerType.STEAL_ABILITY,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -172,6 +178,9 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     REJUVENATION: AbilityPowerType.REJUVENATION,
     SHOTS_COST: AbilityPowerType.SHOTS_COST,
     ABSORB_DAMAGE: AbilityPowerType.ABSORB_DAMAGE,
+    DISABLE_FLY_MOVEMENT: AbilityPowerType.DISABLE_FLY_MOVEMENT,
+    INFEST: AbilityPowerType.INFEST,
+    STEAL_ABILITY: AbilityPowerType.STEAL_ABILITY,
 };
 
 export enum AbilityType {

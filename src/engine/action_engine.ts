@@ -90,7 +90,8 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
         unitName: string;
         amount: number;
         caster: Unit;
-        spell: Spell;
+        spell?: Spell;
+        sourceAbility?: string;
     }) => Unit | undefined;
     canPlaceUnit?: (unit: Unit, cells: XY[], action: Extract<GameAction, { type: "place_unit" }>) => boolean;
     canSplitUnit?: (unit: Unit, action: Extract<GameAction, { type: "split_unit" }>) => boolean;
@@ -419,6 +420,10 @@ export class GameActionEngine {
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
+        const killAttributions = this.createDirectKillAttributions(unitIdsDied, [
+            { victim: target, killer: attacker },
+            { victim: attacker, killer: target },
+        ]);
         const events: GameEvent[] = [
             {
                 type: "unit_attacked",
@@ -430,7 +435,8 @@ export class GameActionEngine {
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];
-        events.push(...this.cleanupDeadUnits(unitIdsDied));
+        events.push(...this.createAbilityStolenEvents(result.abilityStolen));
+        events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
@@ -513,6 +519,12 @@ export class GameActionEngine {
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
+        const primaryRangeTarget = evalResult.affectedUnits[0]?.[0];
+        const responseTarget = responseUnits?.[0];
+        const killAttributions = this.createDirectKillAttributions(unitIdsDied, [
+            ...(primaryRangeTarget ? [{ victim: primaryRangeTarget, killer: attacker }] : []),
+            ...(responseTarget ? [{ victim: responseTarget, killer: target }] : []),
+        ]);
         const events: GameEvent[] = [
             {
                 type: "unit_attacked",
@@ -524,7 +536,8 @@ export class GameActionEngine {
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];
-        events.push(...this.cleanupDeadUnits(unitIdsDied));
+        events.push(...this.createAbilityStolenEvents(result.abilityStolen));
+        events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
@@ -738,6 +751,13 @@ export class GameActionEngine {
 
         const affectedUnitIds = affectedUnits?.[0]?.map((unit) => unit.getId()) ?? [];
         const unitIdsDied = [...new Set(result.unitIdsDied)];
+        // Area Throw has no retaliation path: every enemy in its resolved affected set is directly damaged
+        // by the acting thrower. Friendly/self deaths are intentionally not attributed.
+        const areaVictims = (affectedUnits ?? [])
+            .flat()
+            .filter((unit) => unit.getTeam() !== attacker.getTeam())
+            .map((victim) => ({ victim, killer: attacker }));
+        const killAttributions = this.createDirectKillAttributions(unitIdsDied, areaVictims);
         const events: GameEvent[] = [
             {
                 type: "area_attacked",
@@ -751,7 +771,8 @@ export class GameActionEngine {
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];
-        events.push(...this.cleanupDeadUnits(unitIdsDied));
+        events.push(...this.createAbilityStolenEvents(result.abilityStolen));
+        events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
@@ -799,6 +820,10 @@ export class GameActionEngine {
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
+        const killAttributions = this.createDirectKillAttributions(
+            unitIdsDied,
+            target && target.getTeam() !== caster.getTeam() ? [{ victim: target, killer: caster }] : [],
+        );
         const events: GameEvent[] = [
             {
                 type: "spell_cast",
@@ -810,7 +835,7 @@ export class GameActionEngine {
                 animations: this.serializeAnimations(result.animationData ?? []),
             },
         ];
-        events.push(...this.cleanupDeadUnits(unitIdsDied));
+        events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
@@ -1542,7 +1567,26 @@ export class GameActionEngine {
             bodyUnitId: animation.bodyUnit?.getId(),
         }));
     }
-    private cleanupDeadUnits(unitIdsDied: string[]): GameEvent[] {
+    private createAbilityStolenEvents(
+        stolen: Array<{ thiefId: string; targetId: string; abilityName: string }> | undefined,
+    ): GameEvent[] {
+        return (stolen ?? []).map((entry) => ({ type: "ability_stolen", ...entry }));
+    }
+    /** Only explicitly resolved hit/response pairs may trigger Infest; unrelated exchange deaths stay unattributed. */
+    private createDirectKillAttributions(
+        unitIdsDied: string[],
+        candidates: Array<{ victim: Unit; killer: Unit }>,
+    ): Map<string, Unit> {
+        const attributions = new Map<string, Unit>();
+        const died = new Set(unitIdsDied);
+        for (const { victim, killer } of candidates) {
+            if (victim.isDead() && died.has(victim.getId())) {
+                attributions.set(victim.getId(), killer);
+            }
+        }
+        return attributions;
+    }
+    private cleanupDeadUnits(unitIdsDied: string[], killAttributions = new Map<string, Unit>()): GameEvent[] {
         const events: GameEvent[] = [];
         const processed = new Set<string>();
 
@@ -1558,9 +1602,18 @@ export class GameActionEngine {
             }
 
             const unitName = unit.getName();
+            const corpseCells = structuredClone(unit.getCells());
+            const corpseLevel = unit.getLevel();
             const deleted = this.context.unitsHolder.deleteUnitById(unitId, true);
             if (deleted) {
                 events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+                const killer = killAttributions.get(unitId);
+                if (killer?.hasAbilityActive("Infest")) {
+                    const infested = this.spawnInfestedUnit(killer, corpseLevel, corpseCells);
+                    if (infested) {
+                        events.push(infested);
+                    }
+                }
                 continue;
             }
 
@@ -1579,6 +1632,74 @@ export class GameActionEngine {
         }
 
         return events;
+    }
+    private spawnInfestedUnit(killer: Unit, corpseLevel: number, corpseCells: XY[]): GameEvent | undefined {
+        if (!this.context.createSummonedUnit || !corpseCells.length) {
+            return undefined;
+        }
+
+        let unitName: "Arachna Queen" | "Arachna Spider";
+        if (corpseLevel === PBTypes.UnitLevelVals.FOURTH) {
+            unitName = "Arachna Queen";
+        } else if (
+            corpseLevel === PBTypes.UnitLevelVals.FIRST ||
+            corpseLevel === PBTypes.UnitLevelVals.SECOND ||
+            corpseLevel === PBTypes.UnitLevelVals.THIRD
+        ) {
+            unitName = "Arachna Spider";
+        } else {
+            return undefined;
+        }
+        const spawned = this.context.createSummonedUnit({
+            team: killer.getTeam(),
+            faction: PBTypes.FactionVals.NATURE,
+            unitName,
+            amount: 1,
+            caster: killer,
+            sourceAbility: "Infest",
+        });
+        if (!spawned || this.context.unitsHolder.getAllUnits().has(spawned.getId())) {
+            return undefined;
+        }
+
+        const cells =
+            corpseCells.length === (spawned.isSmallSize() ? 1 : 4)
+                ? corpseCells
+                : this.resolveSummonCells(spawned, corpseCells[0]);
+        const position = getPositionForCells(this.context.grid.getSettings(), cells);
+        if (!cells.length || !position) {
+            return undefined;
+        }
+        const occupied = this.context.grid.occupyCells(
+            cells,
+            spawned.getId(),
+            spawned.getTeam(),
+            spawned.getAttackRange(),
+            spawned.hasAbilityActive("Made of Fire"),
+            spawned.hasAbilityActive("Made of Water"),
+        );
+        if (!occupied) {
+            this.context.sceneLog.updateLog(`${killer.getName()}'s Infest found no room for ${unitName}`);
+            return undefined;
+        }
+
+        spawned.setPosition(position.x, position.y);
+        this.context.unitsHolder.addUnit(spawned);
+        this.context.sceneLog.updateLog(`${killer.getName()} infested the fallen stack with ${unitName}`);
+        const spawnCell = spawned.getBaseCell();
+        this.context.sceneLog.updateLog(`${unitName} spawned at (${spawnCell.x}, ${spawnCell.y})`);
+        return {
+            type: "unit_summoned",
+            casterId: killer.getId(),
+            unitId: spawned.getId(),
+            team: spawned.getTeam(),
+            unitName,
+            amount: 1,
+            position: { ...spawned.getPosition() },
+            cells: structuredClone(cells),
+            merged: false,
+            sourceAbility: "Infest",
+        };
     }
     private reject(rejectionReason: GameActionRejectionReason, message?: string): IGameActionResult {
         return { completed: false, events: [], rejectionReason, message };

@@ -97,9 +97,21 @@ function rawCreatureConfigs(): Map<string, IRawCreatureConfig> {
     return configs;
 }
 
+/**
+ * v0.7 preregistration freeze: the archetype battery was preregistered when ANGEL=40 was the last
+ * catalog id. Arachna Queen was enabled later, so exclude post-Angel creatures to keep the taxonomy—and
+ * historical manifests that pin its sha256—stable.
+ */
+const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
+
+const creatureEnumId = (creatureName: string): number =>
+    (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;
+
 /** Trait sets are derived from the enabled PB-enum catalog, never from unreleased JSON-only creatures. */
 export function classifyEnabledV07ArchetypeCreatures(): IV07ArchetypeTaxonomy {
-    const enabled = [1, 2, 3, 4].flatMap((level) => creaturesByLevel(level));
+    const enabled = [1, 2, 3, 4]
+        .flatMap((level) => creaturesByLevel(level))
+        .filter((entry) => creatureEnumId(entry.creatureName) <= V07_CATALOG_MAX_CREATURE_ID);
     const configs = rawCreatureConfigs();
     const abilities = ABILITIES_JSON as unknown as Record<string, IRawAbilityConfig>;
     const names = (predicate: (entry: (typeof enabled)[number]) => boolean): string[] =>
