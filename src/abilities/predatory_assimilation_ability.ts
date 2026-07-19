@@ -47,9 +47,9 @@ export function processPredatoryAssimilationAbility(
         return undefined;
     }
 
-    // Capture every remaining charge owned by the card before disabling it, because the disabled ability is
-    // intentionally no longer present in the target's mechanical ability list. Duplicate entries are charges.
-    const spellEntries = target.takeAbilitySpellEntries(selected.getName());
+    // Capture spellbook charges before disabling the card, because the disabled ability is intentionally no
+    // longer present in the target's mechanical ability list. Duplicate entries are meaningful spell charges.
+    const spellEntries = target.takeSpellbookSpellEntries(selected.getName());
     if (!target.disableAbilityAsStolen(selected.getName())) {
         return undefined;
     }

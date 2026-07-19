@@ -78,8 +78,6 @@ export class UnitProperties {
     public readonly size: number;
     public readonly level: number;
     public readonly spells: string[];
-    /** True once `spells` is a runtime/snapshot charge list rather than raw creature configuration. */
-    public spell_entries_authoritative?: boolean;
     public readonly abilities: string[];
     public readonly abilities_descriptions: string[];
     public readonly abilities_stack_powered: boolean[];
