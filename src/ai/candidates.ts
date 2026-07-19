@@ -30,7 +30,6 @@ import type { Spell } from "../spells/spell";
 import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
-import { findMountainMeleeStrike } from "./ai";
 import type { IDecisionContext } from "./ai_strategy";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 
@@ -650,12 +649,84 @@ class CandidateGenerator {
         }
     }
     // ---- mountain mining -------------------------------------------------------------------------
+    /**
+     * v0.8-only mountain selector. The shared <=v0.7 helper intentionally retains its historical base-cell
+     * adjacency semantics; challengers instead mirror the engine and consider every cell in a LARGE footprint.
+     */
+    private mountainMeleeStrike(
+        targetCells: readonly XY[],
+    ): { attackFrom: XY; targetCell: XY; route?: IWeightedRoute } | undefined {
+        interface IStrike {
+            attackFrom: XY;
+            targetCell: XY;
+            route?: IWeightedRoute;
+            weight: number;
+        }
+
+        const targets = [...targetCells].sort((left, right) => left.x - right.x || left.y - right.y);
+        const adjacentTarget = (standCell: XY): XY | undefined => {
+            for (const footprintCell of this.footprintForCell(standCell)) {
+                const target = targets.find((cell) => isAdjacentCell(footprintCell, cell));
+                if (target) {
+                    return target;
+                }
+            }
+            return undefined;
+        };
+        const routeSignature = (route?: IWeightedRoute): string =>
+            route
+                ? `${route.route.map((cell) => `${cell.x},${cell.y}`).join(";")}|${Number(route.hasLavaCell)}|${Number(route.hasWaterCell)}`
+                : "";
+        const precedes = (left: IStrike, right: IStrike): boolean => {
+            if (left.weight !== right.weight) return left.weight < right.weight;
+            if (left.attackFrom.x !== right.attackFrom.x) return left.attackFrom.x < right.attackFrom.x;
+            if (left.attackFrom.y !== right.attackFrom.y) return left.attackFrom.y < right.attackFrom.y;
+            if (left.targetCell.x !== right.targetCell.x) return left.targetCell.x < right.targetCell.x;
+            if (left.targetCell.y !== right.targetCell.y) return left.targetCell.y < right.targetCell.y;
+            return routeSignature(left.route) < routeSignature(right.route);
+        };
+
+        const strikes: IStrike[] = [];
+        const consider = (attackFrom: XY, weight: number, route?: IWeightedRoute): void => {
+            if (!Number.isFinite(weight) || !this.footprintOk(attackFrom)) {
+                return;
+            }
+            const targetCell = adjacentTarget(attackFrom);
+            if (!targetCell) {
+                return;
+            }
+            strikes.push({ attackFrom, targetCell, route, weight });
+        };
+
+        // Any current footprint cell touching rock is an authoritative stationary strike, regardless of reach.
+        const base = this.unit.getBaseCell();
+        consider(base, 0);
+        const stationary = strikes[0];
+        if (stationary) {
+            return { attackFrom: stationary.attackFrom, targetCell: stationary.targetCell };
+        }
+
+        // Otherwise select the cheapest legal reachable anchor. Inspect every route so flags come from the
+        // exact route selected by the deterministic tie-break, rather than whichever route happened to be first.
+        for (const routes of this.movePath()?.knownPaths.values() ?? []) {
+            for (const route of routes) {
+                if (!route?.route.length || (route.cell.x === base.x && route.cell.y === base.y)) {
+                    continue;
+                }
+                consider(route.cell, route.weight, route);
+            }
+        }
+        strikes.sort((left, right) => (precedes(left, right) ? -1 : precedes(right, left) ? 1 : 0));
+        const best = strikes[0];
+        return best ? { attackFrom: best.attackFrom, targetCell: best.targetCell, route: best.route } : undefined;
+    }
+
     /** One deterministic, engine-legal melee strike against an intact BLOCK_CENTER mountain. */
     private addMountainAttack(): void {
         if (!this.options.includeMountainAttacks) {
             return;
         }
-        const { attackHandler, fightProperties, grid, matrix, pathHelper, unitsHolder } = this.context;
+        const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
         if (
             !attackHandler ||
             !fightProperties ||
@@ -676,24 +747,23 @@ class CandidateGenerator {
             return;
         }
 
-        const strike = findMountainMeleeStrike(this.unit, grid, matrix, pathHelper);
-        if (!strike) {
-            return;
-        }
         const mid = grid.getSettings().getGridSize() >> 1;
-        const targetHasHits =
-            strike.targetCell.x >= mid
-                ? fightProperties.getObstacleHitsLeftRight() > 0
-                : fightProperties.getObstacleHitsLeftLeft() > 0;
-        if (!targetHasHits) {
+        const strike = this.mountainMeleeStrike(
+            grid
+                .getCenterCells(true)
+                .filter((cell) =>
+                    cell.x >= mid
+                        ? fightProperties.getObstacleHitsLeftRight() > 0
+                        : fightProperties.getObstacleHitsLeftLeft() > 0,
+                ),
+        );
+        if (!strike) {
             return;
         }
 
         const base = this.unit.getBaseCell();
         const inPlace = strike.attackFrom.x === base.x && strike.attackFrom.y === base.y;
-        const route = inPlace
-            ? undefined
-            : strike.knownPaths.get((strike.attackFrom.x << 4) | strike.attackFrom.y)?.[0];
+        const route = inPlace ? undefined : strike.route;
         if (!inPlace && !route?.route.length) {
             return;
         }

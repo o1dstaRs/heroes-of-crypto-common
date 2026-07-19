@@ -14,7 +14,10 @@ import { basename, dirname, join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 import { V08_ALIGNED_96H_V1_VERSION_PROFILE } from "../../src/simulation/optimizer/aligned_96h_version_profile";
-import { V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
+import {
+    buildV08AlignedV1ProductionCandidateCatalog,
+    V08_ALIGNED_V1_PRODUCTION_CATALOG_SHA256,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
 import { evaluateV07AlignedV2Shard } from "../../src/simulation/optimizer/v0_7_aligned_96h_v2_evaluator";
 import {
     loadV07AlignedV2PersistedShard,
@@ -36,6 +39,7 @@ import {
     buildV08AlignedV1ThroughputRequest,
     buildV08AlignedV1ThroughputSeedReceipt,
     buildV08AlignedV1ThroughputWorstCostGenome,
+    measureV08AlignedV1ThroughputWorkloadProxy,
     replayV08AlignedV1ThroughputEvidence,
     validateV07AlignedV2ProductionThroughputAttestation,
     validateV07AlignedV2ThroughputRequest,
@@ -292,6 +296,38 @@ function oneScenarioLegacyPlan(): IV07AlignedV2InjectedSeedPlan {
 }
 
 describe("v0.8 aligned 96-hour v1 throughput profile", () => {
+    it("selects a workload/deadline maximum that dominates or ties all 48 catalog arms", () => {
+        const catalog = buildV08AlignedV1ProductionCandidateCatalog();
+        const worstCost = buildV08AlignedV1ThroughputWorstCostGenome();
+        const maximum = measureV08AlignedV1ThroughputWorkloadProxy(worstCost);
+        const tiedLabels: string[] = [];
+
+        expect(catalog).toHaveLength(48);
+        for (const candidate of catalog) {
+            const workload = measureV08AlignedV1ThroughputWorkloadProxy(candidate);
+            expect(workload.rolloutWork, candidate.search.label).toBeLessThanOrEqual(maximum.rolloutWork);
+            expect(workload.maxMelee, candidate.search.label).toBeLessThanOrEqual(maximum.maxMelee);
+            expect(workload.maxShots, candidate.search.label).toBeLessThanOrEqual(maximum.maxShots);
+            expect(workload.maxThrows, candidate.search.label).toBeLessThanOrEqual(maximum.maxThrows);
+            expect(workload.decisionDeadlineMs, candidate.search.label).toBeLessThanOrEqual(maximum.decisionDeadlineMs);
+            if (canonicalV07AlignedV2Json(workload) === canonicalV07AlignedV2Json(maximum)) {
+                tiedLabels.push(candidate.search.label ?? "<unlabeled>");
+            }
+        }
+        expect(maximum).toEqual({
+            rolloutWork: 72,
+            maxMelee: 6,
+            maxShots: 4,
+            maxThrows: 2,
+            decisionDeadlineMs: 175,
+        });
+        expect(tiedLabels).toEqual([
+            "aligned-prod-depth-b9ce-h12-d175",
+            "aligned-prod-depth-midpoint-h12-d175",
+            "aligned-prod-melee-ranged-target-b9ce-h12",
+        ]);
+    });
+
     it("binds the exact profile, catalog, source ledger, replay, and schema-2 attestation", () => {
         const sourceBytes = readFileSync(SOURCE_MANIFEST);
         const { receipt, plan } = buildV08AlignedV1ThroughputSeedReceipt(sourceBytes);

@@ -104,6 +104,15 @@ export const V07_ALIGNED_V2_THROUGHPUT_WORST_COST_GENOME_SHA256 =
 export const V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256 =
     "13ec7aee5e5793c93f584a366a6779916583a51448b11bdd0b05757bbbca73a5" as const;
 
+export interface IV08AlignedV1ThroughputWorkloadProxy {
+    /** Conservative search expansion proxy: horizon * shortlist * rollouts. */
+    rolloutWork: number;
+    maxMelee: number;
+    maxShots: number;
+    maxThrows: number;
+    decisionDeadlineMs: number;
+}
+
 const ROOT_INVENTORY = [
     "batches",
     "evidence.json",
@@ -924,16 +933,50 @@ export function buildV07AlignedV2ThroughputWorstCostGenome(): IV07AlignedV2Candi
 }
 
 export function buildV08AlignedV1ThroughputWorstCostGenome(): IV08AlignedV1CandidateGenome {
-    const matches = buildV08AlignedV1ProductionCandidateCatalog().filter(
-        (genome) => genome.search.label === V07_ALIGNED_V2_THROUGHPUT_WORST_COST_LABEL,
-    );
+    const catalog = buildV08AlignedV1ProductionCandidateCatalog();
+    const matches = catalog.filter((genome) => genome.search.label === V07_ALIGNED_V2_THROUGHPUT_WORST_COST_LABEL);
     if (
         matches.length !== 1 ||
         fingerprintV08AlignedV1CandidateGenome(matches[0]) !== V08_ALIGNED_V1_THROUGHPUT_WORST_COST_GENOME_SHA256
     ) {
         throw new Error("v0.8 throughput worst-cost arm drifted from the version-bound production catalog");
     }
-    return structuredClone(matches[0]);
+    const worstCost = matches[0];
+    const worstProxy = measureV08AlignedV1ThroughputWorkloadProxy(worstCost);
+    for (const candidate of catalog) {
+        const candidateProxy = measureV08AlignedV1ThroughputWorkloadProxy(candidate);
+        if (
+            candidateProxy.rolloutWork > worstProxy.rolloutWork ||
+            candidateProxy.maxMelee > worstProxy.maxMelee ||
+            candidateProxy.maxShots > worstProxy.maxShots ||
+            candidateProxy.maxThrows > worstProxy.maxThrows ||
+            candidateProxy.decisionDeadlineMs > worstProxy.decisionDeadlineMs
+        ) {
+            throw new Error(
+                `v0.8 throughput arm is lighter than production candidate ${candidate.search.label ?? "<unlabeled>"}`,
+            );
+        }
+    }
+    return structuredClone(worstCost);
+}
+
+/**
+ * Catalog-wide conservative compute proxy for the diagnostic arm. Candidate enumeration caps bound the
+ * per-node fan-out; horizon * shortlist * rollouts bounds repeated rollout expansion; the deadline bounds the
+ * amount of wall time a decision may consume. The selected arm must dominate or tie every production arm in
+ * every component, so throughput cannot be qualified on a knowingly lighter member of the 48-arm catalog.
+ */
+export function measureV08AlignedV1ThroughputWorkloadProxy(
+    genome: IV08AlignedV1CandidateGenome,
+): IV08AlignedV1ThroughputWorkloadProxy {
+    const shortlist = genome.controls.shortlist ?? 1;
+    return {
+        rolloutWork: genome.search.horizon * shortlist * genome.search.rollouts,
+        maxMelee: genome.search.maxMelee,
+        maxShots: genome.search.maxShots,
+        maxThrows: genome.search.maxThrows,
+        decisionDeadlineMs: genome.controls.decisionDeadlineMs,
+    };
 }
 
 function validateProvenance(value: unknown): IV07AlignedV2ThroughputProvenance {

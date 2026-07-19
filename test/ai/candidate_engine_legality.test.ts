@@ -26,6 +26,7 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell, getPositionForCells } from "../../src/grid/grid_math";
+import type { IWeightedRoute } from "../../src/grid/path_definitions";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -291,6 +292,154 @@ describe("enumerated candidate engine legality", () => {
             expect(action.hasWaterCell).toBe(false);
         }
         expectCandidatesToApply(harness, mine);
+    });
+
+    it("applies LARGE stationary mining from every footprint-facing edge, including base (12,8) at speed 1", () => {
+        const cases: Array<{
+            name: string;
+            team: number;
+            base: XY;
+            targetCell: XY;
+            side: "left" | "right";
+        }> = [
+            {
+                name: "LOWER right-side reported base",
+                team: LOWER,
+                base: { x: 12, y: 8 },
+                targetCell: { x: 10, y: 7 },
+                side: "right",
+            },
+            {
+                name: "UPPER right-mountain high-Y edge",
+                team: UPPER,
+                base: { x: 10, y: 10 },
+                targetCell: { x: 9, y: 8 },
+                side: "right",
+            },
+            {
+                name: "LOWER left-mountain corridor edge",
+                team: LOWER,
+                base: { x: 8, y: 8 },
+                targetCell: { x: 6, y: 7 },
+                side: "left",
+            },
+            {
+                name: "UPPER left-mountain high-Y edge",
+                team: UPPER,
+                base: { x: 6, y: 10 },
+                targetCell: { x: 5, y: 8 },
+                side: "left",
+            },
+        ];
+
+        for (const testCase of cases) {
+            const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+            const active = createTestUnit({
+                team: testCase.team,
+                name: testCase.name,
+                attackType: MELEE,
+                size: PBTypes.UnitSizeVals.LARGE,
+                speed: 1,
+            });
+            const enemy = createTestUnit({
+                team: testCase.team === LOWER ? UPPER : LOWER,
+                name: `${testCase.name} enemy`,
+                attackType: MELEE,
+            });
+            placeLarge(combat, active, testCase.base);
+            placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 15, y: 15 });
+            const harness = activate(combat, active);
+            const hitsBefore =
+                testCase.side === "right"
+                    ? harness.fightProperties.getObstacleHitsLeftRight()
+                    : harness.fightProperties.getObstacleHitsLeftLeft();
+            const mine = enumerateCandidates(active, harness.context, incumbentFor(active), {
+                includeMountainAttacks: true,
+            }).candidates.filter((candidate) => candidate.kind === "mine");
+
+            expect(active.getBaseCell(), testCase.name).toEqual(testCase.base);
+            expect(mine, testCase.name).toHaveLength(1);
+            expect(mine[0], testCase.name).toMatchObject({
+                standCell: testCase.base,
+                targetCell: testCase.targetCell,
+                actions: [
+                    {
+                        type: "obstacle_attack",
+                        attackFrom: testCase.base,
+                        path: undefined,
+                        hasLavaCell: undefined,
+                        hasWaterCell: undefined,
+                    },
+                ],
+            });
+
+            const result = harness.engine.apply(mine[0].actions[0]);
+            expect(result.completed, `${testCase.name}: ${result.rejectionReason ?? "no rejection"}`).toBe(true);
+            const hitsAfter =
+                testCase.side === "right"
+                    ? harness.fightProperties.getObstacleHitsLeftRight()
+                    : harness.fightProperties.getObstacleHitsLeftLeft();
+            expect(hitsAfter, testCase.name).toBe(hitsBefore - 1);
+        }
+    });
+
+    it("chooses the cheapest legal LARGE mountain route and preserves that route's terrain flags", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const active = createTestUnit({
+            team: LOWER,
+            name: "Large routed miner",
+            attackType: MELEE,
+            size: PBTypes.UnitSizeVals.LARGE,
+            speed: 1,
+        });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeLarge(combat, active, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 15, y: 15 });
+        const harness = activate(combat, active);
+        const route = (cell: XY, weight: number, hasLavaCell: boolean, hasWaterCell: boolean): IWeightedRoute => ({
+            cell,
+            route: [active.getBaseCell(), cell],
+            weight,
+            firstAggrMet: false,
+            hasLavaCell,
+            hasWaterCell,
+        });
+        const occupiedCheapest = route({ x: 11, y: 8 }, 1, true, true);
+        const selected = route({ x: 12, y: 8 }, 2, false, true);
+        const expensive = route({ x: 8, y: 8 }, 3, true, false);
+        const knownPaths = new Map<number, IWeightedRoute[]>([
+            [(expensive.cell.x << 4) | expensive.cell.y, [expensive]],
+            [(occupiedCheapest.cell.x << 4) | occupiedCheapest.cell.y, [occupiedCheapest]],
+            [(selected.cell.x << 4) | selected.cell.y, [selected]],
+        ]);
+        const context: IDecisionContext = {
+            ...harness.context,
+            pathHelper: {
+                getMovePath: () => ({
+                    cells: [expensive.cell, occupiedCheapest.cell, selected.cell],
+                    hashes: new Set(knownPaths.keys()),
+                    knownPaths,
+                }),
+            } as unknown as PathHelper,
+        };
+        const mine = enumerateCandidates(active, context, incumbentFor(active), {
+            includeMountainAttacks: true,
+        }).candidates.filter((candidate) => candidate.kind === "mine");
+
+        expect(mine).toHaveLength(1);
+        expect(mine[0]).toMatchObject({
+            standCell: selected.cell,
+            targetCell: { x: 10, y: 7 },
+            actions: [
+                {
+                    type: "obstacle_attack",
+                    attackFrom: selected.cell,
+                    path: selected.route,
+                    hasLavaCell: false,
+                    hasWaterCell: true,
+                },
+            ],
+        });
     });
 
     it("does not emit mountain challengers for unavailable or engine-rejected mining states", () => {
