@@ -1017,7 +1017,7 @@
         "name": "Predatory Assimilation",
         "type": "ATTACK",
         "desc": [
-            "Each landed direct attack has a stack-powered chance ({}% at full stack before modifiers) to permanently disable and steal one random active ability from the target"
+            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target"
         ],
         "power": 25,
         "power_type": "STEAL_ABILITY",
