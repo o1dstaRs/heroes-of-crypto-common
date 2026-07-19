@@ -235,7 +235,17 @@ const envNum = (name: string, fallback: number, min: number): number => {
 };
 
 const INCUMBENT_KINDS = new Set(["idle", "defend", "wait", "move", "melee", "shot", "area_throw", "spell", "mine"]);
-const CHALLENGER_KINDS = new Set<CandidateKind>(["wait", "defend", "move", "melee", "shot", "area_throw", "spell"]);
+const CHALLENGER_KINDS = new Set<CandidateKind>([
+    "wait",
+    "defend",
+    "move",
+    "melee",
+    "shot",
+    "area_throw",
+    "spell",
+    "mine",
+]);
+const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
 
 function parseKindFilter<T extends string>(
     name: string,
@@ -682,6 +692,7 @@ export class SearchDriver {
             };
             const set = enumerateCandidates(unit, context, incumbent, {
                 ...this.caps,
+                includeMountainAttacks: this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version),
                 enrichIncumbentMetadata: this.ilPath !== undefined,
             });
             const candidates = set.candidates.filter((candidate) => {

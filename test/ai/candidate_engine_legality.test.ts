@@ -25,7 +25,7 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCells } from "../../src/grid/grid_math";
+import { getPositionForCell, getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -91,7 +91,7 @@ function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
 
 function activate(combat: CombatTestContext, active: Unit): LegalityHarness {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setGridType(PBTypes.GridVals.NORMAL);
+    fightProperties.setGridType(combat.grid.getGridType());
     fightProperties.startFight();
     fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
     fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
@@ -216,6 +216,133 @@ describe("enumerated candidate engine legality", () => {
 
         expect(throws.length).toBeGreaterThan(0);
         expectCandidatesToApply(harness, throws);
+    });
+
+    it("applies an in-place mountain strike and deduplicates the same incumbent", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const active = createTestUnit({ team: LOWER, name: "Miner", attackType: MELEE, speed: 3 });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, active, { x: 4, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
+        const harness = activate(combat, active);
+
+        expect(
+            enumerateCandidates(active, harness.context, incumbentFor(active)).candidates.some(
+                (candidate) => candidate.kind === "mine",
+            ),
+        ).toBe(false);
+        const mine = enumerateCandidates(active, harness.context, incumbentFor(active), {
+            includeMountainAttacks: true,
+        }).candidates.filter((candidate) => candidate.kind === "mine");
+
+        expect(mine).toHaveLength(1);
+        expect(mine[0].standCell).toEqual(active.getBaseCell());
+        expect(mine[0].targetCell).toEqual({ x: 5, y: 7 });
+        expect(mine[0].actions).toEqual([
+            {
+                type: "obstacle_attack",
+                attackerId: active.getId(),
+                targetPosition: getPositionForCell(
+                    { x: 5, y: 7 },
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                ),
+                attackFrom: { x: 4, y: 7 },
+                path: undefined,
+                hasLavaCell: undefined,
+                hasWaterCell: undefined,
+            },
+        ]);
+        expectCandidatesToApply(harness, mine);
+
+        const anchored = enumerateCandidates(active, harness.context, mine[0].actions, {
+            includeMountainAttacks: true,
+            enrichIncumbentMetadata: true,
+        }).candidates;
+        expect(
+            anchored.filter((candidate) => candidate.actions.some((action) => action.type === "obstacle_attack")),
+        ).toHaveLength(1);
+        expect(anchored[0]).toMatchObject({
+            kind: "incumbent",
+            targetCell: { x: 5, y: 7 },
+            standCell: { x: 4, y: 7 },
+        });
+    });
+
+    it("applies a move-to-mine mountain strike with its authoritative route metadata", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const active = createTestUnit({ team: LOWER, name: "Miner", attackType: MELEE, speed: 3 });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, active, { x: 2, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
+        const harness = activate(combat, active);
+        const mine = enumerateCandidates(active, harness.context, incumbentFor(active), {
+            includeMountainAttacks: true,
+        }).candidates.filter((candidate) => candidate.kind === "mine");
+
+        expect(mine).toHaveLength(1);
+        const action = mine[0].actions[0];
+        expect(action.type).toBe("obstacle_attack");
+        if (action.type === "obstacle_attack") {
+            expect(action.path?.length).toBeGreaterThan(0);
+            expect(action.path?.at(-1)).toEqual(action.attackFrom);
+            expect(action.hasLavaCell).toBe(false);
+            expect(action.hasWaterCell).toBe(false);
+        }
+        expectCandidatesToApply(harness, mine);
+    });
+
+    it("does not emit mountain challengers for unavailable or engine-rejected mining states", () => {
+        const mineCount = (combat: CombatTestContext, active: Unit): number => {
+            const harness = activate(combat, active);
+            return enumerateCandidates(active, harness.context, incumbentFor(active), {
+                includeMountainAttacks: true,
+            }).candidates.filter((candidate) => candidate.kind === "mine").length;
+        };
+
+        const normal = createCombatTestContext(PBTypes.GridVals.NORMAL);
+        const normalMiner = createTestUnit({ team: LOWER, attackType: MELEE, speed: 3 });
+        const normalEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(normal.grid, normal.unitsHolder, normalMiner, { x: 4, y: 7 });
+        placeUnit(normal.grid, normal.unitsHolder, normalEnemy, { x: 14, y: 14 });
+        expect(mineCount(normal, normalMiner)).toBe(0);
+
+        const cleared = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const clearedMiner = createTestUnit({ team: LOWER, attackType: MELEE, speed: 3 });
+        const clearedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(cleared.grid, cleared.unitsHolder, clearedMiner, { x: 4, y: 7 });
+        placeUnit(cleared.grid, cleared.unitsHolder, clearedEnemy, { x: 14, y: 14 });
+        const clearedHarness = activate(cleared, clearedMiner);
+        clearedHarness.fightProperties.setObstacleHitsLeft(0);
+        expect(
+            enumerateCandidates(clearedMiner, clearedHarness.context, incumbentFor(clearedMiner), {
+                includeMountainAttacks: true,
+            }).candidates.some((candidate) => candidate.kind === "mine"),
+        ).toBe(false);
+
+        const ranged = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const rangedMiner = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 5, speed: 3 });
+        const rangedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(ranged.grid, ranged.unitsHolder, rangedMiner, { x: 4, y: 7 });
+        placeUnit(ranged.grid, ranged.unitsHolder, rangedEnemy, { x: 14, y: 14 });
+        expect(mineCount(ranged, rangedMiner)).toBe(0);
+
+        const immobilized = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const immobilizedMiner = createTestUnit({ team: LOWER, attackType: MELEE, speed: 3 });
+        const immobilizedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        immobilizedMiner.applyEffect(new EffectFactory().makeEffect("Paralysis")!);
+        placeUnit(immobilized.grid, immobilized.unitsHolder, immobilizedMiner, { x: 4, y: 7 });
+        placeUnit(immobilized.grid, immobilized.unitsHolder, immobilizedEnemy, { x: 14, y: 14 });
+        expect(mineCount(immobilized, immobilizedMiner)).toBe(0);
+
+        const forced = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const forcedMiner = createTestUnit({ team: LOWER, attackType: MELEE, speed: 3 });
+        const forcedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        forcedMiner.setTarget(forcedEnemy.getId());
+        placeUnit(forced.grid, forced.unitsHolder, forcedMiner, { x: 4, y: 7 });
+        placeUnit(forced.grid, forced.unitsHolder, forcedEnemy, { x: 14, y: 14 });
+        expect(mineCount(forced, forcedMiner)).toBe(0);
     });
 
     it("applies targeted, mass, and movement-range spell candidates, including Castling", () => {

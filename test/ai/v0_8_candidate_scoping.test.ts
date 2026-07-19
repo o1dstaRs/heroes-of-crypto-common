@@ -40,6 +40,8 @@ const ENV_KEYS = [
     "V06_MELEE_DIMS_VERSIONS",
     "V07_SEARCH",
     "SEARCH_VERSIONS",
+    "SEARCH_OBSERVE_ONLY",
+    "SEARCH_CHALLENGER_KINDS",
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_PURE_RANGED_TERMINAL_WEIGHT",
 ] as const;
@@ -184,5 +186,24 @@ describe("v0.8 aligned candidate-only experiment scopes", () => {
                 pureRangedTerminalWeight: number;
             },
         ).toMatchObject({ lateRangedFinishWeight: 4, pureRangedTerminalWeight: 1 });
+    });
+
+    it("accepts mine as an auditable v0.8 challenger filter", () => {
+        process.env.V07_SEARCH = "1";
+        process.env.SEARCH_VERSIONS = "v0.8s";
+        process.env.SEARCH_OBSERVE_ONLY = "1";
+        process.env.SEARCH_CHALLENGER_KINDS = "mine";
+
+        const driver = new SearchDriver(undefined as never, {
+            greenVersion: "v0.8s",
+            redVersion: "v0.7",
+        });
+        const challengerKinds = (
+            driver as unknown as {
+                challengerKinds: ReadonlySet<string> | null;
+            }
+        ).challengerKinds;
+
+        expect(challengerKinds ? [...challengerKinds] : null).toEqual(["mine"]);
     });
 });

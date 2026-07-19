@@ -30,6 +30,7 @@ import type { Spell } from "../spells/spell";
 import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
+import { findMountainMeleeStrike } from "./ai";
 import type { IDecisionContext } from "./ai_strategy";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 
@@ -68,10 +69,10 @@ const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbility
  *                      charge — exposed as an opportunity-cost feature), Valkyrie's Wind Flow
  *                      (ALL_FLYING mass), Harpy's Castling (ENEMY_WITHIN_MOVEMENT_RANGE), plus
  *                      heals/buffs/debuffs/summons
+ *      mine          — one deterministic reachable melee strike against an intact BLOCK_CENTER mountain
  *      defend        — luck shield (always legal for the acting unit)
  *      wait          — hourglass, when the engine would accept it
- *    (obstacle_attack — mountain mining on BLOCK_CENTER — is NOT enumerated yet; the incumbent decision
- *    carries it when v0.6's mining policy picks it. Backlog.)
+ *    Mountain challengers are opt-in so versions predating v0.8 retain their exact candidate set.
  *  - Enumeration is COMPLETE by default; per-class caps are opt-in and every applied cap is reported in
  *    `truncated` so consumers can log it (the "principled top-K with the cap logged" contract).
  *  - DETERMINISTIC and RNG-FREE: never draws from the seeded tournament stream (summon target cells are
@@ -83,7 +84,8 @@ const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbility
  * stubs. Backlog for consumers to extend: morale-from-move-distance, luck-aura coverage deltas, the
  * target's own morale/luck state, deny-turn (target hasn't acted yet), spell power economy.
  */
-export type CandidateKind = "incumbent" | "wait" | "defend" | "move" | "melee" | "shot" | "area_throw" | "spell";
+export type CandidateKind =
+    "incumbent" | "wait" | "defend" | "move" | "melee" | "shot" | "area_throw" | "spell" | "mine";
 
 export interface ICandidateFeatures {
     /** Immediate morale cost/gain of the action ITSELF (wait -3, defend -2; 0 stub for the rest). */
@@ -165,6 +167,8 @@ export interface IEnumerateOptions {
     maxShotAims?: number;
     /** Cap on area-throw target cells, kept by expected damage (0/undefined = all relevant). */
     maxAreaThrowCells?: number;
+    /** Opt in to deterministic BLOCK_CENTER melee-mining challengers (v0.8 search only). */
+    includeMountainAttacks?: boolean;
     /**
      * Dataset-only metadata enrichment for candidate 0. When its exact action is rediscovered by the
      * generator, copy the generated candidate's observations onto the incumbent anchor. Default false;
@@ -266,6 +270,7 @@ class CandidateGenerator {
         this.addWait();
         this.addDefend();
         this.addMelee();
+        this.addMountainAttack();
         this.addShots();
         this.addAreaThrows();
         this.addSpells();
@@ -353,6 +358,8 @@ class CandidateGenerator {
                         return `at:${cell(a.targetCell)}`;
                     case "cast_spell":
                         return `cs:${a.spellName}>${a.targetId ?? "-"}@${cell(a.targetCell)}`;
+                    case "obstacle_attack":
+                        return `mn:${cell(a.targetPosition)}@${cell(a.attackFrom)}`;
                     default:
                         return a.type;
                 }
@@ -641,6 +648,80 @@ class CandidateGenerator {
         for (const p of kept) {
             this.push(candidateOf(p));
         }
+    }
+    // ---- mountain mining -------------------------------------------------------------------------
+    /** One deterministic, engine-legal melee strike against an intact BLOCK_CENTER mountain. */
+    private addMountainAttack(): void {
+        if (!this.options.includeMountainAttacks) {
+            return;
+        }
+        const { attackHandler, fightProperties, grid, matrix, pathHelper, unitsHolder } = this.context;
+        if (
+            !attackHandler ||
+            !fightProperties ||
+            grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            fightProperties.getObstacleHitsLeft() <= 0 ||
+            this.unit.isDead() ||
+            !this.unit.canMove() ||
+            this.unit.getAttackType() === RANGE ||
+            this.unit.getAttackTypeSelection() === RANGE ||
+            !this.canMelee()
+        ) {
+            return;
+        }
+
+        const forcedTarget = unitsHolder.getAllUnits().get(this.unit.getTarget());
+        if (forcedTarget && !forcedTarget.isDead()) {
+            return;
+        }
+
+        const strike = findMountainMeleeStrike(this.unit, grid, matrix, pathHelper);
+        if (!strike) {
+            return;
+        }
+        const mid = grid.getSettings().getGridSize() >> 1;
+        const targetHasHits =
+            strike.targetCell.x >= mid
+                ? fightProperties.getObstacleHitsLeftRight() > 0
+                : fightProperties.getObstacleHitsLeftLeft() > 0;
+        if (!targetHasHits) {
+            return;
+        }
+
+        const base = this.unit.getBaseCell();
+        const inPlace = strike.attackFrom.x === base.x && strike.attackFrom.y === base.y;
+        const route = inPlace
+            ? undefined
+            : strike.knownPaths.get((strike.attackFrom.x << 4) | strike.attackFrom.y)?.[0];
+        if (!inPlace && !route?.route.length) {
+            return;
+        }
+        const settings = grid.getSettings();
+        const targetPosition = getPositionForCell(
+            strike.targetCell,
+            settings.getMinX(),
+            settings.getStep(),
+            settings.getHalfStep(),
+        );
+        const actions: GameAction[] = [
+            {
+                type: "obstacle_attack",
+                attackerId: this.unit.getId(),
+                targetPosition: { x: targetPosition.x, y: targetPosition.y },
+                attackFrom: { x: strike.attackFrom.x, y: strike.attackFrom.y },
+                path: route?.route.map((cell) => ({ x: cell.x, y: cell.y })),
+                hasLavaCell: route?.hasLavaCell,
+                hasWaterCell: route?.hasWaterCell,
+            },
+        ];
+        this.push({
+            kind: "mine",
+            actions,
+            targetCell: { x: strike.targetCell.x, y: strike.targetCell.y },
+            standCell: { x: strike.attackFrom.x, y: strike.attackFrom.y },
+            features: this.features(),
+        });
     }
     // ---- ranged shots --------------------------------------------------------------------------------
     private canShoot(attackHandler: AttackHandler): boolean {
