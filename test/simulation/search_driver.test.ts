@@ -989,6 +989,21 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(calls[0].map((candidate) => candidate.kind)).toEqual(expect.arrayContaining(["wait", "defend"]));
     });
 
+    it("keeps v0.8 tactical-wait challengers but never introduces a generated Luck Shield", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const h = buildBattle(203, "v0.8s");
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+        const driver = h.makeDriver();
+        const calls = captureCandidates(driver);
+
+        expect(driver.chooseDecision(unit!, "v0.8s", incumbent)).toBe(incumbent);
+        expect(calls).toHaveLength(1);
+        expect(calls[0].map((candidate) => candidate.kind)).toContain("wait");
+        expect(calls[0].slice(1).map((candidate) => candidate.kind)).not.toContain("defend");
+    });
+
     it("SEARCH_ACTIVE_CHALLENGERS removes wait/defend challengers but never the incumbent anchor", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6", SEARCH_ACTIVE_CHALLENGERS: "1" });
         const h = buildBattle(204, "v0.6");

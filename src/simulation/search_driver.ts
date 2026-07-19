@@ -86,6 +86,9 @@ import {
  * and hard-passive fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured move set.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
+ * v0.8 goes further regardless of that probe: generated defend and mountain challengers are excluded. An
+ * inherited defend/mountain remains candidate zero for fail-closed and observe-only semantics; normal active
+ * search replaces it when an engine-valid productive challenger exists. Tactical wait remains a scored action.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
  * the exact incumbent action-array reference. SEARCH_INCUMBENT_KINDS limits which incumbent action classes
  * enter shadow search (the filter runs before enumeration), and SEARCH_CHALLENGER_KINDS limits the generated
@@ -769,6 +772,9 @@ export class SearchDriver {
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
+                // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
+                // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
+                if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) return false;
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
                 // enable the broader move experiment. Otherwise a unit with no attack can still choose wait,
                 // defend, or a mountain hit while a real reposition is available. SEARCH_INCLUDE_MOVES continues
