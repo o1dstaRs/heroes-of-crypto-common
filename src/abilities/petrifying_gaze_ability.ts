@@ -48,14 +48,16 @@ export function calculatePetrifyingGazeKillChance(
 export function processPetrifyingGazeAbility(
     fromUnit: Unit,
     toUnit: Unit,
-    damageFromAttack: number,
+    // Always the landed hit's damage BEFORE Flesh Shield redirection. Petrifying Gaze resolves directly
+    // on the struck target; the aura may absorb the base hit, but it never absorbs or weakens the gaze.
+    damageBeforeFleshShield: number,
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     secondaryDamage?: ISecondaryDamage[],
     // Ranged shot-distance divisor for THIS attack (1 = full, 2 = half, 4 = quarter, 8 = eighth). Melee = 1.
     rangeDivisor = 1,
 ): void {
-    if (toUnit.isDead() || damageFromAttack <= 0) {
+    if (toUnit.isDead() || damageBeforeFleshShield <= 0) {
         return;
     }
 
@@ -76,7 +78,7 @@ export function processPetrifyingGazeAbility(
     const percentageMin = Math.floor((percentageMax / 3) * 2);
 
     const randomCoeff = HoCLib.getRandomInt(percentageMin, percentageMax) / 100;
-    const randomAdditionalDamage = damageFromAttack * randomCoeff;
+    const randomAdditionalDamage = damageBeforeFleshShield * randomCoeff;
     const unitsKilled = randomAdditionalDamage / toUnit.getMaxHp();
     let amountOfUnitsKilled = Math.min(Math.floor(unitsKilled), toUnit.getAmountAlive() - 1);
     let damageFromAbility = amountOfUnitsKilled * toUnit.getMaxHp();

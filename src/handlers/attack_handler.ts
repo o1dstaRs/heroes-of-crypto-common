@@ -634,6 +634,7 @@ export class AttackHandler {
 
         // response starts here
         let damageFromResponse = 0;
+        let petrifyingGazeResponseDamage = 0;
         let isResponseMissed = false;
         if (
             rangeResponseUnit &&
@@ -731,6 +732,9 @@ export class AttackHandler {
             );
             attackDamageApplied = false;
         }
+        // Flesh Shield may reduce the base hit below, but Petrifying Gaze remains attached to the unit
+        // this shot landed on and therefore uses the complete pre-redirection impact.
+        const petrifyingGazeAttackDamage = damageFromAttack;
 
         // handle response damage
         let aoeRangeResponseResult: AllAbilities.IAOERangeAttackResult | undefined = undefined;
@@ -790,6 +794,7 @@ export class AttackHandler {
                     ),
                     this.sceneLog,
                 );
+                petrifyingGazeResponseDamage = damageFromResponse;
 
                 rangeResponseFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                     targetUnit,
@@ -927,7 +932,7 @@ export class AttackHandler {
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
-                    damageFromAttack,
+                    petrifyingGazeAttackDamage,
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),
@@ -987,7 +992,7 @@ export class AttackHandler {
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
                         rangeResponseUnit,
-                        damageFromResponse,
+                        petrifyingGazeResponseDamage,
                         this.sceneLog,
                         this.damageStatisticHolder,
                         (damageForAnimation.secondary ??= []),
@@ -1001,6 +1006,26 @@ export class AttackHandler {
                         this.grid,
                         this.sceneLog,
                     );
+                    if (rangeResponseUnit.isDead()) {
+                        if (!unitIdsDied.includes(rangeResponseUnit.getId())) {
+                            this.sceneLog.updateLog(`${rangeResponseUnit.getName()} died`);
+                            unitIdsDied.push(rangeResponseUnit.getId());
+                            this.updateMoraleDecreaseForTheUnitTeam(moraleDecreaseForTheUnitTeam, {
+                                [`${rangeResponseUnit.getName()}:${rangeResponseUnit.getTeam()}`]:
+                                    HoCConstants.MORALE_CHANGE_FOR_KILL,
+                            });
+                            if (!targetUnit.isDead()) {
+                                targetUnitPlusMorale += HoCConstants.MORALE_CHANGE_FOR_KILL;
+                            }
+                        }
+                        if (attackerUnit.getId() === rangeResponseUnit.getId()) {
+                            increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
+                            increaseUnitMorale(targetUnit, targetUnitPlusMorale);
+                            unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
+                            resolveAssimilation();
+                            return { completed: true, unitIdsDied, animationData, abilityStolen };
+                        }
+                    }
                 }
             }
         }
@@ -1121,7 +1146,7 @@ export class AttackHandler {
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
-                    secondShotResult.damage,
+                    secondShotResult.petrifyingGazeDamage,
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),
@@ -1476,6 +1501,10 @@ export class AttackHandler {
             });
         }
 
+        // Petrifying Gaze is resolved from the landed melee impact before Flesh Shield redirects any of
+        // its base damage. The effect remains on target even when the aura absorbs the whole base hit.
+        const petrifyingGazeAttackDamage = damageFromAttack;
+
         if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses ⚔️ on ${targetUnit.getName()}`);
             // Tell the client the blow was dodged (Dodge / Small Specie / Boar Saliva / Broken Aegis) so
@@ -1670,6 +1699,7 @@ export class AttackHandler {
                             ),
                             this.sceneLog,
                         ) + AllAbilities.processPenetratingBiteAbility(targetUnit, attackerUnit);
+                    const petrifyingGazeResponseDamage = damageFromResponse;
 
                     const responseFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                         targetUnit,
@@ -1733,7 +1763,7 @@ export class AttackHandler {
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
                         attackerUnit,
-                        damageFromResponse,
+                        petrifyingGazeResponseDamage,
                         this.sceneLog,
                         this.damageStatisticHolder,
                         (damageForAnimation.secondary ??= []),
@@ -1828,7 +1858,7 @@ export class AttackHandler {
             AllAbilities.processPetrifyingGazeAbility(
                 attackerUnit,
                 targetUnit,
-                damageFromAttack,
+                petrifyingGazeAttackDamage,
                 this.sceneLog,
                 this.damageStatisticHolder,
                 (damageForAnimation.secondary ??= []),
@@ -1871,6 +1901,7 @@ export class AttackHandler {
         unitsHolder.refreshStackPowerForAllUnits();
 
         const secondPunchResult = AllAbilities.processDoublePunchAbility(attackerUnit, targetUnit, this.sceneLog);
+        const petrifyingGazeSecondPunchDamage = secondPunchResult.damage;
 
         if (!hasLightningSpinResponseLanded && attackerUnit.isDead() && !unitIdsDied.includes(attackerUnit.getId())) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} died`);
@@ -1972,7 +2003,7 @@ export class AttackHandler {
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
-                    secondPunchResult.damage,
+                    petrifyingGazeSecondPunchDamage,
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),

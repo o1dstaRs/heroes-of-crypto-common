@@ -136,6 +136,9 @@ export function processThroughShotAbility(
             }
             // Through Shot is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * targetUnit.getPhysicalAoeDamageMultiplier());
+            // Preserve this pierced unit's impact for Petrifying Gaze. Flesh Shield can redirect the base
+            // projectile damage, but the gaze remains attached to the unit the projectile actually hit.
+            const petrifyingGazeDamage = damageFromAttack;
             const fleshShieldResult = processFleshShieldAura(
                 attackerUnit,
                 targetUnit,
@@ -198,9 +201,11 @@ export function processThroughShotAbility(
                 processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
-                    damageFromAttack,
+                    petrifyingGazeDamage,
                     sceneLog,
                     damageStatisticHolder,
+                    secondaryDamage,
+                    hoverRangeAttackDivisor,
                 );
             }
         }

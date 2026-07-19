@@ -30,6 +30,8 @@ export interface IDoubleShotResult {
     applied: boolean;
     aoeRangeAttackLanded: boolean;
     damage: number;
+    /** Second-shot impact before Flesh Shield; Petrifying Gaze resolves from this damage on the hit target. */
+    petrifyingGazeDamage: number;
     unitIdsDied: string[];
     animationData: IAnimationData[];
     moraleIncrease: number;
@@ -54,6 +56,7 @@ export function processDoubleShotAbility(
     const unitIdsDied: string[] = [];
 
     let damageFromAttack = 0;
+    let petrifyingGazeDamage = 0;
     let moraleIncrease = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
@@ -69,6 +72,7 @@ export function processDoubleShotAbility(
             applied: false,
             aoeRangeAttackLanded: false,
             damage: damageFromAttack,
+            petrifyingGazeDamage,
             unitIdsDied,
             animationData,
             moraleIncrease,
@@ -88,6 +92,7 @@ export function processDoubleShotAbility(
             applied: false,
             aoeRangeAttackLanded: false,
             damage: damageFromAttack,
+            petrifyingGazeDamage,
             unitIdsDied,
             animationData,
             moraleIncrease,
@@ -155,6 +160,8 @@ export function processDoubleShotAbility(
             ),
             sceneLog,
         );
+        // The second shot's gaze stays on the struck unit even if Flesh Shield redirects the entire base hit.
+        petrifyingGazeDamage = damageFromAttack;
         const fleshShieldAbsorb = processFleshShieldAura(
             fromUnit,
             toUnit,
@@ -206,6 +213,7 @@ export function processDoubleShotAbility(
         applied: true,
         aoeRangeAttackLanded: aoeRangeAttackResult.landed,
         damage: damageFromAttack,
+        petrifyingGazeDamage,
         unitIdsDied: aoeRangeAttackResult.unitIdsDied,
         animationData,
         moraleIncrease,

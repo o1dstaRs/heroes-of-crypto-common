@@ -136,6 +136,10 @@ export function processRangeAOEAbility(
                 // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
                 damageFromAttack = Math.floor(damageFromAttack * unit.getPhysicalAoeDamageMultiplier());
 
+                // Petrifying Gaze is an on-hit effect on this unit, not part of the damage Flesh Shield can
+                // redirect. Preserve the fully resolved impact damage before the aura splits the base hit.
+                const petrifyingGazeDamage = damageFromAttack;
+
                 const fleshShieldResult = processFleshShieldAura(
                     attackerUnit,
                     unit,
@@ -198,10 +202,11 @@ export function processRangeAOEAbility(
                     processPetrifyingGazeAbility(
                         attackerUnit,
                         unit,
-                        damageFromAttack,
+                        petrifyingGazeDamage,
                         sceneLog,
                         damageStatisticHolder,
                         secondaryDamage,
+                        rangeAttackDivisor,
                     );
                 }
             }

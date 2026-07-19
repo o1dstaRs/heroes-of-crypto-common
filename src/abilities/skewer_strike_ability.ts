@@ -126,6 +126,10 @@ export function processSkewerStrikeAbility(
         // Skewer Strike is a physical line/AOE attack: status resistance hardens the victim (Mechanisms take extra).
         damageFromAttack = Math.floor(damageFromAttack * nextStandingTarget.getPhysicalAoeDamageMultiplier());
 
+        // Petrifying Gaze belongs to the skewered target and uses the unsplit impact. Flesh Shield may
+        // redirect the base damage only; it cannot absorb or weaken this on-hit effect.
+        const petrifyingGazeDamage = damageFromAttack;
+
         const fleshShieldResult = processFleshShieldAura(
             fromUnit,
             nextStandingTarget,
@@ -188,7 +192,14 @@ export function processSkewerStrikeAbility(
         processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
         processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
         processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
-        processPetrifyingGazeAbility(fromUnit, nextStandingTarget, damageFromAttack, sceneLog, damageStatisticHolder);
+        processPetrifyingGazeAbility(
+            fromUnit,
+            nextStandingTarget,
+            petrifyingGazeDamage,
+            sceneLog,
+            damageStatisticHolder,
+            secondaryDamage,
+        );
         processBoarSalivaAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
         processAggrAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
         processDeepWoundsAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
@@ -198,6 +209,11 @@ export function processSkewerStrikeAbility(
             processShatterArmorAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
         } else {
             processBlindnessAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+        }
+        // Gaze is processed after the skewer's base damage. Track a last-creature petrification as a
+        // skewer death so the result, morale, and client cleanup cannot omit it.
+        if (nextStandingTarget.isDead() && !unitsDead.includes(nextStandingTarget)) {
+            unitsDead.push(nextStandingTarget);
         }
     }
 

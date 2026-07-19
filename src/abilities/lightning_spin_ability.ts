@@ -155,6 +155,10 @@ export function processLightningSpinAbility(
             // Status resistance hardens the victim vs physical AOE (Mechanisms take extra).
             damageFromAttack = Math.floor(damageFromAttack * enemy.getPhysicalAoeDamageMultiplier());
 
+            // Flesh Shield redirects only the spin's base damage. Any Petrifying Gaze proc still resolves
+            // from the original impact against the enemy that was actually struck.
+            const petrifyingGazeDamage = damageFromAttack;
+
             if (grid) {
                 const fleshShieldResult = processFleshShieldAura(
                     fromUnit,
@@ -226,7 +230,7 @@ export function processLightningSpinAbility(
                 processPetrifyingGazeAbility(
                     fromUnit,
                     enemy,
-                    damageFromAttack,
+                    petrifyingGazeDamage,
                     sceneLog,
                     damageStatisticHolder,
                     secondaryDamage,
@@ -241,6 +245,11 @@ export function processLightningSpinAbility(
                 } else {
                     processBlindnessAbility(fromUnit, enemy, fromUnit, sceneLog);
                 }
+            }
+            // Gaze resolves after the base hit. If it petrified the last creature, include that death in
+            // the same spin's unit/morale bookkeeping just like a death from the base damage.
+            if (enemy.isDead() && !unitsDead.includes(enemy)) {
+                unitsDead.push(enemy);
             }
         }
 
