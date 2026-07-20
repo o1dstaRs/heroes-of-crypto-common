@@ -412,7 +412,11 @@ describe("v0.8 aligned execution and map integrity", () => {
             markCandidateNonproductiveTurn(fallbackFinal[index], kind, false),
         );
         expect(assessV08AlignedV1Final(fallbackFinal).verdict).toBe("PASS");
-    });
+        // Explicit timeout: builds seven 1000/2000-scenario exact panels — pure CPU whose wall-clock
+        // scales with runner load (5.5s+ on a busy CI host). The bunfig preload's raised default did
+        // not reach the client repo's submodule-test job (it timed this test out at bun's 5000ms
+        // default), and an explicit budget covers every invocation path.
+    }, 60_000);
 
     it("lets a clean challenger replace a passive incumbent but never promotes a passive challenger", () => {
         const challenger = exactPanel(1000, "candidate_win");
@@ -425,7 +429,8 @@ describe("v0.8 aligned execution and map integrity", () => {
         challenger[0].execution.candidate.strategyNoOpTurns = 1;
         challenger[0].execution.candidatePassiveAlternatives.strategyNoOp.turns = 1;
         expect(assessV08AlignedV1Promotion(pairs).verdict).toBe("HOLD");
-    });
+        // Explicit timeout: two 1000-scenario exact panels (~2s on a loaded CI runner); see above.
+    }, 60_000);
 
     it("cannot return final PASS when one candidate execution has a no-op", () => {
         const final = exactPanel(2000);
@@ -435,5 +440,6 @@ describe("v0.8 aligned execution and map integrity", () => {
         const terminal = assessV08AlignedV1Final(final);
         expect(terminal.verdict).toBe("FAIL");
         expect(terminal.checks.integrityPassed).toBe(false);
-    });
+        // Explicit timeout: two 2000-scenario exact panels (~2s on a loaded CI runner); see above.
+    }, 60_000);
 });

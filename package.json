@@ -18,7 +18,7 @@
     ],
     "scripts": {
         "prebuild": "rimraf dist && bun run fmt",
-        "build": "bun test && tsc -p tsconfig.build.json && bun run copy-json && bun run copy-generated",
+        "build": "bun test --timeout 30000 && tsc -p tsconfig.build.json && bun run copy-json && bun run copy-generated",
         "build:proto": "bun add -d protoc-gen-ts; scripts/protoc_generate.sh",
         "copy-generated": "bunx cpy \"src/generated/**/*\" \"dist/generated\"",
         "copy-json": "bunx cpy \"src/**/*.json\" dist --parents",
@@ -33,7 +33,7 @@
         "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\"",
         "lint:style:fix": "bun run lint:style:base -- --write",
         "prepare": "git config core.hooksPath .githooks || true",
-        "test": "bun test"
+        "test": "bun test --timeout 30000"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
