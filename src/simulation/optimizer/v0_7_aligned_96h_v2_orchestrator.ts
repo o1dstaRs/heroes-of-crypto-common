@@ -381,11 +381,13 @@ function hasExactKeys(value: Record<string, unknown>, expected: readonly string[
 
 function validateSchedule(schedule: IV07AlignedV2OrchestratorSchedule): void {
     for (const [label, value] of Object.entries(schedule)) requireSafeInteger(value, `schedule.${label}`);
-    if (!(
-        schedule.startAtMs < schedule.trainDeadlineAtMs &&
-        schedule.trainDeadlineAtMs < schedule.confirmDeadlineAtMs &&
-        schedule.confirmDeadlineAtMs < schedule.finalDeadlineAtMs
-    )) {
+    if (
+        !(
+            schedule.startAtMs < schedule.trainDeadlineAtMs &&
+            schedule.trainDeadlineAtMs < schedule.confirmDeadlineAtMs &&
+            schedule.confirmDeadlineAtMs < schedule.finalDeadlineAtMs
+        )
+    ) {
         throw new Error("aligned v2 orchestration deadlines must be strictly ordered");
     }
     if (schedule.finalDeadlineAtMs - schedule.startAtMs !== 96 * HOUR_MS) {

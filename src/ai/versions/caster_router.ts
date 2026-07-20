@@ -28,7 +28,13 @@ type CandidateEnumerator = (
 ) => ICandidateSet;
 
 export type CasterRouterSpell =
-    "resurrection" | "windflow" | "castling" | "wildregen" | "summonwolves" | "reswait" | "reswiden";
+    | "resurrection"
+    | "windflow"
+    | "castling"
+    | "wildregen"
+    | "summonwolves"
+    | "reswait"
+    | "reswiden";
 
 export interface ICasterRouterPolicy {
     readonly spells: readonly CasterRouterSpell[];

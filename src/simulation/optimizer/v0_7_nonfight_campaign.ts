@@ -40,7 +40,13 @@ import {
 } from "./v0_7_nonfight_campaign_core";
 
 type V07NonfightLaneStatus =
-    "pending" | "waiting-to-restart" | "running" | "completed" | "failed" | "deadline-stopped" | "signal-stopped";
+    | "pending"
+    | "waiting-to-restart"
+    | "running"
+    | "completed"
+    | "failed"
+    | "deadline-stopped"
+    | "signal-stopped";
 
 interface IV07NonfightCampaignRun {
     schemaVersion: 1;

@@ -315,9 +315,12 @@ export class AttackHandler {
 
                 const laps = currentActiveSpell.getLapsTotal();
 
-                if (!(
-                    currentActiveSpell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()
-                )) {
+                if (
+                    !(
+                        currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
+                        debuffTarget.hasMindAttackResistance()
+                    )
+                ) {
                     if (currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE) {
                         const attackerUnitPosition = structuredClone(attackerUnit.getPosition());
                         const targetUnitPosition = structuredClone(debuffTarget.getPosition());

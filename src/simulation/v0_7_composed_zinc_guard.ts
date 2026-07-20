@@ -757,7 +757,8 @@ if (import.meta.main) {
     const contract = JSON.parse(contractBytes) as IV07ComposedZincGuardContract;
     const snapshotArtifact = options.snapshotPath
         ? (JSON.parse(readFileSync(options.snapshotPath, "utf8")) as
-              IV07ComposedZincSnapshot | { snapshot: IV07ComposedZincSnapshot })
+              | IV07ComposedZincSnapshot
+              | { snapshot: IV07ComposedZincSnapshot })
         : undefined;
     const snapshot = snapshotArtifact
         ? "snapshot" in snapshotArtifact

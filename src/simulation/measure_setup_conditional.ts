@@ -1115,7 +1115,9 @@ interface IJob {
 }
 
 type WorkerReply =
-    { type: "ready" } | { type: "result"; record: ISetupConditionalRecord } | { type: "error"; error: string };
+    | { type: "ready" }
+    | { type: "result"; record: ISetupConditionalRecord }
+    | { type: "error"; error: string };
 
 async function runJobsConcurrent(
     jobs: readonly IJob[],

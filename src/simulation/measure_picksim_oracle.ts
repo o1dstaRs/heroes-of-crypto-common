@@ -900,7 +900,9 @@ export function cellBaseSeed(baseSeed: number, cellIndex: number): number {
 }
 
 type WorkerReply =
-    { type: "ready" } | { type: "result"; key: string; record: IPickSimGameRecord } | { type: "error"; error: string };
+    | { type: "ready" }
+    | { type: "result"; key: string; record: IPickSimGameRecord }
+    | { type: "error"; error: string };
 
 async function runJobsConcurrent(
     jobs: readonly IPickSimJob[],

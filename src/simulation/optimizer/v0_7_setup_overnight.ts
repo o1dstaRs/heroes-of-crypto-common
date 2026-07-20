@@ -156,7 +156,9 @@ interface ISetupEvaluationJobResult {
 }
 
 type SetupWorkerReply =
-    { type: "ready" } | { type: "result"; result: ISetupEvaluationJobResult } | { type: "error"; error: string };
+    | { type: "ready" }
+    | { type: "result"; result: ISetupEvaluationJobResult }
+    | { type: "error"; error: string };
 
 if (LEAGUE_ROUND1_DRAFT_SPEC !== V07_SETUP_DRAFT_SPEC) {
     throw new Error(
