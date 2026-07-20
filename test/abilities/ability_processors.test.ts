@@ -673,6 +673,54 @@ describe("ability processors", () => {
         expect(mechanism.hasEffectActive("Paralysis")).toBe(true);
     });
 
+    it("Wounding Charm ADDS its scaled Level-1 bonus on top of native Deep Wounds instead of scaling them down", () => {
+        const sceneLog = new SceneLogMock();
+        type TestUnit = ReturnType<typeof createTestUnit>;
+        // Mirror UnitsHolder.applyArtifacts' Wounding Charm setup: grant the Level-1 card (idempotent
+        // for native owners) + the percent marker buff (power 50 = half-strength contribution).
+        const applyWoundingCharm = (unit: TestUnit): void => {
+            unit.grantAbility("Deep Wounds Level 1");
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Wounding Charm"),
+                amount: 1,
+            });
+            buff.setPower(50);
+            unit.applyBuff(buff);
+        };
+        // Each measurement hits a FRESH target so accumulated effect power never leaks between cases.
+        const measure = (attacker: TestUnit): number =>
+            processDeepWoundsAbility(
+                attacker,
+                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LOWER, amountAlive: 3 }),
+                attacker,
+                sceneLog,
+            );
+
+        // Baselines without the charm: a native Level-1 (Wolf) and a native Level-2 (White Tiger) wounder.
+        const level1Power = measure(createTestUnit({ name: "Wolf", abilities: ["Deep Wounds Level 1"] }));
+        const level2Power = measure(createTestUnit({ name: "White Tiger", abilities: ["Deep Wounds Level 2"] }));
+        expect(level1Power).toBeGreaterThan(0);
+        expect(level2Power).toBeGreaterThan(level1Power);
+
+        // A plain unit's charm-granted wounds stay at the scaled fraction (50% of Level 1) — unchanged.
+        const recruit = createTestUnit({ name: "Recruit", team: PBTypes.TeamVals.UPPER });
+        applyWoundingCharm(recruit);
+        expect(measure(recruit)).toBeCloseTo(level1Power * 0.5, 0);
+
+        // Native deep-wounders keep FULL native power and the charm bonus stacks ON TOP — the charm
+        // must never scale a native card down (the regression: Wolf dropped to half, White Tiger's
+        // total fell below its own native Level 2).
+        const wolf = createTestUnit({ name: "Wolf", abilities: ["Deep Wounds Level 1"] });
+        applyWoundingCharm(wolf);
+        expect(measure(wolf)).toBeCloseTo(level1Power * 1.5, 0);
+
+        const tiger = createTestUnit({ name: "White Tiger", abilities: ["Deep Wounds Level 2"] });
+        applyWoundingCharm(tiger);
+        const tigerWithCharm = measure(tiger);
+        expect(tigerWithCharm).toBeCloseTo(level2Power + level1Power * 0.5, 0);
+        expect(tigerWithCharm).toBeGreaterThan(level2Power);
+    });
+
     it("processes low-level melee utility abilities", () => {
         const miner = createTestUnit({
             name: "Miner",
