@@ -1674,8 +1674,7 @@ function replayAlignedThroughputEvidence(
         throw new Error("throughput evidence source manifest raw bytes changed");
     }
     const plan = readArtifact(root, evidence.plan, "throughput evidence plan") as
-        | IV07AlignedV2InjectedSeedPlan
-        | IV08AlignedV1InjectedSeedPlan;
+        IV07AlignedV2InjectedSeedPlan | IV08AlignedV1InjectedSeedPlan;
     const receipt = v08
         ? validateV08AlignedV1ThroughputSeedReceipt(
               readArtifact(root, evidence.receipt, "throughput evidence receipt"),
@@ -1719,8 +1718,7 @@ function replayAlignedThroughputEvidence(
             : buildV07AlignedV2ThroughputBatchPlan(plan as IV07AlignedV2InjectedSeedPlan, batchIndex);
         const batchPlanRef = artifactRef(`batches/${batchDirectoryName(batchIndex)}/plan.json`, expectedPlan);
         const batchPlan = readArtifact(root, batchPlanRef, `throughput batch ${batchIndex} plan`) as
-            | IV07AlignedV2InjectedSeedPlan
-            | IV08AlignedV1InjectedSeedPlan;
+            IV07AlignedV2InjectedSeedPlan | IV08AlignedV1InjectedSeedPlan;
         if (canonicalV07AlignedV2Json(batchPlan) !== canonicalV07AlignedV2Json(expectedPlan)) {
             throw new Error(`throughput batch ${batchIndex} plan is not the balanced deterministic partition`);
         }
@@ -2026,14 +2024,12 @@ async function runAlignedThroughputEvidence(
             const elapsedMs = monotonicMs() - startedMonotonicMs;
             const endedAtMs = Date.now();
             requirePositiveFinite(elapsedMs, `throughput batch ${batchIndex} measured elapsedMs`);
-            const shardRefs = persisted.map(
-                (entry): IV07AlignedV2ThroughputShardRef => ({
-                    directory: relative(root, entry.directory).split(sep).join("/"),
-                    manifestSha256: entry.manifestSha256,
-                    games: entry.evaluation.records.length,
-                    workerAttestations: entry.evaluation.attestations.length,
-                }),
-            );
+            const shardRefs = persisted.map((entry): IV07AlignedV2ThroughputShardRef => ({
+                directory: relative(root, entry.directory).split(sep).join("/"),
+                manifestSha256: entry.manifestSha256,
+                games: entry.evaluation.records.length,
+                workerAttestations: entry.evaluation.attestations.length,
+            }));
             const workerAttestations = shardRefs.reduce((sum, entry) => sum + entry.workerAttestations, 0);
             const gamesPerWorkerHour =
                 (V07_ALIGNED_V2_THROUGHPUT_GAMES_PER_BATCH * HOUR_MS) /

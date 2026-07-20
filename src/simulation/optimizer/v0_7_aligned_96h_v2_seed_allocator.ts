@@ -1164,13 +1164,11 @@ export function deriveV07AlignedV2SeedCandidate(input: IV07AlignedV2SeedCandidat
     requireUint32(input.attempt, "candidate attempt");
     requireUint32(input.coordinates.scenarioOrdinal, "candidate scenarioOrdinal");
     requireUint32(input.coordinates.streamOrdinal, "candidate streamOrdinal");
-    if (
-        !(
-            input.coordinates.purpose === "train" ||
-            input.coordinates.purpose === "confirm" ||
-            input.coordinates.purpose === "final"
-        )
-    ) {
+    if (!(
+        input.coordinates.purpose === "train" ||
+        input.coordinates.purpose === "confirm" ||
+        input.coordinates.purpose === "final"
+    )) {
         throw new Error("candidate purpose is invalid");
     }
     if (!input.coordinates.panelId.trim()) throw new Error("candidate panelId must not be empty");

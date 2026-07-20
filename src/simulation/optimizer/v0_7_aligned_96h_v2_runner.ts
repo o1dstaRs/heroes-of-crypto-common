@@ -1161,8 +1161,7 @@ export function validateV07AlignedV2ThroughputAttestation(
         throw new Error("aligned v2 throughput attestation does not bind this exact code, host, and shard geometry");
     }
     return value as unknown as
-        | IV07AlignedV2SyntheticThroughputAttestation
-        | IV08AlignedV1SyntheticThroughputAttestation;
+        IV07AlignedV2SyntheticThroughputAttestation | IV08AlignedV1SyntheticThroughputAttestation;
 }
 
 function loadThroughputAttestation(

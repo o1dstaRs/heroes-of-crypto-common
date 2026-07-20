@@ -841,12 +841,10 @@ export function validateIlCorpus(
         if (game.green === game.red) {
             fail(options.cohort, `seed ${game.seed} uses the same version in both seats; orientation is untestable`);
         }
-        if (
-            !(
-                (game.green === versions[0] && game.red === versions[1]) ||
-                (game.green === versions[1] && game.red === versions[0])
-            )
-        ) {
+        if (!(
+            (game.green === versions[0] && game.red === versions[1]) ||
+            (game.green === versions[1] && game.red === versions[0])
+        )) {
             fail(
                 options.cohort,
                 `seed ${game.seed} versions ${game.green},${game.red} do not match planned pair ${versions.join(",")}`,

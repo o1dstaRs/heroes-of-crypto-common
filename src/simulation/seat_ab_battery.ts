@@ -278,9 +278,7 @@ async function runBattery(
                 "message",
                 (
                     message:
-                        | { type: "ready" }
-                        | ({ type: "result" } & ISeatAbGameResult)
-                        | { type: "error"; error: string },
+                        { type: "ready" } | ({ type: "result" } & ISeatAbGameResult) | { type: "error"; error: string },
                 ) => {
                     if (settled) return;
                     if (message.type === "error") {

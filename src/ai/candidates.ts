@@ -84,15 +84,7 @@ const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbility
  * target's own morale/luck state, deny-turn (target hasn't acted yet), spell power economy.
  */
 export type CandidateKind =
-    | "incumbent"
-    | "wait"
-    | "defend"
-    | "move"
-    | "melee"
-    | "shot"
-    | "area_throw"
-    | "spell"
-    | "mine";
+    "incumbent" | "wait" | "defend" | "move" | "melee" | "shot" | "area_throw" | "spell" | "mine";
 
 export interface ICandidateFeatures {
     /** Immediate morale cost/gain of the action ITSELF (wait -3, defend -2; 0 stub for the rest). */

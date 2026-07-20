@@ -28,9 +28,7 @@ interface IAiMetaWorkerData {
 
 type WorkerRequest = { type: "pair"; pair: number } | { type: "stop" };
 type WorkerResponse =
-    | { type: "ready" }
-    | { type: "result"; record: IAiMetaPairRecord }
-    | { type: "error"; error: string };
+    { type: "ready" } | { type: "result"; record: IAiMetaPairRecord } | { type: "error"; error: string };
 
 // Freeze the behavioral environment inside the isolate. Ambient experiment flags must not silently change a
 // million-game balance run. SIM_NO_ACTIONS keeps worker messages small; all requested aggregate outcomes remain.

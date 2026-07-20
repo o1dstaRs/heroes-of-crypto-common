@@ -680,9 +680,7 @@ interface IPublicRosterWorkerJob {
 }
 
 type PublicRosterWorkerReply =
-    | { type: "ready" }
-    | { type: "result"; cluster: IPublicRosterPlacementCluster }
-    | { type: "error"; error: string };
+    { type: "ready" } | { type: "result"; cluster: IPublicRosterPlacementCluster } | { type: "error"; error: string };
 
 async function runJobs(
     jobs: readonly IPublicRosterWorkerJob[],

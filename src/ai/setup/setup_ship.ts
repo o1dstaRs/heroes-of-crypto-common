@@ -276,10 +276,7 @@ export function pickSynergiesForVariant(
 export const COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT = "public-roster-non-melee-other" as const;
 
 export type PlacementPolicyVariant =
-    | "baseline"
-    | "legitimate-reveal"
-    | "public-roster"
-    | typeof COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT;
+    "baseline" | "legitimate-reveal" | "public-roster" | typeof COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT;
 export type PlacementOpponentVisibility = "none" | "legitimate-reveal" | "public-roster";
 
 /**

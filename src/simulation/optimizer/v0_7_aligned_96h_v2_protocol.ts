@@ -92,18 +92,16 @@ const V07_ALIGNED_V2_EVALUATOR_CELL_VALUES: IV07AlignedV2EvaluatorCell[] = [
             ["fixed_ranged_precision", "ranged", "ranged", "ranged_precision"],
             ["fixed_ranged_control", "ranged", "ranged", "ranged_control"],
         ] as const
-    ).map(
-        ([id, cohort, archetype, template]): IV07AlignedV2EvaluatorCell => ({
-            id,
-            cohort,
-            distribution: "fixed_template",
-            scenarioProtocol: "fixed_physical_side_swap",
-            archetype,
-            template,
-            candidate: "v0.7s",
-            opponent: "v0.6",
-        }),
-    ),
+    ).map(([id, cohort, archetype, template]): IV07AlignedV2EvaluatorCell => ({
+        id,
+        cohort,
+        distribution: "fixed_template",
+        scenarioProtocol: "fixed_physical_side_swap",
+        archetype,
+        template,
+        candidate: "v0.7s",
+        opponent: "v0.6",
+    })),
 ];
 
 export const V07_ALIGNED_V2_EVALUATOR_CELLS: readonly Readonly<IV07AlignedV2EvaluatorCell>[] = Object.freeze(
@@ -641,18 +639,16 @@ export function flattenV07AlignedV2SeedPlan(plan: IV07AlignedV2InjectedSeedPlan)
     validateV07AlignedV2SeedPlan(plan);
     return plan.pairs
         .flatMap((pair) =>
-            V07_ALIGNED_96H_V2_SEATS.map(
-                (candidateSeat): IV07AlignedV2ExecutionTask => ({
-                    panelId: plan.panelId,
-                    purpose: plan.purpose,
-                    cellId: pair.cellId,
-                    scenarioOrdinal: pair.scenarioOrdinal,
-                    scenarioId: pair.scenarioId,
-                    candidateSeat,
-                    setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
-                    combatSeed: pair.seats[candidateSeat].combatSeed,
-                }),
-            ),
+            V07_ALIGNED_96H_V2_SEATS.map((candidateSeat): IV07AlignedV2ExecutionTask => ({
+                panelId: plan.panelId,
+                purpose: plan.purpose,
+                cellId: pair.cellId,
+                scenarioOrdinal: pair.scenarioOrdinal,
+                scenarioId: pair.scenarioId,
+                candidateSeat,
+                setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
+                combatSeed: pair.seats[candidateSeat].combatSeed,
+            })),
         )
         .sort(compareTaskIdentity);
 }

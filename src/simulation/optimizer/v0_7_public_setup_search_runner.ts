@@ -484,9 +484,7 @@ interface IPublicSetupWorkerJob {
 }
 
 type PublicSetupWorkerReply =
-    | { type: "ready" }
-    | { type: "result"; cluster: IPublicSetupCluster }
-    | { type: "error"; error: string };
+    { type: "ready" } | { type: "result"; cluster: IPublicSetupCluster } | { type: "error"; error: string };
 
 async function runJobs(
     jobs: readonly IPublicSetupWorkerJob[],

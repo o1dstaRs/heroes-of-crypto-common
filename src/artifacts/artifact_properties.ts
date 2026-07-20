@@ -59,8 +59,7 @@ export enum Tier2Artifact {
 }
 
 export type ArtifactType =
-    | { tier: ArtifactTier.TIER_1; value: Tier1Artifact }
-    | { tier: ArtifactTier.TIER_2; value: Tier2Artifact };
+    { tier: ArtifactTier.TIER_1; value: Tier1Artifact } | { tier: ArtifactTier.TIER_2; value: Tier2Artifact };
 
 // String -> enum converters (wire ids arrive as strings from the JSON pick document / query params).
 export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {

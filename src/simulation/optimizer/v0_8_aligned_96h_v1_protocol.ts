@@ -367,18 +367,17 @@ export function flattenV08AlignedV1SeedPlan(plan: IV08AlignedV1InjectedSeedPlan)
     validateV08AlignedV1SeedPlan(plan);
     return plan.pairs
         .flatMap((pair) =>
-            V08_ALIGNED_96H_V1_SEATS.map(
-                (candidateSeat): IV08AlignedV1ExecutionTask =>
-                    upgradeV08AlignedV1ExecutionTask({
-                        panelId: plan.panelId,
-                        purpose: plan.purpose,
-                        cellId: pair.cellId,
-                        scenarioOrdinal: pair.scenarioOrdinal,
-                        scenarioId: pair.scenarioId,
-                        candidateSeat,
-                        setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
-                        combatSeed: pair.seats[candidateSeat].combatSeed,
-                    }),
+            V08_ALIGNED_96H_V1_SEATS.map((candidateSeat): IV08AlignedV1ExecutionTask =>
+                upgradeV08AlignedV1ExecutionTask({
+                    panelId: plan.panelId,
+                    purpose: plan.purpose,
+                    cellId: pair.cellId,
+                    scenarioOrdinal: pair.scenarioOrdinal,
+                    scenarioId: pair.scenarioId,
+                    candidateSeat,
+                    setupSeeds: [...pair.seats[candidateSeat].setupSeeds],
+                    combatSeed: pair.seats[candidateSeat].combatSeed,
+                }),
             ),
         )
         .sort(
