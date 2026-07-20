@@ -21,7 +21,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // same legitimate roster-draw shift. Two runs produced this byte-identical digest.
 // Re-pinned again after enabling Arachna Queen (44) grew the L4 pool to 12 and shifted the same seeded
 // roster draws. Two runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "5c1786ddeb62e398a6e047eadef6d38a6c57188d93d119b306ea4c7ecdaa39b7";
+// Re-pinned again after raising L4 auto-bans 3 -> 5 (LIVE_AUTO_BANS_BY_LEVEL): banning more of the L4 pool
+// shifts the same seeded roster draws. Two runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "1016edff2b16232e41ca1738480da8876a87c88b0ad19e484bb36eb2d3b3f9e7";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

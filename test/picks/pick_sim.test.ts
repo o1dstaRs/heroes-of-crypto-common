@@ -51,7 +51,7 @@ const finishBundlePhase = (state: IPickSimState): IPickSimState => {
 };
 
 describe("pick_sim", () => {
-    it("generates the live bundles, offers, and 5/5/3/3 auto-bans in server RNG order", () => {
+    it("generates the live bundles, offers, and 5/5/3/5 auto-bans in server RNG order", () => {
         const drawPoolSizes: number[] = [];
         const state = createPickSimState((maxExclusive) => {
             drawPoolSizes.push(maxExclusive);
@@ -68,7 +68,7 @@ describe("pick_sim", () => {
         ]);
         expect(state.lower.tier2Offers).toEqual([1, 2, 3]);
         expect(state.upper.tier2Offers).toEqual([1, 2, 3]);
-        expect(state.creaturesBanned).toEqual([12, 13, 21, 22, 23, 15, 16, 24, 25, 26, 7, 8, 17, 9, 10, 19]);
+        expect(state.creaturesBanned).toEqual([12, 13, 21, 22, 23, 15, 16, 24, 25, 26, 7, 8, 17, 9, 10, 19, 20, 29]);
         expect(drawPoolSizes).toEqual([
             12,
             11,
@@ -103,7 +103,9 @@ describe("pick_sim", () => {
             6, // L3 bans
             12,
             11,
-            10, // L4 bans (12-creature pool after enabling Arachna Queen)
+            10,
+            9,
+            8, // L4 bans (12-creature pool after enabling Arachna Queen)
         ]);
 
         const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
@@ -191,13 +193,13 @@ describe("pick_sim", () => {
         state = accept(state, { type: "select_tier2", team: LOWER, artifactId: 1 });
         expect(state.phaseSequence).toBe(9);
 
-        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 20 });
-        state = accept(state, { type: "pick_creature", team: LOWER, creatureId: 29 });
+        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 30 });
+        state = accept(state, { type: "pick_creature", team: LOWER, creatureId: 39 });
 
         expect(isPickSimComplete(state)).toBe(true);
         expect(state.phaseSequence).toBe(11);
-        expect(state.lower.creatures).toEqual([1, 4, 2, 14, 18, 29]);
-        expect(state.upper.creatures).toEqual([3, 6, 11, 5, 27, 20]);
+        expect(state.lower.creatures).toEqual([1, 4, 2, 14, 18, 39]);
+        expect(state.upper.creatures).toEqual([3, 6, 11, 5, 27, 30]);
         expect(state.lower.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.upper.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.transcript.map((event) => event.type)).toEqual([
