@@ -473,17 +473,12 @@ export class UnitsHolder {
                     break;
                 case Tier1Artifact.HUNTERS_LONGBOW:
                     if (isRange) {
-                        // Scales with army composition: every ranged unit on the team contributes +1 attack and
-                        // -7.5% defense to each ranged unit, so N archers => +N attack / -7.5N% defense.
+                        // Scales with army composition: every ranged unit on the team contributes +1 attack
+                        // to each ranged unit, so N archers => +N attack. No downside (the old defense
+                        // penalty is gone), hence a plain buff rather than a dual/cursed artifact.
                         const archerCount = archersPerTeam.get(team) ?? 0;
                         if (archerCount > 0) {
-                            applyDualArtifact(
-                                "Hunters Longbow",
-                                "Ranged units gain +{} attack.",
-                                "Ranged units suffer -{}% defense.",
-                                AP.LONGBOW_ATTACK_FLAT_PER_ARCHER * archerCount,
-                                AP.LONGBOW_DEFENSE_PENALTY_PERCENT_PER_ARCHER * archerCount,
-                            );
+                            applyArtifactBuff("Hunters Longbow", AP.LONGBOW_ATTACK_FLAT_PER_ARCHER * archerCount, 0);
                         }
                     }
                     break;

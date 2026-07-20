@@ -2489,19 +2489,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.base_armor - parseInt(this.getBuffProperties("Berserkers Bond")[1] || "0", 10),
             );
         }
-        const huntersLongbowArmorBuff = this.getBuff("Hunters Longbow");
-        if (huntersLongbowArmorBuff) {
-            // parseFloat (not parseInt) so a fractional penalty like 7.5% or 22.5% applies exactly. The penalty
-            // scales with the number of archers, so clamp to a minimum of 1 armor for archer-heavy armies.
-            const longbowDefPenaltyPercent = parseFloat(this.getBuffProperties("Hunters Longbow")[1] || "0");
-            if (longbowDefPenaltyPercent > 0) {
-                this.unitProperties.base_armor = Math.max(
-                    1,
-                    this.unitProperties.base_armor -
-                        Number(((this.unitProperties.base_armor / 100) * longbowDefPenaltyPercent).toFixed(2)),
-                );
-            }
-        }
 
         // BUFFS & DEBUFFS
         const weakeningBeamDebuff = this.getDebuff("Weakening Beam");

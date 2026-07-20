@@ -37,7 +37,7 @@ export enum Tier1Artifact {
     DUAL_STRIKE_CHARM = 7, // +50% damage on a unit's second attack
     WOUNDING_CHARM = 8, // +1 Deep Wounds stack to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
-    HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk & -7.5% def per archer in the army (scales with archer count)
+    HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk per archer in the army (scales with archer count), no downside
     HELM_OF_FOCUS = 11, // +25% mind resist
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
 }
@@ -118,7 +118,6 @@ export const ARTIFACT_POWER = {
     // Per-archer scaling: each ranged unit in the army grants every ranged unit this much bonus attack and
     // defense penalty. N archers => +N attack and -7.5N% defense on each ranged unit.
     LONGBOW_ATTACK_FLAT_PER_ARCHER: 1,
-    LONGBOW_DEFENSE_PENALTY_PERCENT_PER_ARCHER: 7.5,
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
@@ -250,7 +249,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "hunters_longbow",
         "Hunter's Longbow",
         "Hunters Longbow",
-        "Ranged units gain +{} attack and -[]% defense for each ranged unit in the army.",
+        "Ranged units gain +{} attack for each ranged unit in the army.",
     ),
     [Tier1Artifact.HELM_OF_FOCUS]: t1(
         Tier1Artifact.HELM_OF_FOCUS,
@@ -373,7 +372,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     dual_strike_charm: [AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT],
     wounding_charm: [AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT],
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
-    hunters_longbow: [AP.LONGBOW_ATTACK_FLAT_PER_ARCHER, AP.LONGBOW_DEFENSE_PENALTY_PERCENT_PER_ARCHER],
+    hunters_longbow: [AP.LONGBOW_ATTACK_FLAT_PER_ARCHER],
     helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_PERCENT],

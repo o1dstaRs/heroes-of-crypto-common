@@ -147,6 +147,16 @@ export class Grid {
                     } else if (obstacleType === ObstacleType.WATER) {
                         this.boardCoord[row][column] = "W";
                     }
+                } else {
+                    // Clear the PREVIOUS map's terrain marker. Only cells that are center-obstacles
+                    // under the NEW type get rewritten above, so switching e.g. Lava -> Mountains
+                    // used to leave stale "L" on the corridor and the rows hugging the rocks —
+                    // invisible cells that blocked standing/pathing there ("can't attack the
+                    // mountain from certain positions"). Unit ids are never touched.
+                    const current = this.boardCoord[row][column];
+                    if (current === "B" || current === "L" || current === "W") {
+                        this.boardCoord[row][column] = NO_UNIT;
+                    }
                 }
             }
         }
