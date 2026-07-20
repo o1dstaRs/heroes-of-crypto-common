@@ -324,7 +324,11 @@ describe("v0.7 guarded supervisor lifecycle", () => {
         rmSync(join(out, "SUPERVISOR_HOST_GUARD_ARMED"));
         expect(await waitForExit(child)).toEqual({ code: 80, signal: null });
         const marker = readFileSync(join(out, "SUPERVISOR_HOST_CONTENTION_QUARANTINE"), "utf8");
-        expect(marker).toContain("missing-or-corrupt-armed-ongoing");
+        // The sentinel can vanish during either the "ongoing" or "post-ongoing" sub-phase
+        // depending on scheduling under load; both quarantine identically (exit 80,
+        // state=host-contention-quarantined). Assert the stable quarantine reason rather than
+        // the transient sub-phase suffix so a scheduling race can't fail a correct quarantine.
+        expect(marker).toContain("missing-or-corrupt-armed");
         expect(existsSync(join(out, "optimizer.pid"))).toBe(false);
     }, 20_000);
 

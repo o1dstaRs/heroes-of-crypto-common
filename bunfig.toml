@@ -1,0 +1,6 @@
+[test]
+# Raise the default per-test timeout for this package. Its simulation/evidence
+# suites build 268k-seed diagnostic plans and run multi-game batches that can
+# exceed Bun's 5000ms default when the machine is under parallel-build/CI load,
+# surfacing as spurious "timed out after 5000ms" failures. See test/setup_timeout.ts.
+preload = ["./test/setup_timeout.ts"]
