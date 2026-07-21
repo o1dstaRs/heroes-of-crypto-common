@@ -27,7 +27,6 @@ import { getDistance, type XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { otherTeam } from "./v0_1";
-import { teamRangedFirepower } from "./v0_2";
 import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -321,7 +320,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const enemyTeam = otherTeam(team);
         const enemies = uh.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (!enemies.length) return decision;
-        if (teamRangedFirepower(team, uh) > teamRangedFirepower(enemyTeam, uh)) {
+        if (this.rangedOutput(team, uh) > this.rangedOutput(enemyTeam, uh)) {
             return this.canHourglass(unit, context) ? [{ type: "wait_turn", unitId: unit.getId() }] : decision;
         }
         if (!FRONT_TANKS.has(unit.getName())) return decision;
@@ -897,8 +896,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         // Only worth the gift when we're DEFENDING with a ranged-heavy army (we out-gun them at range): the
         // regen tank holds the line while our shooters out-attrition them. Otherwise the Troll just fights.
         if (
-            teamRangedFirepower(unit.getTeam(), unitsHolder) <=
-            teamRangedFirepower(otherTeam(unit.getTeam()), unitsHolder)
+            this.rangedOutput(unit.getTeam(), unitsHolder) <= this.rangedOutput(otherTeam(unit.getTeam()), unitsHolder)
         ) {
             return undefined;
         }
@@ -1331,7 +1329,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
     private holdWhenRangedSuperior(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
         const uh = context.unitsHolder;
         const team = unit.getTeam();
-        if (teamRangedFirepower(team, uh) <= teamRangedFirepower(otherTeam(team), uh)) {
+        if (this.rangedOutput(team, uh) <= this.rangedOutput(otherTeam(team), uh)) {
             return undefined; // not (yet) ranged-superior — play normally
         }
         if (this.canLandRange(unit, context)) {

@@ -62,8 +62,8 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts).
     // It remains the explicitly shipped default below while v0.8 is evaluated.
     STRATEGY_V0_7,
-    // v0.8s is a measurement-only seat alias for future search A/Bs. Keep it immediately before v0.8 so
-    // the alias can never become LATEST_AI_VERSION.
+    // v0.8s is the measurement-only seat for anti-Armageddon target-pressure/search A/Bs. Keep it immediately
+    // before v0.8 so the experiment can never become LATEST_AI_VERSION or alter plain v0.8 by registration.
     STRATEGY_V0_8S,
     // v0.8 starts from v0.7 but converts terminal policy no-ops into explicit actions. Register it last so
     // training and tournaments can target the next generation without changing the shipped DEFAULT_AI_VERSION.

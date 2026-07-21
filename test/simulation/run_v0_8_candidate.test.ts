@@ -20,6 +20,7 @@ import {
     prepareV08CandidateOutputDirectory,
     scanV08CandidateTournamentRawEvidence,
     verifyV08CandidateOperationalIdentity,
+    type IV08CandidateOperationalIdentity,
     type IV08CandidateLevel4RecordEvidence,
     type IV08CandidateLevel4SummaryEvidence,
 } from "../../src/simulation/run_v0_8_candidate";
@@ -28,6 +29,28 @@ const LEVEL4_LANES = ["Champion", "Arachna Queen", "Abomination", "Frenzied Boar
     { unit, owner: "candidate" },
     { unit, owner: "opponent" },
 ]);
+
+const emptyTournamentRawEvidence = () => ({
+    games: 6000,
+    uniqueGames: 6000,
+    armageddonReached: 0,
+    rejectedCandidate: 0,
+    candidateCompletedEndTurns: 0,
+    candidateCompletedObstacleAttacks: 0,
+    candidateCompletedDefendTurns: 0,
+    candidateCompletedWaitTurns: 0,
+    candidateWaitTurnsActedAgainSameLap: 0,
+    candidateWaitTurnsWithoutSameLapAction: 0,
+    candidateLateWaitTurns: 0,
+    candidateLateWaitTurnsActedAgainSameLap: 0,
+});
+
+const sealedIdentityFixture = (): IV08CandidateOperationalIdentity => ({
+    sourceFiles: Object.freeze({ "src/ai/versions/v0_8.ts": "a".repeat(64) }),
+    sourceBundleSha256: "b".repeat(64),
+    operationalEnvironmentSha256: "c".repeat(64),
+    policySha256: "d".repeat(64),
+});
 
 describe("pinned v0.8 candidate tournament runner", () => {
     it("rebinds the bounded candidate to v0.8 and scrubs inherited experiment drift", () => {
@@ -138,18 +161,16 @@ describe("pinned v0.8 candidate tournament runner", () => {
         expect(normalizeV08CandidateMaps(" Normal, LAVA ,block ")).toBe("normal,lava,block");
     });
 
-    it("verifies the reviewed source/environment/policy pin and fails closed on source drift", () => {
-        const identity = verifyV08CandidateOperationalIdentity();
-        expect(identity.sourceBundleSha256).toHaveLength(64);
-        expect(identity.operationalEnvironmentSha256).toHaveLength(64);
-        expect(identity.policySha256).toHaveLength(64);
+    it("keeps the sealed-r1 runner fail-closed while experimental r3 source is under qualification", () => {
+        // The committed operational r1 identity is intentionally not repinned to unpromoted v0.8s work.
+        expect(() => verifyV08CandidateOperationalIdentity()).toThrow("repin");
         expect(() => verifyV08CandidateOperationalIdentity("/unused", () => new TextEncoder().encode("drift"))).toThrow(
             "repin",
         );
     });
 
     it("builds a non-promotable manifest bound to exact identity, environment, source, and geometry", () => {
-        const identity = verifyV08CandidateOperationalIdentity();
+        const identity = sealedIdentityFixture();
         const invocation = buildV08CandidateTournamentInvocation({
             games: 6000,
             baseSeed: 99,
@@ -228,11 +249,54 @@ describe("pinned v0.8 candidate tournament runner", () => {
                 endReasons: { elimination: 6000 },
                 armageddonDecided: 0,
             },
-            raw: { games: 6000, uniqueGames: 6000, armageddonReached: 0, rejectedCandidate: 0 },
+            raw: {
+                ...emptyTournamentRawEvidence(),
+                candidateCompletedDefendTurns: 7,
+                candidateCompletedWaitTurns: 9,
+                candidateWaitTurnsActedAgainSameLap: 8,
+                candidateWaitTurnsWithoutSameLapAction: 1,
+                candidateLateWaitTurns: 3,
+                candidateLateWaitTurnsActedAgainSameLap: 3,
+            },
         });
         expect(verdict.status).toBe("passed");
         expect(verdict.operationalQualificationPassed).toBe(true);
         expect(verdict.promotionEligible).toBe(false);
+        expect(verdict.diagnostics).toMatchObject({
+            candidateCompletedActions: { endTurn: 0, obstacleAttack: 0, defendTurn: 7, waitTurn: 9 },
+            candidateWaitInitiative: {
+                actedAgainSameLap: 8,
+                withoutSameLapAction: 1,
+                lateLap9OrLater: 3,
+                lateActedAgainSameLap: 3,
+            },
+        });
+
+        const invalidActions = evaluateV08CandidateTournamentQualification({
+            timingMode: "operational_bounded",
+            expectedGames: 6000,
+            expectedBaseSeed: 123,
+            summary: {
+                versionA: "v0.8",
+                versionB: "v0.7",
+                games: 6000,
+                baseSeed: 123,
+                a: { version: "v0.8", wins: 3600 },
+                b: { version: "v0.7", wins: 2400 },
+                draws: 0,
+                winRateA: 0.6,
+                endReasons: { elimination: 6000 },
+                armageddonDecided: 0,
+            },
+            raw: {
+                ...emptyTournamentRawEvidence(),
+                candidateCompletedEndTurns: 1,
+                candidateCompletedObstacleAttacks: 2,
+            },
+        });
+        expect(invalidActions.status).toBe("failed");
+        expect(invalidActions.gates.zeroCandidateCompletedEndTurns.passed).toBe(false);
+        expect(invalidActions.gates.zeroCandidateCompletedObstacleAttacks.passed).toBe(false);
 
         const incomplete = evaluateV08CandidateTournamentQualification({
             timingMode: "operational_bounded",
@@ -257,8 +321,34 @@ describe("pinned v0.8 candidate tournament runner", () => {
 
     it("streams an exact raw tournament census and attributes rejections to the candidate seat", async () => {
         const root = mkdtempSync(join(tmpdir(), "hoc-v08-raw-census-"));
-        const record = (game: number, reachedArmageddon: boolean, rejectedGreen: number, rejectedRed: number) => {
+        type TestAction = {
+            lap: number;
+            side: "green" | "red";
+            unitId: string;
+            actionType: string;
+        };
+        const record = (
+            game: number,
+            reachedArmageddon: boolean,
+            rejectedGreen: number,
+            rejectedRed: number,
+            rawActions: TestAction[] = [
+                {
+                    lap: 1,
+                    side: game % 2 === 0 ? "green" : "red",
+                    unitId: `candidate-${game}`,
+                    actionType: "move_unit",
+                },
+            ],
+        ) => {
             const candidateIsGreen = game % 2 === 0;
+            const actions = rawActions.map((action, index) => ({
+                index,
+                ...action,
+                creatureName: `unit-${action.unitId}`,
+                fromCell: { x: 1, y: 1 },
+                completed: true,
+            }));
             return {
                 game,
                 greenEntrant: candidateIsGreen ? "a" : "b",
@@ -267,6 +357,8 @@ describe("pinned v0.8 candidate tournament runner", () => {
                 result: {
                     rejectedGreen,
                     rejectedRed,
+                    totalActions: actions.length,
+                    actions,
                     attrition: { reachedArmageddon },
                 },
             };
@@ -274,10 +366,27 @@ describe("pinned v0.8 candidate tournament runner", () => {
         try {
             const path = join(root, "records.jsonl");
             const records = [
-                record(2, true, 3, 7),
-                record(0, false, 2, 11),
-                record(3, false, 5, 13),
-                record(1, true, 17, 19),
+                record(2, true, 3, 7, [
+                    { lap: 8, side: "green", unitId: "candidate-2", actionType: "wait_turn" },
+                    { lap: 8, side: "red", unitId: "opponent-2", actionType: "obstacle_attack" },
+                    { lap: 8, side: "green", unitId: "candidate-2", actionType: "range_attack" },
+                    { lap: 9, side: "green", unitId: "candidate-2b", actionType: "defend_turn" },
+                    { lap: 9, side: "green", unitId: "candidate-2b", actionType: "obstacle_attack" },
+                ]),
+                record(0, false, 2, 11, [
+                    { lap: 1, side: "green", unitId: "candidate-0", actionType: "end_turn" },
+                    { lap: 1, side: "red", unitId: "opponent-0", actionType: "end_turn" },
+                ]),
+                record(3, false, 5, 13, [
+                    { lap: 9, side: "red", unitId: "candidate-3", actionType: "wait_turn" },
+                    { lap: 9, side: "green", unitId: "opponent-3", actionType: "defend_turn" },
+                    { lap: 10, side: "red", unitId: "candidate-3", actionType: "move_unit" },
+                ]),
+                record(1, true, 17, 19, [
+                    { lap: 9, side: "red", unitId: "candidate-1", actionType: "wait_turn" },
+                    { lap: 9, side: "green", unitId: "opponent-1", actionType: "wait_turn" },
+                    { lap: 9, side: "red", unitId: "candidate-1", actionType: "move_unit" },
+                ]),
             ];
             writeFileSync(path, `${records.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
 
@@ -286,6 +395,14 @@ describe("pinned v0.8 candidate tournament runner", () => {
                 uniqueGames: 4,
                 armageddonReached: 2,
                 rejectedCandidate: 37,
+                candidateCompletedEndTurns: 1,
+                candidateCompletedObstacleAttacks: 1,
+                candidateCompletedDefendTurns: 1,
+                candidateCompletedWaitTurns: 3,
+                candidateWaitTurnsActedAgainSameLap: 2,
+                candidateWaitTurnsWithoutSameLapAction: 1,
+                candidateLateWaitTurns: 2,
+                candidateLateWaitTurnsActedAgainSameLap: 1,
             });
 
             writeFileSync(
@@ -302,6 +419,34 @@ describe("pinned v0.8 candidate tournament runner", () => {
             await expect(scanV08CandidateTournamentRawEvidence(path, 1)).rejects.toThrow(
                 "candidate side/version binding drifted",
             );
+
+            const invalidActionSide = record(0, false, 0, 0, [
+                { lap: 1, side: "green", unitId: "candidate", actionType: "move_unit" },
+            ]);
+            (invalidActionSide.result.actions[0] as { side: string }).side = "blue";
+            writeFileSync(path, `${JSON.stringify(invalidActionSide)}\n`);
+            await expect(scanV08CandidateTournamentRawEvidence(path, 1)).rejects.toThrow(
+                "actions[0].side must be green or red",
+            );
+
+            const invalidActionType = record(0, false, 0, 0, [
+                { lap: 1, side: "green", unitId: "candidate", actionType: "attack_mountain_via_unknown_schema" },
+            ]);
+            writeFileSync(path, `${JSON.stringify(invalidActionType)}\n`);
+            await expect(scanV08CandidateTournamentRawEvidence(path, 1)).rejects.toThrow(
+                "actions[0].actionType is unknown",
+            );
+
+            writeFileSync(path, `${JSON.stringify(record(0, false, 0, 0, []))}\n`);
+            await expect(scanV08CandidateTournamentRawEvidence(path, 1)).rejects.toThrow("actions must not be empty");
+
+            const opponentOnly = record(0, false, 0, 0, [
+                { lap: 1, side: "red", unitId: "opponent", actionType: "move_unit" },
+            ]);
+            writeFileSync(path, `${JSON.stringify(opponentOnly)}\n`);
+            await expect(scanV08CandidateTournamentRawEvidence(path, 1)).rejects.toThrow(
+                "has no recorded candidate-side actions",
+            );
         } finally {
             rmSync(root, { recursive: true });
         }
@@ -309,6 +454,15 @@ describe("pinned v0.8 candidate tournament runner", () => {
 
     it("validates the exact L4 lane/seat/map census and rejects duplicates, skips, rejections, and Armageddon", () => {
         const baseSeed = 77;
+        const targetActionTypes = (game: number): Record<string, number> => {
+            if (game === 0) return { defend_turn: 1 };
+            if (game === 2) return { obstacle_attack: 1 };
+            return {};
+        };
+        const laneActionTypes = (lane: { unit: string; owner: string }): Record<string, number> => {
+            if (lane.unit !== "Champion") return {};
+            return lane.owner === "candidate" ? { defend_turn: 1 } : { obstacle_attack: 1 };
+        };
         const records: IV08CandidateLevel4RecordEvidence[] = LEVEL4_LANES.flatMap((lane, laneIndex) =>
             [0, 1].map((seatOffset) => {
                 const game = laneIndex * 2 + seatOffset;
@@ -327,7 +481,16 @@ describe("pinned v0.8 candidate tournament runner", () => {
                         lane.owner === "candidate" ? candidateSide : candidateSide === "green" ? "red" : "green",
                     endReason: "elimination",
                     rejectedCandidate: 0,
-                    target: { appearances: 1, actingTurns: 1, rawEndTurnDecisions: 0 },
+                    target: {
+                        appearances: 1,
+                        actingTurns: 1,
+                        completedActions: Object.values(targetActionTypes(game)).reduce(
+                            (total, count) => total + count,
+                            0,
+                        ),
+                        rawEndTurnDecisions: 0,
+                        actionTypes: targetActionTypes(game),
+                    },
                     armageddon: { reached: false },
                 };
             }),
@@ -344,9 +507,11 @@ describe("pinned v0.8 candidate tournament runner", () => {
                 games: 2,
                 appearances: 2,
                 actingTurns: 2,
+                completedActions: Object.values(laneActionTypes(lane)).reduce((total, count) => total + count, 0),
                 rejectedCandidate: 0,
                 rawEndTurnDecisions: 0,
                 armageddonReached: 0,
+                actionTypes: laneActionTypes(lane),
             })),
         };
         const passed = evaluateV08CandidateLevel4Qualification({
@@ -358,10 +523,39 @@ describe("pinned v0.8 candidate tournament runner", () => {
         });
         expect(passed.status).toBe("passed");
         expect(passed.promotionEligible).toBe(false);
+        expect(passed.diagnostics.candidateLevel4TargetCompletedActions).toEqual({
+            defendTurn: 1,
+            obstacleAttack: 0,
+        });
+
+        const omittedRecordActions = structuredClone(records);
+        omittedRecordActions[0].target.actionTypes = {};
+        const omittedVerdict = evaluateV08CandidateLevel4Qualification({
+            timingMode: "operational_bounded",
+            pairsPerLane: 1,
+            baseSeed,
+            summary,
+            records: omittedRecordActions,
+        });
+        expect(omittedVerdict.gates.exactRecordCensus.passed).toBe(false);
+
+        const unknownSummaryAction = structuredClone(summary);
+        unknownSummaryAction.lanes[0].actionTypes.future_unreviewed_action = 1;
+        unknownSummaryAction.lanes[0].completedActions += 1;
+        const unknownVerdict = evaluateV08CandidateLevel4Qualification({
+            timingMode: "operational_bounded",
+            pairsPerLane: 1,
+            baseSeed,
+            summary: unknownSummaryAction,
+            records,
+        });
+        expect(unknownVerdict.gates.exactLaneCoverage.passed).toBe(false);
 
         const broken = structuredClone(records);
         broken[0].rejectedCandidate = 1;
         broken[0].target.rawEndTurnDecisions = 1;
+        broken[0].target.actionTypes.obstacle_attack = 1;
+        broken[0].target.completedActions = 2;
         broken[0].armageddon.reached = true;
         broken[broken.length - 1] = structuredClone(broken[0]);
         const failed = evaluateV08CandidateLevel4Qualification({
@@ -375,6 +569,7 @@ describe("pinned v0.8 candidate tournament runner", () => {
         expect(failed.gates.exactRecordCensus.passed).toBe(false);
         expect(failed.gates.zeroCandidateRejections.passed).toBe(false);
         expect(failed.gates.zeroCandidateRawEndTurns.passed).toBe(false);
+        expect(failed.gates.zeroCandidateTargetObstacleAttacks.passed).toBe(false);
         expect(failed.gates.armageddonReachedRate.passed).toBe(false);
     });
 });

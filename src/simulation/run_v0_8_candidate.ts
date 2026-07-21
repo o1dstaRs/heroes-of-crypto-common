@@ -13,6 +13,7 @@ import { arch, availableParallelism, hostname, platform, release } from "node:os
 import { basename, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
+import type { GameAction } from "../engine/actions";
 import {
     buildV08TestCandidateEnvironment,
     V08_TEST_CANDIDATE_OPERATIONAL_ENVIRONMENT_SHA256,
@@ -45,6 +46,28 @@ const LEVEL4_LANES = LEVEL4_UNITS.flatMap((unit) => [
     { unit, owner: "candidate" as const },
     { unit, owner: "opponent" as const },
 ]);
+
+/** Exhaustive runtime allowlist: new GameAction variants must update the qualification scanner at compile time. */
+const RECORDED_ACTION_TYPE_FLAGS = {
+    start_fight: true,
+    end_turn: true,
+    wait_turn: true,
+    defend_turn: true,
+    select_attack_type: true,
+    move_unit: true,
+    melee_attack: true,
+    range_attack: true,
+    obstacle_attack: true,
+    area_throw_attack: true,
+    cast_spell: true,
+    place_unit: true,
+    split_unit: true,
+    delete_unit: true,
+    request_additional_time: true,
+    augment: true,
+    synergy: true,
+} satisfies Record<GameAction["type"], true>;
+const RECORDED_ACTION_TYPES: ReadonlySet<string> = new Set(Object.keys(RECORDED_ACTION_TYPE_FLAGS));
 
 /** Only execution essentials survive. No inherited experiment, roster, preload, or unknown behavior knob can. */
 const INHERITED_OS_ENVIRONMENT_KEYS = [
@@ -108,6 +131,8 @@ export interface IV08CandidateQualificationVerdict {
     promotionEligible: false;
     nonPromotableReasons: readonly string[];
     gates: Readonly<Record<string, IV08CandidateQualificationGate>>;
+    /** Evidence that is useful for review but is not itself a pass/fail claim. */
+    diagnostics: Readonly<Record<string, unknown>>;
 }
 
 export interface IV08CandidateTournamentRawEvidence {
@@ -115,6 +140,15 @@ export interface IV08CandidateTournamentRawEvidence {
     uniqueGames: number;
     armageddonReached: number;
     rejectedCandidate: number;
+    /** Added in the action-census revision; absent historical raw summaries remain readable but incomplete. */
+    candidateCompletedEndTurns?: number;
+    candidateCompletedObstacleAttacks?: number;
+    candidateCompletedDefendTurns?: number;
+    candidateCompletedWaitTurns?: number;
+    candidateWaitTurnsActedAgainSameLap?: number;
+    candidateWaitTurnsWithoutSameLapAction?: number;
+    candidateLateWaitTurns?: number;
+    candidateLateWaitTurnsActedAgainSameLap?: number;
 }
 
 export interface IV08CandidateTournamentSummaryEvidence {
@@ -146,7 +180,9 @@ export interface IV08CandidateLevel4RecordEvidence {
     target: {
         appearances: number;
         actingTurns: number;
+        completedActions: number;
         rawEndTurnDecisions: number;
+        actionTypes: Record<string, number>;
     };
     armageddon: { reached: boolean };
 }
@@ -163,9 +199,11 @@ export interface IV08CandidateLevel4SummaryEvidence {
         games: number;
         appearances: number;
         actingTurns: number;
+        completedActions: number;
         rejectedCandidate: number;
         rawEndTurnDecisions: number;
         armageddonReached: number;
+        actionTypes: Record<string, number>;
     }>;
 }
 
@@ -372,6 +410,7 @@ const gate = (passed: boolean | null, observed: unknown, requirement: string): I
 
 function qualificationVerdict(
     gates: Readonly<Record<string, IV08CandidateQualificationGate>>,
+    diagnostics: Readonly<Record<string, unknown>> = {},
 ): IV08CandidateQualificationVerdict {
     const values = Object.values(gates);
     const status = values.some(({ passed }) => passed === false)
@@ -389,8 +428,42 @@ function qualificationVerdict(
             ...(status === "passed" ? ["promotion requires a separate reviewed release decision"] : []),
         ],
         gates,
+        diagnostics,
     };
 }
+
+type V08CandidateActionCensus = Required<
+    Pick<
+        IV08CandidateTournamentRawEvidence,
+        | "candidateCompletedEndTurns"
+        | "candidateCompletedObstacleAttacks"
+        | "candidateCompletedDefendTurns"
+        | "candidateCompletedWaitTurns"
+        | "candidateWaitTurnsActedAgainSameLap"
+        | "candidateWaitTurnsWithoutSameLapAction"
+        | "candidateLateWaitTurns"
+        | "candidateLateWaitTurnsActedAgainSameLap"
+    >
+>;
+
+const readCandidateActionCensus = (
+    raw: IV08CandidateTournamentRawEvidence | undefined,
+): V08CandidateActionCensus | null => {
+    if (!raw) return null;
+    const census = {
+        candidateCompletedEndTurns: raw.candidateCompletedEndTurns,
+        candidateCompletedObstacleAttacks: raw.candidateCompletedObstacleAttacks,
+        candidateCompletedDefendTurns: raw.candidateCompletedDefendTurns,
+        candidateCompletedWaitTurns: raw.candidateCompletedWaitTurns,
+        candidateWaitTurnsActedAgainSameLap: raw.candidateWaitTurnsActedAgainSameLap,
+        candidateWaitTurnsWithoutSameLapAction: raw.candidateWaitTurnsWithoutSameLapAction,
+        candidateLateWaitTurns: raw.candidateLateWaitTurns,
+        candidateLateWaitTurnsActedAgainSameLap: raw.candidateLateWaitTurnsActedAgainSameLap,
+    };
+    return Object.values(census).every((value) => Number.isSafeInteger(value) && (value ?? -1) >= 0)
+        ? (census as V08CandidateActionCensus)
+        : null;
+};
 
 export function evaluateV08CandidateTournamentQualification(input: {
     timingMode: V08TestCandidateTimingMode;
@@ -403,60 +476,133 @@ export function evaluateV08CandidateTournamentQualification(input: {
     const decisive = summary.a.wins + summary.b.wins;
     const armageddonDecidedRate = summary.games > 0 ? summary.armageddonDecided / summary.games : 1;
     const armageddonReachedRate = raw && raw.games > 0 ? raw.armageddonReached / raw.games : null;
-    return qualificationVerdict({
-        boundedOperationalTiming: gate(
-            input.timingMode === "operational_bounded",
-            input.timingMode,
-            "operational_bounded",
-        ),
-        exactIdentity: gate(
-            summary.versionA === V08_TEST_CANDIDATE_PROFILE.operationalCandidateVersion &&
-                summary.versionB === V08_TEST_CANDIDATE_PROFILE.opponentVersion &&
-                summary.a.version === V08_TEST_CANDIDATE_PROFILE.operationalCandidateVersion &&
-                summary.b.version === V08_TEST_CANDIDATE_PROFILE.opponentVersion,
-            { versionA: summary.versionA, versionB: summary.versionB },
-            "plain v0.8 candidate versus v0.7",
-        ),
-        exactGeometry: gate(
-            summary.games === input.expectedGames && summary.baseSeed === input.expectedBaseSeed,
-            { games: summary.games, baseSeed: summary.baseSeed },
-            `games=${input.expectedGames}, baseSeed=${input.expectedBaseSeed}`,
-        ),
-        minimumQualificationGames: gate(
-            summary.games >= V08_CANDIDATE_MINIMUM_QUALIFICATION_GAMES,
-            summary.games,
-            `>= ${V08_CANDIDATE_MINIMUM_QUALIFICATION_GAMES}`,
-        ),
-        decisiveWinRate: gate(
-            decisive > 0 && summary.winRateA >= V08_CANDIDATE_DECISIVE_WIN_RATE_GATE,
-            summary.winRateA,
-            `>= ${V08_CANDIDATE_DECISIVE_WIN_RATE_GATE}`,
-        ),
-        noStuckGames: gate((summary.endReasons.stuck ?? 0) === 0, summary.endReasons.stuck ?? 0, "0"),
-        armageddonDecidedRate: gate(
-            armageddonDecidedRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
-            armageddonDecidedRate,
-            `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}`,
-        ),
-        armageddonReachedRate: gate(
-            armageddonReachedRate === null ? null : armageddonReachedRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
-            armageddonReachedRate,
-            `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}; requires raw-game census`,
-        ),
-        exactRawGameCensus: gate(
-            raw === undefined ? null : raw.games === input.expectedGames && raw.uniqueGames === input.expectedGames,
-            raw ? { games: raw.games, uniqueGames: raw.uniqueGames } : null,
-            `exactly ${input.expectedGames} unique raw games`,
-        ),
-        zeroCandidateRejections: gate(
-            raw === undefined ? null : raw.rejectedCandidate === 0,
-            raw?.rejectedCandidate ?? null,
-            "0; requires raw-game census",
-        ),
-    });
+    const actionCensus = readCandidateActionCensus(raw);
+    const consistentWaitCensus = actionCensus
+        ? actionCensus.candidateWaitTurnsActedAgainSameLap + actionCensus.candidateWaitTurnsWithoutSameLapAction ===
+              actionCensus.candidateCompletedWaitTurns &&
+          actionCensus.candidateLateWaitTurns <= actionCensus.candidateCompletedWaitTurns &&
+          actionCensus.candidateLateWaitTurnsActedAgainSameLap <= actionCensus.candidateLateWaitTurns &&
+          actionCensus.candidateLateWaitTurnsActedAgainSameLap <= actionCensus.candidateWaitTurnsActedAgainSameLap
+        : null;
+    return qualificationVerdict(
+        {
+            boundedOperationalTiming: gate(
+                input.timingMode === "operational_bounded",
+                input.timingMode,
+                "operational_bounded",
+            ),
+            exactIdentity: gate(
+                summary.versionA === V08_TEST_CANDIDATE_PROFILE.operationalCandidateVersion &&
+                    summary.versionB === V08_TEST_CANDIDATE_PROFILE.opponentVersion &&
+                    summary.a.version === V08_TEST_CANDIDATE_PROFILE.operationalCandidateVersion &&
+                    summary.b.version === V08_TEST_CANDIDATE_PROFILE.opponentVersion,
+                { versionA: summary.versionA, versionB: summary.versionB },
+                "plain v0.8 candidate versus v0.7",
+            ),
+            exactGeometry: gate(
+                summary.games === input.expectedGames && summary.baseSeed === input.expectedBaseSeed,
+                { games: summary.games, baseSeed: summary.baseSeed },
+                `games=${input.expectedGames}, baseSeed=${input.expectedBaseSeed}`,
+            ),
+            minimumQualificationGames: gate(
+                summary.games >= V08_CANDIDATE_MINIMUM_QUALIFICATION_GAMES,
+                summary.games,
+                `>= ${V08_CANDIDATE_MINIMUM_QUALIFICATION_GAMES}`,
+            ),
+            decisiveWinRate: gate(
+                decisive > 0 && summary.winRateA >= V08_CANDIDATE_DECISIVE_WIN_RATE_GATE,
+                summary.winRateA,
+                `>= ${V08_CANDIDATE_DECISIVE_WIN_RATE_GATE}`,
+            ),
+            noStuckGames: gate((summary.endReasons.stuck ?? 0) === 0, summary.endReasons.stuck ?? 0, "0"),
+            armageddonDecidedRate: gate(
+                armageddonDecidedRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
+                armageddonDecidedRate,
+                `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}`,
+            ),
+            armageddonReachedRate: gate(
+                armageddonReachedRate === null ? null : armageddonReachedRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
+                armageddonReachedRate,
+                `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}; requires raw-game census`,
+            ),
+            exactRawGameCensus: gate(
+                raw === undefined ? null : raw.games === input.expectedGames && raw.uniqueGames === input.expectedGames,
+                raw ? { games: raw.games, uniqueGames: raw.uniqueGames } : null,
+                `exactly ${input.expectedGames} unique raw games`,
+            ),
+            consistentCandidateWaitCensus: gate(
+                consistentWaitCensus,
+                actionCensus
+                    ? {
+                          waits: actionCensus.candidateCompletedWaitTurns,
+                          actedAgainSameLap: actionCensus.candidateWaitTurnsActedAgainSameLap,
+                          withoutSameLapAction: actionCensus.candidateWaitTurnsWithoutSameLapAction,
+                          late: actionCensus.candidateLateWaitTurns,
+                          lateActedAgainSameLap: actionCensus.candidateLateWaitTurnsActedAgainSameLap,
+                      }
+                    : null,
+                "same-lap wait outcomes partition completed waits; late counts are subsets",
+            ),
+            zeroCandidateRejections: gate(
+                raw === undefined ? null : raw.rejectedCandidate === 0,
+                raw?.rejectedCandidate ?? null,
+                "0; requires raw-game census",
+            ),
+            zeroCandidateCompletedEndTurns: gate(
+                actionCensus ? actionCensus.candidateCompletedEndTurns === 0 : null,
+                actionCensus?.candidateCompletedEndTurns ?? null,
+                "0 completed candidate end_turn actions; requires action census",
+            ),
+            zeroCandidateCompletedObstacleAttacks: gate(
+                actionCensus ? actionCensus.candidateCompletedObstacleAttacks === 0 : null,
+                actionCensus?.candidateCompletedObstacleAttacks ?? null,
+                "0 completed candidate obstacle_attack actions; requires action census",
+            ),
+        },
+        {
+            candidateCompletedActions: actionCensus
+                ? {
+                      endTurn: actionCensus.candidateCompletedEndTurns,
+                      obstacleAttack: actionCensus.candidateCompletedObstacleAttacks,
+                      defendTurn: actionCensus.candidateCompletedDefendTurns,
+                      waitTurn: actionCensus.candidateCompletedWaitTurns,
+                  }
+                : null,
+            candidateWaitInitiative: actionCensus
+                ? {
+                      actedAgainSameLap: actionCensus.candidateWaitTurnsActedAgainSameLap,
+                      withoutSameLapAction: actionCensus.candidateWaitTurnsWithoutSameLapAction,
+                      lateLap9OrLater: actionCensus.candidateLateWaitTurns,
+                      lateActedAgainSameLap: actionCensus.candidateLateWaitTurnsActedAgainSameLap,
+                  }
+                : null,
+            defendTurnInterpretation:
+                "diagnostic only: completed action logs do not prove whether a productive legal alternative existed",
+        },
+    );
 }
 
 const laneKey = (lane: { unit: string; owner: string }): string => `${lane.unit}:${lane.owner}`;
+
+const validatedActionCounts = (value: unknown): Record<string, number> | null => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+    const counts: Record<string, number> = {};
+    for (const [actionType, count] of Object.entries(value)) {
+        if (!RECORDED_ACTION_TYPES.has(actionType) || !Number.isSafeInteger(count) || (count as number) < 0) {
+            return null;
+        }
+        counts[actionType] = count as number;
+    }
+    return counts;
+};
+
+const actionCountsEqual = (
+    left: Readonly<Record<string, number>>,
+    right: Readonly<Record<string, number>>,
+): boolean => {
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+    return [...keys].every((key) => (left[key] ?? 0) === (right[key] ?? 0));
+};
 
 /** Rigorous L4 evidence validator: exact deterministic census, no duplicates, no candidate skips/rejections. */
 export function evaluateV08CandidateLevel4Qualification(input: {
@@ -471,6 +617,8 @@ export function evaluateV08CandidateLevel4Qualification(input: {
     const expectedLaneByKey = new Map(LEVEL4_LANES.map((lane) => [laneKey(lane), lane]));
     const counts = new Map(LEVEL4_LANES.map((lane) => [laneKey(lane), 0]));
     const actingTurns = new Map(LEVEL4_LANES.map((lane) => [laneKey(lane), 0]));
+    const completedActions = new Map(LEVEL4_LANES.map((lane) => [laneKey(lane), 0]));
+    const actionCounts = new Map<string, Record<string, number>>(LEVEL4_LANES.map((lane) => [laneKey(lane), {}]));
     const seenGames = new Set<number>();
     const recordErrors: string[] = [];
     let candidateRejections = 0;
@@ -478,6 +626,8 @@ export function evaluateV08CandidateLevel4Qualification(input: {
     let armageddonReached = 0;
     let appearances = 0;
     let stuck = 0;
+    let candidateTargetDefendTurns = 0;
+    let candidateTargetObstacleAttacks = 0;
 
     for (const record of input.records) {
         const key = laneKey(record.lane);
@@ -511,6 +661,29 @@ export function evaluateV08CandidateLevel4Qualification(input: {
         }
         counts.set(key, (counts.get(key) ?? 0) + 1);
         actingTurns.set(key, (actingTurns.get(key) ?? 0) + record.target.actingTurns);
+        const recordCompletedActions = record.target.completedActions;
+        const recordActionCounts = validatedActionCounts(record.target.actionTypes);
+        if (!Number.isSafeInteger(recordCompletedActions) || recordCompletedActions < 0 || !recordActionCounts) {
+            recordErrors.push(
+                `game ${record.game} target action census must contain known action types and non-negative completedActions`,
+            );
+        } else if (
+            Object.values(recordActionCounts).reduce((total, count) => total + count, 0) !== recordCompletedActions
+        ) {
+            recordErrors.push(`game ${record.game} target.actionTypes does not sum to completedActions`);
+        } else {
+            completedActions.set(key, (completedActions.get(key) ?? 0) + recordCompletedActions);
+            const laneActionCounts = actionCounts.get(key);
+            if (laneActionCounts) {
+                for (const [actionType, count] of Object.entries(recordActionCounts)) {
+                    laneActionCounts[actionType] = (laneActionCounts[actionType] ?? 0) + count;
+                }
+            }
+            if (record.lane.owner === "candidate") {
+                candidateTargetDefendTurns += recordActionCounts.defend_turn ?? 0;
+                candidateTargetObstacleAttacks += recordActionCounts.obstacle_attack ?? 0;
+            }
+        }
         appearances += record.target.appearances;
         candidateRejections += record.rejectedCandidate;
         if (record.lane.owner === "candidate") candidateRawEndTurns += record.target.rawEndTurnDecisions;
@@ -529,6 +702,10 @@ export function evaluateV08CandidateLevel4Qualification(input: {
         input.summary.lanes.length === LEVEL4_LANES.length;
     for (const cell of input.summary.lanes) {
         const key = laneKey(cell.lane);
+        const summaryActionCounts = validatedActionCounts(cell.actionTypes);
+        const summaryActionTotal = summaryActionCounts
+            ? Object.values(summaryActionCounts).reduce((total, count) => total + count, 0)
+            : -1;
         if (summaryLaneKeys.has(key)) summaryValid = false;
         summaryLaneKeys.add(key);
         if (
@@ -536,8 +713,14 @@ export function evaluateV08CandidateLevel4Qualification(input: {
             cell.games !== expectedLaneGames ||
             cell.appearances !== expectedLaneGames ||
             cell.actingTurns <= 0 ||
+            !Number.isSafeInteger(cell.completedActions) ||
+            cell.completedActions < 0 ||
+            cell.completedActions !== completedActions.get(key) ||
+            summaryActionTotal !== cell.completedActions ||
             cell.rejectedCandidate !== 0 ||
             (cell.lane.owner === "candidate" && cell.rawEndTurnDecisions !== 0) ||
+            !summaryActionCounts ||
+            !actionCountsEqual(summaryActionCounts ?? {}, actionCounts.get(key) ?? {}) ||
             cell.armageddonReached !==
                 input.records.filter((record) => laneKey(record.lane) === key && record.armageddon.reached).length
         ) {
@@ -549,32 +732,47 @@ export function evaluateV08CandidateLevel4Qualification(input: {
     );
     const armageddonRate = expectedTotal ? armageddonReached / expectedTotal : 1;
 
-    return qualificationVerdict({
-        boundedOperationalTiming: gate(
-            input.timingMode === "operational_bounded",
-            input.timingMode,
-            "operational_bounded",
-        ),
-        exactRecordCensus: gate(
-            input.records.length === expectedTotal && seenGames.size === expectedTotal && recordErrors.length === 0,
-            { records: input.records.length, uniqueGames: seenGames.size, errors: recordErrors.slice(0, 8) },
-            `${expectedTotal} deterministic, unique records`,
-        ),
-        exactLaneCoverage: gate(
-            exactLaneCensus && summaryValid,
-            { expectedLaneGames, summaryValid, laneCounts: Object.fromEntries(counts) },
-            "all 8 lanes, both seats, exact summary and deterministic map/seed binding",
-        ),
-        exactAppearances: gate(appearances === expectedTotal, appearances, `${expectedTotal}`),
-        zeroCandidateRejections: gate(candidateRejections === 0, candidateRejections, "0"),
-        zeroCandidateRawEndTurns: gate(candidateRawEndTurns === 0, candidateRawEndTurns, "0"),
-        noStuckGames: gate(stuck === 0, stuck, "0"),
-        armageddonReachedRate: gate(
-            armageddonRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
-            armageddonRate,
-            `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}`,
-        ),
-    });
+    return qualificationVerdict(
+        {
+            boundedOperationalTiming: gate(
+                input.timingMode === "operational_bounded",
+                input.timingMode,
+                "operational_bounded",
+            ),
+            exactRecordCensus: gate(
+                input.records.length === expectedTotal && seenGames.size === expectedTotal && recordErrors.length === 0,
+                { records: input.records.length, uniqueGames: seenGames.size, errors: recordErrors.slice(0, 8) },
+                `${expectedTotal} deterministic, unique records`,
+            ),
+            exactLaneCoverage: gate(
+                exactLaneCensus && summaryValid,
+                { expectedLaneGames, summaryValid, laneCounts: Object.fromEntries(counts) },
+                "all 8 lanes, both seats, exact summary and deterministic map/seed binding",
+            ),
+            exactAppearances: gate(appearances === expectedTotal, appearances, `${expectedTotal}`),
+            zeroCandidateRejections: gate(candidateRejections === 0, candidateRejections, "0"),
+            zeroCandidateRawEndTurns: gate(candidateRawEndTurns === 0, candidateRawEndTurns, "0"),
+            zeroCandidateTargetObstacleAttacks: gate(
+                candidateTargetObstacleAttacks === 0,
+                candidateTargetObstacleAttacks,
+                "0 completed obstacle_attack actions by candidate-owned L4 targets",
+            ),
+            noStuckGames: gate(stuck === 0, stuck, "0"),
+            armageddonReachedRate: gate(
+                armageddonRate <= V08_CANDIDATE_ARMAGEDDON_RATE_GATE,
+                armageddonRate,
+                `<= ${V08_CANDIDATE_ARMAGEDDON_RATE_GATE}`,
+            ),
+        },
+        {
+            candidateLevel4TargetCompletedActions: {
+                defendTurn: candidateTargetDefendTurns,
+                obstacleAttack: candidateTargetObstacleAttacks,
+            },
+            defendTurnInterpretation:
+                "diagnostic only: target actionTypes do not prove whether a productive legal alternative existed",
+        },
+    );
 }
 
 /** Pure manifest builder so identity/geometry binding is reviewable without spawning a tournament. */
@@ -657,6 +855,52 @@ const requireNonNegativeInteger = (value: unknown, label: string): number => {
     return value as number;
 };
 
+const requireNonEmptyString = (value: unknown, label: string): string => {
+    if (typeof value !== "string" || value.length === 0) throw new Error(`${label} must be a non-empty string`);
+    return value;
+};
+
+interface IV08ValidatedRecordedAction {
+    index: number;
+    lap: number;
+    side: "green" | "red";
+    unitId: string;
+    actionType: string;
+}
+
+function validateRecordedActions(result: Record<string, unknown>, game: number): IV08ValidatedRecordedAction[] {
+    if (!Array.isArray(result.actions))
+        throw new Error(`tournament records game ${game}.result.actions must be an array`);
+    const totalActions = requireNonNegativeInteger(
+        result.totalActions,
+        `tournament records game ${game}.result.totalActions`,
+    );
+    if (totalActions !== result.actions.length) {
+        throw new Error(
+            `tournament records game ${game}.result.totalActions=${totalActions} does not match actions.length=${result.actions.length}`,
+        );
+    }
+    if (totalActions === 0) {
+        throw new Error(`tournament records game ${game}.result.actions must not be empty`);
+    }
+    return result.actions.map((rawAction, position) => {
+        const action = requireObject(rawAction, `tournament records game ${game}.result.actions[${position}]`);
+        const label = `tournament records game ${game}.result.actions[${position}]`;
+        const index = requireNonNegativeInteger(action.index, `${label}.index`);
+        if (index !== position) throw new Error(`${label}.index must be contiguous execution index ${position}`);
+        const lap = requireNonNegativeInteger(action.lap, `${label}.lap`);
+        if (action.side !== "green" && action.side !== "red") {
+            throw new Error(`${label}.side must be green or red`);
+        }
+        const unitId = requireNonEmptyString(action.unitId, `${label}.unitId`);
+        requireNonEmptyString(action.creatureName, `${label}.creatureName`);
+        const actionType = requireNonEmptyString(action.actionType, `${label}.actionType`);
+        if (!RECORDED_ACTION_TYPES.has(actionType)) throw new Error(`${label}.actionType is unknown: ${actionType}`);
+        if (action.completed !== true) throw new Error(`${label}.completed must be true`);
+        return { index, lap, side: action.side, unitId, actionType };
+    });
+}
+
 /**
  * Stream the authoritative tournament records without retaining action logs in memory. Every game index and
  * side swap is validated before its Armageddon/rejection evidence is admitted to the qualification verdict.
@@ -670,6 +914,14 @@ export async function scanV08CandidateTournamentRawEvidence(
     let games = 0;
     let armageddonReached = 0;
     let rejectedCandidate = 0;
+    let candidateCompletedEndTurns = 0;
+    let candidateCompletedObstacleAttacks = 0;
+    let candidateCompletedDefendTurns = 0;
+    let candidateCompletedWaitTurns = 0;
+    let candidateWaitTurnsActedAgainSameLap = 0;
+    let candidateWaitTurnsWithoutSameLapAction = 0;
+    let candidateLateWaitTurns = 0;
+    let candidateLateWaitTurnsActedAgainSameLap = 0;
     let lineNumber = 0;
     const lines = createInterface({ input: createReadStream(path), crlfDelay: Infinity });
 
@@ -719,6 +971,31 @@ export async function scanV08CandidateTournamentRawEvidence(
             result.rejectedRed,
             `tournament records game ${game}.result.rejectedRed`,
         );
+        const actions = validateRecordedActions(result, game);
+        const candidateSide = candidateIsGreen ? "green" : "red";
+        if (!actions.some((action) => action.side === candidateSide)) {
+            throw new Error(`tournament records game ${game} has no recorded candidate-side actions`);
+        }
+        const laterCandidateActionByUnitLap = new Set<string>();
+        for (let actionIndex = actions.length - 1; actionIndex >= 0; actionIndex -= 1) {
+            const action = actions[actionIndex];
+            if (action.side !== candidateSide) continue;
+            const unitLap = `${action.lap}\u0000${action.unitId}`;
+            if (action.actionType === "end_turn") candidateCompletedEndTurns += 1;
+            else if (action.actionType === "obstacle_attack") candidateCompletedObstacleAttacks += 1;
+            else if (action.actionType === "defend_turn") candidateCompletedDefendTurns += 1;
+            else if (action.actionType === "wait_turn") {
+                const actedAgainSameLap = laterCandidateActionByUnitLap.has(unitLap);
+                candidateCompletedWaitTurns += 1;
+                candidateWaitTurnsActedAgainSameLap += Number(actedAgainSameLap);
+                candidateWaitTurnsWithoutSameLapAction += Number(!actedAgainSameLap);
+                if (action.lap >= 9) {
+                    candidateLateWaitTurns += 1;
+                    candidateLateWaitTurnsActedAgainSameLap += Number(actedAgainSameLap);
+                }
+            }
+            laterCandidateActionByUnitLap.add(unitLap);
+        }
         armageddonReached += Number(attrition.reachedArmageddon);
         rejectedCandidate += candidateIsGreen ? rejectedGreen : rejectedRed;
         games += 1;
@@ -727,7 +1004,20 @@ export async function scanV08CandidateTournamentRawEvidence(
     if (seenGames.size !== expectedGames) {
         throw new Error(`tournament records contain ${seenGames.size}/${expectedGames} unique games`);
     }
-    return { games, uniqueGames: seenGames.size, armageddonReached, rejectedCandidate };
+    return {
+        games,
+        uniqueGames: seenGames.size,
+        armageddonReached,
+        rejectedCandidate,
+        candidateCompletedEndTurns,
+        candidateCompletedObstacleAttacks,
+        candidateCompletedDefendTurns,
+        candidateCompletedWaitTurns,
+        candidateWaitTurnsActedAgainSameLap,
+        candidateWaitTurnsWithoutSameLapAction,
+        candidateLateWaitTurns,
+        candidateLateWaitTurnsActedAgainSameLap,
+    };
 }
 
 async function runChild(invocation: IV08CandidateInvocation): Promise<number> {

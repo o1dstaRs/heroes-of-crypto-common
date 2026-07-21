@@ -26,8 +26,17 @@ import {
     extractWaitFeaturesV2Raw,
     waitIncumbentKindOf,
 } from "../ai/versions/wait_scorer";
-import { isV08StrongerRangedPostureWait, selectV08DirectCombatCandidate } from "../ai/versions/v0_8";
+import {
+    isV08StrongerRangedPostureWait,
+    selectV08DirectCombatCandidate,
+    v08TeamRangedOutput,
+} from "../ai/versions/v0_8";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
+import {
+    selectV08STargetPressureCandidate,
+    V08S_URGENT_FINISH_START_LAP,
+    V08_TARGET_PRESSURE_START_LAP,
+} from "../ai/versions/v0_8s_finish";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -97,6 +106,11 @@ import {
  * v0.8 goes further regardless of that probe: generated defend and mountain challengers are excluded. An
  * inherited defend/mountain remains candidate zero for fail-closed and observe-only semantics; normal active
  * search replaces it when an engine-valid productive challenger exists. Tactical wait remains a scored action.
+ * The measurement-only v0.8s seat adds target pressure at lap 6: an inherited attack is retargeted to the
+ * least-deadline-slack enemy. Ordinary/balanced stronger-ranged waits remain legal through lap 8; the inherited
+ * >=2:1 dominant finish may press from lap 7. At lap 9 it universally forces a positive-damage attack and otherwise
+ * the nearest advance. Coverage-preserving attack caps, shortlist, deadline, and circuit fallbacks all use the same
+ * selector; plain v0.8 and historical decisions are unchanged.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
  * the exact incumbent action-array reference. SEARCH_INCUMBENT_KINDS limits which incumbent action classes
  * enter shadow search (the filter runs before enumeration), and SEARCH_CHALLENGER_KINDS limits the generated
@@ -267,6 +281,7 @@ const CHALLENGER_KINDS = new Set<CandidateKind>([
 const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS = new Set<IncumbentKind>(["idle", "defend", "mine"]);
 const V08_AGGRESSIVE_VERSIONS = new Set(["v0.8", "v0.8s"]);
+const V08S_EXPERIMENT_VERSION = "v0.8s";
 const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
 const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "move_unit",
@@ -290,6 +305,14 @@ function isProductiveCandidate(candidate: Pick<IEnumeratedCandidate, "kind" | "a
 
 function isDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
     return isV08DirectCombatDecision(candidate.actions);
+}
+
+function isPositiveDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "actions" | "features">): boolean {
+    return (
+        isDirectCombatCandidate(candidate) &&
+        Number.isFinite(candidate.features?.expectedDamage) &&
+        (candidate.features?.expectedDamage ?? 0) > 0
+    );
 }
 
 function isPureMoveCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
@@ -378,6 +401,8 @@ interface ISearchCounters {
     dominantFinishCombatOverrides: number;
     /** Deadline/circuit fallbacks where the finish tier selected direct combat over a non-combat incumbent. */
     dominantFinishCombatFallbacks: number;
+    /** Explicit v0.8 stronger-ranged initiative waits observed by the search wrapper. */
+    strongerRangedPostureWaits: number;
     /** Leaf evaluations that reached the eligible late ranged finish calculation. */
     finishPressureLeaves: number;
     /** Enabled leaf evaluations whose bounded finish-pressure feature was positive. */
@@ -433,6 +458,7 @@ const emptyCounters = (): ISearchCounters => ({
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
     dominantFinishCombatFallbacks: 0,
+    strongerRangedPostureWaits: 0,
     finishPressureLeaves: 0,
     finishPressureNonzeroLeaves: 0,
     finishPressureLogitSum: 0,
@@ -738,6 +764,7 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
+        const isV08SExperiment = isV08Search && version === V08S_EXPERIMENT_VERSION;
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -746,10 +773,26 @@ export class SearchDriver {
         const strongerRangedPostureWait =
             incumbentKind === "wait" &&
             isV08StrongerRangedPostureWait(unit, this.deps.unitsHolder, currentLap, incumbent);
+        if (strongerRangedPostureWait) {
+            this.counters.strongerRangedPostureWaits += 1;
+        }
         const aggressiveWaitComparison = isAggressiveV08 && incumbentKind === "wait" && !strongerRangedPostureWait;
         const prioritizeDominantFinish =
             isV08Search && v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), currentLap).dominant;
-        const useProductiveFallback = (prioritizeProductiveActions || prioritizeDominantFinish) && !this.observeOnly;
+        const prioritizeV08SUrgency =
+            isV08SExperiment && Number.isFinite(currentLap) && currentLap >= V08S_URGENT_FINISH_START_LAP;
+        const v08sHasStrongerRangedOutput =
+            isV08SExperiment &&
+            v08TeamRangedOutput(unit.getTeam(), this.deps.unitsHolder) >
+                v08TeamRangedOutput(otherTeam(unit.getTeam()), this.deps.unitsHolder);
+        const prioritizeV08STargetPressure =
+            isV08SExperiment &&
+            Number.isFinite(currentLap) &&
+            (prioritizeV08SUrgency ||
+                (isV08DirectCombatDecision(incumbent) &&
+                    (!v08sHasStrongerRangedOutput || currentLap >= V08_TARGET_PRESSURE_START_LAP)));
+        const useProductiveFallback =
+            (prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency) && !this.observeOnly;
         if (prioritizeDominantFinish) {
             this.counters.dominantFinishTurns += 1;
         }
@@ -788,6 +831,12 @@ export class SearchDriver {
                 ...this.caps,
                 includeMountainAttacks: isV08Search,
                 enrichIncumbentMetadata: isV08Search || this.ilPath !== undefined,
+                preserveMovePostureDiversity:
+                    isV08SExperiment &&
+                    v08sHasStrongerRangedOutput &&
+                    !prioritizeDominantFinish &&
+                    !prioritizeV08SUrgency,
+                preserveAttackTargetCoverage: prioritizeV08STargetPressure || prioritizeV08SUrgency,
             });
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
@@ -812,7 +861,14 @@ export class SearchDriver {
             // decision also probes here because it intentionally skips the expensive comparison below.
             const productiveFallback =
                 useProductiveFallback && (this.decisionDeadlineMs !== null || this.circuitOpen)
-                    ? this.firstEngineValidProductiveCandidate(unit, candidates, seedBase, prioritizeDominantFinish)
+                    ? this.firstEngineValidProductiveCandidate(
+                          unit,
+                          candidates,
+                          seedBase,
+                          prioritizeDominantFinish,
+                          prioritizeV08STargetPressure,
+                          prioritizeV08SUrgency,
+                      )
                     : undefined;
             if (this.circuitOpen) {
                 this.counters.circuitSkipped += 1;
@@ -840,6 +896,8 @@ export class SearchDriver {
                 productiveFallback,
                 prioritizeDominantFinish,
                 aggressiveWaitComparison,
+                prioritizeV08STargetPressure,
+                prioritizeV08SUrgency,
             );
         } finally {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
@@ -932,6 +990,7 @@ export class SearchDriver {
             dominantFinishTurns: c.dominantFinishTurns,
             dominantFinishCombatOverrides: c.dominantFinishCombatOverrides,
             dominantFinishCombatFallbacks: c.dominantFinishCombatFallbacks,
+            strongerRangedPostureWaits: c.strongerRangedPostureWaits,
             lateRangedFinishWeight: this.lateRangedFinishWeight,
             initialBoardRangedness: this.finishPressureState?.initialBoardRangedness ?? 0,
             finishPressureLeaves: c.finishPressureLeaves,
@@ -1007,6 +1066,8 @@ export class SearchDriver {
         productiveFallback?: IEnumeratedCandidate,
         prioritizeDominantFinish = false,
         aggressiveWaitComparison = false,
+        prioritizeV08STargetPressure = false,
+        prioritizeV08SUrgency = false,
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -1028,6 +1089,7 @@ export class SearchDriver {
         let means: number[];
         let bestIdx = 0;
         let bestChallengerIdx = -1;
+        let hasPreferredV08STarget = false;
         let validationMeans: number[] | null = null;
         try {
             scoredCandidates = this.shortlistCandidates(
@@ -1037,6 +1099,8 @@ export class SearchDriver {
                 deadlineAt,
                 prioritizeProductiveActions,
                 prioritizeDominantFinish,
+                prioritizeV08STargetPressure,
+                prioritizeV08SUrgency,
             );
             means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
@@ -1056,6 +1120,14 @@ export class SearchDriver {
             const preferredFinishingAttackIndex = preferredFinishingAttack
                 ? scoredCandidates.indexOf(preferredFinishingAttack)
                 : -1;
+            const preferredV08STarget = selectV08STargetPressureCandidate(
+                unit,
+                this.deps.unitsHolder,
+                legalDirectCombatIndices.map((index) => scoredCandidates[index]),
+                this.deps.fightProperties.getCurrentLap(),
+            );
+            const preferredV08STargetIndex = preferredV08STarget ? scoredCandidates.indexOf(preferredV08STarget) : -1;
+            hasPreferredV08STarget = preferredV08STargetIndex >= 0;
             const dominantFinishIndices =
                 preferredFinishingAttackIndex >= 0
                     ? [preferredFinishingAttackIndex]
@@ -1063,17 +1135,33 @@ export class SearchDriver {
                       ? legalAdvanceIndices
                       : legalProductiveIndices;
             const selectionIndices =
-                prioritizeDominantFinish && dominantFinishIndices.length
-                    ? dominantFinishIndices
-                    : prioritizeProductiveActions && legalProductiveIndices.length
-                      ? legalProductiveIndices
-                      : aggressiveWaitComparison
-                        ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
-                        : scoredCandidates.map((_candidate, index) => index);
+                prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
+                    ? prioritizeV08SUrgency
+                        ? [preferredV08STargetIndex]
+                        : preferredV08STargetIndex === 0
+                          ? [0]
+                          : [0, preferredV08STargetIndex]
+                    : prioritizeV08SUrgency
+                      ? legalAdvanceIndices.length
+                          ? legalAdvanceIndices
+                          : [0]
+                      : prioritizeDominantFinish && dominantFinishIndices.length
+                        ? dominantFinishIndices
+                        : prioritizeProductiveActions && legalProductiveIndices.length
+                          ? legalProductiveIndices
+                          : aggressiveWaitComparison
+                            ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
+                            : scoredCandidates.map((_candidate, index) => index);
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
                     means[index] > means[bestIdx] ||
+                    (prioritizeV08STargetPressure &&
+                        !prioritizeV08SUrgency &&
+                        bestIdx === 0 &&
+                        index > 0 &&
+                        means[index] !== -Infinity &&
+                        means[index] === means[bestIdx]) ||
                     (aggressiveWaitComparison &&
                         bestIdx === 0 &&
                         index > 0 &&
@@ -1154,6 +1242,8 @@ export class SearchDriver {
                 (prioritizeProductiveActions &&
                     isProductiveCandidate(scoredCandidates[bestIdx]) &&
                     !isProductiveCandidate(scoredCandidates[0])) ||
+                (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
+                (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
                 (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
                 (aggressiveWaitComparison &&
                     isProductiveCandidate(scoredCandidates[bestIdx]) &&
@@ -1271,27 +1361,51 @@ export class SearchDriver {
         candidates: readonly IEnumeratedCandidate[],
         seedBase: number,
         prioritizeDominantFinish = false,
+        prioritizeV08STargetPressure = false,
+        prioritizeV08SUrgency = false,
     ): IEnumeratedCandidate | undefined {
         const productiveCandidates = candidates.filter(isProductiveCandidate);
         const directCombatCandidates = productiveCandidates.filter(isDirectCombatCandidate);
-        const preferredFinishingAttack = selectV08DirectCombatCandidate(directCombatCandidates);
+        const forceTierDirectCombatCandidates = directCombatCandidates.filter(isPositiveDirectCombatCandidate);
+        const preferredV08STarget = selectV08STargetPressureCandidate(
+            unit,
+            this.deps.unitsHolder,
+            forceTierDirectCombatCandidates,
+            this.deps.fightProperties.getCurrentLap(),
+        );
+        const preferredFinishingAttack = selectV08DirectCombatCandidate(forceTierDirectCombatCandidates);
         const orderedDirectCombat = preferredFinishingAttack
             ? [
                   preferredFinishingAttack,
-                  ...directCombatCandidates.filter((candidate) => candidate !== preferredFinishingAttack),
+                  ...forceTierDirectCombatCandidates.filter((candidate) => candidate !== preferredFinishingAttack),
               ]
-            : directCombatCandidates;
-        const orderedCandidates = prioritizeDominantFinish
+            : forceTierDirectCombatCandidates;
+        const orderedV08SDirectCombat = preferredV08STarget
             ? [
-                  ...orderedDirectCombat,
-                  ...productiveCandidates.filter(
-                      (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
-                  ),
-                  ...productiveCandidates.filter(
-                      (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
-                  ),
+                  preferredV08STarget,
+                  ...forceTierDirectCombatCandidates.filter((candidate) => candidate !== preferredV08STarget),
               ]
-            : productiveCandidates;
+            : forceTierDirectCombatCandidates;
+        const orderedCandidates = prioritizeV08STargetPressure
+            ? prioritizeV08SUrgency
+                ? [
+                      ...orderedV08SDirectCombat,
+                      ...productiveCandidates.filter(
+                          (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
+                      ),
+                  ]
+                : orderedV08SDirectCombat
+            : prioritizeDominantFinish
+              ? [
+                    ...orderedDirectCombat,
+                    ...productiveCandidates.filter(
+                        (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
+                    ),
+                    ...productiveCandidates.filter(
+                        (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
+                    ),
+                ]
+              : productiveCandidates;
         for (const candidate of orderedCandidates) {
             const strictCandidate: ISearchCandidate =
                 candidate.kind === "incumbent"
@@ -1313,6 +1427,8 @@ export class SearchDriver {
         deadlineAt: number | null,
         prioritizeProductiveActions = false,
         prioritizeDominantFinish = false,
+        prioritizeV08STargetPressure = false,
+        prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
         if (this.shortlist === null || candidates.length <= this.shortlist) {
             return candidates;
@@ -1324,8 +1440,24 @@ export class SearchDriver {
             .filter(({ score }) => score !== -Infinity)
             .sort((left, right) => right.score - left.score || left.index - right.index);
         const directCombat = prioritizeDominantFinish
-            ? rankedChallengers.filter(({ index }) => isDirectCombatCandidate(candidates[index]))
+            ? rankedChallengers.filter(({ index }) => isPositiveDirectCombatCandidate(candidates[index]))
             : [];
+        const v08sDirectCombat = prioritizeV08STargetPressure
+            ? rankedChallengers.filter(({ index }) => isPositiveDirectCombatCandidate(candidates[index]))
+            : [];
+        const preferredV08STarget = selectV08STargetPressureCandidate(
+            unit,
+            this.deps.unitsHolder,
+            v08sDirectCombat.map(({ index }) => candidates[index]),
+            this.deps.fightProperties.getCurrentLap(),
+        );
+        if (preferredV08STarget) {
+            v08sDirectCombat.sort((left, right) => {
+                const leftPreferred = candidates[left.index] === preferredV08STarget;
+                const rightPreferred = candidates[right.index] === preferredV08STarget;
+                return leftPreferred === rightPreferred ? 0 : leftPreferred ? -1 : 1;
+            });
+        }
         const preferredFinishingAttack = selectV08DirectCombatCandidate(
             directCombat.map(({ index }) => candidates[index]),
         );
@@ -1339,17 +1471,33 @@ export class SearchDriver {
         const advances = prioritizeDominantFinish
             ? rankedChallengers.filter(({ index }) => isPureMoveCandidate(candidates[index]))
             : [];
+        const v08sAdvances = prioritizeV08SUrgency
+            ? rankedChallengers.filter(({ index }) => isPureMoveCandidate(candidates[index]))
+            : [];
         const productive =
             prioritizeProductiveActions || prioritizeDominantFinish
                 ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
                 : [];
-        const ordered = directCombat.length
-            ? [...directCombat, ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index]))]
-            : advances.length
-              ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
-              : productive.length
-                ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
-                : rankedChallengers;
+        const ordered = v08sDirectCombat.length
+            ? [
+                  ...v08sDirectCombat,
+                  ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+              ]
+            : v08sAdvances.length
+              ? [...v08sAdvances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
+              : directCombat.length
+                ? [
+                      ...directCombat,
+                      ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+                  ]
+                : advances.length
+                  ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
+                  : productive.length
+                    ? [
+                          ...productive,
+                          ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index])),
+                      ]
+                    : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
         return [candidates[0], ...challengers];
     }

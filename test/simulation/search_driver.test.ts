@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumeratedCandidate } from "../../src/ai";
 import { isV08StrongerRangedPostureWait } from "../../src/ai/versions/v0_8";
 import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
+import { V08S_URGENT_FINISH_START_LAP, V08_TARGET_PRESSURE_START_LAP } from "../../src/ai/versions/v0_8s_finish";
 import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -609,7 +610,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             },
             { kind: "spell", actions: [{ type: "cast_spell", casterId: id, spellName: "support" }] },
             { kind: "move", actions: [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }] },
-            { kind: "melee", actions: attack },
+            { kind: "melee", actions: attack, features: { expectedDamage: 10, expectedKill: 0 } },
         ] as unknown as IEnumeratedCandidate[];
         const calls: Array<{ mode: string; kinds: string[] }> = [];
         const driver = harness.makeDriver() as unknown as {
@@ -698,6 +699,214 @@ describe("search driver — gating, hygiene, determinism", () => {
         ]);
     });
 
+    it("arms universal balanced-fight urgency only for v0.8s at lap 9", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8,v0.7", SEARCH_INCLUDE_MOVES: "1" });
+        const harness = buildBattle(922, "v0.8s");
+        const unit = harness.activeUnit()!;
+        while (harness.fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP) {
+            harness.fightProperties.flipLap();
+        }
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const flags: Array<{ targetPressure: boolean; urgent: boolean }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+                aggressiveWaitComparison?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ): GameAction[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.search = (
+            _unit,
+            _candidates,
+            current,
+            _seed,
+            _t0,
+            _productive,
+            _fallback,
+            _dominant,
+            _aggressive,
+            targetPressure = false,
+            urgent = false,
+        ) => {
+            flags.push({ targetPressure, urgent });
+            return current;
+        };
+
+        expect(driver.chooseDecision(unit, "v0.8s", incumbent)).toBe(incumbent);
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        expect(driver.chooseDecision(unit, "v0.7", incumbent)).toBe(incumbent);
+        expect(flags).toEqual([
+            { targetPressure: true, urgent: true },
+            { targetPressure: false, urgent: false },
+            { targetPressure: false, urgent: false },
+        ]);
+    });
+
+    it("keeps searched v0.8s candidate enumeration identical to v0.8 before target pressure starts", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s,v0.8",
+            SEARCH_MAX_MELEE: "1",
+            SEARCH_MAX_SHOTS: "1",
+            SEARCH_MAX_THROWS: "1",
+        });
+        const capture = (version: "v0.8s" | "v0.8"): IEnumeratedCandidate[] => {
+            const harness = buildBattle(203, version);
+            expect(harness.fightProperties.getCurrentLap()).toBeLessThan(V08_TARGET_PRESSURE_START_LAP);
+            const unit = harness.unitsHolder
+                .getAllAllies(GREEN_TEAM)
+                .find((candidate) => !candidate.isDead() && candidate.isRangeCapable())!;
+            expect(unit).toBeDefined();
+            unit.refreshPossibleAttackTypes(true);
+            harness.setActiveUnitId(unit.getId());
+            const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+            let captured: IEnumeratedCandidate[] | undefined;
+            const driver = harness.makeDriver() as unknown as {
+                search(
+                    unit: Unit,
+                    candidates: IEnumeratedCandidate[],
+                    incumbent: GameAction[],
+                    seed: number,
+                    t0: number,
+                ): GameAction[];
+                chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+            };
+            driver.search = (_unit, candidates, current) => {
+                captured = candidates;
+                return current;
+            };
+
+            expect(driver.chooseDecision(unit, version, incumbent)).toBe(incumbent);
+            expect(captured).toBeDefined();
+            expect(captured!.filter(({ kind }) => kind === "shot")).toHaveLength(1);
+            return captured!;
+        };
+
+        expect(capture("v0.8s")).toEqual(capture("v0.8"));
+    });
+
+    it("keeps the preferred v0.8s target shortlisted but requires a non-worse rollout before lap 9", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+        });
+        const harness = buildBattle(923, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const enemies = harness.unitsHolder
+            .getAllAllies(unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM)
+            .filter((enemy) => !enemy.isDead())
+            .sort((left, right) => left.getCumulativeHp() - right.getCumulativeHp());
+        const easy = enemies[0];
+        const hard = enemies[enemies.length - 1];
+        const attack = (target: Unit): GameAction[] => [
+            { type: "range_attack", attackerId: unit.getId(), targetId: target.getId() },
+        ];
+        const features = (damage: number) => ({
+            moraleDelta: 0,
+            luckDelta: 0,
+            enemiesNotYetActedFrac: 0,
+            alliesNotYetActedFrac: 0,
+            lap: 6,
+            hourglassSpent: 0 as const,
+            spendsRangeShot: 1 as const,
+            spendsSpellCharge: 0 as const,
+            burnsResurrectionCharge: 0 as const,
+            expectedDamage: damage,
+            expectedKill: 0 as const,
+        });
+        const incumbent = attack(easy);
+        const hardAttack = attack(hard);
+        const candidates: IEnumeratedCandidate[] = [
+            {
+                kind: "incumbent",
+                actions: incumbent,
+                targetId: easy.getId(),
+                features: features(Math.max(1, easy.getCumulativeHp())),
+                shotFeatures: { primaryTargetDamage: Math.max(1, easy.getCumulativeHp()) } as never,
+            },
+            {
+                kind: "spell",
+                actions: [{ type: "cast_spell", casterId: unit.getId(), spellName: "support" }],
+                features: features(0),
+            },
+            {
+                kind: "shot",
+                actions: hardAttack,
+                targetId: hard.getId(),
+                features: features(1),
+                shotFeatures: { primaryTargetDamage: 1 } as never,
+            },
+        ];
+        const calls: Array<{ mode: string; kinds: string[] }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ): number[];
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+                aggressiveWaitComparison?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ): GameAction[];
+            firstEngineValidProductiveCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                prioritizeDominantFinish?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ): IEnumeratedCandidate | undefined;
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push({ mode, kinds: scored.map(({ kind }) => kind) });
+            return scored.map(({ kind }) => (kind === "spell" ? 0.99 : kind === "incumbent" ? 0.9 : 0.01));
+        };
+
+        expect(
+            driver.search(unit, candidates, incumbent, 123, performance.now(), false, undefined, false, false, true),
+        ).toBe(incumbent);
+        expect(calls).toEqual([
+            { mode: "leaf", kinds: ["incumbent", "spell", "shot"] },
+            { mode: "turns", kinds: ["incumbent", "shot"] },
+        ]);
+
+        calls.length = 0;
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push({ mode, kinds: scored.map(({ kind }) => kind) });
+            return scored.map(({ kind }) => (kind === "spell" ? 0.99 : 0.5));
+        };
+        expect(
+            driver.search(unit, candidates, incumbent, 123, performance.now(), false, undefined, false, false, true),
+        ).toBe(hardAttack);
+
+        calls.length = 0;
+        expect(driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true)).toBe(
+            candidates[2],
+        );
+        expect(calls[0]).toEqual({ mode: "leaf", kinds: ["shot"] });
+    });
+
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.7", SEARCH_INCLUDE_MOVES: "1" });
         const harness = buildBattle(93, "v0.8s");
@@ -749,6 +958,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const attack = {
             kind: "shot",
             actions: [{ type: "range_attack", attackerId: id, targetId: "enemy" }],
+            features: { expectedDamage: 10, expectedKill: 0 },
         } as unknown as IEnumeratedCandidate;
         const driver = harness.makeDriver() as unknown as {
             scoreCandidates: (
@@ -822,6 +1032,48 @@ describe("search driver — gating, hygiene, determinism", () => {
         };
 
         expect(driver.firstEngineValidProductiveCandidate(unit, [moveThenMine, move], 123)).toBe(move);
+        expect(probed).toEqual(["move"]);
+    });
+
+    it("skips net-zero or harmful direct attacks in urgent deadline and circuit fallbacks", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const harness = buildBattle(951, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const enemy = harness.unitsHolder
+            .getAllAllies(unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM)
+            .find((candidate) => !candidate.isDead())!;
+        const harmful = {
+            kind: "shot",
+            actions: [{ type: "range_attack", attackerId: unit.getId(), targetId: enemy.getId() }],
+            features: { expectedDamage: -10, expectedKill: 1 },
+        } as unknown as IEnumeratedCandidate;
+        const move = {
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: unit.getId(), path: [{ x: 4, y: 4 }] }],
+        } as unknown as IEnumeratedCandidate;
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            firstEngineValidProductiveCandidate: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                prioritizeDominantFinish?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ) => IEnumeratedCandidate | undefined;
+        };
+        const probed: string[] = [];
+        driver.scoreCandidates = (_unit, [candidate]) => {
+            probed.push(candidate.kind);
+            return [0.5];
+        };
+
+        expect(driver.firstEngineValidProductiveCandidate(unit, [harmful, move], 123, false, true, true)).toBe(move);
         expect(probed).toEqual(["move"]);
     });
 
@@ -1230,6 +1482,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
         const tied = buildStrongPosture();
         const tiedDriver = tied.harness.makeDriver() as unknown as {
+            counters: { strongerRangedPostureWaits: number };
             scoreCandidates(
                 unit: Unit,
                 candidates: readonly IEnumeratedCandidate[],
@@ -1240,6 +1493,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         };
         tiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
         expect(tiedDriver.chooseDecision(tied.unit, "v0.8s", tied.wait)).toBe(tied.wait);
+        expect(tiedDriver.counters.strongerRangedPostureWaits).toBe(1);
 
         const better = buildStrongPosture();
         const betterDriver = better.harness.makeDriver() as unknown as {

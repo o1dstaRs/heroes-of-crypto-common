@@ -146,6 +146,10 @@ export interface IEnumeratedCandidate {
     actions: GameAction[];
     /** Primary target unit id (attacks, targeted spells). */
     targetId?: string;
+    /** Enemy stack used by v0.8s target-pressure scheduling when engine interception makes targetId an ally. */
+    pressureTargetId?: string;
+    /** Experiment-only kill estimate for pressureTargetId when it differs from the engine-primary targetId. */
+    pressureExpectedKill?: 0 | 1;
     /** Spell name for kind === "spell". */
     spellName?: string;
     /** Move destination / area-throw aim cell / summon cell (base cell for large units). */
@@ -160,12 +164,24 @@ export interface IEnumeratedCandidate {
 export interface IEnumerateOptions {
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
+    /**
+     * Opt-in capped-move diversity for ranged-posture search. When both classes exist, retain the nearest
+     * closing move and the least-retreating non-closing move; a cap of one expands to two so neither posture is
+     * erased. Default false so historical capped consumers, including v0.7 search, keep their exact ordering.
+     */
+    preserveMovePostureDiversity?: boolean;
     /** Cap on melee (target x stand-cell) pairs, kept by expected damage (0/undefined = all). */
     maxMeleePairs?: number;
     /** Cap on ranged aims, kept by expected damage (0/undefined = all distinct hit sets). */
     maxShotAims?: number;
     /** Cap on area-throw target cells, kept by expected damage (0/undefined = all relevant). */
     maxAreaThrowCells?: number;
+    /**
+     * Experimental late-finish coverage: when an attack-class cap is active, retain its best delivery to every
+     * distinct primary target before filling the remaining budget. The effective budget expands to at least the
+     * number of targets. Default false so every existing strategy/search arm keeps byte-identical enumeration.
+     */
+    preserveAttackTargetCoverage?: boolean;
     /** Opt in to deterministic BLOCK_CENTER melee-mining challengers (v0.8 search only). */
     includeMountainAttacks?: boolean;
     /**
@@ -174,6 +190,64 @@ export interface IEnumerateOptions {
      * actions, ordering, deduplication, caps, and live scoring are unchanged.
      */
     enrichIncumbentMetadata?: boolean;
+}
+
+interface IAttackCapView<T> {
+    readonly value: T;
+    readonly index: number;
+    readonly targetId: string;
+    readonly expectedDamage: number;
+    readonly expectedKill: 0 | 1;
+    readonly stationary: boolean;
+}
+
+/**
+ * Apply an opt-in attack cap without erasing a target from the candidate set. Per-target delivery is ordered by
+ * kill, expected damage, stationary-over-move, then stable source order. Remaining slots use the same order.
+ */
+function capAttackCandidates<T>(
+    values: readonly T[],
+    cap: number,
+    preserveTargetCoverage: boolean,
+    view: (value: T, index: number) => Omit<IAttackCapView<T>, "value" | "index">,
+): T[] {
+    if (cap <= 0 || values.length <= cap) {
+        return values as T[];
+    }
+    if (!preserveTargetCoverage) {
+        return [...values]
+            .map((value, index) => ({ value, index, ...view(value, index) }))
+            .sort((left, right) => right.expectedDamage - left.expectedDamage || left.index - right.index)
+            .slice(0, cap)
+            .map(({ value }) => value);
+    }
+
+    const annotated: IAttackCapView<T>[] = values.map((value, index) => ({ value, index, ...view(value, index) }));
+    const precedes = (left: IAttackCapView<T>, right: IAttackCapView<T>): boolean =>
+        left.expectedKill > right.expectedKill ||
+        (left.expectedKill === right.expectedKill &&
+            (left.expectedDamage > right.expectedDamage ||
+                (left.expectedDamage === right.expectedDamage &&
+                    ((left.stationary && !right.stationary) ||
+                        (left.stationary === right.stationary && left.index < right.index)))));
+    const bestByTarget = new Map<string, IAttackCapView<T>>();
+    for (const candidate of annotated) {
+        const best = bestByTarget.get(candidate.targetId);
+        if (!best || precedes(candidate, best)) {
+            bestByTarget.set(candidate.targetId, candidate);
+        }
+    }
+
+    const coverage = [...bestByTarget.values()];
+    const coverageIndices = new Set(coverage.map(({ index }) => index));
+    const fill = annotated
+        .filter(({ index }) => !coverageIndices.has(index))
+        .sort((left, right) => {
+            if (precedes(left, right)) return -1;
+            if (precedes(right, left)) return 1;
+            return 0;
+        });
+    return [...coverage, ...fill].slice(0, Math.max(cap, bestByTarget.size)).map(({ value }) => value);
 }
 
 export interface ICandidateSet {
@@ -398,6 +472,8 @@ class CandidateGenerator {
             return;
         }
         incumbent.targetId = cand.targetId;
+        if (cand.pressureTargetId !== undefined) incumbent.pressureTargetId = cand.pressureTargetId;
+        if (cand.pressureExpectedKill !== undefined) incumbent.pressureExpectedKill = cand.pressureExpectedKill;
         incumbent.spellName = cand.spellName;
         incumbent.targetCell = cand.targetCell ? { ...cand.targetCell } : undefined;
         incumbent.standCell = cand.standCell ? { ...cand.standCell } : undefined;
@@ -517,8 +593,26 @@ class CandidateGenerator {
                           }),
                       )
                     : 0;
-            kept = [...routes].sort((a, b) => dist(a.cell) - dist(b.cell)).slice(0, cap);
-            this.truncated.push("move");
+            const ranked = routes
+                .map((route, index) => ({ route, index, distance: dist(route.cell) }))
+                .sort((a, b) => a.distance - b.distance || a.index - b.index);
+            if (this.options.preserveMovePostureDiversity === true) {
+                const currentDistance = dist(base);
+                const closing = ranked.find(({ distance }) => distance < currentDistance);
+                const nonClosing = ranked.find(({ distance }) => distance >= currentDistance);
+                if (closing && nonClosing) {
+                    const required = new Set([closing.index, nonClosing.index]);
+                    const budget = Math.max(cap, required.size);
+                    kept = [closing, nonClosing, ...ranked.filter(({ index }) => !required.has(index))]
+                        .slice(0, budget)
+                        .map(({ route }) => route);
+                } else {
+                    kept = ranked.slice(0, cap).map(({ route }) => route);
+                }
+            } else {
+                kept = ranked.slice(0, cap).map(({ route }) => route);
+            }
+            if (kept.length < routes.length) this.truncated.push("move");
         }
         const candidateOf = (route: IWeightedRoute): IEnumeratedCandidate => ({
             kind: "move",
@@ -616,8 +710,13 @@ class CandidateGenerator {
         const cap = this.options.maxMeleePairs ?? 0;
         let kept = pairs;
         if (cap > 0 && pairs.length > cap) {
-            kept = [...pairs].sort((a, b) => b.effective - a.effective).slice(0, cap);
-            this.truncated.push("melee");
+            kept = capAttackCandidates(pairs, cap, this.options.preserveAttackTargetCoverage === true, (pair) => ({
+                targetId: pair.target.getId(),
+                expectedDamage: pair.effective,
+                expectedKill: pair.kill,
+                stationary: pair.route === undefined,
+            }));
+            if (kept.length < pairs.length) this.truncated.push("melee");
         }
         const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
             const actions: GameAction[] = [...prefix];
@@ -1031,8 +1130,13 @@ class CandidateGenerator {
         const cap = this.options.maxShotAims ?? 0;
         let kept = found;
         if (cap > 0 && found.length > cap) {
-            kept = [...found].sort((a, b) => b.value - a.value).slice(0, cap);
-            this.truncated.push("shot");
+            kept = capAttackCandidates(found, cap, this.options.preserveAttackTargetCoverage === true, (shot) => ({
+                targetId: shot.targetId,
+                expectedDamage: shot.value,
+                expectedKill: shot.kill,
+                stationary: true,
+            }));
+            if (kept.length < found.length) this.truncated.push("shot");
         }
         const candidateOf = (s: IShot): IEnumeratedCandidate => ({
             kind: "shot",
@@ -1117,6 +1221,8 @@ class CandidateGenerator {
         interface IThrow {
             aim: XY;
             primaryTargetId: string;
+            pressureTargetId: string;
+            pressureKill: 0 | 1;
             value: number;
             kill: 0 | 1;
         }
@@ -1132,20 +1238,32 @@ class CandidateGenerator {
             if (!primaryTargetId || (forcedTargetId && forcedTargetId !== primaryTargetId)) {
                 continue; // AttackHandler enforces the same first-affected-unit forced-target check.
             }
+            // An interceptor can be allied even though the same legal splash deals positive net enemy damage.
+            // Keep engine-primary metadata intact while exposing the first affected enemy to v0.8s scheduling.
+            const pressureTargetId = affectedUnits
+                .flat()
+                .find((target) => target.getTeam() === this.enemyTeam)
+                ?.getId();
+            if (!pressureTargetId) continue;
             const divisor = attackHandler.getRangeAttackDivisor(this.unit, targetPosition);
-            const { value, kill } = this.shotDamage(
-                { affectedUnits, rangeAttackDivisors: affectedUnits.map(() => divisor) },
-                primaryTargetId,
-                shots,
-                true,
-            );
-            found.push({ aim, primaryTargetId, value, kill });
+            const evaluation = { affectedUnits, rangeAttackDivisors: affectedUnits.map(() => divisor) };
+            const { value, kill } = this.shotDamage(evaluation, primaryTargetId, shots, true);
+            const pressureKill =
+                this.options.preserveAttackTargetCoverage && pressureTargetId !== primaryTargetId
+                    ? this.shotDamage(evaluation, pressureTargetId, shots, true).kill
+                    : kill;
+            found.push({ aim, primaryTargetId, pressureTargetId, pressureKill, value, kill });
         }
         const cap = this.options.maxAreaThrowCells ?? 0;
         let kept = found;
         if (cap > 0 && found.length > cap) {
-            kept = [...found].sort((a, b) => b.value - a.value).slice(0, cap);
-            this.truncated.push("area_throw");
+            kept = capAttackCandidates(found, cap, this.options.preserveAttackTargetCoverage === true, (areaThrow) => ({
+                targetId: areaThrow.pressureTargetId,
+                expectedDamage: areaThrow.value,
+                expectedKill: this.options.preserveAttackTargetCoverage ? areaThrow.pressureKill : areaThrow.kill,
+                stationary: true,
+            }));
+            if (kept.length < found.length) this.truncated.push("area_throw");
         }
         const candidateOf = (t: IThrow): IEnumeratedCandidate => ({
             kind: "area_throw",
@@ -1158,6 +1276,9 @@ class CandidateGenerator {
                 },
             ],
             targetId: t.primaryTargetId,
+            ...(this.options.preserveAttackTargetCoverage
+                ? { pressureTargetId: t.pressureTargetId, pressureExpectedKill: t.pressureKill }
+                : {}),
             targetCell: { x: t.aim.x, y: t.aim.y },
             features: this.features({ spendsRangeShot: 1, expectedDamage: t.value, expectedKill: t.kill }),
         });

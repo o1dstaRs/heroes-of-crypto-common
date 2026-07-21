@@ -92,6 +92,10 @@ export function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): num
  */
 export class StrategyV0_2 extends StrategyV0_1 {
     public override readonly version: string = "v0.2";
+    /** Compatibility seam: historical versions retain the amount-blind proxy; newer versions may refine it. */
+    protected rangedOutput(team: number, unitsHolder: UnitsHolder): number {
+        return teamRangedFirepower(team, unitsHolder);
+    }
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         const placements = new Map<string, XY>();
         const occupied = new Set<number>();
@@ -216,8 +220,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             return undefined;
         }
         const enemies = unitsHolder.getAllEnemyUnits(team).filter((u) => !u.isDead() && !u.hasBuffActive("Hidden"));
-        const rangedSuperior =
-            teamRangedFirepower(team, unitsHolder) > teamRangedFirepower(otherTeam(team), unitsHolder);
+        const rangedSuperior = this.rangedOutput(team, unitsHolder) > this.rangedOutput(otherTeam(team), unitsHolder);
         // "Fighting soon": an enemy is within ~half the board, so a timed buff won't expire unused.
         const nearestEnemyDist = enemies.length
             ? Math.min(...enemies.map((e) => getDistance(unit.getBaseCell(), e.getBaseCell())))
@@ -640,7 +643,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         if (!enemyHasRange) {
             return false;
         }
-        if (teamRangedFirepower(fromTeam, unitsHolder) <= teamRangedFirepower(enemyTeam, unitsHolder)) {
+        if (this.rangedOutput(fromTeam, unitsHolder) <= this.rangedOutput(enemyTeam, unitsHolder)) {
             return false;
         }
         // Respect the engine's hourglass rules so the proposal is never rejected (which would waste the turn).

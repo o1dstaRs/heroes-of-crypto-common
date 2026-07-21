@@ -18,6 +18,7 @@ import {
     getEnemiesCellsWithinMovementRange,
     type IEnumeratedCandidate,
 } from "../../src/ai/candidates";
+import { selectV08STargetPressureCandidate } from "../../src/ai/versions/v0_8s_finish";
 import { getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { EffectFactory } from "../../src/effects/effect_factory";
@@ -142,6 +143,27 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }
     });
 
+    it("opt-in attack caps retain the best delivery to every distinct target", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Scheduler", attackType: MELEE, amountAlive: 5 });
+        const first = createTestUnit({ team: UPPER, name: "First blocker", attackType: MELEE, amountAlive: 3 });
+        const second = createTestUnit({ team: UPPER, name: "Second blocker", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, first, { x: 5, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, second, { x: 6, y: 5 });
+
+        const defaultCapped = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMeleePairs: 1 });
+        const covered = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
+            maxMeleePairs: 1,
+            preserveAttackTargetCoverage: true,
+        });
+
+        expect(new Set(ofKind(defaultCapped.candidates, "melee").map(({ targetId }) => targetId)).size).toBe(1);
+        expect(new Set(ofKind(covered.candidates, "melee").map(({ targetId }) => targetId))).toEqual(
+            new Set([first.getId(), second.getId()]),
+        );
+    });
+
     it("melee: emits move-and-strike (move_unit + stationary melee_attack) pairs across stand cells", () => {
         const c = createCombatTestContext();
         // Unengaged unit (aggro pathing constrains movement once adjacent to an enemy — that legality
@@ -195,6 +217,54 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         for (const m of cappedMoves) {
             expect(m.targetCell!.y).toBeGreaterThan(8);
         }
+    });
+
+    it("opt-in capped moves retain one closing and one non-closing posture without changing the default", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, speed: 4 });
+        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
+        const distance = (cell: XY): number =>
+            Math.abs(cell.x - enemy.getBaseCell().x) + Math.abs(cell.y - enemy.getBaseCell().y);
+        const currentDistance = distance(unit.getBaseCell());
+
+        const historical = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMoveDestinations: 1 });
+        const historicalMoves = ofKind(historical.candidates, "move");
+        expect(historicalMoves).toHaveLength(1);
+        expect(distance(historicalMoves[0].targetCell!)).toBeLessThan(currentDistance);
+
+        const diversified = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
+            maxMoveDestinations: 1,
+            preserveMovePostureDiversity: true,
+        });
+        const diversifiedMoves = ofKind(diversified.candidates, "move");
+        expect(diversifiedMoves).toHaveLength(2);
+        expect(diversifiedMoves.some(({ targetCell }) => distance(targetCell!) < currentDistance)).toBe(true);
+        expect(diversifiedMoves.some(({ targetCell }) => distance(targetCell!) >= currentDistance)).toBe(true);
+        expect(diversified.truncated).toContain("move");
+
+        const full = ofKind(enumerateCandidates(unit, ctxFor(c), endTurn(unit)).candidates, "move");
+        const optInUncapped = ofKind(
+            enumerateCandidates(unit, ctxFor(c), endTurn(unit), { preserveMovePostureDiversity: true }).candidates,
+            "move",
+        );
+        expect(optInUncapped.map(({ targetCell }) => targetCell)).toEqual(full.map(({ targetCell }) => targetCell));
+    });
+
+    it("does not expand an opt-in move cap when every reachable destination is closing", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Corner runner", attackType: MELEE, speed: 2 });
+        const enemy = createTestUnit({ team: UPPER, name: "Far enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 0, y: 0 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 14, y: 14 });
+
+        const diversified = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
+            maxMoveDestinations: 1,
+            preserveMovePostureDiversity: true,
+        });
+        expect(ofKind(diversified.candidates, "move")).toHaveLength(1);
+        expect(diversified.truncated).toContain("move");
     });
 
     it("defend is always offered; wait (hourglass) only when the engine would accept it", () => {
@@ -252,6 +322,34 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(shot.aimCell).toBeDefined();
             expect(shot.aimSide).toBeDefined();
         }
+    });
+
+    it("opt-in shot caps expand to cover every primary target", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Coverage archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+        });
+        const first = createTestUnit({ team: UPPER, name: "First shot target", attackType: MELEE });
+        const second = createTestUnit({ team: UPPER, name: "Second shot target", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, first, { x: 10, y: 10 });
+        placeUnit(c.grid, c.unitsHolder, second, { x: 12, y: 10 });
+
+        const defaultCapped = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter), { maxShotAims: 1 });
+        const covered = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter), {
+            maxShotAims: 1,
+            preserveAttackTargetCoverage: true,
+        });
+
+        expect(new Set(ofKind(defaultCapped.candidates, "shot").map(({ targetId }) => targetId)).size).toBe(1);
+        expect(new Set(ofKind(covered.candidates, "shot").map(({ targetId }) => targetId))).toEqual(
+            new Set([first.getId(), second.getId()]),
+        );
     });
 
     it("shots: an exact incumbent duplicate is enriched in place and omitted from challengers", () => {
@@ -337,6 +435,42 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(anchor.features.expectedDamage).toBe(splash!.features.expectedDamage);
     });
 
+    it("v0.8s target pressure rejects a net-negative splash even when it kills the primary target", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const ally = createTestUnit({
+            team: LOWER,
+            name: "Large ally",
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 100,
+        });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "Tiny target",
+            attackType: MELEE,
+            amountAlive: 1,
+            maxHp: 1,
+        });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 10 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 10, y: 9 });
+
+        const shots = ofKind(
+            enumerateCandidates(garg, ctxFor(c), endTurn(garg), { preserveAttackTargetCoverage: true }).candidates,
+            "shot",
+        );
+        const harmful = shots.find(
+            (candidate) =>
+                candidate.targetId === target.getId() &&
+                candidate.features.expectedDamage < 0 &&
+                (candidate.shotFeatures?.primaryTargetDamage ?? 0) > 0,
+        );
+        expect(harmful).toBeDefined();
+        expect(harmful!.features.expectedKill).toBe(1);
+        expect(selectV08STargetPressureCandidate(garg, c.unitsHolder, [harmful!])).toBeUndefined();
+    });
+
     it("shots: a pinned shooter (adjacent enemy) gets NO shot candidates (engine would reject)", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({ team: LOWER, name: "Pinned", attackType: RANGE, rangeShots: 5 });
@@ -360,11 +494,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const { candidates } = enumerateCandidates(garg, ctxFor(c), endTurn(garg));
         const throws = ofKind(candidates, "area_throw");
         expect(throws.length).toBeGreaterThan(0);
+        expect(throws.every((candidate) => !("pressureTargetId" in candidate))).toBe(true);
+        expect(throws.every((candidate) => !("pressureExpectedKill" in candidate))).toBe(true);
         for (const t of throws) {
             // Engine legality: in-grid and not unit-occupied.
             const occupant = c.grid.getOccupantUnitId(t.targetCell!);
             expect(!occupant || occupant === "L" || occupant === "W").toBe(true);
             expect(t.features.spendsRangeShot).toBe(1);
+            expect(t.pressureTargetId).toBeUndefined();
         }
         // The cluster cell must be among the aims, and its splash (both enemies) out-damages
         // any single-enemy splash.
@@ -398,6 +535,43 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const throws = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "area_throw");
         expect(throws.length).toBeGreaterThan(0);
         expect(throws.every((candidate) => candidate.targetId === forced.getId())).toBe(true);
+    });
+
+    it("v0.8s target pressure schedules a positive Area Throw whose engine-primary hit is allied", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const enemyA = createTestUnit({
+            team: UPPER,
+            name: "Enemy A",
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 1,
+        });
+        const enemyB = createTestUnit({
+            team: UPPER,
+            name: "Enemy B",
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 1,
+        });
+        const ally = createTestUnit({ team: LOWER, name: "Interceptor", attackType: MELEE, amountAlive: 1, maxHp: 1 });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemyA, { x: 10, y: 9 });
+        placeUnit(c.grid, c.unitsHolder, enemyB, { x: 10, y: 11 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 8, y: 8 });
+
+        const throws = ofKind(
+            enumerateCandidates(garg, ctxFor(c), endTurn(garg), { preserveAttackTargetCoverage: true }).candidates,
+            "area_throw",
+        );
+        const friendlyPrimary = throws.find(
+            (candidate) => candidate.targetId === ally.getId() && candidate.features.expectedDamage > 0,
+        );
+        expect(friendlyPrimary).toBeDefined();
+        expect([enemyA.getId(), enemyB.getId()]).toContain(friendlyPrimary!.pressureTargetId!);
+        expect(friendlyPrimary!.features.expectedKill).toBe(0);
+        expect(friendlyPrimary!.pressureExpectedKill).toBe(1);
+        expect(selectV08STargetPressureCandidate(garg, c.unitsHolder, [friendlyPrimary!])).toBe(friendlyPrimary);
     });
 
     it("area_throw: hit probability prevents a Dodge/Small Specie cluster from outranking a clean shot", () => {
