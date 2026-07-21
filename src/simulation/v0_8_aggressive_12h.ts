@@ -56,17 +56,18 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-const SCHEMA = "hoc.v0_8_aggressive_campaign.v3" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v4" as const;
+const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
 const LEVEL4_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_l4_coverage.ts");
 const LIVE_MAPS = "normal,lava,block";
-// At screen/validation sizes this effectively requires zero Armageddon-decided games; pooled long-run
+// At screen/validation sizes this effectively requires zero Armageddon-reached games; pooled long-run
 // promotion evidence may tolerate at most one per thousand.
 const ARMAGEDDON_RATE_GATE = 0.001;
-const ARMAGEDDON_SCORE_PENALTY = 2;
 const BASE_CANDIDATE_COUNT = 48;
-const ADAPTIVE_GENERATOR_VERSION = 1;
+export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 2;
+const ADAPTIVE_GENERATOR_VERSION = V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION;
 const ADAPTIVE_PARENT_COUNT = 4;
 const ADAPTIVE_CHILD_TARGET = 24;
 // Children reuse the base screen's common-random panel so ranking does not confound candidate and seed.
@@ -76,6 +77,19 @@ const ADAPTIVE_GATE_STEP = 0.005;
 const ADAPTIVE_LEAF_BLEND_ALPHAS = [0.15, 0.25] as const;
 const LEVEL4_RESERVE_MULTIPLIER = 3;
 export const V08_CAMPAIGN_DEFAULT_LANES = 3;
+export const V08_CAMPAIGN_RESEARCH_RANKING = "decisive-win-rate_then_non-loss-armageddon-rate" as const;
+
+export interface IV08CampaignPromotionStrengthRequirement {
+    /** Head-to-head decisive rate produced by the incumbent against itself (parity is 0.5). */
+    incumbentDecisiveWinRate: number;
+    /** Required improvement over incumbent parity. Zero is the conservative non-regression default. */
+    minimumCandidateDelta: number;
+}
+
+export const V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH = Object.freeze({
+    incumbentDecisiveWinRate: 0.5,
+    minimumCandidateDelta: 0,
+} satisfies IV08CampaignPromotionStrengthRequirement);
 
 interface ICli {
     output: string;
@@ -111,7 +125,8 @@ interface IManifest {
     config: Omit<ICli, "output">;
     liveMaps: typeof LIVE_MAPS;
     armageddonRateGate: typeof ARMAGEDDON_RATE_GATE;
-    armageddonScorePenalty: typeof ARMAGEDDON_SCORE_PENALTY;
+    researchRanking: typeof V08_CAMPAIGN_RESEARCH_RANKING;
+    promotionStrength: typeof V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH;
     adaptive: {
         generatorVersion: typeof ADAPTIVE_GENERATOR_VERSION;
         parentCount: typeof ADAPTIVE_PARENT_COUNT;
@@ -250,8 +265,16 @@ const ADMISSION_MIN_DURATION_SAMPLES = 3;
 const ADMISSION_FALLBACK_CPU_MS_PER_GAME = 2_000;
 const ADMISSION_SAFETY_MARGIN_MS = 30_000;
 
+export interface IV08CampaignArmageddonOutcomeBuckets {
+    total: number;
+    candidateWins: number;
+    draws: number;
+    candidateLosses: number;
+}
+
 interface ITournamentSummaryWithReached extends ITournamentSummary {
     armageddonReached: number;
+    armageddonReachedByOutcome: IV08CampaignArmageddonOutcomeBuckets;
 }
 
 interface IRankedCandidate {
@@ -272,13 +295,18 @@ interface IRankedCandidate {
     armageddonReached: number;
     armageddonDecided: number;
     armageddonRate: number;
+    nonLossArmageddonReached: number;
+    nonLossArmageddonRate: number;
+    armageddonReachedCandidateWins: number;
+    armageddonReachedDraws: number;
+    armageddonReachedCandidateLosses: number;
     level4Games: number;
     level4ArmageddonReached: number;
     level4ArmageddonRate: number;
     level4CoveragePassed: boolean;
     passesArmageddonGate: boolean;
+    passesStrengthGate: boolean;
     promotionEligible: boolean;
-    score: number;
     level4SummaryPaths: string[];
 }
 
@@ -551,14 +579,40 @@ function tournamentJsonl(directory: string): string {
     return files[0];
 }
 
-function countArmageddonReached(path: string): number {
-    let reached = 0;
-    for (const line of readFileSync(path, "utf8").split("\n")) {
-        if (!line) continue;
-        const record = JSON.parse(line) as { result?: { attrition?: { reachedArmageddon?: unknown } } };
-        reached += Number(record.result?.attrition?.reachedArmageddon === true);
+/**
+ * Attribute every Armageddon-reached tournament record to the candidate's final outcome.
+ *
+ * Research ranking deliberately ignores candidate-loss Armageddons: preferring an earlier loss would make the
+ * AI weaker. The absolute total remains available for the shipping gate.
+ */
+export function summarizeV08CampaignArmageddonJsonl(contents: string): IV08CampaignArmageddonOutcomeBuckets {
+    const buckets: IV08CampaignArmageddonOutcomeBuckets = {
+        total: 0,
+        candidateWins: 0,
+        draws: 0,
+        candidateLosses: 0,
+    };
+    for (const line of contents.split("\n")) {
+        if (!line.trim()) continue;
+        const record = JSON.parse(line) as {
+            winnerVersion?: unknown;
+            result?: { attrition?: { reachedArmageddon?: unknown } };
+        };
+        if (record.result?.attrition?.reachedArmageddon !== true) continue;
+        buckets.total += 1;
+        if (record.winnerVersion === "v0.8s") buckets.candidateWins += 1;
+        else if (record.winnerVersion === "draw") buckets.draws += 1;
+        else if (record.winnerVersion === "v0.7") buckets.candidateLosses += 1;
+        else throw new Error("Armageddon-reached tournament record has an unknown winnerVersion");
     }
-    return reached;
+    return buckets;
+}
+
+function armageddonEvidence(
+    path: string,
+): Pick<ITournamentSummaryWithReached, "armageddonReached" | "armageddonReachedByOutcome"> {
+    const armageddonReachedByOutcome = summarizeV08CampaignArmageddonJsonl(readFileSync(path, "utf8"));
+    return { armageddonReached: armageddonReachedByOutcome.total, armageddonReachedByOutcome };
 }
 
 interface IAdaptiveProposal {
@@ -778,13 +832,36 @@ function candidateMetadata(manifest: IManifest, adaptive: IAdaptiveCatalog | nul
     return registry;
 }
 
+export interface IV08CampaignResearchCandidate {
+    candidateId: string;
+    candidateIndex: number;
+    decisiveWinRate: number;
+    nonLossArmageddonRate: number;
+}
+
+/** Wins are lexicographically primary; Armageddon can only break an equal-outcome tie. */
+export function compareV08CampaignResearchCandidates(
+    left: IV08CampaignResearchCandidate,
+    right: IV08CampaignResearchCandidate,
+): number {
+    return (
+        right.decisiveWinRate - left.decisiveWinRate ||
+        left.nonLossArmageddonRate - right.nonLossArmageddonRate ||
+        left.candidateIndex - right.candidateIndex ||
+        left.candidateId.localeCompare(right.candidateId)
+    );
+}
+
+export function rankV08CampaignResearchCandidates<T extends IV08CampaignResearchCandidate>(rows: readonly T[]): T[] {
+    return [...rows].sort(compareV08CampaignResearchCandidates);
+}
+
 export function selectValidationCandidateIds(
-    rows: readonly Pick<IRankedCandidate, "candidateId" | "level4CoveragePassed">[],
+    rows: readonly (IV08CampaignResearchCandidate & Pick<IRankedCandidate, "level4CoveragePassed">)[],
     count: number,
 ): string[] {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error("validation candidate count must be positive");
-    return rows
-        .filter((row) => row.level4CoveragePassed)
+    return rankV08CampaignResearchCandidates(rows.filter((row) => row.level4CoveragePassed))
         .slice(0, count)
         .map((row) => row.candidateId);
 }
@@ -793,16 +870,42 @@ export interface IV08CampaignPromotionEvidence {
     unboundedSearch: boolean;
     hasValidationEvidence: boolean;
     level4CoveragePassed: boolean;
+    decisiveWinRate: number;
     armageddonRate: number;
     level4ArmageddonRate: number;
 }
 
+export function isV08CampaignPromotionStrengthQualified(
+    decisiveWinRate: number,
+    requirement: IV08CampaignPromotionStrengthRequirement = V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+): boolean {
+    if (
+        !Number.isFinite(requirement.incumbentDecisiveWinRate) ||
+        requirement.incumbentDecisiveWinRate < 0 ||
+        requirement.incumbentDecisiveWinRate > 1 ||
+        !Number.isFinite(requirement.minimumCandidateDelta) ||
+        requirement.minimumCandidateDelta < 0
+    ) {
+        throw new Error("Invalid v0.8 campaign promotion strength requirement");
+    }
+    return (
+        Number.isFinite(decisiveWinRate) &&
+        decisiveWinRate >= 0 &&
+        decisiveWinRate <= 1 &&
+        decisiveWinRate >= requirement.incumbentDecisiveWinRate + requirement.minimumCandidateDelta
+    );
+}
+
 /** Research fitness is never deployable until replayed inside the reviewed bounded operational envelope. */
-export function isV08CampaignPromotionEligible(evidence: IV08CampaignPromotionEvidence): boolean {
+export function isV08CampaignPromotionEligible(
+    evidence: IV08CampaignPromotionEvidence,
+    strengthRequirement: IV08CampaignPromotionStrengthRequirement = V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+): boolean {
     return (
         !evidence.unboundedSearch &&
         evidence.hasValidationEvidence &&
         evidence.level4CoveragePassed &&
+        isV08CampaignPromotionStrengthQualified(evidence.decisiveWinRate, strengthRequirement) &&
         evidence.armageddonRate <= ARMAGEDDON_RATE_GATE &&
         evidence.level4ArmageddonRate <= ARMAGEDDON_RATE_GATE
     );
@@ -865,6 +968,7 @@ async function runChild(
 
 function tournamentSummary(value: unknown, path: string): ITournamentSummaryWithReached {
     const summary = value as Partial<ITournamentSummaryWithReached>;
+    const armageddon = summary.armageddonReachedByOutcome;
     if (
         summary.versionA !== "v0.8s" ||
         summary.versionB !== "v0.7" ||
@@ -873,11 +977,33 @@ function tournamentSummary(value: unknown, path: string): ITournamentSummaryWith
         !summary.b ||
         typeof summary.winRateA !== "number" ||
         !Number.isSafeInteger(summary.armageddonDecided) ||
-        !Number.isSafeInteger(summary.armageddonReached)
+        !Number.isSafeInteger(summary.armageddonReached) ||
+        !armageddon ||
+        !Number.isSafeInteger(armageddon.total) ||
+        !Number.isSafeInteger(armageddon.candidateWins) ||
+        !Number.isSafeInteger(armageddon.draws) ||
+        !Number.isSafeInteger(armageddon.candidateLosses) ||
+        armageddon.total < 0 ||
+        armageddon.candidateWins < 0 ||
+        armageddon.draws < 0 ||
+        armageddon.candidateLosses < 0 ||
+        armageddon.total !== summary.armageddonReached ||
+        armageddon.candidateWins + armageddon.draws + armageddon.candidateLosses !== armageddon.total ||
+        armageddon.total > (summary.games ?? -1)
     ) {
         throw new Error(`Invalid tournament summary: ${path}`);
     }
     return summary as ITournamentSummaryWithReached;
+}
+
+/** Minimal version header check used before accepting any resumable manifest. */
+export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean {
+    const manifest = value as { schema?: unknown; kind?: unknown; adaptive?: { generatorVersion?: unknown } };
+    return (
+        manifest?.schema === V08_CAMPAIGN_SCHEMA &&
+        manifest.kind === "manifest" &&
+        manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION
+    );
 }
 
 function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IManifest {
@@ -913,7 +1039,8 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         config,
         liveMaps: LIVE_MAPS as typeof LIVE_MAPS,
         armageddonRateGate: ARMAGEDDON_RATE_GATE as typeof ARMAGEDDON_RATE_GATE,
-        armageddonScorePenalty: ARMAGEDDON_SCORE_PENALTY as typeof ARMAGEDDON_SCORE_PENALTY,
+        researchRanking: V08_CAMPAIGN_RESEARCH_RANKING,
+        promotionStrength: V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
         adaptive: {
             generatorVersion: ADAPTIVE_GENERATOR_VERSION as typeof ADAPTIVE_GENERATOR_VERSION,
             parentCount: ADAPTIVE_PARENT_COUNT as typeof ADAPTIVE_PARENT_COUNT,
@@ -967,12 +1094,13 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
     };
     const expectedCatalog = buildV08AlignedV1ProductionCatalogIdentity();
     if (
-        manifest.schema !== SCHEMA ||
-        manifest.kind !== "manifest" ||
+        !isV08CampaignManifestProvenanceCurrent(manifest) ||
         manifest.fingerprint !== fingerprintV08AlignedV1({ ...manifest, fingerprint: undefined }) ||
         JSON.stringify(manifest.config) !== JSON.stringify(requested) ||
         manifest.catalogIdentity.catalogSha256 !== expectedCatalog.catalogSha256 ||
-        manifest.adaptive?.generatorVersion !== ADAPTIVE_GENERATOR_VERSION ||
+        manifest.researchRanking !== V08_CAMPAIGN_RESEARCH_RANKING ||
+        fingerprintV08AlignedV1(manifest.promotionStrength) !==
+            fingerprintV08AlignedV1(V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH) ||
         manifest.adaptive.parentCount !== ADAPTIVE_PARENT_COUNT ||
         manifest.adaptive.childTarget !== ADAPTIVE_CHILD_TARGET ||
         manifest.adaptive.screenSeed !== cli.screenSeed ||
@@ -1137,7 +1265,7 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
     if (verifySource) {
         const source = {
             ...(readJson<ITournamentSummary>(paths.summaryPath) as ITournamentSummary),
-            armageddonReached: countArmageddonReached(tournamentJsonl(dirname(paths.summaryPath))),
+            ...armageddonEvidence(tournamentJsonl(dirname(paths.summaryPath))),
         };
         if (fingerprintV08AlignedV1(source) !== fingerprintV08AlignedV1(result.summary)) {
             throw new Error(`Tournament result ${job.id} does not match its source artifacts`);
@@ -1255,12 +1383,26 @@ function collectLeaderboard(
         const draws = summaries.reduce((sum, summary) => sum + summary.draws, 0);
         const armageddonReached = summaries.reduce((sum, summary) => sum + summary.armageddonReached, 0);
         const armageddonDecided = summaries.reduce((sum, summary) => sum + summary.armageddonDecided, 0);
+        const armageddonReachedCandidateWins = summaries.reduce(
+            (sum, summary) => sum + summary.armageddonReachedByOutcome.candidateWins,
+            0,
+        );
+        const armageddonReachedDraws = summaries.reduce(
+            (sum, summary) => sum + summary.armageddonReachedByOutcome.draws,
+            0,
+        );
+        const armageddonReachedCandidateLosses = summaries.reduce(
+            (sum, summary) => sum + summary.armageddonReachedByOutcome.candidateLosses,
+            0,
+        );
         const validationSummaries = validationByCandidate.get(id) ?? [];
         const validationRuns = validationSummaries.length;
         const validationGames = validationSummaries.reduce((sum, summary) => sum + summary.games, 0);
         const hasValidationEvidence = validationRuns > 0;
         const decisiveWinRate = winsA + winsB ? winsA / (winsA + winsB) : 0.5;
         const armageddonRate = games ? armageddonReached / games : 1;
+        const nonLossArmageddonReached = armageddonReachedCandidateWins + armageddonReachedDraws;
+        const nonLossArmageddonRate = games ? nonLossArmageddonReached / games : 1;
         const level4Summaries = (level4ByCandidate.get(id) ?? []).map((path) =>
             readJson<{
                 games: number;
@@ -1299,13 +1441,18 @@ function collectLeaderboard(
             armageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4ArmageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4CoveragePassed;
-        const promotionEligible = isV08CampaignPromotionEligible({
-            unboundedSearch: manifest.config.unboundedSearch,
-            hasValidationEvidence,
-            level4CoveragePassed,
-            armageddonRate,
-            level4ArmageddonRate,
-        });
+        const passesStrengthGate = isV08CampaignPromotionStrengthQualified(decisiveWinRate, manifest.promotionStrength);
+        const promotionEligible = isV08CampaignPromotionEligible(
+            {
+                unboundedSearch: manifest.config.unboundedSearch,
+                hasValidationEvidence,
+                level4CoveragePassed,
+                decisiveWinRate,
+                armageddonRate,
+                level4ArmageddonRate,
+            },
+            manifest.promotionStrength,
+        );
         return {
             rank: 0,
             candidateId: id,
@@ -1324,13 +1471,18 @@ function collectLeaderboard(
             armageddonReached,
             armageddonDecided,
             armageddonRate,
+            nonLossArmageddonReached,
+            nonLossArmageddonRate,
+            armageddonReachedCandidateWins,
+            armageddonReachedDraws,
+            armageddonReachedCandidateLosses,
             level4Games,
             level4ArmageddonReached,
             level4ArmageddonRate,
             level4CoveragePassed,
             passesArmageddonGate,
+            passesStrengthGate,
             promotionEligible,
-            score: decisiveWinRate - ARMAGEDDON_SCORE_PENALTY * armageddonRate,
             level4SummaryPaths: level4ByCandidate.get(id) ?? [],
         };
     });
@@ -1338,10 +1490,7 @@ function collectLeaderboard(
         (left, right) =>
             Number(right.promotionEligible) - Number(left.promotionEligible) ||
             Number(right.hasValidationEvidence) - Number(left.hasValidationEvidence) ||
-            Number(right.passesArmageddonGate) - Number(left.passesArmageddonGate) ||
-            right.score - left.score ||
-            right.decisiveWinRate - left.decisiveWinRate ||
-            left.candidateIndex - right.candidateIndex,
+            compareV08CampaignResearchCandidates(left, right),
     );
     rows.forEach((row, index) => (row.rank = index + 1));
     atomicJson(join(manifest.output, options.outputName ?? "leaderboard.json"), {
@@ -1350,7 +1499,8 @@ function collectLeaderboard(
         researchOnly: true,
         generatedAt: new Date().toISOString(),
         armageddonRateGate: ARMAGEDDON_RATE_GATE,
-        armageddonScorePenalty: ARMAGEDDON_SCORE_PENALTY,
+        researchRanking: V08_CAMPAIGN_RESEARCH_RANKING,
+        promotionStrength: manifest.promotionStrength,
         unboundedSearch: manifest.config.unboundedSearch,
         operationalReplayRequired: manifest.config.unboundedSearch,
         promotionCandidateId: rows.find((row) => row.promotionEligible)?.candidateId ?? null,
@@ -1405,7 +1555,7 @@ function buildAdaptiveCatalog(
         kinds: new Set<JobKind>(["screen"]),
         outputName: "base-screen-leaderboard.json",
     });
-    const parentRows = baseRows.slice(0, ADAPTIVE_PARENT_COUNT);
+    const parentRows = rankV08CampaignResearchCandidates(baseRows).slice(0, ADAPTIVE_PARENT_COUNT);
     if (parentRows.length !== ADAPTIVE_PARENT_COUNT) {
         throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT} ranked parents`);
     }
@@ -1512,10 +1662,12 @@ function validateAdaptiveCatalog(
     ) {
         throw new Error("Adaptive catalog header, evidence, or fingerprint is invalid");
     }
-    const expectedParents = collectLeaderboard(manifest, checkpoint, null, {
-        kinds: new Set<JobKind>(["screen"]),
-        outputName: "base-screen-leaderboard.json",
-    }).slice(0, ADAPTIVE_PARENT_COUNT);
+    const expectedParents = rankV08CampaignResearchCandidates(
+        collectLeaderboard(manifest, checkpoint, null, {
+            kinds: new Set<JobKind>(["screen"]),
+            outputName: "base-screen-leaderboard.json",
+        }),
+    ).slice(0, ADAPTIVE_PARENT_COUNT);
     if (
         fingerprintV08AlignedV1(expectedParents.map(({ candidateId }) => candidateId)) !==
             fingerprintV08AlignedV1(adaptive.parentCandidateIds) ||
@@ -1783,7 +1935,7 @@ async function runJob(
             ? rawSummary
             : {
                   ...(rawSummary as ITournamentSummary),
-                  armageddonReached: countArmageddonReached(tournamentJsonl(directory)),
+                  ...armageddonEvidence(tournamentJsonl(directory)),
               };
     if (spec.kind !== "level4") tournamentSummary(summary, absoluteSummary);
     const completedAtMs = Date.now();
@@ -1942,9 +2094,9 @@ async function main(): Promise<void> {
         preLevel4.length,
         manifest.config.topCandidates * manifest.adaptive.level4ReserveMultiplier,
     );
-    // A zero count in a 256-game screen cannot establish the 0.1% target. Cover a fixed score-ranked reserve,
+    // A zero count in a 256-game screen cannot establish the 0.1% target. Cover a fixed research-ranked reserve,
     // then let repeated fresh validation determine Armageddon safety without lucky-zero admission bias.
-    const level4Queue = preLevel4.slice(0, level4ReserveTarget);
+    const level4Queue = rankV08CampaignResearchCandidates(preLevel4).slice(0, level4ReserveTarget);
     let leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
     checkpoint.phase = "level4";
     saveCheckpoint(manifest, checkpoint);
