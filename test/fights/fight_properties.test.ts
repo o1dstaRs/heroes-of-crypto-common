@@ -628,6 +628,37 @@ describe("FightProperties", () => {
 
             expect(Array.from(fightProperties.getUpNextQueueIterable())[0]).toBe(lowerUnits[0].getId());
         });
+
+        it("releases a living hourglass unit without counting an ineligible dead stack", () => {
+            const fightProperties = new FightProperties();
+            const waiter = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+            const completed = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const dead = createTestUnit({ team: PBTypes.TeamVals.LOWER, amountAlive: 0 });
+            const allUnits = new Map([waiter, completed, dead].map((unit) => [unit.getId(), unit]));
+
+            expect(dead.isDead()).toBe(true);
+            fightProperties.addAlreadyMadeTurn(completed.getTeam(), completed.getId());
+            fightProperties.enqueueHourglass(waiter.getId());
+
+            fightProperties.prefetchNextUnitsToTurn(allUnits, [waiter], [completed]);
+
+            expect(fightProperties.dequeueNextUnitId()).toBe(waiter.getId());
+        });
+
+        it("does not let stale dead up-next entries consume the living queue budget", () => {
+            const fightProperties = new FightProperties();
+            const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+            const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const dead = createTestUnit({ team: PBTypes.TeamVals.UPPER, amountAlive: 0 });
+            const allUnits = new Map([upper, lower, dead].map((unit) => [unit.getId(), unit]));
+
+            fightProperties.enqueueUpNext(dead.getId());
+            fightProperties.prefetchNextUnitsToTurn(allUnits, [upper], [lower]);
+
+            expect(Array.from(fightProperties.getUpNextQueueIterable())).toEqual(
+                expect.arrayContaining([dead.getId(), upper.getId(), lower.getId()]),
+            );
+        });
     });
 
     describe("obstacle hit points per mountain (BLOCK_CENTER)", () => {

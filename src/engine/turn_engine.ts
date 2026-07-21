@@ -155,12 +155,15 @@ export class TurnEngine {
 
         let nextUnitId = this.fightProperties.dequeueNextUnitId();
         let nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
-        // Skip stale queue entries: an id can outlive its unit in upNext, and a stale id at the front
-        // would otherwise return no next unit (and no events), stranding the turn order with valid
-        // units still queued behind it. Drain past any such entries to the next real unit.
-        while (nextUnitId && !nextUnit && this.fightProperties.getUpNextQueueSize() > 0) {
+        // Skip stale queue entries: an id can outlive its unit in upNext, or the holder can briefly retain a dead
+        // stack during cleanup/resurrection. Neither is eligible for activation, and leaving one at the front
+        // would strand valid living units queued behind it.
+        while (nextUnitId && (!nextUnit || nextUnit.isDead()) && this.fightProperties.getUpNextQueueSize() > 0) {
             nextUnitId = this.fightProperties.dequeueNextUnitId();
             nextUnit = nextUnitId ? this.unitsHolder.getAllUnits().get(nextUnitId) : undefined;
+        }
+        if (nextUnit?.isDead()) {
+            nextUnit = undefined;
         }
 
         if (nextUnit) {

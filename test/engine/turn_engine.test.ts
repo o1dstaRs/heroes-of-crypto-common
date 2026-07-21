@@ -158,6 +158,69 @@ describe("TurnEngine", () => {
         expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LOWER)).toBe(750);
     });
 
+    it("reactivates a surviving hourglass unit after another stack dies before the wait", () => {
+        const setup = setupStartedFight();
+        const dead = createTestUnit({
+            name: "Dead before wait",
+            team: PBTypes.TeamVals.UPPER,
+            amountAlive: 0,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, dead, { x: 10, y: 9 });
+        expect(dead.isDead()).toBe(true);
+
+        setup.fightProperties.markFirstTurn();
+        setup.fightProperties.addAlreadyMadeTurn(setup.upper.getTeam(), setup.upper.getId());
+        setup.fightProperties.enqueueHourglass(setup.lower.getId());
+        setup.lower.setOnHourglass(true);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result.fightFinished).toBe(false);
+        expect(result.nextUnit?.getId()).toBe(setup.lower.getId());
+        expect(setup.fightProperties.getCurrentLap()).toBe(1);
+        expect(result.events.some((event) => event.type === "lap_flipped")).toBe(false);
+    });
+
+    it("drains a retained dead up-next entry before activating the next living unit", () => {
+        const setup = setupStartedFight();
+        const dead = createTestUnit({
+            name: "Dead queued stack",
+            team: PBTypes.TeamVals.UPPER,
+            amountAlive: 0,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, dead, { x: 10, y: 9 });
+
+        setup.fightProperties.enqueueUpNext(dead.getId());
+        setup.fightProperties.enqueueUpNext(setup.lower.getId());
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(12), nowMillis: [1000] }),
+        });
+
+        const result = engine.advanceAfterNoActiveUnit();
+
+        expect(result.nextUnit?.getId()).toBe(setup.lower.getId());
+        expect(result.events).not.toContainEqual({
+            type: "next_unit_selected",
+            unitId: dead.getId(),
+            team: PBTypes.TeamVals.UPPER,
+        });
+    });
+
     it("uses deterministic morale rolls during common lap transitions", () => {
         const setup = setupStartedFight({ lowerMorale: 100, upperMorale: -100 });
 

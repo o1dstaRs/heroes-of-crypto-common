@@ -1273,14 +1273,34 @@ export class FightProperties {
         unitsLower: Unit[],
         randomInt: RandomIntFn = getRandomInt,
     ): void {
-        const upNextUnitsCount = unitsUpper.length + unitsLower.length;
+        // The holder can temporarily retain a dead stack while attack cleanup/resurrection resolves. Turn-order
+        // cardinality must use only the living units supplied by TurnEngine; otherwise a dead map entry prevents
+        // the hourglass queue from reaching the old allUnits.size threshold and the surviving waiter is dropped
+        // when the simulator recovers the apparently stalled lap. Keep the map intersection so stale caller lists
+        // cannot make a removed unit eligible, while living summons remain eligible immediately.
+        const eligibleUnits = [...unitsUpper, ...unitsLower].filter((unit) => {
+            const stored = allUnits.get(unit.getId());
+            return stored !== undefined && !stored.isDead() && !unit.isDead();
+        });
+        const eligibleUnitIds = new Set(eligibleUnits.map((unit) => unit.getId()));
+        const eligibleUpper = unitsUpper.filter((unit) => eligibleUnitIds.has(unit.getId()));
+        const eligibleLower = unitsLower.filter((unit) => eligibleUnitIds.has(unit.getId()));
+        const upNextUnitsCount = eligibleUnitIds.size;
+        const eligibleUpNextCount = (): number => {
+            const queued = new Set<string>();
+            for (let i = 0; i < this.upNextQueue.length; i++) {
+                const unitId = this.upNextQueue.get(i);
+                if (unitId && eligibleUnitIds.has(unitId)) queued.add(unitId);
+            }
+            return queued.size;
+        };
 
-        if (this.upNextQueue.length >= upNextUnitsCount) {
+        if (eligibleUpNextCount() >= upNextUnitsCount) {
             return;
         }
 
-        while (this.upNextQueue.length < upNextUnitsCount) {
-            const nextUnitId = this.getNextTurnUnitId(allUnits, unitsUpper, unitsLower, randomInt);
+        while (eligibleUpNextCount() < upNextUnitsCount) {
+            const nextUnitId = this.getNextTurnUnitId(eligibleUnitIds, eligibleUpper, eligibleLower, randomInt);
 
             if (nextUnitId) {
                 const unit = allUnits.get(nextUnitId);
@@ -1389,7 +1409,7 @@ export class FightProperties {
         return removed;
     }
     private getNextTurnUnitId(
-        allUnits: ReadonlyMap<string, Unit>,
+        eligibleUnitIds: ReadonlySet<string>,
         unitsUpper: Unit[],
         unitsLower: Unit[],
         randomInt: RandomIntFn,
@@ -1401,7 +1421,12 @@ export class FightProperties {
         // plus morale
         while (this.moralePlusQueue.length) {
             const nextUnitId = this.moralePlusQueue.shift();
-            if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+            if (
+                nextUnitId &&
+                eligibleUnitIds.has(nextUnitId) &&
+                !this.alreadyMadeTurn.has(nextUnitId) &&
+                !this.upNextIncludes(nextUnitId)
+            ) {
                 return nextUnitId;
             }
         }
@@ -1492,19 +1517,31 @@ export class FightProperties {
         // minus morale
         while (this.moraleMinusQueue.length) {
             const nextUnitId = this.moraleMinusQueue.shift();
-            if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+            if (
+                nextUnitId &&
+                eligibleUnitIds.has(nextUnitId) &&
+                !this.alreadyMadeTurn.has(nextUnitId) &&
+                !this.upNextIncludes(nextUnitId)
+            ) {
                 return nextUnitId;
             }
         }
 
         // hourglass
-        if (
-            this.hourglassQueue.length &&
-            this.alreadyMadeTurn.size + this.hourglassQueue.length + this.upNextQueue.length >= allUnits.size
-        ) {
+        const hasEligibleHourglassUnit = this.hourglassQueue.toArray().some((unitId) => eligibleUnitIds.has(unitId));
+        const allEligibleUnitsAccountedFor = Array.from(eligibleUnitIds).every(
+            (unitId) =>
+                this.alreadyMadeTurn.has(unitId) || this.hourglassIncludes(unitId) || this.upNextIncludes(unitId),
+        );
+        if (hasEligibleHourglassUnit && allEligibleUnitsAccountedFor) {
             while (this.hourglassQueue.length) {
                 const nextUnitId = this.hourglassQueue.shift();
-                if (nextUnitId && !this.alreadyMadeTurn.has(nextUnitId) && !this.upNextIncludes(nextUnitId)) {
+                if (
+                    nextUnitId &&
+                    eligibleUnitIds.has(nextUnitId) &&
+                    !this.alreadyMadeTurn.has(nextUnitId) &&
+                    !this.upNextIncludes(nextUnitId)
+                ) {
                     return nextUnitId;
                 }
             }
