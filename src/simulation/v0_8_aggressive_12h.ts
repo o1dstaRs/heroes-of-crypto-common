@@ -22,6 +22,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
+import { V08_TEST_CANDIDATE_GENOME, V08_TEST_CANDIDATE_GENOME_SHA256 } from "../ai/versions/v0_8_candidate_profile";
 import type { ITournamentSummary } from "./tournament";
 import {
     buildV08AlignedV1ProductionCandidateCatalog,
@@ -56,7 +57,7 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v5" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v6" as const;
 const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
@@ -65,8 +66,13 @@ const LIVE_MAPS = "normal,lava,block";
 // At screen/validation sizes this effectively requires zero Armageddon-reached games; pooled long-run
 // promotion evidence may tolerate at most one per thousand.
 const ARMAGEDDON_RATE_GATE = 0.001;
-const BASE_CANDIDATE_COUNT = 48;
-export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 3;
+const PRODUCTION_CANDIDATE_COUNT = 48;
+const BASE_CANDIDATE_COUNT = 49;
+export const V08_CAMPAIGN_EXACT_ANCHOR_INDEX = 48 as const;
+export const V08_CAMPAIGN_EXACT_ANCHOR_ID = "c48" as const;
+export const V08_CAMPAIGN_INACTIVE_CONTROL_IDS = ["c37", "c38"] as const;
+export const V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS = ["screen", "adaptive", "level4"] as const;
+export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 4;
 const ADAPTIVE_GENERATOR_VERSION = V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION;
 const ADAPTIVE_PARENT_COUNT = 4;
 const ADAPTIVE_CHILD_TARGET = 24;
@@ -77,26 +83,15 @@ const ADAPTIVE_GATE_STEP = 0.005;
 const ADAPTIVE_LEAF_BLEND_ALPHAS = [0.15, 0.25] as const;
 const LEVEL4_RESERVE_MULTIPLIER = 3;
 export const V08_CAMPAIGN_DEFAULT_LANES = 3;
+export const V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES = 8;
 export const V08_CAMPAIGN_SCHEDULER_VERSION = 1;
 export const V08_CAMPAIGN_RESEARCH_RANKING = "candidate-win-rate_then_draw-rate_then_non-loss-armageddon-rate" as const;
-
-export interface IV08CampaignPromotionStrengthRequirement {
-    /** All-game win rate produced by the incumbent against itself (parity is 0.5). */
-    incumbentCandidateWinRate: number;
-    /** Required all-game win-rate improvement over incumbent parity. */
-    minimumCandidateWinRateDelta: number;
-    /** Head-to-head decisive rate produced by the incumbent against itself (parity is 0.5). */
-    incumbentDecisiveWinRate: number;
-    /** Required decisive-rate improvement over incumbent parity. */
-    minimumDecisiveWinRateDelta: number;
-}
-
-export const V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH = Object.freeze({
-    incumbentCandidateWinRate: 0.5,
-    minimumCandidateWinRateDelta: 0,
-    incumbentDecisiveWinRate: 0.5,
-    minimumDecisiveWinRateDelta: 0,
-} satisfies IV08CampaignPromotionStrengthRequirement);
+export const V08_CAMPAIGN_RESERVE_ELIGIBILITY = Object.freeze({
+    minimumCandidateWinRate: 0.5,
+    minimumDecisiveWinRate: 0.5,
+});
+export const V08_CAMPAIGN_SELECTION_VERSION = 1 as const;
+export const V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION = 1 as const;
 
 interface ICli {
     output: string;
@@ -116,6 +111,26 @@ interface ICli {
     unboundedSearch: boolean;
 }
 
+interface IManifestCandidate {
+    index: number;
+    id: string;
+    label: string | null;
+    genomeSha256: string;
+    bindingSha256: string;
+    effectiveBehaviorEnvironmentSha256: string;
+}
+
+interface ICampaignBaseIdentity {
+    schemaVersion: 1;
+    productionCatalogSha256: string;
+    productionCandidateCount: typeof PRODUCTION_CANDIDATE_COUNT;
+    campaignCandidateCount: typeof BASE_CANDIDATE_COUNT;
+    orderedCandidateGenomeSha256: string[];
+    exactAnchor: IManifestCandidate;
+    inactiveControls: [IManifestCandidate, IManifestCandidate];
+    identitySha256: string;
+}
+
 interface IManifest {
     schema: typeof SCHEMA;
     kind: "manifest";
@@ -133,7 +148,21 @@ interface IManifest {
     liveMaps: typeof LIVE_MAPS;
     armageddonRateGate: typeof ARMAGEDDON_RATE_GATE;
     researchRanking: typeof V08_CAMPAIGN_RESEARCH_RANKING;
-    promotionStrength: typeof V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH;
+    reserveEligibility: typeof V08_CAMPAIGN_RESERVE_ELIGIBILITY;
+    selection: {
+        version: typeof V08_CAMPAIGN_SELECTION_VERSION;
+        exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
+        inactiveControlCandidateIds: typeof V08_CAMPAIGN_INACTIVE_CONTROL_IDS;
+        minimumValidationCandidates: 2;
+        strategy: "exact-anchor_then_inactive-control_then_strength_then_total-arm-reserve";
+    };
+    promotionComparison: {
+        version: typeof V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION;
+        exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
+        evidence: "fully-committed-common-random-validation-rounds";
+        minimumCandidateWinRateDelta: 0;
+        minimumDecisiveWinRateDelta: 0;
+    };
     scheduler: {
         version: typeof V08_CAMPAIGN_SCHEDULER_VERSION;
         discipline: "work-conserving-fifo";
@@ -152,21 +181,21 @@ interface IManifest {
         level4ReserveMultiplier: typeof LEVEL4_RESERVE_MULTIPLIER;
     };
     catalogIdentity: ReturnType<typeof buildV08AlignedV1ProductionCatalogIdentity>;
-    candidates: Array<{
-        index: number;
-        id: string;
-        label: string | null;
-        genomeSha256: string;
-        bindingSha256: string;
-        effectiveBehaviorEnvironmentSha256: string;
-    }>;
+    campaignBaseIdentity: ICampaignBaseIdentity;
+    candidates: IManifestCandidate[];
     fingerprint: string;
 }
 
 export type JobKind = "screen" | "adaptive" | "level4" | "validation";
 const JOB_KINDS: ReadonlySet<JobKind> = new Set(["screen", "adaptive", "level4", "validation"]);
+const VALIDATION_SELECTION_SOURCE_KINDS: ReadonlySet<JobKind> = new Set(V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS);
 
-interface IAdaptiveMutation {
+/** The immutable pre-validation evidence scope used to create and verify a resumable shortlist. */
+export function isV08CampaignValidationSelectionSourceJob(job: { kind: JobKind }): boolean {
+    return VALIDATION_SELECTION_SOURCE_KINDS.has(job.kind);
+}
+
+export interface IV08CampaignAdaptiveMutation {
     kind: "gate" | "control" | "leaf-blend";
     field: string;
     from: unknown;
@@ -176,6 +205,24 @@ interface IAdaptiveMutation {
     alpha?: number;
 }
 
+export interface IV08CampaignAdaptiveProposalParent {
+    candidateId: string;
+    candidateIndex: number;
+    genomeSha256: string;
+    genome: IV08AlignedV1CandidateGenome;
+}
+
+export interface IV08CampaignAdaptiveProposal {
+    genome: IV08AlignedV1CandidateGenome;
+    mutation: IV08CampaignAdaptiveMutation;
+}
+
+export const V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS = Object.freeze([
+    Object.freeze({ field: "controls.meleeRangedTargetWeight", to: 2 as const }),
+    Object.freeze({ field: "controls.lateRangedFinishWeight", to: 4 as const }),
+    Object.freeze({ field: "controls.pureRangedTerminalWeight", to: 1 as const }),
+]);
+
 interface IAdaptiveChild {
     index: number;
     id: string;
@@ -183,7 +230,7 @@ interface IAdaptiveChild {
     parentCandidateId: string;
     parentCandidateIndex: number;
     parentGenomeSha256: string;
-    mutation: IAdaptiveMutation;
+    mutation: IV08CampaignAdaptiveMutation;
     genome: IV08AlignedV1CandidateGenome;
     genomeSha256: string;
     bindingSha256: string;
@@ -199,7 +246,10 @@ interface IAdaptiveCatalog {
     automaticDeploy: false;
     manifestFingerprint: string;
     generatorVersion: typeof ADAPTIVE_GENERATOR_VERSION;
-    sourceCatalogSha256: string;
+    sourceCampaignBaseIdentitySha256: string;
+    exactAnchorGenomeSha256: typeof V08_TEST_CANDIDATE_GENOME_SHA256;
+    exactAnchorMutationFields: string[];
+    exactAnchorMutationPlanSha256: string;
     screenEvidenceSha256: string;
     parentCandidateIds: string[];
     parentGenomeSha256: string[];
@@ -214,6 +264,21 @@ interface IAdaptiveCheckpoint {
     fingerprint: string;
     screenEvidenceSha256: string;
     children: number;
+}
+
+interface IValidationSelection {
+    schema: "hoc.v0_8_aggressive_validation_selection.v1";
+    version: typeof V08_CAMPAIGN_SELECTION_VERSION;
+    manifestFingerprint: string;
+    sourceEvidenceSha256: string;
+    exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
+    exactAnchorGenomeSha256: typeof V08_TEST_CANDIDATE_GENOME_SHA256;
+    inactiveControlCandidateId: (typeof V08_CAMPAIGN_INACTIVE_CONTROL_IDS)[number];
+    inactiveControlGenomeSha256: string;
+    candidateIds: string[];
+    candidateGenomeSha256: string[];
+    createdAt: string;
+    fingerprint: string;
 }
 
 export interface ICompletedJob {
@@ -261,7 +326,7 @@ interface ICheckpoint {
     validationRound: number;
     completed: ICompletedJob[];
     adaptiveCatalog: IAdaptiveCheckpoint | null;
-    validationCandidateIds: string[];
+    validationSelection: IValidationSelection | null;
     activeJobs: Record<string, IActiveJob>;
     updatedAt: string;
 }
@@ -300,6 +365,12 @@ interface IRankedCandidate {
     validationRuns: number;
     validationGames: number;
     hasValidationEvidence: boolean;
+    validationWinsA: number;
+    validationWinsB: number;
+    validationDraws: number;
+    validationCandidateWinRate: number;
+    validationDecisiveWinRate: number;
+    validationEvidenceSha256: string | null;
     games: number;
     winsA: number;
     winsB: number;
@@ -318,6 +389,7 @@ interface IRankedCandidate {
     level4Games: number;
     level4ArmageddonReached: number;
     level4ArmageddonRate: number;
+    hasLevel4Evidence: boolean;
     level4CoveragePassed: boolean;
     passesArmageddonGate: boolean;
     passesStrengthGate: boolean;
@@ -637,7 +709,8 @@ function parseCli(argv: readonly string[]): ICli {
         console.log(
             "Usage: bun src/simulation/v0_8_aggressive_12h.ts [--output DIR] [--hours 12] " +
                 "[--concurrency TOTAL_WORKERS] [--screen-games 256] [--validation-games 1024] " +
-                `[--lanes ${V08_CAMPAIGN_DEFAULT_LANES}] [--top 4] [--l4-pairs 16] [--screen-seed N] ` +
+                `[--lanes ${V08_CAMPAIGN_DEFAULT_LANES}] [--top ${V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES}] ` +
+                "[--l4-pairs 16] [--screen-seed N] " +
                 "[--level4-seed N] " +
                 "[--validation-seed N] [--unbounded-search]",
         );
@@ -662,7 +735,7 @@ function parseCli(argv: readonly string[]): ICli {
         maxWorkers: workerPlan.maxWorkers,
         screenGames,
         validationGames,
-        topCandidates: positiveInteger(flagValue(argv, "--top"), 4, "--top"),
+        topCandidates: positiveInteger(flagValue(argv, "--top"), V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES, "--top"),
         level4PairsPerLane: positiveInteger(flagValue(argv, "--l4-pairs"), 16, "--l4-pairs"),
         screenSeed: uint32Integer(flagValue(argv, "--screen-seed"), ADAPTIVE_SCREEN_SEED, "--screen-seed"),
         level4Seed: uint32Integer(flagValue(argv, "--level4-seed"), 30_260_719, "--level4-seed"),
@@ -684,6 +757,31 @@ function readJson<T>(path: string): T {
 
 function candidateId(index: number): string {
     return `c${String(index).padStart(2, "0")}`;
+}
+
+/** The pinned production-48 catalog plus the immutable, independently qualified r3 profile as c48. */
+export function buildV08CampaignBaseGenomes(): IV08AlignedV1CandidateGenome[] {
+    const production = buildV08AlignedV1ProductionCandidateCatalog();
+    if (production.length !== PRODUCTION_CANDIDATE_COUNT) {
+        throw new Error(`Expected exact ${PRODUCTION_CANDIDATE_COUNT}-candidate production catalog`);
+    }
+    const exactAnchor = normalizeV08AlignedV1CandidateGenome(
+        structuredClone(V08_TEST_CANDIDATE_GENOME) as IV08AlignedV1CandidateGenome,
+    );
+    const exactAnchorHash = fingerprintV08AlignedV1CandidateGenome(exactAnchor);
+    const productionHashes = production.map(fingerprintV08AlignedV1CandidateGenome);
+    if (exactAnchorHash !== V08_TEST_CANDIDATE_GENOME_SHA256 || productionHashes.includes(exactAnchorHash)) {
+        throw new Error("Exact v0.8 r3 anchor identity drifted or duplicates the production catalog");
+    }
+    const campaign = [...production, exactAnchor];
+    if (
+        campaign.length !== BASE_CANDIDATE_COUNT ||
+        candidateId(V08_CAMPAIGN_EXACT_ANCHOR_INDEX) !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
+        new Set(campaign.map(fingerprintV08AlignedV1CandidateGenome)).size !== BASE_CANDIDATE_COUNT
+    ) {
+        throw new Error("v0.8 campaign base catalog census or uniqueness drifted");
+    }
+    return campaign.map((genome) => structuredClone(genome));
 }
 
 export function effectiveBehaviorEnvironment(
@@ -784,11 +882,6 @@ function armageddonEvidence(
     return { armageddonReached: armageddonReachedByOutcome.total, armageddonReachedByOutcome };
 }
 
-interface IAdaptiveProposal {
-    genome: IV08AlignedV1CandidateGenome;
-    mutation: IAdaptiveMutation;
-}
-
 function adaptiveCandidateId(index: number): string {
     return `a${String(index).padStart(2, "0")}`;
 }
@@ -797,7 +890,7 @@ function controlProposal<K extends keyof IV08AlignedV1CandidateGenome["controls"
     parent: IV08AlignedV1CandidateGenome,
     field: K,
     to: IV08AlignedV1CandidateGenome["controls"][K],
-): IAdaptiveProposal {
+): IV08CampaignAdaptiveProposal {
     const genome = structuredClone(parent);
     const from = genome.controls[field];
     genome.controls[field] = to;
@@ -805,11 +898,11 @@ function controlProposal<K extends keyof IV08AlignedV1CandidateGenome["controls"
 }
 
 function adaptiveProposals(
-    parent: { row: IRankedCandidate; genome: IV08AlignedV1CandidateGenome },
-    parents: readonly { row: IRankedCandidate; genome: IV08AlignedV1CandidateGenome }[],
-): IAdaptiveProposal[] {
-    const proposals: IAdaptiveProposal[] = [];
-    const leafProposals: IAdaptiveProposal[] = [];
+    parent: IV08CampaignAdaptiveProposalParent,
+    parents: readonly IV08CampaignAdaptiveProposalParent[],
+): IV08CampaignAdaptiveProposal[] {
+    const proposals: IV08CampaignAdaptiveProposal[] = [];
+    const leafProposals: IV08CampaignAdaptiveProposal[] = [];
     for (const delta of [-ADAPTIVE_GATE_STEP, ADAPTIVE_GATE_STEP]) {
         const genome = structuredClone(parent.genome);
         const from = genome.search.gate;
@@ -821,7 +914,7 @@ function adaptiveProposals(
     }
 
     for (const donor of parents) {
-        if (donor.row.candidateId === parent.row.candidateId) continue;
+        if (donor.candidateId === parent.candidateId) continue;
         if (
             parent.genome.search.leafMode !== "model" ||
             donor.genome.search.leafMode !== "model" ||
@@ -846,8 +939,8 @@ function adaptiveProposals(
                     field: "search.leaf",
                     from: fingerprintV08AlignedV1(source),
                     to: fingerprintV08AlignedV1(genome.search.leaf),
-                    donorCandidateId: donor.row.candidateId,
-                    donorGenomeSha256: donor.row.genomeSha256,
+                    donorCandidateId: donor.candidateId,
+                    donorGenomeSha256: donor.genomeSha256,
                     alpha,
                 },
             });
@@ -882,7 +975,97 @@ function adaptiveProposals(
             }
         }
     }
-    return [...proposals.slice(0, 2), ...leafProposals.slice(0, 2), ...proposals.slice(2), ...leafProposals.slice(2)];
+    const defaultOrder = [
+        ...proposals.slice(0, 2),
+        ...leafProposals.slice(0, 2),
+        ...proposals.slice(2),
+        ...leafProposals.slice(2),
+    ];
+    if (parent.candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID) return defaultOrder;
+
+    const requiredFinish = V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS.map(({ field, to }) =>
+        proposals.find((proposal) => proposal.mutation.field === field && proposal.mutation.to === to),
+    );
+    const lowerGate = proposals.find(
+        (proposal) =>
+            proposal.mutation.field === "search.gate" && Number(proposal.mutation.to) < Number(proposal.mutation.from),
+    );
+    const usefulLeaf = leafProposals.filter(
+        ({ mutation }) => mutation.field === "search.leaf" && mutation.from !== mutation.to,
+    );
+    if (requiredFinish.some((proposal) => proposal === undefined) || !lowerGate || !usefulLeaf.length) {
+        throw new Error("Exact c48 adaptive plan cannot cover finish, gate, and leaf mutations");
+    }
+    const priority = [...requiredFinish, lowerGate, ...usefulLeaf] as IV08CampaignAdaptiveProposal[];
+    const prioritized = new Set(priority);
+    return [...priority, ...defaultOrder.filter((proposal) => !prioritized.has(proposal))];
+}
+
+function assertExactAnchorMutationCoverage(proposals: readonly IV08CampaignAdaptiveProposal[]): void {
+    const required = V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS;
+    if (
+        proposals.length < required.length + 2 ||
+        required.some(
+            ({ field, to }, index) =>
+                proposals[index]?.mutation.field !== field || proposals[index]?.mutation.to !== to,
+        ) ||
+        !proposals.some(({ mutation }) => mutation.field === "search.gate") ||
+        !proposals.some(({ mutation }) => mutation.field === "search.leaf")
+    ) {
+        throw new Error("Exact c48 children lost required finish, gate, or leaf mutation coverage");
+    }
+}
+
+/** Select the exact unique child mutations used by generator v4, including c48's reserved finish coverage. */
+export function selectV08CampaignAdaptiveChildProposals(
+    parent: IV08CampaignAdaptiveProposalParent,
+    parents: readonly IV08CampaignAdaptiveProposalParent[],
+    existingGenomeSha256: readonly string[],
+    count: number,
+): IV08CampaignAdaptiveProposal[] {
+    if (!Number.isSafeInteger(count) || count < 1) throw new Error("adaptive child count must be positive");
+    if (
+        new Set(parents.map(({ candidateId }) => candidateId)).size !== parents.length ||
+        fingerprintV08AlignedV1CandidateGenome(parent.genome) !== parent.genomeSha256 ||
+        !parents.some(
+            ({ candidateId, candidateIndex, genomeSha256 }) =>
+                candidateId === parent.candidateId &&
+                candidateIndex === parent.candidateIndex &&
+                genomeSha256 === parent.genomeSha256,
+        ) ||
+        parents.some(({ genome, genomeSha256 }) => fingerprintV08AlignedV1CandidateGenome(genome) !== genomeSha256)
+    ) {
+        throw new Error("Adaptive proposal parents have invalid or duplicate identities");
+    }
+    if (
+        parent.candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
+        (parent.candidateIndex !== V08_CAMPAIGN_EXACT_ANCHOR_INDEX ||
+            parent.genomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256)
+    ) {
+        throw new Error("Exact c48 adaptive parent identity drifted");
+    }
+    const seen = new Set(existingGenomeSha256);
+    const selected: IV08CampaignAdaptiveProposal[] = [];
+    for (const proposal of adaptiveProposals(parent, parents)) {
+        if (selected.length >= count) break;
+        let normalized: IV08AlignedV1CandidateGenome;
+        try {
+            normalized = normalizeV08AlignedV1CandidateGenome(proposal.genome);
+        } catch {
+            continue;
+        }
+        assertAdaptiveComputeEnvelope(parent.genome, normalized);
+        assertAdaptiveMutationScope(parent.genome, normalized, proposal.mutation);
+        const genomeSha256 = fingerprintV08AlignedV1CandidateGenome(normalized);
+        if (seen.has(genomeSha256)) continue;
+        selected.push({ genome: normalized, mutation: structuredClone(proposal.mutation) });
+        seen.add(genomeSha256);
+    }
+    if (selected.length !== count) {
+        throw new Error(`Adaptive parent ${parent.candidateId} produced only ${selected.length} unique safe children`);
+    }
+    if (parent.candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID) assertExactAnchorMutationCoverage(selected);
+    return selected;
 }
 
 function assertAdaptiveComputeEnvelope(
@@ -920,7 +1103,7 @@ function assertAdaptiveComputeEnvelope(
 function assertAdaptiveMutationScope(
     parent: IV08AlignedV1CandidateGenome,
     child: IV08AlignedV1CandidateGenome,
-    mutation: IAdaptiveMutation,
+    mutation: IV08CampaignAdaptiveMutation,
 ): void {
     const parentSearch = { ...parent.search, label: undefined };
     const childSearch = { ...child.search, label: undefined };
@@ -1027,72 +1210,199 @@ export function rankV08CampaignResearchCandidates<T extends IV08CampaignResearch
     return [...rows].sort(compareV08CampaignResearchCandidates);
 }
 
+export function selectV08CampaignAdaptiveParents<T extends IV08CampaignResearchCandidate>(rows: readonly T[]): T[] {
+    const exactAnchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
+    if (!exactAnchor) throw new Error("Adaptive generation requires the exact c48 anchor");
+    const leaders = rankV08CampaignResearchCandidates(
+        rows.filter(({ candidateId }) => candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID),
+    ).slice(0, ADAPTIVE_PARENT_COUNT - 1);
+    if (leaders.length !== ADAPTIVE_PARENT_COUNT - 1) {
+        throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT - 1} non-anchor leaders`);
+    }
+    return [exactAnchor, ...leaders];
+}
+
+export function selectV08CampaignInactiveControl<T extends IV08CampaignResearchCandidate>(rows: readonly T[]): T {
+    const c37 = rows.find((row) => row.candidateId === V08_CAMPAIGN_INACTIVE_CONTROL_IDS[0]);
+    const c38 = rows.find((row) => row.candidateId === V08_CAMPAIGN_INACTIVE_CONTROL_IDS[1]);
+    if (!c37 || !c38) {
+        throw new Error("Both inactive-challenger controls c37/c38 are required");
+    }
+    return rankV08CampaignResearchCandidates([c37, c38])[0]!;
+}
+
+export function isV08CampaignReserveEligible(
+    row: Pick<IRankedCandidate, "candidateWinRate" | "decisiveWinRate">,
+): boolean {
+    return (
+        Number.isFinite(row.candidateWinRate) &&
+        row.candidateWinRate >= V08_CAMPAIGN_RESERVE_ELIGIBILITY.minimumCandidateWinRate &&
+        row.candidateWinRate <= 1 &&
+        Number.isFinite(row.decisiveWinRate) &&
+        row.decisiveWinRate >= V08_CAMPAIGN_RESERVE_ELIGIBILITY.minimumDecisiveWinRate &&
+        row.decisiveWinRate <= 1
+    );
+}
+
+export function selectV08CampaignLevel4CandidateIds<
+    T extends IV08CampaignResearchCandidate & Pick<IRankedCandidate, "armageddonRate" | "decisiveWinRate">,
+>(rows: readonly T[], count: number): string[] {
+    if (!Number.isSafeInteger(count) || count < 1) throw new Error("level-4 reserve count must be positive");
+    const targetCount = Math.min(rows.length, Math.max(2, count));
+    const anchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
+    if (!anchor) throw new Error("Level-4 reserve requires the exact c48 anchor");
+    const inactiveControl = selectV08CampaignInactiveControl(rows);
+    const selected: T[] = [];
+    const seen = new Set<string>();
+    const add = (row: T): void => {
+        if (selected.length >= targetCount || seen.has(row.candidateId)) return;
+        selected.push(row);
+        seen.add(row.candidateId);
+    };
+    add(anchor);
+    add(inactiveControl);
+
+    const remainingSlots = Math.max(0, targetCount - selected.length);
+    const strengthSlots = Math.ceil(remainingSlots / 2);
+    const strength = rankV08CampaignResearchCandidates(rows);
+    for (const row of strength) {
+        if (selected.length >= 2 + strengthSlots) break;
+        add(row);
+    }
+    const armReserve = rows
+        .filter(isV08CampaignReserveEligible)
+        .sort(
+            (left, right) =>
+                left.armageddonRate - right.armageddonRate || compareV08CampaignResearchCandidates(left, right),
+        );
+    for (const row of armReserve) add(row);
+    for (const row of strength) add(row);
+    if (selected.length !== targetCount) throw new Error("Level-4 reserve could not fill its requested census");
+    return selected.map(({ candidateId }) => candidateId);
+}
+
 export function selectValidationCandidateIds(
-    rows: readonly (IV08CampaignResearchCandidate & Pick<IRankedCandidate, "level4CoveragePassed">)[],
+    rows: readonly (IV08CampaignResearchCandidate &
+        Pick<IRankedCandidate, "armageddonRate" | "decisiveWinRate" | "hasLevel4Evidence" | "level4CoveragePassed">)[],
     count: number,
 ): string[] {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error("validation candidate count must be positive");
-    return rankV08CampaignResearchCandidates(rows.filter((row) => row.level4CoveragePassed))
-        .slice(0, count)
-        .map((row) => row.candidateId);
+    const targetCount = Math.max(2, count);
+    const covered = rows.filter((row) => row.level4CoveragePassed);
+    const anchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
+    if (!anchor?.hasLevel4Evidence) throw new Error("Exact c48 anchor must complete its level-4 job before validation");
+    const screenedInactiveControl = selectV08CampaignInactiveControl(rows);
+    if (!screenedInactiveControl.hasLevel4Evidence) {
+        throw new Error("Best screened inactive-challenger control must complete its level-4 job");
+    }
+    const inactiveControl = screenedInactiveControl;
+    const selected: Array<(typeof rows)[number]> = [];
+    const seen = new Set<string>();
+    const add = (row: (typeof covered)[number]): void => {
+        if (selected.length >= targetCount || seen.has(row.candidateId)) return;
+        selected.push(row);
+        seen.add(row.candidateId);
+    };
+    add(anchor);
+    add(inactiveControl);
+
+    const remainingSlots = Math.max(0, targetCount - selected.length);
+    const strengthSlots = Math.ceil(remainingSlots / 2);
+    const strength = rankV08CampaignResearchCandidates(covered);
+    for (const row of strength) {
+        if (selected.length >= 2 + strengthSlots) break;
+        add(row);
+    }
+
+    const armReserve = covered
+        .filter(isV08CampaignReserveEligible)
+        .sort(
+            (left, right) =>
+                left.armageddonRate - right.armageddonRate || compareV08CampaignResearchCandidates(left, right),
+        );
+    for (const row of armReserve) add(row);
+    for (const row of strength) add(row);
+    if (selected.length !== targetCount) {
+        throw new Error(`Validation selection requires ${targetCount} covered candidates, found ${selected.length}`);
+    }
+    return selected.map(({ candidateId }) => candidateId);
 }
 
-export interface IV08CampaignPromotionEvidence {
+export interface IV08CampaignValidationStrengthEvidence {
+    validationRuns: number;
+    validationGames: number;
+    validationCandidateWinRate: number;
+    validationDecisiveWinRate: number;
+    validationEvidenceSha256: string | null;
+}
+
+export interface IV08CampaignPromotionEvidence extends IV08CampaignValidationStrengthEvidence {
+    isExactAnchor: boolean;
     unboundedSearch: boolean;
     hasValidationEvidence: boolean;
     level4CoveragePassed: boolean;
-    candidateWinRate: number;
-    decisiveWinRate: number;
     armageddonRate: number;
     level4ArmageddonRate: number;
 }
 
 export function isV08CampaignPromotionStrengthQualified(
-    candidateWinRate: number,
-    decisiveWinRate: number,
-    requirement: IV08CampaignPromotionStrengthRequirement = V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+    candidate: IV08CampaignValidationStrengthEvidence,
+    exactAnchor: IV08CampaignValidationStrengthEvidence,
 ): boolean {
     if (
-        !Number.isFinite(requirement.incumbentCandidateWinRate) ||
-        requirement.incumbentCandidateWinRate < 0 ||
-        requirement.incumbentCandidateWinRate > 1 ||
-        !Number.isFinite(requirement.minimumCandidateWinRateDelta) ||
-        requirement.minimumCandidateWinRateDelta < 0 ||
-        !Number.isFinite(requirement.incumbentDecisiveWinRate) ||
-        requirement.incumbentDecisiveWinRate < 0 ||
-        requirement.incumbentDecisiveWinRate > 1 ||
-        !Number.isFinite(requirement.minimumDecisiveWinRateDelta) ||
-        requirement.minimumDecisiveWinRateDelta < 0
+        !Number.isSafeInteger(candidate.validationRuns) ||
+        !Number.isSafeInteger(exactAnchor.validationRuns) ||
+        !Number.isSafeInteger(candidate.validationGames) ||
+        !Number.isSafeInteger(exactAnchor.validationGames) ||
+        candidate.validationRuns < 0 ||
+        exactAnchor.validationRuns < 0 ||
+        candidate.validationGames < 0 ||
+        exactAnchor.validationGames < 0 ||
+        !Number.isFinite(candidate.validationCandidateWinRate) ||
+        !Number.isFinite(exactAnchor.validationCandidateWinRate) ||
+        !Number.isFinite(candidate.validationDecisiveWinRate) ||
+        !Number.isFinite(exactAnchor.validationDecisiveWinRate) ||
+        candidate.validationCandidateWinRate < 0 ||
+        candidate.validationCandidateWinRate > 1 ||
+        exactAnchor.validationCandidateWinRate < 0 ||
+        exactAnchor.validationCandidateWinRate > 1 ||
+        candidate.validationDecisiveWinRate < 0 ||
+        candidate.validationDecisiveWinRate > 1 ||
+        exactAnchor.validationDecisiveWinRate < 0 ||
+        exactAnchor.validationDecisiveWinRate > 1 ||
+        (candidate.validationEvidenceSha256 !== null && !/^[a-f0-9]{64}$/.test(candidate.validationEvidenceSha256)) ||
+        (exactAnchor.validationEvidenceSha256 !== null && !/^[a-f0-9]{64}$/.test(exactAnchor.validationEvidenceSha256))
     ) {
-        throw new Error("Invalid v0.8 campaign promotion strength requirement");
+        throw new Error("Invalid v0.8 campaign validation strength evidence");
     }
     return (
-        Number.isFinite(candidateWinRate) &&
-        candidateWinRate >= 0 &&
-        candidateWinRate <= 1 &&
-        candidateWinRate >= requirement.incumbentCandidateWinRate + requirement.minimumCandidateWinRateDelta &&
-        Number.isFinite(decisiveWinRate) &&
-        decisiveWinRate >= 0 &&
-        decisiveWinRate <= 1 &&
-        decisiveWinRate >= requirement.incumbentDecisiveWinRate + requirement.minimumDecisiveWinRateDelta
+        candidate.validationRuns > 0 &&
+        candidate.validationRuns === exactAnchor.validationRuns &&
+        candidate.validationGames > 0 &&
+        candidate.validationGames === exactAnchor.validationGames &&
+        candidate.validationEvidenceSha256 !== null &&
+        candidate.validationEvidenceSha256 === exactAnchor.validationEvidenceSha256 &&
+        candidate.validationCandidateWinRate >= exactAnchor.validationCandidateWinRate &&
+        candidate.validationDecisiveWinRate >= exactAnchor.validationDecisiveWinRate
     );
 }
 
 /** Research fitness is never deployable until replayed inside the reviewed bounded operational envelope. */
 export function isV08CampaignPromotionEligible(
     evidence: IV08CampaignPromotionEvidence,
-    strengthRequirement: IV08CampaignPromotionStrengthRequirement = V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+    exactAnchor: IV08CampaignValidationStrengthEvidence,
 ): boolean {
     return (
+        !evidence.isExactAnchor &&
         !evidence.unboundedSearch &&
         evidence.hasValidationEvidence &&
         evidence.level4CoveragePassed &&
-        isV08CampaignPromotionStrengthQualified(
-            evidence.candidateWinRate,
-            evidence.decisiveWinRate,
-            strengthRequirement,
-        ) &&
+        isV08CampaignPromotionStrengthQualified(evidence, exactAnchor) &&
+        Number.isFinite(evidence.armageddonRate) &&
+        evidence.armageddonRate >= 0 &&
         evidence.armageddonRate <= ARMAGEDDON_RATE_GATE &&
+        Number.isFinite(evidence.level4ArmageddonRate) &&
+        evidence.level4ArmageddonRate >= 0 &&
         evidence.level4ArmageddonRate <= ARMAGEDDON_RATE_GATE
     );
 }
@@ -1189,13 +1499,107 @@ export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean 
         kind?: unknown;
         adaptive?: { generatorVersion?: unknown };
         scheduler?: { version?: unknown };
+        campaignBaseIdentity?: {
+            campaignCandidateCount?: unknown;
+            exactAnchor?: { id?: unknown; genomeSha256?: unknown };
+            inactiveControls?: Array<{ id?: unknown }>;
+        };
+        selection?: { version?: unknown; exactAnchorCandidateId?: unknown };
+        promotionComparison?: { version?: unknown; exactAnchorCandidateId?: unknown };
     };
     return (
         manifest?.schema === V08_CAMPAIGN_SCHEMA &&
         manifest.kind === "manifest" &&
         manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
-        manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION
+        manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION &&
+        manifest.campaignBaseIdentity?.campaignCandidateCount === BASE_CANDIDATE_COUNT &&
+        manifest.campaignBaseIdentity.exactAnchor?.id === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
+        manifest.campaignBaseIdentity.exactAnchor.genomeSha256 === V08_TEST_CANDIDATE_GENOME_SHA256 &&
+        Array.isArray(manifest.campaignBaseIdentity.inactiveControls) &&
+        fingerprintV08AlignedV1(manifest.campaignBaseIdentity.inactiveControls.map(({ id }) => id)) ===
+            fingerprintV08AlignedV1(V08_CAMPAIGN_INACTIVE_CONTROL_IDS) &&
+        manifest.selection?.version === V08_CAMPAIGN_SELECTION_VERSION &&
+        manifest.selection.exactAnchorCandidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
+        manifest.promotionComparison?.version === V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION &&
+        manifest.promotionComparison.exactAnchorCandidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID
     );
+}
+
+export interface IV08CampaignAdaptiveCatalogProvenanceExpectation {
+    manifestFingerprint: string;
+    campaignBaseIdentitySha256: string;
+}
+
+/** Minimal resume header check binding generator v4 to the full production-48-plus-c48 campaign base. */
+export function isV08CampaignAdaptiveCatalogProvenanceCurrent(
+    value: unknown,
+    expected: IV08CampaignAdaptiveCatalogProvenanceExpectation,
+): boolean {
+    const catalog = value as {
+        schema?: unknown;
+        kind?: unknown;
+        manifestFingerprint?: unknown;
+        generatorVersion?: unknown;
+        sourceCampaignBaseIdentitySha256?: unknown;
+        exactAnchorGenomeSha256?: unknown;
+    };
+    return (
+        /^[a-f0-9]{64}$/.test(expected.manifestFingerprint) &&
+        /^[a-f0-9]{64}$/.test(expected.campaignBaseIdentitySha256) &&
+        catalog?.schema === V08_CAMPAIGN_SCHEMA &&
+        catalog.kind === "adaptive-catalog" &&
+        catalog.manifestFingerprint === expected.manifestFingerprint &&
+        catalog.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
+        catalog.sourceCampaignBaseIdentitySha256 === expected.campaignBaseIdentitySha256 &&
+        catalog.exactAnchorGenomeSha256 === V08_TEST_CANDIDATE_GENOME_SHA256
+    );
+}
+
+function campaignCandidateDescriptors(
+    bindings: readonly IV08AlignedV1CandidateBinding[],
+    unboundedSearch: boolean,
+): IManifestCandidate[] {
+    return bindings.map((binding, index) => {
+        const environment = effectiveBehaviorEnvironment(binding, "<job-audit-path>", unboundedSearch);
+        return {
+            index,
+            id: candidateId(index),
+            label: binding.genome.search.label ?? null,
+            genomeSha256: binding.genomeSha256,
+            bindingSha256: fingerprintV08AlignedV1(binding),
+            effectiveBehaviorEnvironmentSha256: fingerprintV08AlignedV1(environment),
+        };
+    });
+}
+
+function buildCampaignBaseIdentity(candidates: readonly IManifestCandidate[]): ICampaignBaseIdentity {
+    const productionIdentity = buildV08AlignedV1ProductionCatalogIdentity();
+    const exactAnchor = candidates[V08_CAMPAIGN_EXACT_ANCHOR_INDEX];
+    const inactiveControls = V08_CAMPAIGN_INACTIVE_CONTROL_IDS.map((id) =>
+        candidates.find((candidate) => candidate.id === id),
+    );
+    if (
+        candidates.length !== BASE_CANDIDATE_COUNT ||
+        !exactAnchor ||
+        exactAnchor.id !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
+        exactAnchor.genomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        inactiveControls.some((candidate) => candidate === undefined)
+    ) {
+        throw new Error("Campaign base candidates do not contain the pinned anchor/control identities");
+    }
+    const unsigned = {
+        schemaVersion: 1 as const,
+        productionCatalogSha256: productionIdentity.catalogSha256,
+        productionCandidateCount: PRODUCTION_CANDIDATE_COUNT as typeof PRODUCTION_CANDIDATE_COUNT,
+        campaignCandidateCount: BASE_CANDIDATE_COUNT as typeof BASE_CANDIDATE_COUNT,
+        orderedCandidateGenomeSha256: candidates.map(({ genomeSha256 }) => genomeSha256),
+        exactAnchor: structuredClone(exactAnchor),
+        inactiveControls: inactiveControls.map((candidate) => structuredClone(candidate!)) as [
+            IManifestCandidate,
+            IManifestCandidate,
+        ],
+    };
+    return { ...unsigned, identitySha256: fingerprintV08AlignedV1(unsigned) };
 }
 
 function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IManifest {
@@ -1215,6 +1619,7 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         maxWorkers: cli.maxWorkers,
         unboundedSearch: cli.unboundedSearch,
     };
+    const candidates = campaignCandidateDescriptors(bindings, cli.unboundedSearch);
     const unsigned = {
         schema: SCHEMA,
         kind: "manifest" as const,
@@ -1232,7 +1637,21 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         liveMaps: LIVE_MAPS as typeof LIVE_MAPS,
         armageddonRateGate: ARMAGEDDON_RATE_GATE as typeof ARMAGEDDON_RATE_GATE,
         researchRanking: V08_CAMPAIGN_RESEARCH_RANKING,
-        promotionStrength: V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+        reserveEligibility: V08_CAMPAIGN_RESERVE_ELIGIBILITY,
+        selection: {
+            version: V08_CAMPAIGN_SELECTION_VERSION as typeof V08_CAMPAIGN_SELECTION_VERSION,
+            exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
+            inactiveControlCandidateIds: V08_CAMPAIGN_INACTIVE_CONTROL_IDS,
+            minimumValidationCandidates: 2 as const,
+            strategy: "exact-anchor_then_inactive-control_then_strength_then_total-arm-reserve" as const,
+        },
+        promotionComparison: {
+            version: V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION as typeof V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION,
+            exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
+            evidence: "fully-committed-common-random-validation-rounds" as const,
+            minimumCandidateWinRateDelta: 0 as const,
+            minimumDecisiveWinRateDelta: 0 as const,
+        },
         scheduler: {
             version: V08_CAMPAIGN_SCHEDULER_VERSION as typeof V08_CAMPAIGN_SCHEDULER_VERSION,
             discipline: "work-conserving-fifo" as const,
@@ -1251,17 +1670,8 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
             level4ReserveMultiplier: LEVEL4_RESERVE_MULTIPLIER as typeof LEVEL4_RESERVE_MULTIPLIER,
         },
         catalogIdentity: buildV08AlignedV1ProductionCatalogIdentity(),
-        candidates: bindings.map((binding, index) => {
-            const environment = effectiveBehaviorEnvironment(binding, "<job-audit-path>", cli.unboundedSearch);
-            return {
-                index,
-                id: candidateId(index),
-                label: binding.genome.search.label ?? null,
-                genomeSha256: binding.genomeSha256,
-                bindingSha256: fingerprintV08AlignedV1(binding),
-                effectiveBehaviorEnvironmentSha256: fingerprintV08AlignedV1(environment),
-            };
-        }),
+        campaignBaseIdentity: buildCampaignBaseIdentity(candidates),
+        candidates,
     };
     return { ...unsigned, fingerprint: fingerprintV08AlignedV1(unsigned) };
 }
@@ -1291,14 +1701,25 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         unboundedSearch: cli.unboundedSearch,
     };
     const expectedCatalog = buildV08AlignedV1ProductionCatalogIdentity();
+    const expectedCandidates = campaignCandidateDescriptors(bindings, cli.unboundedSearch);
+    const expectedCampaignBaseIdentity = buildCampaignBaseIdentity(expectedCandidates);
     if (
         !isV08CampaignManifestProvenanceCurrent(manifest) ||
         manifest.fingerprint !== fingerprintV08AlignedV1({ ...manifest, fingerprint: undefined }) ||
         JSON.stringify(manifest.config) !== JSON.stringify(requested) ||
         manifest.catalogIdentity.catalogSha256 !== expectedCatalog.catalogSha256 ||
+        fingerprintV08AlignedV1(manifest.campaignBaseIdentity) !==
+            fingerprintV08AlignedV1(expectedCampaignBaseIdentity) ||
         manifest.researchRanking !== V08_CAMPAIGN_RESEARCH_RANKING ||
-        fingerprintV08AlignedV1(manifest.promotionStrength) !==
-            fingerprintV08AlignedV1(V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH) ||
+        fingerprintV08AlignedV1(manifest.reserveEligibility) !==
+            fingerprintV08AlignedV1(V08_CAMPAIGN_RESERVE_ELIGIBILITY) ||
+        manifest.selection.strategy !== "exact-anchor_then_inactive-control_then_strength_then_total-arm-reserve" ||
+        manifest.selection.minimumValidationCandidates !== 2 ||
+        fingerprintV08AlignedV1(manifest.selection.inactiveControlCandidateIds) !==
+            fingerprintV08AlignedV1(V08_CAMPAIGN_INACTIVE_CONTROL_IDS) ||
+        manifest.promotionComparison.evidence !== "fully-committed-common-random-validation-rounds" ||
+        manifest.promotionComparison.minimumCandidateWinRateDelta !== 0 ||
+        manifest.promotionComparison.minimumDecisiveWinRateDelta !== 0 ||
         manifest.scheduler.discipline !== "work-conserving-fifo" ||
         manifest.scheduler.validationEvidenceCommit !== "complete-round-only" ||
         manifest.scheduler.validationRoundPipelining !== false ||
@@ -1309,7 +1730,7 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         manifest.adaptive.computeExpansionAllowed !== false ||
         manifest.adaptive.level4ReserveMultiplier !== LEVEL4_RESERVE_MULTIPLIER ||
         manifest.candidates.length !== bindings.length ||
-        manifest.candidates.some((candidate, index) => candidate.genomeSha256 !== bindings[index]?.genomeSha256)
+        fingerprintV08AlignedV1(manifest.candidates) !== fingerprintV08AlignedV1(expectedCandidates)
     ) {
         throw new Error(`Existing campaign manifest is incompatible or corrupt: ${path}`);
     }
@@ -1338,6 +1759,77 @@ function completedJobSpec(job: ICompletedJob): IJobSpec {
         ...(job.pairsPerLane === undefined ? {} : { pairsPerLane: job.pairsPerLane }),
         baseSeed: job.baseSeed,
     };
+}
+
+export interface IV08CampaignValidationRoundCensusInput {
+    completed: readonly Pick<ICompletedJob, "id" | "kind" | "candidateId" | "games" | "baseSeed">[];
+    nextValidationRound: number;
+    candidateIds: readonly string[];
+    validationGames: number;
+    validationSeed: number;
+}
+
+/** Fail closed unless every committed round contains the exact persisted shortlist on one common seed panel. */
+export function assertV08CampaignCommittedValidationRoundCensus({
+    completed,
+    nextValidationRound,
+    candidateIds,
+    validationGames,
+    validationSeed,
+}: IV08CampaignValidationRoundCensusInput): void {
+    if (
+        !Number.isSafeInteger(nextValidationRound) ||
+        nextValidationRound < 0 ||
+        !Number.isSafeInteger(validationGames) ||
+        validationGames < 1 ||
+        !Number.isSafeInteger(validationSeed) ||
+        validationSeed < 0 ||
+        validationSeed > 0xffffffff ||
+        new Set(candidateIds).size !== candidateIds.length ||
+        candidateIds.some((id) => typeof id !== "string" || !id)
+    ) {
+        throw new Error("Invalid committed validation-round census input");
+    }
+    const candidateSet = new Set(candidateIds);
+    const committed = new Set<string>();
+    const seenValidation = new Set<string>();
+    let validationJobs = 0;
+    for (const job of completed) {
+        if (job.kind !== "validation") continue;
+        validationJobs += 1;
+        const match = /^validation-r(\d+)-(.+)$/.exec(job.id);
+        if (!match || match[2] !== job.candidateId) {
+            throw new Error(`Validation job ${job.id} has a non-canonical round identity`);
+        }
+        const round = Number(match[1]);
+        const expectedId = `validation-r${String(round).padStart(3, "0")}-${job.candidateId}`;
+        if (
+            !Number.isSafeInteger(round) ||
+            round > nextValidationRound ||
+            job.id !== expectedId ||
+            !candidateSet.has(job.candidateId) ||
+            job.games !== validationGames ||
+            job.baseSeed !== (validationSeed + round * 1_000_003) >>> 0
+        ) {
+            throw new Error(`Validation job ${job.id} is outside the persisted common-random round plan`);
+        }
+        const key = `${round}:${job.candidateId}`;
+        if (seenValidation.has(key)) throw new Error(`Validation round contains duplicate ${key}`);
+        seenValidation.add(key);
+        if (round < nextValidationRound) {
+            committed.add(key);
+        }
+    }
+    if ((nextValidationRound > 0 || validationJobs > 0) && candidateIds.length < 2) {
+        throw new Error("Committed validation evidence requires a persisted shortlist");
+    }
+    for (let round = 0; round < nextValidationRound; round += 1) {
+        for (const candidateId of candidateIds) {
+            if (!committed.has(`${round}:${candidateId}`)) {
+                throw new Error(`Committed validation round ${round} is missing candidate ${candidateId}`);
+            }
+        }
+    }
 }
 
 /** Validation artifacts are evidence only after every shortlisted candidate in their round has committed. */
@@ -1493,6 +1985,44 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
     return result;
 }
 
+function assertValidationSelectionHeader(selection: IValidationSelection, manifest: IManifest): void {
+    const inactive = manifest.campaignBaseIdentity.inactiveControls.find(
+        ({ id }) => id === selection.inactiveControlCandidateId,
+    );
+    if (
+        selection.schema !== "hoc.v0_8_aggressive_validation_selection.v1" ||
+        selection.version !== V08_CAMPAIGN_SELECTION_VERSION ||
+        selection.manifestFingerprint !== manifest.fingerprint ||
+        selection.exactAnchorCandidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
+        selection.exactAnchorGenomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        !V08_CAMPAIGN_INACTIVE_CONTROL_IDS.includes(selection.inactiveControlCandidateId) ||
+        !inactive ||
+        selection.inactiveControlGenomeSha256 !== inactive.genomeSha256 ||
+        !Array.isArray(selection.candidateIds) ||
+        !Array.isArray(selection.candidateGenomeSha256) ||
+        selection.candidateIds.length < 2 ||
+        selection.candidateIds.length !== selection.candidateGenomeSha256.length ||
+        selection.candidateIds.some((id) => typeof id !== "string" || !/^[a-z][a-z0-9]*$/i.test(id)) ||
+        selection.candidateGenomeSha256.some(
+            (genomeSha256) => typeof genomeSha256 !== "string" || !/^[a-f0-9]{64}$/.test(genomeSha256),
+        ) ||
+        selection.candidateIds[0] !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
+        selection.candidateGenomeSha256[0] !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        selection.candidateIds[1] !== selection.inactiveControlCandidateId ||
+        selection.candidateGenomeSha256[1] !== selection.inactiveControlGenomeSha256 ||
+        !selection.candidateIds.includes(V08_CAMPAIGN_EXACT_ANCHOR_ID) ||
+        !selection.candidateIds.includes(selection.inactiveControlCandidateId) ||
+        new Set(selection.candidateIds).size !== selection.candidateIds.length ||
+        typeof selection.sourceEvidenceSha256 !== "string" ||
+        !selection.sourceEvidenceSha256 ||
+        typeof selection.createdAt !== "string" ||
+        !Number.isFinite(Date.parse(selection.createdAt)) ||
+        selection.fingerprint !== fingerprintV08AlignedV1({ ...selection, fingerprint: undefined })
+    ) {
+        throw new Error("Checkpoint validation selection identity is invalid");
+    }
+}
+
 function loadCheckpoint(manifest: IManifest): ICheckpoint {
     const path = join(manifest.output, "checkpoint.json");
     if (!existsSync(path)) {
@@ -1504,7 +2034,7 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
             validationRound: 0,
             completed: [],
             adaptiveCatalog: null,
-            validationCandidateIds: [],
+            validationSelection: null,
             activeJobs: {},
             updatedAt: new Date().toISOString(),
         };
@@ -1519,14 +2049,15 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         checkpoint.validationRound < 0 ||
         !Array.isArray(checkpoint.completed) ||
         !(checkpoint.adaptiveCatalog === null || typeof checkpoint.adaptiveCatalog === "object") ||
-        !Array.isArray(checkpoint.validationCandidateIds) ||
-        checkpoint.validationCandidateIds.some((id) => typeof id !== "string") ||
-        new Set(checkpoint.validationCandidateIds).size !== checkpoint.validationCandidateIds.length ||
+        !(checkpoint.validationSelection === null || typeof checkpoint.validationSelection === "object") ||
         !checkpoint.activeJobs ||
         typeof checkpoint.activeJobs !== "object" ||
         Array.isArray(checkpoint.activeJobs)
     ) {
         throw new Error(`Invalid checkpoint: ${path}`);
+    }
+    if (checkpoint.validationSelection !== null) {
+        assertValidationSelectionHeader(checkpoint.validationSelection, manifest);
     }
     const completedIds = new Set<string>();
     for (const job of checkpoint.completed) {
@@ -1534,6 +2065,13 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         completedIds.add(job.id);
         validateResultArtifact(manifest, job, false);
     }
+    assertV08CampaignCommittedValidationRoundCensus({
+        completed: checkpoint.completed,
+        nextValidationRound: checkpoint.validationRound,
+        candidateIds: checkpoint.validationSelection?.candidateIds ?? [],
+        validationGames: manifest.config.validationGames,
+        validationSeed: manifest.config.validationSeed,
+    });
     for (const [id, active] of Object.entries(checkpoint.activeJobs)) {
         if (
             !active ||
@@ -1564,9 +2102,17 @@ function collectLeaderboard(
     adaptive: IAdaptiveCatalog | null,
     options: { kinds?: ReadonlySet<JobKind>; outputName?: string } = {},
 ): IRankedCandidate[] {
+    assertV08CampaignCommittedValidationRoundCensus({
+        completed: checkpoint.completed,
+        nextValidationRound: checkpoint.validationRound,
+        candidateIds: checkpoint.validationSelection?.candidateIds ?? [],
+        validationGames: manifest.config.validationGames,
+        validationSeed: manifest.config.validationSeed,
+    });
     const metadata = candidateMetadata(manifest, adaptive);
     const byCandidate = new Map<string, ITournamentSummaryWithReached[]>();
     const validationByCandidate = new Map<string, ITournamentSummaryWithReached[]>();
+    const validationEvidenceByCandidate = new Map<string, Array<{ round: number; games: number; baseSeed: number }>>();
     const level4ByCandidate = new Map<string, string[]>();
     for (const job of checkpoint.completed) {
         if (options.kinds && !options.kinds.has(job.kind)) continue;
@@ -1595,6 +2141,11 @@ function collectLeaderboard(
             const validationSummaries = validationByCandidate.get(job.candidateId) ?? [];
             validationSummaries.push(summary);
             validationByCandidate.set(job.candidateId, validationSummaries);
+            const match = /^validation-r(\d+)-/.exec(job.id);
+            if (!match || job.games === undefined) throw new Error(`Validation job ${job.id} has invalid evidence`);
+            const evidence = validationEvidenceByCandidate.get(job.candidateId) ?? [];
+            evidence.push({ round: Number(match[1]), games: job.games, baseSeed: job.baseSeed });
+            validationEvidenceByCandidate.set(job.candidateId, evidence);
         }
     }
     const rows = [...byCandidate.entries()].map(([id, summaries]) => {
@@ -1622,6 +2173,16 @@ function collectLeaderboard(
         const validationRuns = validationSummaries.length;
         const validationGames = validationSummaries.reduce((sum, summary) => sum + summary.games, 0);
         const hasValidationEvidence = validationRuns > 0;
+        const validationWinsA = validationSummaries.reduce((sum, summary) => sum + summary.a.wins, 0);
+        const validationWinsB = validationSummaries.reduce((sum, summary) => sum + summary.b.wins, 0);
+        const validationDraws = validationSummaries.reduce((sum, summary) => sum + summary.draws, 0);
+        const validationCandidateWinRate = validationGames ? validationWinsA / validationGames : 0;
+        const validationDecisiveWinRate =
+            validationWinsA + validationWinsB ? validationWinsA / (validationWinsA + validationWinsB) : 0.5;
+        const validationEvidence = (validationEvidenceByCandidate.get(id) ?? []).sort(
+            (left, right) => left.round - right.round,
+        );
+        const validationEvidenceSha256 = validationEvidence.length ? fingerprintV08AlignedV1(validationEvidence) : null;
         const candidateWinRate = games ? winsA / games : 0;
         const drawRate = games ? draws / games : 0;
         const decisiveWinRate = winsA + winsB ? winsA / (winsA + winsB) : 0.5;
@@ -1648,8 +2209,9 @@ function collectLeaderboard(
             0,
         );
         const level4ArmageddonRate = level4Games ? level4ArmageddonReached / level4Games : 1;
+        const hasLevel4Evidence = level4Summaries.length > 0;
         const level4CoveragePassed =
-            level4Summaries.length > 0 &&
+            hasLevel4Evidence &&
             level4Summaries.every(
                 (summary) =>
                     summary.lanes.length === 8 &&
@@ -1666,23 +2228,6 @@ function collectLeaderboard(
             armageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4ArmageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4CoveragePassed;
-        const passesStrengthGate = isV08CampaignPromotionStrengthQualified(
-            candidateWinRate,
-            decisiveWinRate,
-            manifest.promotionStrength,
-        );
-        const promotionEligible = isV08CampaignPromotionEligible(
-            {
-                unboundedSearch: manifest.config.unboundedSearch,
-                hasValidationEvidence,
-                level4CoveragePassed,
-                candidateWinRate,
-                decisiveWinRate,
-                armageddonRate,
-                level4ArmageddonRate,
-            },
-            manifest.promotionStrength,
-        );
         return {
             rank: 0,
             candidateId: id,
@@ -1693,6 +2238,12 @@ function collectLeaderboard(
             validationRuns,
             validationGames,
             hasValidationEvidence,
+            validationWinsA,
+            validationWinsB,
+            validationDraws,
+            validationCandidateWinRate,
+            validationDecisiveWinRate,
+            validationEvidenceSha256,
             games,
             winsA,
             winsB,
@@ -1711,13 +2262,32 @@ function collectLeaderboard(
             level4Games,
             level4ArmageddonReached,
             level4ArmageddonRate,
+            hasLevel4Evidence,
             level4CoveragePassed,
             passesArmageddonGate,
-            passesStrengthGate,
-            promotionEligible,
+            passesStrengthGate: false,
+            promotionEligible: false,
             level4SummaryPaths: level4ByCandidate.get(id) ?? [],
         };
     });
+    const exactAnchor = rows.find(
+        ({ candidateId }) => candidateId === manifest.promotionComparison.exactAnchorCandidateId,
+    );
+    if (exactAnchor) {
+        for (const row of rows) {
+            row.passesStrengthGate =
+                row.candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID &&
+                isV08CampaignPromotionStrengthQualified(row, exactAnchor);
+            row.promotionEligible = isV08CampaignPromotionEligible(
+                {
+                    ...row,
+                    isExactAnchor: row.candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID,
+                    unboundedSearch: manifest.config.unboundedSearch,
+                },
+                exactAnchor,
+            );
+        }
+    }
     rows.sort(
         (left, right) =>
             Number(right.promotionEligible) - Number(left.promotionEligible) ||
@@ -1732,13 +2302,95 @@ function collectLeaderboard(
         generatedAt: new Date().toISOString(),
         armageddonRateGate: ARMAGEDDON_RATE_GATE,
         researchRanking: V08_CAMPAIGN_RESEARCH_RANKING,
-        promotionStrength: manifest.promotionStrength,
+        reserveEligibility: manifest.reserveEligibility,
+        promotionComparison: manifest.promotionComparison,
         unboundedSearch: manifest.config.unboundedSearch,
         operationalReplayRequired: manifest.config.unboundedSearch,
         promotionCandidateId: rows.find((row) => row.promotionEligible)?.candidateId ?? null,
         rows,
     });
     return rows;
+}
+
+function validationSelectionEvidenceSha256(rows: readonly IRankedCandidate[]): string {
+    return fingerprintV08AlignedV1(
+        [...rows]
+            .sort((left, right) => left.candidateIndex - right.candidateIndex)
+            .map((row) => ({
+                candidateId: row.candidateId,
+                candidateIndex: row.candidateIndex,
+                genomeSha256: row.genomeSha256,
+                games: row.games,
+                winsA: row.winsA,
+                winsB: row.winsB,
+                draws: row.draws,
+                armageddonReached: row.armageddonReached,
+                nonLossArmageddonReached: row.nonLossArmageddonReached,
+                armageddonReachedCandidateWins: row.armageddonReachedCandidateWins,
+                armageddonReachedDraws: row.armageddonReachedDraws,
+                armageddonReachedCandidateLosses: row.armageddonReachedCandidateLosses,
+                candidateWinRate: row.candidateWinRate,
+                decisiveWinRate: row.decisiveWinRate,
+                level4Games: row.level4Games,
+                level4ArmageddonReached: row.level4ArmageddonReached,
+                hasLevel4Evidence: row.hasLevel4Evidence,
+                level4CoveragePassed: row.level4CoveragePassed,
+            })),
+    );
+}
+
+function buildValidationSelection(
+    manifest: IManifest,
+    rows: readonly IRankedCandidate[],
+    count: number,
+): IValidationSelection {
+    const candidateIds = selectValidationCandidateIds(rows, count);
+    const rowsById = new Map(rows.map((row) => [row.candidateId, row]));
+    const selected = candidateIds.map((id) => rowsById.get(id));
+    if (selected.some((row) => row === undefined)) throw new Error("Validation selection references a missing row");
+    const inactiveControlCandidateId = candidateIds[1];
+    if (!V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === inactiveControlCandidateId)) {
+        throw new Error("Validation selection did not retain the inactive-challenger control in slot 2");
+    }
+    const unsigned = {
+        schema: "hoc.v0_8_aggressive_validation_selection.v1" as const,
+        version: V08_CAMPAIGN_SELECTION_VERSION as typeof V08_CAMPAIGN_SELECTION_VERSION,
+        manifestFingerprint: manifest.fingerprint,
+        sourceEvidenceSha256: validationSelectionEvidenceSha256(rows),
+        exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
+        exactAnchorGenomeSha256: V08_TEST_CANDIDATE_GENOME_SHA256,
+        inactiveControlCandidateId: inactiveControlCandidateId as IValidationSelection["inactiveControlCandidateId"],
+        inactiveControlGenomeSha256: selected[1]!.genomeSha256,
+        candidateIds,
+        candidateGenomeSha256: selected.map((row) => row!.genomeSha256),
+        createdAt: new Date().toISOString(),
+    };
+    const selection = { ...unsigned, fingerprint: fingerprintV08AlignedV1(unsigned) };
+    assertValidationSelectionHeader(selection, manifest);
+    return selection;
+}
+
+function validateValidationSelection(
+    selection: IValidationSelection,
+    manifest: IManifest,
+    rows: readonly IRankedCandidate[],
+): void {
+    assertValidationSelectionHeader(selection, manifest);
+    const expectedIds = selectValidationCandidateIds(rows, manifest.config.topCandidates);
+    const rowsById = new Map(rows.map((row) => [row.candidateId, row]));
+    const expectedHashes = selection.candidateIds.map((id) => rowsById.get(id)?.genomeSha256);
+    if (
+        selection.sourceEvidenceSha256 !== validationSelectionEvidenceSha256(rows) ||
+        fingerprintV08AlignedV1(selection.candidateIds) !== fingerprintV08AlignedV1(expectedIds) ||
+        expectedHashes.some((hash) => hash === undefined) ||
+        fingerprintV08AlignedV1(selection.candidateGenomeSha256) !== fingerprintV08AlignedV1(expectedHashes) ||
+        selection.candidateIds.some((id, index) => {
+            const row = rowsById.get(id);
+            return !row?.hasLevel4Evidence || (index >= 2 && !row.level4CoveragePassed);
+        })
+    ) {
+        throw new Error("Persisted validation selection no longer matches its committed source evidence");
+    }
 }
 
 function baseScreenEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint): string {
@@ -1787,7 +2439,7 @@ function buildAdaptiveCatalog(
         kinds: new Set<JobKind>(["screen"]),
         outputName: "base-screen-leaderboard.json",
     });
-    const parentRows = rankV08CampaignResearchCandidates(baseRows).slice(0, ADAPTIVE_PARENT_COUNT);
+    const parentRows = selectV08CampaignAdaptiveParents(baseRows);
     if (parentRows.length !== ADAPTIVE_PARENT_COUNT) {
         throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT} ranked parents`);
     }
@@ -1802,21 +2454,24 @@ function buildAdaptiveCatalog(
     const children: IAdaptiveChild[] = [];
     const childrenPerParent = ADAPTIVE_CHILD_TARGET / ADAPTIVE_PARENT_COUNT;
     if (!Number.isSafeInteger(childrenPerParent)) throw new Error("Adaptive child target must divide parent count");
+    const proposalParents: IV08CampaignAdaptiveProposalParent[] = parents.map(({ row, genome }) => ({
+        candidateId: row.candidateId,
+        candidateIndex: row.candidateIndex,
+        genomeSha256: row.genomeSha256,
+        genome,
+    }));
 
-    for (const parent of parents) {
-        let accepted = 0;
-        for (const proposal of adaptiveProposals(parent, parents)) {
-            if (accepted >= childrenPerParent) break;
-            let normalized: IV08AlignedV1CandidateGenome;
-            try {
-                normalized = normalizeV08AlignedV1CandidateGenome(proposal.genome);
-            } catch {
-                continue;
-            }
-            assertAdaptiveComputeEnvelope(parent.genome, normalized);
-            assertAdaptiveMutationScope(parent.genome, normalized, proposal.mutation);
+    for (const [parentOffset, parent] of parents.entries()) {
+        const proposalParent = proposalParents[parentOffset]!;
+        const selectedProposals = selectV08CampaignAdaptiveChildProposals(
+            proposalParent,
+            proposalParents,
+            [...seen],
+            childrenPerParent,
+        );
+        for (const proposal of selectedProposals) {
+            const normalized = proposal.genome;
             const genomeSha256 = fingerprintV08AlignedV1CandidateGenome(normalized);
-            if (seen.has(genomeSha256)) continue;
 
             const childOffset = children.length;
             const id = adaptiveCandidateId(childOffset);
@@ -1841,15 +2496,20 @@ function buildAdaptiveCatalog(
             };
             children.push(child);
             seen.add(genomeSha256);
-            accepted += 1;
-        }
-        if (accepted !== childrenPerParent) {
-            throw new Error(`Adaptive parent ${parent.row.candidateId} produced only ${accepted} unique safe children`);
         }
     }
     if (children.length !== ADAPTIVE_CHILD_TARGET) {
         throw new Error(`Adaptive generator produced ${children.length}/${ADAPTIVE_CHILD_TARGET} children`);
     }
+    const exactAnchorChildren = children.filter(
+        ({ parentCandidateId }) => parentCandidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID,
+    );
+    const exactAnchorProposals = exactAnchorChildren.map(({ genome, mutation }) => ({ genome, mutation }));
+    assertExactAnchorMutationCoverage(exactAnchorProposals);
+    const exactAnchorMutationFields = exactAnchorChildren.map(({ mutation }) => mutation.field);
+    const exactAnchorMutationPlanSha256 = fingerprintV08AlignedV1(
+        exactAnchorChildren.map(({ id, mutation, genomeSha256 }) => ({ id, mutation, genomeSha256 })),
+    );
     const unsigned = {
         schema: SCHEMA,
         kind: "adaptive-catalog" as const,
@@ -1858,7 +2518,10 @@ function buildAdaptiveCatalog(
         automaticDeploy: false as const,
         manifestFingerprint: manifest.fingerprint,
         generatorVersion: ADAPTIVE_GENERATOR_VERSION as typeof ADAPTIVE_GENERATOR_VERSION,
-        sourceCatalogSha256: manifest.catalogIdentity.catalogSha256,
+        sourceCampaignBaseIdentitySha256: manifest.campaignBaseIdentity.identitySha256,
+        exactAnchorGenomeSha256: V08_TEST_CANDIDATE_GENOME_SHA256,
+        exactAnchorMutationFields,
+        exactAnchorMutationPlanSha256,
         screenEvidenceSha256,
         parentCandidateIds: parents.map(({ row }) => row.candidateId),
         parentGenomeSha256: parents.map(({ row }) => row.genomeSha256),
@@ -1877,6 +2540,10 @@ function validateAdaptiveCatalog(
 ): IAdaptiveCatalog {
     const expectedEvidence = baseScreenEvidenceSha256(manifest, checkpoint);
     if (
+        !isV08CampaignAdaptiveCatalogProvenanceCurrent(adaptive, {
+            manifestFingerprint: manifest.fingerprint,
+            campaignBaseIdentitySha256: manifest.campaignBaseIdentity.identitySha256,
+        }) ||
         adaptive.schema !== SCHEMA ||
         adaptive.kind !== "adaptive-catalog" ||
         adaptive.researchOnly !== true ||
@@ -1884,7 +2551,10 @@ function validateAdaptiveCatalog(
         adaptive.automaticDeploy !== false ||
         adaptive.manifestFingerprint !== manifest.fingerprint ||
         adaptive.generatorVersion !== ADAPTIVE_GENERATOR_VERSION ||
-        adaptive.sourceCatalogSha256 !== manifest.catalogIdentity.catalogSha256 ||
+        adaptive.exactAnchorGenomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        !Array.isArray(adaptive.exactAnchorMutationFields) ||
+        adaptive.exactAnchorMutationFields.some((field) => typeof field !== "string" || !field) ||
+        !/^[a-f0-9]{64}$/.test(adaptive.exactAnchorMutationPlanSha256) ||
         adaptive.screenEvidenceSha256 !== expectedEvidence ||
         adaptive.childTarget !== ADAPTIVE_CHILD_TARGET ||
         adaptive.children.length !== ADAPTIVE_CHILD_TARGET ||
@@ -1894,12 +2564,12 @@ function validateAdaptiveCatalog(
     ) {
         throw new Error("Adaptive catalog header, evidence, or fingerprint is invalid");
     }
-    const expectedParents = rankV08CampaignResearchCandidates(
+    const expectedParents = selectV08CampaignAdaptiveParents(
         collectLeaderboard(manifest, checkpoint, null, {
             kinds: new Set<JobKind>(["screen"]),
             outputName: "base-screen-leaderboard.json",
         }),
-    ).slice(0, ADAPTIVE_PARENT_COUNT);
+    );
     if (
         fingerprintV08AlignedV1(expectedParents.map(({ candidateId }) => candidateId)) !==
             fingerprintV08AlignedV1(adaptive.parentCandidateIds) ||
@@ -1909,6 +2579,38 @@ function validateAdaptiveCatalog(
         throw new Error("Adaptive catalog parents do not match the committed base-screen ranking");
     }
     const baseHashes = new Set(baseGenomes.map(fingerprintV08AlignedV1CandidateGenome));
+    const expectedProposalParents: IV08CampaignAdaptiveProposalParent[] = expectedParents.map((row) => ({
+        candidateId: row.candidateId,
+        candidateIndex: row.candidateIndex,
+        genomeSha256: row.genomeSha256,
+        genome: baseGenomes[row.candidateIndex]!,
+    }));
+    const expectedSeen = new Set(baseHashes);
+    const expectedChildren = expectedProposalParents.flatMap((parent) => {
+        const proposals = selectV08CampaignAdaptiveChildProposals(
+            parent,
+            expectedProposalParents,
+            [...expectedSeen],
+            ADAPTIVE_CHILD_TARGET / ADAPTIVE_PARENT_COUNT,
+        );
+        for (const { genome } of proposals) expectedSeen.add(fingerprintV08AlignedV1CandidateGenome(genome));
+        return proposals.map(({ genome, mutation }) => ({
+            parentCandidateId: parent.candidateId,
+            mutation,
+            genomeSha256: fingerprintV08AlignedV1CandidateGenome(genome),
+        }));
+    });
+    if (
+        fingerprintV08AlignedV1(
+            adaptive.children.map(({ parentCandidateId, mutation, genomeSha256 }) => ({
+                parentCandidateId,
+                mutation,
+                genomeSha256,
+            })),
+        ) !== fingerprintV08AlignedV1(expectedChildren)
+    ) {
+        throw new Error("Adaptive catalog children do not match generator v4's deterministic mutation plan");
+    }
     const seen = new Set(baseHashes);
     for (const [offset, child] of adaptive.children.entries()) {
         const parent = manifest.candidates.find(({ id }) => id === child.parentCandidateId);
@@ -1970,6 +2672,21 @@ function validateAdaptiveCatalog(
             throw new Error(`Adaptive child ${child.id} binding or genome fingerprint is invalid`);
         }
         seen.add(genomeSha256);
+    }
+    const exactAnchorChildren = adaptive.children.filter(
+        ({ parentCandidateId }) => parentCandidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID,
+    );
+    assertExactAnchorMutationCoverage(exactAnchorChildren.map(({ genome, mutation }) => ({ genome, mutation })));
+    const exactAnchorMutationFields = exactAnchorChildren.map(({ mutation }) => mutation.field);
+    const exactAnchorMutationPlanSha256 = fingerprintV08AlignedV1(
+        exactAnchorChildren.map(({ id, mutation, genomeSha256 }) => ({ id, mutation, genomeSha256 })),
+    );
+    if (
+        fingerprintV08AlignedV1(adaptive.exactAnchorMutationFields) !==
+            fingerprintV08AlignedV1(exactAnchorMutationFields) ||
+        adaptive.exactAnchorMutationPlanSha256 !== exactAnchorMutationPlanSha256
+    ) {
+        throw new Error("Adaptive catalog lost its persisted exact-anchor mutation identity");
     }
     return adaptive;
 }
@@ -2265,12 +2982,12 @@ async function runJobQueue(
 
 async function main(): Promise<void> {
     const cli = parseCli(process.argv.slice(2));
-    const baseGenomes = buildV08AlignedV1ProductionCandidateCatalog();
+    const baseGenomes = buildV08CampaignBaseGenomes();
     const baseBindings = baseGenomes.map((genome) =>
         validateV08AlignedV1CandidateBinding(bindV08AlignedV1Candidate(genome)),
     );
     if (baseBindings.length !== BASE_CANDIDATE_COUNT) {
-        throw new Error(`Expected exact ${BASE_CANDIDATE_COUNT}-candidate catalog, got ${baseBindings.length}`);
+        throw new Error(`Expected exact ${BASE_CANDIDATE_COUNT}-candidate campaign base, got ${baseBindings.length}`);
     }
     const manifest = loadOrCreateManifest(cli, baseBindings);
     const checkpoint = loadCheckpoint(manifest);
@@ -2337,7 +3054,12 @@ async function main(): Promise<void> {
     );
     // A zero count in a 256-game screen cannot establish the 0.1% target. Cover a fixed research-ranked reserve,
     // then let repeated fresh validation determine Armageddon safety without lucky-zero admission bias.
-    const level4Queue = rankV08CampaignResearchCandidates(preLevel4).slice(0, level4ReserveTarget);
+    const preLevel4ById = new Map(preLevel4.map((row) => [row.candidateId, row]));
+    const level4Queue = selectV08CampaignLevel4CandidateIds(preLevel4, level4ReserveTarget).map((id) => {
+        const row = preLevel4ById.get(id);
+        if (!row) throw new Error(`Level-4 reserve candidate ${id} is missing from the leaderboard`);
+        return row;
+    });
     let leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
     checkpoint.phase = "level4";
     saveCheckpoint(manifest, checkpoint);
@@ -2358,26 +3080,31 @@ async function main(): Promise<void> {
         const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
         if (!ok) return;
     }
-    collectLeaderboard(manifest, checkpoint, adaptive);
+    const validationSelectionSource = collectLeaderboard(manifest, checkpoint, adaptive, {
+        kinds: VALIDATION_SELECTION_SOURCE_KINDS,
+        outputName: "validation-selection-source-leaderboard.json",
+    });
 
     checkpoint.phase = "validation";
     saveCheckpoint(manifest, checkpoint);
     leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
-    if (!checkpoint.validationCandidateIds.length) {
-        checkpoint.validationCandidateIds = selectValidationCandidateIds(leaderboard, manifest.config.topCandidates);
+    if (checkpoint.validationSelection === null) {
+        checkpoint.validationSelection = buildValidationSelection(
+            manifest,
+            validationSelectionSource,
+            manifest.config.topCandidates,
+        );
         saveCheckpoint(manifest, checkpoint);
+    } else {
+        validateValidationSelection(checkpoint.validationSelection, manifest, validationSelectionSource);
     }
-    if (!checkpoint.validationCandidateIds.length) {
-        checkpoint.phase = "complete";
-        saveCheckpoint(manifest, checkpoint);
-        console.log("No candidate completed forced level-4 coverage; campaign ended without a promotion candidate.");
-        return;
-    }
+    const validationSelection = checkpoint.validationSelection;
+    if (validationSelection === null) throw new Error("Validation selection was not persisted");
     while (Date.now() < manifest.deadlineAtMs && !stopRequested) {
         leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
         const rowsById = new Map(leaderboard.map((row) => [row.candidateId, row]));
-        const top = checkpoint.validationCandidateIds.map((id) => rowsById.get(id)).filter((row) => row !== undefined);
-        if (top.length !== checkpoint.validationCandidateIds.length) {
+        const top = validationSelection.candidateIds.map((id) => rowsById.get(id)).filter((row) => row !== undefined);
+        if (top.length !== validationSelection.candidateIds.length) {
             throw new Error("Persisted validation shortlist does not match the candidate registry");
         }
         const round = checkpoint.validationRound;
