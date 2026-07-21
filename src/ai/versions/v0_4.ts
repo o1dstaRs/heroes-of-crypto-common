@@ -308,7 +308,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (this.canHourglass(unit, context)) return [{ type: "wait_turn", unitId: unit.getId() }];
         return undefined;
     }
-    private frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+    protected frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         if (!frontMoveOn || unit.getAttackType() !== MELEE || !unit.canMove()) return decision;
         const myRanged = context.unitsHolder
             .getAllAllies(unit.getTeam())

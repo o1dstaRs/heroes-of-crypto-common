@@ -15,6 +15,7 @@ import {
     isV08DirectCombatDecision,
     V08_DOMINANT_FINISH_HP_RATIO,
     V08_DOMINANT_FINISH_START_LAP,
+    V08_URGENT_FINISH_START_LAP,
     v08DominantFinishState,
 } from "../../src/ai/versions/v0_8_dominant_finish";
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../src/constants";
@@ -37,8 +38,8 @@ function strengthState(ownHp: number, enemyHp: number, lap: number, team: TeamTy
 }
 
 describe("v0.8 dominant-finish policy", () => {
-    it("arms at a two-to-one original-stack HP lead with three pre-Armageddon laps left", () => {
-        expect(V08_DOMINANT_FINISH_START_LAP).toBe(NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 3);
+    it("arms at a two-to-one original-stack HP lead with five pre-Armageddon laps left", () => {
+        expect(V08_DOMINANT_FINISH_START_LAP).toBe(NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 5);
         expect(V08_DOMINANT_FINISH_HP_RATIO).toBe(2);
 
         expect(strengthState(30, 10, V08_DOMINANT_FINISH_START_LAP - 1).state.active).toBe(false);
@@ -47,8 +48,21 @@ describe("v0.8 dominant-finish policy", () => {
             currentLap: V08_DOMINANT_FINISH_START_LAP,
             ownHp: 20,
             enemyHp: 10,
+            dominant: true,
+            urgent: false,
             active: true,
         });
+    });
+
+    it("forces every surviving army into a final sprint three laps before Armageddon", () => {
+        expect(V08_URGENT_FINISH_START_LAP).toBe(NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 3);
+        expect(strengthState(10, 20, V08_URGENT_FINISH_START_LAP - 1).state.active).toBe(false);
+        expect(strengthState(10, 20, V08_URGENT_FINISH_START_LAP).state).toMatchObject({
+            dominant: false,
+            urgent: true,
+            active: true,
+        });
+        expect(strengthState(10, 10, V08_URGENT_FINISH_START_LAP).state.active).toBe(true);
     });
 
     it("ignores summoned HP and is symmetric when the commanding side is swapped", () => {

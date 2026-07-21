@@ -207,7 +207,7 @@ describe("v0.8 aligned execution and map integrity", () => {
         );
     });
 
-    it("records seeded BLOCK_CENTER passives and distinguishes attack opportunities from mere movement", () => {
+    it("records seeded BLOCK_CENTER tactical waits while v0.8 removes mountain turns", () => {
         const record = playV08AlignedV1Task(fixedTask(3), searchOffBinding());
         const wait = record.execution.candidatePassiveAlternatives.explicitWait;
         const mountain = record.execution.candidatePassiveAlternatives.obstacleAttack;
@@ -217,10 +217,10 @@ describe("v0.8 aligned execution and map integrity", () => {
         expect(wait.withLegalAttackOrSpell > 0).toBe(true);
         expect(wait.withLegalMove > 0).toBe(true);
         expect(mountain.withLegalAttackOrSpell).toBe(0);
-        expect(mountain.withLegalMove > 0).toBe(true);
+        expect(mountain.withLegalMove).toBe(0);
         expect(record.execution.candidate.explicitWaits > 0).toBe(true);
         expect(record.execution.candidate.explicitDefends).toBe(0);
-        expect(record.execution.candidate.completedObstacleAttacks > 0).toBe(true);
+        expect(record.execution.candidate.completedObstacleAttacks).toBe(0);
     });
 
     it("pairs a search-overridden explicit defend with its incumbent attack and legal move", () => {

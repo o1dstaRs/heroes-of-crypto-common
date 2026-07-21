@@ -26,6 +26,7 @@ import {
     extractWaitFeaturesV2Raw,
     waitIncumbentKindOf,
 } from "../ai/versions/wait_scorer";
+import { isV08StrongerRangedPostureWait, selectV08DirectCombatCandidate } from "../ai/versions/v0_8";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
@@ -86,6 +87,13 @@ import {
  * and hard-passive fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured move set.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
+ * V08_AGGRESSIVE=1 is a research-only v0.8s policy constraint. It preserves v0.8's hard exclusion of generated
+ * Luck Shield/mountain challengers and its productive override for incumbent Luck Shield/mountain/no-op turns.
+ * An incumbent strategic wait remains scored and is replaced only when an engine-valid attack, spell, or move
+ * scores at least as well (a local zero gate). The explicit stronger-ranged posture wait keeps the normal rollout
+ * gate so a numerical tie cannot make its melee screen abandon superior shooters. Late combat retains v0.8's
+ * pre-Armageddon two-to-one-HP dominant-finish rule and forces an advance when no direct attack exists. The flag
+ * is deliberately scoped to v0.8s; plain v0.8 and historical versions are exact.
  * v0.8 goes further regardless of that probe: generated defend and mountain challengers are excluded. An
  * inherited defend/mountain remains candidate zero for fail-closed and observe-only semantics; normal active
  * search replaces it when an engine-valid productive challenger exists. Tactical wait remains a scored action.
@@ -258,6 +266,7 @@ const CHALLENGER_KINDS = new Set<CandidateKind>([
 ]);
 const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS = new Set<IncumbentKind>(["idle", "defend", "mine"]);
+const V08_AGGRESSIVE_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
 const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "move_unit",
@@ -281,6 +290,10 @@ function isProductiveCandidate(candidate: Pick<IEnumeratedCandidate, "kind" | "a
 
 function isDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
     return isV08DirectCombatDecision(candidate.actions);
+}
+
+function isPureMoveCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
+    return candidate.actions.length > 0 && candidate.actions.every((action) => action.type === "move_unit");
 }
 
 function isDominantFinishCombatReplacement(
@@ -469,6 +482,7 @@ export class SearchDriver {
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly activeChallengers: boolean;
+    private readonly aggressiveV08: boolean;
     private readonly observeOnly: boolean;
     private readonly incumbentKinds: ReadonlySet<IncumbentKind> | null;
     private readonly challengerKinds: ReadonlySet<CandidateKind> | null;
@@ -535,6 +549,7 @@ export class SearchDriver {
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
         this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
+        this.aggressiveV08 = this.mode === "search" && process.env.V08_AGGRESSIVE === "1";
         const rawObserveOnly = process.env.SEARCH_OBSERVE_ONLY;
         if (rawObserveOnly !== undefined && rawObserveOnly !== "" && rawObserveOnly !== "0" && rawObserveOnly !== "1") {
             throw new Error("SEARCH_OBSERVE_ONLY must be 0 or 1");
@@ -718,18 +733,23 @@ export class SearchDriver {
         }
         const incumbentKind = classifyActions(incumbent);
         const isV08Search = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
-        // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
-        // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. Ordinary waits must beat
-        // the rollout gate, while the separate dominant-finish tier may still force immediate combat late.
-        const prioritizeProductiveActions = isV08Search && V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind);
-        const prioritizeDominantFinish =
-            isV08Search &&
-            v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), this.deps.fightProperties.getCurrentLap())
-                .active;
-        const useProductiveFallback = (prioritizeProductiveActions || prioritizeDominantFinish) && !this.observeOnly;
+        const isAggressiveV08 = this.aggressiveV08 && V08_AGGRESSIVE_VERSIONS.has(version);
         if (this.incumbentKinds && !this.incumbentKinds.has(incumbentKind)) {
             return incumbent;
         }
+        const currentLap = this.deps.fightProperties.getCurrentLap();
+        // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
+        // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
+        // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
+        // two-to-one-HP dominant-finish tier may still force immediate combat late.
+        const prioritizeProductiveActions = isV08Search && V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS.has(incumbentKind);
+        const strongerRangedPostureWait =
+            incumbentKind === "wait" &&
+            isV08StrongerRangedPostureWait(unit, this.deps.unitsHolder, currentLap, incumbent);
+        const aggressiveWaitComparison = isAggressiveV08 && incumbentKind === "wait" && !strongerRangedPostureWait;
+        const prioritizeDominantFinish =
+            isV08Search && v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), currentLap).dominant;
+        const useProductiveFallback = (prioritizeProductiveActions || prioritizeDominantFinish) && !this.observeOnly;
         if (prioritizeDominantFinish) {
             this.counters.dominantFinishTurns += 1;
         }
@@ -767,14 +787,16 @@ export class SearchDriver {
             const set = enumerateCandidates(unit, context, incumbent, {
                 ...this.caps,
                 includeMountainAttacks: isV08Search,
-                enrichIncumbentMetadata: this.ilPath !== undefined,
+                enrichIncumbentMetadata: isV08Search || this.ilPath !== undefined,
             });
             const candidates = set.candidates.filter((candidate) => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
                 // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
-                if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) return false;
+                if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) {
+                    return false;
+                }
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
                 // enable the broader move experiment. Otherwise a unit with no attack can still choose wait,
                 // defend, or a mountain hit while a real reposition is available. SEARCH_INCLUDE_MOVES continues
@@ -817,6 +839,7 @@ export class SearchDriver {
                 prioritizeProductiveActions,
                 productiveFallback,
                 prioritizeDominantFinish,
+                aggressiveWaitComparison,
             );
         } finally {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
@@ -885,6 +908,7 @@ export class SearchDriver {
             horizon: this.mode === "oracle" ? "lap" : this.horizon,
             rollouts: this.rollouts,
             leaf: this.learnedV2 ? "learned_v2" : this.learned ? "learned" : "material",
+            aggressiveV08: this.aggressiveV08,
             ...(this.oppModel ? { oppModel: this.oppModel.version } : {}),
             decisions: c.decisions,
             searched: c.searched,
@@ -982,6 +1006,7 @@ export class SearchDriver {
         prioritizeProductiveActions = false,
         productiveFallback?: IEnumeratedCandidate,
         prioritizeDominantFinish = false,
+        aggressiveWaitComparison = false,
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -1022,15 +1047,41 @@ export class SearchDriver {
             const legalDirectCombatIndices = legalProductiveIndices.filter((index) =>
                 isDirectCombatCandidate(scoredCandidates[index]),
             );
+            const legalAdvanceIndices = legalProductiveIndices.filter((index) =>
+                isPureMoveCandidate(scoredCandidates[index]),
+            );
+            const preferredFinishingAttack = selectV08DirectCombatCandidate(
+                legalDirectCombatIndices.map((index) => scoredCandidates[index]),
+            );
+            const preferredFinishingAttackIndex = preferredFinishingAttack
+                ? scoredCandidates.indexOf(preferredFinishingAttack)
+                : -1;
+            const dominantFinishIndices =
+                preferredFinishingAttackIndex >= 0
+                    ? [preferredFinishingAttackIndex]
+                    : legalAdvanceIndices.length
+                      ? legalAdvanceIndices
+                      : legalProductiveIndices;
             const selectionIndices =
-                prioritizeDominantFinish && legalDirectCombatIndices.length
-                    ? legalDirectCombatIndices
+                prioritizeDominantFinish && dominantFinishIndices.length
+                    ? dominantFinishIndices
                     : prioritizeProductiveActions && legalProductiveIndices.length
                       ? legalProductiveIndices
-                      : scoredCandidates.map((_candidate, index) => index);
+                      : aggressiveWaitComparison
+                        ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
+                        : scoredCandidates.map((_candidate, index) => index);
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
-                if (means[index] > means[bestIdx]) bestIdx = index;
+                if (
+                    means[index] > means[bestIdx] ||
+                    (aggressiveWaitComparison &&
+                        bestIdx === 0 &&
+                        index > 0 &&
+                        means[index] !== -Infinity &&
+                        means[index] === means[bestIdx])
+                ) {
+                    bestIdx = index;
+                }
                 if (index > 0 && (bestChallengerIdx === -1 || means[index] > means[bestChallengerIdx])) {
                     bestChallengerIdx = index;
                 }
@@ -1103,9 +1154,10 @@ export class SearchDriver {
                 (prioritizeProductiveActions &&
                     isProductiveCandidate(scoredCandidates[bestIdx]) &&
                     !isProductiveCandidate(scoredCandidates[0])) ||
-                (prioritizeDominantFinish &&
-                    isDirectCombatCandidate(scoredCandidates[bestIdx]) &&
-                    !isDirectCombatCandidate(scoredCandidates[0])) ||
+                (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                (aggressiveWaitComparison &&
+                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                    means[bestIdx] >= means[0]) ||
                 means[bestIdx] - means[0] >= this.gate);
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
@@ -1221,10 +1273,23 @@ export class SearchDriver {
         prioritizeDominantFinish = false,
     ): IEnumeratedCandidate | undefined {
         const productiveCandidates = candidates.filter(isProductiveCandidate);
+        const directCombatCandidates = productiveCandidates.filter(isDirectCombatCandidate);
+        const preferredFinishingAttack = selectV08DirectCombatCandidate(directCombatCandidates);
+        const orderedDirectCombat = preferredFinishingAttack
+            ? [
+                  preferredFinishingAttack,
+                  ...directCombatCandidates.filter((candidate) => candidate !== preferredFinishingAttack),
+              ]
+            : directCombatCandidates;
         const orderedCandidates = prioritizeDominantFinish
             ? [
-                  ...productiveCandidates.filter(isDirectCombatCandidate),
-                  ...productiveCandidates.filter((candidate) => !isDirectCombatCandidate(candidate)),
+                  ...orderedDirectCombat,
+                  ...productiveCandidates.filter(
+                      (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
+                  ),
+                  ...productiveCandidates.filter(
+                      (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
+                  ),
               ]
             : productiveCandidates;
         for (const candidate of orderedCandidates) {
@@ -1261,14 +1326,30 @@ export class SearchDriver {
         const directCombat = prioritizeDominantFinish
             ? rankedChallengers.filter(({ index }) => isDirectCombatCandidate(candidates[index]))
             : [];
-        const productive = prioritizeProductiveActions
-            ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
+        const preferredFinishingAttack = selectV08DirectCombatCandidate(
+            directCombat.map(({ index }) => candidates[index]),
+        );
+        if (preferredFinishingAttack) {
+            directCombat.sort((left, right) => {
+                const leftPreferred = candidates[left.index] === preferredFinishingAttack;
+                const rightPreferred = candidates[right.index] === preferredFinishingAttack;
+                return leftPreferred === rightPreferred ? 0 : leftPreferred ? -1 : 1;
+            });
+        }
+        const advances = prioritizeDominantFinish
+            ? rankedChallengers.filter(({ index }) => isPureMoveCandidate(candidates[index]))
             : [];
+        const productive =
+            prioritizeProductiveActions || prioritizeDominantFinish
+                ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
+                : [];
         const ordered = directCombat.length
             ? [...directCombat, ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index]))]
-            : productive.length
-              ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
-              : rankedChallengers;
+            : advances.length
+              ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
+              : productive.length
+                ? [...productive, ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index]))]
+                : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
         return [candidates[0], ...challengers];
     }

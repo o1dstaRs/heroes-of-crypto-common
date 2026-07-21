@@ -14,16 +14,23 @@ import type { GameAction } from "../../engine/actions";
 import type { TeamType } from "../../generated/protobuf/v1/types_gen";
 import type { UnitsHolder } from "../../units/units_holder";
 
-/** Leave three complete laps to turn a commanding material lead into a clean elimination. */
-export const V08_DOMINANT_FINISH_START_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 3;
+/** Leave five complete laps to turn a commanding material lead into a clean elimination. */
+export const V08_DOMINANT_FINISH_START_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 5;
 
 /** "Way stronger" is deliberately conservative: current original-stack HP must be at least two-to-one. */
 export const V08_DOMINANT_FINISH_HP_RATIO = 2;
+
+/** With three laps left, every surviving v0.8 army must press for elimination regardless of material. */
+export const V08_URGENT_FINISH_START_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 3;
 
 export interface IV08DominantFinishState {
     readonly currentLap: number;
     readonly ownHp: number;
     readonly enemyHp: number;
+    /** Early five-lap finish window, armed only with at least a two-to-one original-stack HP lead. */
+    readonly dominant: boolean;
+    /** Universal three-lap terminal window; only immediate-kill retargeting is forced in balanced fights. */
+    readonly urgent: boolean;
     readonly active: boolean;
 }
 
@@ -37,8 +44,10 @@ export function isV08DirectCombatDecision(actions: readonly GameAction[]): boole
 }
 
 /**
- * Describe the narrow late-fight state in which v0.8 should force combat instead of protecting an already-large
- * win-probability estimate. Summons are excluded so a temporary/generated stack cannot arm the invariant.
+ * Describe the late-fight state in which v0.8 must force combat instead of protecting a saturated value estimate.
+ * A commanding two-to-one army starts five laps before Armageddon; every surviving army starts a universal final
+ * sprint three laps before it. Summons are excluded from the material comparison so a temporary/generated stack
+ * cannot arm the early invariant.
  */
 export function v08DominantFinishState(
     unitsHolder: UnitsHolder,
@@ -55,10 +64,10 @@ export function v08DominantFinishState(
         else enemyHp += hp;
     }
 
-    const active =
-        Number.isFinite(currentLap) &&
-        currentLap >= V08_DOMINANT_FINISH_START_LAP &&
-        enemyHp > 0 &&
-        ownHp >= V08_DOMINANT_FINISH_HP_RATIO * enemyHp;
-    return { currentLap, ownHp, enemyHp, active };
+    const validLap = Number.isFinite(currentLap);
+    const dominant =
+        validLap && currentLap >= V08_DOMINANT_FINISH_START_LAP && ownHp >= V08_DOMINANT_FINISH_HP_RATIO * enemyHp;
+    const urgent = validLap && currentLap >= V08_URGENT_FINISH_START_LAP;
+    const active = enemyHp > 0 && (dominant || urgent);
+    return { currentLap, ownHp, enemyHp, dominant: enemyHp > 0 && dominant, urgent: enemyHp > 0 && urgent, active };
 }

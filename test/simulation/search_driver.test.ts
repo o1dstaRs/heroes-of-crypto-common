@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumeratedCandidate } from "../../src/ai";
+import { isV08StrongerRangedPostureWait } from "../../src/ai/versions/v0_8";
 import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
@@ -72,6 +73,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
@@ -644,6 +646,58 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.counters.dominantFinishCombatOverrides).toBe(1);
     });
 
+    it("v0.8 dominant-finish advances before spending a no-attack turn on support", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const harness = buildBattle(921, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: id }];
+        const support: GameAction[] = [{ type: "cast_spell", casterId: id, spellName: "support" }];
+        const advance: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "spell", actions: support },
+            { kind: "move", actions: advance },
+        ] as unknown as IEnumeratedCandidate[];
+        const calls: Array<{ mode: string; kinds: string[] }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+            ) => GameAction[];
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push({ mode, kinds: scored.map(({ kind }) => kind) });
+            return scored.map(({ kind }) => (kind === "spell" ? 0.99 : kind === "incumbent" ? 0.9 : 0.01));
+        };
+
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), false, undefined, true)).toEqual(
+            advance,
+        );
+        expect(calls).toEqual([
+            { mode: "leaf", kinds: ["incumbent", "spell", "move"] },
+            { mode: "turns", kinds: ["incumbent", "move"] },
+        ]);
+    });
+
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.7", SEARCH_INCLUDE_MOVES: "1" });
         const harness = buildBattle(93, "v0.8s");
@@ -721,6 +775,14 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         probed.length = 0;
         expect(driver.firstEngineValidProductiveCandidate(unit, [incumbent, attack], 123, false)).toBe(incumbent);
+        expect(probed).toEqual(["move"]);
+
+        const support = {
+            kind: "spell",
+            actions: [{ type: "cast_spell", casterId: id, spellName: "support" }],
+        } as unknown as IEnumeratedCandidate;
+        probed.length = 0;
+        expect(driver.firstEngineValidProductiveCandidate(unit, [support, incumbent], 123, true)).toBe(incumbent);
         expect(probed).toEqual(["move"]);
     });
 
@@ -1002,6 +1064,238 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].map((candidate) => candidate.kind)).toContain("wait");
         expect(calls[0].slice(1).map((candidate) => candidate.kind)).not.toContain("defend");
+    });
+
+    it("V08_AGGRESSIVE keeps waits scored while hard-prioritizing only idle, Luck Shield, and mountain", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8", V08_AGGRESSIVE: "1" });
+        const h = buildBattle(203, "v0.8s");
+        const unit = h.activeUnit()!;
+        const id = unit.getId();
+        const calls: Array<{ kinds: string[]; prioritizeProductive: boolean; aggressiveWait: boolean }> = [];
+        const driver = h.makeDriver() as unknown as {
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seedBase: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+                aggressiveWaitComparison?: boolean,
+            ): GameAction[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.search = (
+            _unit,
+            candidates,
+            incumbent,
+            _seed,
+            _t0,
+            prioritizeProductive = false,
+            _fallback,
+            _finish,
+            aggressiveWait = false,
+        ) => {
+            calls.push({ kinds: candidates.slice(1).map(({ kind }) => kind), prioritizeProductive, aggressiveWait });
+            return incumbent;
+        };
+
+        const passiveIncumbents: GameAction[][] = [
+            [{ type: "end_turn", unitId: id, reason: "skip" }],
+            [{ type: "wait_turn", unitId: id }],
+            [{ type: "defend_turn", unitId: id }],
+            [{ type: "obstacle_attack", attackerId: id, targetPosition: { x: 7, y: 7 } }],
+        ];
+        for (const incumbent of passiveIncumbents) {
+            expect(driver.chooseDecision(unit, "v0.8s", incumbent)).toBe(incumbent);
+        }
+
+        expect(calls).toHaveLength(passiveIncumbents.length);
+        expect(calls.map(({ prioritizeProductive }) => prioritizeProductive)).toEqual([true, false, true, true]);
+        expect(calls.map(({ aggressiveWait }) => aggressiveWait)).toEqual([false, true, false, false]);
+        expect(calls[0].kinds).toContain("wait");
+        for (const call of calls) {
+            expect(call.kinds).not.toContain("defend");
+            expect(call.kinds).not.toContain("mine");
+        }
+
+        calls.length = 0;
+        const wait = passiveIncumbents[1];
+        expect(driver.chooseDecision(unit, "v0.8", wait)).toBe(wait);
+        expect(driver.chooseDecision(unit, "v0.8", passiveIncumbents[0])).toBe(passiveIncumbents[0]);
+        expect(calls).toHaveLength(2);
+        expect(calls[0].prioritizeProductive).toBe(false);
+        expect(calls[0].aggressiveWait).toBe(true);
+        expect(calls[1].kinds).toContain("wait");
+    });
+
+    it("V08_AGGRESSIVE replaces a wait only with an engine-valid productive action scoring at least as well", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            V08_AGGRESSIVE: "1",
+        });
+        const h = buildBattle(206, "v0.8s");
+        const unit = h.activeUnit()!;
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.scoreCandidates = (_unit, candidates) =>
+            candidates.map(({ kind }) => (kind === "incumbent" ? 0.99 : 0.01));
+
+        expect(driver.chooseDecision(unit, "v0.8s", wait)).toBe(wait);
+
+        const tiedHarness = buildBattle(206, "v0.8s");
+        const tiedUnit = tiedHarness.activeUnit()!;
+        const tiedWait: GameAction[] = [{ type: "wait_turn", unitId: tiedUnit.getId() }];
+        const tiedDriver = tiedHarness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        tiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        const tiedChoice = tiedDriver.chooseDecision(tiedUnit, "v0.8s", tiedWait);
+        expect(tiedChoice).not.toBe(tiedWait);
+        expect(hasProductiveAction(tiedChoice)).toBe(true);
+        expectEngineAcceptsProductiveDecision(tiedHarness, tiedChoice);
+
+        const rejectedHarness = buildBattle(206, "v0.8s");
+        const rejectedUnit = rejectedHarness.activeUnit()!;
+        const rejectedWait: GameAction[] = [{ type: "wait_turn", unitId: rejectedUnit.getId() }];
+        const rejectedDriver = rejectedHarness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        rejectedDriver.scoreCandidates = (_unit, candidates) =>
+            candidates.map(({ kind }) => (kind === "incumbent" ? 0.99 : -Infinity));
+        expect(rejectedDriver.chooseDecision(rejectedUnit, "v0.8s", rejectedWait)).toBe(rejectedWait);
+    });
+
+    it("keeps the normal rollout gate for an explicit stronger-ranged posture wait", () => {
+        const buildStrongPosture = () => {
+            const harness = buildBattle(203, "v0.8s");
+            const unit = [...harness.unitsHolder.getAllAllies(GREEN_TEAM)].find(
+                (candidate) =>
+                    !candidate.isDead() &&
+                    candidate.getAttackType() === PBTypes.AttackVals.MELEE &&
+                    !candidate.isRangeCapable() &&
+                    candidate.canMove(),
+            )!;
+            const ownShooters = harness.unitsHolder
+                .getAllAllies(GREEN_TEAM)
+                .filter((candidate) => !candidate.isDead() && candidate.isRangeCapable());
+            const enemyShooters = harness.unitsHolder
+                .getAllAllies(RED_TEAM)
+                .filter((candidate) => !candidate.isDead() && candidate.isRangeCapable());
+            expect(ownShooters.length).toBeGreaterThan(0);
+            expect(enemyShooters.length).toBeGreaterThan(0);
+            for (const shooter of ownShooters) shooter.setAmountAlive(1_000);
+            for (const shooter of enemyShooters) shooter.setAmountAlive(1);
+            harness.setActiveUnitId(unit.getId());
+            const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+            expect(
+                isV08StrongerRangedPostureWait(
+                    unit,
+                    harness.unitsHolder,
+                    harness.fightProperties.getCurrentLap(),
+                    wait,
+                ),
+            ).toBe(true);
+            return { harness, unit, wait };
+        };
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "0.1",
+            V08_AGGRESSIVE: "1",
+        });
+        const tied = buildStrongPosture();
+        const tiedDriver = tied.harness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        tiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        expect(tiedDriver.chooseDecision(tied.unit, "v0.8s", tied.wait)).toBe(tied.wait);
+
+        const better = buildStrongPosture();
+        const betterDriver = better.harness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        betterDriver.scoreCandidates = (_unit, candidates) =>
+            candidates.map(({ kind }) => (kind === "incumbent" ? 0.1 : 0.9));
+        const betterChoice = betterDriver.chooseDecision(better.unit, "v0.8s", better.wait);
+        expect(betterChoice).not.toBe(better.wait);
+        expect(hasProductiveAction(betterChoice)).toBe(true);
+    });
+
+    it("V08_AGGRESSIVE starts the two-to-one finish window five laps before Armageddon", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8", V08_AGGRESSIVE: "1" });
+        const h = buildBattle(207, "v0.8s");
+        const unit = h.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const finishFlags: boolean[] = [];
+        const driver = h.makeDriver() as unknown as {
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seedBase: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+            ): GameAction[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.search = (_unit, _candidates, current, _seed, _t0, _productive, _fallback, finish = false) => {
+            finishFlags.push(finish);
+            return current;
+        };
+
+        while (h.fightProperties.getCurrentLap() < V08_DOMINANT_FINISH_START_LAP - 1) {
+            h.fightProperties.flipLap();
+        }
+        expect(driver.chooseDecision(unit, "v0.8s", incumbent)).toBe(incumbent);
+
+        const enemyTeam = unit.getTeam() === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+        for (const enemy of h.unitsHolder.getAllAllies(enemyTeam)) {
+            enemy.applyDamage(Math.floor(enemy.getCumulativeHp() * 0.75), 0, new SceneLogMock());
+        }
+        h.fightProperties.flipLap();
+        expect(h.fightProperties.getCurrentLap()).toBe(V08_DOMINANT_FINISH_START_LAP);
+        expect(driver.chooseDecision(unit, "v0.8s", incumbent)).toBe(incumbent);
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+        expect(finishFlags).toEqual([false, true, true]);
     });
 
     it("SEARCH_ACTIVE_CHALLENGERS removes wait/defend challengers but never the incumbent anchor", () => {
