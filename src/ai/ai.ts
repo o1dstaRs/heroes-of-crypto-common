@@ -93,6 +93,52 @@ export function clearAITargetMemory(unitsHolder: UnitsHolder): void {
     previousTargetsByBattle.delete(unitsHolder);
 }
 
+/** The engine enforces Aggr only while the referenced target is still alive. */
+function liveForcedTargetId(unit: IUnitAIRepr, unitsHolder: UnitsHolder): string | undefined {
+    const targetId = unit.getTarget();
+    if (!targetId) {
+        return undefined;
+    }
+    const target = unitsHolder.getAllUnits().get(targetId);
+    return target && !target.isDead?.() ? targetId : undefined;
+}
+
+/** Mirror the engine's target-side melee guards before pathing toward or selecting a victim. */
+function canSelectMeleeTarget(unit: IUnitAIRepr, target: Unit, unitsHolder: UnitsHolder): boolean {
+    if (target.isDead?.() || target.getTeam() === unit.getTeam() || target.hasBuffActive?.("Hidden")) {
+        return false;
+    }
+
+    const forcedTargetId = liveForcedTargetId(unit, unitsHolder);
+    if (forcedTargetId && target.getId() !== forcedTargetId) {
+        return false;
+    }
+
+    const attacker = unitsHolder.getAllUnits().get(unit.getId());
+    return !(attacker?.hasDebuffActive?.("Cowardice") && attacker.getCumulativeHp?.() < target.getCumulativeHp?.());
+}
+
+function selectableMeleeTargetIdAt(
+    unit: IUnitAIRepr,
+    cell: HoCMath.XY,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+): string | undefined {
+    const occupantUnitId = grid.getOccupantUnitId(cell);
+    if (!occupantUnitId) {
+        return undefined;
+    }
+    const target = unitsHolder.getAllUnits().get(occupantUnitId);
+    if (!target) {
+        // `findTarget` is also a low-level grid/path helper and historically accepts grid-only test
+        // representations. Production battles always have a matching UnitsHolder entry; preserve the
+        // grid-only contract while still respecting an explicitly matching forced id when supplied.
+        const forcedTargetId = unit.getTarget();
+        return !forcedTargetId || forcedTargetId === occupantUnitId ? occupantUnitId : undefined;
+    }
+    return canSelectMeleeTarget(unit, target, unitsHolder) ? occupantUnitId : undefined;
+}
+
 export enum AIActionType {
     MELEE_ATTACK,
     RANGE_ATTACK,
@@ -162,30 +208,23 @@ export function findTarget(
     const unitCell = unit.getBaseCell();
     const unitTeam = unit.getTeam();
     const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
-    // Exclude dead and UNTARGETABLE (Disguise Aura -> "Hidden") enemies up front: the random fallback
-    // pick below otherwise selects them, and the engine rejects the resulting attack (attack_not_available).
+    // Apply the same target guards as the engine up front: the random fallback below must not select a
+    // dead/Hidden/Cowardice-barred victim or violate a live Aggr target.
     const enemiesAround = unitsHolder
         .allEnemiesAroundUnit(unit, false)
-        .filter((e) => !e.isDead() && !e.hasBuffActive("Hidden"));
+        .filter(
+            (e) =>
+                canSelectMeleeTarget(unit, e, unitsHolder) &&
+                GridMath.isPositionWithinGrid(grid.getSettings(), e.getPosition()),
+        );
     const hasNoMelee = unit.hasAbilityActive("No Melee");
-    for (const e of enemiesAround) {
-        if (e.isDead() || e.hasBuffActive("Hidden")) {
-            continue;
-        }
-
-        if (!GridMath.isPositionWithinGrid(grid.getSettings(), e.getPosition())) {
-            continue;
-        }
-
-        if (unit.getTarget() && unit.getTarget() === e.getId()) {
-            selectedEnemy = e;
-            break;
-        }
-
+    const forcedTargetId = liveForcedTargetId(unit, unitsHolder);
+    if (forcedTargetId) {
+        selectedEnemy = enemiesAround.find((e) => e.getId() === forcedTargetId);
+    } else {
         const previousTarget = previousTargets.get(unit.getId());
-        if (previousTarget && previousTarget === e.getId()) {
-            selectedEnemy = e;
-            break;
+        if (previousTarget) {
+            selectedEnemy = enemiesAround.find((e) => e.getId() === previousTarget);
         }
     }
 
@@ -315,6 +354,7 @@ export function findTarget(
                 matrix,
                 enemyTeam,
                 true,
+                (cell) => canUnitLandAt(unit, grid, cell),
             );
             if (saferCell && saferCell !== action.cellToMove()) {
                 action = new BasicAIAction(AIActionType.MOVE, saferCell, undefined, action.currentActiveKnownPaths());
@@ -332,6 +372,7 @@ export function findTarget(
                     matrix,
                     enemyTeam,
                     true,
+                    (cell) => canUnitLandAt(unit, grid, cell),
                 );
                 if (saferCell && saferCell !== destCell) {
                     action = new BasicAIAction(
@@ -815,6 +856,9 @@ export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.X
             { x: baseCell.x - 1, y: baseCell.y - 1 },
         );
     }
+    if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
+        return false;
+    }
     return (
         grid.areAllCellsEmpty(cells, unit.getId()) ||
         grid.canOccupyCells(cells, unit.hasAbilityActive("Made of Fire"), unit.hasAbilityActive("Made of Water"))
@@ -1104,6 +1148,11 @@ function preferBackstabAttackCell(
     if (!unit.isSmallSize() || !unit.hasAbilityActive("Backstab")) {
         return action;
     }
+    // A rooted/paralysed Scavenger may still strike an adjacent enemy from its current cell, but must not
+    // turn that legal stationary attack into a backstab move the engine will reject as cannot_move.
+    if (!unit.canMove()) {
+        return action;
+    }
 
     const targetCell = action.cellToAttack();
     const currentFromCell = action.cellToMove();
@@ -1181,8 +1230,9 @@ function preferBackstabAttackCell(
 /**
  * For ranged units: if the preferred destination is adjacent to an enemy (melee
  * threat), scan reachable cells for a safer spot NOT in melee range. Prefers cells
- * close to the preferred destination. For melee units: overridden by team-aware logic
- * in findTarget instead.
+ * close to the preferred destination. `canLandAt` keeps transit-only hazards and occupied
+ * footprints out of the candidate set. For melee units: overridden by team-aware logic in
+ * findTarget instead.
  */
 export function findSaferMoveCell(
     preferredCell: HoCMath.XY | undefined,
@@ -1190,18 +1240,30 @@ export function findSaferMoveCell(
     matrix: number[][],
     enemyTeam: number,
     isRangedUnit: boolean,
+    canLandAt?: (cell: HoCMath.XY) => boolean,
 ): HoCMath.XY | undefined {
     if (!preferredCell || !knownPaths || knownPaths.size === 0 || !isRangedUnit) {
         return preferredCell;
     }
 
+    const isLandable = (cell: HoCMath.XY): boolean => {
+        const val = HoCMath.matrixElementOrDefault(matrix, cell.x, cell.y, 0);
+        if (val === ObstacleType.BLOCK || val === ObstacleType.HOLE || val === enemyTeam) {
+            return false;
+        }
+        if (val === ObstacleType.LAVA || val === ObstacleType.WATER) {
+            return canLandAt?.(cell) ?? false;
+        }
+        return canLandAt?.(cell) ?? true;
+    };
     const preferredThreats = countMeleeThreatsToCell(preferredCell, matrix, enemyTeam);
-    if (preferredThreats === 0) {
+    const preferredIsLegal = isLandable(preferredCell);
+    if (preferredThreats === 0 && preferredIsLegal) {
         return preferredCell;
     }
 
-    let safestCell = preferredCell;
-    let safestThreats = preferredThreats;
+    let safestCell = preferredIsLegal ? preferredCell : undefined;
+    let safestThreats = preferredIsLegal ? preferredThreats : Infinity;
     let safestDist = Infinity;
 
     for (const [key] of knownPaths) {
@@ -1209,11 +1271,7 @@ export function findSaferMoveCell(
         const cy = key & 0xf;
         const candidateCell = { x: cx, y: cy };
 
-        const val = HoCMath.matrixElementOrDefault(matrix, cx, cy, 0);
-        if (val === ObstacleType.BLOCK || val === ObstacleType.HOLE || val === ObstacleType.LAVA) {
-            continue;
-        }
-        if (val === enemyTeam) {
+        if (!isLandable(candidateCell)) {
             continue;
         }
 
@@ -1481,16 +1539,8 @@ function doFindTarget(
                         continue;
                     }
 
-                    const occupantUnitId = grid.getOccupantUnitId({ x: x, y: y });
+                    const occupantUnitId = selectableMeleeTargetIdAt(unit, { x, y }, grid, unitsHolder);
                     if (!occupantUnitId) {
-                        continue;
-                    }
-
-                    // A Disguise-Aura unit with the "Hidden" buff is UNTARGETABLE — the engine rejects any
-                    // melee/move+melee strike against it (attack_not_available). The candidate-pool filter
-                    // above only guards the random fallback; this matrix scan picks enemy cells straight off
-                    // the grid, so skip Hidden occupants here too or the AI keeps proposing doomed melees.
-                    if (unitsHolder.getAllUnits().get(occupantUnitId)?.hasBuffActive?.("Hidden")) {
                         continue;
                     }
 
@@ -1523,10 +1573,7 @@ function doFindTarget(
                             const { knownPaths } = movePath;
 
                             if (depth === 0 && cellKey(layerCell) === cellKey(unitCell)) {
-                                const occupantUnitId = grid.getOccupantUnitId({ x: x, y: y });
-                                if (occupantUnitId) {
-                                    previousTargets.set(unit.getId(), occupantUnitId);
-                                }
+                                previousTargets.set(unit.getId(), occupantUnitId);
                                 return new BasicAIAction(
                                     AIActionType.MELEE_ATTACK,
                                     unitCell,
@@ -1645,15 +1692,8 @@ function doFindTarget(
                         continue;
                     }
 
-                    const occupantUnitId = grid.getOccupantUnitId({ x: x, y: y });
+                    const occupantUnitId = selectableMeleeTargetIdAt(unit, { x, y }, grid, unitsHolder);
                     if (!occupantUnitId) {
-                        continue;
-                    }
-
-                    // Hidden (Disguise Aura) units are untargetable — skip so the AI never proposes a melee
-                    // the engine rejects as attack_not_available (this scan reads enemy cells off the grid,
-                    // bypassing the candidate-pool Hidden filter).
-                    if (unitsHolder.getAllUnits().get(occupantUnitId)?.hasBuffActive?.("Hidden")) {
                         continue;
                     }
 
@@ -1679,10 +1719,7 @@ function doFindTarget(
                             const { knownPaths } = movePath;
 
                             if (depth === 0 && cellKey(layerCell) === cellKey(unitCell)) {
-                                const occupantUnitId = grid.getOccupantUnitId({ x: x, y: y });
-                                if (occupantUnitId) {
-                                    previousTargets.set(unit.getId(), occupantUnitId);
-                                }
+                                previousTargets.set(unit.getId(), occupantUnitId);
                                 return new BasicAIAction(
                                     AIActionType.MELEE_ATTACK,
                                     unitCell,
@@ -1866,9 +1903,11 @@ function doFindTarget(
         }
         return new BasicAIAction(
             AIActionType.MOVE,
-            resultRoute?.route[resultRoute?.route.length - 1],
+            usedInfinitPath && resultRouteIndex !== undefined
+                ? resultRoute?.route[resultRouteIndex]
+                : resultRoute?.route.at(-1),
             undefined,
-            movePath.knownPaths,
+            actualMovePath.knownPaths,
         );
     }
 
@@ -1917,7 +1956,10 @@ function doFindTarget(
             movePath.knownPaths,
         );
     }
-    let toMoveTo = resultRoute?.route[resultRoute?.route.length - 1];
+    const toMoveTo =
+        usedInfinitPath && resultRouteIndex !== undefined
+            ? resultRoute?.route[resultRouteIndex]
+            : resultRoute?.route.at(-1);
     if (debug) {
         console.log("action MOVE with cell to move to x:" + toMoveTo?.x + " t:" + toMoveTo?.y);
     }
@@ -1925,9 +1967,9 @@ function doFindTarget(
 
     return new BasicAIAction(
         AIActionType.MOVE,
-        resultRoute?.route[resultRoute?.route.length - 1],
+        toMoveTo,
         undefined,
-        movePath.knownPaths,
+        usedInfinitPath ? actualMovePath.knownPaths : movePath.knownPaths,
     );
 }
 

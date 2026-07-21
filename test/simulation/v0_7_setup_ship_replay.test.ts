@@ -23,7 +23,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // roster draws. Two runs produced this byte-identical digest.
 // Re-pinned again after raising L4 auto-bans 3 -> 5 (LIVE_AUTO_BANS_BY_LEVEL): banning more of the L4 pool
 // shifts the same seeded roster draws. Two runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "1016edff2b16232e41ca1738480da8876a87c88b0ad19e484bb36eb2d3b3f9e7";
+// Re-pinned after hardening v0.1 melee target legality and preferring enemies that already replied this lap;
+// the affected seeded combat actions legitimately change. Two runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "068fce6fbc516ed8ee3508457916e30f9ccc9a3e57c3189704357c6866e46303";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

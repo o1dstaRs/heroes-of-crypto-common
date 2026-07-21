@@ -10,14 +10,24 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
-import { getCellsAroundPosition, getPositionForCell } from "../../grid/grid_math";
+import {
+    getCellsAroundPosition,
+    getPositionForCell,
+    getRangeAttackSideCenter,
+    isCellWithinGrid,
+    isRangeAttackSideObservable,
+    RANGE_ATTACK_CELL_SIDES,
+    type RangeAttackCellSide,
+} from "../../grid/grid_math";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
-import type { XY } from "../../utils/math";
+import { getDistance, type XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
 
 export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 
@@ -25,12 +35,10 @@ export const otherTeam = (team: number): number =>
     team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
 
 /**
- * v0.1 — the frozen baseline. Decision-making is exactly today's shipping heuristic AI
- * (`AI.findTarget` + the same action mapping the live server runs in runServerAiTurn), so a v0.2 vs
- * v0.1 tournament measures real improvement against what currently ships. Placement is a simple,
- * deterministic role-based layout (melee in front, ranged/casters behind) — there was no AI placement
- * before, so this is the baseline placement to beat. Magic/aura play is intentionally NOT included in
- * v0.1; a caster simply advances/holds, leaving headroom for v0.2 to add spellcasting.
+ * v0.1 — the simple baseline. Decision-making is the shipping heuristic (`AI.findTarget` + the same
+ * action mapping the live server uses), hardened to emit only engine-legal actions. Placement is a
+ * deterministic role-based layout (melee in front, ranged/casters behind). Magic/aura play is
+ * intentionally NOT included; a caster simply advances/holds.
  */
 export class StrategyV0_1 implements IAIStrategy {
     public readonly version: string = "v0.1";
@@ -115,6 +123,10 @@ export class StrategyV0_1 implements IAIStrategy {
             if (!targetId) {
                 return this.fallbackTurn(unit, context);
             }
+            const shot = this.findLegalRangeAttack(unit, context, targetId);
+            if (!shot) {
+                return this.fallbackTurn(unit, context);
+            }
             const actions: GameAction[] = [];
             if (unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE) {
                 actions.push({
@@ -123,8 +135,7 @@ export class StrategyV0_1 implements IAIStrategy {
                     attackType: PBTypes.AttackVals.RANGE,
                 });
             }
-            // No aim is sent: the engine deterministically aims at the target's nearest visible edge.
-            actions.push({ type: "range_attack", attackerId: unit.getId(), targetId });
+            actions.push(shot);
             return actions;
         }
 
@@ -137,19 +148,40 @@ export class StrategyV0_1 implements IAIStrategy {
             }
             const targetCell = aiAction.cellToAttack();
             const attackFrom = aiAction.cellToMove() ?? unit.getBaseCell();
-            const targetId = targetCell ? grid.getOccupantUnitId(targetCell) : undefined;
+            let targetId = targetCell ? grid.getOccupantUnitId(targetCell) : undefined;
             if (!targetId || !attackFrom) {
                 return this.fallbackTurn(unit, context);
             }
-            const route =
-                type === AIActionType.MOVE_AND_MELEE_ATTACK ? this.routeForCell(aiAction, attackFrom) : undefined;
-            const actions: GameAction[] = [];
-            if (unit.getAttackTypeSelection() !== PBTypes.AttackVals.MELEE) {
-                actions.push({
-                    type: "select_attack_type",
-                    unitId: unit.getId(),
-                    attackType: PBTypes.AttackVals.MELEE,
-                });
+
+            const target = unitsHolder.getAllUnits().get(targetId);
+            if (!target || !this.isLegalMeleeTarget(unit, target, context)) {
+                return this.fallbackTurn(unit, context);
+            }
+
+            const attackFromCells = this.footprintForCell(unit, attackFrom, context);
+            if (!grid.areCellsAdjacent(attackFromCells, target.getCells())) {
+                return this.fallbackTurn(unit, context);
+            }
+
+            const base = unit.getBaseCell();
+            const movesToAttack = attackFrom.x !== base.x || attackFrom.y !== base.y;
+            if (movesToAttack && !unit.canMove()) {
+                return this.fallbackTurn(unit, context);
+            }
+            const route = movesToAttack ? this.routeForCell(aiAction, attackFrom) : undefined;
+            if (movesToAttack && !route?.route.length) {
+                return this.fallbackTurn(unit, context);
+            }
+
+            if (this.version === "v0.1") {
+                targetId = this.preferRespondedMeleeTarget(unit, context, targetId, attackFromCells);
+            }
+
+            const actions = meleeAttackTypeSelectionPrefix(unit);
+            const selected = unit.getAttackTypeSelection();
+            const alreadyMelee = selected === PBTypes.AttackVals.MELEE || selected === PBTypes.AttackVals.MELEE_MAGIC;
+            if (!alreadyMelee && !actions.length) {
+                return this.fallbackTurn(unit, context);
             }
             actions.push({
                 type: "melee_attack",
@@ -200,7 +232,7 @@ export class StrategyV0_1 implements IAIStrategy {
                 return this.fallbackTurn(unit, context);
             }
             const route = this.routeForCell(aiAction, targetCell);
-            if (!route?.route.length) {
+            if (!route || !this.isLegalMoveRoute(unit, context, targetCell, route)) {
                 return this.fallbackTurn(unit, context);
             }
             return [
@@ -218,8 +250,239 @@ export class StrategyV0_1 implements IAIStrategy {
         // MAGIC_ATTACK (and anything else): v0.1 doesn't cast — just advance toward the enemy / hold.
         return this.fallbackTurn(unit, context);
     }
+    /**
+     * Resolve v0.1's simple target choice into an exact engine-landable shot. The legacy no-aim shot stays
+     * first so ordinary open-field behaviour is unchanged; if its default edge is occluded, try every
+     * visible edge of that target, then the remaining live enemies, in deterministic roster order.
+     */
+    protected findLegalRangeAttack(
+        unit: Unit,
+        context: IDecisionContext,
+        preferredTargetId: string,
+    ): Extract<GameAction, { type: "range_attack" }> | undefined {
+        const enemies = context.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((target) => !target.isDead() && !target.hasBuffActive("Hidden"));
+        const preferred = enemies.find((target) => target.getId() === preferredTargetId);
+        const orderedTargets = preferred
+            ? [preferred, ...enemies.filter((target) => target.getId() !== preferredTargetId)]
+            : enemies;
+
+        for (const target of orderedTargets) {
+            const defaultShot: Extract<GameAction, { type: "range_attack" }> = {
+                type: "range_attack",
+                attackerId: unit.getId(),
+                targetId: target.getId(),
+            };
+            if (this.isRangeShotLandable(unit, context, defaultShot)) {
+                return defaultShot;
+            }
+
+            if (!context.attackHandler) {
+                continue;
+            }
+            const matrix = context.grid.getMatrix();
+            const through = unit.hasAbilityActive("Through Shot");
+            for (const cell of target.getCells()) {
+                for (const side of RANGE_ATTACK_CELL_SIDES) {
+                    if (!isRangeAttackSideObservable(matrix, cell, side, unit.getTeam(), through)) {
+                        continue;
+                    }
+                    const aimedShot: Extract<GameAction, { type: "range_attack" }> = {
+                        ...defaultShot,
+                        aimCell: { x: cell.x, y: cell.y },
+                        aimSide: side,
+                    };
+                    if (this.isRangeShotLandable(unit, context, aimedShot)) {
+                        return aimedShot;
+                    }
+                }
+            }
+        }
+        return undefined;
+    }
+    /** Mirror the range handler's pre-damage gates for this exact target cell/edge intent. */
+    protected isRangeShotLandable(
+        unit: Unit,
+        context: IDecisionContext,
+        action: Extract<GameAction, { type: "range_attack" }>,
+    ): boolean {
+        const target = context.unitsHolder.getAllUnits().get(action.targetId);
+        if (!target || target.isDead() || target.getTeam() === unit.getTeam() || target.hasBuffActive("Hidden")) {
+            return false;
+        }
+
+        const attackHandler = context.attackHandler;
+        if (!attackHandler) {
+            return true;
+        }
+        if (!attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))) {
+            return false;
+        }
+
+        const gridSettings = context.grid.getSettings();
+        const matrix = context.grid.getMatrix();
+        const from = unit.getPosition();
+        const through = unit.hasAbilityActive("Through Shot");
+        const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
+        const closestCell = (cells: XY[]): XY | undefined => {
+            let best: XY | undefined;
+            let bestDistance = Number.MAX_VALUE;
+            for (const cell of cells) {
+                const distance = getDistance(
+                    from,
+                    getPositionForCell(
+                        cell,
+                        gridSettings.getMinX(),
+                        gridSettings.getStep(),
+                        gridSettings.getHalfStep(),
+                    ),
+                );
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = cell;
+                }
+            }
+            return best;
+        };
+        const closestSide = (cell: XY, sides: readonly RangeAttackCellSide[]): RangeAttackCellSide => {
+            let best = sides[0];
+            let bestDistance = Number.MAX_VALUE;
+            for (const side of sides) {
+                const distance = getDistance(from, getRangeAttackSideCenter(gridSettings, cell, side, from));
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = side;
+                }
+            }
+            return best;
+        };
+
+        const targetCells = target.getCells();
+        const aimCell =
+            (action.aimCell &&
+                targetCells.find((cell) => cell.x === action.aimCell?.x && cell.y === action.aimCell?.y)) ??
+            closestCell(targetCells);
+        if (!aimCell) {
+            return false;
+        }
+        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
+            isRangeAttackSideObservable(matrix, aimCell, side, unit.getTeam(), through),
+        );
+        const to = !observableSides.length
+            ? target.getPosition()
+            : getRangeAttackSideCenter(
+                  gridSettings,
+                  aimCell,
+                  action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
+                      ? (action.aimSide as RangeAttackCellSide)
+                      : closestSide(aimCell, observableSides),
+                  from,
+              );
+        const evaluation = attackHandler.evaluateRangeAttack(
+            context.unitsHolder.getAllUnits(),
+            unit,
+            from,
+            to,
+            through,
+            false,
+            isAOE,
+        );
+        const firstGroup = evaluation.affectedUnits[0];
+        if (!firstGroup?.length || evaluation.rangeAttackDivisors.length !== evaluation.affectedUnits.length) {
+            return false;
+        }
+        const firstHit = firstGroup[0];
+        if (firstHit.isDead() || firstHit.getTeam() === unit.getTeam()) {
+            return false;
+        }
+        if (evaluation.affectedUnits.length === 1 && firstHit.hasBuffActive("Hidden")) {
+            return false;
+        }
+        const forcedTargetId = unit.getTarget();
+        const forcedTarget = forcedTargetId ? context.unitsHolder.getAllUnits().get(forcedTargetId) : undefined;
+        if (forcedTarget && !forcedTarget.isDead() && firstHit.getId() !== forcedTarget.getId()) {
+            return false;
+        }
+        return through || !unit.hasDebuffActive("Cowardice") || unit.getCumulativeHp() >= firstHit.getCumulativeHp();
+    }
+    /** Mirror the target-side checks in AttackHandler.handleMeleeAttack. */
+    protected isLegalMeleeTarget(unit: Unit, target: Unit, context: IDecisionContext): boolean {
+        if (target.isDead() || target.getTeam() === unit.getTeam() || target.hasBuffActive("Hidden")) {
+            return false;
+        }
+        if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < target.getCumulativeHp()) {
+            return false;
+        }
+        const forcedTargetId = unit.getTarget();
+        const forcedTarget = forcedTargetId ? context.unitsHolder.getAllUnits().get(forcedTargetId) : undefined;
+        return !forcedTarget || forcedTarget.isDead() || forcedTarget.getId() === target.getId();
+    }
+    /**
+     * Berserker-style v0.1 play stays deliberately simple: from the already-selected attack cell, prefer
+     * an adjacent legal enemy that has spent its one melee response this lap. Position and route stay
+     * unchanged, and a live Aggr target always wins.
+     */
+    protected preferRespondedMeleeTarget(
+        unit: Unit,
+        context: IDecisionContext,
+        currentTargetId: string,
+        attackFromCells: XY[],
+    ): string {
+        const fightProperties = context.fightProperties ?? FightStateManager.getInstance().getFightProperties();
+        if (fightProperties.hasAlreadyRepliedAttack(currentTargetId)) {
+            return currentTargetId;
+        }
+
+        const candidates = context.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter(
+                (target) =>
+                    target.getId() !== currentTargetId &&
+                    this.isLegalMeleeTarget(unit, target, context) &&
+                    fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
+                    context.grid.areCellsAdjacent(attackFromCells, target.getCells()),
+            )
+            .sort((a, b) => {
+                const threatA = Math.max(1, a.getAttackDamageMax()) * Math.max(1, a.getAmountAlive());
+                const threatB = Math.max(1, b.getAttackDamageMax()) * Math.max(1, b.getAmountAlive());
+                if (threatA !== threatB) {
+                    return threatB - threatA;
+                }
+                const cellA = a.getBaseCell();
+                const cellB = b.getBaseCell();
+                return cellA.y - cellB.y || cellA.x - cellB.x || a.getName().localeCompare(b.getName());
+            });
+        return candidates[0]?.getId() ?? currentTargetId;
+    }
     protected routeForCell(aiAction: IAIAction, cell: XY): IWeightedRoute | undefined {
         return aiAction.currentActiveKnownPaths().get(cellKey(cell))?.[0];
+    }
+    /** Keep MOVE proposals inside the same path, step-budget, continuity, and landing gates as the engine. */
+    protected isLegalMoveRoute(unit: Unit, context: IDecisionContext, targetCell: XY, route: IWeightedRoute): boolean {
+        if (!canUnitLandAt(unit, context.grid, targetCell)) {
+            return false;
+        }
+        const destination = route.route.at(-1);
+        if (!destination || destination.x !== targetCell.x || destination.y !== targetCell.y) {
+            return false;
+        }
+        const base = unit.getBaseCell();
+        const travelled =
+            route.route[0]?.x === base.x && route.route[0]?.y === base.y ? route.route.slice(1) : route.route;
+        if (!travelled.length || travelled.length > Math.max(1, Math.ceil(unit.getSteps()))) {
+            return false;
+        }
+        let previous = base;
+        for (const cell of travelled) {
+            const dx = Math.abs(cell.x - previous.x);
+            const dy = Math.abs(cell.y - previous.y);
+            if (!isCellWithinGrid(context.grid.getSettings(), cell) || (dx === 0 && dy === 0) || dx > 1 || dy > 1) {
+                return false;
+            }
+            previous = cell;
+        }
+        return true;
     }
     protected footprintForCell(unit: Unit, cell: XY, context: IDecisionContext): XY[] {
         if (unit.isSmallSize()) {
@@ -270,6 +533,9 @@ export class StrategyV0_1 implements IAIStrategy {
                 continue;
             }
             if (!canUnitLandAt(unit, grid, cell)) {
+                continue;
+            }
+            if (!this.isLegalMoveRoute(unit, context, cell, route)) {
                 continue;
             }
             const score = Math.min(

@@ -856,6 +856,24 @@ export class AttackHandler {
             );
         }
 
+        // A landed on-hit effect (notably Petrifying Gaze) can kill the primary target after the base-hit
+        // death check. Keep this collector idempotent because several response-death paths return early and
+        // Double Shot can reach the same bookkeeping later; a death must grant morale and be reported once.
+        const recordPrimaryTargetDeath = (): boolean => {
+            if (!targetUnit.isDead()) {
+                return false;
+            }
+            if (!unitIdsDied.includes(targetUnit.getId())) {
+                this.sceneLog.updateLog(`${targetUnit.getName()} died`);
+                unitIdsDied.push(targetUnit.getId());
+                attackerUnitPlusMorale += HoCConstants.MORALE_CHANGE_FOR_KILL;
+                this.updateMoraleDecreaseForTheUnitTeam(moraleDecreaseForTheUnitTeam, {
+                    [`${targetUnit.getName()}:${targetUnit.getTeam()}`]: HoCConstants.MORALE_CHANGE_FOR_KILL,
+                });
+            }
+            return true;
+        };
+
         let switchTargetUnit = false;
         if (!aoeRangeAttackResult?.landed || !isAOE) {
             if (!attackDamageApplied) {
@@ -912,32 +930,27 @@ export class AttackHandler {
                 }
             }
 
-            if (targetUnit.isDead()) {
-                switchTargetUnit = true;
-                if (!unitIdsDied.includes(targetUnit.getId())) {
-                    this.sceneLog.updateLog(`${targetUnit.getName()} died`);
-                    unitIdsDied.push(targetUnit.getId());
-                    attackerUnitPlusMorale += HoCConstants.MORALE_CHANGE_FOR_KILL;
-                    this.updateMoraleDecreaseForTheUnitTeam(moraleDecreaseForTheUnitTeam, {
-                        [`${targetUnit.getName()}:${targetUnit.getTeam()}`]: HoCConstants.MORALE_CHANGE_FOR_KILL,
-                    });
-                }
-            } else if (!isAttackMissed) {
+            if (!targetUnit.isDead() && !isAttackMissed) {
                 // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
                 // and still Stun it).
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
-                AllAbilities.processPetrifyingGazeAbility(
-                    attackerUnit,
-                    targetUnit,
-                    petrifyingGazeAttackDamage,
-                    this.sceneLog,
-                    this.damageStatisticHolder,
-                    (damageForAnimation.secondary ??= []),
-                    hoverRangeAttackDivisor,
-                );
+                // Area Throw / Large Caliber already resolved Gaze for every struck unit in the AOE
+                // processor. Keep the outer primary on-hit pass for its other effects, but do not petrify
+                // the unit-targeted primary a second time.
+                if (!aoeRangeAttackResult?.landed) {
+                    AllAbilities.processPetrifyingGazeAbility(
+                        attackerUnit,
+                        targetUnit,
+                        petrifyingGazeAttackDamage,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                        hoverRangeAttackDivisor,
+                    );
+                }
                 AllAbilities.processSpitBallAbility(
                     attackerUnit,
                     targetUnit,
@@ -946,6 +959,9 @@ export class AttackHandler {
                     this.grid,
                     this.sceneLog,
                 );
+            }
+            if (recordPrimaryTargetDeath()) {
+                switchTargetUnit = true;
             }
         }
 
@@ -1075,7 +1091,7 @@ export class AttackHandler {
                 (attackerUnit.hasDebuffActive("Cowardice") &&
                     attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
             ) {
-                if (targetUnit.isDead()) {
+                if (targetUnit.isDead() && !unitIdsDied.includes(targetUnit.getId())) {
                     unitIdsDied.push(targetUnit.getId());
                 }
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
@@ -1134,14 +1150,7 @@ export class AttackHandler {
         }
 
         if (!secondShotResult.aoeRangeAttackLanded) {
-            if (targetUnit.isDead() && !unitIdsDied.includes(targetUnit.getId())) {
-                this.sceneLog.updateLog(`${targetUnit.getName()} died`);
-                unitIdsDied.push(targetUnit.getId());
-                attackerUnitPlusMorale += HoCConstants.MORALE_CHANGE_FOR_KILL;
-                this.updateMoraleDecreaseForTheUnitTeam(moraleDecreaseForTheUnitTeam, {
-                    [`${targetUnit.getName()}:${targetUnit.getTeam()}`]: HoCConstants.MORALE_CHANGE_FOR_KILL,
-                });
-            } else if (secondShotResult.applied) {
+            if (!targetUnit.isDead() && secondShotResult.applied) {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
@@ -1161,6 +1170,7 @@ export class AttackHandler {
                     this.sceneLog,
                 );
             }
+            recordPrimaryTargetDeath();
         }
 
         attackerUnit.increaseMorale(

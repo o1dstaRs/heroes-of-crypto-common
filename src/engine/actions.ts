@@ -42,7 +42,7 @@ export type GameAction =
           // The visible edge the player aimed at, as bounded intent only: which cell of the target
           // (aimCell) and which of its 4 sides (aimSide, see RangeAttackCellSide). The server
           // validates and reconstructs the exact trajectory from these — it never trusts a raw
-          // position. Omitted by the AI path, where the engine picks a deterministic default edge.
+          // position. It may be omitted to ask the engine for its deterministic default edge.
           aimCell?: XY;
           aimSide?: number;
       }

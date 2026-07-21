@@ -187,7 +187,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
         expect(Math.abs(cellOf(arbalester).x - centreX)).toBeGreaterThan(Math.abs(cellOf(healer).x - centreX));
     });
 
-    it("when it CAN shoot, v0.2 fires the best visible edge with an explicit aim (v0.1 sends none)", () => {
+    it("when it CAN shoot, v0.2 fires the best-scoring visible edge with an explicit aim", () => {
         const ctx = createCombatTestContext();
         const shooter = createTestUnit({
             name: "Shooter",
@@ -217,7 +217,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
         const shot = actions.find((a) => a.type === "range_attack");
         expect(shot).toBeDefined();
         if (shot?.type === "range_attack") {
-            // Best-shot always sends the chosen edge (aimCell + aimSide); v0.1 leaves these undefined.
+            // v0.2's best-shot scorer always sends the chosen edge (aimCell + aimSide).
             expect(shot.aimCell).toBeDefined();
             expect(typeof shot.aimSide).toBe("number");
             // The high-HP stack yields far more effective damage than the 5-hp chip, so it's preferred.

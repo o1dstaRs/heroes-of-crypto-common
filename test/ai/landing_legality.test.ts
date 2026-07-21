@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { AIActionType, canUnitLandAt, findTarget } from "../../src/ai/ai";
+import { AIActionType, canUnitLandAt, findSaferMoveCell, findTarget } from "../../src/ai/ai";
 import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -54,6 +54,34 @@ describe("AI landing legality", () => {
         expect(lava.getOccupantUnitId({ x: 7, y: 10 })).toBe("");
         expect(lava.getOccupantUnitId({ x: 7, y: 9 })).toBe("L");
         expect(canUnitLandAt(largeFlyer, lava, { x: 7, y: 10 })).toBe(false);
+    });
+
+    test("rejects a large-unit anchor whose footprint crosses the board edge", () => {
+        const normal = createCombatTestContext(PBTypes.GridVals.NORMAL).grid;
+        const large = createTestUnit({ team: LOWER, size: PBTypes.UnitSizeVals.LARGE });
+
+        expect(canUnitLandAt(large, normal, { x: 1, y: 1 })).toBe(true);
+        expect(canUnitLandAt(large, normal, { x: 0, y: 0 })).toBe(false);
+    });
+
+    test("keeps a legal Made of Fire lava cell in ranged safety candidates", () => {
+        const lava = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER).grid;
+        const madeOfFire = createTestUnit({ team: LOWER, abilities: ["Made of Fire"] });
+        const occupiedPreferred = { x: 5, y: 5 };
+        const legalLavaCell = { x: 7, y: 7 };
+        lava.occupyCell(occupiedPreferred, "enemy", UPPER, 1, false, false);
+
+        const safer = findSaferMoveCell(
+            occupiedPreferred,
+            new Map([[(legalLavaCell.x << 4) | legalLavaCell.y, []]]),
+            lava.getMatrix(),
+            UPPER,
+            true,
+            (cell) => canUnitLandAt(madeOfFire, lava, cell),
+        );
+
+        expect(lava.getOccupantUnitId(legalLavaCell)).toBe("L");
+        expect(safer).toEqual(legalLavaCell);
     });
 
     test("fallback can cross lava but chooses a legal far-side endpoint", () => {

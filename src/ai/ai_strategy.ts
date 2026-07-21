@@ -64,8 +64,8 @@ export interface IDecisionContext {
     /**
      * Optional: lets a strategy ask whether a unit can actually LAND a ranged shot right now (not just
      * whether it has ammo) — i.e. it isn't boxed in by melee and isn't range-suppressed — and to
-     * evaluate candidate shots (which units a trajectory hits, with what divisors). v0.1 ignores it;
-     * v0.2+ uses it to pick the best shot and to stop wasting turns on doomed ones.
+     * evaluate candidate shots (which units a trajectory hits, with what divisors). v0.1 uses it as an
+     * exact legality guard; v0.2+ also uses it to score and pick the best shot.
      */
     attackHandler?: AttackHandler;
     /** Optional: turn/hourglass state, so a strategy can decide whether a unit may wait (hourglass). */

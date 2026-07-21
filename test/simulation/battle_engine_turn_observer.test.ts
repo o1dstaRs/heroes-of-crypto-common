@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import type { IAIStrategy } from "../../src/ai/ai_strategy";
+import { STRATEGY_V0_1 } from "../../src/ai/versions/v0_1";
 import type { GameAction } from "../../src/engine/actions";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { buildRoster, makeRng } from "../../src/simulation/army";
-import { runMatch, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
+import { runMatch, type IMatchResult, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
 
 const runObservedMatch = (seed: number, maxLaps: number) => {
     const decisions: (readonly GameAction[])[] = [];
@@ -19,13 +22,45 @@ const runObservedMatch = (seed: number, maxLaps: number) => {
     return { decisions, turns };
 };
 
+type DecideTurn = IAIStrategy["decideTurn"];
+type DecisionTransform = (
+    unit: Parameters<DecideTurn>[0],
+    context: Parameters<DecideTurn>[1],
+    incumbent: GameAction[],
+) => GameAction[];
+
+const runObservedMatchWithV01Transform = (
+    seed: number,
+    maxLaps: number,
+    transform: DecisionTransform,
+): { result: IMatchResult; turns: ITurnExecutionObservation[] } => {
+    const turns: ITurnExecutionObservation[] = [];
+    const originalDecideTurn = STRATEGY_V0_1.decideTurn;
+    STRATEGY_V0_1.decideTurn = (unit, context) =>
+        transform(unit, context, originalDecideTurn.call(STRATEGY_V0_1, unit, context));
+    try {
+        const result = runMatch({
+            greenVersion: "v0.1",
+            redVersion: "v0.1",
+            roster: buildRoster(makeRng(seed)),
+            seed,
+            maxLaps,
+            turnExecutionObserver: (observation) => turns.push(observation),
+        });
+        return { result, turns };
+    } finally {
+        STRATEGY_V0_1.decideTurn = originalDecideTurn;
+    }
+};
+
 describe("battle engine turn execution observer", () => {
     test("emits exactly once per decision with detached actions and explicit skip events", () => {
         // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
         // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps.
         // Re-pinned 31 -> 10 -> 20 after enabling Abomination (41), then Champion/Frenzied Boar (42/43),
-        // shifted roster draws the same way.
-        const { decisions, turns } = runObservedMatch(20, 5);
+        // shifted roster draws the same way. Re-pinned 20 -> 35 after v0.1 stopped emitting illegal
+        // forced-target melees, which changed the fight trajectory while retaining a genuine skip.
+        const { decisions, turns } = runObservedMatch(35, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
@@ -48,34 +83,119 @@ describe("battle engine turn execution observer", () => {
         );
     });
 
-    test("reports a rejected strategy action separately from the recovery shield", () => {
+    test("reports a repaired ranged decision as accepted without invoking the recovery shield", () => {
         // Seed re-pinned from 1603 -> 952 after the lap-start morale-roll fix (applyMoraleRolls now reads
         // true accumulated morale, not the stale ±20 lock) shifted the seeded trajectory so 1603 no longer
         // produced a rejected-melee -> defend-recovery turn. Re-pinned 952 -> 445 after enabling
         // Abomination/Champion/Frenzied Boar (catalog ids 41-43) shifted roster draws. Re-pinned 445 -> 952
         // after enabling Arachna Queen (44) shifted the L4 pool while preserving this observer seam.
-        const { decisions, turns } = runObservedMatch(952, 40);
+        // Re-pinned 952 -> 25 after v0.1's melee legality hardening removed that forced-target rejection.
+        // Seed 25 then exposed a default-edge ranged rejection; exact edge validation now repairs the shot
+        // before execution, and the observer must report that accepted strategy action with no recovery.
+        const { decisions, turns } = runObservedMatch(25, 40);
 
         expect(turns).toHaveLength(decisions.length);
-        const recovered = turns.find((turn) => turn.recovery.source === "defend");
-        expect(recovered).toBeDefined();
-        expect(recovered!.strategyActions).toHaveLength(1);
-        expect(recovered!.strategyActions[0]).toMatchObject({
-            action: { type: "melee_attack" },
-            completed: false,
-            rejectionReason: "attack_not_available",
+        const repaired = turns.find((turn) =>
+            turn.strategyActions.some((execution) => execution.action.type === "range_attack"),
+        );
+        expect(repaired).toBeDefined();
+        expect(repaired!.strategyActions.at(-1)).toMatchObject({
+            action: { type: "range_attack" },
+            completed: true,
         });
+        expect(repaired!.strategyActions.every((execution) => execution.completed)).toBe(true);
+        expect(repaired!.recoveryAttempts).toEqual([]);
+        expect(repaired!.recovery).toEqual({ source: "none", completed: false, events: [] });
+        expect(repaired!.events.map((event) => event.type)).toContain("unit_attacked");
+        expect(repaired!.events.map((event) => event.type)).toContain("turn_completed");
+    });
+
+    test("reports a deliberately rejected strategy action separately from defend recovery", () => {
+        let injectedUnitId: string | undefined;
+        const { result, turns } = runObservedMatchWithV01Transform(35, 5, (unit, _context, incumbent) => {
+            if (!injectedUnitId && incumbent.some((action) => action.type === "end_turn")) {
+                injectedUnitId = unit.getId();
+                return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];
+            }
+            return incumbent;
+        });
+
+        expect(injectedUnitId).toBeDefined();
+        expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(1);
+        const recovered = turns.find((turn) =>
+            turn.strategyActions.some(
+                (execution) =>
+                    execution.action.type === "range_attack" &&
+                    execution.action.targetId === execution.action.attackerId,
+            ),
+        );
+        expect(recovered).toBeDefined();
+        expect(recovered!.strategyActions).toEqual([
+            {
+                action: { type: "range_attack", attackerId: injectedUnitId!, targetId: injectedUnitId! },
+                completed: false,
+                rejectionReason: "attack_not_available",
+                events: [],
+            },
+        ]);
         expect(recovered!.recovery).toMatchObject({
             source: "defend",
             completed: true,
-            action: { type: "defend_turn" },
+            action: { type: "defend_turn", unitId: injectedUnitId },
         });
-        expect(recovered!.recoveryAttempts).toEqual([recovered!.recovery]);
-        expect(
-            recovered!.recovery.events.some(
-                (event) => event.type === "unit_defended" && event.unitId === recovered!.unitId,
-            ),
-        ).toBe(true);
+        expect(recovered!.recoveryAttempts.at(-1)).toEqual(recovered!.recovery);
         expect(recovered!.events.map((event) => event.type)).toEqual(["unit_defended", "turn_completed"]);
+    });
+
+    test("counts a rejected attack-type selector once when the following attack succeeds", () => {
+        let injectedUnitId: string | undefined;
+        const { result, turns } = runObservedMatchWithV01Transform(35, 8, (unit, _context, incumbent) => {
+            const hasMelee = incumbent.some((action) => action.type === "melee_attack");
+            const hasSelector = incumbent.some((action) => action.type === "select_attack_type");
+            if (
+                !injectedUnitId &&
+                hasMelee &&
+                !hasSelector &&
+                unit.getAttackTypeSelection() === PBTypes.AttackVals.MELEE &&
+                !unit.getPossibleAttackTypes().includes(PBTypes.AttackVals.MELEE_MAGIC)
+            ) {
+                injectedUnitId = unit.getId();
+                return [
+                    {
+                        type: "select_attack_type",
+                        unitId: unit.getId(),
+                        attackType: PBTypes.AttackVals.MELEE_MAGIC,
+                    },
+                    ...incumbent,
+                ];
+            }
+            return incumbent;
+        });
+
+        expect(injectedUnitId).toBeDefined();
+        expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(1);
+        expect(result.rejectedDetails).toEqual([
+            expect.objectContaining({
+                type: "select_attack_type",
+                reason: "attack_type_not_available",
+                cause: `select:${PBTypes.AttackVals.MELEE_MAGIC}`,
+            }),
+        ]);
+        const selectedThenAttacked = turns.find((turn) => turn.unitId === injectedUnitId);
+        expect(selectedThenAttacked).toBeDefined();
+        expect(selectedThenAttacked!.strategyActions).toHaveLength(2);
+        expect(selectedThenAttacked!.strategyActions[0]).toMatchObject({
+            action: { type: "select_attack_type", attackType: PBTypes.AttackVals.MELEE_MAGIC },
+            completed: false,
+            rejectionReason: "attack_type_not_available",
+        });
+        expect(selectedThenAttacked!.strategyActions[1]).toMatchObject({
+            action: { type: "melee_attack" },
+            completed: true,
+        });
+        expect(selectedThenAttacked!.recoveryAttempts).toEqual([]);
+        expect(selectedThenAttacked!.recovery).toEqual({ source: "none", completed: false, events: [] });
+        expect(selectedThenAttacked!.events.map((event) => event.type)).toContain("unit_attacked");
+        expect(selectedThenAttacked!.events.map((event) => event.type)).toContain("turn_completed");
     });
 });

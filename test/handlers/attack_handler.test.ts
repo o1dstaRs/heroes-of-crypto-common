@@ -20,6 +20,7 @@ import { getPositionForCell } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { AttackTarget } from "../../src/handlers/attack_handler";
 import { Spell } from "../../src/spells/spell";
+import { setDeterministicRandomSource } from "../../src/utils/lib";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -372,6 +373,7 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(target.isDead()).toBe(true);
+            expect(result.unitIdsDied.filter((unitId) => unitId === target.getId())).toHaveLength(1);
             // Killer gains morale; the fallen stack's surviving same-type ally loses it.
             expect(attacker.getMorale()).toBe(attackerMoraleBefore + MORALE_CHANGE_FOR_KILL);
             expect(targetAlly.getMorale()).toBe(allyMoraleBefore - MORALE_CHANGE_FOR_KILL);
@@ -573,6 +575,132 @@ describe("AttackHandler", () => {
                     lap: 1,
                 },
             ]);
+        });
+
+        it("reports both deaths when primary Petrifying Gaze and the ranged response kill each other", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                name: "Gazer",
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                amountAlive: 1,
+                maxHp: 10,
+                abilities: ["Petrifying Gaze"],
+                stackPower: 5,
+                luck: 10,
+            });
+            const target = createTestUnit({
+                name: "Responder",
+                team: PBTypes.TeamVals.LOWER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                amountAlive: 1,
+                maxHp: 100,
+                morale: 0,
+            });
+            const targetAlly = createTestUnit({
+                name: "Responder",
+                team: PBTypes.TeamVals.LOWER,
+                amountAlive: 1,
+                morale: 10,
+            });
+            attacker.calculateMissChance = () => 0;
+            target.calculateMissChance = () => 0;
+            attacker.calculateAttackDamage = () => 1;
+            target.calculateAttackDamage = () => 100;
+
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            placeUnit(grid, unitsHolder, targetAlly, { x: 6, y: 6 });
+            const damageForAnimation = createVisibleDamage(target);
+
+            setDeterministicRandomSource(() => 0);
+            try {
+                const result = attackHandler.handleRangeAttack(
+                    unitsHolder,
+                    [1],
+                    1,
+                    damageForAnimation,
+                    attacker,
+                    [[target]],
+                    [attacker],
+                    target.getPosition(),
+                );
+
+                targetAlly.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+                expect(result.completed).toBe(true);
+                expect(attacker.isDead()).toBe(true);
+                expect(target.isDead()).toBe(true);
+                expect(result.unitIdsDied.filter((unitId) => unitId === attacker.getId())).toHaveLength(1);
+                expect(result.unitIdsDied.filter((unitId) => unitId === target.getId())).toHaveLength(1);
+                expect(damageForAnimation.secondary).toEqual([
+                    expect.objectContaining({
+                        source: "petrifying_gaze",
+                        unitId: target.getId(),
+                        amount: 99,
+                        unitsDied: 1,
+                    }),
+                ]);
+                expect(targetAlly.getMorale()).toBe(10 - MORALE_CHANGE_FOR_KILL);
+            } finally {
+                setDeterministicRandomSource(undefined);
+            }
+        });
+
+        it("applies Petrifying Gaze once to a unit-targeted Area Throw primary", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                name: "AOE Gazer",
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                amountAlive: 1,
+                abilities: ["Area Throw", "Petrifying Gaze"],
+                stackPower: 5,
+                luck: 10,
+            });
+            const target = createTestUnit({
+                name: "AOE Target",
+                team: PBTypes.TeamVals.LOWER,
+                amountAlive: 3,
+                maxHp: 100,
+            });
+            attacker.calculateMissChance = () => 0;
+            attacker.calculateAttackDamage = () => 10;
+
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            const damageForAnimation = createVisibleDamage(target);
+
+            setDeterministicRandomSource(() => 0);
+            try {
+                const result = attackHandler.handleRangeAttack(
+                    unitsHolder,
+                    [1],
+                    1,
+                    damageForAnimation,
+                    attacker,
+                    [[target]],
+                    undefined,
+                    target.getPosition(),
+                );
+                const gazeDamage = damageForAnimation.secondary?.filter((entry) => entry.source === "petrifying_gaze");
+
+                expect(result.completed).toBe(true);
+                expect(gazeDamage).toEqual([
+                    expect.objectContaining({
+                        unitId: target.getId(),
+                        amount: 90,
+                        unitsDied: 1,
+                    }),
+                ]);
+                expect(target.getAmountAlive()).toBe(2);
+                expect(target.getCumulativeHp()).toBe(200);
+            } finally {
+                setDeterministicRandomSource(undefined);
+            }
         });
     });
 

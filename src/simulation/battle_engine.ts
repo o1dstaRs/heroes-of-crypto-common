@@ -965,15 +965,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     auditAttacked = true;
                 }
             }
-            if (!result.completed && action.type !== "select_attack_type") {
-                // The strategy proposed a command the engine declined — a smooth AI should never do this.
+            if (!result.completed) {
+                // The strategy proposed a command the engine declined — including a bookkeeping selector.
+                // A smooth AI should never emit any rejected command, even if a later attack still lands.
                 if (unit.getTeam() === GREEN_TEAM) {
                     rejectedGreen += 1;
                 } else {
                     rejectedRed += 1;
                 }
                 let cause: string | undefined;
-                if (action.type === "melee_attack") {
+                if (action.type === "select_attack_type") {
+                    cause = `select:${action.attackType}`;
+                } else if (action.type === "melee_attack") {
                     const tgt = unitsHolder.getAllUnits().get(action.targetId);
                     const af = action.attackFrom ?? unit.getBaseCell();
                     const afCells = unit.isSmallSize()
