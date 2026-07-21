@@ -312,6 +312,26 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Angelic Host": {
+            "name": "Angelic Host",
+            "level": 0,
+            "desc": [
+                "Angelic Host grants +{} attack, +{} defense and +{} movement distance.",
+                "Active while an allied unit with Angelic Host is alive."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 1,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Cursed Ward": {
             "name": "Cursed Ward",
             "level": 0,

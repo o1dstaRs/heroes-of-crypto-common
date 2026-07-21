@@ -327,6 +327,20 @@
         "aura_effect": "Arrows Wingshield",
         "can_be_cast": false
     },
+    "Angelic Host": {
+        "name": "Angelic Host",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allied flying units gain +{} attack, +{} defense and +{} movement distance"
+        ],
+        "power": 1,
+        "power_type": "ARMY_FLYING_ATTACK_ARMOR_STEPS",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "AI Driven": {
         "name": "AI Driven",
         "type": "CONTROL",

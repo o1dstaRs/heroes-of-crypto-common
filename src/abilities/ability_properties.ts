@@ -64,6 +64,7 @@ export enum AbilityPowerType {
     DISABLE_FLY_MOVEMENT = 51,
     INFEST = 52,
     STEAL_ABILITY = 53,
+    ARMY_FLYING_ATTACK_ARMOR_STEPS = 54,
 }
 
 export const AllAbilityPowerTypes = [
@@ -121,6 +122,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.DISABLE_FLY_MOVEMENT,
     AbilityPowerType.INFEST,
     AbilityPowerType.STEAL_ABILITY,
+    AbilityPowerType.ARMY_FLYING_ATTACK_ARMOR_STEPS,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -181,6 +183,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     DISABLE_FLY_MOVEMENT: AbilityPowerType.DISABLE_FLY_MOVEMENT,
     INFEST: AbilityPowerType.INFEST,
     STEAL_ABILITY: AbilityPowerType.STEAL_ABILITY,
+    ARMY_FLYING_ATTACK_ARMOR_STEPS: AbilityPowerType.ARMY_FLYING_ATTACK_ARMOR_STEPS,
 };
 
 export enum AbilityType {

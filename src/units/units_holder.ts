@@ -760,6 +760,45 @@ export class UnitsHolder {
 
         return enemyList;
     }
+    private refreshAngelicHostForAllUnits(): void {
+        const powerPerTeam: Map<TeamType, number> = new Map();
+
+        for (const unit of this.getAllUnitsIterator()) {
+            if (unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+                continue;
+            }
+
+            const angelicHostAbility = unit.getAbility("Angelic Host");
+            if (angelicHostAbility) {
+                powerPerTeam.set(
+                    unit.getTeam(),
+                    Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, angelicHostAbility.getPower()),
+                );
+            }
+        }
+
+        for (const unit of this.getAllUnitsIterator()) {
+            unit.deleteBuff("Angelic Host");
+
+            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
+            if (
+                power <= 0 ||
+                unit.isDead() ||
+                !unit.canFly() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell())
+            ) {
+                continue;
+            }
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Angelic Host", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
+            buff.setPower(power);
+            unit.applyBuff(buff, power);
+        }
+    }
     public refreshStackPowerForAllUnits(): void {
         FightStateManager.getInstance()
             .getFightProperties()
@@ -770,6 +809,7 @@ export class UnitsHolder {
         // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsForAllUnits();
+        this.refreshAngelicHostForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;

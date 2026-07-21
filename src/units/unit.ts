@@ -2557,6 +2557,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod = Number((this.unitProperties.armor_mod + titanPlateArmorBonus).toFixed(2));
         }
 
+        const angelicHostBuff = this.getBuff("Angelic Host");
+        if (angelicHostBuff) {
+            this.unitProperties.armor_mod = Number(
+                (this.unitProperties.armor_mod + angelicHostBuff.getPower()).toFixed(2),
+            );
+        }
+
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
 
         const leatherArmorAbility = this.getAbility("Leather Armor");
@@ -2680,6 +2687,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.steps = Number((this.unitProperties.steps * stepsMultiplier).toFixed(1));
         this.unitProperties.steps_mod = Number((this.unitProperties.steps_mod * stepsMultiplier).toFixed(1));
+        if (angelicHostBuff) {
+            this.unitProperties.steps_mod = Number(
+                (this.unitProperties.steps_mod + angelicHostBuff.getPower()).toFixed(2),
+            );
+        }
 
         // ATTACK
         if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
@@ -2813,6 +2825,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Warlord's Edge's +% attack (captured pre-aura above) lands here as an additional attack_mod — additive
         // off base, non-compounding, surviving the Riot/Weakness attack_mod overwrites; getAttack = base + mod.
         this.unitProperties.attack_mod = Number((this.unitProperties.attack_mod + warlordsEdgeAttackBonus).toFixed(2));
+        if (angelicHostBuff) {
+            this.unitProperties.attack_mod = Number(
+                (this.unitProperties.attack_mod + angelicHostBuff.getPower()).toFixed(2),
+            );
+        }
         this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));
         this.unitProperties.shot_distance = Number(this.unitProperties.shot_distance.toFixed(2));
 
