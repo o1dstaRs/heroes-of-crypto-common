@@ -48,14 +48,13 @@ function ctxFor(c: CombatTestContext): IDecisionContext {
 const moveAction = (a: GameAction[]): Extract<GameAction, { type: "move_unit" }> | undefined =>
     a.find((x) => x.type === "move_unit") as Extract<GameAction, { type: "move_unit" }> | undefined;
 
-describe("AI version registry — v0.7 is the shipped default (the wait-scorer generation)", () => {
-    it("registers every generation while keeping v0.7 as the shipped default", () => {
+describe("AI version registry — v0.8 is the shipped default", () => {
+    it("registers every generation while keeping v0.8 as the shipped default", () => {
         expect(AI_VERSIONS).toContain("v0.3");
         expect(AI_VERSIONS).toContain("v0.4");
         expect(AI_VERSIONS).toContain("v0.5");
         expect(AI_VERSIONS).toContain("v0.6");
-        // v0.7 remains shipped while later registry entries can be trained and tournament-tested.
-        expect(DEFAULT_AI_VERSION).toBe("v0.7");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
         expect(AI_VERSIONS.indexOf("v0.4")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.3"));
         expect(AI_VERSIONS.indexOf("v0.5")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.4"));
         expect(AI_VERSIONS.indexOf("v0.6")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.5"));

@@ -155,7 +155,7 @@ afterEach(() => {
 });
 
 describe("v0.8 candidate policy", () => {
-    it("is the latest candidate while v0.7 remains the shipped default", () => {
+    it("is the latest version and the shipped default", () => {
         const candidate = getAIStrategy("v0.8");
         expect(candidate).toBeInstanceOf(StrategyV0_7);
         expect(candidate).toBeInstanceOf(StrategyV0_8);
@@ -163,7 +163,7 @@ describe("v0.8 candidate policy", () => {
         expect(Object.getOwnPropertyNames(StrategyV0_8.prototype)).toEqual(["constructor", "frontMove", "decideTurn"]);
         expect(AI_VERSIONS.indexOf("v0.8")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.7"));
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.7");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
     });
 
     it("replaces only empty/end-turn-only decisions with an explicit defend", () => {

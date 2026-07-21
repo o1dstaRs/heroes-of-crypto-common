@@ -33,14 +33,14 @@ afterEach(() => {
 });
 
 describe("v0.7 search measurement alias", () => {
-    it("remains immediately before v0.7 without changing the shipped default or latest candidate", () => {
+    it("remains immediately before v0.7 without changing the shipped default or latest version", () => {
         const alias = getAIStrategy("v0.7s");
         expect(alias).toBeInstanceOf(StrategyV0_7);
         expect(alias.version).toBe("v0.7s");
         expect(Object.getOwnPropertyNames(StrategyV0_7S.prototype)).toEqual(["constructor"]);
         expect(AI_VERSIONS.indexOf("v0.7s")).toBe(AI_VERSIONS.indexOf("v0.7") - 1);
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.7");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
     });
 
     it("plays an unsearched seeded match byte-identically to v0.7 apart from version identity", () => {

@@ -60,13 +60,13 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // so registering the alias cannot change LATEST_AI_VERSION; DEFAULT_AI_VERSION is explicit below.
     STRATEGY_V0_7S,
     // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts).
-    // It remains the explicitly shipped default below while v0.8 is evaluated.
+    // It remains registered as the frozen incumbent now that v0.8 is the shipped default below.
     STRATEGY_V0_7,
     // v0.8s is the measurement-only seat for anti-Armageddon target-pressure/search A/Bs. Keep it immediately
     // before v0.8 so the experiment can never become LATEST_AI_VERSION or alter plain v0.8 by registration.
     STRATEGY_V0_8S,
-    // v0.8 starts from v0.7 but converts terminal policy no-ops into explicit actions. Register it last so
-    // training and tournaments can target the next generation without changing the shipped DEFAULT_AI_VERSION.
+    // v0.8 starts from v0.7 but converts terminal policy no-ops into explicit actions. Register it last and ship
+    // it as DEFAULT_AI_VERSION so local and server-owned AI seats use the same promoted strategy.
     STRATEGY_V0_8,
 ];
 
@@ -81,15 +81,11 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * Promoted to v0.7 — the shipped default for in-game AI (was v0.6): v0.6 + the distilled wait-scorer baked
- * in (S1 sign-off). Bake battery 2026-07-10 (fresh seeds 1000700..1080708 + 1090709/1091700/1092701, LIVETWIN):
- * v0.7 vs v0.6 pooled 68.83% ± 0.24 (+18.83pp >= the +4pp §0 bar; 9/9 seeds positive), v0.7 vs v0.4 80.59%
- * (plain v0.6's anchor was 73.17%), cohorts vs v0.6 all non-negative (melee 70.09 / mixed 62.67 / random
- * 57.53), default-amount config 55.10% (seed 1093702), integrity <= 0.36% draws+armageddon, 0 rejections.
- * v0.6 is now PARKED as the frozen baseline that future v0.7 improvements are measured against (the same
- * role v0.5 played for v0.6).
+ * Promoted to v0.8 — the shipped default for in-game AI (was v0.7). v0.8 preserves the accepted v0.7 policy
+ * chain while replacing avoidable end-turn, Luck Shield, and obstacle attacks with productive legal actions,
+ * pressing dominant late fights, and preserving intentional waits when its ranged army is stronger.
  */
-export const DEFAULT_AI_VERSION = "v0.7";
+export const DEFAULT_AI_VERSION = "v0.8";
 
 export function getAIStrategy(version: string): IAIStrategy {
     const strategy = STRATEGY_BY_VERSION.get(version);

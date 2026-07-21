@@ -154,11 +154,11 @@ function primeArmyProfile(strategy: Pick<IAIStrategy, "placeArmy">, context: IDe
 }
 
 describe("v0.7 registry", () => {
-    it("keeps v0.7 as DEFAULT after the v0.8 candidate is registered", () => {
+    it("keeps v0.7 registered after v0.8 is promoted", () => {
         expect(AI_VERSIONS).toContain("v0.7");
         expect(getAIStrategy("v0.7").version).toBe("v0.7");
         expect(LATEST_AI_VERSION).toBe("v0.8");
-        expect(DEFAULT_AI_VERSION).toBe("v0.7");
+        expect(DEFAULT_AI_VERSION).toBe("v0.8");
     });
 });
 
