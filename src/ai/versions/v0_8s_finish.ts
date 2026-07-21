@@ -10,9 +10,11 @@
  */
 
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../constants";
-import type { IEnumeratedCandidate } from "../candidates";
+import type { GameAction } from "../../engine/actions";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
+import type { IDecisionContext } from "../ai_strategy";
+import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
 import { isV08DirectCombatDecision } from "./v0_8_dominant_finish";
 
 /** Start eliminating the hardest remaining stack with six complete laps of pre-wave budget. */
@@ -181,4 +183,34 @@ export function selectV08STargetPressureCandidate(
         return left.index - right.index;
     });
     return focused[0]?.candidate;
+}
+
+/**
+ * The a13 native finish layer originally lived only on the `v0.8s` measurement alias.
+ * It is pure strategy behavior (not rollout scoring), so production v0.8 bakes the same
+ * layer and keeps SearchDriver free to compare the inherited action as candidate zero
+ * before the universal final sprint.
+ */
+export function prioritizeV08A13FinishDecision(
+    unit: Unit,
+    context: IDecisionContext,
+    incumbent: GameAction[],
+): GameAction[] {
+    const currentLap = context.fightProperties?.getCurrentLap() ?? 0;
+    if (!Number.isFinite(currentLap) || currentLap < V08S_URGENT_FINISH_START_LAP) {
+        return incumbent;
+    }
+
+    const candidates = enumerateCandidates(unit, context, incumbent, {
+        maxMoveDestinations: 1,
+        maxMeleePairs: 8,
+        maxShotAims: 6,
+        maxAreaThrowCells: 4,
+        enrichIncumbentMetadata: true,
+        preserveAttackTargetCoverage: true,
+    }).candidates;
+    const attack = selectV08STargetPressureCandidate(unit, context.unitsHolder, candidates, currentLap);
+    if (attack) return attack.actions;
+    const advance = candidates.find((candidate) => candidate.kind === "move");
+    return advance?.actions ?? incumbent;
 }

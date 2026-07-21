@@ -96,21 +96,22 @@ import {
  * and hard-passive fallback; SEARCH_INCLUDE_MOVES=1 expands either policy to the configured move set.
  * SEARCH_ACTIVE_CHALLENGERS=1 is a research-only attrition probe: the incumbent anchor is always retained,
  * but generated wait/defend challengers are excluded so search cannot introduce a new passive action.
- * V08_AGGRESSIVE=1 is a research-only v0.8s policy constraint. It preserves v0.8's hard exclusion of generated
+ * V08_AGGRESSIVE=1 is the a13 v0.8/v0.8s policy constraint. It preserves v0.8's hard exclusion of generated
  * Luck Shield/mountain challengers and its productive override for incumbent Luck Shield/mountain/no-op turns.
  * An incumbent strategic wait remains scored and is replaced only when an engine-valid attack, spell, or move
  * scores at least as well (a local zero gate). The explicit stronger-ranged posture wait keeps the normal rollout
  * gate so a numerical tie cannot make its melee screen abandon superior shooters. Late combat retains v0.8's
  * pre-Armageddon two-to-one-HP dominant-finish rule and forces an advance when no direct attack exists. The flag
- * is deliberately scoped to v0.8s; plain v0.8 and historical versions are exact.
+ * is deliberately scoped to the two a13-compatible version names; historical versions are exact.
  * v0.8 goes further regardless of that probe: generated defend and mountain challengers are excluded. An
  * inherited defend/mountain remains candidate zero for fail-closed and observe-only semantics; normal active
  * search replaces it when an engine-valid productive challenger exists. Tactical wait remains a scored action.
- * The measurement-only v0.8s seat adds target pressure at lap 6: an inherited attack is retargeted to the
+ * The a13 policy (production v0.8 and its frozen-training v0.8s alias) adds target pressure at lap 6: an
+ * inherited attack is retargeted to the
  * least-deadline-slack enemy. Ordinary/balanced stronger-ranged waits remain legal through lap 8; the inherited
  * >=2:1 dominant finish may press from lap 7. At lap 9 it universally forces a positive-damage attack and otherwise
  * the nearest advance. Coverage-preserving attack caps, shortlist, deadline, and circuit fallbacks all use the same
- * selector; plain v0.8 and historical decisions are unchanged.
+ * selector; historical decisions are unchanged.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
  * the exact incumbent action-array reference. SEARCH_INCUMBENT_KINDS limits which incumbent action classes
  * enter shadow search (the filter runs before enumeration), and SEARCH_CHALLENGER_KINDS limits the generated
@@ -281,7 +282,9 @@ const CHALLENGER_KINDS = new Set<CandidateKind>([
 const V08_MOUNTAIN_CHALLENGER_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const V08_FORCE_PRODUCTIVE_INCUMBENT_KINDS = new Set<IncumbentKind>(["idle", "defend", "mine"]);
 const V08_AGGRESSIVE_VERSIONS = new Set(["v0.8", "v0.8s"]);
-const V08S_EXPERIMENT_VERSION = "v0.8s";
+// Production v0.8 bakes the v0.8s native policy used by a13, so both names must
+// receive the same search-side target-pressure and urgent-finish semantics.
+const V08_TARGET_PRESSURE_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
 const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "move_unit",
@@ -764,7 +767,7 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
-        const isV08SExperiment = isV08Search && version === V08S_EXPERIMENT_VERSION;
+        const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -780,13 +783,13 @@ export class SearchDriver {
         const prioritizeDominantFinish =
             isV08Search && v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), currentLap).dominant;
         const prioritizeV08SUrgency =
-            isV08SExperiment && Number.isFinite(currentLap) && currentLap >= V08S_URGENT_FINISH_START_LAP;
+            isV08TargetPressurePolicy && Number.isFinite(currentLap) && currentLap >= V08S_URGENT_FINISH_START_LAP;
         const v08sHasStrongerRangedOutput =
-            isV08SExperiment &&
+            isV08TargetPressurePolicy &&
             v08TeamRangedOutput(unit.getTeam(), this.deps.unitsHolder) >
                 v08TeamRangedOutput(otherTeam(unit.getTeam()), this.deps.unitsHolder);
         const prioritizeV08STargetPressure =
-            isV08SExperiment &&
+            isV08TargetPressurePolicy &&
             Number.isFinite(currentLap) &&
             (prioritizeV08SUrgency ||
                 (isV08DirectCombatDecision(incumbent) &&
@@ -832,7 +835,7 @@ export class SearchDriver {
                 includeMountainAttacks: isV08Search,
                 enrichIncumbentMetadata: isV08Search || this.ilPath !== undefined,
                 preserveMovePostureDiversity:
-                    isV08SExperiment &&
+                    isV08TargetPressurePolicy &&
                     v08sHasStrongerRangedOutput &&
                     !prioritizeDominantFinish &&
                     !prioritizeV08SUrgency,

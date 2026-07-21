@@ -35,7 +35,7 @@ import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const SEARCH_ENV_KEYS = ["V07_SEARCH", "Q2_WAIT_ABLATION", "Q2_ORACLE", "SEARCH_VERSIONS"] as const;
+const SEARCH_ENV_KEYS = ["V07_SEARCH", "Q2_WAIT_ABLATION", "Q2_ORACLE", "SEARCH_VERSIONS", "V08_A13_SEARCH"] as const;
 const savedSearchEnv = Object.fromEntries(SEARCH_ENV_KEYS.map((key) => [key, process.env[key]]));
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
@@ -133,17 +133,14 @@ describe("v0.8 search measurement alias", () => {
         const alias = getAIStrategy("v0.8s");
         expect(alias).toBeInstanceOf(StrategyV0_8);
         expect(alias.version).toBe("v0.8s");
-        expect(Object.getOwnPropertyNames(StrategyV0_8S.prototype)).toEqual([
-            "constructor",
-            "rangedOutput",
-            "decideTurn",
-        ]);
+        expect(Object.getOwnPropertyNames(StrategyV0_8S.prototype)).toEqual(["constructor"]);
         expect(AI_VERSIONS.indexOf("v0.8s")).toBe(AI_VERSIONS.indexOf("v0.8") - 1);
         expect(LATEST_AI_VERSION).toBe("v0.8");
         expect(DEFAULT_AI_VERSION).toBe("v0.8");
     });
 
     it("plays byte-identically to v0.8 before the lap-6 experiment boundary", () => {
+        process.env.V08_A13_SEARCH = "0";
         const seed = 20260719;
         const roster = buildRoster(makeRng(seed));
         const config = { redVersion: "v0.7", roster, seed, maxLaps: 5 } as const;
@@ -155,7 +152,8 @@ describe("v0.8 search measurement alias", () => {
         expect(aliased).toEqual(baseline);
     });
 
-    it("pins plain v0.7 and v0.8 seeded matches byte-for-byte", () => {
+    it("pins plain v0.7 and the baked a13 direct-policy baseline byte-for-byte", () => {
+        process.env.V08_A13_SEARCH = "0";
         const seed = 20260719;
         const digest = (version: "v0.7" | "v0.8"): string => {
             const roster = buildRoster(makeRng(seed));
@@ -164,7 +162,7 @@ describe("v0.8 search measurement alias", () => {
         };
 
         expect(digest("v0.7")).toBe("30a30017ad1962110965ded64aa80cfa22ba07f507a10a813b19f76d4b46283c");
-        expect(digest("v0.8")).toBe("4b7f05dd76ece224663ba168de1926674713cd170c36f8a8175da2dd4996cd25");
+        expect(digest("v0.8")).toBe("b9e2f99dc51422510759a4ab830718f23bcbd97b3421e3a70ec888f9a65fae03");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
@@ -419,10 +417,11 @@ describe("v0.8 search measurement alias", () => {
             fightProperties,
         };
 
-        expect(new StrategyV0_8().decideTurn(actor, context)).toEqual([{ type: "wait_turn", unitId: actor.getId() }]);
-        const urgent = new StrategyV0_8S().decideTurn(actor, context);
-        expect(urgent.some((action) => action.type === "wait_turn" || action.type === "defend_turn")).toBe(false);
-        const move = urgent.find((action) => action.type === "move_unit");
+        const production = new StrategyV0_8().decideTurn(actor, context);
+        const alias = new StrategyV0_8S().decideTurn(actor, context);
+        expect(alias).toEqual(production);
+        expect(production.some((action) => action.type === "wait_turn" || action.type === "defend_turn")).toBe(false);
+        const move = production.find((action) => action.type === "move_unit");
         expect(move).toBeDefined();
         const destination = move?.type === "move_unit" ? move.path.at(-1) : undefined;
         expect(destination).toBeDefined();

@@ -24,6 +24,28 @@ import { STRATEGY_V0_8S } from "./versions/v0_8s";
 
 export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
 
+// Browser-safe identity and immutable configuration for the promoted v0.8+a13
+// composite. The Node-only SearchDriver factory is exported separately from
+// `src/simulation` so importing the shared game API never pulls in node:fs/path.
+export {
+    buildV08A13SearchEnvironment,
+    V08_A13_CANDIDATE_ID,
+    V08_A13_GENOME,
+    V08_A13_GENOME_SHA256,
+    V08_A13_OPPONENT_VERSION,
+    V08_A13_POLICY,
+    V08_A13_PRODUCTION_VERSION,
+    V08_A13_PROFILE,
+    V08_A13_PROFILE_SCHEMA,
+    V08_A13_SEARCH,
+    V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256,
+    V08_A13_SOURCE_BINDING_SHA256,
+    V08_A13_SOURCE_COMMIT,
+    V08_A13_SOURCE_TREE,
+    V08_A13_SOURCE_VERSION,
+    V08_A13_VALUE_LEAF,
+} from "./versions/v0_8_a13_profile";
+
 // F4 — the shared enumerated candidate generator (./candidates.ts): every engine-legal candidate turn
 // for the acting unit (moves, melee target x stand-cell, shot aims, area throws, all castable spells,
 // defend, wait) with candidate 0 always the incumbent decision, per-candidate morale/luck-economy +
@@ -62,11 +84,13 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts).
     // It remains registered as the frozen incumbent now that v0.8 is the shipped default below.
     STRATEGY_V0_7,
-    // v0.8s is the measurement-only seat for anti-Armageddon target-pressure/search A/Bs. Keep it immediately
-    // before v0.8 so the experiment can never become LATEST_AI_VERSION or alter plain v0.8 by registration.
+    // v0.8s is the compatibility alias used to replay the frozen a13 training/validation seat. Its native
+    // strategy is now identical to v0.8; the distinct version string remains useful for historical artifacts
+    // and seat-scoped research. Keep it before v0.8 so it can never become LATEST/DEFAULT by registration.
     STRATEGY_V0_8S,
-    // v0.8 starts from v0.7 but converts terminal policy no-ops into explicit actions. Register it last and ship
-    // it as DEFAULT_AI_VERSION so local and server-owned AI seats use the same promoted strategy.
+    // v0.8 is the promoted a13 composite's native strategy. Search-capable simulation/server runtimes pair it
+    // with the exact bounded a13 SearchDriver exported from `src/simulation`; browser-only callers retain every
+    // baked native policy advancement without importing Node-only simulation dependencies.
     STRATEGY_V0_8,
 ];
 
@@ -81,9 +105,10 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * Promoted to v0.8 — the shipped default for in-game AI (was v0.7). v0.8 preserves the accepted v0.7 policy
- * chain while replacing avoidable end-turn, Luck Shield, and obstacle attacks with productive legal actions,
- * pressing dominant late fights, and preserving intentional waits when its ranged army is stronger.
+ * Promoted to v0.8+a13 — the shipped default for in-game AI (was v0.7). The registered strategy contains the
+ * a13 native policy: productive legal-action recovery, target pressure, dominant/urgent finishing, learned
+ * melee targeting and reveal placement, while preserving intentional waits when its ranged army is stronger.
+ * Search-capable runtimes complete the composite with the exact bounded a13 SearchDriver from `src/simulation`.
  */
 export const DEFAULT_AI_VERSION = "v0.8";
 

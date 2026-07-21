@@ -699,7 +699,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         ]);
     });
 
-    it("arms universal balanced-fight urgency only for v0.8s at lap 9", () => {
+    it("arms universal balanced-fight urgency for the a13 alias and production v0.8 at lap 9", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8,v0.7", SEARCH_INCLUDE_MOVES: "1" });
         const harness = buildBattle(922, "v0.8s");
         const unit = harness.activeUnit()!;
@@ -746,7 +746,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.chooseDecision(unit, "v0.7", incumbent)).toBe(incumbent);
         expect(flags).toEqual([
             { targetPressure: true, urgent: true },
-            { targetPressure: false, urgent: false },
+            { targetPressure: true, urgent: true },
             { targetPressure: false, urgent: false },
         ]);
     });

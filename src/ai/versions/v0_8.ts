@@ -14,11 +14,13 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { TeamType } from "../../generated/protobuf/v1/types_gen";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
-import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
+import type { XY } from "../../utils/math";
+import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../candidates";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_7 } from "./v0_7";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
+import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const V08_DIRECT_COMBAT_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw"]);
@@ -221,6 +223,23 @@ export function prioritizeV08Decision(unit: Unit, context: IDecisionContext, dec
 /** v0.8 starts from v0.7 and makes attack/advance lexicographically stronger than avoidable passive turns. */
 export class StrategyV0_8 extends StrategyV0_7 {
     public override readonly version: string = "v0.8";
+    /** a13 uses living-stack ranged output, not the historical per-creature proxy. */
+    protected override rangedOutput(team: number, unitsHolder: UnitsHolder): number {
+        return v08TeamRangedOutput(team as TeamType, unitsHolder);
+    }
+    /** Bake a13's trained preference for pinning enemy shooters into this version. */
+    protected override applyMeleeDims(): void {
+        this.w[56] = 0;
+        this.w[57] = 2;
+    }
+    /** Bake a13's reveal-conditioned placement when the caller did not select an explicit setup policy. */
+    public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
+        const productionContext: IPlacementContext = {
+            ...context,
+            setupPlacementPolicy: context.setupPlacementPolicy ?? "legitimate-reveal",
+        };
+        return super.placeArmy(units, productionContext);
+    }
     protected override frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         const strongerRangedPosture = v08HasStrongerRangedPosture(
             unit,
@@ -261,9 +280,11 @@ export class StrategyV0_8 extends StrategyV0_7 {
         // Luck Shield is a last-resort engine action, not useful tempo. If the unit still owns its one legal
         // initiative defer, hourglass it and let it try again later in the lap; retain defend only when neither
         // a productive action nor hourglass is actually available.
-        return onlyForcedFallback && this.canHourglass(unit, context)
-            ? [{ type: "wait_turn", unitId: unit.getId() }]
-            : prioritized;
+        const active: GameAction[] =
+            onlyForcedFallback && this.canHourglass(unit, context)
+                ? [{ type: "wait_turn", unitId: unit.getId() }]
+                : prioritized;
+        return prioritizeV08A13FinishDecision(unit, context, active);
     }
 }
 

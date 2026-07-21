@@ -40,7 +40,7 @@ import { runMatch } from "../../src/simulation/battle_engine";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const BEHAVIOR_ENV_PREFIXES = ["V04_", "V05_", "V06_", "V07_", "SEARCH_", "Q2_", "CEM_"] as const;
+const BEHAVIOR_ENV_PREFIXES = ["V04_", "V05_", "V06_", "V07_", "V08_", "SEARCH_", "Q2_", "CEM_"] as const;
 const savedBehaviorEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => BEHAVIOR_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))),
 );
@@ -160,7 +160,14 @@ describe("v0.8 candidate policy", () => {
         expect(candidate).toBeInstanceOf(StrategyV0_7);
         expect(candidate).toBeInstanceOf(StrategyV0_8);
         expect(candidate.version).toBe("v0.8");
-        expect(Object.getOwnPropertyNames(StrategyV0_8.prototype)).toEqual(["constructor", "frontMove", "decideTurn"]);
+        expect(Object.getOwnPropertyNames(StrategyV0_8.prototype)).toEqual([
+            "constructor",
+            "rangedOutput",
+            "applyMeleeDims",
+            "placeArmy",
+            "frontMove",
+            "decideTurn",
+        ]);
         expect(AI_VERSIONS.indexOf("v0.8")).toBeGreaterThan(AI_VERSIONS.indexOf("v0.7"));
         expect(LATEST_AI_VERSION).toBe("v0.8");
         expect(DEFAULT_AI_VERSION).toBe("v0.8");

@@ -56,6 +56,7 @@ import {
     requirePhaseBRunFingerprint,
 } from "./phase_b_dataset";
 import { SearchDriver } from "./search_driver";
+import { createV08A13SearchDriver, shouldUseDefaultV08A13Search } from "./v0_8_a13_search";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
@@ -552,11 +553,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // observational wait-horizon ablation; default OFF -> byte-identical). Shares the lookahead's dependency
     // seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT live in
     // ./search_driver.ts.
-    const search = new SearchDriver(driverDeps, {
+    const searchMatch = {
         seed: config.seed,
         greenVersion: config.greenVersion,
         redVersion: config.redVersion,
-    });
+    };
+    const search = shouldUseDefaultV08A13Search(searchMatch)
+        ? createV08A13SearchDriver(driverDeps, searchMatch)
+        : new SearchDriver(driverDeps, searchMatch);
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
     const greenRoster = config.roster;
