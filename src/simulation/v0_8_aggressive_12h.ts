@@ -56,7 +56,7 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v4" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v5" as const;
 const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
@@ -66,7 +66,7 @@ const LIVE_MAPS = "normal,lava,block";
 // promotion evidence may tolerate at most one per thousand.
 const ARMAGEDDON_RATE_GATE = 0.001;
 const BASE_CANDIDATE_COUNT = 48;
-export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 2;
+export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 3;
 const ADAPTIVE_GENERATOR_VERSION = V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION;
 const ADAPTIVE_PARENT_COUNT = 4;
 const ADAPTIVE_CHILD_TARGET = 24;
@@ -77,18 +77,25 @@ const ADAPTIVE_GATE_STEP = 0.005;
 const ADAPTIVE_LEAF_BLEND_ALPHAS = [0.15, 0.25] as const;
 const LEVEL4_RESERVE_MULTIPLIER = 3;
 export const V08_CAMPAIGN_DEFAULT_LANES = 3;
-export const V08_CAMPAIGN_RESEARCH_RANKING = "decisive-win-rate_then_non-loss-armageddon-rate" as const;
+export const V08_CAMPAIGN_SCHEDULER_VERSION = 1;
+export const V08_CAMPAIGN_RESEARCH_RANKING = "candidate-win-rate_then_draw-rate_then_non-loss-armageddon-rate" as const;
 
 export interface IV08CampaignPromotionStrengthRequirement {
+    /** All-game win rate produced by the incumbent against itself (parity is 0.5). */
+    incumbentCandidateWinRate: number;
+    /** Required all-game win-rate improvement over incumbent parity. */
+    minimumCandidateWinRateDelta: number;
     /** Head-to-head decisive rate produced by the incumbent against itself (parity is 0.5). */
     incumbentDecisiveWinRate: number;
-    /** Required improvement over incumbent parity. Zero is the conservative non-regression default. */
-    minimumCandidateDelta: number;
+    /** Required decisive-rate improvement over incumbent parity. */
+    minimumDecisiveWinRateDelta: number;
 }
 
 export const V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH = Object.freeze({
+    incumbentCandidateWinRate: 0.5,
+    minimumCandidateWinRateDelta: 0,
     incumbentDecisiveWinRate: 0.5,
-    minimumCandidateDelta: 0,
+    minimumDecisiveWinRateDelta: 0,
 } satisfies IV08CampaignPromotionStrengthRequirement);
 
 interface ICli {
@@ -127,6 +134,12 @@ interface IManifest {
     armageddonRateGate: typeof ARMAGEDDON_RATE_GATE;
     researchRanking: typeof V08_CAMPAIGN_RESEARCH_RANKING;
     promotionStrength: typeof V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH;
+    scheduler: {
+        version: typeof V08_CAMPAIGN_SCHEDULER_VERSION;
+        discipline: "work-conserving-fifo";
+        validationEvidenceCommit: "complete-round-only";
+        validationRoundPipelining: false;
+    };
     adaptive: {
         generatorVersion: typeof ADAPTIVE_GENERATOR_VERSION;
         parentCount: typeof ADAPTIVE_PARENT_COUNT;
@@ -291,6 +304,8 @@ interface IRankedCandidate {
     winsA: number;
     winsB: number;
     draws: number;
+    candidateWinRate: number;
+    drawRate: number;
     decisiveWinRate: number;
     armageddonReached: number;
     armageddonDecided: number;
@@ -416,6 +431,10 @@ function estimatedMillisecondsPerWorkUnit(
     return Math.max(fallback, observed);
 }
 
+function estimateJobDurationMs(job: JobWork, completed: readonly IJobDurationSample[], workersPerJob: number): number {
+    return Math.ceil(jobWorkUnits(job) * estimatedMillisecondsPerWorkUnit(job.kind, completed, workersPerJob));
+}
+
 /** Estimate a parallel batch: its wall duration is governed by its slowest lane. */
 export function estimateBatchDurationMs(
     jobs: readonly JobWork[],
@@ -423,13 +442,27 @@ export function estimateBatchDurationMs(
     workersPerJob: number,
 ): number {
     if (!jobs.length) return 0;
-    return Math.ceil(
-        Math.max(
-            ...jobs.map(
-                (job) => jobWorkUnits(job) * estimatedMillisecondsPerWorkUnit(job.kind, completed, workersPerJob),
-            ),
-        ),
-    );
+    return Math.ceil(Math.max(...jobs.map((job) => estimateJobDurationMs(job, completed, workersPerJob))));
+}
+
+/** Estimate the FIFO list-scheduling makespan used by the dynamic lane scheduler. */
+export function estimateDynamicQueueDurationMs(
+    jobs: readonly JobWork[],
+    completed: readonly IJobDurationSample[],
+    workersPerJob: number,
+    lanes: number,
+): number {
+    if (!Number.isSafeInteger(lanes) || lanes < 1) throw new Error("lanes must be a positive integer");
+    if (!jobs.length) return 0;
+    const laneReadyAt = Array.from({ length: Math.min(lanes, jobs.length) }, () => 0);
+    for (const job of jobs) {
+        let earliestLane = 0;
+        for (let lane = 1; lane < laneReadyAt.length; lane += 1) {
+            if (laneReadyAt[lane]! < laneReadyAt[earliestLane]!) earliestLane = lane;
+        }
+        laneReadyAt[earliestLane] = laneReadyAt[earliestLane]! + estimateJobDurationMs(job, completed, workersPerJob);
+    }
+    return Math.max(...laneReadyAt);
 }
 
 /** Sequential batches compose one indivisible admission unit (notably a complete validation round). */
@@ -461,6 +494,142 @@ export function canAdmitJobBatches(options: IJobBatchesAdmission): boolean {
     }
     const duration = estimateJobBatchesDurationMs(options.batches, options.completed, options.workersPerJob);
     return options.nowMs + duration + safetyMarginMs <= options.deadlineAtMs;
+}
+
+export interface IV08CampaignDynamicQueueItem {
+    id: string;
+}
+
+export type V08CampaignDynamicQueueStatus =
+    "completed" | "admission-deferred" | "deadline" | "stopped" | "job-incomplete";
+
+export interface IV08CampaignDynamicQueueResult {
+    status: V08CampaignDynamicQueueStatus;
+    launchedJobs: number;
+    completedJobs: number;
+    remainingJobs: number;
+    peakActiveLanes: number;
+    peakActiveWorkers: number;
+    deferredJobId: string | null;
+}
+
+export interface IV08CampaignDynamicQueueOptions<T extends IV08CampaignDynamicQueueItem> {
+    jobs: readonly T[];
+    lanes: number;
+    workersPerJob: number;
+    maxWorkers: number;
+    deadlineAtMs: number;
+    execute: (job: T) => Promise<boolean>;
+    canAdmit?: (job: T, nowMs: number) => boolean;
+    nowMs?: () => number;
+    shouldStop?: () => boolean;
+}
+
+/**
+ * Work-conserving FIFO lane scheduler. A completed lane immediately takes the next admitted job; no sibling
+ * lane forms a batch barrier. Failed/stopped work halts new admission while already-running executors drain.
+ */
+export async function runV08CampaignDynamicQueue<T extends IV08CampaignDynamicQueueItem>(
+    options: IV08CampaignDynamicQueueOptions<T>,
+): Promise<IV08CampaignDynamicQueueResult> {
+    if (!Number.isSafeInteger(options.lanes) || options.lanes < 1) {
+        throw new Error("lanes must be a positive integer");
+    }
+    if (!Number.isSafeInteger(options.workersPerJob) || options.workersPerJob < 1) {
+        throw new Error("workersPerJob must be a positive integer");
+    }
+    if (!Number.isSafeInteger(options.maxWorkers) || options.maxWorkers < options.workersPerJob) {
+        throw new Error("maxWorkers must fit at least one job");
+    }
+    if (!Number.isFinite(options.deadlineAtMs)) throw new Error("deadlineAtMs must be finite");
+    if (new Set(options.jobs.map(({ id }) => id)).size !== options.jobs.length) {
+        throw new Error("Dynamic queue job IDs must be unique");
+    }
+
+    const nowMs = options.nowMs ?? Date.now;
+    const shouldStop = options.shouldStop ?? (() => false);
+    const laneCapacity = Math.min(options.lanes, Math.floor(options.maxWorkers / options.workersPerJob));
+    type Settlement = { token: number; ok: boolean; error?: never } | { token: number; ok?: never; error: unknown };
+    const active = new Map<number, Promise<Settlement>>();
+    let activeWorkers = 0;
+    let cursor = 0;
+    let token = 0;
+    let launchedJobs = 0;
+    let completedJobs = 0;
+    let peakActiveLanes = 0;
+    let peakActiveWorkers = 0;
+    let status: V08CampaignDynamicQueueStatus | "running" = "running";
+    let deferredJobId: string | null = null;
+    let firstError: unknown;
+
+    const haltForCurrentState = (): boolean => {
+        if (shouldStop()) {
+            status = "stopped";
+            return true;
+        }
+        if (nowMs() >= options.deadlineAtMs) {
+            status = "deadline";
+            return true;
+        }
+        return false;
+    };
+
+    const fillFreedLanes = (): void => {
+        while (status === "running" && cursor < options.jobs.length && active.size < laneCapacity) {
+            if (haltForCurrentState()) return;
+            const job = options.jobs[cursor]!;
+            const admissionNowMs = nowMs();
+            if (options.canAdmit && !options.canAdmit(job, admissionNowMs)) {
+                status = "admission-deferred";
+                deferredJobId = job.id;
+                return;
+            }
+            cursor += 1;
+            launchedJobs += 1;
+            activeWorkers += options.workersPerJob;
+            if (activeWorkers > options.maxWorkers) throw new Error("Dynamic queue exceeded maxWorkers");
+            const currentToken = token++;
+            const execution: Promise<Settlement> = Promise.resolve()
+                .then(() => options.execute(job))
+                .then(
+                    (ok): Settlement => ({ token: currentToken, ok }),
+                    (error: unknown): Settlement => ({ token: currentToken, error }),
+                );
+            active.set(currentToken, execution);
+            peakActiveLanes = Math.max(peakActiveLanes, active.size);
+            peakActiveWorkers = Math.max(peakActiveWorkers, activeWorkers);
+        }
+    };
+
+    fillFreedLanes();
+    while (active.size > 0) {
+        const settled = await Promise.race(active.values());
+        active.delete(settled.token);
+        activeWorkers -= options.workersPerJob;
+        if ("error" in settled) {
+            firstError ??= settled.error;
+            status = "job-incomplete";
+        } else if (settled.ok) {
+            completedJobs += 1;
+        } else if (status === "running") {
+            status = shouldStop() ? "stopped" : nowMs() >= options.deadlineAtMs ? "deadline" : "job-incomplete";
+        }
+        if (status === "running") fillFreedLanes();
+    }
+
+    if (firstError !== undefined) throw firstError;
+    if (status === "running") {
+        status = cursor === options.jobs.length ? "completed" : "job-incomplete";
+    }
+    return {
+        status,
+        launchedJobs,
+        completedJobs,
+        remainingJobs: options.jobs.length - completedJobs,
+        peakActiveLanes,
+        peakActiveWorkers,
+        deferredJobId,
+    };
 }
 
 function parseCli(argv: readonly string[]): ICli {
@@ -835,17 +1004,19 @@ function candidateMetadata(manifest: IManifest, adaptive: IAdaptiveCatalog | nul
 export interface IV08CampaignResearchCandidate {
     candidateId: string;
     candidateIndex: number;
-    decisiveWinRate: number;
+    candidateWinRate: number;
+    drawRate: number;
     nonLossArmageddonRate: number;
 }
 
-/** Wins are lexicographically primary; Armageddon can only break an equal-outcome tie. */
+/** All-game outcomes are lexicographically primary; Armageddon can only break an exact W/D outcome tie. */
 export function compareV08CampaignResearchCandidates(
     left: IV08CampaignResearchCandidate,
     right: IV08CampaignResearchCandidate,
 ): number {
     return (
-        right.decisiveWinRate - left.decisiveWinRate ||
+        right.candidateWinRate - left.candidateWinRate ||
+        right.drawRate - left.drawRate ||
         left.nonLossArmageddonRate - right.nonLossArmageddonRate ||
         left.candidateIndex - right.candidateIndex ||
         left.candidateId.localeCompare(right.candidateId)
@@ -870,29 +1041,40 @@ export interface IV08CampaignPromotionEvidence {
     unboundedSearch: boolean;
     hasValidationEvidence: boolean;
     level4CoveragePassed: boolean;
+    candidateWinRate: number;
     decisiveWinRate: number;
     armageddonRate: number;
     level4ArmageddonRate: number;
 }
 
 export function isV08CampaignPromotionStrengthQualified(
+    candidateWinRate: number,
     decisiveWinRate: number,
     requirement: IV08CampaignPromotionStrengthRequirement = V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
 ): boolean {
     if (
+        !Number.isFinite(requirement.incumbentCandidateWinRate) ||
+        requirement.incumbentCandidateWinRate < 0 ||
+        requirement.incumbentCandidateWinRate > 1 ||
+        !Number.isFinite(requirement.minimumCandidateWinRateDelta) ||
+        requirement.minimumCandidateWinRateDelta < 0 ||
         !Number.isFinite(requirement.incumbentDecisiveWinRate) ||
         requirement.incumbentDecisiveWinRate < 0 ||
         requirement.incumbentDecisiveWinRate > 1 ||
-        !Number.isFinite(requirement.minimumCandidateDelta) ||
-        requirement.minimumCandidateDelta < 0
+        !Number.isFinite(requirement.minimumDecisiveWinRateDelta) ||
+        requirement.minimumDecisiveWinRateDelta < 0
     ) {
         throw new Error("Invalid v0.8 campaign promotion strength requirement");
     }
     return (
+        Number.isFinite(candidateWinRate) &&
+        candidateWinRate >= 0 &&
+        candidateWinRate <= 1 &&
+        candidateWinRate >= requirement.incumbentCandidateWinRate + requirement.minimumCandidateWinRateDelta &&
         Number.isFinite(decisiveWinRate) &&
         decisiveWinRate >= 0 &&
         decisiveWinRate <= 1 &&
-        decisiveWinRate >= requirement.incumbentDecisiveWinRate + requirement.minimumCandidateDelta
+        decisiveWinRate >= requirement.incumbentDecisiveWinRate + requirement.minimumDecisiveWinRateDelta
     );
 }
 
@@ -905,7 +1087,11 @@ export function isV08CampaignPromotionEligible(
         !evidence.unboundedSearch &&
         evidence.hasValidationEvidence &&
         evidence.level4CoveragePassed &&
-        isV08CampaignPromotionStrengthQualified(evidence.decisiveWinRate, strengthRequirement) &&
+        isV08CampaignPromotionStrengthQualified(
+            evidence.candidateWinRate,
+            evidence.decisiveWinRate,
+            strengthRequirement,
+        ) &&
         evidence.armageddonRate <= ARMAGEDDON_RATE_GATE &&
         evidence.level4ArmageddonRate <= ARMAGEDDON_RATE_GATE
     );
@@ -998,11 +1184,17 @@ function tournamentSummary(value: unknown, path: string): ITournamentSummaryWith
 
 /** Minimal version header check used before accepting any resumable manifest. */
 export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean {
-    const manifest = value as { schema?: unknown; kind?: unknown; adaptive?: { generatorVersion?: unknown } };
+    const manifest = value as {
+        schema?: unknown;
+        kind?: unknown;
+        adaptive?: { generatorVersion?: unknown };
+        scheduler?: { version?: unknown };
+    };
     return (
         manifest?.schema === V08_CAMPAIGN_SCHEMA &&
         manifest.kind === "manifest" &&
-        manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION
+        manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
+        manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION
     );
 }
 
@@ -1041,6 +1233,12 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         armageddonRateGate: ARMAGEDDON_RATE_GATE as typeof ARMAGEDDON_RATE_GATE,
         researchRanking: V08_CAMPAIGN_RESEARCH_RANKING,
         promotionStrength: V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH,
+        scheduler: {
+            version: V08_CAMPAIGN_SCHEDULER_VERSION as typeof V08_CAMPAIGN_SCHEDULER_VERSION,
+            discipline: "work-conserving-fifo" as const,
+            validationEvidenceCommit: "complete-round-only" as const,
+            validationRoundPipelining: false as const,
+        },
         adaptive: {
             generatorVersion: ADAPTIVE_GENERATOR_VERSION as typeof ADAPTIVE_GENERATOR_VERSION,
             parentCount: ADAPTIVE_PARENT_COUNT as typeof ADAPTIVE_PARENT_COUNT,
@@ -1101,6 +1299,9 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         manifest.researchRanking !== V08_CAMPAIGN_RESEARCH_RANKING ||
         fingerprintV08AlignedV1(manifest.promotionStrength) !==
             fingerprintV08AlignedV1(V08_CAMPAIGN_DEFAULT_PROMOTION_STRENGTH) ||
+        manifest.scheduler.discipline !== "work-conserving-fifo" ||
+        manifest.scheduler.validationEvidenceCommit !== "complete-round-only" ||
+        manifest.scheduler.validationRoundPipelining !== false ||
         manifest.adaptive.parentCount !== ADAPTIVE_PARENT_COUNT ||
         manifest.adaptive.childTarget !== ADAPTIVE_CHILD_TARGET ||
         manifest.adaptive.screenSeed !== cli.screenSeed ||
@@ -1137,6 +1338,24 @@ function completedJobSpec(job: ICompletedJob): IJobSpec {
         ...(job.pairsPerLane === undefined ? {} : { pairsPerLane: job.pairsPerLane }),
         baseSeed: job.baseSeed,
     };
+}
+
+/** Validation artifacts are evidence only after every shortlisted candidate in their round has committed. */
+export function isV08CampaignValidationEvidenceCommitted(
+    job: Pick<IJobSpec, "id" | "kind" | "candidateId">,
+    nextValidationRound: number,
+): boolean {
+    if (!Number.isSafeInteger(nextValidationRound) || nextValidationRound < 0) {
+        throw new Error("nextValidationRound must be a non-negative integer");
+    }
+    if (job.kind !== "validation") return true;
+    const match = /^validation-r(\d+)-(.+)$/.exec(job.id);
+    if (!match || match[2] !== job.candidateId) {
+        throw new Error(`Validation job ${job.id} has a non-canonical round identity`);
+    }
+    const round = Number(match[1]);
+    if (!Number.isSafeInteger(round)) throw new Error(`Validation job ${job.id} has an invalid round`);
+    return round < nextValidationRound;
 }
 
 function assertJobSpec(spec: IJobSpec, context: string): void {
@@ -1295,6 +1514,9 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         checkpoint.schema !== SCHEMA ||
         checkpoint.kind !== "checkpoint" ||
         checkpoint.manifestFingerprint !== manifest.fingerprint ||
+        !["screen", "adaptive", "level4", "validation", "complete"].includes(checkpoint.phase) ||
+        !Number.isSafeInteger(checkpoint.validationRound) ||
+        checkpoint.validationRound < 0 ||
         !Array.isArray(checkpoint.completed) ||
         !(checkpoint.adaptiveCatalog === null || typeof checkpoint.adaptiveCatalog === "object") ||
         !Array.isArray(checkpoint.validationCandidateIds) ||
@@ -1326,7 +1548,7 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         assertJobSpec(active.spec, `Active job ${id}`);
     }
     // A resumed orchestrator cannot own children from the prior process. The result artifact, not stale PID state,
-    // is the recovery commit point; runJobBatch reconciles any result written just before interruption.
+    // is the recovery commit point; runJobQueue reconciles any result written just before interruption.
     checkpoint.activeJobs = {};
     return checkpoint;
 }
@@ -1358,6 +1580,7 @@ function collectLeaderboard(
             throw new Error(`Completed job ${job.id} has invalid candidate provenance`);
         }
         const result = validateResultArtifact(manifest, job, false);
+        if (!isV08CampaignValidationEvidenceCommitted(job, checkpoint.validationRound)) continue;
         if (job.kind === "level4") {
             const paths = level4ByCandidate.get(job.candidateId) ?? [];
             paths.push(job.summaryPath);
@@ -1399,6 +1622,8 @@ function collectLeaderboard(
         const validationRuns = validationSummaries.length;
         const validationGames = validationSummaries.reduce((sum, summary) => sum + summary.games, 0);
         const hasValidationEvidence = validationRuns > 0;
+        const candidateWinRate = games ? winsA / games : 0;
+        const drawRate = games ? draws / games : 0;
         const decisiveWinRate = winsA + winsB ? winsA / (winsA + winsB) : 0.5;
         const armageddonRate = games ? armageddonReached / games : 1;
         const nonLossArmageddonReached = armageddonReachedCandidateWins + armageddonReachedDraws;
@@ -1441,12 +1666,17 @@ function collectLeaderboard(
             armageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4ArmageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4CoveragePassed;
-        const passesStrengthGate = isV08CampaignPromotionStrengthQualified(decisiveWinRate, manifest.promotionStrength);
+        const passesStrengthGate = isV08CampaignPromotionStrengthQualified(
+            candidateWinRate,
+            decisiveWinRate,
+            manifest.promotionStrength,
+        );
         const promotionEligible = isV08CampaignPromotionEligible(
             {
                 unboundedSearch: manifest.config.unboundedSearch,
                 hasValidationEvidence,
                 level4CoveragePassed,
+                candidateWinRate,
                 decisiveWinRate,
                 armageddonRate,
                 level4ArmageddonRate,
@@ -1467,6 +1697,8 @@ function collectLeaderboard(
             winsA,
             winsB,
             draws,
+            candidateWinRate,
+            drawRate,
             decisiveWinRate,
             armageddonReached,
             armageddonDecided,
@@ -1969,7 +2201,7 @@ async function runJob(
     return true;
 }
 
-async function runJobBatch(
+async function runJobQueue(
     manifest: IManifest,
     checkpoint: ICheckpoint,
     registry: CandidateRegistry,
@@ -1977,28 +2209,40 @@ async function runJobBatch(
     specs: IJobSpec[],
     options: { admissionReserved?: boolean } = {},
 ): Promise<boolean> {
-    if (specs.length > manifest.config.lanes) {
-        throw new Error(`Batch has ${specs.length} jobs but only ${manifest.config.lanes} lanes`);
-    }
-    if (specs.length * manifest.config.workersPerJob > manifest.config.concurrency) {
-        throw new Error("Batch exceeds the manifest's total worker budget");
+    if (
+        manifest.config.lanes * manifest.config.workersPerJob !== manifest.config.maxWorkers ||
+        manifest.config.maxWorkers > manifest.config.concurrency
+    ) {
+        throw new Error("Manifest scheduler worker budget is inconsistent");
     }
     for (const spec of specs) reconcileJobResult(manifest, checkpoint, registry, spec);
     const completedIds = new Set(checkpoint.completed.map(({ id }) => id));
     const pending = specs.filter(({ id }) => !completedIds.has(id));
     if (!pending.length) return true;
-    if (
-        !options.admissionReserved &&
-        !canAdmitJobBatches({
-            batches: [pending],
-            completed: checkpoint.completed,
-            workersPerJob: manifest.config.workersPerJob,
-            nowMs: Date.now(),
-            deadlineAtMs: manifest.deadlineAtMs,
-        })
-    ) {
-        const estimatedDurationMs = estimateBatchDurationMs(
-            pending,
+    const result = await runV08CampaignDynamicQueue({
+        jobs: pending,
+        lanes: manifest.config.lanes,
+        workersPerJob: manifest.config.workersPerJob,
+        maxWorkers: manifest.config.maxWorkers,
+        deadlineAtMs: manifest.deadlineAtMs,
+        shouldStop: () => stopRequested,
+        canAdmit: options.admissionReserved
+            ? undefined
+            : (spec, nowMs) =>
+                  canAdmitJobBatches({
+                      batches: [[spec]],
+                      completed: checkpoint.completed,
+                      workersPerJob: manifest.config.workersPerJob,
+                      nowMs,
+                      deadlineAtMs: manifest.deadlineAtMs,
+                  }),
+        execute: (spec) => runJob(manifest, checkpoint, registry, adaptive, spec),
+    });
+    if (result.status === "admission-deferred") {
+        const deferred = pending.find(({ id }) => id === result.deferredJobId);
+        if (!deferred) throw new Error("Dynamic queue deferred an unknown job");
+        const estimatedDurationMs = estimateJobDurationMs(
+            deferred,
             checkpoint.completed,
             manifest.config.workersPerJob,
         );
@@ -2007,19 +2251,16 @@ async function runJobBatch(
             `${JSON.stringify({
                 at: new Date().toISOString(),
                 event: "admission-deferred",
-                jobIds: pending.map(({ id }) => id),
+                schedulerVersion: V08_CAMPAIGN_SCHEDULER_VERSION,
+                jobIds: [deferred.id],
                 estimatedDurationMs,
                 safetyMarginMs: ADMISSION_SAFETY_MARGIN_MS,
                 deadlineAtMs: manifest.deadlineAtMs,
             })}\n`,
         );
-        console.log(
-            `[defer] ${pending.map(({ id }) => id).join(", ")} needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`,
-        );
-        return false;
+        console.log(`[defer] ${deferred.id} needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`);
     }
-    const results = await Promise.all(pending.map((spec) => runJob(manifest, checkpoint, registry, adaptive, spec)));
-    return results.every(Boolean);
+    return result.status === "completed";
 }
 
 async function main(): Promise<void> {
@@ -2043,6 +2284,7 @@ async function main(): Promise<void> {
         `Research-only v0.8 aggressive campaign: ${manifest.output}\n` +
             `deadline ${manifest.deadlineAt}, total workers ${manifest.config.concurrency}, lanes ${manifest.config.lanes}, ` +
             `workers/job ${manifest.config.workersPerJob}, max active ${manifest.config.maxWorkers}, ` +
+            `scheduler v${manifest.scheduler.version} ${manifest.scheduler.discipline}, ` +
             `timing ${manifest.config.unboundedSearch ? "unbounded deterministic fitness" : "bound operational"}, ` +
             `catalog ${manifest.catalogIdentity.catalogSha256}`,
     );
@@ -2053,9 +2295,8 @@ async function main(): Promise<void> {
 
     checkpoint.phase = "screen";
     saveCheckpoint(manifest, checkpoint);
-    for (let start = 0; start < baseBindings.length; start += manifest.config.lanes) {
-        const specs: IJobSpec[] = baseBindings.slice(start, start + manifest.config.lanes).map((_binding, offset) => {
-            const index = start + offset;
+    {
+        const specs: IJobSpec[] = baseBindings.map((_binding, index) => {
             return {
                 id: `screen-${candidateId(index)}`,
                 kind: "screen" as const,
@@ -2065,7 +2306,7 @@ async function main(): Promise<void> {
                 baseSeed: manifest.config.screenSeed,
             };
         });
-        const ok = await runJobBatch(manifest, checkpoint, registry, adaptive, specs);
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
         if (!ok) return;
     }
 
@@ -2073,8 +2314,8 @@ async function main(): Promise<void> {
     registry = buildCandidateRegistry(manifest, baseBindings, adaptive);
     checkpoint.phase = "adaptive";
     saveCheckpoint(manifest, checkpoint);
-    for (let start = 0; start < adaptive.children.length; start += manifest.config.lanes) {
-        const specs: IJobSpec[] = adaptive.children.slice(start, start + manifest.config.lanes).map((child) => ({
+    {
+        const specs: IJobSpec[] = adaptive.children.map((child) => ({
             id: `adaptive-${child.id}`,
             kind: "adaptive" as const,
             candidateId: child.id,
@@ -2082,7 +2323,7 @@ async function main(): Promise<void> {
             games: manifest.adaptive.screenGames,
             baseSeed: manifest.adaptive.screenSeed,
         }));
-        const ok = await runJobBatch(manifest, checkpoint, registry, adaptive, specs);
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
         if (!ok) return;
     }
 
@@ -2103,25 +2344,19 @@ async function main(): Promise<void> {
     const alreadyCovered = new Set(
         checkpoint.completed.filter((job) => job.kind === "level4").map((job) => job.candidateId),
     );
-    let level4Cursor = 0;
-    while (level4Cursor < level4Queue.length && Date.now() < manifest.deadlineAtMs && !stopRequested) {
-        const batch: IRankedCandidate[] = [];
-        while (level4Cursor < level4Queue.length && batch.length < manifest.config.lanes) {
-            const row = level4Queue[level4Cursor++]!;
-            if (!alreadyCovered.has(row.candidateId)) batch.push(row);
-        }
-        if (!batch.length) continue;
-        const specs: IJobSpec[] = batch.map((row) => ({
-            id: `level4-${row.candidateId}`,
-            kind: "level4" as const,
-            candidateId: row.candidateId,
-            candidateIndex: row.candidateIndex,
-            pairsPerLane: manifest.config.level4PairsPerLane,
-            baseSeed: manifest.config.level4Seed,
-        }));
-        const ok = await runJobBatch(manifest, checkpoint, registry, adaptive, specs);
+    {
+        const specs: IJobSpec[] = level4Queue
+            .filter((row) => !alreadyCovered.has(row.candidateId))
+            .map((row) => ({
+                id: `level4-${row.candidateId}`,
+                kind: "level4" as const,
+                candidateId: row.candidateId,
+                candidateIndex: row.candidateIndex,
+                pairsPerLane: manifest.config.level4PairsPerLane,
+                baseSeed: manifest.config.level4Seed,
+            }));
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
         if (!ok) return;
-        batch.forEach((row) => alreadyCovered.add(row.candidateId));
     }
     collectLeaderboard(manifest, checkpoint, adaptive);
 
@@ -2146,49 +2381,45 @@ async function main(): Promise<void> {
             throw new Error("Persisted validation shortlist does not match the candidate registry");
         }
         const round = checkpoint.validationRound;
-        const roundBatches: IJobSpec[][] = [];
-        for (let start = 0; start < top.length; start += manifest.config.lanes) {
-            const specs: IJobSpec[] = top.slice(start, start + manifest.config.lanes).map((row) => ({
-                id: `validation-r${String(round).padStart(3, "0")}-${row.candidateId}`,
-                kind: "validation" as const,
-                candidateId: row.candidateId,
-                candidateIndex: row.candidateIndex,
-                games: manifest.config.validationGames,
-                baseSeed: (manifest.config.validationSeed + round * 1_000_003) >>> 0,
-            }));
-            roundBatches.push(specs);
-        }
-        // Reconcile every batch before admission so an interrupted result is not charged twice. The remaining
-        // batches form one reservation: never knowingly start the first half of a round without budget for all.
-        for (const specs of roundBatches) {
-            for (const spec of specs) reconcileJobResult(manifest, checkpoint, registry, spec);
-        }
+        const roundSpecs: IJobSpec[] = top.map((row) => ({
+            id: `validation-r${String(round).padStart(3, "0")}-${row.candidateId}`,
+            kind: "validation" as const,
+            candidateId: row.candidateId,
+            candidateIndex: row.candidateIndex,
+            games: manifest.config.validationGames,
+            baseSeed: (manifest.config.validationSeed + round * 1_000_003) >>> 0,
+        }));
+        // Reconcile the whole round before admission so an interrupted result is not charged twice. The remaining
+        // jobs form one reservation: never knowingly start a partial round without budget for every candidate.
+        for (const spec of roundSpecs) reconcileJobResult(manifest, checkpoint, registry, spec);
         const completedIds = new Set(checkpoint.completed.map(({ id }) => id));
-        const pendingBatches = roundBatches
-            .map((specs) => specs.filter(({ id }) => !completedIds.has(id)))
-            .filter((specs) => specs.length > 0);
+        const pending = roundSpecs.filter(({ id }) => !completedIds.has(id));
         if (
-            pendingBatches.length > 0 &&
-            !canAdmitJobBatches({
-                batches: pendingBatches,
-                completed: checkpoint.completed,
-                workersPerJob: manifest.config.workersPerJob,
-                nowMs: Date.now(),
-                deadlineAtMs: manifest.deadlineAtMs,
-            })
+            pending.length > 0 &&
+            Date.now() +
+                estimateDynamicQueueDurationMs(
+                    pending,
+                    checkpoint.completed,
+                    manifest.config.workersPerJob,
+                    manifest.config.lanes,
+                ) +
+                ADMISSION_SAFETY_MARGIN_MS >
+                manifest.deadlineAtMs
         ) {
-            const estimatedDurationMs = estimateJobBatchesDurationMs(
-                pendingBatches,
+            const estimatedDurationMs = estimateDynamicQueueDurationMs(
+                pending,
                 checkpoint.completed,
                 manifest.config.workersPerJob,
+                manifest.config.lanes,
             );
             appendFileSync(
                 join(manifest.output, "logs", "orchestrator.jsonl"),
                 `${JSON.stringify({
                     at: new Date().toISOString(),
                     event: "validation-round-admission-deferred",
+                    schedulerVersion: V08_CAMPAIGN_SCHEDULER_VERSION,
                     round,
-                    jobIds: pendingBatches.flatMap((specs) => specs.map(({ id }) => id)),
+                    jobIds: pending.map(({ id }) => id),
                     estimatedDurationMs,
                     safetyMarginMs: ADMISSION_SAFETY_MARGIN_MS,
                     deadlineAtMs: manifest.deadlineAtMs,
@@ -2197,14 +2428,15 @@ async function main(): Promise<void> {
             console.log(`[defer] validation round ${round} needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`);
             return;
         }
-        for (const specs of roundBatches) {
-            const ok = await runJobBatch(manifest, checkpoint, registry, adaptive, specs, {
-                admissionReserved: true,
-            });
-            if (!ok) return;
-        }
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, roundSpecs, {
+            admissionReserved: true,
+        });
+        if (!ok) return;
+        // This atomic checkpoint advance is the evidence barrier. Until it succeeds, collectLeaderboard excludes
+        // every result in this round, so completion skew, shutdown, or resume cannot favor one shortlisted arm.
         checkpoint.validationRound += 1;
         saveCheckpoint(manifest, checkpoint);
+        collectLeaderboard(manifest, checkpoint, adaptive);
     }
     checkpoint.phase = "complete";
     saveCheckpoint(manifest, checkpoint);
