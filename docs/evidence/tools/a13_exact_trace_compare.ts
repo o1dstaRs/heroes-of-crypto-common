@@ -318,7 +318,7 @@ function main(): void {
                 baseline.source.instrumentedA13SearchSha256 === candidate.source.instrumentedA13SearchSha256,
         },
         reproduction: {
-            baseCommit: "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+            baseCommit: "7950492f1e5ca81d5e071c377bb2956c8c01832a",
             baseBattleEngineSha256: "106d11abf1df06547f68cc921ad8d98ce1bf573c3a0886e0b97cf9dfbe0a3139",
             baseA13SearchSha256: "6dd6d7a23beac7b26f10b1a93116aff2b0436f520d9860242b7b6cddc298f59a",
             tools: {
