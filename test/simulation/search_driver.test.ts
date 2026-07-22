@@ -49,6 +49,7 @@ import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulati
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { ilActionSignature, parseIlGameRow, parseIlRow } from "../../src/simulation/il_dataset";
+import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { classifyActions, SearchDriver } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
@@ -83,6 +84,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE",
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS",
+    "SEARCH_PURE_RANGED_DEADLINE_FINISHER",
+    "SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -1463,6 +1466,81 @@ describe("search driver — gating, hygiene, determinism", () => {
         const candidate = driver.chooseDecision(unit, "v0.8", candidateIncumbent);
         expect(candidate).not.toBe(candidateIncumbent);
         expect(candidate.some((action) => action.type === "range_attack")).toBe(true);
+    });
+
+    const pureRangedDeadlineRoster = (): readonly IArmyUnitSpec[] =>
+        buildMirrorRoster("pure_ranged", 10_307, "expBudget");
+    const pureRangedDeadlineEnvironment = {
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8,v0.8s",
+        SEARCH_GATE: "1000",
+        SEARCH_HORIZON: "1",
+        SEARCH_ROLLOUTS: "1",
+        SEARCH_PURE_RANGED_DEADLINE_FINISHER: "1",
+        SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
+    } as const;
+
+    const greenUnitNamed = (h: Harness, name: string): Unit =>
+        [...h.unitsHolder.getAllUnits().values()].find(
+            (candidate) => candidate.getTeam() === GREEN_TEAM && candidate.getName() === name,
+        )!;
+
+    it("preserves Medusa's opening target while terminal-finisher slack remains", () => {
+        setEnv({ ...pureRangedDeadlineEnvironment });
+        const openingRoster = pureRangedDeadlineRoster().map((spec) =>
+            spec.creatureName === "Tsar Cannon" ? { ...spec, amount: 1 } : spec,
+        );
+        const h = buildBattle(8_222_701, "v0.8", undefined, openingRoster);
+        const unit = greenUnitNamed(h, "Medusa");
+        h.setActiveUnitId(unit.getId());
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(h.fightProperties.getCurrentLap()).toBe(1);
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
+    it("redirects only Endless Quiver to the original No Melee barrier at zero deadline slack", () => {
+        setEnv({ ...pureRangedDeadlineEnvironment });
+        const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
+        h.fightProperties.flipLap();
+        h.fightProperties.flipLap();
+        const medusa = greenUnitNamed(h, "Medusa");
+        h.setActiveUnitId(medusa.getId());
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const medusaIncumbent: GameAction[] = [{ type: "wait_turn", unitId: medusa.getId() }];
+        const chosen = driver.chooseDecision(medusa, "v0.8", medusaIncumbent);
+        const shot = chosen.find((action) => action.type === "range_attack");
+        expect(shot?.type).toBe("range_attack");
+        expect(h.unitsHolder.getAllUnits().get(shot!.targetId)?.getName()).toBe("Tsar Cannon");
+
+        const tsar = greenUnitNamed(h, "Tsar Cannon");
+        h.setActiveUnitId(tsar.getId());
+        const tsarIncumbent: GameAction[] = [{ type: "wait_turn", unitId: tsar.getId() }];
+        expect(driver.chooseDecision(tsar, "v0.8", tsarIncumbent)).toBe(tsarIncumbent);
+    });
+
+    it("scopes the deadline finisher to the candidate version and rejects the failed pressure combination", () => {
+        setEnv({ ...pureRangedDeadlineEnvironment });
+        const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
+        h.fightProperties.flipLap();
+        h.fightProperties.flipLap();
+        const unit = greenUnitNamed(h, "Medusa");
+        h.setActiveUnitId(unit.getId());
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const controlIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        expect(driver.chooseDecision(unit, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const candidateIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        expect(driver.chooseDecision(unit, "v0.8", candidateIncumbent)).not.toBe(candidateIncumbent);
+
+        setEnv({
+            ...pureRangedDeadlineEnvironment,
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "1",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+        });
+        expect(() => h.makeDriver()).toThrow("mutually exclusive");
     });
 
     it("only re-decides for versions listed in SEARCH_VERSIONS (default v0.6s)", () => {
