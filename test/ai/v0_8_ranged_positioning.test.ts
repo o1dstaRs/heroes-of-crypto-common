@@ -121,9 +121,49 @@ function setupPinnedShooter(
     return { shooter, pinner, context: decisionContext(combat) };
 }
 
+function setupPartiallyScreenedPinnedShooter(): {
+    shooter: Unit;
+    context: IDecisionContext;
+} {
+    const combat = createCombatTestContext();
+    const shooter = createTestUnit({
+        team: LOWER,
+        name: "Partially screened archer",
+        attackType: RANGE,
+        speed: 2,
+        rangeShots: 8,
+        damageMin: 4,
+        damageMax: 4,
+    });
+    const pinner = createTestUnit({ team: UPPER, name: "Current pinner", attackType: MELEE, speed: 1, maxHp: 3 });
+    const upperThreat = createTestUnit({
+        team: UPPER,
+        name: "Upper threat",
+        attackType: MELEE,
+        speed: 10,
+        maxHp: 100,
+    });
+    const lowerThreat = createTestUnit({
+        team: UPPER,
+        name: "Lower threat",
+        attackType: MELEE,
+        speed: 10,
+        maxHp: 100,
+    });
+    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, speed: 1 });
+    placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 6, y: 7 });
+    placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
+    placeUnit(combat.grid, combat.unitsHolder, upperThreat, { x: 4, y: 10 });
+    placeUnit(combat.grid, combat.unitsHolder, lowerThreat, { x: 4, y: 4 });
+    placeUnit(combat.grid, combat.unitsHolder, screen, { x: 5, y: 7 });
+    shooter.refreshPossibleAttackTypes(false);
+    return { shooter, context: decisionContext(combat) };
+}
+
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
+    delete process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS;
 });
 
 describe("v0.8 protected ranged positioning", () => {
@@ -232,6 +272,22 @@ describe("v0.8 protected ranged positioning", () => {
         expect(actions.some((action) => action.type === "range_attack")).toBe(true);
     });
 
+    it("scopes supported-delta independently from the shared positioning baseline", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = "v0.8s";
+        const production = setupPartiallyScreenedPinnedShooter();
+        expect(
+            new StrategyV0_8()
+                .decideTurn(production.shooter, production.context)
+                .some((action) => action.type === "melee_attack"),
+        ).toBe(true);
+
+        const control = setupPartiallyScreenedPinnedShooter();
+        expect(new StrategyV0_8S().decideTurn(control.shooter, control.context).map((action) => action.type)).toEqual([
+            "move_unit",
+        ]);
+    });
+
     it("may close on a ranged target after that stack has spent its response", () => {
         const { shooter, target, context } = setupSupportedShot(true, true);
         target.setAmountAlive(100);
@@ -291,6 +347,45 @@ describe("v0.8 protected ranged positioning", () => {
         const move = actions[0];
         if (move.type !== "move_unit") throw new Error("expected screened retreat");
         expect(move.targetCells).toBeDefined();
+    });
+
+    it("default-off delta accepts a partial screen only when it reduces unscreened reach without adding threats", () => {
+        const baseline = setupPartiallyScreenedPinnedShooter();
+        expect(
+            new StrategyV0_8()
+                .decideTurn(baseline.shooter, baseline.context)
+                .some((action) => action.type === "melee_attack"),
+        ).toBe(true);
+
+        process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = "v0.8";
+        const armed = setupPartiallyScreenedPinnedShooter();
+        const actions = new StrategyV0_8().decideTurn(armed.shooter, armed.context);
+        expect(actions.map((action) => action.type)).toEqual(["move_unit"]);
+    });
+
+    it("applies the partial-screen escape through the authoritative action engine", () => {
+        process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = "v0.8";
+        const { shooter, context } = setupPartiallyScreenedPinnedShooter();
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
+        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        shooter.refreshPossibleAttackTypes(false);
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+
+        expect(actions.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(engine.apply(actions[0]).completed).toBe(true);
     });
 
     it("retains ranged melee only for a real secure kill, and leaves Handyman unchanged", () => {
