@@ -64,6 +64,8 @@ export interface IV08RangedPositioningABOptions {
     timingMode: V08RangedPositioningTimingMode;
     moveShots?: V08RangedPositioningMoveShots;
     noMeleeTerminalPressure?: boolean;
+    deadlineFinisher?: boolean;
+    supportedRangedDelta?: boolean;
     diag?: boolean;
 }
 
@@ -98,6 +100,8 @@ export interface IV08RangedPositioningABManifest {
         timingMode: V08RangedPositioningTimingMode;
         moveShots: V08RangedPositioningMoveShots;
         noMeleeTerminalPressure: boolean;
+        deadlineFinisher: boolean;
+        supportedRangedDelta: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -127,6 +131,28 @@ const isTimingMode = (value: string): value is V08RangedPositioningTimingMode =>
 
 const isMoveShotCap = (value: number): value is V08RangedPositioningMoveShots =>
     value === 0 || value === 1 || value === 2;
+
+function validateBehaviorArmGeometry(
+    mode: V08RangedPositioningMode,
+    moveShots: V08RangedPositioningMoveShots,
+    noMeleeTerminalPressure: boolean,
+    deadlineFinisher: boolean,
+    supportedRangedDelta: boolean,
+): void {
+    const enabledSpecialArms = [noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta].filter(Boolean).length;
+    if (enabledSpecialArms > 1) {
+        throw new Error("noMeleeTerminalPressure, deadlineFinisher, and supportedRangedDelta are mutually exclusive");
+    }
+    if (noMeleeTerminalPressure && (mode !== "off" || moveShots !== 0)) {
+        throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
+    if (deadlineFinisher && (mode !== "off" || moveShots !== 0)) {
+        throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
+    if (supportedRangedDelta && ((mode !== "retreat" && mode !== "both") || moveShots !== 0)) {
+        throw new Error("supportedRangedDelta requires mode=retreat|both and moveShots=0");
+    }
+}
 
 export function normalizeV08RangedPositioningCohorts(raw: string): MirrorCohortName[] {
     const cohorts = raw
@@ -168,14 +194,24 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.noMeleeTerminalPressure !== undefined && typeof options.noMeleeTerminalPressure !== "boolean") {
         throw new Error("noMeleeTerminalPressure must be a boolean");
     }
-    if (
-        options.noMeleeTerminalPressure &&
-        (options.cohorts.length !== 1 ||
-            options.cohorts[0] !== "pure_ranged" ||
-            options.mode !== "off" ||
-            (options.moveShots ?? 0) !== 0)
-    ) {
+    if (options.deadlineFinisher !== undefined && typeof options.deadlineFinisher !== "boolean") {
+        throw new Error("deadlineFinisher must be a boolean");
+    }
+    if (options.supportedRangedDelta !== undefined && typeof options.supportedRangedDelta !== "boolean") {
+        throw new Error("supportedRangedDelta must be a boolean");
+    }
+    validateBehaviorArmGeometry(
+        options.mode,
+        options.moveShots ?? 0,
+        options.noMeleeTerminalPressure ?? false,
+        options.deadlineFinisher ?? false,
+        options.supportedRangedDelta ?? false,
+    );
+    if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
+    if (options.deadlineFinisher && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
+        throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
     if (options.diag !== undefined && typeof options.diag !== "boolean") throw new Error("diag must be a boolean");
 }
@@ -277,6 +313,8 @@ export function buildV08RangedPositioningABManifest(
             timingMode: options.timingMode,
             moveShots,
             noMeleeTerminalPressure: options.noMeleeTerminalPressure ?? false,
+            deadlineFinisher: options.deadlineFinisher ?? false,
+            supportedRangedDelta: options.supportedRangedDelta ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -294,9 +332,9 @@ function writeExperimentManifest(path: string, manifest: IV08RangedPositioningAB
 }
 
 /**
- * Build the exact promoted a13 search policy for both seats. The only asymmetric switch is ranged positioning,
- * scoped to production v0.8; v0.8s is the otherwise identical control. Research timing removes only a13's two
- * wall-clock guards, leaving its search genome, candidate caps, leaf, gate, and strategy controls unchanged.
+ * Build the exact promoted a13 search policy for both seats. Experimental switches are explicitly scoped to
+ * production v0.8; v0.8s is the otherwise identical control. Research timing removes only a13's two wall-clock
+ * guards, leaving its search genome, candidate caps, leaf, gate, and strategy controls unchanged.
  */
 export function buildV08RangedPositioningABEnvironment(
     mode: V08RangedPositioningMode,
@@ -304,11 +342,16 @@ export function buildV08RangedPositioningABEnvironment(
     sourceEnvironment: NodeJS.ProcessEnv = process.env,
     moveShots: V08RangedPositioningMoveShots = 0,
     noMeleeTerminalPressure = false,
+    deadlineFinisher = false,
+    supportedRangedDelta = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
     if (!isMoveShotCap(moveShots)) throw new Error("moveShots must be 0|1|2");
     if (typeof noMeleeTerminalPressure !== "boolean") throw new Error("noMeleeTerminalPressure must be a boolean");
+    if (typeof deadlineFinisher !== "boolean") throw new Error("deadlineFinisher must be a boolean");
+    if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
+    validateBehaviorArmGeometry(mode, moveShots, noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta);
 
     const environment = minimalChildEnvironment(sourceEnvironment);
     for (const [key, value] of Object.entries(buildV08A13SearchEnvironment())) {
@@ -327,7 +370,14 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_MOVE_SHOT_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE = noMeleeTerminalPressure ? "1" : "0";
     environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS = V08_A13_PRODUCTION_VERSION;
-    environment.V08_RANGED_POSITION_VERSIONS = V08_A13_PRODUCTION_VERSION;
+    environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER = deadlineFinisher ? "1" : "0";
+    environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS = V08_A13_PRODUCTION_VERSION;
+    environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
+    // The supported-delta arm compares the new escape rule against the same shipped positioning policy,
+    // so both seats receive the baseline and only production v0.8 receives the incremental delta.
+    environment.V08_RANGED_POSITION_VERSIONS = supportedRangedDelta
+        ? V08_RANGED_POSITIONING_AB_VERSIONS
+        : V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
     return environment;
 }
@@ -345,6 +395,8 @@ export function buildV08RangedPositioningABInvocations(
         sourceEnvironment,
         options.moveShots ?? 0,
         options.noMeleeTerminalPressure ?? false,
+        options.deadlineFinisher ?? false,
+        options.supportedRangedDelta ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -403,12 +455,15 @@ export async function runV08RangedPositioningAB(
     const writeManifest = dependencies.writeManifest ?? writeExperimentManifest;
     const moveShots = options.moveShots ?? 0;
     const noMeleeTerminalPressure = options.noMeleeTerminalPressure ?? false;
+    const deadlineFinisher = options.deadlineFinisher ?? false;
+    const supportedRangedDelta = options.supportedRangedDelta ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
             `[v0.8-ranged-positioning-ab] cohort=${invocation.cohort} mode=${options.mode} ` +
                 `moveShots=${moveShots} diag=${options.diag ?? false} timing=${options.timingMode} ` +
                 `noMeleeTerminalPressure=${noMeleeTerminalPressure} ` +
+                `deadlineFinisher=${deadlineFinisher} supportedRangedDelta=${supportedRangedDelta} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         const code = await runChild(invocation);
@@ -434,6 +489,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             mode: { type: "string", default: "both" },
             "move-shots": { type: "string", default: "0" },
             "no-melee-terminal-pressure": { type: "boolean", default: false },
+            "deadline-finisher": { type: "boolean", default: false },
+            "supported-ranged-delta": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -458,6 +515,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         timingMode,
         moveShots,
         noMeleeTerminalPressure: values["no-melee-terminal-pressure"]!,
+        deadlineFinisher: values["deadline-finisher"]!,
+        supportedRangedDelta: values["supported-ranged-delta"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -470,7 +529,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
             "Usage: bun src/simulation/run_v0_8_ranged_positioning_ab.ts " +
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
-                "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--diag] " +
+                "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
+                "[--supported-ranged-delta] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
