@@ -17,6 +17,7 @@ import {
     getCellsAroundCell,
     getCellsAroundPosition,
     getPositionForCell,
+    getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
     isRangeAttackSideObservable,
@@ -174,6 +175,11 @@ export interface IEnumerateOptions {
     maxMeleePairs?: number;
     /** Cap on ranged aims, kept by expected damage (0/undefined = all distinct hit sets). */
     maxShotAims?: number;
+    /**
+     * Experimental move-then-shot challengers. Values above two are clamped to two; 0/undefined disables the
+     * class completely so every existing consumer retains byte-identical actions and candidate ordering.
+     */
+    maxMoveShotComposites?: number;
     /** Cap on area-throw target cells, kept by expected damage (0/undefined = all relevant). */
     maxAreaThrowCells?: number;
     /**
@@ -1077,12 +1083,14 @@ class CandidateGenerator {
         const prefix = this.rangePrefix();
 
         interface IShot {
+            target: Unit;
             targetId: string;
             aimCell: XY;
             aimSide: RangeAttackCellSide;
             value: number;
             kill: 0 | 1;
             shotFeatures: IShotCandidateFeatures;
+            hitUnitSignature: string;
         }
         const found: IShot[] = [];
         const hitSetSeen = new Set<string>();
@@ -1131,12 +1139,16 @@ class CandidateGenerator {
                     hitSetSeen.add(hitSig);
                     const damage = this.shotDamage(evaluation, enemy.getId(), shots, isAOE);
                     found.push({
+                        target: enemy,
                         targetId: enemy.getId(),
                         aimCell: { x: cell.x, y: cell.y },
                         aimSide: side,
                         value: damage.value,
                         kill: damage.kill,
                         shotFeatures: this.shotFeatures(enemy, damage),
+                        hitUnitSignature: evaluation.affectedUnits
+                            .map((group) => group.map((unit) => unit.getId()).join(","))
+                            .join(";"),
                     });
                 }
             }
@@ -1176,6 +1188,146 @@ class CandidateGenerator {
         }
         for (const s of kept) {
             this.push(candidateOf(s));
+        }
+
+        const moveShotCap = Math.min(2, Math.max(0, Math.floor(this.options.maxMoveShotComposites ?? 0)));
+        if (
+            moveShotCap === 0 ||
+            isAOE ||
+            isThroughShot ||
+            this.unit.hasAbilityActive("Sniper") ||
+            !this.unit.canMove()
+        ) {
+            return;
+        }
+        const movePath = this.movePath();
+        if (!movePath) {
+            return;
+        }
+        const forcedTarget = allUnits.get(this.unit.getTarget());
+        const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+
+        interface IMoveShot {
+            shot: IShot;
+            route: IWeightedRoute;
+            value: number;
+            kill: 0 | 1;
+            shotFeatures: IShotCandidateFeatures;
+            improvement: number;
+            sourceIndex: number;
+        }
+        const moveShots: IMoveShot[] = [];
+        const base = this.unit.getBaseCell();
+        let sourceIndex = 0;
+        for (const routeList of movePath.knownPaths.values()) {
+            const route = routeList[0];
+            if (
+                !route?.route.length ||
+                (route.cell.x === base.x && route.cell.y === base.y) ||
+                route.hasLavaCell ||
+                route.hasWaterCell ||
+                !this.footprintOk(route.cell)
+            ) {
+                continue;
+            }
+            const footprint = this.footprintForCell(route.cell);
+            const origin = getPositionForCells(gs, footprint);
+            if (
+                !origin ||
+                attackHandler.canBeAttackedByMelee(
+                    origin,
+                    this.unit.isSmallSize(),
+                    grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
+                )
+            ) {
+                continue;
+            }
+            for (const shot of kept) {
+                if (
+                    (forcedTargetId && shot.targetId !== forcedTargetId) ||
+                    (this.unit.hasDebuffActive("Cowardice") &&
+                        this.unit.getCumulativeHp() < shot.target.getCumulativeHp())
+                ) {
+                    continue;
+                }
+                const to = getRangeAttackSideCenter(gs, shot.aimCell, shot.aimSide, origin);
+                const evaluation = attackHandler.evaluateRangeAttack(
+                    allUnits,
+                    this.unit,
+                    origin,
+                    to,
+                    false,
+                    false,
+                    false,
+                );
+                const primaryHit = evaluation.affectedUnits[0]?.[0];
+                const hitUnitSignature = evaluation.affectedUnits
+                    .map((group) => group.map((candidate) => candidate.getId()).join(","))
+                    .join(";");
+                // Preserve the incumbent aim's exact semantic target/interception. A changed first hit or hit
+                // set is a different shot, and special line/AOE geometry is deliberately outside this probe.
+                if (
+                    primaryHit?.getId() !== shot.targetId ||
+                    hitUnitSignature !== shot.hitUnitSignature ||
+                    isHidden(primaryHit)
+                ) {
+                    continue;
+                }
+                const damage = this.shotDamage(evaluation, shot.targetId, shots, false);
+                if (!(damage.value > shot.value)) {
+                    continue;
+                }
+                moveShots.push({
+                    shot,
+                    route,
+                    value: damage.value,
+                    kill: damage.kill,
+                    shotFeatures: this.shotFeatures(shot.target, damage),
+                    improvement: damage.value - shot.value,
+                    sourceIndex: sourceIndex++,
+                });
+            }
+        }
+        moveShots.sort(
+            (left, right) =>
+                right.kill - left.kill ||
+                right.improvement - left.improvement ||
+                right.value - left.value ||
+                (left.route.weight ?? left.route.route.length) - (right.route.weight ?? right.route.route.length) ||
+                left.route.cell.y - right.route.cell.y ||
+                left.route.cell.x - right.route.cell.x ||
+                left.sourceIndex - right.sourceIndex,
+        );
+        if (moveShots.length > moveShotCap && !this.truncated.includes("shot")) {
+            this.truncated.push("shot");
+        }
+        const moveShotCandidateOf = (moveShot: IMoveShot): IEnumeratedCandidate => ({
+            kind: "shot",
+            actions: [
+                this.moveAction(moveShot.route),
+                ...prefix,
+                {
+                    type: "range_attack",
+                    attackerId: this.unit.getId(),
+                    targetId: moveShot.shot.targetId,
+                    aimCell: moveShot.shot.aimCell,
+                    aimSide: moveShot.shot.aimSide,
+                },
+            ],
+            targetId: moveShot.shot.targetId,
+            targetCell: { x: moveShot.route.cell.x, y: moveShot.route.cell.y },
+            shotFeatures: moveShot.shotFeatures,
+            features: this.features({
+                spendsRangeShot: 1,
+                expectedDamage: moveShot.value,
+                expectedKill: moveShot.kill,
+            }),
+        });
+        for (const moveShot of moveShots) {
+            this.enrichIncumbentCandidate(moveShotCandidateOf(moveShot));
+        }
+        for (const moveShot of moveShots.slice(0, moveShotCap)) {
+            this.push(moveShotCandidateOf(moveShot));
         }
     }
     // ---- area throw (Gargantuan) ------------------------------------------------------------------

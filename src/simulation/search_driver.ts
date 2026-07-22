@@ -133,6 +133,12 @@ import {
  * SEARCH_PURE_RANGED_TERMINAL_WEIGHT=<0..16> is a default-zero leaf-logit overlay restricted to battles in
  * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
  * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
+ * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
+ * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
+ * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
+ * excluded; each surviving ordered action list is still applied through the real engine before it can win.
+ * SEARCH_MOVE_SHOT_VERSIONS=<csv> scopes that probe to selected seats (for example `v0.8` while an identical
+ * `v0.8s` seat remains the control). Unset defaults to SEARCH_VERSIONS; it is ignored while the max is zero.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then historical versions and strategic
  * v0.8 waits retain each later incumbent. v0.8 still engine-validates a bounded fallback for no-ops, Luck Shields,
@@ -510,6 +516,8 @@ export class SearchDriver {
     private readonly horizon: number;
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
+    private readonly maxMoveShotComposites: number;
+    private readonly moveShotVersions: ReadonlySet<string>;
     private readonly activeChallengers: boolean;
     private readonly aggressiveV08: boolean;
     private readonly observeOnly: boolean;
@@ -577,6 +585,32 @@ export class SearchDriver {
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
+        const rawMaxMoveShots = process.env.SEARCH_MAX_MOVE_SHOTS;
+        if (this.mode !== "search" || rawMaxMoveShots === undefined || rawMaxMoveShots === "") {
+            this.maxMoveShotComposites = 0;
+        } else {
+            const maxMoveShots = Number(rawMaxMoveShots);
+            if (!Number.isSafeInteger(maxMoveShots) || maxMoveShots < 0 || maxMoveShots > 2) {
+                throw new Error("SEARCH_MAX_MOVE_SHOTS must be an integer between 0 and 2");
+            }
+            this.maxMoveShotComposites = maxMoveShots;
+        }
+        const rawMoveShotVersions = process.env.SEARCH_MOVE_SHOT_VERSIONS;
+        if (this.maxMoveShotComposites === 0) {
+            this.moveShotVersions = new Set();
+        } else if (rawMoveShotVersions === undefined) {
+            this.moveShotVersions = new Set(this.versions);
+        } else {
+            const moveShotVersions = rawMoveShotVersions.split(",").map((version) => version.trim());
+            if (
+                !moveShotVersions.length ||
+                moveShotVersions.some((version) => !version) ||
+                new Set(moveShotVersions).size !== moveShotVersions.length
+            ) {
+                throw new Error("SEARCH_MOVE_SHOT_VERSIONS must be a comma-separated list of unique versions");
+            }
+            this.moveShotVersions = new Set(moveShotVersions);
+        }
         this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
         this.aggressiveV08 = this.mode === "search" && process.env.V08_AGGRESSIVE === "1";
         const rawObserveOnly = process.env.SEARCH_OBSERVE_ONLY;
@@ -739,6 +773,10 @@ export class SearchDriver {
     public appliesTo(version: string): boolean {
         return this.enabled && this.versions.has(version);
     }
+    /** Seat-local action-space switch; lets one searched version remain an otherwise identical control. */
+    private moveShotCapForVersion(version: string): number {
+        return this.moveShotVersions.has(version) ? this.maxMoveShotComposites : 0;
+    }
     /** Capture the immutable post-setup armies before either side takes a combat turn. */
     public onFightReady(): void {
         if (this.lateRangedFinishWeight > 0 && this.finishPressureState === null) {
@@ -832,6 +870,7 @@ export class SearchDriver {
             };
             const set = enumerateCandidates(unit, context, incumbent, {
                 ...this.caps,
+                maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
                 enrichIncumbentMetadata: isV08Search || this.ilPath !== undefined,
                 preserveMovePostureDiversity:

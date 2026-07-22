@@ -50,6 +50,7 @@ const INHERITED_OS_ENVIRONMENT_KEYS = [
 
 export type V08RangedPositioningMode = "advance" | "retreat" | "both" | "off";
 export type V08RangedPositioningTimingMode = "research_unbounded" | "operational_bounded";
+export type V08RangedPositioningMoveShots = 0 | 1 | 2;
 
 export interface IV08RangedPositioningABOptions {
     cohorts: readonly MirrorCohortName[];
@@ -59,6 +60,7 @@ export interface IV08RangedPositioningABOptions {
     out: string;
     mode: V08RangedPositioningMode;
     timingMode: V08RangedPositioningTimingMode;
+    moveShots?: V08RangedPositioningMoveShots;
 }
 
 export interface IV08RangedPositioningABInvocation {
@@ -81,6 +83,9 @@ const isPositioningMode = (value: string): value is V08RangedPositioningMode =>
 
 const isTimingMode = (value: string): value is V08RangedPositioningTimingMode =>
     value === "research_unbounded" || value === "operational_bounded";
+
+const isMoveShotCap = (value: number): value is V08RangedPositioningMoveShots =>
+    value === 0 || value === 1 || value === 2;
 
 export function normalizeV08RangedPositioningCohorts(raw: string): MirrorCohortName[] {
     const cohorts = raw
@@ -118,6 +123,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (!isTimingMode(options.timingMode)) {
         throw new Error("timingMode must be research_unbounded|operational_bounded");
     }
+    if (!isMoveShotCap(options.moveShots ?? 0)) throw new Error("moveShots must be 0|1|2");
 }
 
 function minimalChildEnvironment(sourceEnvironment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -139,9 +145,11 @@ export function buildV08RangedPositioningABEnvironment(
     mode: V08RangedPositioningMode,
     timingMode: V08RangedPositioningTimingMode,
     sourceEnvironment: NodeJS.ProcessEnv = process.env,
+    moveShots: V08RangedPositioningMoveShots = 0,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
+    if (!isMoveShotCap(moveShots)) throw new Error("moveShots must be 0|1|2");
 
     const environment = minimalChildEnvironment(sourceEnvironment);
     for (const [key, value] of Object.entries(buildV08A13SearchEnvironment())) {
@@ -156,6 +164,8 @@ export function buildV08RangedPositioningABEnvironment(
     // Force the explicitly rebound generic SearchDriver. The default factory intentionally scopes a13 to only
     // production v0.8, which would make v0.8s an invalid control for this two-seat experiment.
     environment.V08_A13_SEARCH = "0";
+    environment.SEARCH_MAX_MOVE_SHOTS = String(moveShots);
+    environment.SEARCH_MOVE_SHOT_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
     return environment;
@@ -168,7 +178,12 @@ export function buildV08RangedPositioningABInvocations(
     validateOptions(options);
     const out = resolve(options.out);
     const concurrency = Math.min(options.concurrency, options.games);
-    const environment = buildV08RangedPositioningABEnvironment(options.mode, options.timingMode, sourceEnvironment);
+    const environment = buildV08RangedPositioningABEnvironment(
+        options.mode,
+        options.timingMode,
+        sourceEnvironment,
+        options.moveShots ?? 0,
+    );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
         return {
@@ -221,10 +236,11 @@ export async function runV08RangedPositioningAB(
 ): Promise<IV08RangedPositioningABInvocation[]> {
     const invocations = buildV08RangedPositioningABInvocations(options);
     const runChild = dependencies.runChild ?? spawnInvocation;
+    const moveShots = options.moveShots ?? 0;
     for (const invocation of invocations) {
         console.error(
             `[v0.8-ranged-positioning-ab] cohort=${invocation.cohort} mode=${options.mode} ` +
-                `timing=${options.timingMode} games=${options.games} seed=${options.seed}`,
+                `moveShots=${moveShots} timing=${options.timingMode} games=${options.games} seed=${options.seed}`,
         );
         const code = await runChild(invocation);
         if (code !== 0) throw new Error(`ranged-positioning A/B ${invocation.cohort} exited with code ${code}`);
@@ -245,6 +261,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             },
             out: { type: "string", default: "sim-out/v0.8-ranged-positioning-ab" },
             mode: { type: "string", default: "both" },
+            "move-shots": { type: "string", default: "0" },
             timing: { type: "string", default: "operational_bounded" },
         },
         strict: true,
@@ -252,10 +269,12 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
     });
     const mode = values.mode!;
     const timingMode = values.timing!;
+    const moveShots = Number(values["move-shots"]);
     if (!isPositioningMode(mode)) throw new Error("--mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) {
         throw new Error("--timing must be research_unbounded|operational_bounded");
     }
+    if (!isMoveShotCap(moveShots)) throw new Error("--move-shots must be 0|1|2");
     const options: IV08RangedPositioningABOptions = {
         cohorts: normalizeV08RangedPositioningCohorts(values.cohorts!),
         games: Number(values.games),
@@ -264,6 +283,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         out: values.out!,
         mode,
         timingMode,
+        moveShots,
     };
     validateOptions(options);
     return options;
@@ -275,6 +295,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
             "Usage: bun src/simulation/run_v0_8_ranged_positioning_ab.ts " +
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
+                "[--move-shots 0|1|2] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;

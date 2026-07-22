@@ -31,6 +31,7 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     out: "/tmp/hoc-v08-ranged-ab-test",
     mode: "both",
     timingMode: "operational_bounded",
+    moveShots: 0,
 };
 
 const argValue = (args: readonly string[], flag: string): string | undefined => {
@@ -44,6 +45,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const environment = buildV08RangedPositioningABEnvironment("both", "operational_bounded", {
             PATH: "/bin",
             SEARCH_GATE: "99",
+            SEARCH_MAX_MOVE_SHOTS: "2",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8s",
             SEARCH_VERSIONS: "v0.4",
             V08_RANGED_POSITION_VERSIONS: "v0.8s",
             HOSTILE_EXPERIMENT: "1",
@@ -71,6 +74,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_VERSIONS: "v0.8,v0.8s",
             SEARCH_DECISION_DEADLINE_MS: "175",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
+            SEARCH_MAX_MOVE_SHOTS: "0",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
@@ -106,6 +111,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(invocation.args, "--vA")).toBe("v0.8");
             expect(argValue(invocation.args, "--vB")).toBe("v0.8s");
             expect(argValue(invocation.args, "--out")).toBe(`/tmp/hoc-v08-ranged-ab-test/${invocation.cohort}`);
+            expect(invocation.environment.SEARCH_MAX_MOVE_SHOTS).toBe("0");
         }
     });
 
@@ -124,6 +130,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 "/tmp/ranged-ab",
                 "--mode",
                 "retreat",
+                "--move-shots",
+                "2",
                 "--timing",
                 "research_unbounded",
             ]),
@@ -135,9 +143,13 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             out: "/tmp/ranged-ab",
             mode: "retreat",
             timingMode: "research_unbounded",
+            moveShots: 2,
         });
+        expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
+        expect(() => parseV08RangedPositioningABOptions(["--move-shots", "3"])).toThrow("--move-shots");
+        expect(() => parseV08RangedPositioningABOptions(["--move-shots", "1.5"])).toThrow("--move-shots");
         expect(() => normalizeV08RangedPositioningCohorts("hybrid,hybrid")).toThrow("duplicate cohort");
         expect(() => normalizeV08RangedPositioningCohorts("unknown")).toThrow("unknown cohort");
     });
@@ -148,6 +160,20 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(environment.V08_RANGED_POSITION_MODE).toBe(mode);
             expect(environment.V08_RANGED_POSITION_VERSIONS).toBe("v0.8");
         }
+    });
+
+    it("exposes the default-off composite probe at validated caps zero, one, and two", () => {
+        for (const moveShots of [0, 1, 2] as const) {
+            const environment = buildV08RangedPositioningABEnvironment("off", "operational_bounded", {}, moveShots);
+            expect(environment.SEARCH_MAX_MOVE_SHOTS).toBe(String(moveShots));
+            expect(environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
+        }
+        const [probe] = buildV08RangedPositioningABInvocations(
+            { ...BASE_OPTIONS, cohorts: ["hybrid"], moveShots: 2 },
+            { PATH: "/bin" },
+        );
+        expect(probe.environment.SEARCH_MAX_MOVE_SHOTS).toBe("2");
+        expect(probe.environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
     });
 
     it("runs cohort children sequentially and fails closed on a nonzero child", async () => {

@@ -82,6 +82,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
+    "SEARCH_MAX_MOVE_SHOTS",
+    "SEARCH_MOVE_SHOT_VERSIONS",
     "SEARCH_MAX_MELEE",
     "SEARCH_MAX_SHOTS",
     "SEARCH_MAX_THROWS",
@@ -1120,6 +1122,59 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         setEnv({ SEARCH_SHORTLIST: "invalid" });
         expect(buildBattle(88, "v0.6").makeDriver().enabled).toBe(false);
+    });
+
+    it("keeps move-shots default-off, bounds the probe, and scopes it to explicit version seats", () => {
+        const configured = (
+            seed: number,
+        ): {
+            max: number;
+            capFor: (version: string) => number;
+        } => {
+            const driver = buildBattle(seed, "v0.8s").makeDriver() as unknown as {
+                maxMoveShotComposites: number;
+                moveShotCapForVersion: (version: string) => number;
+            };
+            return {
+                max: driver.maxMoveShotComposites,
+                capFor: (version) => driver.moveShotCapForVersion(version),
+            };
+        };
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        expect(configured(881).max).toBe(0);
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8", SEARCH_MAX_MOVE_SHOTS: "2" });
+        const defaultScope = configured(882);
+        expect(defaultScope.max).toBe(2);
+        expect(defaultScope.capFor("v0.8s")).toBe(2);
+        expect(defaultScope.capFor("v0.8")).toBe(2);
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s,v0.8",
+            SEARCH_MAX_MOVE_SHOTS: "2",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+        });
+        const scoped = configured(886);
+        expect(scoped.capFor("v0.8")).toBe(2);
+        expect(scoped.capFor("v0.8s")).toBe(0);
+
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s", SEARCH_MAX_MOVE_SHOTS: "3" });
+        expect(() => configured(883)).toThrow("SEARCH_MAX_MOVE_SHOTS must be an integer between 0 and 2");
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s", SEARCH_MAX_MOVE_SHOTS: "1.5" });
+        expect(() => configured(884)).toThrow("SEARCH_MAX_MOVE_SHOTS must be an integer between 0 and 2");
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s,v0.8",
+            SEARCH_MAX_MOVE_SHOTS: "1",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8,v0.8",
+        });
+        expect(() => configured(887)).toThrow(
+            "SEARCH_MOVE_SHOT_VERSIONS must be a comma-separated list of unique versions",
+        );
+
+        setEnv({ SEARCH_MAX_MOVE_SHOTS: "invalid", SEARCH_MOVE_SHOT_VERSIONS: "," });
+        expect(buildBattle(885, "v0.8s").makeDriver().enabled).toBe(false);
     });
 
     it("validates an opt-in decision deadline and requires circuit headroom", () => {

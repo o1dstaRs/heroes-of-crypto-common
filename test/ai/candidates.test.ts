@@ -22,11 +22,13 @@ import { selectV08STargetPressureCandidate } from "../../src/ai/versions/v0_8s_f
 import { getCreatureConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { EffectFactory } from "../../src/effects/effect_factory";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCells } from "../../src/grid/grid_math";
+import { getPositionForCells, getRangeAttackSideCenter } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { ilCandidateActionEncoding } from "../../src/simulation/il_action_features";
 import {
@@ -362,6 +364,140 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         if (shot.type === "range_attack") {
             expect(shot.aimCell).toBeDefined();
             expect(shot.aimSide).toBeDefined();
+        }
+    });
+
+    it("move-shots: default-off enumeration is unchanged; opt-in emits at most two exact legal composites", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Advancing archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 3,
+            speed: 3,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 5,
+        });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "Distant target",
+            attackType: MELEE,
+            speed: 1,
+            amountAlive: 20,
+            maxHp: 20,
+        });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+        const incumbent = endTurn(shooter);
+        const baseline = enumerateCandidates(shooter, context, incumbent).candidates;
+        const explicitOff = enumerateCandidates(shooter, context, incumbent, {
+            maxMoveShotComposites: 0,
+        }).candidates;
+        const hasMoveAndShot = (candidate: IEnumeratedCandidate): boolean =>
+            candidate.actions.some((action) => action.type === "move_unit") &&
+            candidate.actions.some((action) => action.type === "range_attack");
+
+        expect(explicitOff).toEqual(baseline);
+        expect(baseline.some(hasMoveAndShot)).toBe(false);
+
+        const enabled = enumerateCandidates(shooter, context, incumbent, {
+            maxMoveShotComposites: 99,
+        });
+        const composites = enabled.candidates.filter(hasMoveAndShot);
+        expect(composites.length).toBeGreaterThan(0);
+        expect(composites.length).toBeLessThanOrEqual(2);
+        expect(enabled.truncated).toContain("shot");
+
+        const stationary = ofKind(enabled.candidates, "shot").find(
+            (candidate) =>
+                candidate.targetId === target.getId() && !candidate.actions.some((a) => a.type === "move_unit"),
+        );
+        expect(stationary).toBeDefined();
+        for (const candidate of composites) {
+            expect(candidate.kind).toBe("shot");
+            expect(candidate.targetId).toBe(target.getId());
+            expect(candidate.features.spendsRangeShot).toBe(1);
+            expect(candidate.features.expectedDamage).toBeGreaterThan(stationary!.features.expectedDamage);
+            expect(candidate.shotFeatures?.enemyDamage).toBe(candidate.features.expectedDamage);
+            expect(candidate.shotFeatures?.friendlyFireDamage).toBe(0);
+            expect(candidate.shotFeatures?.primaryTargetDamage).toBe(candidate.features.expectedDamage);
+
+            const move = candidate.actions.find((action) => action.type === "move_unit");
+            const shot = candidate.actions.find((action) => action.type === "range_attack");
+            if (move?.type !== "move_unit" || shot?.type !== "range_attack" || !move.targetCells) {
+                throw new Error("expected a bounded move-then-range-shot candidate");
+            }
+            const origin = getPositionForCells(testGridSettings, move.targetCells);
+            if (!origin || !shot.aimCell || shot.aimSide === undefined) throw new Error("missing exact shot intent");
+            const to = getRangeAttackSideCenter(testGridSettings, shot.aimCell, shot.aimSide, origin);
+            const evaluation = c.attackHandler.evaluateRangeAttack(
+                c.unitsHolder.getAllUnits(),
+                shooter,
+                origin,
+                to,
+                false,
+                false,
+                false,
+            );
+            expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(target.getId());
+        }
+
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, 1);
+        fightProperties.setTeamUnitsAlive(UPPER, 1);
+        fightProperties.startTurn(LOWER, 1_000);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: c.grid,
+            unitsHolder: c.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, c.grid, c.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: c.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+        expect(composites[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+    });
+
+    it("move-shots: excludes pinned shooters and special range geometry", () => {
+        const enumerateFor = (abilities: string[] = [], pinned = false): IEnumeratedCandidate[] => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: `Excluded ${abilities[0] ?? "pinned"}`,
+                attackType: RANGE,
+                rangeShots: 5,
+                shotDistance: 3,
+                speed: 3,
+                abilities,
+            });
+            const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, speed: 1 });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+            if (pinned) {
+                const pinner = createTestUnit({ team: UPPER, name: "Pinner", attackType: MELEE });
+                placeUnit(c.grid, c.unitsHolder, pinner, { x: 3, y: 7 });
+            }
+            shooter.refreshPossibleAttackTypes(!pinned);
+            return enumerateCandidates(shooter, ctxFor(c), endTurn(shooter), {
+                maxMoveShotComposites: 2,
+            }).candidates;
+        };
+        const composites = (candidates: IEnumeratedCandidate[]): IEnumeratedCandidate[] =>
+            candidates.filter(
+                (candidate) =>
+                    candidate.actions.some((action) => action.type === "move_unit") &&
+                    candidate.actions.some((action) => action.type === "range_attack"),
+            );
+
+        expect(composites(enumerateFor([], true))).toHaveLength(0);
+        for (const ability of ["Sniper", "Through Shot", "Large Caliber", "Area Throw"]) {
+            expect(composites(enumerateFor([ability]))).toHaveLength(0);
         }
     });
 
