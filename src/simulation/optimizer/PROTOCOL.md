@@ -43,8 +43,11 @@ with the other agent paused (so **v0.2 stays frozen** — it is the benchmark an
 
 ## Measurement is now DETERMINISTIC (read this before tuning the gate)
 Combat randomness is seeded in simulation (`battle_engine.runMatch` installs a deterministic source per
-match via `setDeterministicRandomSource`; production stays crypto-secure). So at a **fixed concurrency**,
-the same `(versions, baseSeed, games)` reproduces **exactly** — there is no run-to-run noise. Consequences:
+match via `setDeterministicRandomSource`; production stays crypto-secure). Cohort workers also use static lanes:
+game `workerIndex + n * concurrency` always runs in the same long-lived isolate, regardless of which treatment
+finishes first. So at a **fixed concurrency**, the same `(versions, baseSeed, games)` reproduces **exactly** —
+there is no run-to-run noise. Consequences:
+
 - The gate can be **fast and sensitive**: `cycle.mjs` now defaults to **12000 games / +0.2pp** (was the
   noisy 30k / 0.6pp). A measured `+0.2pp` on the same fixed scenario set is a *real, repeatable* gain.
 - **Guard against overfitting one seed set.** A change that helps `baseSeed=1` should be re-validated on a

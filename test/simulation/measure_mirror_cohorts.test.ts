@@ -15,6 +15,7 @@ import {
     aggregateMirrorDiag,
     buildMirrorRoster,
     mirrorGameSeed,
+    mirrorWorkerGameIndex,
     playMirrorGame,
     PURE_RANGED_ROSTER_NAMES,
     summarizeMirrorRecords,
@@ -95,6 +96,28 @@ function recordedAction(
 }
 
 describe("measure_mirror_cohorts", () => {
+    test("pins every game to a deterministic worker lane instead of completion-order dispatch", () => {
+        const games = 10;
+        const concurrency = 3;
+        const lanes = Array.from({ length: concurrency }, (_, workerIndex) => {
+            const lane: number[] = [];
+            for (let dispatched = 0; ; dispatched += 1) {
+                const game = mirrorWorkerGameIndex(workerIndex, dispatched, concurrency);
+                if (game >= games) break;
+                lane.push(game);
+            }
+            return lane;
+        });
+
+        expect(lanes).toEqual([
+            [0, 3, 6, 9],
+            [1, 4, 7],
+            [2, 5, 8],
+        ]);
+        expect(lanes.flat().sort((left, right) => left - right)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        expect(() => mirrorWorkerGameIndex(3, 0, concurrency)).toThrow(RangeError);
+    });
+
     test("paired games share the seed and swap which seat runs version A", () => {
         expect(mirrorGameSeed(BASE_CFG.seed, 0)).toBe(mirrorGameSeed(BASE_CFG.seed, 1));
         expect(mirrorGameSeed(BASE_CFG.seed, 2)).toBe(mirrorGameSeed(BASE_CFG.seed, 3));
