@@ -1130,7 +1130,8 @@ class CandidateGenerator {
                         primaryHit.getTeam() !== this.enemyTeam ||
                         isHidden(primaryHit) ||
                         (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
-                        (this.unit.hasDebuffActive("Cowardice") &&
+                        (!isThroughShot &&
+                            this.unit.hasDebuffActive("Cowardice") &&
                             this.unit.getCumulativeHp() < primaryHit.getCumulativeHp())
                     ) {
                         continue;
