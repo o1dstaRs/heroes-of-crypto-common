@@ -46,6 +46,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     jitNoMeleeFocusCatalogOnly: false,
     supportedRangedDelta: false,
     responseNeutralAdvance: false,
+    supportedPrepinEgress: false,
+    supportedPrepinEgressCatalogOnly: false,
     diag: false,
 };
 
@@ -104,6 +106,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_MODE: "both",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
+            V08_SUPPORTED_PREPIN_EGRESS: "0",
+            V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
         });
         expect(environment.HOSTILE_EXPERIMENT).toBeUndefined();
     });
@@ -182,6 +186,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             jitNoMeleeFocusCatalogOnly: false,
             supportedRangedDelta: false,
             responseNeutralAdvance: false,
+            supportedPrepinEgress: false,
+            supportedPrepinEgressCatalogOnly: false,
             diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
@@ -194,6 +200,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).jitNoMeleeFocusCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgress).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgressCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
@@ -437,7 +445,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4",
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
@@ -571,6 +579,91 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("mode=advance|both");
     });
 
+    it("isolates supported pre-pin egress with a catalog-identical selector-off control", () => {
+        const treatment: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "retreat",
+            supportedPrepinEgress: true,
+            diag: true,
+        };
+        const control: IV08RangedPositioningABOptions = {
+            ...treatment,
+            supportedPrepinEgress: false,
+            supportedPrepinEgressCatalogOnly: true,
+        };
+        const [treatmentInvocation] = buildV08RangedPositioningABInvocations(treatment, { PATH: "/bin" });
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, { PATH: "/bin" });
+
+        expect(treatmentInvocation.environment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "retreat",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_PREPIN_EGRESS: "1",
+            V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "v0.8",
+        });
+        expect(controlInvocation.environment).toMatchObject({
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_PREPIN_EGRESS: "1",
+            V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "supported-prepin-egress-catalog-only-control",
+        });
+        const differingEnvironmentKeys = [
+            ...new Set([
+                ...Object.keys(treatmentInvocation.environment),
+                ...Object.keys(controlInvocation.environment),
+            ]),
+        ].filter((key) => treatmentInvocation.environment[key] !== controlInvocation.environment[key]);
+        expect(differingEnvironmentKeys).toEqual(["V08_SUPPORTED_PREPIN_EGRESS_VERSIONS"]);
+
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
+        expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4",
+            arm: {
+                supportedPrepinEgress: true,
+                supportedPrepinEgressCatalogOnly: false,
+            },
+        });
+        expect(buildV08RangedPositioningABManifest(controlInvocation, control, source)).toMatchObject({
+            arm: {
+                supportedPrepinEgress: false,
+                supportedPrepinEgressCatalogOnly: true,
+            },
+        });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "retreat",
+                "--supported-prepin-egress",
+            ]).supportedPrepinEgress,
+        ).toBe(true);
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-prepin-catalog-only",
+            ]).supportedPrepinEgressCatalogOnly,
+        ).toBe(true);
+
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "advance" })).toThrow(
+            "mode=retreat|both",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "off" })).toThrow(
+            "mode=retreat|both",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...treatment, supportedPrepinEgressCatalogOnly: true }),
+        ).toThrow("mutually exclusive");
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, supportedRangedDelta: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "both" })).not.toThrow();
+    });
+
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
         const options: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -590,7 +683,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -619,6 +712,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 jitNoMeleeFocusDamageFloor: 0.8,
                 supportedRangedDelta: false,
                 responseNeutralAdvance: false,
+                supportedPrepinEgress: false,
+                supportedPrepinEgressCatalogOnly: false,
                 diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
@@ -644,6 +739,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
+            V08_SUPPORTED_PREPIN_EGRESS: "0",
+            V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();
         expect(first.behaviorEnvironment.SEARCH_AUDIT).toBeUndefined();

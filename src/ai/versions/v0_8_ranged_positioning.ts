@@ -19,6 +19,7 @@ import {
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
 import type { IWeightedRoute } from "../../grid/path_definitions";
+import { ObstacleType } from "../../obstacles/obstacle_type";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
@@ -30,6 +31,9 @@ import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_domina
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
+
+const SUPPORTED_PREPIN_EGRESS_ENABLED_ENV = "V08_SUPPORTED_PREPIN_EGRESS";
+const SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -153,6 +157,18 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IWeightedRoute[
     return routes;
 }
 
+function footprintForAnchor(unit: Unit, anchor: XY): XY[] {
+    if (unit.isSmallSize()) {
+        return [{ x: anchor.x, y: anchor.y }];
+    }
+    return [
+        { x: anchor.x, y: anchor.y },
+        { x: anchor.x, y: anchor.y - 1 },
+        { x: anchor.x - 1, y: anchor.y },
+        { x: anchor.x - 1, y: anchor.y - 1 },
+    ];
+}
+
 function moveAction(unit: Unit, route: IWeightedRoute, footprint: XY[]): GameAction {
     return {
         type: "move_unit",
@@ -175,20 +191,7 @@ function routeView(
     if (!attackHandler) {
         return undefined;
     }
-    const footprint = unit.isSmallSize()
-        ? [{ x: route.cell.x, y: route.cell.y }]
-        : (() => {
-              const settings = context.grid.getSettings();
-              const position = getPositionForCells(settings, [route.cell]);
-              if (!position) return [];
-              // StrategyV0_1's footprint convention treats a large unit's route.cell as its upper-right base.
-              return [
-                  { x: route.cell.x, y: route.cell.y },
-                  { x: route.cell.x, y: route.cell.y - 1 },
-                  { x: route.cell.x - 1, y: route.cell.y },
-                  { x: route.cell.x - 1, y: route.cell.y - 1 },
-              ];
-          })();
+    const footprint = footprintForAnchor(unit, route.cell);
     const position = getPositionForCells(context.grid.getSettings(), footprint);
     if (!footprint.length || !position) {
         return undefined;
@@ -216,6 +219,315 @@ function routeView(
         nearestFrontlineDistance,
         futureDivisor,
     };
+}
+
+const sameCell = (left: XY, right: XY): boolean => left.x === right.x && left.y === right.y;
+
+function canLandOnHypotheticalMatrix(unit: Unit, anchor: XY, matrix: readonly (readonly number[])[]): boolean {
+    const current = unit.getCells();
+    for (const cell of footprintForAnchor(unit, anchor)) {
+        const value = matrix[cell.y]?.[cell.x];
+        if (value === undefined) return false;
+        if (current.some((occupied) => sameCell(occupied, cell))) continue;
+        if (value === 0) continue;
+        if (value === ObstacleType.LAVA && unit.hasAbilityActive("Made of Fire")) continue;
+        if (value === ObstacleType.WATER && unit.hasAbilityActive("Made of Water")) continue;
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Exact movement-catalog reach using the same PathHelper as the engine's melee candidate generator. Aggression
+ * weights are deliberately omitted: proving safety against the more permissive geometric path is fail-closed.
+ */
+function canMeleeFootprintThisActivation(
+    threat: Unit,
+    targetFootprint: readonly XY[],
+    matrix: number[][],
+    context: IDecisionContext,
+): boolean {
+    const anchors: XY[] = [threat.getBaseCell()];
+    if (threat.canMove()) {
+        const movePath = context.pathHelper.getMovePath(
+            threat.getBaseCell(),
+            matrix,
+            threat.getSteps(),
+            undefined,
+            threat.canFly(),
+            threat.isSmallSize(),
+            threat.canTraverseLava(),
+        );
+        for (const routes of movePath.knownPaths.values()) {
+            const anchor = routes[0]?.cell;
+            if (anchor && !anchors.some((known) => sameCell(known, anchor))) {
+                anchors.push(anchor);
+            }
+        }
+    }
+    return anchors.some(
+        (anchor) =>
+            canLandOnHypotheticalMatrix(threat, anchor, matrix) &&
+            context.grid.areCellsAdjacent(footprintForAnchor(threat, anchor), [...targetFootprint]),
+    );
+}
+
+function pendingMeleeThreats(unit: Unit, context: IDecisionContext): Unit[] {
+    const fightProperties = context.fightProperties!;
+    return context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => {
+        const pending =
+            !fightProperties.hasAlreadyMadeTurn(enemy.getId()) ||
+            fightProperties.hourglassIncludes(enemy.getId()) ||
+            fightProperties.moralePlusIncludes(enemy.getId()) ||
+            fightProperties.upNextIncludes(enemy.getId());
+        return (
+            !enemy.isDead() &&
+            pending &&
+            // Every attack class receives a legal melee option unless No Melee is active. In particular,
+            // native shooters and casters may move in and pin this unit, so the safety proof must include them.
+            !enemy.hasAbilityActive("No Melee")
+        );
+    });
+}
+
+function fixedNativeMeleeGuards(unit: Unit, context: IDecisionContext): Unit[] {
+    const fightProperties = context.fightProperties!;
+    return context.unitsHolder.getAllAllies(unit.getTeam()).filter((ally) => {
+        const nativeAttackType = ally.getUnitProperties().attack_type;
+        const actedWithoutQueuedReactivation =
+            fightProperties.hasAlreadyMadeTurn(ally.getId()) &&
+            !fightProperties.hourglassIncludes(ally.getId()) &&
+            !fightProperties.moralePlusIncludes(ally.getId()) &&
+            !fightProperties.upNextIncludes(ally.getId());
+        return (
+            ally.getId() !== unit.getId() &&
+            !ally.isDead() &&
+            (nativeAttackType === MELEE || nativeAttackType === MELEE_MAGIC) &&
+            (!ally.canMove() || actedWithoutQueuedReactivation)
+        );
+    });
+}
+
+function canRestoreClearedCells(context: IDecisionContext, cells: readonly XY[]): boolean {
+    const gridType = context.grid.getGridType();
+    if (gridType !== PBTypes.GridVals.LAVA_CENTER && gridType !== PBTypes.GridVals.WATER_CENTER) return true;
+    const terrainCells = context.grid.getCenterCells();
+    return cells.every((cell) => !terrainCells.some((terrain) => sameCell(cell, terrain)));
+}
+
+function postMoveMatrix(unit: Unit, destination: readonly XY[], context: IDecisionContext): number[][] | undefined {
+    const current = unit.getCells();
+    if (!canRestoreClearedCells(context, current)) return undefined;
+    const matrix = context.matrix.map((row) => row.slice());
+    const terrain = context.grid.getMatrixNoUnits();
+    for (const cell of current) matrix[cell.y]![cell.x] = terrain[cell.y]![cell.x]!;
+    for (const cell of destination) matrix[cell.y]![cell.x] = unit.getTeam();
+    return matrix;
+}
+
+function matrixWithoutGuard(
+    withGuard: readonly (readonly number[])[],
+    guard: Unit,
+    context: IDecisionContext,
+): number[][] | undefined {
+    if (!canRestoreClearedCells(context, guard.getCells())) return undefined;
+    const matrix = withGuard.map((row) => [...row]);
+    const terrain = context.grid.getMatrixNoUnits();
+    for (const cell of guard.getCells()) matrix[cell.y]![cell.x] = terrain[cell.y]![cell.x]!;
+    return matrix;
+}
+
+function hasSameNonRegressingRangeSignature(
+    current: ReturnType<NonNullable<IDecisionContext["attackHandler"]>["evaluateRangeAttack"]>,
+    candidate: ReturnType<NonNullable<IDecisionContext["attackHandler"]>["evaluateRangeAttack"]>,
+): boolean {
+    if (
+        current.attackObstacle ||
+        candidate.attackObstacle ||
+        current.affectedUnits.length !== candidate.affectedUnits.length ||
+        current.rangeAttackDivisors.length !== candidate.rangeAttackDivisors.length ||
+        current.affectedUnits.length !== current.rangeAttackDivisors.length
+    ) {
+        return false;
+    }
+    for (let index = 0; index < current.affectedUnits.length; index += 1) {
+        const currentIds = current.affectedUnits[index]!.map((affected) => affected.getId());
+        const candidateIds = candidate.affectedUnits[index]!.map((affected) => affected.getId());
+        if (
+            currentIds.length !== candidateIds.length ||
+            currentIds.some((id, affectedIndex) => id !== candidateIds[affectedIndex])
+        ) {
+            return false;
+        }
+        const currentDivisor = current.rangeAttackDivisors[index];
+        const candidateDivisor = candidate.rangeAttackDivisors[index];
+        if (
+            currentDivisor === undefined ||
+            candidateDivisor === undefined ||
+            !Number.isFinite(currentDivisor) ||
+            !Number.isFinite(candidateDivisor) ||
+            currentDivisor <= 0 ||
+            candidateDivisor <= 0 ||
+            candidateDivisor > currentDivisor
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Research-only pre-pin egress. The geometry catalog is intentionally computed for every baseline seat while the
+ * global arm is enabled, including the catalog-only control, because PathHelper consumes seeded tie-break RNG.
+ * Only the selector-scoped seat may retain the proposal.
+ */
+function supportedPrepinEgress(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    strategyVersion: string,
+): GameAction[] {
+    if (process.env[SUPPORTED_PREPIN_EGRESS_ENABLED_ENV] !== "1") return decision;
+    const attackHandler = context.attackHandler;
+    const fightProperties = context.fightProperties;
+    const shot = decision[0];
+    if (
+        !attackHandler ||
+        !fightProperties ||
+        decision.length !== 1 ||
+        shot?.type !== "range_attack" ||
+        !shot.aimCell ||
+        shot.aimSide === undefined ||
+        unit.getUnitProperties().attack_type !== RANGE ||
+        !unit.isRangeCapable() ||
+        !unit.canMove() ||
+        unit.getRangeShots() <= 0 ||
+        unit.hasAbilityActive("Sniper") ||
+        unit.hasAbilityActive("Through Shot") ||
+        unit.hasAbilityActive("Large Caliber") ||
+        unit.hasAbilityActive("Area Throw") ||
+        unit.hasAbilityActive("Double Shot") ||
+        unit.hasDebuffActive("Range Null Field Aura") ||
+        unit.hasDebuffActive("Rangebane") ||
+        attackHandler.canBeAttackedByMelee(
+            unit.getPosition(),
+            unit.isSmallSize(),
+            context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+        ) ||
+        !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId())) ||
+        v08DominantFinishState(context.unitsHolder, unit.getTeam(), fightProperties.getCurrentLap()).active
+    ) {
+        return decision;
+    }
+    const target = context.unitsHolder.getAllUnits().get(shot.targetId);
+    if (!target || target.isDead() || isHidden(target)) return decision;
+    const targetCanCounter =
+        target.isRangeCapable() &&
+        target.getRangeShots() > 0 &&
+        !unit.canSkipResponse() &&
+        !fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
+        target.canRespond(RANGE) &&
+        !target.hasDebuffActive("Range Null Field Aura") &&
+        !target.hasDebuffActive("Rangebane") &&
+        !attackHandler.canBeAttackedByMelee(
+            target.getPosition(),
+            target.isSmallSize(),
+            context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+        );
+    if (targetCanCounter) return decision;
+
+    const threats = pendingMeleeThreats(unit, context);
+    const currentThreats = threats.filter((threat) =>
+        canMeleeFootprintThisActivation(threat, unit.getCells(), context.matrix, context),
+    );
+    const guards = fixedNativeMeleeGuards(unit, context);
+    if (!currentThreats.length || !guards.length) return decision;
+
+    const settings = context.grid.getSettings();
+    const currentOrigin = unit.getPosition();
+    const currentTargetPosition = getRangeAttackSideCenter(
+        settings,
+        shot.aimCell,
+        shot.aimSide as RangeAttackCellSide,
+        currentOrigin,
+    );
+    const currentEvaluation = attackHandler.evaluateRangeAttack(
+        context.unitsHolder.getAllUnits(),
+        unit,
+        currentOrigin,
+        currentTargetPosition,
+        false,
+        false,
+        false,
+    );
+    if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) return decision;
+
+    const proposals: Array<{ route: IWeightedRoute; footprint: XY[] }> = [];
+    for (const route of reachableRoutes(unit, context)) {
+        const footprint = footprintForAnchor(unit, route.cell);
+        const matrix = postMoveMatrix(unit, footprint, context);
+        const origin = getPositionForCells(settings, footprint);
+        if (
+            !matrix ||
+            !origin ||
+            threats.some((threat) => canMeleeFootprintThisActivation(threat, footprint, matrix, context))
+        ) {
+            continue;
+        }
+        const hasCausalGuard = guards.some((guard) => {
+            const withoutGuard = matrixWithoutGuard(matrix, guard, context);
+            return (
+                withoutGuard !== undefined &&
+                currentThreats.every((threat) =>
+                    canMeleeFootprintThisActivation(threat, footprint, withoutGuard, context),
+                )
+            );
+        });
+        if (!hasCausalGuard) continue;
+        const targetPosition = getRangeAttackSideCenter(
+            settings,
+            shot.aimCell,
+            shot.aimSide as RangeAttackCellSide,
+            origin,
+        );
+        const candidateEvaluation = attackHandler.evaluateRangeAttack(
+            context.unitsHolder.getAllUnits(),
+            unit,
+            origin,
+            targetPosition,
+            false,
+            false,
+            false,
+        );
+        if (
+            candidateEvaluation.affectedUnits[0]?.[0]?.getId() === target.getId() &&
+            hasSameNonRegressingRangeSignature(currentEvaluation, candidateEvaluation)
+        ) {
+            proposals.push({ route, footprint });
+        }
+    }
+    proposals.sort(
+        (left, right) =>
+            routeCost(left.route) - routeCost(right.route) ||
+            left.route.cell.y - right.route.cell.y ||
+            left.route.cell.x - right.route.cell.x,
+    );
+    const best = proposals[0];
+    if (!best) return decision;
+
+    const selectorVersions = (process.env[SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (!selectorVersions.includes(strategyVersion)) return decision;
+    context.policyEventObserver?.({
+        kind: "v0.8_supported_prepin_egress",
+        unitId: unit.getId(),
+        creatureName: unit.getName(),
+        team: unit.getTeam(),
+        lap: fightProperties.getCurrentLap(),
+    });
+    return [moveAction(unit, best.route, best.footprint), shot];
 }
 
 function preferAdvance(left: IRouteView, leftDivisor: number, right: IRouteView, rightDivisor: number): boolean {
@@ -614,5 +926,7 @@ export function prioritizeV08RangedPositioning(
         mode === "both" || mode === "advance"
             ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
             : decision;
-    return mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
+    const retreated =
+        mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
+    return supportedPrepinEgress(unit, context, retreated, strategyVersion);
 }

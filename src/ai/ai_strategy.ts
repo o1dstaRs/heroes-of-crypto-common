@@ -56,7 +56,8 @@ export interface IPlacementContext {
     setupPlacementPolicy?: PlacementPolicyVariant;
 }
 
-export type AIPolicyEventKind = "v0.8_supported_ranged_escape" | "v0.8_response_neutral_advance";
+export type AIPolicyEventKind =
+    "v0.8_supported_ranged_escape" | "v0.8_response_neutral_advance" | "v0.8_supported_prepin_egress";
 
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export interface IAIPolicyEvent {
