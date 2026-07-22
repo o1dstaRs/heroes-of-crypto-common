@@ -59,6 +59,17 @@ import { ilCandidateActionEncoding } from "./il_action_features";
 import type { ILookaheadDeps } from "./lookahead";
 import { rankPureRangedDeadlineFinisherCandidates } from "./pure_ranged_deadline_finisher";
 import {
+    isPureRangedJitNoMeleeFocusStationaryIncumbent,
+    PURE_RANGED_JIT_NO_MELEE_FOCUS_ACTIVATION_BUFFER,
+    PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR,
+    PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP,
+    PURE_RANGED_JIT_NO_MELEE_FOCUS_LAST_LAP,
+    PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP,
+    pureRangedJitNoMeleeFocusActorEligible,
+    pureRangedJitNoMeleeFocusLapEligible,
+    rankPureRangedJitNoMeleeFocusCandidates,
+} from "./pure_ranged_jit_no_melee_focus";
+import {
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     pureRangedParetoNoMeleeFocusActorAbility,
     rankPureRangedParetoNoMeleeFocusCandidates,
@@ -153,6 +164,14 @@ import {
  * SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR is restricted to 0.9..1 and defaults to exact Pareto at
  * one. Both measured seats receive the same catalog; the scoped candidate seat may select the engine-validated
  * redirect.
+ * SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS=1 is an independent default-off, version-scoped scheduler for ordinary
+ * original shooters on those all-ranged boards. During laps 6..11 it locks an inherited stationary shot already
+ * aimed at an armed original No Melee barrier, or redirects another stationary shot when the barrier has at most
+ * one spare activation under the current-ammo optimistic upper bound (negative slack remains eligible). A
+ * redirect preserves primary-target kill, at least 80% of enemy/net aggregate damage, and friendly-fire safety,
+ * then passes the real engine probe. Both seats receive the same target-covered catalog; only the scoped
+ * treatment seat may lock or redirect. This arm is mutually exclusive with every earlier pure-ranged
+ * intervention, including the Pareto arm.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
@@ -480,6 +499,59 @@ interface ISearchCounters {
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: Record<string, number>;
     pureRangedParetoNoMeleeFocusProposalsByActorName: Record<string, number>;
     pureRangedParetoNoMeleeFocusOverridesByActorName: Record<string, number>;
+    /** JIT turns whose inherited stationary shot proposes a lock on an armed original No Melee barrier. */
+    pureRangedJitNoMeleeFocusIncumbentLockProposals: number;
+    /** Proposed incumbent locks accepted by the authoritative engine probe. */
+    pureRangedJitNoMeleeFocusIncumbentLocks: number;
+    pureRangedJitNoMeleeFocusRejectedLockProbes: number;
+    /** JIT turns where the hard filters proposed at least one different No Melee aim. */
+    pureRangedJitNoMeleeFocusProposals: number;
+    /** Proposed JIT redirects accepted by the authoritative engine probe. */
+    pureRangedJitNoMeleeFocusValidOverrides: number;
+    /** Proposed JIT turns where every authoritative engine probe rejected. */
+    pureRangedJitNoMeleeFocusRejectedProbes: number;
+    pureRangedJitNoMeleeFocusImmediateKillProposals: number;
+    pureRangedJitNoMeleeFocusImmediateKillValidOverrides: number;
+    pureRangedJitNoMeleeFocusNegativeSlackProposals: number;
+    pureRangedJitNoMeleeFocusNegativeSlackValidOverrides: number;
+    pureRangedJitNoMeleeFocusExactSlackProposals: number;
+    pureRangedJitNoMeleeFocusExactSlackValidOverrides: number;
+    pureRangedJitNoMeleeFocusOneBufferProposals: number;
+    pureRangedJitNoMeleeFocusOneBufferValidOverrides: number;
+    /** Every accepted causal selection: incumbent locks plus redirects. */
+    pureRangedJitNoMeleeFocusSelections: number;
+    pureRangedJitNoMeleeFocusFiniteAmmoSelections: number;
+    pureRangedJitNoMeleeFocusEndlessQuiverSelections: number;
+    pureRangedJitNoMeleeFocusNegativeSlackSelections: number;
+    pureRangedJitNoMeleeFocusExactSlackSelections: number;
+    pureRangedJitNoMeleeFocusOneBufferSelections: number;
+    pureRangedJitNoMeleeFocusExpectedDamage: number;
+    pureRangedJitNoMeleeFocusEnemyDamageDelta: number;
+    pureRangedJitNoMeleeFocusNetDamageDelta: number;
+    pureRangedJitNoMeleeFocusMinimumDeadlineSlack: number;
+    pureRangedJitNoMeleeFocusMaximumDeadlineSlack: number;
+    pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations: number;
+    pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations: number;
+    pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound: number;
+    pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound: number;
+    pureRangedJitNoMeleeFocusMinimumDamageRatio: number;
+    pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio: number;
+    pureRangedJitNoMeleeFocusMinimumNetDamageRatio: number;
+    /** Defensive tripwires; all four must remain zero. */
+    pureRangedJitNoMeleeFocusBelowFloorViolations: number;
+    pureRangedJitNoMeleeFocusExpectedKillRegressionViolations: number;
+    pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations: number;
+    pureRangedJitNoMeleeFocusNonSingleActivationViolations: number;
+    pureRangedJitNoMeleeFocusLocksByActorName: Record<string, number>;
+    pureRangedJitNoMeleeFocusLocksByTargetName: Record<string, number>;
+    pureRangedJitNoMeleeFocusLocksByLap: Record<string, number>;
+    pureRangedJitNoMeleeFocusLocksBySlack: Record<string, number>;
+    pureRangedJitNoMeleeFocusProposalsByActorName: Record<string, number>;
+    pureRangedJitNoMeleeFocusOverridesByActorName: Record<string, number>;
+    pureRangedJitNoMeleeFocusProposalsByTargetName: Record<string, number>;
+    pureRangedJitNoMeleeFocusOverridesByTargetName: Record<string, number>;
+    pureRangedJitNoMeleeFocusProposalsByLap: Record<string, number>;
+    pureRangedJitNoMeleeFocusOverridesByLap: Record<string, number>;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -551,6 +623,52 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: {},
     pureRangedParetoNoMeleeFocusProposalsByActorName: {},
     pureRangedParetoNoMeleeFocusOverridesByActorName: {},
+    pureRangedJitNoMeleeFocusIncumbentLockProposals: 0,
+    pureRangedJitNoMeleeFocusIncumbentLocks: 0,
+    pureRangedJitNoMeleeFocusRejectedLockProbes: 0,
+    pureRangedJitNoMeleeFocusProposals: 0,
+    pureRangedJitNoMeleeFocusValidOverrides: 0,
+    pureRangedJitNoMeleeFocusRejectedProbes: 0,
+    pureRangedJitNoMeleeFocusImmediateKillProposals: 0,
+    pureRangedJitNoMeleeFocusImmediateKillValidOverrides: 0,
+    pureRangedJitNoMeleeFocusNegativeSlackProposals: 0,
+    pureRangedJitNoMeleeFocusNegativeSlackValidOverrides: 0,
+    pureRangedJitNoMeleeFocusExactSlackProposals: 0,
+    pureRangedJitNoMeleeFocusExactSlackValidOverrides: 0,
+    pureRangedJitNoMeleeFocusOneBufferProposals: 0,
+    pureRangedJitNoMeleeFocusOneBufferValidOverrides: 0,
+    pureRangedJitNoMeleeFocusSelections: 0,
+    pureRangedJitNoMeleeFocusFiniteAmmoSelections: 0,
+    pureRangedJitNoMeleeFocusEndlessQuiverSelections: 0,
+    pureRangedJitNoMeleeFocusNegativeSlackSelections: 0,
+    pureRangedJitNoMeleeFocusExactSlackSelections: 0,
+    pureRangedJitNoMeleeFocusOneBufferSelections: 0,
+    pureRangedJitNoMeleeFocusExpectedDamage: 0,
+    pureRangedJitNoMeleeFocusEnemyDamageDelta: 0,
+    pureRangedJitNoMeleeFocusNetDamageDelta: 0,
+    pureRangedJitNoMeleeFocusMinimumDeadlineSlack: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMaximumDeadlineSlack: Number.NEGATIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations: Number.NEGATIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound: Number.NEGATIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMinimumDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusMinimumNetDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedJitNoMeleeFocusBelowFloorViolations: 0,
+    pureRangedJitNoMeleeFocusExpectedKillRegressionViolations: 0,
+    pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations: 0,
+    pureRangedJitNoMeleeFocusNonSingleActivationViolations: 0,
+    pureRangedJitNoMeleeFocusLocksByActorName: {},
+    pureRangedJitNoMeleeFocusLocksByTargetName: {},
+    pureRangedJitNoMeleeFocusLocksByLap: {},
+    pureRangedJitNoMeleeFocusLocksBySlack: {},
+    pureRangedJitNoMeleeFocusProposalsByActorName: {},
+    pureRangedJitNoMeleeFocusOverridesByActorName: {},
+    pureRangedJitNoMeleeFocusProposalsByTargetName: {},
+    pureRangedJitNoMeleeFocusOverridesByTargetName: {},
+    pureRangedJitNoMeleeFocusProposalsByLap: {},
+    pureRangedJitNoMeleeFocusOverridesByLap: {},
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -612,6 +730,8 @@ export class SearchDriver {
     private readonly pureRangedParetoNoMeleeFocus: boolean;
     private readonly pureRangedParetoNoMeleeFocusVersions: ReadonlySet<string>;
     private readonly pureRangedParetoNoMeleeFocusDamageFloor: number;
+    private readonly pureRangedJitNoMeleeFocus: boolean;
+    private readonly pureRangedJitNoMeleeFocusVersions: ReadonlySet<string>;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -890,14 +1010,47 @@ export class SearchDriver {
             }
             this.pureRangedParetoNoMeleeFocusDamageFloor = damageFloor;
         }
+        const rawPureRangedJitNoMeleeFocus = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS;
         if (
-            [this.pureRangedNoMeleePressure, this.pureRangedDeadlineFinisher, this.pureRangedParetoNoMeleeFocus].filter(
-                Boolean,
-            ).length > 1
+            this.mode === "search" &&
+            rawPureRangedJitNoMeleeFocus !== undefined &&
+            rawPureRangedJitNoMeleeFocus !== "" &&
+            rawPureRangedJitNoMeleeFocus !== "0" &&
+            rawPureRangedJitNoMeleeFocus !== "1"
+        ) {
+            throw new Error("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS must be 0 or 1");
+        }
+        this.pureRangedJitNoMeleeFocus = this.mode === "search" && rawPureRangedJitNoMeleeFocus === "1";
+        const rawPureRangedJitNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS;
+        if (!this.pureRangedJitNoMeleeFocus) {
+            this.pureRangedJitNoMeleeFocusVersions = new Set();
+        } else if (rawPureRangedJitNoMeleeFocusVersions === undefined) {
+            this.pureRangedJitNoMeleeFocusVersions = new Set(this.versions);
+        } else {
+            const versions = rawPureRangedJitNoMeleeFocusVersions.split(",").map((version) => version.trim());
+            if (
+                !versions.length ||
+                versions.some((version) => !version) ||
+                new Set(versions).size !== versions.length
+            ) {
+                throw new Error(
+                    "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS must be a comma-separated list of unique versions",
+                );
+            }
+            this.pureRangedJitNoMeleeFocusVersions = new Set(versions);
+        }
+        if (
+            [
+                this.pureRangedNoMeleePressure,
+                this.pureRangedDeadlineFinisher,
+                this.pureRangedParetoNoMeleeFocus,
+                this.pureRangedJitNoMeleeFocus,
+            ].filter(Boolean).length > 1
         ) {
             throw new Error(
                 "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE, SEARCH_PURE_RANGED_DEADLINE_FINISHER, and " +
-                    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS are mutually exclusive",
+                    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS, and SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS " +
+                    "are mutually exclusive",
             );
         }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
@@ -983,7 +1136,8 @@ export class SearchDriver {
             (this.pureRangedTerminalWeight > 0 ||
                 this.pureRangedNoMeleePressure ||
                 this.pureRangedDeadlineFinisher ||
-                this.pureRangedParetoNoMeleeFocus) &&
+                this.pureRangedParetoNoMeleeFocus ||
+                this.pureRangedJitNoMeleeFocus) &&
             this.pureRangedTerminalState === null
         ) {
             this.pureRangedTerminalState = capturePureRangedTerminalState(
@@ -1015,6 +1169,8 @@ export class SearchDriver {
             this.pureRangedDeadlineFinisher && this.pureRangedDeadlineFinisherVersions.has(version);
         const pureRangedParetoNoMeleeFocusSeat =
             this.pureRangedParetoNoMeleeFocus && this.pureRangedParetoNoMeleeFocusVersions.has(version);
+        const pureRangedJitNoMeleeFocusSeat =
+            this.pureRangedJitNoMeleeFocus && this.pureRangedJitNoMeleeFocusVersions.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -1051,7 +1207,8 @@ export class SearchDriver {
             this.pureRangedTerminalWeight > 0 ||
             pureRangedNoMeleePressureSeat ||
             pureRangedDeadlineFinisherSeat ||
-            this.pureRangedParetoNoMeleeFocus
+            this.pureRangedParetoNoMeleeFocus ||
+            this.pureRangedJitNoMeleeFocus
         ) {
             this.onFightReady();
         }
@@ -1071,6 +1228,15 @@ export class SearchDriver {
             Number.isFinite(currentLap) &&
             currentLap >= 1 &&
             currentLap < PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP;
+        // Catalog expansion is also global for the JIT arm. Its stricter pre-enumeration guards ensure that
+        // move-shots and all other action classes retain their stock a13 catalogs exactly.
+        const pureRangedJitNoMeleeFocusCatalogBoard =
+            this.pureRangedJitNoMeleeFocus &&
+            this.pureRangedTerminalState?.eligible === true &&
+            incumbentKind === "shot" &&
+            pureRangedJitNoMeleeFocusActorEligible(unit, this.pureRangedTerminalState) &&
+            pureRangedJitNoMeleeFocusLapEligible(currentLap) &&
+            isPureRangedJitNoMeleeFocusStationaryIncumbent(unit, incumbent);
         const pureRangedDirectInterventionBoard = pureRangedNoMeleePressureBoard || pureRangedDeadlineFinisherBoard;
         // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
         // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
@@ -1101,7 +1267,10 @@ export class SearchDriver {
                 fightProperties: this.deps.fightProperties,
             };
             const preserveBaselineAttackTargetCoverage =
-                prioritizeV08STargetPressure || prioritizeV08SUrgency || pureRangedParetoNoMeleeFocusCatalogBoard;
+                prioritizeV08STargetPressure ||
+                prioritizeV08SUrgency ||
+                pureRangedParetoNoMeleeFocusCatalogBoard ||
+                pureRangedJitNoMeleeFocusCatalogBoard;
             const enumerationOptions = {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
@@ -1144,6 +1313,171 @@ export class SearchDriver {
                           preserveAttackTargetCoverage: true,
                       }).candidates.filter(keepCandidate)
                     : candidates;
+            if (
+                pureRangedJitNoMeleeFocusSeat &&
+                pureRangedJitNoMeleeFocusCatalogBoard &&
+                !this.circuitOpen &&
+                !this.observeOnly
+            ) {
+                const focusCandidates = rankPureRangedJitNoMeleeFocusCandidates(
+                    unit,
+                    this.deps.unitsHolder,
+                    candidates,
+                    this.pureRangedTerminalState,
+                    currentLap,
+                );
+                const incumbentLockProposal = focusCandidates.find((candidate) => candidate.incumbentLocked);
+                const redirectProposal = focusCandidates.find((candidate) => !candidate.incumbentLocked);
+                if (incumbentLockProposal) {
+                    this.counters.pureRangedJitNoMeleeFocusIncumbentLockProposals += 1;
+                }
+                if (redirectProposal) {
+                    const proposal = redirectProposal;
+                    this.counters.pureRangedJitNoMeleeFocusProposals += 1;
+                    if (proposal.immediateKill) this.counters.pureRangedJitNoMeleeFocusImmediateKillProposals += 1;
+                    if (proposal.deadlineSlack < 0) {
+                        this.counters.pureRangedJitNoMeleeFocusNegativeSlackProposals += 1;
+                    } else if (proposal.deadlineSlack === 0) {
+                        this.counters.pureRangedJitNoMeleeFocusExactSlackProposals += 1;
+                    } else if (proposal.deadlineSlack === 1) {
+                        this.counters.pureRangedJitNoMeleeFocusOneBufferProposals += 1;
+                    }
+                    bump(this.counters.pureRangedJitNoMeleeFocusProposalsByActorName, unit.getName());
+                    bump(this.counters.pureRangedJitNoMeleeFocusProposalsByTargetName, proposal.noMeleeTargetName);
+                    bump(this.counters.pureRangedJitNoMeleeFocusProposalsByLap, String(currentLap));
+                }
+                let focusCandidate: IEnumeratedCandidate | undefined;
+                let focusProbeCompleted = true;
+                try {
+                    focusCandidate = this.firstEngineValidCandidate(
+                        unit,
+                        focusCandidates.map(({ candidate }) => candidate),
+                        seedBase,
+                        this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs,
+                    );
+                } catch (error) {
+                    if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
+                    focusProbeCompleted = false;
+                }
+                const focus = focusCandidates.find(({ candidate }) => candidate === focusCandidate);
+                if (focusCandidate && focus) {
+                    this.counters.pureRangedJitNoMeleeFocusSelections += 1;
+                    if (focus.activeEndlessQuiver) {
+                        this.counters.pureRangedJitNoMeleeFocusEndlessQuiverSelections += 1;
+                    } else {
+                        this.counters.pureRangedJitNoMeleeFocusFiniteAmmoSelections += 1;
+                    }
+                    if (focus.deadlineSlack < 0) {
+                        this.counters.pureRangedJitNoMeleeFocusNegativeSlackSelections += 1;
+                    } else if (focus.deadlineSlack === 0) {
+                        this.counters.pureRangedJitNoMeleeFocusExactSlackSelections += 1;
+                    } else if (focus.deadlineSlack === 1) {
+                        this.counters.pureRangedJitNoMeleeFocusOneBufferSelections += 1;
+                    }
+                    this.counters.pureRangedJitNoMeleeFocusMinimumDeadlineSlack = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumDeadlineSlack,
+                        focus.deadlineSlack,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMaximumDeadlineSlack = Math.max(
+                        this.counters.pureRangedJitNoMeleeFocusMaximumDeadlineSlack,
+                        focus.deadlineSlack,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations,
+                        focus.estimatedRequiredActivations,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations = Math.max(
+                        this.counters.pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations,
+                        focus.estimatedRequiredActivations,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound,
+                        focus.availableFullDamageActivationsUpperBound,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound = Math.max(
+                        this.counters.pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound,
+                        focus.availableFullDamageActivationsUpperBound,
+                    );
+                }
+                if (focusCandidate && focus?.incumbentLocked) {
+                    this.counters.decisions += 1;
+                    this.counters.pureRangedJitNoMeleeFocusIncumbentLocks += 1;
+                    bump(this.counters.pureRangedJitNoMeleeFocusLocksByActorName, unit.getName());
+                    bump(this.counters.pureRangedJitNoMeleeFocusLocksByTargetName, focus.noMeleeTargetName);
+                    bump(this.counters.pureRangedJitNoMeleeFocusLocksByLap, String(currentLap));
+                    bump(this.counters.pureRangedJitNoMeleeFocusLocksBySlack, String(focus.deadlineSlack));
+                    this.counters.msTotal += performance.now() - t0;
+                    // Keep the caller's exact action-array identity. Candidate-zero metadata is enriched only for
+                    // engine validation and must never make a lock look like an override.
+                    return incumbent;
+                }
+                if (focusCandidate && focus) {
+                    this.counters.decisions += 1;
+                    this.counters.pureRangedJitNoMeleeFocusValidOverrides += 1;
+                    if (focus.immediateKill) {
+                        this.counters.pureRangedJitNoMeleeFocusImmediateKillValidOverrides += 1;
+                    }
+                    if (focus.deadlineSlack < 0) {
+                        this.counters.pureRangedJitNoMeleeFocusNegativeSlackValidOverrides += 1;
+                    } else if (focus.deadlineSlack === 0) {
+                        this.counters.pureRangedJitNoMeleeFocusExactSlackValidOverrides += 1;
+                    } else if (focus.deadlineSlack === 1) {
+                        this.counters.pureRangedJitNoMeleeFocusOneBufferValidOverrides += 1;
+                    }
+                    this.counters.pureRangedJitNoMeleeFocusExpectedDamage += focus.expectedNoMeleeDamage;
+                    this.counters.pureRangedJitNoMeleeFocusEnemyDamageDelta += focus.expectedEnemyDamageDelta;
+                    this.counters.pureRangedJitNoMeleeFocusNetDamageDelta += focus.expectedNetDamageDelta;
+                    this.counters.pureRangedJitNoMeleeFocusMinimumDamageRatio = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumDamageRatio,
+                        focus.minimumDamageRatio,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio,
+                        focus.enemyDamageRatio,
+                    );
+                    this.counters.pureRangedJitNoMeleeFocusMinimumNetDamageRatio = Math.min(
+                        this.counters.pureRangedJitNoMeleeFocusMinimumNetDamageRatio,
+                        focus.netDamageRatio,
+                    );
+                    if (
+                        focus.enemyDamageRatio < PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR ||
+                        focus.netDamageRatio < PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR
+                    ) {
+                        this.counters.pureRangedJitNoMeleeFocusBelowFloorViolations += 1;
+                    }
+                    if (focus.expectedKillDelta < 0) {
+                        this.counters.pureRangedJitNoMeleeFocusExpectedKillRegressionViolations += 1;
+                    }
+                    if (focus.friendlyFireDamageDelta > 0) {
+                        this.counters.pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations += 1;
+                    }
+                    if (
+                        focusCandidate.features.spendsRangeShot !== 1 ||
+                        focusCandidate.actions.filter((action) => action.type === "range_attack").length !== 1 ||
+                        focusCandidate.actions.some(
+                            (action) => action.type !== "select_attack_type" && action.type !== "range_attack",
+                        )
+                    ) {
+                        this.counters.pureRangedJitNoMeleeFocusNonSingleActivationViolations += 1;
+                    }
+                    bump(this.counters.pureRangedJitNoMeleeFocusOverridesByActorName, unit.getName());
+                    bump(this.counters.pureRangedJitNoMeleeFocusOverridesByTargetName, focus.noMeleeTargetName);
+                    bump(this.counters.pureRangedJitNoMeleeFocusOverridesByLap, String(currentLap));
+                    this.counters.msTotal += performance.now() - t0;
+                    if (focusCandidate.actions !== incumbent) {
+                        this.counters.overrides += 1;
+                        bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                        bump(this.counters.overridesToKind, focusCandidate.kind);
+                    }
+                    return focusCandidate.actions;
+                }
+                if (!focusCandidate && incumbentLockProposal && focusProbeCompleted) {
+                    this.counters.pureRangedJitNoMeleeFocusRejectedLockProbes += 1;
+                }
+                if (!focusCandidate && redirectProposal && focusProbeCompleted) {
+                    this.counters.pureRangedJitNoMeleeFocusRejectedProbes += 1;
+                }
+            }
             if (
                 pureRangedParetoNoMeleeFocusSeat &&
                 pureRangedParetoNoMeleeFocusCatalogBoard &&
@@ -1459,6 +1793,87 @@ export class SearchDriver {
             pureRangedParetoNoMeleeFocusOverridesByActorAbility: c.pureRangedParetoNoMeleeFocusOverridesByActorAbility,
             pureRangedParetoNoMeleeFocusProposalsByActorName: c.pureRangedParetoNoMeleeFocusProposalsByActorName,
             pureRangedParetoNoMeleeFocusOverridesByActorName: c.pureRangedParetoNoMeleeFocusOverridesByActorName,
+            pureRangedJitNoMeleeFocus: this.pureRangedJitNoMeleeFocus,
+            pureRangedJitNoMeleeFocusVersions: [...this.pureRangedJitNoMeleeFocusVersions],
+            pureRangedJitNoMeleeFocusStartLap: PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP,
+            pureRangedJitNoMeleeFocusLastLap: PURE_RANGED_JIT_NO_MELEE_FOCUS_LAST_LAP,
+            pureRangedJitNoMeleeFocusEndLapExclusive: PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP,
+            pureRangedJitNoMeleeFocusActivationBuffer: PURE_RANGED_JIT_NO_MELEE_FOCUS_ACTIVATION_BUFFER,
+            pureRangedJitNoMeleeFocusDamageFloor: PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR,
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: c.pureRangedJitNoMeleeFocusIncumbentLockProposals,
+            pureRangedJitNoMeleeFocusIncumbentLocks: c.pureRangedJitNoMeleeFocusIncumbentLocks,
+            pureRangedJitNoMeleeFocusRejectedLockProbes: c.pureRangedJitNoMeleeFocusRejectedLockProbes,
+            pureRangedJitNoMeleeFocusProposals: c.pureRangedJitNoMeleeFocusProposals,
+            pureRangedJitNoMeleeFocusValidOverrides: c.pureRangedJitNoMeleeFocusValidOverrides,
+            pureRangedJitNoMeleeFocusRejectedProbes: c.pureRangedJitNoMeleeFocusRejectedProbes,
+            pureRangedJitNoMeleeFocusImmediateKillProposals: c.pureRangedJitNoMeleeFocusImmediateKillProposals,
+            pureRangedJitNoMeleeFocusImmediateKillValidOverrides:
+                c.pureRangedJitNoMeleeFocusImmediateKillValidOverrides,
+            pureRangedJitNoMeleeFocusNegativeSlackProposals: c.pureRangedJitNoMeleeFocusNegativeSlackProposals,
+            pureRangedJitNoMeleeFocusNegativeSlackValidOverrides:
+                c.pureRangedJitNoMeleeFocusNegativeSlackValidOverrides,
+            pureRangedJitNoMeleeFocusExactSlackProposals: c.pureRangedJitNoMeleeFocusExactSlackProposals,
+            pureRangedJitNoMeleeFocusExactSlackValidOverrides: c.pureRangedJitNoMeleeFocusExactSlackValidOverrides,
+            pureRangedJitNoMeleeFocusOneBufferProposals: c.pureRangedJitNoMeleeFocusOneBufferProposals,
+            pureRangedJitNoMeleeFocusOneBufferValidOverrides: c.pureRangedJitNoMeleeFocusOneBufferValidOverrides,
+            pureRangedJitNoMeleeFocusSelections: c.pureRangedJitNoMeleeFocusSelections,
+            pureRangedJitNoMeleeFocusFiniteAmmoSelections: c.pureRangedJitNoMeleeFocusFiniteAmmoSelections,
+            pureRangedJitNoMeleeFocusEndlessQuiverSelections: c.pureRangedJitNoMeleeFocusEndlessQuiverSelections,
+            pureRangedJitNoMeleeFocusNegativeSlackSelections: c.pureRangedJitNoMeleeFocusNegativeSlackSelections,
+            pureRangedJitNoMeleeFocusExactSlackSelections: c.pureRangedJitNoMeleeFocusExactSlackSelections,
+            pureRangedJitNoMeleeFocusOneBufferSelections: c.pureRangedJitNoMeleeFocusOneBufferSelections,
+            pureRangedJitNoMeleeFocusExpectedDamage: Number(c.pureRangedJitNoMeleeFocusExpectedDamage.toFixed(3)),
+            pureRangedJitNoMeleeFocusEnemyDamageDelta: Number(c.pureRangedJitNoMeleeFocusEnemyDamageDelta.toFixed(3)),
+            pureRangedJitNoMeleeFocusNetDamageDelta: Number(c.pureRangedJitNoMeleeFocusNetDamageDelta.toFixed(3)),
+            pureRangedJitNoMeleeFocusMinimumDeadlineSlack:
+                c.pureRangedJitNoMeleeFocusSelections > 0 ? c.pureRangedJitNoMeleeFocusMinimumDeadlineSlack : null,
+            pureRangedJitNoMeleeFocusMaximumDeadlineSlack:
+                c.pureRangedJitNoMeleeFocusSelections > 0 ? c.pureRangedJitNoMeleeFocusMaximumDeadlineSlack : null,
+            pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations:
+                c.pureRangedJitNoMeleeFocusSelections > 0
+                    ? c.pureRangedJitNoMeleeFocusMinimumEstimatedRequiredActivations
+                    : null,
+            pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations:
+                c.pureRangedJitNoMeleeFocusSelections > 0
+                    ? c.pureRangedJitNoMeleeFocusMaximumEstimatedRequiredActivations
+                    : null,
+            pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound:
+                c.pureRangedJitNoMeleeFocusSelections > 0
+                    ? c.pureRangedJitNoMeleeFocusMinimumAvailableActivationUpperBound
+                    : null,
+            pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound:
+                c.pureRangedJitNoMeleeFocusSelections > 0
+                    ? c.pureRangedJitNoMeleeFocusMaximumAvailableActivationUpperBound
+                    : null,
+            pureRangedJitNoMeleeFocusMinimumDamageRatio:
+                c.pureRangedJitNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedJitNoMeleeFocusMinimumDamageRatio.toFixed(6))
+                    : null,
+            pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio:
+                c.pureRangedJitNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedJitNoMeleeFocusMinimumEnemyDamageRatio.toFixed(6))
+                    : null,
+            pureRangedJitNoMeleeFocusMinimumNetDamageRatio:
+                c.pureRangedJitNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedJitNoMeleeFocusMinimumNetDamageRatio.toFixed(6))
+                    : null,
+            pureRangedJitNoMeleeFocusBelowFloorViolations: c.pureRangedJitNoMeleeFocusBelowFloorViolations,
+            pureRangedJitNoMeleeFocusExpectedKillRegressionViolations:
+                c.pureRangedJitNoMeleeFocusExpectedKillRegressionViolations,
+            pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations:
+                c.pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations,
+            pureRangedJitNoMeleeFocusNonSingleActivationViolations:
+                c.pureRangedJitNoMeleeFocusNonSingleActivationViolations,
+            pureRangedJitNoMeleeFocusLocksByActorName: c.pureRangedJitNoMeleeFocusLocksByActorName,
+            pureRangedJitNoMeleeFocusLocksByTargetName: c.pureRangedJitNoMeleeFocusLocksByTargetName,
+            pureRangedJitNoMeleeFocusLocksByLap: c.pureRangedJitNoMeleeFocusLocksByLap,
+            pureRangedJitNoMeleeFocusLocksBySlack: c.pureRangedJitNoMeleeFocusLocksBySlack,
+            pureRangedJitNoMeleeFocusProposalsByActorName: c.pureRangedJitNoMeleeFocusProposalsByActorName,
+            pureRangedJitNoMeleeFocusOverridesByActorName: c.pureRangedJitNoMeleeFocusOverridesByActorName,
+            pureRangedJitNoMeleeFocusProposalsByTargetName: c.pureRangedJitNoMeleeFocusProposalsByTargetName,
+            pureRangedJitNoMeleeFocusOverridesByTargetName: c.pureRangedJitNoMeleeFocusOverridesByTargetName,
+            pureRangedJitNoMeleeFocusProposalsByLap: c.pureRangedJitNoMeleeFocusProposalsByLap,
+            pureRangedJitNoMeleeFocusOverridesByLap: c.pureRangedJitNoMeleeFocusOverridesByLap,
             pureRangedTerminalEligible: this.pureRangedTerminalState?.eligible ?? false,
             pureRangedTerminalInitialScale: this.pureRangedTerminalState?.initialScale ?? 0,
             pureRangedTerminalLeaves: c.pureRangedTerminalLeaves,
