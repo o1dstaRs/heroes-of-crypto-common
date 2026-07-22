@@ -330,7 +330,7 @@ export interface IRecordedAction {
     rejectionReason?: string;
     /** Extra enemy stacks hit beyond the primary target (AoE splash + line/secondary damage). */
     secondaryHits?: number;
-    /** Actual direct projectile/strike impact, including all Through Shot/AOE splash entries. */
+    /** Direct attack-event impact; sums all Through Shot/range-AOE splash entries when present. */
     impactDamage?: number;
     /** Legacy single-target visible amount; zero for Through Shot/AOE even when splash dealt damage. */
     damage?: number;
@@ -1401,9 +1401,7 @@ function recordAction(
     const impactDamage = visibleDamage
         ? visibleDamage.splash?.length
             ? visibleDamage.splash.reduce((total, hit) => total + hit.amount, 0)
-            : visibleDamage.hits?.length
-              ? visibleDamage.hits.reduce((total, hit) => total + hit.amount, 0)
-              : visibleDamage.amount
+            : visibleDamage.amount
         : undefined;
     actions.push({
         index: actions.length,
