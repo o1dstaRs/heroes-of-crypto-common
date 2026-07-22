@@ -19,7 +19,7 @@ import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumerate
 import { isV08StrongerRangedPostureWait } from "../../src/ai/versions/v0_8";
 import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { V08S_URGENT_FINISH_START_LAP, V08_TARGET_PRESSURE_START_LAP } from "../../src/ai/versions/v0_8s_finish";
-import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW } from "../../src/ai/versions/wait_scorer";
+import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW, waitScorerInSupport } from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -2605,7 +2605,8 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
                 fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
                 !fp.hourglassIncludes(id) &&
                 !fp.hasAlreadyMadeTurn(id) &&
-                !fp.hasAlreadyHourglass(id);
+                !fp.hasAlreadyHourglass(id) &&
+                waitScorerInSupport(unit, h.unitsHolder);
             const incumbent = h.decideActive();
             if (eligible && incumbent.length > 0 && !incumbent.some((a) => a.type === "wait_turn")) {
                 return { unit, incumbent };
@@ -2617,15 +2618,26 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
     const armedBias = (b: number): string => JSON.stringify({ b, w: new Array(WAIT_FEATURE_NAMES.length).fill(0) });
 
     it("armed scorer overrides v0.6s's act to a wait the ENGINE ACCEPTS (mirror/engine legality parity)", () => {
-        setEnv({});
-        // Re-pinned 3101 -> 2 after enabling Arachna Queen expanded the L4 roster pool and shifted the
-        // seeded battle at 3101 to a caster decision that the scorer correctly leaves active.
-        const h = buildBattle(2, "v0.6s");
-        const { unit } = findEligibleActPoint(h);
+        // Find a deterministic live-battle point inside the deployed scorer's training support. Searching a
+        // small fixed seed prefix keeps catalog additions from pinning this wiring test to a newly ranged or
+        // caster-heavy roster while still failing if no supported engine-waitable action remains reachable.
+        let fixture: { h: Harness; unit: Unit } | undefined;
+        for (let seed = 1; seed <= 64 && !fixture; seed += 1) {
+            setEnv({});
+            const h = buildBattle(seed, "v0.6s");
+            try {
+                fixture = { h, unit: findEligibleActPoint(h).unit };
+            } catch {
+                // This roster has no supported act point inside the bounded live-battle window.
+            }
+        }
+        expect(fixture).toBeDefined();
+        if (!fixture) throw new Error("no supported wait-scorer wiring fixture found");
+
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(9) });
-        const decided = h.decideActive();
-        expect(decided).toEqual([{ type: "wait_turn", unitId: unit.getId() }]);
-        const applied = h.engine.apply(decided[0]);
+        const decided = fixture.h.decideActive();
+        expect(decided).toEqual([{ type: "wait_turn", unitId: fixture.unit.getId() }]);
+        const applied = fixture.h.engine.apply(decided[0]);
         expect(applied.completed).toBe(true);
     });
 

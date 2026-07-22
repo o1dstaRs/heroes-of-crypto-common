@@ -281,9 +281,8 @@ describe("ranked conditional dual-genome compatibility", () => {
             upperGenome: round1,
         });
         expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
-        // Re-pinned 40 -> 20 in the last slot after enabling Abomination: the 9-creature L4 pool
-        // shifts the seeded round-3 draft's final pick from Angel to Behemoth.
-        expect(mixed.lower.creatureIds).toEqual([22, 36, 23, 26, 38, 20]);
+        // Re-pinned after Dryad expanded the L1 catalog and shifted the seeded round-3 draft picks.
+        expect(mixed.lower.creatureIds).toEqual([23, 36, 31, 26, 38, 20]);
     });
 });
 
