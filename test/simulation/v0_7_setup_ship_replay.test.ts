@@ -25,7 +25,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // shifts the same seeded roster draws. Two runs produced this byte-identical digest.
 // Re-pinned after hardening v0.1 melee target legality and preferring enemies that already replied this lap;
 // the affected seeded combat actions legitimately change. Two runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "068fce6fbc516ed8ee3508457916e30f9ccc9a3e57c3189704357c6866e46303";
+// Re-pinned after enabling Dryad expanded the Nature L1 catalog and shifted the deterministic roster draws.
+// The full and focused suites independently produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "06d3b22c545e32993825c1d1e53172a16f4883bcc7deb2695dbe3f88507f1a02";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

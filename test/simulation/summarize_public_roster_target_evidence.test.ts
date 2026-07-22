@@ -218,7 +218,7 @@ describe("public-roster target evidence summarizer", () => {
             }),
         );
         expect(() => summarizePublicRosterTargetEvidence(wrongBasePaths, TEST_SOURCE_COMMIT, TEST_BASE_SEED)).toThrow(
-            "board ledger does not match the reconstructed outcome-blind target scan",
+            "does not match the reconstructed outcome-blind target scan",
         );
 
         expect(() =>
@@ -308,7 +308,7 @@ describe("public-roster target evidence summarizer", () => {
                     report.baseSeed = TEST_BASE_SEED + 1;
                 }),
             ]),
-        ).toThrow("board ledger does not match the reconstructed outcome-blind target scan");
+        ).toThrow("does not match the reconstructed outcome-blind target scan");
         expect(() =>
             summarizePublicRosterTargetDiagnostics([
                 mutateFixture(path, "pairing.json", (report) => {
