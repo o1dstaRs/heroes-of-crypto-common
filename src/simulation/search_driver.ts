@@ -57,6 +57,7 @@ import {
 } from "./il_dataset";
 import { ilCandidateActionEncoding } from "./il_action_features";
 import type { ILookaheadDeps } from "./lookahead";
+import { rankPureRangedNoMeleePressureCandidates } from "./pure_ranged_no_melee_pressure";
 import {
     canonicalPhaseBSeed,
     PHASE_B_DATASET_VERSION,
@@ -133,6 +134,9 @@ import {
  * SEARCH_PURE_RANGED_TERMINAL_WEIGHT=<0..16> is a default-zero leaf-logit overlay restricted to battles in
  * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
  * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
+ * SEARCH_PURE_RANGED_NO_MELEE_PRESSURE=1 is a default-off, version-scoped terminal-barrier intervention for
+ * those same all-ranged original boards. From lap one, a legal stationary ranged kill remains first; otherwise
+ * a legal positive-damage shot pressures a living enemy No Melee stack before ammunition is exhausted.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
@@ -528,6 +532,8 @@ export class SearchDriver {
     private readonly decisionDeadlineMs: number | null;
     private readonly lateRangedFinishWeight: number;
     private readonly pureRangedTerminalWeight: number;
+    private readonly pureRangedNoMeleePressure: boolean;
+    private readonly pureRangedNoMeleePressureVersions: ReadonlySet<string>;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -703,6 +709,35 @@ export class SearchDriver {
             }
             this.pureRangedTerminalWeight = terminalWeight;
         }
+        const rawPureRangedNoMeleePressure = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE;
+        if (
+            this.mode === "search" &&
+            rawPureRangedNoMeleePressure !== undefined &&
+            rawPureRangedNoMeleePressure !== "" &&
+            rawPureRangedNoMeleePressure !== "0" &&
+            rawPureRangedNoMeleePressure !== "1"
+        ) {
+            throw new Error("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE must be 0 or 1");
+        }
+        this.pureRangedNoMeleePressure = this.mode === "search" && rawPureRangedNoMeleePressure === "1";
+        const rawPureRangedNoMeleePressureVersions = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS;
+        if (!this.pureRangedNoMeleePressure) {
+            this.pureRangedNoMeleePressureVersions = new Set();
+        } else if (rawPureRangedNoMeleePressureVersions === undefined) {
+            this.pureRangedNoMeleePressureVersions = new Set(this.versions);
+        } else {
+            const versions = rawPureRangedNoMeleePressureVersions.split(",").map((version) => version.trim());
+            if (
+                !versions.length ||
+                versions.some((version) => !version) ||
+                new Set(versions).size !== versions.length
+            ) {
+                throw new Error(
+                    "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS must be a comma-separated list of unique versions",
+                );
+            }
+            this.pureRangedNoMeleePressureVersions = new Set(versions);
+        }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
             rawValueWeights === "material"
@@ -782,7 +817,10 @@ export class SearchDriver {
         if (this.lateRangedFinishWeight > 0 && this.finishPressureState === null) {
             this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
         }
-        if (this.pureRangedTerminalWeight > 0 && this.pureRangedTerminalState === null) {
+        if (
+            (this.pureRangedTerminalWeight > 0 || this.pureRangedNoMeleePressure) &&
+            this.pureRangedTerminalState === null
+        ) {
             this.pureRangedTerminalState = capturePureRangedTerminalState(
                 this.deps.unitsHolder,
                 this.deps.fightProperties.getCurrentLap(),
@@ -806,6 +844,8 @@ export class SearchDriver {
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
+        const pureRangedNoMeleePressureSeat =
+            this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -837,12 +877,14 @@ export class SearchDriver {
         if (prioritizeDominantFinish) {
             this.counters.dominantFinishTurns += 1;
         }
-        if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0) {
+        if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0 || pureRangedNoMeleePressureSeat) {
             this.onFightReady();
         }
+        const pureRangedNoMeleePressureBoard =
+            pureRangedNoMeleePressureSeat && this.pureRangedTerminalState?.eligible === true;
         // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
         // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
-        if (this.circuitOpen && !useProductiveFallback) {
+        if (this.circuitOpen && !useProductiveFallback && !pureRangedNoMeleePressureBoard) {
             this.counters.circuitSkipped += 1;
             return incumbent;
         }
@@ -868,7 +910,8 @@ export class SearchDriver {
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
             };
-            const set = enumerateCandidates(unit, context, incumbent, {
+            const preserveBaselineAttackTargetCoverage = prioritizeV08STargetPressure || prioritizeV08SUrgency;
+            const enumerationOptions = {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
@@ -878,9 +921,9 @@ export class SearchDriver {
                     v08sHasStrongerRangedOutput &&
                     !prioritizeDominantFinish &&
                     !prioritizeV08SUrgency,
-                preserveAttackTargetCoverage: prioritizeV08STargetPressure || prioritizeV08SUrgency,
-            });
-            const candidates = set.candidates.filter((candidate) => {
+                preserveAttackTargetCoverage: preserveBaselineAttackTargetCoverage,
+            };
+            const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
@@ -896,7 +939,38 @@ export class SearchDriver {
                     return false;
                 }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
-            });
+            };
+            const candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
+                keepCandidate,
+            );
+            if (pureRangedNoMeleePressureBoard && !this.observeOnly) {
+                // The normal capped catalog remains untouched if this intervention finds no engine-valid shot.
+                // Its private re-enumeration only prevents a legal No-Melee target from disappearing behind the
+                // generic shot cap; no expanded candidate can leak into the fallback search.
+                const pressureCandidateSource = preserveBaselineAttackTargetCoverage
+                    ? candidates
+                    : enumerateCandidates(unit, context, incumbent, {
+                          ...enumerationOptions,
+                          preserveAttackTargetCoverage: true,
+                      }).candidates.filter(keepCandidate);
+                const pressureCandidates = rankPureRangedNoMeleePressureCandidates(
+                    unit,
+                    this.deps.unitsHolder,
+                    pressureCandidateSource,
+                    this.pureRangedTerminalState,
+                );
+                const pressureCandidate = this.firstEngineValidCandidate(unit, pressureCandidates, seedBase);
+                if (pressureCandidate) {
+                    this.counters.decisions += 1;
+                    this.counters.msTotal += performance.now() - t0;
+                    if (pressureCandidate.actions !== incumbent) {
+                        this.counters.overrides += 1;
+                        bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                        bump(this.counters.overridesToKind, pressureCandidate.kind);
+                    }
+                    return pressureCandidate.actions;
+                }
+            }
             // Prepare a bounded, deterministic fallback before an expensive rollout can exhaust its deadline.
             // The probe uses the real engine and full battle snapshot/restore, so "productive" means the action
             // actually completes rather than merely passing the enumerator's legality mirror. A circuit-open
@@ -1041,6 +1115,8 @@ export class SearchDriver {
             finishPressureNonzeroLeaves: c.finishPressureNonzeroLeaves,
             finishPressureLogitSum: Number(c.finishPressureLogitSum.toFixed(6)),
             pureRangedTerminalWeight: this.pureRangedTerminalWeight,
+            pureRangedNoMeleePressure: this.pureRangedNoMeleePressure,
+            pureRangedNoMeleePressureVersions: [...this.pureRangedNoMeleePressureVersions],
             pureRangedTerminalEligible: this.pureRangedTerminalState?.eligible ?? false,
             pureRangedTerminalInitialScale: this.pureRangedTerminalState?.initialScale ?? 0,
             pureRangedTerminalLeaves: c.pureRangedTerminalLeaves,
@@ -1451,6 +1527,25 @@ export class SearchDriver {
                 ]
               : productiveCandidates;
         for (const candidate of orderedCandidates) {
+            const strictCandidate: ISearchCandidate =
+                candidate.kind === "incumbent"
+                    ? {
+                          kind: classifyActions(candidate.actions) as CandidateKind,
+                          actions: candidate.actions,
+                      }
+                    : candidate;
+            const [score] = this.scoreCandidates(unit, [strictCandidate], seedBase, "leaf", 1, null);
+            if (score !== -Infinity) return candidate;
+        }
+        return undefined;
+    }
+    /** Engine-validate an already-ranked narrow intervention without opening a rollout comparison. */
+    private firstEngineValidCandidate(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        seedBase: number,
+    ): IEnumeratedCandidate | undefined {
+        for (const candidate of candidates) {
             const strictCandidate: ISearchCandidate =
                 candidate.kind === "incumbent"
                     ? {

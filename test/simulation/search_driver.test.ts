@@ -48,6 +48,7 @@ import {
     createUnitFromSpec,
     deterministicSimulationId,
     makeRng,
+    type IArmyUnitSpec,
 } from "../../src/simulation/army";
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
@@ -85,6 +86,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
+    "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE",
+    "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -167,7 +170,12 @@ interface Harness {
 }
 
 /** Mid-fight harness mirroring battle_engine's loop with a deterministic clock (see lookahead.test.ts). */
-function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrategy): Harness {
+function buildBattle(
+    seed: number,
+    version = "v0.6",
+    rolloutStrategy?: IAIStrategy,
+    rosterOverride?: readonly IArmyUnitSpec[],
+): Harness {
     FightStateManager.getInstance();
     setDeterministicRandomSource(makeRng((seed ^ 0x6d2b79f5) >>> 0));
 
@@ -232,7 +240,7 @@ function buildBattle(seed: number, version = "v0.6", rolloutStrategy?: IAIStrate
         },
     };
 
-    const roster = buildRoster(makeRng(seed));
+    const roster = rosterOverride ?? buildRoster(makeRng(seed));
     const greenUnits = roster.map((s, index) =>
         createUnitFromSpec(
             s,
@@ -1358,6 +1366,95 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.enabled).toBe(false);
         expect(driver.appliesTo("v0.6")).toBe(false);
         expect(driver.chooseDecision(unit!, "v0.6", incumbent)).toBe(incumbent);
+    });
+
+    const pureRangedTerminalRoster = (arbalesterAmount: number): readonly IArmyUnitSpec[] => [
+        { faction: "Life", creatureName: "Tsar Cannon", level: 4, size: 2, amount: 2 },
+        { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: arbalesterAmount },
+    ];
+    const pureRangedTerminalEnvironment = {
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8,v0.8s",
+        SEARCH_GATE: "1000",
+        SEARCH_HORIZON: "1",
+        SEARCH_ROLLOUTS: "1",
+        SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "1",
+        SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+    } as const;
+
+    it("keeps the pure-ranged terminal-pressure decision identical while default-off", () => {
+        setEnv({
+            ...pureRangedTerminalEnvironment,
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: undefined,
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: undefined,
+        });
+        const h = buildBattle(10_301, "v0.8", undefined, pureRangedTerminalRoster(100));
+        const unit = h.activeUnit()!;
+        expect(unit.getName()).toBe("Tsar Cannon");
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
+    it("pressures a live Tsar Cannon from lap one without waiting, defending, or mining", () => {
+        setEnv({ ...pureRangedTerminalEnvironment });
+        const h = buildBattle(10_302, "v0.8", undefined, pureRangedTerminalRoster(100));
+        const unit = h.activeUnit()!;
+        expect(unit.getName()).toBe("Tsar Cannon");
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const chosen = driver.chooseDecision(unit, "v0.8", incumbent);
+        const shot = chosen.find((action) => action.type === "range_attack");
+        expect(shot?.type).toBe("range_attack");
+        expect(h.unitsHolder.getAllUnits().get(shot!.targetId)?.getName()).toBe("Tsar Cannon");
+        expect(chosen.some((action) => action.type === "wait_turn")).toBe(false);
+        expect(chosen.some((action) => action.type === "defend_turn")).toBe(false);
+        expect(chosen.some((action) => action.type === "obstacle_attack")).toBe(false);
+        expect(h.fightProperties.getCurrentLap()).toBeLessThan(V08_TARGET_PRESSURE_START_LAP);
+    });
+
+    it("keeps an immediate ranged kill ahead of Tsar terminal-barrier pressure", () => {
+        setEnv({ ...pureRangedTerminalEnvironment });
+        const h = buildBattle(10_303, "v0.8", undefined, pureRangedTerminalRoster(1));
+        const unit = h.activeUnit()!;
+        expect(unit.getName()).toBe("Tsar Cannon");
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const chosen = driver.chooseDecision(unit, "v0.8", [{ type: "wait_turn", unitId: unit.getId() }]);
+        const shot = chosen.find((action) => action.type === "range_attack");
+        expect(shot?.type).toBe("range_attack");
+        expect(h.unitsHolder.getAllUnits().get(shot!.targetId)?.getName()).toBe("Arbalester");
+    });
+
+    it("preserves the incumbent on a mixed original board", () => {
+        setEnv({ ...pureRangedTerminalEnvironment });
+        const mixedRoster: readonly IArmyUnitSpec[] = [
+            { faction: "Life", creatureName: "Tsar Cannon", level: 4, size: 2, amount: 2 },
+            { faction: "Life", creatureName: "Peasant", level: 1, size: 1, amount: 100 },
+        ];
+        const h = buildBattle(10_304, "v0.8", undefined, mixedRoster);
+        const unit = h.activeUnit()!;
+        expect(unit.getName()).toBe("Tsar Cannon");
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
+    it("scopes pure-ranged terminal pressure to the configured candidate version", () => {
+        setEnv({ ...pureRangedTerminalEnvironment });
+        const h = buildBattle(10_305, "v0.8", undefined, pureRangedTerminalRoster(100));
+        const unit = h.activeUnit()!;
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const controlIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        expect(driver.chooseDecision(unit, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const candidateIncumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const candidate = driver.chooseDecision(unit, "v0.8", candidateIncumbent);
+        expect(candidate).not.toBe(candidateIncumbent);
+        expect(candidate.some((action) => action.type === "range_attack")).toBe(true);
     });
 
     it("only re-decides for versions listed in SEARCH_VERSIONS (default v0.6s)", () => {

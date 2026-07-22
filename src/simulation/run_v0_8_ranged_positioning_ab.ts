@@ -63,6 +63,7 @@ export interface IV08RangedPositioningABOptions {
     mode: V08RangedPositioningMode;
     timingMode: V08RangedPositioningTimingMode;
     moveShots?: V08RangedPositioningMoveShots;
+    noMeleeTerminalPressure?: boolean;
     diag?: boolean;
 }
 
@@ -96,6 +97,7 @@ export interface IV08RangedPositioningABManifest {
         mode: V08RangedPositioningMode;
         timingMode: V08RangedPositioningTimingMode;
         moveShots: V08RangedPositioningMoveShots;
+        noMeleeTerminalPressure: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -163,6 +165,18 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         throw new Error("timingMode must be research_unbounded|operational_bounded");
     }
     if (!isMoveShotCap(options.moveShots ?? 0)) throw new Error("moveShots must be 0|1|2");
+    if (options.noMeleeTerminalPressure !== undefined && typeof options.noMeleeTerminalPressure !== "boolean") {
+        throw new Error("noMeleeTerminalPressure must be a boolean");
+    }
+    if (
+        options.noMeleeTerminalPressure &&
+        (options.cohorts.length !== 1 ||
+            options.cohorts[0] !== "pure_ranged" ||
+            options.mode !== "off" ||
+            (options.moveShots ?? 0) !== 0)
+    ) {
+        throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
     if (options.diag !== undefined && typeof options.diag !== "boolean") throw new Error("diag must be a boolean");
 }
 
@@ -262,6 +276,7 @@ export function buildV08RangedPositioningABManifest(
             mode: options.mode,
             timingMode: options.timingMode,
             moveShots,
+            noMeleeTerminalPressure: options.noMeleeTerminalPressure ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -288,10 +303,12 @@ export function buildV08RangedPositioningABEnvironment(
     timingMode: V08RangedPositioningTimingMode,
     sourceEnvironment: NodeJS.ProcessEnv = process.env,
     moveShots: V08RangedPositioningMoveShots = 0,
+    noMeleeTerminalPressure = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
     if (!isMoveShotCap(moveShots)) throw new Error("moveShots must be 0|1|2");
+    if (typeof noMeleeTerminalPressure !== "boolean") throw new Error("noMeleeTerminalPressure must be a boolean");
 
     const environment = minimalChildEnvironment(sourceEnvironment);
     for (const [key, value] of Object.entries(buildV08A13SearchEnvironment())) {
@@ -308,6 +325,8 @@ export function buildV08RangedPositioningABEnvironment(
     environment.V08_A13_SEARCH = "0";
     environment.SEARCH_MAX_MOVE_SHOTS = String(moveShots);
     environment.SEARCH_MOVE_SHOT_VERSIONS = V08_A13_PRODUCTION_VERSION;
+    environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE = noMeleeTerminalPressure ? "1" : "0";
+    environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
     return environment;
@@ -325,6 +344,7 @@ export function buildV08RangedPositioningABInvocations(
         options.timingMode,
         sourceEnvironment,
         options.moveShots ?? 0,
+        options.noMeleeTerminalPressure ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -382,11 +402,13 @@ export async function runV08RangedPositioningAB(
     const discoverSourceIdentity = dependencies.discoverSourceIdentity ?? discoverV08RangedPositioningABSourceIdentity;
     const writeManifest = dependencies.writeManifest ?? writeExperimentManifest;
     const moveShots = options.moveShots ?? 0;
+    const noMeleeTerminalPressure = options.noMeleeTerminalPressure ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
             `[v0.8-ranged-positioning-ab] cohort=${invocation.cohort} mode=${options.mode} ` +
                 `moveShots=${moveShots} diag=${options.diag ?? false} timing=${options.timingMode} ` +
+                `noMeleeTerminalPressure=${noMeleeTerminalPressure} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         const code = await runChild(invocation);
@@ -411,6 +433,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             out: { type: "string", default: "sim-out/v0.8-ranged-positioning-ab" },
             mode: { type: "string", default: "both" },
             "move-shots": { type: "string", default: "0" },
+            "no-melee-terminal-pressure": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -434,6 +457,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         mode,
         timingMode,
         moveShots,
+        noMeleeTerminalPressure: values["no-melee-terminal-pressure"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -446,7 +470,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
             "Usage: bun src/simulation/run_v0_8_ranged_positioning_ab.ts " +
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
-                "[--move-shots 0|1|2] [--diag] " +
+                "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
