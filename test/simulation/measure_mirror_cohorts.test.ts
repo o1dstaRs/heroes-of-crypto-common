@@ -12,6 +12,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+    aggregateMirrorDiag,
     buildMirrorRoster,
     mirrorGameSeed,
     playMirrorGame,
@@ -20,7 +21,7 @@ import {
     type IMirrorGameRecord,
     type IMirrorRunConfig,
 } from "../../src/simulation/measure_mirror_cohorts";
-import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
+import type { IMatchConfig, IMatchResult, IRecordedAction } from "../../src/simulation/battle_engine";
 
 const BASE_CFG: IMirrorRunConfig = {
     cohort: "ranged_max_sniper3",
@@ -34,17 +35,21 @@ const BASE_CFG: IMirrorRunConfig = {
     zeroScorer: false,
 };
 
-function fakeResult(config: IMatchConfig, winner: IMatchResult["winner"]): IMatchResult {
+function fakeResult(
+    config: IMatchConfig,
+    winner: IMatchResult["winner"],
+    actions: IRecordedAction[] = [],
+): IMatchResult {
     return {
         seed: config.seed,
         gridType: config.gridType ?? 1,
         winner,
         endReason: "elimination",
         laps: 5,
-        totalActions: 0,
+        totalActions: actions.length,
         roster: config.roster,
         placements: { green: [], red: [] },
-        actions: [],
+        actions,
         outcome: {
             green: { version: config.greenVersion, unitsAlive: 1, creaturesAlive: 1, hpRemaining: 1 },
             red: { version: config.redVersion, unitsAlive: 0, creaturesAlive: 0, hpRemaining: 0 },
@@ -56,6 +61,28 @@ function fakeResult(config: IMatchConfig, winner: IMatchResult["winner"]): IMatc
             unitsKilledByNarrowing: 0,
             decidedByArmageddon: false,
         },
+    };
+}
+
+function recordedAction(
+    index: number,
+    actionType: IRecordedAction["actionType"],
+    side: IRecordedAction["side"],
+    unitId: string,
+    lap: number,
+    damage?: number,
+    completed = true,
+): IRecordedAction {
+    return {
+        index,
+        lap,
+        side,
+        unitId,
+        creatureName: "Arbalester",
+        fromCell: { x: 0, y: 0 },
+        actionType,
+        completed,
+        ...(damage === undefined ? {} : { damage }),
     };
 }
 
@@ -105,6 +132,59 @@ describe("measure_mirror_cohorts", () => {
         expect(table.map((u) => u.amount)).toEqual([50, 50, 30, 30, 15, 8]);
         // expBudget differs from the level table for at least one stack (live ceil(1000/exp) rule).
         expect(exp.map((u) => u.amount)).not.toEqual(table.map((u) => u.amount));
+    });
+
+    test("diagnostics aggregate only completed adjacent same-unit same-side same-lap move-shots by version", () => {
+        const actions: IRecordedAction[] = [
+            recordedAction(0, "move_unit", "green", "green-valid", 1),
+            recordedAction(1, "range_attack", "green", "green-valid", 1, 40),
+            recordedAction(2, "move_unit", "green", "interrupted", 1),
+            recordedAction(3, "defend_turn", "green", "interrupted", 1),
+            recordedAction(4, "range_attack", "green", "interrupted", 1, 99),
+            recordedAction(5, "move_unit", "green", "cross-lap", 1),
+            recordedAction(6, "range_attack", "green", "cross-lap", 2, 88),
+            recordedAction(7, "move_unit", "red", "cross-side", 2),
+            recordedAction(8, "range_attack", "green", "cross-side", 2, 77),
+            recordedAction(9, "move_unit", "red", "incomplete", 3, undefined, false),
+            recordedAction(10, "range_attack", "red", "incomplete", 3, 66),
+            recordedAction(11, "move_unit", "red", "red-valid", 4),
+            recordedAction(12, "range_attack", "red", "red-valid", 4, 30),
+            recordedAction(13, "move_unit", "green", "unit-a", 5),
+            recordedAction(14, "range_attack", "green", "unit-b", 5, 55),
+        ];
+        const cfg = { ...BASE_CFG, diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => fakeResult(config, "draw", actions);
+        const first = playMirrorGame(cfg, 0, { matchRunner });
+        const swapped = playMirrorGame(cfg, 1, { matchRunner });
+
+        expect(first.diag?.green.moveShotSequences).toBe(1);
+        expect(first.diag?.green.moveShotRangeDamage).toBe(40);
+        expect(first.diag?.red.moveShotSequences).toBe(1);
+        expect(first.diag?.red.moveShotRangeDamage).toBe(30);
+
+        const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
+            versions: Record<
+                string,
+                {
+                    games: number;
+                    moveShotSequences: number;
+                    moveShotSequencesPerGame: number;
+                    moveShotRangeDamage: number;
+                    moveShotRangeDamagePerGame: number;
+                    meanMoveShotRangeDamage: number | null;
+                }
+            >;
+        };
+        for (const version of [cfg.vA, cfg.vB]) {
+            expect(aggregate.versions[version]).toMatchObject({
+                games: 2,
+                moveShotSequences: 2,
+                moveShotSequencesPerGame: 1,
+                moveShotRangeDamage: 70,
+                moveShotRangeDamagePerGame: 35,
+                meanMoveShotRangeDamage: 35,
+            });
+        }
     });
 
     test("summary tallies wins per version with a binomial SE over decisive games", () => {

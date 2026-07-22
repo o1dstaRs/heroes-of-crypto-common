@@ -33,6 +33,7 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     mode: "both",
     timingMode: "operational_bounded",
     moveShots: 0,
+    diag: false,
 };
 
 const argValue = (args: readonly string[], flag: string): string | undefined => {
@@ -111,6 +112,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(invocation.args, "--livetwin")).toBe("1");
             expect(argValue(invocation.args, "--vA")).toBe("v0.8");
             expect(argValue(invocation.args, "--vB")).toBe("v0.8s");
+            expect(invocation.args).not.toContain("--diag");
             expect(argValue(invocation.args, "--out")).toBe(`/tmp/hoc-v08-ranged-ab-test/${invocation.cohort}`);
             expect(invocation.environment.SEARCH_MAX_MOVE_SHOTS).toBe("0");
         }
@@ -133,6 +135,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 "retreat",
                 "--move-shots",
                 "2",
+                "--diag",
                 "--timing",
                 "research_unbounded",
             ]),
@@ -145,8 +148,10 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             mode: "retreat",
             timingMode: "research_unbounded",
             moveShots: 2,
+            diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
+        expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
         expect(() => parseV08RangedPositioningABOptions(["--move-shots", "3"])).toThrow("--move-shots");
@@ -170,11 +175,12 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
         }
         const [probe] = buildV08RangedPositioningABInvocations(
-            { ...BASE_OPTIONS, cohorts: ["hybrid"], moveShots: 2 },
+            { ...BASE_OPTIONS, cohorts: ["hybrid"], moveShots: 2, diag: true },
             { PATH: "/bin" },
         );
         expect(probe.environment.SEARCH_MAX_MOVE_SHOTS).toBe("2");
         expect(probe.environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
+        expect(probe.args.filter((arg) => arg === "--diag")).toHaveLength(1);
     });
 
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
@@ -184,6 +190,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             mode: "off",
             timingMode: "research_unbounded",
             moveShots: 2,
+            diag: true,
         };
         const [invocation] = buildV08RangedPositioningABInvocations(options, {
             PATH: "/bin",
@@ -211,6 +218,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 mode: "off",
                 timingMode: "research_unbounded",
                 moveShots: 2,
+                diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
             },
@@ -239,6 +247,18 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             buildV08RangedPositioningABManifest(changedInvocation, { ...options, moveShots: 1 }, source)
                 .fingerprintSha256,
         ).not.toBe(first.fingerprintSha256);
+
+        const [noDiagInvocation] = buildV08RangedPositioningABInvocations(
+            { ...options, diag: false },
+            { PATH: "/bin" },
+        );
+        const noDiagManifest = buildV08RangedPositioningABManifest(
+            noDiagInvocation,
+            { ...options, diag: false },
+            source,
+        );
+        expect(noDiagManifest.arm.diag).toBe(false);
+        expect(noDiagManifest.fingerprintSha256).not.toBe(first.fingerprintSha256);
     });
 
     it("runs cohort children sequentially and fails closed on a nonzero child", async () => {

@@ -1081,6 +1081,8 @@ class CandidateGenerator {
         const isThroughShot = this.unit.hasAbilityActive("Through Shot");
         const shots = this.unit.hasAbilityActive("Double Shot") ? 2 : 1;
         const prefix = this.rangePrefix();
+        const forcedTarget = allUnits.get(this.unit.getTarget());
+        const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
 
         interface IShot {
             target: Unit;
@@ -1113,13 +1115,24 @@ class CandidateGenerator {
                         false,
                         isAOE,
                     );
-                    // The engine declines a shot whose SOLE affected group leads with a Hidden unit (an AOE
-                    // splash can put a Hidden neighbour first) — not a legal candidate.
                     const primaryHit = evaluation.affectedUnits[0]?.[0];
-                    if (evaluation.affectedUnits.length === 1 && primaryHit && isHidden(primaryHit)) {
-                        continue;
-                    }
-                    if (!evaluation.affectedUnits.length) {
+                    // Apply handleRangeAttack's structural/live-forced-target checks against the ACTUAL first
+                    // unit resolved by line geometry, not merely the enemy whose edge was aimed at. Candidate
+                    // enumeration is deliberately stricter than the handler for special multi-group shots: even
+                    // though the handler only rejects Hidden for a single group (and permits allied primaries for
+                    // AOE), no candidate may advertise a dead, allied, or Hidden unit as its scored primary.
+                    // Reject before dedupe/enrichment so an invalid incumbent cannot acquire truthful-looking
+                    // shot metadata. The group/divisor equality is the handler's unconditional structural guard.
+                    if (
+                        !primaryHit ||
+                        evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+                        primaryHit.isDead() ||
+                        primaryHit.getTeam() !== this.enemyTeam ||
+                        isHidden(primaryHit) ||
+                        (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
+                        (this.unit.hasDebuffActive("Cowardice") &&
+                            this.unit.getCumulativeHp() < primaryHit.getCumulativeHp())
+                    ) {
                         continue;
                     }
                     // Alternative aims are only interesting when they change WHAT the shot hits: dedupe
@@ -1204,9 +1217,6 @@ class CandidateGenerator {
         if (!movePath) {
             return;
         }
-        const forcedTarget = allUnits.get(this.unit.getTarget());
-        const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
-
         interface IMoveShot {
             shot: IShot;
             route: IWeightedRoute;
