@@ -555,6 +555,26 @@ describe("PathHelper Tests", () => {
             const cellKeys = new Set(movePath.cells.map((c) => (c.x << 4) | c.y));
             expect(cellKeys.has((4 << 4) | 3)).toBe(false);
         });
+
+        test("large-unit recovery never reads aggro outside the board from a malformed edge base", () => {
+            const matrix = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+            const aggrBoard = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(1));
+
+            // A large unit normally has x/y >= 1 because its base is the upper-right footprint cell. A
+            // size-unsafe position swap can corrupt it to x=0; upward candidates would then include footprint
+            // cell x=-1 and previously indexed aggrBoard[-1].
+            const movePath = pathHelper.getMovePath({ x: 0, y: 5 }, matrix, 5, aggrBoard, false, false, false);
+
+            expect(movePath.knownPaths.size).toBeGreaterThan(0);
+            for (const routes of movePath.knownPaths.values()) {
+                for (const route of routes) {
+                    expect(route.cell.x).toBeGreaterThanOrEqual(1);
+                    expect(route.cell.y).toBeGreaterThanOrEqual(1);
+                    expect(route.cell.x).toBeLessThan(GRID_SIZE);
+                    expect(route.cell.y).toBeLessThan(GRID_SIZE);
+                }
+            }
+        });
     });
 });
 

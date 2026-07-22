@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
+import { Worker } from "node:worker_threads";
 
 import {
     AI_META_COHORTS,
@@ -59,6 +60,32 @@ const outcome = (aIsGreen: boolean, winner: "a" | "b" | "draw"): IAiMetaGameOutc
     survivorsA: winner === "a" ? 2 : 0,
     survivorsB: winner === "b" ? 2 : 0,
 });
+
+const runMetaPairInWorker = (cohort: (typeof AI_META_COHORTS)[number], pair: number): Promise<IAiMetaPairRecord> =>
+    new Promise((resolve, reject) => {
+        const worker = new Worker(new URL("../../src/simulation/ai_meta_cohorts_worker.ts", import.meta.url), {
+            workerData: { options: options(cohort, 150_000) },
+            env: sanitizedAiMetaEnvironment(),
+        });
+        const fail = (error: unknown): void => {
+            void worker.terminate();
+            reject(error instanceof Error ? error : new Error(String(error)));
+        };
+        worker.once("error", fail);
+        worker.on(
+            "message",
+            (message: { type: "ready" | "result" | "error"; record?: IAiMetaPairRecord; error?: string }) => {
+                if (message.type === "ready") {
+                    worker.postMessage({ type: "pair", pair });
+                } else if (message.type === "error") {
+                    fail(new Error(message.error ?? "AI meta worker failed"));
+                } else if (message.record) {
+                    void worker.terminate();
+                    resolve(message.record);
+                }
+            },
+        );
+    });
 
 describe("AI meta cohort generation", () => {
     it("pins the current study to the promoted v0.8+a13 profile and deployed synergy policy", () => {
@@ -203,6 +230,17 @@ describe("AI meta cohort generation", () => {
         expect(identity.executionHost.logicalCpus).toBeGreaterThan(0);
         expect(identity.executionHost.availableParallelism).toBeGreaterThan(0);
         expect(identity.executionHost.totalMemoryBytes).toBeGreaterThan(0);
+    });
+
+    it("replays the ranked pair that exposed size-incompatible stolen Castling", async () => {
+        const record = await runMetaPairInWorker("ranked-draft", 1013);
+
+        expect(record.pair).toBe(1013);
+        expect(record.map).toBe(4);
+        expect(record.armyA.roster.some((unit) => unit.creatureName === "Black Dragon")).toBe(true);
+        expect(record.armyB.roster.some((unit) => unit.creatureName === "Arachna Queen")).toBe(true);
+        expect(record.games).toHaveLength(2);
+        expect(record.games.every((game) => game.rejectedA === 0 && game.rejectedB === 0)).toBe(true);
     });
 
     it("only accepts complete three-map seat-swap cycles", () => {

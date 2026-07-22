@@ -318,7 +318,15 @@ export class AttackHandler {
                 if (!(
                     currentActiveSpell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()
                 )) {
-                    if (currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE) {
+                    // Castling's one-cell swap is only defined for two small units. Re-check the effective
+                    // target after Absorb Penalties redirection so an aura cannot collapse a large unit's
+                    // 2x2 footprint into a single occupied cell.
+                    if (
+                        currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE &&
+                        (!attackerUnit.isSmallSize() || !debuffTarget.isSmallSize())
+                    ) {
+                        applied = false;
+                    } else if (currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE) {
                         const attackerUnitPosition = structuredClone(attackerUnit.getPosition());
                         const targetUnitPosition = structuredClone(debuffTarget.getPosition());
                         const attackerBaseCell = attackerUnit.getBaseCell();

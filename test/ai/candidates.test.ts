@@ -740,6 +740,20 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(ofKind(candidates, "spell").filter((s) => s.spellName === "Castling").length).toBe(0);
     });
 
+    it("Arachna Queen: inherited Castling is not enumerated for a LARGE caster", () => {
+        const c = createCombatTestContext();
+        const queen = makeReal(LOWER, "Nature", "Arachna Queen");
+        queen.grantStolenAbility("Castling", [":Castling"]);
+        queen.setStackPower(5);
+        const enemy = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 3 });
+        placeLarge(c, queen, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 6 });
+
+        expect(queen.hasSpellRemaining("Castling")).toBe(true);
+        const { candidates } = enumerateCandidates(queen, ctxFor(c), endTurn(queen));
+        expect(ofKind(candidates, "spell").filter((candidate) => candidate.spellName === "Castling")).toHaveLength(0);
+    });
+
     it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {
         const c = createCombatTestContext();
         const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 2, amountAlive: 3 });

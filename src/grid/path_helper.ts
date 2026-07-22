@@ -1242,6 +1242,13 @@ export class PathHelper {
             const key = (cur.x << 4) | cur.y;
             for (const n of this.getNeighborCells(cur, visited, isSmallUnit)) {
                 const keyNeighbor = (n.x << 4) | n.y;
+                // A legal large-unit anchor is the upper-right cell of its 2x2 footprint, so x/y must both
+                // stay at least 1. Keep malformed state (for example, a size-unsafe position swap) from
+                // evaluating occupancy or aggro outside the board while recovery finds a valid re-entry.
+                if (!isSmallUnit && (n.x < 1 || n.y < 1 || !isCellWithinGrid(this.gridSettings, n))) {
+                    visited.add(keyNeighbor);
+                    continue;
+                }
                 const el1 = matrixElementOrDefault(matrix, n.x, n.y, 0);
                 if (isSmallUnit) {
                     if (

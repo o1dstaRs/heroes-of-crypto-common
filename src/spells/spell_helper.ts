@@ -302,8 +302,9 @@ export function canCastSpell(
     if (
         spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY ||
         (spell.getSpellTargetType() === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE &&
+            casterUnit.isSmallSize() &&
             targetUnit &&
-            targetUnit.getSize() === 1 &&
+            targetUnit.isSmallSize() &&
             oneOfTheEnemiesHasTargetCell())
     ) {
         const forcedUnitId = casterUnit.getTarget();

@@ -336,6 +336,34 @@ describe("spell_helper", () => {
         ).toBe(false);
     });
 
+    it("rejects Castling inherited by a large caster", () => {
+        const caster = createTestUnit({
+            name: "Arachna Queen",
+            team: PBTypes.TeamVals.UPPER,
+            size: PBTypes.UnitSizeVals.LARGE,
+            spells: ["System:Castling"],
+            stackPower: 5,
+        });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LOWER });
+        const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
+
+        expect(
+            canCastSpell(
+                false,
+                testGridSettings,
+                emptyMatrix(),
+                caster,
+                enemy,
+                castling,
+                enemy.getBaseCell(),
+                enemy.getMagicResist(),
+                false,
+                enemy.canBeHealed(),
+                [enemy.getBaseCell()],
+            ),
+        ).toBe(false);
+    });
+
     it("rejects direct spell casts for missing spells, immunity, and already-applied effects", () => {
         const caster = createTestUnit({
             name: "Caster",

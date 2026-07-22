@@ -1441,9 +1441,13 @@ class CandidateGenerator {
             }
 
             if (targetType === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE) {
-                // Castling (Harpy): swap with a SMALL enemy within movement range. The legality list is
-                // computed once per decision; the engine must see the same list through its own context
-                // callback (see getEnemiesCellsWithinMovementRange docs).
+                // Castling swaps two SMALL units. Predatory Assimilation can install the spell on a large
+                // Arachna Queen, but that inherited cast is not engine-legal and must never be enumerated.
+                if (!this.unit.isSmallSize()) {
+                    continue;
+                }
+                // The legality list is computed once per decision; the engine must see the same list through
+                // its own context callback (see getEnemiesCellsWithinMovementRange docs).
                 castlingCells ??= getEnemiesCellsWithinMovementRange(this.unit, this.context);
                 if (!castlingCells.length) {
                     continue;

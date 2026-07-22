@@ -21,7 +21,7 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { AttackType, GridType, MovementType, UnitSizeType } from "../../src/generated/protobuf/v1/types_gen";
 import type { IWeightedRoute } from "../../src/grid/path_definitions";
-import { getPositionForCell, RangeAttackCellSide } from "../../src/grid/grid_math";
+import { getPositionForCell, getPositionForCells, RangeAttackCellSide } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
@@ -1465,6 +1465,100 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.lower.getBaseCell()).toEqual(enemyCell);
         expect(setup.upper.getBaseCell()).toEqual(casterStart);
+    });
+
+    it("rejects Castling inherited by a LARGE caster without mutating combat state", () => {
+        const enemyCell = { x: 5, y: 3 };
+        const setup = setupActionFight({
+            lowerSize: PBTypes.UnitSizeVals.LARGE,
+            lowerSpells: ["System:Castling"],
+            lowerStackPower: 4,
+            upperCell: enemyCell,
+            currentEnemiesCellsWithinMovementRange: [enemyCell],
+        });
+        const casterPosition = structuredClone(setup.lower.getPosition());
+        const targetPosition = structuredClone(setup.upper.getPosition());
+        const matrix = structuredClone(setup.grid.getMatrix());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Castling",
+            targetId: setup.upper.getId(),
+            targetCell: setup.upper.getBaseCell(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("spell_not_available");
+        expect(setup.lower.getPosition()).toEqual(casterPosition);
+        expect(setup.upper.getPosition()).toEqual(targetPosition);
+        expect(setup.grid.getMatrix()).toEqual(matrix);
+        expect(setup.lower.hasSpellRemaining("Castling")).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+    });
+
+    it("does not collapse a LARGE Absorb Penalties target when Castling is redirected", () => {
+        const enemyCell = { x: 5, y: 3 };
+        const setup = setupActionFight({
+            lowerSpells: ["System:Castling"],
+            lowerStackPower: 4,
+            upperCell: enemyCell,
+            currentEnemiesCellsWithinMovementRange: [enemyCell],
+        });
+        const absorber = createTestUnit({
+            name: "Large Absorber",
+            team: PBTypes.TeamVals.UPPER,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+        const absorberCells = [
+            { x: 7, y: 5 },
+            { x: 6, y: 5 },
+            { x: 7, y: 4 },
+            { x: 6, y: 4 },
+        ];
+        const absorberPosition = getPositionForCells(setup.grid.getSettings(), absorberCells);
+        expect(absorberPosition).toBeDefined();
+        absorber.setPosition(absorberPosition!.x, absorberPosition!.y);
+        setup.grid.occupyCells(
+            absorberCells,
+            absorber.getId(),
+            absorber.getTeam(),
+            absorber.getAttackRange(),
+            false,
+            false,
+        );
+        setup.unitsHolder.addUnit(absorber);
+        setup.upper.applyAuraEffect("Absorb Penalties Aura", "absorb", true, 100, "7;5");
+
+        const casterPosition = structuredClone(setup.lower.getPosition());
+        const targetPosition = structuredClone(setup.upper.getPosition());
+        const largePosition = structuredClone(absorber.getPosition());
+        const matrix = structuredClone(setup.grid.getMatrix());
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Castling",
+            targetId: setup.upper.getId(),
+            targetCell: setup.upper.getBaseCell(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.rejectionReason).toBeUndefined();
+        expect(setup.lower.getPosition()).toEqual(casterPosition);
+        expect(setup.upper.getPosition()).toEqual(targetPosition);
+        expect(absorber.getPosition()).toEqual(largePosition);
+        expect(setup.grid.getMatrix()).toEqual(matrix);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                casterId: setup.lower.getId(),
+                targetId: setup.upper.getId(),
+                spellName: "Castling",
+                animations: [],
+            }),
+        );
+        expect(setup.lower.hasSpellRemaining("Castling")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
     it("rejects Castling when the in-range enemy list is absent (the ranked server-context bug)", () => {
