@@ -1505,12 +1505,11 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
     });
 
-    it("redirects only Endless Quiver to the original No Melee barrier at zero deadline slack", () => {
+    it("redirects only Endless Quiver at the last feasible No Melee boundary", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
-        h.fightProperties.flipLap();
-        h.fightProperties.flipLap();
         const medusa = greenUnitNamed(h, "Medusa");
+        medusa.setAmountAlive(32);
         h.setActiveUnitId(medusa.getId());
         const driver = h.makeDriver();
         driver.onFightReady();
@@ -1526,12 +1525,41 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.chooseDecision(tsar, "v0.8", tsarIncumbent)).toBe(tsarIncumbent);
     });
 
+    it("rejects an already-hopeless No Melee completion schedule", () => {
+        setEnv({ ...pureRangedDeadlineEnvironment });
+        const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
+        const medusa = greenUnitNamed(h, "Medusa");
+        medusa.setAmountAlive(1);
+        h.setActiveUnitId(medusa.getId());
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: medusa.getId() }];
+        expect(driver.chooseDecision(medusa, "v0.8", incumbent)).toBe(incumbent);
+    });
+
+    it("preserves an incumbent immediate kill at the feasible No Melee boundary", () => {
+        setEnv({ ...pureRangedDeadlineEnvironment });
+        const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
+        const medusa = greenUnitNamed(h, "Medusa");
+        medusa.setAmountAlive(32);
+        h.setActiveUnitId(medusa.getId());
+        const incumbent = h.decideActive();
+        const shot = incumbent.find((action) => action.type === "range_attack");
+        expect(shot?.type).toBe("range_attack");
+        const target = h.unitsHolder.getAllUnits().get(shot!.targetId)!;
+        expect(target.getName()).not.toBe("Tsar Cannon");
+        target.applyDamage(target.getCumulativeHp() - 1, 0, new SceneLogMock(), false);
+
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(driver.chooseDecision(medusa, "v0.8", incumbent)).toBe(incumbent);
+    });
+
     it("scopes the deadline finisher to the candidate version and rejects the failed pressure combination", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
-        h.fightProperties.flipLap();
-        h.fightProperties.flipLap();
         const unit = greenUnitNamed(h, "Medusa");
+        unit.setAmountAlive(32);
         h.setActiveUnitId(unit.getId());
         const driver = h.makeDriver();
         driver.onFightReady();
