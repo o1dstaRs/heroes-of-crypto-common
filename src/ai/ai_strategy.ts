@@ -66,15 +66,15 @@ export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
     "ordinary_shot",
     "eligible_shooter",
     "target_no_counter",
-    "current_threat",
-    "single_current_threat",
-    "fixed_guard",
+    "future_exposure",
+    "native_guard",
     "current_signature",
     "reachable_route",
-    "safe_route",
-    "screened_guard",
-    "chain_safe",
+    "pending_distance_safe",
+    "screened_route",
+    "exposure_improved",
     "retained_signature",
+    "posture_safe",
 ] as const;
 
 export type V08SupportedPrepinEgressFunnelStage = (typeof V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES)[number];

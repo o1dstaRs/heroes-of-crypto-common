@@ -166,6 +166,7 @@ export function buildV08A13SearchEnvironment(
         // Research-only strategy delta. Ordinary a13 construction records the global gate and selector as off;
         // paired runners may override both in their isolated child environment.
         V08_SUPPORTED_PREPIN_EGRESS: "0",
+        V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "",
         V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
     });
 }

@@ -271,7 +271,7 @@ describe("measure_mirror_cohorts", () => {
         const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
         const matchRunner = (config: IMatchConfig): IMatchResult => {
             const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
-            for (const stage of ["ordinary_shot", "eligible_shooter", "current_threat"] as const) {
+            for (const stage of ["ordinary_shot", "eligible_shooter", "future_exposure"] as const) {
                 config.policyProposalObserver?.({
                     kind: "v0.8_supported_prepin_egress_funnel",
                     unitId: `candidate-${stage}`,
@@ -310,8 +310,8 @@ describe("measure_mirror_cohorts", () => {
             expect(candidate.supportedPrepinEgressFunnel).toMatchObject({
                 ordinary_shot: 1,
                 eligible_shooter: 1,
-                current_threat: 1,
-                fixed_guard: 0,
+                future_exposure: 1,
+                native_guard: 0,
             });
             expect(control.supportedPrepinEgressProposals).toBe(0);
             expect(control.supportedPrepinEgressSelections).toBe(0);
@@ -340,29 +340,29 @@ describe("measure_mirror_cohorts", () => {
                 ordinary_shot: 2,
                 eligible_shooter: 2,
                 target_no_counter: 0,
-                current_threat: 2,
-                single_current_threat: 0,
-                fixed_guard: 0,
+                future_exposure: 2,
+                native_guard: 0,
                 current_signature: 0,
                 reachable_route: 0,
-                safe_route: 0,
-                screened_guard: 0,
-                chain_safe: 0,
+                pending_distance_safe: 0,
+                screened_route: 0,
+                exposure_improved: 0,
                 retained_signature: 0,
+                posture_safe: 0,
             },
             supportedPrepinEgressFunnelPerGame: {
                 ordinary_shot: 1,
                 eligible_shooter: 1,
                 target_no_counter: 0,
-                current_threat: 1,
-                single_current_threat: 0,
-                fixed_guard: 0,
+                future_exposure: 1,
+                native_guard: 0,
                 current_signature: 0,
                 reachable_route: 0,
-                safe_route: 0,
-                screened_guard: 0,
-                chain_safe: 0,
+                pending_distance_safe: 0,
+                screened_route: 0,
+                exposure_improved: 0,
                 retained_signature: 0,
+                posture_safe: 0,
             },
         });
         expect(aggregate.versions["v0.8s"]).toMatchObject({
@@ -374,15 +374,15 @@ describe("measure_mirror_cohorts", () => {
                 ordinary_shot: 0,
                 eligible_shooter: 0,
                 target_no_counter: 0,
-                current_threat: 0,
-                single_current_threat: 0,
-                fixed_guard: 0,
+                future_exposure: 0,
+                native_guard: 0,
                 current_signature: 0,
                 reachable_route: 0,
-                safe_route: 0,
-                screened_guard: 0,
-                chain_safe: 0,
+                pending_distance_safe: 0,
+                screened_route: 0,
+                exposure_improved: 0,
                 retained_signature: 0,
+                posture_safe: 0,
             },
         });
     });

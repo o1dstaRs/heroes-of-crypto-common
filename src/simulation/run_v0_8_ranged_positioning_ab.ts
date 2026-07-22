@@ -570,6 +570,8 @@ export function buildV08RangedPositioningABEnvironment(
     environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_SUPPORTED_PREPIN_EGRESS = supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? "1" : "0";
+    environment.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS =
+        supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = supportedPrepinEgressCatalogOnly
         ? "supported-prepin-egress-catalog-only-control"
         : supportedPrepinEgress
