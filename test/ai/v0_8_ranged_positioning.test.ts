@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../../src/ai";
+import { getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../../src/ai";
 import { V08_DOMINANT_FINISH_START_LAP, V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
@@ -280,9 +280,12 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = "v0.8";
         const { shooter, target, context } = setupSupportedShot(true, true, 20, true);
         target.setAmountAlive(100);
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
 
         const actions = new StrategyV0_8().decideTurn(shooter, context);
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(policyEvents.map(({ kind }) => kind)).toEqual(["v0.8_response_neutral_advance"]);
 
         const move = actions[0];
         if (move.type !== "move_unit") throw new Error("expected response-neutral move + shot");
@@ -424,8 +427,11 @@ describe("v0.8 protected ranged positioning", () => {
 
         process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = "v0.8";
         const armed = setupPartiallyScreenedPinnedShooter();
+        const policyEvents: IAIPolicyEvent[] = [];
+        armed.context.policyEventObserver = (event) => policyEvents.push(event);
         const actions = new StrategyV0_8().decideTurn(armed.shooter, armed.context);
         expect(actions.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(policyEvents.map(({ kind }) => kind)).toEqual(["v0.8_supported_ranged_escape"]);
     });
 
     it("applies the partial-screen escape through the authoritative action engine", () => {

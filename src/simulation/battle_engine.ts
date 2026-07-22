@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IDecisionContext } from "../ai";
+import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../ai";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import type { GameAction } from "../engine/actions";
@@ -273,6 +273,8 @@ export interface IMatchConfig {
     redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
+    /** Optional strategy-policy event instrumentation. Unset in live and ordinary simulation calls. */
+    policyEventObserver?: (event: IAIPolicyEvent) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
 }
@@ -952,6 +954,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
+        // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
+        // search has made its final choice so diagnostics count only policy actions that actually survive a13.
+        const incumbentPolicyEvents: IAIPolicyEvent[] | undefined = config.policyEventObserver ? [] : undefined;
         const decisionContext: IDecisionContext = {
             grid,
             matrix,
@@ -960,6 +965,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             attackHandler,
             fightProperties,
             getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
+            ...(incumbentPolicyEvents
+                ? { policyEventObserver: (event: IAIPolicyEvent): void => void incumbentPolicyEvents.push(event) }
+                : {}),
         };
         const searchApplies = search.appliesTo(strategy.version);
         const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
@@ -984,6 +992,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             : lookaheadApplies
               ? lookahead.chooseDecision(unit, decided0)
               : decided0;
+        if (decided === decided0 && config.policyEventObserver) {
+            for (const event of incumbentPolicyEvents!) {
+                config.policyEventObserver(event);
+            }
+        }
         if ((searchApplies || lookaheadApplies) && decided !== decided0) {
             restoreAITargetMemory(unitsHolder, targetMemoryBeforeDecision!);
             const executedAttack = [...decided]

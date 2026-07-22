@@ -22,7 +22,13 @@ import { STRATEGY_V0_7S } from "./versions/v0_7s";
 import { STRATEGY_V0_8 } from "./versions/v0_8";
 import { STRATEGY_V0_8S } from "./versions/v0_8s";
 
-export type { IAIStrategy, IDecisionContext, IPlacementContext } from "./ai_strategy";
+export type {
+    AIPolicyEventKind,
+    IAIPolicyEvent,
+    IAIStrategy,
+    IDecisionContext,
+    IPlacementContext,
+} from "./ai_strategy";
 
 // Browser-safe identity and immutable configuration for the promoted v0.8+a13
 // composite. The Node-only SearchDriver factory is exported separately from

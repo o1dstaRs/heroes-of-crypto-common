@@ -449,6 +449,15 @@ function protectedAdvanceShot(
     if (!best) {
         return decision;
     }
+    if (targetCanCounter) {
+        context.policyEventObserver?.({
+            kind: "v0.8_response_neutral_advance",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: context.fightProperties?.getCurrentLap() ?? 0,
+        });
+    }
     return [moveAction(unit, best.route, best.footprint), ...decision];
 }
 
@@ -538,6 +547,7 @@ function pinnedRetreat(
     const currentProtection = protectionAt(unit.getCells(), enemies, frontliners);
     const currentUnscreened = currentProtection.reachableThreats - currentProtection.screenedThreats;
     let best: IRouteView | undefined;
+    let bestUsesSupportedDelta = false;
     for (const route of reachableRoutes(unit, context)) {
         const view = routeView(unit, context, route, enemies, frontliners);
         if (!view) {
@@ -556,9 +566,22 @@ function pinnedRetreat(
         }
         if (!best || preferRetreat(view, best)) {
             best = view;
+            bestUsesSupportedDelta = !view.protection.eligible && partialScreenImprovement;
         }
     }
-    return best ? [moveAction(unit, best.route, best.footprint)] : decision;
+    if (!best) {
+        return decision;
+    }
+    if (bestUsesSupportedDelta) {
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_ranged_escape",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: context.fightProperties?.getCurrentLap() ?? 0,
+        });
+    }
+    return [moveAction(unit, best.route, best.footprint)];
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { IAIStrategy } from "../../src/ai/ai_strategy";
+import type { IAIPolicyEvent, IAIStrategy } from "../../src/ai/ai_strategy";
 import { STRATEGY_V0_1 } from "../../src/ai/versions/v0_1";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
@@ -13,6 +13,7 @@ import {
 } from "../../src/grid/grid_math";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 import { runMatch, type IMatchResult, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
+import { SearchDriver } from "../../src/simulation/search_driver";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 
@@ -63,6 +64,51 @@ const runObservedMatchWithV01Transform = (
 };
 
 describe("battle engine turn execution observer", () => {
+    test("emits policy telemetry only when search retains the strategy incumbent", () => {
+        const retained: IAIPolicyEvent[] = [];
+        const overridden: IAIPolicyEvent[] = [];
+        const originalDecideTurn = STRATEGY_V0_1.decideTurn;
+        const originalAppliesTo = SearchDriver.prototype.appliesTo;
+        const originalChooseDecision = SearchDriver.prototype.chooseDecision;
+        STRATEGY_V0_1.decideTurn = (unit, context) => {
+            context.policyEventObserver?.({
+                kind: "v0.8_response_neutral_advance",
+                unitId: unit.getId(),
+                creatureName: unit.getName(),
+                team: unit.getTeam(),
+                lap: context.fightProperties?.getCurrentLap() ?? 0,
+            });
+            return originalDecideTurn.call(STRATEGY_V0_1, unit, context);
+        };
+        try {
+            runMatch({
+                greenVersion: "v0.1",
+                redVersion: "v0.1",
+                roster: buildRoster(makeRng(35)),
+                seed: 35,
+                maxLaps: 1,
+                policyEventObserver: (event) => retained.push(event),
+            });
+            expect(retained.length).toBeGreaterThan(0);
+
+            SearchDriver.prototype.appliesTo = () => true;
+            SearchDriver.prototype.chooseDecision = (_unit, _version, incumbent) => incumbent.slice();
+            runMatch({
+                greenVersion: "v0.1",
+                redVersion: "v0.1",
+                roster: buildRoster(makeRng(35)),
+                seed: 35,
+                maxLaps: 1,
+                policyEventObserver: (event) => overridden.push(event),
+            });
+            expect(overridden).toEqual([]);
+        } finally {
+            STRATEGY_V0_1.decideTurn = originalDecideTurn;
+            SearchDriver.prototype.appliesTo = originalAppliesTo;
+            SearchDriver.prototype.chooseDecision = originalChooseDecision;
+        }
+    });
+
     test("emits exactly once per decision with detached actions and explicit skip events", () => {
         // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
         // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps.

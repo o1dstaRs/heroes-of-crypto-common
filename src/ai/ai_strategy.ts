@@ -56,6 +56,17 @@ export interface IPlacementContext {
     setupPlacementPolicy?: PlacementPolicyVariant;
 }
 
+export type AIPolicyEventKind = "v0.8_supported_ranged_escape" | "v0.8_response_neutral_advance";
+
+/** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
+export interface IAIPolicyEvent {
+    kind: AIPolicyEventKind;
+    unitId: string;
+    creatureName: string;
+    team: TeamType;
+    lap: number;
+}
+
 export interface IDecisionContext {
     grid: Grid;
     matrix: number[][];
@@ -80,6 +91,8 @@ export interface IDecisionContext {
      * wire both from the same helper.
      */
     getCurrentEnemiesCellsWithinMovementRange?: () => XY[] | undefined;
+    /** Optional simulation-only policy telemetry. Observers must not mutate strategy or battle state. */
+    policyEventObserver?: (event: IAIPolicyEvent) => void;
 }
 
 export interface IAIStrategy {

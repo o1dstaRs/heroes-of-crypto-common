@@ -21,7 +21,13 @@ import {
     type IMirrorGameRecord,
     type IMirrorRunConfig,
 } from "../../src/simulation/measure_mirror_cohorts";
-import type { IMatchConfig, IMatchResult, IRecordedAction } from "../../src/simulation/battle_engine";
+import {
+    GREEN_TEAM,
+    RED_TEAM,
+    type IMatchConfig,
+    type IMatchResult,
+    type IRecordedAction,
+} from "../../src/simulation/battle_engine";
 
 const BASE_CFG: IMirrorRunConfig = {
     cohort: "ranged_max_sniper3",
@@ -156,7 +162,23 @@ describe("measure_mirror_cohorts", () => {
             recordedAction(14, "range_attack", "green", "unit-b", 5, 55),
         ];
         const cfg = { ...BASE_CFG, diag: true };
-        const matchRunner = (config: IMatchConfig): IMatchResult => fakeResult(config, "draw", actions);
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            config.policyEventObserver?.({
+                kind: "v0.8_response_neutral_advance",
+                unitId: "green-valid",
+                creatureName: "Arbalester",
+                team: GREEN_TEAM,
+                lap: 1,
+            });
+            config.policyEventObserver?.({
+                kind: "v0.8_supported_ranged_escape",
+                unitId: "red-valid",
+                creatureName: "Arbalester",
+                team: RED_TEAM,
+                lap: 4,
+            });
+            return fakeResult(config, "draw", actions);
+        };
         const first = playMirrorGame(cfg, 0, { matchRunner });
         const swapped = playMirrorGame(cfg, 1, { matchRunner });
 
@@ -164,6 +186,8 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.green.moveShotRangeDamage).toBe(40);
         expect(first.diag?.red.moveShotSequences).toBe(1);
         expect(first.diag?.red.moveShotRangeDamage).toBe(30);
+        expect(first.diag?.green.responseNeutralAdvances).toBe(1);
+        expect(first.diag?.red.supportedRangedEscapes).toBe(1);
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -175,6 +199,8 @@ describe("measure_mirror_cohorts", () => {
                     moveShotRangeDamage: number;
                     moveShotRangeDamagePerGame: number;
                     meanMoveShotRangeDamage: number | null;
+                    supportedRangedEscapes: number;
+                    responseNeutralAdvances: number;
                 }
             >;
         };
@@ -186,6 +212,8 @@ describe("measure_mirror_cohorts", () => {
                 moveShotRangeDamage: 70,
                 moveShotRangeDamagePerGame: 35,
                 meanMoveShotRangeDamage: 35,
+                supportedRangedEscapes: 1,
+                responseNeutralAdvances: 1,
             });
         }
     });
