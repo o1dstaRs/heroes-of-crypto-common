@@ -143,6 +143,47 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }
     });
 
+    it("melee metadata applies a native shooter's penalty while Handyman retains full damage", () => {
+        const meleeMetadata = (abilities: string[] = []): IEnumeratedCandidate => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: abilities.length ? "Handyman shooter" : "Penalized shooter",
+                attackType: RANGE,
+                attack: 10,
+                damageMin: 4,
+                damageMax: 4,
+                rangeShots: 5,
+                abilities,
+            });
+            const target = createTestUnit({
+                team: UPPER,
+                name: "Four HP target",
+                attackType: MELEE,
+                armor: 10,
+                maxHp: 4,
+            });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 5, y: 6 });
+            shooter.refreshPossibleAttackTypes(false);
+
+            const candidate = ofKind(
+                enumerateCandidates(shooter, ctxFor(c), endTurn(shooter)).candidates,
+                "melee",
+            ).find(({ targetId, standCell }) => targetId === target.getId() && standCell?.x === 5 && standCell.y === 5);
+            if (!candidate) throw new Error("expected an in-place ranged-unit melee candidate");
+            return candidate;
+        };
+
+        const penalized = meleeMetadata();
+        expect(penalized.features.expectedDamage).toBe(2);
+        expect(penalized.features.expectedKill).toBe(0);
+
+        const handyman = meleeMetadata(["Handyman"]);
+        expect(handyman.features.expectedDamage).toBe(4);
+        expect(handyman.features.expectedKill).toBe(1);
+    });
+
     it("opt-in attack caps retain the best delivery to every distinct target", () => {
         const c = createCombatTestContext();
         const unit = createTestUnit({ team: LOWER, name: "Scheduler", attackType: MELEE, amountAlive: 5 });

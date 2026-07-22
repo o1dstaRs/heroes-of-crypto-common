@@ -20,6 +20,7 @@ import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } fr
 import { otherTeam } from "./v0_1";
 import { StrategyV0_7 } from "./v0_7";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
+import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -284,7 +285,8 @@ export class StrategyV0_8 extends StrategyV0_7 {
             onlyForcedFallback && this.canHourglass(unit, context)
                 ? [{ type: "wait_turn", unitId: unit.getId() }]
                 : prioritized;
-        return prioritizeV08A13FinishDecision(unit, context, active);
+        const finished = prioritizeV08A13FinishDecision(unit, context, active);
+        return prioritizeV08RangedPositioning(unit, context, finished, this.version);
     }
 }
 

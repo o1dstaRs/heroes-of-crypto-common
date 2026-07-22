@@ -98,7 +98,11 @@ export class AttackHandler {
     public getDamageStatisticHolder(): IStatisticHolder<IDamageStatistic> {
         return this.damageStatisticHolder;
     }
-    public getRangeAttackDivisor(attackerUnit: Unit, attackPosition: HoCMath.XY): number {
+    public getRangeAttackDivisor(
+        attackerUnit: Unit,
+        attackPosition: HoCMath.XY,
+        attackerPosition: HoCMath.XY = attackerUnit.getPosition(),
+    ): number {
         let rangeAttackDivisor = 1;
 
         // Range falloff: damage halves for every full shot-distance of range. Only the Sniper ability negates
@@ -106,7 +110,7 @@ export class AttackHandler {
         // shot_distance (adjustBaseStats), pushing this threshold out so full-damage range is larger.
         if (!attackerUnit.hasAbilityActive("Sniper")) {
             const shotDistancePixels = Math.ceil(attackerUnit.getRangeShotDistance() * this.gridSettings.getStep());
-            let distance = HoCMath.getDistance(attackerUnit.getPosition(), attackPosition);
+            let distance = HoCMath.getDistance(attackerPosition, attackPosition);
             while (distance >= shotDistancePixels) {
                 distance -= shotDistancePixels;
                 rangeAttackDivisor *= 2;
@@ -149,6 +153,7 @@ export class AttackHandler {
             allUnits,
             intersectedCellsToPositions,
             fromUnit,
+            fromPosition,
             isThroughShot,
             isSelection,
             isAOEShot,
@@ -2415,6 +2420,7 @@ export class AttackHandler {
         allUnits: ReadonlyMap<string, Unit>,
         cellsToPositions: [HoCMath.XY, HoCMath.XY][],
         attackerUnit: Unit,
+        attackerPosition: HoCMath.XY,
         isThroughShot = false,
         isSelection = false,
         isAOEShot = false,
@@ -2514,7 +2520,7 @@ export class AttackHandler {
             }
 
             affectedUnits.push(unitsThisShot);
-            rangeAttackDivisors.push(this.getRangeAttackDivisor(attackerUnit, position));
+            rangeAttackDivisors.push(this.getRangeAttackDivisor(attackerUnit, position, attackerPosition));
 
             if (isThroughShot && possibleUnit.hasAbilityActive("Arrows Wingshield Aura")) {
                 break;

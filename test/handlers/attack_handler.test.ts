@@ -53,6 +53,71 @@ describe("AttackHandler", () => {
             expect(damageStatisticHolder.has(3)).toBe(false);
         });
 
+        it("uses exact range-falloff boundaries and an optional attacker origin", () => {
+            const { attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+            });
+            attacker.setPosition(0, 0);
+            const band = Math.ceil(attacker.getRangeShotDistance() * testGridSettings.getStep());
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band - 1, y: 0 })).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band, y: 0 })).toBe(2);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2 - 1, y: 0 })).toBe(2);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2, y: 0 })).toBe(4);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3 - 1, y: 0 })).toBe(4);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 })).toBe(8);
+            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 20, y: 0 })).toBe(8);
+
+            expect(
+                attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 }, { x: band * 2 + 1, y: 0 }),
+            ).toBe(1);
+
+            const sniper = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+                abilities: ["Sniper"],
+            });
+            sniper.setPosition(0, 0);
+            expect(attackHandler.getRangeAttackDivisor(sniper, { x: band * 20, y: 0 })).toBe(1);
+        });
+
+        it("evaluates hypothetical shots with the supplied origin's falloff", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+            });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            const hypotheticalOrigin = getPositionForCell(
+                { x: 7, y: 1 },
+                testGridSettings.getMinX(),
+                testGridSettings.getStep(),
+                testGridSettings.getHalfStep(),
+            );
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, target.getPosition())).toBe(8);
+            expect(attackHandler.getRangeAttackDivisor(attacker, target.getPosition(), hypotheticalOrigin)).toBe(1);
+
+            const evaluation = attackHandler.evaluateRangeAttack(
+                unitsHolder.getAllUnits(),
+                attacker,
+                hypotheticalOrigin,
+                target.getPosition(),
+            );
+
+            expect(evaluation.affectedUnits[0]?.[0]).toBe(target);
+            expect(evaluation.rangeAttackDivisors).toEqual([1]);
+        });
+
         it("calculates range divisors and evaluates affected range targets", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({

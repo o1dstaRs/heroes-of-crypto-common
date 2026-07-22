@@ -658,8 +658,22 @@ class CandidateGenerator {
     }
     private meleeDamage(target: Unit): { effective: number; kill: 0 | 1 } {
         const atkMul = this.unit.hasAbilityActive("Double Punch") ? 2 : 1;
-        const min = atkMul * this.unit.calculateAttackDamageMin(this.unit.getAttack(), target, false, 0, 1);
-        const max = atkMul * this.unit.calculateAttackDamageMax(this.unit.getAttack(), target, false, 0, 1);
+        // Unit.calculateAttackDamage applies this after rolling the raw melee damage. Keep candidate metadata on
+        // that authoritative scale: native shooters deal half melee damage unless Handyman removes the penalty.
+        const nativeRangedMeleeMultiplier =
+            this.unit.getAttackType() === RANGE && !this.unit.hasAbilityActive("Handyman") ? 0.5 : 1;
+        const min =
+            atkMul *
+            Math.floor(
+                this.unit.calculateAttackDamageMin(this.unit.getAttack(), target, false, 0, 1) *
+                    nativeRangedMeleeMultiplier,
+            );
+        const max =
+            atkMul *
+            Math.floor(
+                this.unit.calculateAttackDamageMax(this.unit.getAttack(), target, false, 0, 1) *
+                    nativeRangedMeleeMultiplier,
+            );
         const hp = target.getCumulativeHp();
         const effective = Math.min((min + max) / 2, hp);
         return { effective, kill: effective >= hp ? 1 : 0 };
