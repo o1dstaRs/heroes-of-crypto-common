@@ -44,6 +44,13 @@ const ENV_KEYS = [
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
+    "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE",
+    "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS",
+    "SEARCH_PURE_RANGED_DEADLINE_FINISHER",
+    "SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
     "V07_VALUE_WEIGHTS",
     "V07_VALUE_WEIGHTS_V2",
 ] as const;
@@ -105,6 +112,10 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_SHORTLIST: "3",
             SEARCH_DECISION_DEADLINE_MS: "175",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "1",
             V06_MELEE_DIMS: "0,2",
             V07_PLACEMENT_REVEAL: "on",
             V08_AGGRESSIVE: "1",
@@ -132,6 +143,10 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_VERSIONS = "v0.4";
         process.env.SEARCH_MAX_MOVE_SHOTS = "2";
         process.env.SEARCH_MOVE_SHOT_VERSIONS = "v0.7";
+        process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE = "1";
+        process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER = "1";
+        process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = "1";
+        process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR = "0.9";
         process.env.V07_VALUE_WEIGHTS = "material";
         const driver = createV08A13SearchDriver({} as ILookaheadDeps, {
             seed: 13,
@@ -150,6 +165,10 @@ describe("v0.8 a13 production profile", () => {
             shortlist: number | null;
             decisionDeadlineMs: number | null;
             circuitBreakerMs: number | null;
+            pureRangedNoMeleePressure: boolean;
+            pureRangedDeadlineFinisher: boolean;
+            pureRangedParetoNoMeleeFocus: boolean;
+            pureRangedParetoNoMeleeFocusDamageFloor: number;
             learnedV2: { b: number; w: number[] } | null;
             caps: {
                 maxMoveDestinations: number;
@@ -173,6 +192,10 @@ describe("v0.8 a13 production profile", () => {
             shortlist: 3,
             decisionDeadlineMs: 175,
             circuitBreakerMs: 275,
+            pureRangedNoMeleePressure: false,
+            pureRangedDeadlineFinisher: false,
+            pureRangedParetoNoMeleeFocus: false,
+            pureRangedParetoNoMeleeFocusDamageFloor: 1,
             caps: {
                 maxMoveDestinations: 1,
                 maxMeleePairs: 6,
@@ -190,6 +213,10 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_VERSIONS).toBe("v0.4");
         expect(process.env.SEARCH_MAX_MOVE_SHOTS).toBe("2");
         expect(process.env.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.7");
+        expect(process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE).toBe("1");
+        expect(process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER).toBe("1");
+        expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS).toBe("1");
+        expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR).toBe("0.9");
         expect(process.env.V07_VALUE_WEIGHTS).toBe("material");
     });
 

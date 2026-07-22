@@ -132,6 +132,92 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
         expect(selected.noMeleeTargetId).toBe(f.noMelee.getId());
         expect(selected.expectedNoMeleeDamage).toBe(60);
         expect(selected.expectedEnemyDamageDelta).toBe(20);
+        expect(selected.expectedNetDamageDelta).toBe(20);
+        expect(selected.enemyDamageRatio).toBe(1.2);
+        expect(selected.netDamageRatio).toBe(1.2);
+        expect(selected.minimumDamageRatio).toBeGreaterThanOrEqual(1);
+    });
+
+    it("admits a preregistered five-percent aggregate sacrifice but not a larger one", () => {
+        const f = fixture();
+        const atFloor = shot(f.actor, f.noMelee, "shot", { enemy: 95, net: 95, primary: 70 });
+        const enemyBelowFloor = shot(f.actor, f.noMelee, "shot", { enemy: 94, net: 95, primary: 90 });
+        const netBelowFloor = shot(f.actor, f.noMelee, "shot", { enemy: 95, net: 94, primary: 90 });
+
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(f.actor, f.unitsHolder, [f.incumbent, atFloor], f.state, 4),
+        ).toEqual([]);
+        const [selected] = rankPureRangedParetoNoMeleeFocusCandidates(
+            f.actor,
+            f.unitsHolder,
+            [f.incumbent, atFloor, enemyBelowFloor, netBelowFloor],
+            f.state,
+            4,
+            0.95,
+        );
+        expect(selected.candidate).toBe(atFloor);
+        expect(selected.minimumDamageRatio).toBe(0.95);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, enemyBelowFloor],
+                f.state,
+                4,
+                0.95,
+            ),
+        ).toEqual([]);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, netBelowFloor],
+                f.state,
+                4,
+                0.95,
+            ),
+        ).toEqual([]);
+    });
+
+    it("ranks a preserved kill first, then the smallest aggregate sacrifice before target-local damage", () => {
+        const f = fixture();
+        const highTargetDamage = shot(f.actor, f.noMelee, "shot", { enemy: 95, net: 95, primary: 95 });
+        const betterRetention = shot(f.actor, f.noMelee, "shot", { enemy: 98, net: 98, primary: 60 });
+        const secureKill = shot(f.actor, f.noMelee, "shot", { kill: 1, enemy: 95, net: 95, primary: 50 });
+
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, highTargetDamage, betterRetention],
+                f.state,
+                4,
+                0.95,
+            )[0]?.candidate,
+        ).toBe(betterRetention);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, betterRetention, secureKill],
+                f.state,
+                4,
+                0.95,
+            )[0]?.candidate,
+        ).toBe(secureKill);
+
+        const oldOrderTarget = shot(f.actor, f.noMelee, "shot", { enemy: 101, net: 101, primary: 95 });
+        const higherRatio = shot(f.actor, f.noMelee, "shot", { enemy: 110, net: 110, primary: 60 });
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, oldOrderTarget, higherRatio],
+                f.state,
+                4,
+                1,
+            )[0]?.candidate,
+        ).toBe(oldOrderTarget);
     });
 
     it("requires exact Through Shot-only or Large Caliber-only actor ability shapes", () => {

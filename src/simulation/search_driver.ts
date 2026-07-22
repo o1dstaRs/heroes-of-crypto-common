@@ -149,8 +149,10 @@ import {
  * SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS=1 is a separate default-off, version-scoped target-focus arm. Before
  * lap nine on the same all-ranged boards, an exact Through Shot or Large Caliber shooter may redirect a positive
  * stationary shot to a living original No Melee target only when the aimed-primary kill estimate, total enemy/net
- * damage, friendly fire, and shot spend are aggregate-Pareto-safe. Both measured seats receive the same catalog;
- * scoped candidate seat may select the engine-validated redirect.
+ * damage, friendly fire, and shot spend clear the configured safeguards. The optional
+ * SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR is restricted to 0.9..1 and defaults to exact Pareto at
+ * one. Both measured seats receive the same catalog; the scoped candidate seat may select the engine-validated
+ * redirect.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
@@ -458,6 +460,22 @@ interface ISearchCounters {
     pureRangedParetoNoMeleeFocusRejectedProbes: number;
     /** Sum of expected primary No Melee damage across accepted redirects. */
     pureRangedParetoNoMeleeFocusExpectedDamage: number;
+    /** Selected turns whose best proposal also clears the strict 1.00 floor. */
+    pureRangedParetoNoMeleeFocusStrictProposals: number;
+    /** Selected turns that exist only because the configured floor is below one. */
+    pureRangedParetoNoMeleeFocusRelaxedOnlyProposals: number;
+    /** Engine-valid overrides that exist only because the configured floor is below one. */
+    pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides: number;
+    /** Sum of enemy-only aggregate damage deltas across accepted redirects. */
+    pureRangedParetoNoMeleeFocusEnemyDamageDelta: number;
+    /** Sum of net aggregate damage deltas across accepted redirects. */
+    pureRangedParetoNoMeleeFocusNetDamageDelta: number;
+    /** Lowest retained aggregate-damage ratio across accepted redirects. */
+    pureRangedParetoNoMeleeFocusMinimumDamageRatio: number;
+    pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio: number;
+    pureRangedParetoNoMeleeFocusMinimumNetDamageRatio: number;
+    /** Defensive invariant tripwire; must remain zero. */
+    pureRangedParetoNoMeleeFocusBelowFloorViolations: number;
     pureRangedParetoNoMeleeFocusProposalsByActorAbility: Record<string, number>;
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: Record<string, number>;
     pureRangedParetoNoMeleeFocusProposalsByActorName: Record<string, number>;
@@ -520,6 +538,15 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedParetoNoMeleeFocusValidOverrides: 0,
     pureRangedParetoNoMeleeFocusRejectedProbes: 0,
     pureRangedParetoNoMeleeFocusExpectedDamage: 0,
+    pureRangedParetoNoMeleeFocusStrictProposals: 0,
+    pureRangedParetoNoMeleeFocusRelaxedOnlyProposals: 0,
+    pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides: 0,
+    pureRangedParetoNoMeleeFocusEnemyDamageDelta: 0,
+    pureRangedParetoNoMeleeFocusNetDamageDelta: 0,
+    pureRangedParetoNoMeleeFocusMinimumDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedParetoNoMeleeFocusMinimumNetDamageRatio: Number.POSITIVE_INFINITY,
+    pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
     pureRangedParetoNoMeleeFocusProposalsByActorAbility: {},
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: {},
     pureRangedParetoNoMeleeFocusProposalsByActorName: {},
@@ -584,6 +611,7 @@ export class SearchDriver {
     private readonly pureRangedDeadlineFinisherVersions: ReadonlySet<string>;
     private readonly pureRangedParetoNoMeleeFocus: boolean;
     private readonly pureRangedParetoNoMeleeFocusVersions: ReadonlySet<string>;
+    private readonly pureRangedParetoNoMeleeFocusDamageFloor: number;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -845,6 +873,22 @@ export class SearchDriver {
                 );
             }
             this.pureRangedParetoNoMeleeFocusVersions = new Set(versions);
+        }
+        const rawPureRangedParetoNoMeleeFocusDamageFloor =
+            process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR;
+        if (!this.pureRangedParetoNoMeleeFocus) {
+            this.pureRangedParetoNoMeleeFocusDamageFloor = 1;
+        } else if (
+            rawPureRangedParetoNoMeleeFocusDamageFloor === undefined ||
+            rawPureRangedParetoNoMeleeFocusDamageFloor === ""
+        ) {
+            this.pureRangedParetoNoMeleeFocusDamageFloor = 1;
+        } else {
+            const damageFloor = Number(rawPureRangedParetoNoMeleeFocusDamageFloor);
+            if (!Number.isFinite(damageFloor) || damageFloor < 0.9 || damageFloor > 1) {
+                throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR must be between 0.9 and 1");
+            }
+            this.pureRangedParetoNoMeleeFocusDamageFloor = damageFloor;
         }
         if (
             [this.pureRangedNoMeleePressure, this.pureRangedDeadlineFinisher, this.pureRangedParetoNoMeleeFocus].filter(
@@ -1112,10 +1156,16 @@ export class SearchDriver {
                     candidates,
                     this.pureRangedTerminalState,
                     currentLap,
+                    this.pureRangedParetoNoMeleeFocusDamageFloor,
                 );
                 if (focusCandidates.length) {
                     const proposal = focusCandidates[0];
                     this.counters.pureRangedParetoNoMeleeFocusProposals += 1;
+                    if (proposal.minimumDamageRatio >= 1) {
+                        this.counters.pureRangedParetoNoMeleeFocusStrictProposals += 1;
+                    } else {
+                        this.counters.pureRangedParetoNoMeleeFocusRelaxedOnlyProposals += 1;
+                    }
                     bump(this.counters.pureRangedParetoNoMeleeFocusProposalsByActorAbility, proposal.actorAbility);
                     bump(this.counters.pureRangedParetoNoMeleeFocusProposalsByActorName, unit.getName());
                 }
@@ -1139,6 +1189,29 @@ export class SearchDriver {
                     this.counters.decisions += 1;
                     this.counters.pureRangedParetoNoMeleeFocusValidOverrides += 1;
                     this.counters.pureRangedParetoNoMeleeFocusExpectedDamage += focus.expectedNoMeleeDamage;
+                    if (focus.minimumDamageRatio < 1) {
+                        this.counters.pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides += 1;
+                    }
+                    this.counters.pureRangedParetoNoMeleeFocusEnemyDamageDelta += focus.expectedEnemyDamageDelta;
+                    this.counters.pureRangedParetoNoMeleeFocusNetDamageDelta += focus.expectedNetDamageDelta;
+                    this.counters.pureRangedParetoNoMeleeFocusMinimumDamageRatio = Math.min(
+                        this.counters.pureRangedParetoNoMeleeFocusMinimumDamageRatio,
+                        focus.minimumDamageRatio,
+                    );
+                    this.counters.pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio = Math.min(
+                        this.counters.pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio,
+                        focus.enemyDamageRatio,
+                    );
+                    this.counters.pureRangedParetoNoMeleeFocusMinimumNetDamageRatio = Math.min(
+                        this.counters.pureRangedParetoNoMeleeFocusMinimumNetDamageRatio,
+                        focus.netDamageRatio,
+                    );
+                    if (
+                        focus.enemyDamageRatio < this.pureRangedParetoNoMeleeFocusDamageFloor ||
+                        focus.netDamageRatio < this.pureRangedParetoNoMeleeFocusDamageFloor
+                    ) {
+                        this.counters.pureRangedParetoNoMeleeFocusBelowFloorViolations += 1;
+                    }
                     bump(this.counters.pureRangedParetoNoMeleeFocusOverridesByActorAbility, focus.actorAbility);
                     bump(this.counters.pureRangedParetoNoMeleeFocusOverridesByActorName, unit.getName());
                     this.counters.msTotal += performance.now() - t0;
@@ -1356,10 +1429,32 @@ export class SearchDriver {
             pureRangedDeadlineFinisherPrimaryDamage: Number(c.pureRangedDeadlineFinisherPrimaryDamage.toFixed(3)),
             pureRangedParetoNoMeleeFocus: this.pureRangedParetoNoMeleeFocus,
             pureRangedParetoNoMeleeFocusVersions: [...this.pureRangedParetoNoMeleeFocusVersions],
+            pureRangedParetoNoMeleeFocusDamageFloor: this.pureRangedParetoNoMeleeFocusDamageFloor,
             pureRangedParetoNoMeleeFocusProposals: c.pureRangedParetoNoMeleeFocusProposals,
             pureRangedParetoNoMeleeFocusValidOverrides: c.pureRangedParetoNoMeleeFocusValidOverrides,
             pureRangedParetoNoMeleeFocusRejectedProbes: c.pureRangedParetoNoMeleeFocusRejectedProbes,
             pureRangedParetoNoMeleeFocusExpectedDamage: Number(c.pureRangedParetoNoMeleeFocusExpectedDamage.toFixed(3)),
+            pureRangedParetoNoMeleeFocusStrictProposals: c.pureRangedParetoNoMeleeFocusStrictProposals,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyProposals: c.pureRangedParetoNoMeleeFocusRelaxedOnlyProposals,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides:
+                c.pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides,
+            pureRangedParetoNoMeleeFocusEnemyDamageDelta: Number(
+                c.pureRangedParetoNoMeleeFocusEnemyDamageDelta.toFixed(3),
+            ),
+            pureRangedParetoNoMeleeFocusNetDamageDelta: Number(c.pureRangedParetoNoMeleeFocusNetDamageDelta.toFixed(3)),
+            pureRangedParetoNoMeleeFocusMinimumDamageRatio:
+                c.pureRangedParetoNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedParetoNoMeleeFocusMinimumDamageRatio.toFixed(6))
+                    : null,
+            pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio:
+                c.pureRangedParetoNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedParetoNoMeleeFocusMinimumEnemyDamageRatio.toFixed(6))
+                    : null,
+            pureRangedParetoNoMeleeFocusMinimumNetDamageRatio:
+                c.pureRangedParetoNoMeleeFocusValidOverrides > 0
+                    ? Number(c.pureRangedParetoNoMeleeFocusMinimumNetDamageRatio.toFixed(6))
+                    : null,
+            pureRangedParetoNoMeleeFocusBelowFloorViolations: c.pureRangedParetoNoMeleeFocusBelowFloorViolations,
             pureRangedParetoNoMeleeFocusProposalsByActorAbility: c.pureRangedParetoNoMeleeFocusProposalsByActorAbility,
             pureRangedParetoNoMeleeFocusOverridesByActorAbility: c.pureRangedParetoNoMeleeFocusOverridesByActorAbility,
             pureRangedParetoNoMeleeFocusProposalsByActorName: c.pureRangedParetoNoMeleeFocusProposalsByActorName,

@@ -89,6 +89,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -1588,7 +1589,10 @@ describe("search driver — gating, hygiene, determinism", () => {
         SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
     } as const;
 
-    const positionParetoFocusFixture = (h: Harness): { actor: Unit; primary: Unit; noMelee: Unit } => {
+    const positionParetoFocusFixture = (
+        h: Harness,
+        noMeleeCell: XY = { x: 9, y: 6 },
+    ): { actor: Unit; primary: Unit; noMelee: Unit } => {
         const green = h.unitsHolder.getAllAllies(GREEN_TEAM);
         const red = h.unitsHolder.getAllAllies(RED_TEAM);
         const actor = green[0];
@@ -1617,7 +1621,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         moveTo(actor, { x: 2, y: 7 });
         moveTo(green[1], { x: 2, y: 12 });
         moveTo(primary, { x: 8, y: 7 });
-        moveTo(noMelee, { x: 9, y: 6 });
+        moveTo(noMelee, noMeleeCell);
         h.setActiveUnitId(actor.getId());
         return { actor, primary, noMelee };
     };
@@ -1631,6 +1635,61 @@ describe("search driver — gating, hygiene, determinism", () => {
             aimSide: 0,
         },
     ];
+
+    it("wires the 0.95 floor through SearchDriver while the scoped control remains exact", () => {
+        const exactAudit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-exact-floor-")), "search.jsonl");
+        setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_AUDIT: exactAudit });
+        const exactHarness = buildBattle(10_315, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const exactFixture = positionParetoFocusFixture(exactHarness, { x: 9, y: 10 });
+        exactFixture.noMelee.applyDamage(exactFixture.noMelee.getCumulativeHp() - 100, 0, new SceneLogMock(), false);
+        const exactDriver = exactHarness.makeDriver();
+        exactDriver.onFightReady();
+        const exactIncumbent = plainAim(exactFixture.actor, exactFixture.primary);
+        expect(exactDriver.chooseDecision(exactFixture.actor, "v0.8", exactIncumbent)).toBe(exactIncumbent);
+        exactDriver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(exactAudit, "utf8").trim())).toMatchObject({
+            pureRangedParetoNoMeleeFocusDamageFloor: 1,
+            pureRangedParetoNoMeleeFocusProposals: 0,
+            pureRangedParetoNoMeleeFocusValidOverrides: 0,
+        });
+
+        const relaxedAudit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-relaxed-floor-")), "search.jsonl");
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "0.95",
+            SEARCH_AUDIT: relaxedAudit,
+        });
+        const relaxedHarness = buildBattle(10_315, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const relaxedFixture = positionParetoFocusFixture(relaxedHarness, { x: 9, y: 10 });
+        relaxedFixture.noMelee.applyDamage(
+            relaxedFixture.noMelee.getCumulativeHp() - 100,
+            0,
+            new SceneLogMock(),
+            false,
+        );
+        const relaxedDriver = relaxedHarness.makeDriver();
+        relaxedDriver.onFightReady();
+
+        const controlIncumbent = plainAim(relaxedFixture.actor, relaxedFixture.primary);
+        expect(relaxedDriver.chooseDecision(relaxedFixture.actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const candidateIncumbent = plainAim(relaxedFixture.actor, relaxedFixture.primary);
+        const chosen = relaxedDriver.chooseDecision(relaxedFixture.actor, "v0.8", candidateIncumbent);
+        expect(chosen).not.toBe(candidateIncumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(relaxedFixture.noMelee.getId());
+        relaxedDriver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(relaxedAudit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            pureRangedParetoNoMeleeFocusDamageFloor: 0.95,
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
+            pureRangedParetoNoMeleeFocusStrictProposals: 0,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyProposals: 1,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides: 1,
+            pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
+        });
+        expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThanOrEqual(0.95);
+        expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeLessThan(1);
+    });
 
     it("takes an engine-valid aggregate-Pareto No-Melee focus only for the scoped v0.8 seat", () => {
         const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-focus-")), "search.jsonl");
@@ -1661,15 +1720,21 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(summary).toMatchObject({
             pureRangedParetoNoMeleeFocus: true,
             pureRangedParetoNoMeleeFocusVersions: ["v0.8"],
+            pureRangedParetoNoMeleeFocusDamageFloor: 1,
             pureRangedParetoNoMeleeFocusProposals: 1,
             pureRangedParetoNoMeleeFocusValidOverrides: 1,
             pureRangedParetoNoMeleeFocusRejectedProbes: 0,
+            pureRangedParetoNoMeleeFocusStrictProposals: 1,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyProposals: 0,
+            pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides: 0,
+            pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
             pureRangedParetoNoMeleeFocusProposalsByActorAbility: { through_shot: 1 },
             pureRangedParetoNoMeleeFocusOverridesByActorAbility: { through_shot: 1 },
             pureRangedParetoNoMeleeFocusProposalsByActorName: { Arbalester: 1 },
             pureRangedParetoNoMeleeFocusOverridesByActorName: { Arbalester: 1 },
         });
         expect(summary.pureRangedParetoNoMeleeFocusExpectedDamage as number).toBeGreaterThan(0);
+        expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThan(1);
 
         const hpBefore = noMelee.getCumulativeHp();
         expectEngineAcceptsProductiveDecision(h, chosen);
@@ -1701,6 +1766,12 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
         });
         expect(() => h.makeDriver()).toThrow("mutually exclusive");
+
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "0.89",
+        });
+        expect(() => h.makeDriver()).toThrow("must be between 0.9 and 1");
     });
 
     it("does not let Pareto focus bypass an already-open search circuit", () => {
@@ -1776,6 +1847,26 @@ describe("search driver — gating, hygiene, determinism", () => {
         };
 
         expect(catalog(true)).toEqual(catalog(false));
+    });
+
+    it("gives special-actor candidate and control seats the same target-covered catalog", () => {
+        setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_MAX_SHOTS: "1" });
+        const h = buildBattle(10_316, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const calls = captureCandidates(driver);
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+        };
+        intercepted.firstEngineValidCandidate = () => undefined;
+
+        driver.chooseDecision(actor, "v0.8s", plainAim(actor, primary));
+        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+
+        expect(calls).toHaveLength(2);
+        expect(normalize(calls[1])).toEqual(normalize(calls[0]));
+        expect(calls[0].filter((candidate) => candidate.kind === "shot").length).toBeGreaterThan(1);
     });
 
     it("continues through ordinary a13 search when the Pareto filter has no proposal", () => {
