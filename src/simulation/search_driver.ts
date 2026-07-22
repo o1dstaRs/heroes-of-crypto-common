@@ -135,8 +135,8 @@ import {
  * which every original stack on both teams is RANGE. It compares the two armies' capped pre-Armageddon ammo
  * and post-ammo melee budgets, plus the HP barrier of No Melee stacks. Summons are excluded.
  * SEARCH_PURE_RANGED_NO_MELEE_PRESSURE=1 is a default-off, version-scoped terminal-barrier intervention for
- * those same all-ranged original boards. From lap one, a legal stationary ranged kill remains first; otherwise
- * a legal positive-damage shot pressures a living enemy No Melee stack before ammunition is exhausted.
+ * those same all-ranged original boards. From lap one, a No Melee shooter keeps a legal stationary ranged kill
+ * first; otherwise it pressures a living enemy No Melee stack before both terminal barriers exhaust ammunition.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are

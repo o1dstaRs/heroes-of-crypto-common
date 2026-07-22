@@ -58,8 +58,9 @@ function compareShots(left: IRankedShot, right: IRankedShot): number {
 
 /**
  * Rank the narrow terminal-barrier intervention. Immediate stationary shot kills on another stack come first;
- * otherwise the highest-value stationary shot that really damages a living enemy No Melee stack is first.
- * The caller still applies the candidates through the real engine and takes the first engine-valid delivery.
+ * otherwise a No Melee shooter takes the highest-value stationary shot that really damages a living enemy
+ * No Melee stack. The caller still applies the candidates through the real engine and takes the first
+ * engine-valid delivery.
  */
 export function rankPureRangedNoMeleePressureCandidates(
     actor: Unit,
@@ -67,7 +68,12 @@ export function rankPureRangedNoMeleePressureCandidates(
     candidates: readonly IEnumeratedCandidate[],
     originalState: PureRangedTerminalState | null,
 ): IEnumeratedCandidate[] {
-    if (!originalState?.eligible || actor.isDead() || actor.getRangeShots() <= 0) {
+    if (
+        !originalState?.eligible ||
+        actor.isDead() ||
+        actor.getRangeShots() <= 0 ||
+        !actor.hasAbilityActive("No Melee")
+    ) {
         return [];
     }
 
