@@ -50,6 +50,8 @@ function decisionContext(combat: CombatTestContext): IDecisionContext {
 function setupSupportedShot(
     withScreen = true,
     rangedTarget = false,
+    targetShotDistance?: number,
+    offsetScreen = false,
 ): {
     shooter: Unit;
     target: Unit;
@@ -76,12 +78,13 @@ function setupSupportedShot(
         damageMax: 1,
         amountAlive: 10,
         maxHp: 20,
+        ...(targetShotDistance === undefined ? {} : { shotDistance: targetShotDistance }),
     });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 7 });
     if (withScreen) {
         const screen = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, speed: 1 });
-        placeUnit(combat.grid, combat.unitsHolder, screen, { x: 6, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, screen, { x: 6, y: offsetScreen ? 8 : 7 });
     }
     shooter.refreshPossibleAttackTypes(true);
     return { shooter, target, context: decisionContext(combat) };
@@ -164,6 +167,7 @@ afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
     delete process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS;
+    delete process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS;
 });
 
 describe("v0.8 protected ranged positioning", () => {
@@ -270,6 +274,67 @@ describe("v0.8 protected ranged positioning", () => {
         const actions = new StrategyV0_8().decideTurn(shooter, context);
         expect(actions.some((action) => action.type === "move_unit")).toBe(false);
         expect(actions.some((action) => action.type === "range_attack")).toBe(true);
+    });
+
+    it("may cross a band with support only when the ordinary counter-shot cannot become stronger", () => {
+        process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = "v0.8";
+        const { shooter, target, context } = setupSupportedShot(true, true, 20, true);
+        target.setAmountAlive(100);
+
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+
+        const move = actions[0];
+        if (move.type !== "move_unit") throw new Error("expected response-neutral move + shot");
+        const destination = move.targetCells?.[0];
+        expect(destination).toBeDefined();
+        const settings = context.grid.getSettings();
+        const movedPosition = getPositionForCell(
+            destination!,
+            settings.getMinX(),
+            settings.getStep(),
+            settings.getHalfStep(),
+        );
+        expect(context.attackHandler!.getRangeAttackDivisor(target, movedPosition)).toBeGreaterThanOrEqual(
+            context.attackHandler!.getRangeAttackDivisor(target, shooter.getPosition()),
+        );
+
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
+        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+        const hpBefore = target.getCumulativeHp();
+        const results = actions.map((action) => engine.apply(action));
+        expect(results.every((result) => result.completed)).toBe(true);
+        expect(target.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
+    it("keeps response-neutral advance off for a blocked counter ray and a stronger ranged army", () => {
+        process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = "v0.8";
+        const blocked = setupSupportedShot(true, true, 20);
+        blocked.target.setAmountAlive(100);
+        expect(new StrategyV0_8().decideTurn(blocked.shooter, blocked.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+
+        const stronger = setupSupportedShot(true, true, 20, true);
+        stronger.target.setAmountAlive(1);
+        expect(
+            new StrategyV0_8()
+                .decideTurn(stronger.shooter, stronger.context)
+                .some((action) => action.type === "move_unit"),
+        ).toBe(false);
     });
 
     it("scopes supported-delta independently from the shared positioning baseline", () => {

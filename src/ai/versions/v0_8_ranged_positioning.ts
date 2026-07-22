@@ -12,7 +12,12 @@
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../constants";
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import { getPositionForCells, getRangeAttackSideCenter, type RangeAttackCellSide } from "../../grid/grid_math";
+import {
+    getPositionForCell,
+    getPositionForCells,
+    getRangeAttackSideCenter,
+    type RangeAttackCellSide,
+} from "../../grid/grid_math";
 import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
@@ -224,13 +229,40 @@ function preferAdvance(left: IRouteView, leftDivisor: number, right: IRouteView,
 }
 
 /**
+ * Conservative lower bound for the responder's divisor after the actor occupies `footprint`. The engine
+ * measures the response at the first occupied point, not the destination centre, so use the closest point of
+ * every destination cell. A lower divisor means a stronger response; taking the minimum is deliberately safe.
+ */
+function minimumFootprintResponseDivisor(target: Unit, footprint: readonly XY[], context: IDecisionContext): number {
+    const attackHandler = context.attackHandler!;
+    const settings = context.grid.getSettings();
+    const source = target.getPosition();
+    const halfStep = settings.getHalfStep();
+    return Math.min(
+        ...footprint.map((cell) => {
+            const center = getPositionForCell(cell, settings.getMinX(), settings.getStep(), halfStep);
+            const closest = {
+                x: Math.max(center.x - halfStep, Math.min(source.x, center.x + halfStep)),
+                y: Math.max(center.y - halfStep, Math.min(source.y, center.y + halfStep)),
+            };
+            return attackHandler.getRangeAttackDivisor(target, closest, source);
+        }),
+    );
+}
+
+/**
  * An unpinned shooter may move and then fire in the same activation. Move only when the exact authoritative
  * target-edge divisor improves and the aimed target remains the first hit. Ordinarily a native melee ally must
  * be interposed; an all-ranged army may also cross a band when the target cannot counter and no enemy can reach
  * the destination next turn. The current shot stays untouched for Sniper/AOE/piercing geometry and exposed
  * destinations.
  */
-function protectedAdvanceShot(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+function protectedAdvanceShot(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    responseNeutralAdvance: boolean,
+): GameAction[] {
     const attackHandler = context.attackHandler;
     const shot = decision.find((action) => action.type === "range_attack");
     if (
@@ -272,7 +304,7 @@ function protectedAdvanceShot(unit: Unit, context: IDecisionContext, decision: G
             target.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
-    if (targetCanCounter) {
+    if (targetCanCounter && !responseNeutralAdvance) {
         return decision;
     }
     const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
@@ -320,6 +352,35 @@ function protectedAdvanceShot(unit: Unit, context: IDecisionContext, decision: G
         return decision;
     }
 
+    let currentResponseDivisor: number | undefined;
+    if (targetCanCounter) {
+        // Special response geometry is intentionally outside this arm. For an ordinary shot, prove that the
+        // current response directly hits the actor before considering any hypothetical destination.
+        if (
+            target.hasAbilityActive("Through Shot") ||
+            target.hasAbilityActive("Large Caliber") ||
+            target.hasAbilityActive("Area Throw")
+        ) {
+            return decision;
+        }
+        const response = attackHandler.evaluateRangeAttack(
+            context.unitsHolder.getAllUnits(),
+            target,
+            target.getPosition(),
+            unit.getPosition(),
+            false,
+            false,
+            false,
+        );
+        if (response.affectedUnits[0]?.[0]?.getId() !== unit.getId()) {
+            return decision;
+        }
+        currentResponseDivisor = response.rangeAttackDivisors[0];
+        if (!Number.isFinite(currentResponseDivisor)) {
+            return decision;
+        }
+    }
+
     let best: IRouteView | undefined;
     let bestDivisor = currentDivisor;
     for (const route of reachableRoutes(unit, context)) {
@@ -331,6 +392,9 @@ function protectedAdvanceShot(unit: Unit, context: IDecisionContext, decision: G
             view.protection.eligible && frontliners.some((ally) => allyScreensThreat(view.footprint, ally, target));
         const unreachableAdvance = view.protection.reachableThreats === 0;
         if (!screenedAdvance && !unreachableAdvance) {
+            continue;
+        }
+        if (targetCanCounter && !screenedAdvance) {
             continue;
         }
         const targetPosition = getRangeAttackSideCenter(
@@ -354,6 +418,28 @@ function protectedAdvanceShot(unit: Unit, context: IDecisionContext, decision: G
         const divisor = evaluation.rangeAttackDivisors[0] ?? currentDivisor;
         if (divisor >= currentDivisor) {
             continue;
+        }
+        if (targetCanCounter) {
+            // Trace the future counter-shot through the unchanged board to the empty destination. Any existing
+            // unit or mountain on that ray makes the hypothetical ambiguous, so fail closed. If the ray is
+            // clear, the moved actor must become its first hit; bound the worst footprint-edge divisor without
+            // pretending the live unit/grid has already moved.
+            const clearRay = attackHandler.evaluateRangeAttack(
+                context.unitsHolder.getAllUnits(),
+                target,
+                target.getPosition(),
+                view.position,
+                false,
+                false,
+                false,
+            );
+            if (
+                clearRay.attackObstacle ||
+                clearRay.affectedUnits.some((affectedAtCell) => affectedAtCell.length > 0) ||
+                minimumFootprintResponseDivisor(target, view.footprint, context) < currentResponseDivisor!
+            ) {
+                continue;
+            }
         }
         if (!best || preferAdvance(view, divisor, best, bestDivisor)) {
             best = view;
@@ -495,7 +581,15 @@ export function prioritizeV08RangedPositioning(
         .map((value) => value.trim())
         .filter(Boolean);
     const supportedDelta = supportedDeltaVersions.includes(strategyVersion);
+    const responseNeutralAdvanceVersions = (process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const responseNeutralAdvance = responseNeutralAdvanceVersions.includes(strategyVersion);
     const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
-    const advanced = mode === "both" || mode === "advance" ? protectedAdvanceShot(unit, context, decision) : decision;
+    const advanced =
+        mode === "both" || mode === "advance"
+            ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
+            : decision;
     return mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
 }
