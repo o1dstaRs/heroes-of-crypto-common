@@ -35,6 +35,7 @@ import {
 import {
     AiMetaAccumulator,
     AiMetaAggregation,
+    captureAiMetaSourceIdentity,
     sanitizedAiMetaEnvironment,
     validateAiMetaGamesPerCohort,
 } from "../../src/simulation/measure_ai_meta_cohorts";
@@ -190,6 +191,18 @@ describe("AI meta cohort generation", () => {
         expect(environment.LIVETWIN).toBe("1");
         expect(environment.FIGHT_MELEE_ROSTERS).toBe("0");
         expect(environment.V08_A13_SEARCH).toBe("1");
+    });
+
+    it("records the execution host because a13 search is wall-clock bounded", () => {
+        const identity = captureAiMetaSourceIdentity();
+        expect(identity.runtime).toMatch(/^bun /);
+        expect(identity.executionHost.platform.length).toBeGreaterThan(0);
+        expect(identity.executionHost.architecture.length).toBeGreaterThan(0);
+        expect(identity.executionHost.osRelease.length).toBeGreaterThan(0);
+        expect(identity.executionHost.cpuModel.length).toBeGreaterThan(0);
+        expect(identity.executionHost.logicalCpus).toBeGreaterThan(0);
+        expect(identity.executionHost.availableParallelism).toBeGreaterThan(0);
+        expect(identity.executionHost.totalMemoryBytes).toBeGreaterThan(0);
     });
 
     it("only accepts complete three-map seat-swap cycles", () => {

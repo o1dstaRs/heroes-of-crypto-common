@@ -412,7 +412,10 @@ const flattenProvenance = (value: unknown): { key: string; value: string }[] => 
             rows.push({ key, value: stringifyCompact(nested) });
         }
     }
-    return rows.slice(0, 24);
+    // Provenance is part of the evidence bundle, not decorative metadata. Keep
+    // every field so adding a detailed fight profile cannot silently push maps,
+    // source identity, or execution-host facts out of the standalone report.
+    return rows;
 };
 
 const formatInteger = (value: number): string => new Intl.NumberFormat("en-US").format(value);

@@ -172,6 +172,34 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain("flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px");
     });
 
+    test("keeps complete source, map, and execution-host provenance after a detailed fight profile", () => {
+        const detailedSearch = Object.fromEntries(
+            Array.from({ length: 30 }, (_, index) => [`control${index + 1}`, index + 1]),
+        );
+        const html = renderAiMetaReport({
+            provenance: {
+                title: "v0.8 evidence",
+                fightProfile: { name: "v0.8+a13", search: detailedSearch },
+                maps: [1, 3, 4],
+                commonCommit: "abc123",
+                sourceSha256: "f".repeat(64),
+                executionHost: {
+                    platform: "linux",
+                    architecture: "x64",
+                    cpuModel: "AMD Ryzen 7 9800X3D",
+                    logicalCpus: 16,
+                },
+            },
+            rankings: { units: [] },
+        });
+
+        expect(html).toContain('"key":"maps","value":"[1,3,4]"');
+        expect(html).toContain('"key":"commonCommit","value":"abc123"');
+        expect(html).toContain('"key":"sourceSha256","value":"');
+        expect(html).toContain('"key":"executionHost.cpuModel","value":"AMD Ryzen 7 9800X3D"');
+        expect(html).toContain('"key":"executionHost.logicalCpus","value":"16"');
+    });
+
     test("keeps zero-support buckets auditable without allowing them into comparative views", () => {
         const html = renderAiMetaReport({
             rankings: {

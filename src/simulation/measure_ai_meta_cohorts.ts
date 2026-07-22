@@ -11,7 +11,7 @@
 
 import { createHash } from "node:crypto";
 import { createWriteStream, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
+import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { Worker } from "node:worker_threads";
@@ -819,16 +819,35 @@ export interface IAiMetaSourceIdentity {
     commonStatus: string[];
     sourceSha256: string;
     runtime: string;
+    executionHost: {
+        platform: string;
+        architecture: string;
+        osRelease: string;
+        cpuModel: string;
+        logicalCpus: number;
+        availableParallelism: number;
+        totalMemoryBytes: number;
+    };
 }
 
 export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
     const status = git(["status", "--short"]);
+    const processors = cpus();
     return {
         commonCommit: git(["rev-parse", "HEAD"]),
         commonDirty: Boolean(status),
         commonStatus: status.split("\n").filter(Boolean),
         sourceSha256: sourceFingerprint(),
         runtime: `bun ${process.versions.bun ?? "unknown"}`,
+        executionHost: {
+            platform: platform(),
+            architecture: arch(),
+            osRelease: release(),
+            cpuModel: processors[0]?.model ?? "unknown",
+            logicalCpus: processors.length,
+            availableParallelism: availableParallelism(),
+            totalMemoryBytes: totalmem(),
+        },
     };
 }
 
