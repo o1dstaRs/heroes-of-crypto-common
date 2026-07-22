@@ -107,6 +107,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
+            V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
         });
         expect(environment.HOSTILE_EXPERIMENT).toBeUndefined();
@@ -600,11 +601,13 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_MODE: "retreat",
             V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
             V08_SUPPORTED_PREPIN_EGRESS: "1",
+            V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "v0.8",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "v0.8",
         });
         expect(controlInvocation.environment).toMatchObject({
             V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
             V08_SUPPORTED_PREPIN_EGRESS: "1",
+            V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "v0.8",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "supported-prepin-egress-catalog-only-control",
         });
         const differingEnvironmentKeys = [
@@ -740,6 +743,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
+            V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();

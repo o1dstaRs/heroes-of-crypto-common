@@ -19,7 +19,6 @@ import {
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
 import type { IWeightedRoute } from "../../grid/path_definitions";
-import { ObstacleType } from "../../obstacles/obstacle_type";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
@@ -34,6 +33,7 @@ const RANGE = PBTypes.AttackVals.RANGE;
 
 const SUPPORTED_PREPIN_EGRESS_ENABLED_ENV = "V08_SUPPORTED_PREPIN_EGRESS";
 const SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS";
+const SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -104,16 +104,19 @@ function allyScreensThreat(destination: readonly XY[], ally: Unit, enemy: Unit):
     return allyToEnemy < shooterToEnemy && shooterToAlly <= 3 && allyToEnemy + shooterToAlly <= shooterToEnemy + 1;
 }
 
+function withinMeleeHorizon(destination: readonly XY[], enemy: Unit): boolean {
+    return (
+        !enemy.hasAbilityActive("No Melee") &&
+        cellDistance(destination, enemy.getCells()) <= Math.ceil(Math.max(0, enemy.getSteps())) + 1
+    );
+}
+
 function protectionAt(destination: readonly XY[], enemies: readonly Unit[], frontliners: readonly Unit[]): IProtection {
     let reachableThreats = 0;
     let screenedThreats = 0;
     for (const enemy of enemies) {
-        if (enemy.hasAbilityActive("No Melee")) {
-            continue;
-        }
-        const distance = cellDistance(destination, enemy.getCells());
         // Chebyshev is an optimistic enemy-reach bound: if even it cannot reach, pathing certainly cannot.
-        if (distance > Math.ceil(Math.max(0, enemy.getSteps())) + 1) {
+        if (!withinMeleeHorizon(destination, enemy)) {
             continue;
         }
         reachableThreats += 1;
@@ -221,57 +224,6 @@ function routeView(
     };
 }
 
-const sameCell = (left: XY, right: XY): boolean => left.x === right.x && left.y === right.y;
-
-function canLandOnHypotheticalMatrix(unit: Unit, anchor: XY, matrix: readonly (readonly number[])[]): boolean {
-    const current = unit.getCells();
-    for (const cell of footprintForAnchor(unit, anchor)) {
-        const value = matrix[cell.y]?.[cell.x];
-        if (value === undefined) return false;
-        if (current.some((occupied) => sameCell(occupied, cell))) continue;
-        if (value === 0) continue;
-        if (value === ObstacleType.LAVA && unit.hasAbilityActive("Made of Fire")) continue;
-        if (value === ObstacleType.WATER && unit.hasAbilityActive("Made of Water")) continue;
-        return false;
-    }
-    return true;
-}
-
-/**
- * Exact movement-catalog reach using the same PathHelper as the engine's melee candidate generator. Aggression
- * weights are deliberately omitted: proving safety against the more permissive geometric path is fail-closed.
- */
-function canMeleeFootprintThisActivation(
-    threat: Unit,
-    targetFootprint: readonly XY[],
-    matrix: number[][],
-    context: IDecisionContext,
-): boolean {
-    const anchors: XY[] = [threat.getBaseCell()];
-    if (threat.canMove()) {
-        const movePath = context.pathHelper.getMovePath(
-            threat.getBaseCell(),
-            matrix,
-            threat.getSteps(),
-            undefined,
-            threat.canFly(),
-            threat.isSmallSize(),
-            threat.canTraverseLava(),
-        );
-        for (const routes of movePath.knownPaths.values()) {
-            const anchor = routes[0]?.cell;
-            if (anchor && !anchors.some((known) => sameCell(known, anchor))) {
-                anchors.push(anchor);
-            }
-        }
-    }
-    return anchors.some(
-        (anchor) =>
-            canLandOnHypotheticalMatrix(threat, anchor, matrix) &&
-            context.grid.areCellsAdjacent(footprintForAnchor(threat, anchor), [...targetFootprint]),
-    );
-}
-
 function pendingMeleeThreats(unit: Unit, context: IDecisionContext): Unit[] {
     const fightProperties = context.fightProperties!;
     return context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => {
@@ -290,51 +242,15 @@ function pendingMeleeThreats(unit: Unit, context: IDecisionContext): Unit[] {
     });
 }
 
-function fixedNativeMeleeGuards(unit: Unit, context: IDecisionContext): Unit[] {
-    const fightProperties = context.fightProperties!;
+function nativeMeleeGuards(unit: Unit, context: IDecisionContext): Unit[] {
     return context.unitsHolder.getAllAllies(unit.getTeam()).filter((ally) => {
         const nativeAttackType = ally.getUnitProperties().attack_type;
-        const actedWithoutQueuedReactivation =
-            fightProperties.hasAlreadyMadeTurn(ally.getId()) &&
-            !fightProperties.hourglassIncludes(ally.getId()) &&
-            !fightProperties.moralePlusIncludes(ally.getId()) &&
-            !fightProperties.upNextIncludes(ally.getId());
         return (
             ally.getId() !== unit.getId() &&
             !ally.isDead() &&
-            (nativeAttackType === MELEE || nativeAttackType === MELEE_MAGIC) &&
-            (!ally.canMove() || actedWithoutQueuedReactivation)
+            (nativeAttackType === MELEE || nativeAttackType === MELEE_MAGIC)
         );
     });
-}
-
-function canRestoreClearedCells(context: IDecisionContext, cells: readonly XY[]): boolean {
-    const gridType = context.grid.getGridType();
-    if (gridType !== PBTypes.GridVals.LAVA_CENTER && gridType !== PBTypes.GridVals.WATER_CENTER) return true;
-    const terrainCells = context.grid.getCenterCells();
-    return cells.every((cell) => !terrainCells.some((terrain) => sameCell(cell, terrain)));
-}
-
-function postMoveMatrix(unit: Unit, destination: readonly XY[], context: IDecisionContext): number[][] | undefined {
-    const current = unit.getCells();
-    if (!canRestoreClearedCells(context, current)) return undefined;
-    const matrix = context.matrix.map((row) => row.slice());
-    const terrain = context.grid.getMatrixNoUnits();
-    for (const cell of current) matrix[cell.y]![cell.x] = terrain[cell.y]![cell.x]!;
-    for (const cell of destination) matrix[cell.y]![cell.x] = unit.getTeam();
-    return matrix;
-}
-
-function matrixWithoutGuard(
-    withGuard: readonly (readonly number[])[],
-    guard: Unit,
-    context: IDecisionContext,
-): number[][] | undefined {
-    if (!canRestoreClearedCells(context, guard.getCells())) return undefined;
-    const matrix = withGuard.map((row) => [...row]);
-    const terrain = context.grid.getMatrixNoUnits();
-    for (const cell of guard.getCells()) matrix[cell.y]![cell.x] = terrain[cell.y]![cell.x]!;
-    return matrix;
 }
 
 function hasSameNonRegressingRangeSignature(
@@ -377,14 +293,15 @@ function hasSameNonRegressingRangeSignature(
 }
 
 /**
- * Research-only screened pre-pin egress. The geometry catalog is intentionally computed for every baseline seat
- * while the global arm is enabled, including the catalog-only control, because PathHelper consumes seeded
+ * Research-only proactive screened reposition. The geometry catalog is intentionally computed for every baseline
+ * seat while the global arm is enabled, including the catalog-only control, because PathHelper consumes seeded
  * tie-break RNG. Only the selector-scoped seat may retain the proposal.
  *
- * The screen is a calculated-risk formation rule, but the immediate activation is still guarded carefully: only
- * one enemy may currently pin the shooter, the destination must be unreachable by every pending melee-capable
- * enemy, and removing the selected guard must not make the destination reachable by a second pending enemy. The
- * sole current pinner may spend its activation removing the guard, but cannot then also pin the shooter.
+ * The front line is a calculated-risk next-activation screen. Immediate safety does not depend on that unit
+ * surviving or staying put: every still-pending melee-capable enemy must be outside an optimistic Chebyshev reach
+ * bound at the destination. The move must strictly reduce one-activation exposure and preserve the exact shot at
+ * an equal-or-better divisor. A ranged-superior army never closes; a ranged-inferior army closes only across a real
+ * damage band.
  */
 function supportedPrepinEgress(
     unit: Unit,
@@ -411,8 +328,17 @@ function supportedPrepinEgress(
         .map((value) => value.trim())
         .filter(Boolean);
     const selectorEnabled = selectorVersions.includes(strategyVersion);
+    const funnelVersions = (
+        process.env[SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV] ??
+        process.env[SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV] ??
+        ""
+    )
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const funnelEnabled = funnelVersions.includes(strategyVersion);
     const emitFunnel = (stage: V08SupportedPrepinEgressFunnelStage): void => {
-        if (!selectorEnabled) return;
+        if (!funnelEnabled) return;
         context.policyEventObserver?.({
             kind: "v0.8_supported_prepin_egress_funnel",
             unitId: unit.getId(),
@@ -464,18 +390,14 @@ function supportedPrepinEgress(
     if (targetCanCounter) return decision;
     emitFunnel("target_no_counter");
 
-    const threats = pendingMeleeThreats(unit, context);
-    const currentThreats = threats.filter((threat) =>
-        canMeleeFootprintThisActivation(threat, unit.getCells(), context.matrix, context),
-    );
-    if (!currentThreats.length) return decision;
-    emitFunnel("current_threat");
-    if (currentThreats.length !== 1) return decision;
-    emitFunnel("single_current_threat");
-    const currentThreat = currentThreats[0]!;
-    const guards = fixedNativeMeleeGuards(unit, context);
+    const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
+    const threats = enemies.filter((enemy) => !enemy.hasAbilityActive("No Melee"));
+    const futureThreats = threats.filter((threat) => withinMeleeHorizon(unit.getCells(), threat));
+    if (!futureThreats.length) return decision;
+    emitFunnel("future_exposure");
+    const guards = nativeMeleeGuards(unit, context);
     if (!guards.length) return decision;
-    emitFunnel("fixed_guard");
+    emitFunnel("native_guard");
 
     const settings = context.grid.getSettings();
     const currentOrigin = unit.getPosition();
@@ -496,41 +418,59 @@ function supportedPrepinEgress(
     );
     if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) return decision;
     emitFunnel("current_signature");
+    const currentDivisor = currentEvaluation.rangeAttackDivisors[0];
+    if (currentDivisor === undefined || !Number.isFinite(currentDivisor) || currentDivisor <= 0) return decision;
 
-    const proposals: Array<{ route: IWeightedRoute; footprint: XY[]; divisor: number }> = [];
+    const pendingThreats = pendingMeleeThreats(unit, context);
+    const currentTargetDistance = cellDistance(unit.getCells(), target.getCells());
+    const currentMinEnemyDistance = Math.min(
+        ...enemies.map((enemy) => cellDistance(unit.getCells(), enemy.getCells())),
+    );
+    const rangedSuperior = rangedOutput(context.unitsHolder.getAllAllies(unit.getTeam())) > rangedOutput(enemies);
+
+    const proposals: Array<{
+        route: IWeightedRoute;
+        footprint: XY[];
+        divisor: number;
+        exposure: number;
+        minEnemyDistance: number;
+    }> = [];
     const routes = reachableRoutes(unit, context);
     if (routes.length) emitFunnel("reachable_route");
-    let hasSafeRoute = false;
-    let hasScreenedGuardRoute = false;
-    let hasChainSafeRoute = false;
+    let hasPendingDistanceSafeRoute = false;
+    let hasScreenedRoute = false;
+    let hasExposureImprovedRoute = false;
     let hasRetainedSignatureRoute = false;
+    let hasPostureSafeRoute = false;
     for (const route of routes) {
         const footprint = footprintForAnchor(unit, route.cell);
-        const matrix = postMoveMatrix(unit, footprint, context);
         const origin = getPositionForCells(settings, footprint);
         if (
-            !matrix ||
             !origin ||
-            threats.some((threat) => canMeleeFootprintThisActivation(threat, footprint, matrix, context))
+            attackHandler.canBeAttackedByMelee(
+                origin,
+                unit.isSmallSize(),
+                context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+            ) ||
+            pendingThreats.some((threat) => withinMeleeHorizon(footprint, threat))
         ) {
             continue;
         }
-        hasSafeRoute = true;
-        const hasChainSafeScreen = guards.some((guard) => {
-            if (!allyScreensThreat(footprint, guard, currentThreat)) return false;
-            hasScreenedGuardRoute = true;
-            const withoutGuard = matrixWithoutGuard(matrix, guard, context);
-            return (
-                withoutGuard !== undefined &&
-                threats.every(
-                    (threat) =>
-                        threat.getId() === currentThreat.getId() ||
-                        !canMeleeFootprintThisActivation(threat, footprint, withoutGuard, context),
-                )
-            );
-        });
-        if (!hasChainSafeScreen) continue;
-        hasChainSafeRoute = true;
+        hasPendingDistanceSafeRoute = true;
+        const destinationThreats = threats.filter((threat) => withinMeleeHorizon(footprint, threat));
+        const preservesFrontlineFormation = guards.some((guard) =>
+            futureThreats.some((threat) => allyScreensThreat(footprint, guard, threat)),
+        );
+        const screensEveryResidualThreat = destinationThreats.every((threat) =>
+            guards.some((guard) => allyScreensThreat(footprint, guard, threat)),
+        );
+        if (!preservesFrontlineFormation || !screensEveryResidualThreat) {
+            continue;
+        }
+        hasScreenedRoute = true;
+        const exposure = destinationThreats.length;
+        if (exposure >= futureThreats.length) continue;
+        hasExposureImprovedRoute = true;
         const targetPosition = getRangeAttackSideCenter(
             settings,
             shot.aimCell,
@@ -551,20 +491,32 @@ function supportedPrepinEgress(
             hasSameNonRegressingRangeSignature(currentEvaluation, candidateEvaluation)
         ) {
             hasRetainedSignatureRoute = true;
+            const divisor = candidateEvaluation.rangeAttackDivisors[0]!;
+            const minEnemyDistance = Math.min(...enemies.map((enemy) => cellDistance(footprint, enemy.getCells())));
+            const closes =
+                cellDistance(footprint, target.getCells()) < currentTargetDistance ||
+                minEnemyDistance < currentMinEnemyDistance;
+            if ((rangedSuperior && closes) || (!rangedSuperior && closes && divisor >= currentDivisor)) continue;
+            hasPostureSafeRoute = true;
             proposals.push({
                 route,
                 footprint,
-                divisor: candidateEvaluation.rangeAttackDivisors[0]!,
+                divisor,
+                exposure,
+                minEnemyDistance,
             });
         }
     }
-    if (hasSafeRoute) emitFunnel("safe_route");
-    if (hasScreenedGuardRoute) emitFunnel("screened_guard");
-    if (hasChainSafeRoute) emitFunnel("chain_safe");
+    if (hasPendingDistanceSafeRoute) emitFunnel("pending_distance_safe");
+    if (hasScreenedRoute) emitFunnel("screened_route");
+    if (hasExposureImprovedRoute) emitFunnel("exposure_improved");
     if (hasRetainedSignatureRoute) emitFunnel("retained_signature");
+    if (hasPostureSafeRoute) emitFunnel("posture_safe");
     proposals.sort(
         (left, right) =>
+            left.exposure - right.exposure ||
             left.divisor - right.divisor ||
+            right.minEnemyDistance - left.minEnemyDistance ||
             routeCost(left.route) - routeCost(right.route) ||
             left.route.cell.y - right.route.cell.y ||
             left.route.cell.x - right.route.cell.x,
