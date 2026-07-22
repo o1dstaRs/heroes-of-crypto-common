@@ -101,6 +101,8 @@ const IL_SEARCH_CONFIG_FIELDS = [
     "shortlist",
     "includeMoves",
     "activeChallengers",
+    "maxMoveShotComposites",
+    "moveShotVersions",
     "oppModel",
     "decisionDeadlineMs",
     "circuitBreakerMs",
@@ -251,6 +253,8 @@ export interface IIlSearchConfig {
     shortlist: number | null;
     includeMoves: 0 | 1;
     activeChallengers: 0 | 1;
+    maxMoveShotComposites: number;
+    moveShotVersions: string[];
     oppModel: string | null;
     decisionDeadlineMs: number | null;
     circuitBreakerMs: number | null;
@@ -415,6 +419,23 @@ function parseConfig(value: unknown, context: string): IIlSearchConfig {
     };
     const rawCaps = record(cfg.caps, `${context}.caps`);
     exactKeys(rawCaps, IL_SEARCH_CAP_FIELDS, `${context}.caps`);
+    const maxMoveShotComposites = integer(cfg.maxMoveShotComposites, `${context}.maxMoveShotComposites`);
+    if (maxMoveShotComposites > 2) {
+        fail(`${context}.maxMoveShotComposites`, "expected an integer between 0 and 2");
+    }
+    const rawMoveShotVersions: unknown[] = Array.isArray(cfg.moveShotVersions)
+        ? cfg.moveShotVersions
+        : fail(`${context}.moveShotVersions`, "expected an array");
+    const moveShotVersions = rawMoveShotVersions.map((version, index) =>
+        string(version, `${context}.moveShotVersions[${index}]`),
+    );
+    if (
+        moveShotVersions.some((version) => !version.trim()) ||
+        new Set(moveShotVersions).size !== moveShotVersions.length ||
+        (maxMoveShotComposites > 0 && moveShotVersions.length === 0)
+    ) {
+        fail(`${context}.moveShotVersions`, "expected unique non-empty versions for an enabled move-shot probe");
+    }
     return {
         gate,
         horizon: integer(cfg.horizon, `${context}.horizon`, 1),
@@ -423,6 +444,8 @@ function parseConfig(value: unknown, context: string): IIlSearchConfig {
         shortlist: cfg.shortlist === null ? null : integer(cfg.shortlist, `${context}.shortlist`, 2),
         includeMoves: binary(cfg.includeMoves, `${context}.includeMoves`),
         activeChallengers: binary(cfg.activeChallengers, `${context}.activeChallengers`),
+        maxMoveShotComposites,
+        moveShotVersions,
         oppModel: cfg.oppModel === null ? null : string(cfg.oppModel, `${context}.oppModel`),
         decisionDeadlineMs: deadline(cfg.decisionDeadlineMs, "decisionDeadlineMs"),
         circuitBreakerMs: deadline(cfg.circuitBreakerMs, "circuitBreakerMs"),

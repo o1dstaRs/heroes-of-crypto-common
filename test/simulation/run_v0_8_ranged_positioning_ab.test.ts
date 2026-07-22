@@ -15,6 +15,7 @@ import { buildV08A13SearchEnvironment } from "../../src/ai/versions/v0_8_a13_pro
 import {
     buildV08RangedPositioningABEnvironment,
     buildV08RangedPositioningABInvocations,
+    buildV08RangedPositioningABManifest,
     normalizeV08RangedPositioningCohorts,
     parseV08RangedPositioningABOptions,
     runV08RangedPositioningAB,
@@ -176,20 +177,98 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(probe.environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
     });
 
+    it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "off",
+            timingMode: "research_unbounded",
+            moveShots: 2,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, {
+            PATH: "/bin",
+            SEARCH_MAX_MOVE_SHOTS: "0",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8s",
+        });
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: true } as const;
+        const first = buildV08RangedPositioningABManifest(invocation, options, source);
+        const second = buildV08RangedPositioningABManifest(invocation, options, source);
+
+        expect(first).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1",
+            source,
+            geometry: {
+                cohort: "hybrid",
+                games: 200,
+                seed: 872511,
+                concurrency: 12,
+                amountMode: "expBudget",
+                livetwin: true,
+                pairedSideSwap: true,
+                symmetricRosters: true,
+            },
+            arm: {
+                mode: "off",
+                timingMode: "research_unbounded",
+                moveShots: 2,
+                candidateVersion: "v0.8",
+                controlVersion: "v0.8s",
+            },
+            artifacts: { summary: "/tmp/hoc-v08-ranged-ab-test/hybrid.summary.json" },
+        });
+        expect(first.behaviorEnvironment).toMatchObject({
+            SEARCH_GATE: "0.03",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            SEARCH_DECISION_DEADLINE_MS: "",
+            SEARCH_CIRCUIT_BREAKER_MS: "",
+            SEARCH_MAX_MOVE_SHOTS: "2",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+            V08_RANGED_POSITION_MODE: "off",
+            V08_RANGED_POSITION_VERSIONS: "v0.8",
+        });
+        expect(first.behaviorEnvironment.PATH).toBeUndefined();
+        expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).toSorted());
+        expect(first.fingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
+        expect(second.fingerprintSha256).toBe(first.fingerprintSha256);
+
+        const [changedInvocation] = buildV08RangedPositioningABInvocations(
+            { ...options, moveShots: 1 },
+            { PATH: "/bin" },
+        );
+        expect(
+            buildV08RangedPositioningABManifest(changedInvocation, { ...options, moveShots: 1 }, source)
+                .fingerprintSha256,
+        ).not.toBe(first.fingerprintSha256);
+    });
+
     it("runs cohort children sequentially and fails closed on a nonzero child", async () => {
         const seen: string[] = [];
+        const manifests: Array<{ path: string; fingerprint: string }> = [];
         await runV08RangedPositioningAB(BASE_OPTIONS, {
             runChild: async (invocation) => {
                 seen.push(invocation.cohort);
                 return 0;
             },
+            discoverSourceIdentity: () => ({ head: "c".repeat(40), tree: "d".repeat(40), dirty: false }),
+            writeManifest: (path, manifest) => manifests.push({ path, fingerprint: manifest.fingerprintSha256 }),
         });
         expect(seen).toEqual(["hybrid", "ranged_max_sniper3"]);
+        expect(manifests.map(({ path }) => path)).toEqual([
+            "/tmp/hoc-v08-ranged-ab-test/hybrid.experiment.json",
+            "/tmp/hoc-v08-ranged-ab-test/ranged_max_sniper3.experiment.json",
+        ]);
+        expect(manifests.every(({ fingerprint: value }) => /^[a-f0-9]{64}$/.test(value))).toBe(true);
 
+        let wroteFailedManifest = false;
         await expect(
             runV08RangedPositioningAB(BASE_OPTIONS, {
                 runChild: async (invocation) => (invocation.cohort === "hybrid" ? 7 : 0),
+                discoverSourceIdentity: () => ({ head: null, tree: null, dirty: null }),
+                writeManifest: () => {
+                    wroteFailedManifest = true;
+                },
             }),
         ).rejects.toThrow("hybrid exited with code 7");
+        expect(wroteFailedManifest).toBe(false);
     });
 });

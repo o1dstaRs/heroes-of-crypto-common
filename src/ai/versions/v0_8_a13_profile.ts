@@ -127,6 +127,10 @@ export function buildV08A13SearchEnvironment(
         SEARCH_IL_DATASET: undefined,
         SEARCH_LATE_RANGED_FINISH_WEIGHT: "0",
         SEARCH_MAX_MELEE: String(V08_A13_SEARCH.maxMelee),
+        // Production is sealed default-off. Research callers may spread this environment and override only
+        // the cap; the paired scope below then keeps an otherwise identical seat as the control.
+        SEARCH_MAX_MOVE_SHOTS: "0",
+        SEARCH_MOVE_SHOT_VERSIONS: version,
         SEARCH_MAX_MOVES: String(V08_A13_SEARCH.maxMoves),
         SEARCH_MAX_SHOTS: String(V08_A13_SEARCH.maxShots),
         SEARCH_MAX_THROWS: String(V08_A13_SEARCH.maxThrows),

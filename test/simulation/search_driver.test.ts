@@ -1130,14 +1130,17 @@ describe("search driver — gating, hygiene, determinism", () => {
         ): {
             max: number;
             capFor: (version: string) => number;
+            provenance: { maxMoveShotComposites: number; moveShotVersions: string[] };
         } => {
             const driver = buildBattle(seed, "v0.8s").makeDriver() as unknown as {
                 maxMoveShotComposites: number;
                 moveShotCapForVersion: (version: string) => number;
+                ilConfig: () => { maxMoveShotComposites: number; moveShotVersions: string[] };
             };
             return {
                 max: driver.maxMoveShotComposites,
                 capFor: (version) => driver.moveShotCapForVersion(version),
+                provenance: driver.ilConfig(),
             };
         };
 
@@ -1158,6 +1161,25 @@ describe("search driver — gating, hygiene, determinism", () => {
         const scoped = configured(886);
         expect(scoped.capFor("v0.8")).toBe(2);
         expect(scoped.capFor("v0.8s")).toBe(0);
+        expect(scoped.provenance).toMatchObject({
+            maxMoveShotComposites: 2,
+            moveShotVersions: ["v0.8"],
+        });
+
+        const auditPath = join(mkdtempSync(join(tmpdir(), "search-move-shot-scope-")), "audit.jsonl");
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s,v0.8",
+            SEARCH_MAX_MOVE_SHOTS: "2",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+            SEARCH_AUDIT: auditPath,
+        });
+        const auditDriver = buildBattle(888, "v0.8s").makeDriver();
+        auditDriver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(auditPath, "utf8"))).toMatchObject({
+            maxMoveShotComposites: 2,
+            moveShotVersions: ["v0.8"],
+        });
 
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s", SEARCH_MAX_MOVE_SHOTS: "3" });
         expect(() => configured(883)).toThrow("SEARCH_MAX_MOVE_SHOTS must be an integer between 0 and 2");
@@ -2479,6 +2501,8 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
             shortlist: 2,
             includeMoves: 0,
             activeChallengers: 0,
+            maxMoveShotComposites: 0,
+            moveShotVersions: [],
             oppModel: null,
             decisionDeadlineMs: null,
             circuitBreakerMs: null,
@@ -2502,6 +2526,8 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
             cfg: {
                 shortlist: 2,
                 activeChallengers: 0,
+                maxMoveShotComposites: 0,
+                moveShotVersions: [],
                 decisionDeadlineMs: null,
                 circuitBreakerMs: null,
                 caps: {

@@ -9,7 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -70,8 +72,43 @@ export interface IV08RangedPositioningABInvocation {
     outBase: string;
 }
 
+export interface IV08RangedPositioningABSourceIdentity {
+    head: string | null;
+    tree: string | null;
+    dirty: boolean | null;
+}
+
+export interface IV08RangedPositioningABManifest {
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1";
+    source: IV08RangedPositioningABSourceIdentity;
+    geometry: {
+        cohort: MirrorCohortName;
+        games: number;
+        seed: number;
+        concurrency: number;
+        amountMode: "expBudget";
+        livetwin: true;
+        pairedSideSwap: true;
+        symmetricRosters: true;
+    };
+    arm: {
+        mode: V08RangedPositioningMode;
+        timingMode: V08RangedPositioningTimingMode;
+        moveShots: V08RangedPositioningMoveShots;
+        candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
+        controlVersion: typeof V08_A13_SOURCE_VERSION;
+    };
+    behaviorEnvironment: Readonly<Record<string, string>>;
+    artifacts: {
+        summary: string;
+    };
+    fingerprintSha256: string;
+}
+
 export interface IV08RangedPositioningABDependencies {
     runChild?: (invocation: IV08RangedPositioningABInvocation) => Promise<number>;
+    discoverSourceIdentity?: () => IV08RangedPositioningABSourceIdentity;
+    writeManifest?: (path: string, manifest: IV08RangedPositioningABManifest) => void;
 }
 
 const positiveInteger = (value: number, name: string): void => {
@@ -134,6 +171,107 @@ function minimalChildEnvironment(sourceEnvironment: NodeJS.ProcessEnv): NodeJS.P
     }
     environment.BUN_RUNTIME_TRANSPILER_CACHE_PATH = "0";
     return environment;
+}
+
+const EXECUTION_ONLY_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
+    ...INHERITED_OS_ENVIRONMENT_KEYS,
+    "BUN_RUNTIME_TRANSPILER_CACHE_PATH",
+]);
+
+const compareCanonicalKeys = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+
+const canonicalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonicalize);
+    if (value && typeof value === "object") {
+        return Object.fromEntries(
+            Object.entries(value as Record<string, unknown>)
+                .sort(([left], [right]) => compareCanonicalKeys(left, right))
+                .map(([key, entry]) => [key, canonicalize(entry)]),
+        );
+    }
+    return value;
+};
+
+const fingerprint = (value: unknown): string =>
+    createHash("sha256")
+        .update(JSON.stringify(canonicalize(value)))
+        .digest("hex");
+
+export function extractV08RangedPositioningBehaviorEnvironment(
+    environment: NodeJS.ProcessEnv,
+): Readonly<Record<string, string>> {
+    return Object.freeze(
+        Object.fromEntries(
+            Object.entries(environment)
+                .filter(
+                    (entry): entry is [string, string] =>
+                        entry[1] !== undefined && !EXECUTION_ONLY_ENVIRONMENT_KEYS.has(entry[0]),
+                )
+                .sort(([left], [right]) => compareCanonicalKeys(left, right)),
+        ),
+    );
+}
+
+export function discoverV08RangedPositioningABSourceIdentity(
+    repositoryRoot: string = REPOSITORY_ROOT,
+): IV08RangedPositioningABSourceIdentity {
+    const git = (args: readonly string[]): string | null => {
+        try {
+            return execFileSync("git", ["-C", repositoryRoot, ...args], {
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"],
+                env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+            }).trim();
+        } catch {
+            return null;
+        }
+    };
+    const head = git(["rev-parse", "HEAD"]);
+    const tree = git(["rev-parse", "HEAD^{tree}"]);
+    const status = git(["status", "--porcelain=v1", "--untracked-files=normal"]);
+    return {
+        head: head || null,
+        tree: tree || null,
+        dirty: status === null ? null : status.length > 0,
+    };
+}
+
+export function buildV08RangedPositioningABManifest(
+    invocation: IV08RangedPositioningABInvocation,
+    options: IV08RangedPositioningABOptions,
+    source: IV08RangedPositioningABSourceIdentity,
+): IV08RangedPositioningABManifest {
+    const moveShots = options.moveShots ?? 0;
+    const payload = {
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1" as const,
+        source,
+        geometry: {
+            cohort: invocation.cohort,
+            games: options.games,
+            seed: options.seed,
+            concurrency: Math.min(options.concurrency, options.games),
+            amountMode: "expBudget" as const,
+            livetwin: true as const,
+            pairedSideSwap: true as const,
+            symmetricRosters: true as const,
+        },
+        arm: {
+            mode: options.mode,
+            timingMode: options.timingMode,
+            moveShots,
+            candidateVersion: V08_A13_PRODUCTION_VERSION,
+            controlVersion: V08_A13_SOURCE_VERSION,
+        },
+        behaviorEnvironment: extractV08RangedPositioningBehaviorEnvironment(invocation.environment),
+        artifacts: {
+            summary: `${invocation.outBase}.summary.json`,
+        },
+    };
+    return { ...payload, fingerprintSha256: fingerprint(payload) };
+}
+
+function writeExperimentManifest(path: string, manifest: IV08RangedPositioningABManifest): void {
+    writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 /**
@@ -236,14 +374,19 @@ export async function runV08RangedPositioningAB(
 ): Promise<IV08RangedPositioningABInvocation[]> {
     const invocations = buildV08RangedPositioningABInvocations(options);
     const runChild = dependencies.runChild ?? spawnInvocation;
+    const discoverSourceIdentity = dependencies.discoverSourceIdentity ?? discoverV08RangedPositioningABSourceIdentity;
+    const writeManifest = dependencies.writeManifest ?? writeExperimentManifest;
     const moveShots = options.moveShots ?? 0;
     for (const invocation of invocations) {
+        const sourceIdentity = discoverSourceIdentity();
         console.error(
             `[v0.8-ranged-positioning-ab] cohort=${invocation.cohort} mode=${options.mode} ` +
                 `moveShots=${moveShots} timing=${options.timingMode} games=${options.games} seed=${options.seed}`,
         );
         const code = await runChild(invocation);
         if (code !== 0) throw new Error(`ranged-positioning A/B ${invocation.cohort} exited with code ${code}`);
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, sourceIdentity);
+        writeManifest(`${invocation.outBase}.experiment.json`, manifest);
     }
     return invocations;
 }

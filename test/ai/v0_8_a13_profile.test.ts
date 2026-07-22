@@ -39,6 +39,8 @@ const ENV_KEYS = [
     "SEARCH_ROLLOUTS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_MAX_MOVE_SHOTS",
+    "SEARCH_MOVE_SHOT_VERSIONS",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
     "SEARCH_CIRCUIT_BREAKER_MS",
@@ -93,6 +95,8 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_HORIZON: "12",
             SEARCH_ROLLOUTS: "2",
             SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVE_SHOTS: "0",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
             SEARCH_MAX_MOVES: "1",
             SEARCH_MAX_MELEE: "6",
             SEARCH_MAX_SHOTS: "4",
@@ -107,8 +111,17 @@ describe("v0.8 a13 production profile", () => {
         });
         expect(JSON.parse(production.V07_VALUE_WEIGHTS_V2!)).toEqual(V08_A13_VALUE_LEAF);
         expect(source.SEARCH_VERSIONS).toBe("v0.8s");
+        expect(source.SEARCH_MAX_MOVE_SHOTS).toBe("0");
+        expect(source.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8s");
         expect(source.V06_MELEE_DIMS_VERSIONS).toBe("v0.8s");
         expect(source.V07_PLACEMENT_REVEAL_VERSIONS).toBe("v0.8s");
+
+        // A research runner can spread the canonical profile and override only the cap; the safe seat scope
+        // remains bound to the requested profile version.
+        expect({ ...production, SEARCH_MAX_MOVE_SHOTS: "2" }).toMatchObject({
+            SEARCH_MAX_MOVE_SHOTS: "2",
+            SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+        });
     });
 
     it("constructs an exact bounded driver and restores hostile ambient experiments", () => {
@@ -117,6 +130,8 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_HORIZON = "999";
         process.env.SEARCH_ROLLOUTS = "999";
         process.env.SEARCH_VERSIONS = "v0.4";
+        process.env.SEARCH_MAX_MOVE_SHOTS = "2";
+        process.env.SEARCH_MOVE_SHOT_VERSIONS = "v0.7";
         process.env.V07_VALUE_WEIGHTS = "material";
         const driver = createV08A13SearchDriver({} as ILookaheadDeps, {
             seed: 13,
@@ -129,6 +144,8 @@ describe("v0.8 a13 production profile", () => {
             rollouts: number;
             includeMoves: boolean;
             activeChallengers: boolean;
+            maxMoveShotComposites: number;
+            moveShotCapForVersion: (version: string) => number;
             aggressiveV08: boolean;
             shortlist: number | null;
             decisionDeadlineMs: number | null;
@@ -151,6 +168,7 @@ describe("v0.8 a13 production profile", () => {
             rollouts: 2,
             includeMoves: true,
             activeChallengers: true,
+            maxMoveShotComposites: 0,
             aggressiveV08: true,
             shortlist: 3,
             decisionDeadlineMs: 175,
@@ -162,12 +180,16 @@ describe("v0.8 a13 production profile", () => {
                 maxAreaThrowCells: 2,
             },
         });
+        expect(internals.moveShotCapForVersion("v0.8")).toBe(0);
+        expect(internals.moveShotCapForVersion("v0.7")).toBe(0);
         expect(internals.learnedV2).toEqual(V08_A13_VALUE_LEAF);
         expect(process.env.V07_SEARCH).toBe("0");
         expect(process.env.SEARCH_GATE).toBe("99");
         expect(process.env.SEARCH_HORIZON).toBe("999");
         expect(process.env.SEARCH_ROLLOUTS).toBe("999");
         expect(process.env.SEARCH_VERSIONS).toBe("v0.4");
+        expect(process.env.SEARCH_MAX_MOVE_SHOTS).toBe("2");
+        expect(process.env.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.7");
         expect(process.env.V07_VALUE_WEIGHTS).toBe("material");
     });
 

@@ -54,6 +54,8 @@ const config = {
     shortlist: null,
     includeMoves: 0,
     activeChallengers: 0,
+    maxMoveShotComposites: 0,
+    moveShotVersions: [],
     oppModel: null,
     decisionDeadlineMs: null,
     circuitBreakerMs: null,
@@ -177,7 +179,7 @@ describe("IL dataset v3", () => {
             vf: "01af95ce0fa9b93be9ef76579b56f458161c1eb368ac73f2d8a7a9f8373310c8",
             cf: "e332dbea45c3ebfe117de2276f530517c203b09bddaa71099e32c75f10a2111f",
             af: "fc05c543bbb06d280f523ee2971fb19e89558403ecfe86b35ad3e6c41cd1b885",
-            schema: "95d337946c224c95537fc5a524578fc053e8525c2bc4f97b16736cdb0b0fe176",
+            schema: "af3ae8883d0939e48f963a4bdfc0a4fe01dca4d5145830fcf02b6f3a2f941531",
         });
     });
 

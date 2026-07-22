@@ -102,6 +102,24 @@ function placeLarge(c: CombatTestContext, unit: Unit, base: XY): void {
     c.unitsHolder.addUnit(unit);
 }
 
+function startActionEngine(c: CombatTestContext, unit: Unit, context: IDecisionContext): GameActionEngine {
+    const fightProperties = context.fightProperties!;
+    fightProperties.startFight();
+    fightProperties.setTeamUnitsAlive(LOWER, c.unitsHolder.getAllAllies(LOWER).length);
+    fightProperties.setTeamUnitsAlive(UPPER, c.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.startTurn(unit.getTeam(), 1_000);
+    return new GameActionEngine({
+        fightProperties,
+        grid: c.grid,
+        unitsHolder: c.unitsHolder,
+        moveHandler: new MoveHandler(testGridSettings, c.grid, c.unitsHolder),
+        sceneLog: new SceneLogMock(),
+        attackHandler: c.attackHandler,
+        getCurrentActiveUnitId: () => unit.getId(),
+        getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(unit, context),
+    });
+}
+
 const endTurn = (unit: Unit): GameAction[] => [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
 const ofKind = (cands: IEnumeratedCandidate[], kind: string): IEnumeratedCandidate[] =>
     cands.filter((cand) => cand.kind === kind);
@@ -446,22 +464,112 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(target.getId());
         }
 
-        const fightProperties = context.fightProperties!;
-        fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, 1);
-        fightProperties.setTeamUnitsAlive(UPPER, 1);
-        fightProperties.startTurn(LOWER, 1_000);
-        const engine = new GameActionEngine({
-            fightProperties,
-            grid: c.grid,
-            unitsHolder: c.unitsHolder,
-            moveHandler: new MoveHandler(testGridSettings, c.grid, c.unitsHolder),
-            sceneLog: new SceneLogMock(),
-            attackHandler: c.attackHandler,
-            getCurrentActiveUnitId: () => shooter.getId(),
-            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
-        });
+        const engine = startActionEngine(c, shooter, context);
         expect(composites[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+    });
+
+    it("move-shots: a secondary RANGE selection completes after moving", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Dual-mode archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 3,
+            speed: 3,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 5,
+        });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "Target",
+            attackType: MELEE,
+            speed: 1,
+            amountAlive: 20,
+            maxHp: 20,
+        });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        expect(shooter.selectAttackType(MELEE)).toBe(true);
+        const context = ctxFor(c, true);
+        const composite = enumerateCandidates(shooter, context, endTurn(shooter), {
+            maxMoveShotComposites: 1,
+        }).candidates.find(
+            (candidate) =>
+                candidate.actions.some((action) => action.type === "move_unit") &&
+                candidate.actions.some((action) => action.type === "range_attack"),
+        );
+        expect(composite).toBeDefined();
+        expect(composite!.actions.map((action) => action.type)).toEqual([
+            "move_unit",
+            "select_attack_type",
+            "range_attack",
+        ]);
+
+        const engine = startActionEngine(c, shooter, context);
+        expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true, true]);
+    });
+
+    it("move-shots: a LARGE shooter evaluates and applies its exact legal 2x2 destination footprint", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Large cannon",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 3,
+            speed: 3,
+            size: PBTypes.UnitSizeVals.LARGE,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 5,
+        });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "Target",
+            attackType: MELEE,
+            speed: 1,
+            amountAlive: 20,
+            maxHp: 20,
+        });
+        placeLarge(c, shooter, { x: 3, y: 8 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 11, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+        const composite = enumerateCandidates(shooter, context, endTurn(shooter), {
+            maxMoveShotComposites: 1,
+        }).candidates.find(
+            (candidate) =>
+                candidate.actions.some((action) => action.type === "move_unit") &&
+                candidate.actions.some((action) => action.type === "range_attack"),
+        );
+        expect(composite).toBeDefined();
+        const move = composite!.actions.find((action) => action.type === "move_unit");
+        const shot = composite!.actions.find((action) => action.type === "range_attack");
+        if (move?.type !== "move_unit" || shot?.type !== "range_attack" || !move.targetCells) {
+            throw new Error("expected a LARGE move-shot candidate");
+        }
+        expect(move.targetCells).toHaveLength(4);
+        expect(new Set(move.targetCells.map((cell) => `${cell.x},${cell.y}`)).size).toBe(4);
+        const origin = getPositionForCells(testGridSettings, move.targetCells);
+        if (!origin || !shot.aimCell || shot.aimSide === undefined) throw new Error("missing LARGE shot origin");
+        const to = getRangeAttackSideCenter(testGridSettings, shot.aimCell, shot.aimSide, origin);
+        const evaluation = c.attackHandler.evaluateRangeAttack(
+            c.unitsHolder.getAllUnits(),
+            shooter,
+            origin,
+            to,
+            false,
+            false,
+            false,
+        );
+        expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(target.getId());
+
+        const engine = startActionEngine(c, shooter, context);
+        expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+        expect(shooter.getCells()).toEqual(expect.arrayContaining(move.targetCells));
     });
 
     it("move-shots: excludes pinned shooters and special range geometry", () => {
