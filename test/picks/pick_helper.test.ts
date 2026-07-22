@@ -35,12 +35,13 @@ describe("pick_helper", () => {
         const levelOne = creatureIdsForLevel(1);
         const levelFour = creatureIdsForLevel(4);
 
-        // L1 has a 12-creature pool and both teams may pick 2 each (4 reserved): the 8th ban is the
-        // last legal one, so with 8 already banned a 9th is refused (it would strand a pick). A
-        // sentinel-inflated bucket would wrongly allow it, so this still pins the bucket size.
-        expect(canBanCreatureLevel(1, levelOne.slice(0, 7), [], [])).toBe(true);
-        expect(canBanCreatureLevel(1, levelOne.slice(0, 8), [], [])).toBe(false);
+        // L1 has a 14-creature pool (after adding Mermaid + Dryad) and both teams may pick 2 each
+        // (4 reserved): the 10th ban is the last legal one, so with 10 already banned an 11th is
+        // refused (it would strand a pick). A sentinel-inflated bucket would wrongly allow it, so
+        // this still pins the bucket size.
+        expect(canBanCreatureLevel(1, levelOne.slice(0, 9), [], [])).toBe(true);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 10), [], [])).toBe(false);
+        expect(canBanCreatureLevel(1, levelOne.slice(0, 12), [], [])).toBe(false);
         // L4 now has a 12-creature pool after enabling Arachna Queen. Both teams reserve one pick,
         // so a 10th ban is legal with 9 already banned; an 11th is refused with 10 already banned.
         expect(canBanCreatureLevel(4, levelFour.slice(0, 4), [], [])).toBe(true);

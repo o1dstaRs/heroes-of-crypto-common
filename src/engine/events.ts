@@ -29,7 +29,7 @@ export type GameEvent =
     | { type: "center_obstacle_cleared"; gridType: GridType }
     | { type: "narrowing_applied"; lap: number; layers: number; encounterCurrent: boolean }
     | { type: "unit_moved_by_system"; unitId: string; position: XY; reason: "narrowing" }
-    | { type: "unit_destroyed"; unitId: string; reason: "narrowing" | "armageddon" | "dead_cleanup" }
+    | { type: "unit_destroyed"; unitId: string; reason: "narrowing" | "armageddon" | "dead_cleanup" | "poison" }
     | { type: "unit_resurrected"; unitId: string; team: TeamType; amount: number; hp: number; position: XY }
     | { type: "armageddon_applied"; unitId: string; wave: number; damage: number; unitsDied: number }
     | { type: "morale_applied"; unitId: string; kind: "plus" | "minus"; lap: number }

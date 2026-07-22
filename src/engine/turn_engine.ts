@@ -425,6 +425,18 @@ export class TurnEngine {
         }
         this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
         unit.refreshPreTurnState(this.sceneLog);
+
+        // Poison ticks at the very start of the unit's turn, before it acts (even if it is about to skip).
+        const poisonEffect = unit.getEffect("Poison");
+        if (poisonEffect && poisonEffect.getPower() > 0) {
+            const poisonDamage = unit.applyDamage(poisonEffect.getPower(), 0, this.sceneLog, false);
+            this.sceneLog.updateLog(`${unit.getName()} takes ${poisonDamage} poison damage`);
+            if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId())) {
+                events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "poison" });
+                return events;
+            }
+        }
+
         unit.refreshPossibleAttackTypes(this.canLandRangeAttack?.(unit) ?? true);
         this.fightProperties.markFirstTurn();
 

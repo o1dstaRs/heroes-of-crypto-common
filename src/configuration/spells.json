@@ -696,6 +696,26 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Water Shield": {
+            "name": "Water Shield",
+            "level": 0,
+            "desc": [
+                "Fully absorbs the first incoming attack this battle (0 damage taken), then breaks.",
+                "Lasts till broken."
+            ],
+            "target": "AUTO",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Visible": {
             "name": "Visible",
             "level": 0,
@@ -956,6 +976,23 @@
             "desc": ["The unit's movement range is reduced by 25%.", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
             "power": 25,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Hamstrung": {
+            "name": "Hamstrung",
+            "level": 1,
+            "desc": ["The unit's movement range is reduced by 30%.", "Lasts 3 laps."],
+            "target": "ANY_ENEMY",
+            "power": 30,
             "power_type": "COMMON",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,

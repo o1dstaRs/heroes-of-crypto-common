@@ -70,10 +70,10 @@ describe("pick_sim", () => {
         expect(state.upper.tier2Offers).toEqual([1, 2, 3]);
         expect(state.creaturesBanned).toEqual([12, 13, 21, 22, 23, 15, 16, 24, 25, 26, 7, 8, 17, 9, 10, 19, 20, 29]);
         expect(drawPoolSizes).toEqual([
+            14,
+            13,
             12,
-            11,
-            10,
-            9, // four globally distinct L1 offers
+            11, // four globally distinct L1 offers (14-creature pool after adding Mermaid + Dryad)
             12,
             11,
             10,
@@ -88,11 +88,11 @@ describe("pick_sim", () => {
             12,
             11,
             10, // upper T2 offer
+            10,
+            9,
             8,
             7,
-            6,
-            5,
-            4, // L1 bans after excluding all four offers
+            6, // L1 bans after excluding all four offers (14-creature pool)
             8,
             7,
             6,

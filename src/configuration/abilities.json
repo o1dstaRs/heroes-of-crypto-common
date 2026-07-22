@@ -192,6 +192,30 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Water Element": {
+        "name": "Water Element",
+        "type": "DEFENCE",
+        "desc": ["Gives Water immunity. Fire attacks deal {}% more damage"],
+        "power": 50,
+        "power_type": "MAGIC_VULNERABILITY_FIRE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Water Shield": {
+        "name": "Water Shield",
+        "type": "DEFENCE",
+        "desc": ["Once per battle, fully absorbs the first incoming attack (0 damage taken), then breaks"],
+        "power": 100,
+        "power_type": "ABSORB_FIRST_HIT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Piercing Spear": {
         "name": "Piercing Spear",
         "type": "ATTACK",
@@ -437,6 +461,30 @@
         ],
         "power": 25,
         "power_type": "APPLY_RANDOM_DEBUFF",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Poison Cloud Aura": {
+        "name": "Poison Cloud Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within 2 cells apply {}% (plus their luck) of their attack damage to the target as Poison"],
+        "power": 10,
+        "power_type": "POISON_ON_HIT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Poison Cloud",
+        "can_be_cast": false
+    },
+    "Hamstring": {
+        "name": "Hamstring",
+        "type": "STATUS",
+        "desc": ["On attack, {}% chance to reduce the enemy's movement range by 30% (Hamstrung) for 3 laps"],
+        "power": 30,
+        "power_type": "HAMSTRING",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,

@@ -404,7 +404,9 @@ proto.PBTypes.CreatureVals = {
   CHAMPION: 42,
   FRENZIED_BOAR: 43,
   ARACHNA_QUEEN: 44,
-  ARACHNA_SPIDER: 45
+  ARACHNA_SPIDER: 45,
+  MERMAID: 46,
+  DRYAD: 47
 };
 
 

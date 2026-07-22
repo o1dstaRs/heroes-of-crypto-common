@@ -8,6 +8,14 @@
         "is_buff": true,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE"
     },
+    "Poison Cloud": {
+        "name": "Poison Cloud",
+        "range": 2,
+        "desc": "Affected allies apply {}% (plus their luck) of their attack damage to the target as Poison.",
+        "power": 10,
+        "is_buff": true,
+        "power_type": "POISON_ON_HIT"
+    },
     "Range Null Field": {
         "name": "Range Null Field",
         "range": 2,

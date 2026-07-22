@@ -191,7 +191,13 @@ export interface IBoardObj {
 }
 
 interface IDamageable {
-    applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak: boolean): void;
+    applyDamage(
+        minusHp: number,
+        chanceToBreak: number,
+        sceneLog: ISceneLog,
+        extendBreak: boolean,
+        attacker?: Unit,
+    ): void;
 
     calculatePossibleLosses(minusHp: number): number;
 
@@ -251,6 +257,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     protected possibleAttackTypes: AttackType[] = [];
     protected maxRangeShots = 0;
     protected responded = false;
+    // Water Shield: set once this unit's one-per-battle absorb shield has been consumed, so the seeding
+    // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
+    protected waterShieldSpent = false;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -1317,8 +1326,26 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.applyDamage(armageddonDamage, 0, sceneLog, false);
         return armageddonDamage;
     }
-    public applyDamage(minusHp: number, chanceToBreak: number, sceneLog: ISceneLog, extendBreak = false): number {
+    public applyDamage(
+        minusHp: number,
+        chanceToBreak: number,
+        sceneLog: ISceneLog,
+        extendBreak = false,
+        attacker?: Unit,
+    ): number {
         if (minusHp <= 0) {
+            return 0;
+        }
+
+        // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
+        // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
+        // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
+        // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
+        // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
+        if (this.hasBuffActive("Water Shield") && !attacker?.hasAbilityActive("Fire Element")) {
+            this.waterShieldSpent = true;
+            this.deleteBuff("Water Shield");
+            sceneLog.updateLog(`${this.getName()}'s Water Shield absorbs the hit and breaks`);
             return 0;
         }
 
@@ -1573,6 +1600,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
     }
+    /**
+     * Water Shield seeding: grant this unit its one-per-battle absorb shield as a permanent buff, guarded so
+     * it is applied at most once and never re-granted after it is consumed. Called for every unit by
+     * UnitsHolder.refreshWaterShieldForAllUnits at fight start / on each stack-power refresh.
+     */
+    public trySeedWaterShield(): void {
+        if (this.waterShieldSpent || !this.hasAbilityActive("Water Shield") || this.hasBuffActive("Water Shield")) {
+            return;
+        }
+        this.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
+    }
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;
         const currentHp = this.unitProperties.hp;
@@ -1613,6 +1651,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR) {
+            return auraEffect.getPower();
+        }
+
+        // Poison Cloud is not stack-powered: the affected ally applies the flat base % (its own luck is
+        // added at hit time in processPoisonAuraAbility), so the stored aura power is just the base value.
+        if (auraEffect.getPowerType() === AbilityPowerType.POISON_ON_HIT) {
             return auraEffect.getPower();
         }
 
@@ -1847,6 +1891,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ),
         );
     }
+    /**
+     * Water <-> Fire elemental affinity multiplier. The vulnerability lives on the DEFENDER's element ability
+     * (Fire Element / Water Element, power 50 = "takes 50% more from the opposing element"): a Fire-Element
+     * attacker vs a Water-Element target, and a Water-Element attacker vs a Fire-Element target, each deal
+     * +power% more. Feeding this into calculateAttackDamage covers normal melee/ranged attacks AND Fire Breath
+     * (whose per-target damage routes through calculateAttackDamage).
+     */
+    public getElementalDamageMultiplier(enemyUnit: Unit): number {
+        if (this.hasAbilityActive("Fire Element") && enemyUnit.hasAbilityActive("Water Element")) {
+            return 1 + (enemyUnit.getAbility("Water Element")?.getPower() ?? 0) / 100;
+        }
+        if (this.hasAbilityActive("Water Element") && enemyUnit.hasAbilityActive("Fire Element")) {
+            return 1 + (enemyUnit.getAbility("Fire Element")?.getPower() ?? 0) / 100;
+        }
+        return 1;
+    }
     public calculateAttackDamage(
         enemyUnit: Unit,
         attackType: AttackType,
@@ -1916,7 +1976,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             deepWoundsMultiplier = 1 + deepWoundsPower / 100;
         }
 
-        return Math.floor(getRandomInt(min, max) * attackTypeMultiplier * abilityMultiplier * deepWoundsMultiplier);
+        return Math.floor(
+            getRandomInt(min, max) *
+                attackTypeMultiplier *
+                abilityMultiplier *
+                deepWoundsMultiplier *
+                this.getElementalDamageMultiplier(enemyUnit),
+        );
     }
     public canSkipResponse(): boolean {
         if (!this.hasAbilityActive("Break")) {
@@ -2681,9 +2747,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const quagmireDebuff = this.getDebuff("Quagmire");
+        const hamstrungDebuff = this.getDebuff("Hamstrung");
         let stepsMultiplier = 1;
         if (quagmireDebuff) {
-            stepsMultiplier = (100 - quagmireDebuff.getPower()) / 100;
+            stepsMultiplier *= (100 - quagmireDebuff.getPower()) / 100;
+        }
+        if (hamstrungDebuff) {
+            stepsMultiplier *= (100 - hamstrungDebuff.getPower()) / 100;
         }
         this.unitProperties.steps = Number((this.unitProperties.steps * stepsMultiplier).toFixed(1));
         this.unitProperties.steps_mod = Number((this.unitProperties.steps_mod * stepsMultiplier).toFixed(1));

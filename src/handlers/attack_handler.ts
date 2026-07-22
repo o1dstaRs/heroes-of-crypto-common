@@ -838,6 +838,7 @@ export class AttackHandler {
                             .getBreakChancePerTeam(targetUnit.getTeam()),
                         this.sceneLog,
                         true,
+                        targetUnit,
                     ),
                     team: targetUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
@@ -916,6 +917,8 @@ export class AttackHandler {
                     damageFromAttack,
                     FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                     this.sceneLog,
+                    false,
+                    attackerUnit,
                 );
                 const currentAmount = targetUnit.getAmountAlive();
                 damageForAnimation.hits.push({
@@ -967,6 +970,15 @@ export class AttackHandler {
                     this.grid,
                     this.sceneLog,
                 );
+                AllAbilities.processHamstringAbility(
+                    attackerUnit,
+                    targetUnit,
+                    attackerUnit,
+                    unitsHolder,
+                    this.grid,
+                    this.sceneLog,
+                );
+                AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
             }
             if (recordPrimaryTargetDeath()) {
                 switchTargetUnit = true;
@@ -1177,6 +1189,7 @@ export class AttackHandler {
                     this.grid,
                     this.sceneLog,
                 );
+                AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, secondShotResult.damage, this.sceneLog);
             }
             recordPrimaryTargetDeath();
         }
@@ -1752,6 +1765,7 @@ export class AttackHandler {
                                 .getBreakChancePerTeam(targetUnit.getTeam()),
                             this.sceneLog,
                             true,
+                            targetUnit,
                         ),
                         team: targetUnit.getTeam(),
                         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
@@ -1841,6 +1855,8 @@ export class AttackHandler {
                     damageFromAttack,
                     FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                     this.sceneLog,
+                    false,
+                    attackerUnit,
                 );
                 const currentAmount = targetUnit.getAmountAlive();
                 damageForAnimation.hits.push({
@@ -1864,6 +1880,8 @@ export class AttackHandler {
                             .getFightProperties()
                             .getBreakChancePerTeam(attackerUnit.getTeam()),
                         this.sceneLog,
+                        false,
+                        attackerUnit,
                     ),
                     team: attackerUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
@@ -1897,6 +1915,15 @@ export class AttackHandler {
             AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+            AllAbilities.processHamstringAbility(
+                attackerUnit,
+                targetUnit,
+                attackerUnit,
+                unitsHolder,
+                this.grid,
+                this.sceneLog,
+            );
+            AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
             AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
             updateUnitsDied(
                 AllAbilities.processChainLightningAbility(
@@ -1967,6 +1994,8 @@ export class AttackHandler {
                             .getFightProperties()
                             .getBreakChancePerTeam(attackerUnit.getTeam()),
                         this.sceneLog,
+                        false,
+                        attackerUnit,
                     );
                     const currentAmount = targetUnit.getAmountAlive();
                     damageForAnimation.hits.push({
@@ -1992,6 +2021,8 @@ export class AttackHandler {
                                 .getFightProperties()
                                 .getBreakChancePerTeam(attackerUnit.getTeam()),
                             this.sceneLog,
+                            false,
+                            attackerUnit,
                         ),
                         team: attackerUnit.getTeam(),
                         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
@@ -2045,6 +2076,12 @@ export class AttackHandler {
                 AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processPoisonAuraAbility(
+                    attackerUnit,
+                    targetUnit,
+                    secondPunchResult.damage,
+                    this.sceneLog,
+                );
             }
 
             if (

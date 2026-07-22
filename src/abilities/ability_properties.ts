@@ -65,6 +65,10 @@ export enum AbilityPowerType {
     INFEST = 52,
     STEAL_ABILITY = 53,
     ARMY_FLYING_ATTACK_ARMOR_STEPS = 54,
+    MAGIC_VULNERABILITY_FIRE = 55,
+    POISON_ON_HIT = 56,
+    HAMSTRING = 57,
+    ABSORB_FIRST_HIT = 58,
 }
 
 export const AllAbilityPowerTypes = [
@@ -123,6 +127,10 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.INFEST,
     AbilityPowerType.STEAL_ABILITY,
     AbilityPowerType.ARMY_FLYING_ATTACK_ARMOR_STEPS,
+    AbilityPowerType.MAGIC_VULNERABILITY_FIRE,
+    AbilityPowerType.POISON_ON_HIT,
+    AbilityPowerType.HAMSTRING,
+    AbilityPowerType.ABSORB_FIRST_HIT,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -184,6 +192,10 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     INFEST: AbilityPowerType.INFEST,
     STEAL_ABILITY: AbilityPowerType.STEAL_ABILITY,
     ARMY_FLYING_ATTACK_ARMOR_STEPS: AbilityPowerType.ARMY_FLYING_ATTACK_ARMOR_STEPS,
+    MAGIC_VULNERABILITY_FIRE: AbilityPowerType.MAGIC_VULNERABILITY_FIRE,
+    POISON_ON_HIT: AbilityPowerType.POISON_ON_HIT,
+    HAMSTRING: AbilityPowerType.HAMSTRING,
+    ABSORB_FIRST_HIT: AbilityPowerType.ABSORB_FIRST_HIT,
 };
 
 export enum AbilityType {

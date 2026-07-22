@@ -181,13 +181,15 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     }
 
     const abilityType = ToAbilityType[ability.type];
-    if (!abilityType) {
-        throw new TypeError(`Invalid type for ability ${abilityName} = ${abilityType}`);
+    // NO_TYPE is a legitimate value (enum 0) that the ToAbility*Type maps list explicitly, so reject only
+    // unknown keys (undefined) — a `!x` guard would wrongly throw on the valid 0 (e.g. Water Shield's NO_TYPE).
+    if (abilityType === undefined) {
+        throw new TypeError(`Invalid type for ability ${abilityName} = ${ability.type}`);
     }
 
     const abilityPowerType = ToAbilityPowerType[ability.power_type];
-    if (!abilityPowerType) {
-        throw new TypeError(`Invalid power type for ability ${abilityName} = ${abilityPowerType}`);
+    if (abilityPowerType === undefined) {
+        throw new TypeError(`Invalid power type for ability ${abilityName} = ${ability.power_type}`);
     }
 
     if (!ability.desc || ability.desc.constructor !== Array || !ability.desc.length) {

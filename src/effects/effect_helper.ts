@@ -35,6 +35,7 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
 
     if (
         auraEffectProperties.power_type === AbilityPowerType.LUCK_10 ||
+        auraEffectProperties.power_type === AbilityPowerType.POISON_ON_HIT ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DAMAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
