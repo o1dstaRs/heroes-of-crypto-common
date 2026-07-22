@@ -22,7 +22,10 @@ import { getPositionForCell, getRangeAttackSideCenter } from "../../src/grid/gri
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { makeRng } from "../../src/simulation/army";
 import type { Unit } from "../../src/units/unit";
+import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
+import type { XY } from "../../src/utils/math";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -35,6 +38,7 @@ const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
+const MAGIC = PBTypes.AttackVals.MAGIC;
 
 function decisionContext(combat: CombatTestContext): IDecisionContext {
     return {
@@ -163,14 +167,358 @@ function setupPartiallyScreenedPinnedShooter(): {
     return { shooter, context: decisionContext(combat) };
 }
 
+function setupSupportedPrepinEgress(
+    options: {
+        guardActed?: boolean;
+        guardQueued?: boolean;
+        guardStolenQuiver?: boolean;
+        targetRanged?: boolean;
+        targetCell?: XY;
+        threatRanged?: boolean;
+        threatSpeed?: number;
+        shotDistance?: number;
+    } = {},
+): {
+    shooter: Unit;
+    target: Unit;
+    threat: Unit;
+    guard: Unit;
+    context: IDecisionContext;
+} {
+    const combat = createCombatTestContext();
+    const shooter = createTestUnit({
+        team: LOWER,
+        name: "Pre-pin Archer",
+        attackType: RANGE,
+        speed: 1,
+        rangeShots: 8,
+        shotDistance: options.shotDistance ?? 16,
+        damageMin: 10,
+        damageMax: 10,
+    });
+    const target = createTestUnit({
+        team: UPPER,
+        name: "Shot target",
+        attackType: options.targetRanged ? RANGE : MELEE,
+        speed: 0,
+        rangeShots: options.targetRanged ? 8 : 0,
+        shotDistance: 16,
+        amountAlive: 10,
+        maxHp: 20,
+    });
+    const threat = createTestUnit({
+        team: UPPER,
+        name: "Pending charger",
+        attackType: options.threatRanged ? RANGE : MELEE,
+        speed: options.threatSpeed ?? 2,
+        rangeShots: options.threatRanged ? 8 : 0,
+        shotDistance: 16,
+    });
+    const guard = createTestUnit({ team: LOWER, name: "Causal guard", attackType: MELEE, speed: 1 });
+    // This ranged wall is occupancy-only: it closes the second corner lane but cannot satisfy the native-melee
+    // guard proof. Vacating (0,1) leaves a two-step approach to the old cell, while the acted guard at (1,1)
+    // is the only blocker whose removal opens a two-step attack on the destination at (0,0).
+    const wall = createTestUnit({ team: LOWER, name: "Corner wall", attackType: RANGE, speed: 1, rangeShots: 1 });
+    placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 0, y: 1 });
+    placeUnit(combat.grid, combat.unitsHolder, target, options.targetCell ?? { x: 0, y: 10 });
+    placeUnit(combat.grid, combat.unitsHolder, threat, { x: 3, y: 2 });
+    placeUnit(combat.grid, combat.unitsHolder, guard, { x: 1, y: 1 });
+    placeUnit(combat.grid, combat.unitsHolder, wall, { x: 1, y: 0 });
+    if (options.guardStolenQuiver) {
+        guard.grantStolenAbility("Endless Quiver");
+        guard.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
+    }
+    shooter.refreshPossibleAttackTypes(true);
+    threat.refreshPossibleAttackTypes(true);
+    const context = decisionContext(combat);
+    if (options.guardActed ?? true) {
+        context.fightProperties!.addAlreadyMadeTurn(guard.getTeam(), guard.getId());
+    }
+    if (options.guardQueued) context.fightProperties!.enqueueUpNext(guard.getId());
+    return { shooter, target, threat, guard, context };
+}
+
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
     delete process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS;
     delete process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS;
+    delete process.env.V08_SUPPORTED_PREPIN_EGRESS;
+    delete process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS;
+    setDeterministicRandomSource(undefined);
 });
 
 describe("v0.8 protected ranged positioning", () => {
+    it("uses an acted native melee guard to move out of a pending pin and retain the exact ordinary shot", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, target, context } = setupSupportedPrepinEgress();
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [{ x: 0, y: 0 }] });
+        expect(actions[1]).toMatchObject({ type: "range_attack", targetId: target.getId() });
+        expect(policyEvents.map(({ kind }) => kind)).toEqual(["v0.8_supported_prepin_egress"]);
+    });
+
+    it("keeps the pre-pin experiment default-off and computes but does not select its catalog-only control", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const disabled = setupSupportedPrepinEgress();
+        expect(new StrategyV0_8().decideTurn(disabled.shooter, disabled.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "supported-prepin-egress-catalog-only-control";
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        const control = setupSupportedPrepinEgress();
+        const policyEvents: IAIPolicyEvent[] = [];
+        control.context.policyEventObserver = (event) => policyEvents.push(event);
+        expect(new StrategyV0_8S().decideTurn(control.shooter, control.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        expect(policyEvents).toEqual([]);
+    });
+
+    it("consumes an identical seeded geometry stream before treatment selection and catalog-only rejection", () => {
+        const decideAndReadTail = (version: "v0.8" | "v0.8s", selector: string): number[] => {
+            const fixture = setupSupportedPrepinEgress();
+            process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+            process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = selector;
+            process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+            setDeterministicRandomSource(makeRng(0x13579bdf));
+            const actions =
+                version === "v0.8"
+                    ? new StrategyV0_8().decideTurn(fixture.shooter, fixture.context)
+                    : new StrategyV0_8S().decideTurn(fixture.shooter, fixture.context);
+            expect(actions.map((action) => action.type)).toEqual(
+                version === "v0.8" ? ["move_unit", "range_attack"] : ["range_attack"],
+            );
+            return [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)];
+        };
+
+        const treatmentTail = decideAndReadTail("v0.8", "v0.8");
+        const controlTail = decideAndReadTail("v0.8s", "supported-prepin-egress-catalog-only-control");
+        expect(controlTail).toEqual(treatmentTail);
+    });
+
+    it("fails closed without a fixed native-melee guard or when that acted guard has a queued reactivation", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        for (const options of [{ guardActed: false }, { guardQueued: true }]) {
+            const fixture = setupSupportedPrepinEgress(options);
+            expect(
+                new StrategyV0_8().decideTurn(fixture.shooter, fixture.context).map((action) => action.type),
+            ).toEqual(["range_attack"]);
+        }
+    });
+
+    it("uses stable native class identity when an acted melee guard owns a stolen quiver", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, guard, context } = setupSupportedPrepinEgress({ guardStolenQuiver: true });
+
+        expect(guard.getUnitProperties().attack_type).toBe(MELEE);
+        expect(guard.isRangeCapable()).toBe(true);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+            "move_unit",
+            "range_attack",
+        ]);
+    });
+
+    it("does not egress when the current target can immediately answer with a ranged response", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, target, context } = setupSupportedPrepinEgress({ targetRanged: true });
+
+        expect(target.canRespond(RANGE)).toBe(true);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+    });
+
+    it("requires a current pending pin before considering a guarded destination", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        const noCurrentThreat = setupSupportedPrepinEgress();
+        noCurrentThreat.context.fightProperties!.addAlreadyMadeTurn(UPPER, noCurrentThreat.threat.getId());
+        expect(
+            new StrategyV0_8()
+                .decideTurn(noCurrentThreat.shooter, noCurrentThreat.context)
+                .map((action) => action.type),
+        ).toEqual(["range_attack"]);
+    });
+
+    it("treats a pending native shooter as a melee-pin threat when it can reach the destination", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, threat, context } = setupSupportedPrepinEgress({ threatRanged: true });
+
+        expect(threat.getUnitProperties().attack_type).toBe(RANGE);
+        expect(threat.getPossibleAttackTypes()).toContain(MELEE);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+            "move_unit",
+            "range_attack",
+        ]);
+    });
+
+    it("rejects egress when an unscreened pending shooter can move in and melee-pin the destination", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, context } = setupSupportedPrepinEgress();
+        const unscreenedShooter = createTestUnit({
+            team: UPPER,
+            name: "Unscreened enemy archer",
+            attackType: RANGE,
+            speed: 2,
+            rangeShots: 8,
+            shotDistance: 16,
+        });
+        placeUnit(context.grid, context.unitsHolder, unscreenedShooter, { x: 0, y: 3 });
+        unscreenedShooter.refreshPossibleAttackTypes(true);
+        context.matrix = context.grid.getMatrix();
+
+        expect(unscreenedShooter.getPossibleAttackTypes()).toContain(MELEE);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+    });
+
+    it("rejects egress when an unscreened pending caster can move in and melee-pin the destination", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, context } = setupSupportedPrepinEgress();
+        const unscreenedCaster = createTestUnit({
+            team: UPPER,
+            name: "Unscreened enemy caster",
+            attackType: MAGIC,
+            speed: 2,
+        });
+        placeUnit(context.grid, context.unitsHolder, unscreenedCaster, { x: 0, y: 3 });
+        unscreenedCaster.refreshPossibleAttackTypes(false);
+        context.matrix = context.grid.getMatrix();
+
+        expect(unscreenedCaster.getUnitProperties().attack_type).toBe(MAGIC);
+        expect(unscreenedCaster.getPossibleAttackTypes()).toContain(MELEE);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+    });
+
+    it("rejects a guarded destination whose exact divisor regresses", () => {
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        const destination = getPositionForCell(
+            { x: 0, y: 0 },
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+        let chosen:
+            | {
+                  fixture: ReturnType<typeof setupSupportedPrepinEgress>;
+                  shot: Extract<ReturnType<StrategyV0_8["decideTurn"]>[number], { type: "range_attack" }>;
+              }
+            | undefined;
+        for (let targetY = 4; targetY <= 14 && !chosen; targetY += 1) {
+            for (let shotDistance = 2; shotDistance <= 16 && !chosen; shotDistance += 1) {
+                const fixture = setupSupportedPrepinEgress({
+                    targetCell: { x: 0, y: targetY },
+                    shotDistance,
+                });
+                const shot = new StrategyV0_8().decideTurn(fixture.shooter, fixture.context)[0];
+                if (
+                    shot?.type !== "range_attack" ||
+                    !shot.aimCell ||
+                    shot.aimSide === undefined ||
+                    shot.targetId !== fixture.target.getId()
+                ) {
+                    continue;
+                }
+                const currentAim = getRangeAttackSideCenter(
+                    testGridSettings,
+                    shot.aimCell,
+                    shot.aimSide,
+                    fixture.shooter.getPosition(),
+                );
+                const destinationAim = getRangeAttackSideCenter(
+                    testGridSettings,
+                    shot.aimCell,
+                    shot.aimSide,
+                    destination,
+                );
+                const current = fixture.context.attackHandler!.evaluateRangeAttack(
+                    fixture.context.unitsHolder.getAllUnits(),
+                    fixture.shooter,
+                    fixture.shooter.getPosition(),
+                    currentAim,
+                    false,
+                    false,
+                    false,
+                );
+                const candidate = fixture.context.attackHandler!.evaluateRangeAttack(
+                    fixture.context.unitsHolder.getAllUnits(),
+                    fixture.shooter,
+                    destination,
+                    destinationAim,
+                    false,
+                    false,
+                    false,
+                );
+                if (
+                    current.affectedUnits[0]?.[0]?.getId() === fixture.target.getId() &&
+                    candidate.affectedUnits[0]?.[0]?.getId() === fixture.target.getId() &&
+                    candidate.rangeAttackDivisors[0]! > current.rangeAttackDivisors[0]!
+                ) {
+                    chosen = { fixture, shot };
+                }
+            }
+        }
+        expect(chosen).toBeDefined();
+
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const actions = new StrategyV0_8().decideTurn(chosen!.fixture.shooter, chosen!.fixture.context);
+        const move = actions.find((action) => action.type === "move_unit");
+        expect(move?.targetCells).not.toEqual([{ x: 0, y: 0 }]);
+    });
+
+    it("turns the pre-pin egress off during the universal finish sprint", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, context } = setupSupportedPrepinEgress();
+        while (context.fightProperties!.getCurrentLap() < V08_URGENT_FINISH_START_LAP) {
+            context.fightProperties!.flipLap();
+        }
+
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+    });
+
+    it("applies the exact pre-pin move and retained shot through the authoritative action engine", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        const { shooter, target, context } = setupSupportedPrepinEgress();
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
+        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+        const hpBefore = target.getCumulativeHp();
+        const results = actions.map((action) => engine.apply(action));
+
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(results.every(({ completed }) => completed)).toBe(true);
+        expect(target.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
     it("moves behind its frontline and shoots in the same activation when the exact falloff band improves", () => {
         const { shooter, target, context } = setupSupportedShot();
         const actions = new StrategyV0_8().decideTurn(shooter, context);

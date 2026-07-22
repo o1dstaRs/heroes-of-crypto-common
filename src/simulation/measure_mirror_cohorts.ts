@@ -139,6 +139,10 @@ export interface IMirrorSideDiag {
     responseNeutralAdvances: number;
     /** Pre-search response-neutral advance proposals, including ones later replaced by a13. */
     responseNeutralAdvanceProposals: number;
+    /** Supported pre-pin egress proposals retained after a13 arbitration. */
+    supportedPrepinEgressSelections: number;
+    /** Pre-search supported pre-pin egress proposals, including ones later replaced by a13. */
+    supportedPrepinEgressProposals: number;
     meleeDamage: number;
     firstVolleyLap: number | null;
     firstVolleyDamage: number | null;
@@ -219,6 +223,8 @@ function newSideDiag(version: string): IMirrorSideDiag {
         supportedRangedEscapeProposals: 0,
         responseNeutralAdvances: 0,
         responseNeutralAdvanceProposals: 0,
+        supportedPrepinEgressSelections: 0,
+        supportedPrepinEgressProposals: 0,
         meleeDamage: 0,
         firstVolleyLap: null,
         firstVolleyDamage: null,
@@ -291,6 +297,8 @@ export function playMirrorGame(
                   side.supportedRangedEscapes += 1;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvances += 1;
+              } else if (event.kind === "v0.8_supported_prepin_egress") {
+                  side.supportedPrepinEgressSelections += 1;
               }
           }
         : undefined;
@@ -301,6 +309,8 @@ export function playMirrorGame(
                   side.supportedRangedEscapeProposals += 1;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvanceProposals += 1;
+              } else if (event.kind === "v0.8_supported_prepin_egress") {
+                  side.supportedPrepinEgressProposals += 1;
               }
           }
         : undefined;
@@ -480,6 +490,8 @@ interface IVersionAggregate {
     supportedRangedEscapeProposals: number;
     responseNeutralAdvances: number;
     responseNeutralAdvanceProposals: number;
+    supportedPrepinEgressSelections: number;
+    supportedPrepinEgressProposals: number;
     meleeDamage: number;
     deathsByLap: Map<number, number>;
     dmgByLap: Map<number, number>;
@@ -512,6 +524,8 @@ export function aggregateMirrorDiag(
                 supportedRangedEscapeProposals: 0,
                 responseNeutralAdvances: 0,
                 responseNeutralAdvanceProposals: 0,
+                supportedPrepinEgressSelections: 0,
+                supportedPrepinEgressProposals: 0,
                 meleeDamage: 0,
                 deathsByLap: new Map(),
                 dmgByLap: new Map(),
@@ -543,6 +557,8 @@ export function aggregateMirrorDiag(
             a.supportedRangedEscapeProposals += side.supportedRangedEscapeProposals ?? 0;
             a.responseNeutralAdvances += side.responseNeutralAdvances ?? 0;
             a.responseNeutralAdvanceProposals += side.responseNeutralAdvanceProposals ?? 0;
+            a.supportedPrepinEgressSelections += side.supportedPrepinEgressSelections ?? 0;
+            a.supportedPrepinEgressProposals += side.supportedPrepinEgressProposals ?? 0;
             a.meleeDamage += side.meleeDamage;
             if (side.firstVolleyLap !== null) {
                 a.firstVolleyLaps.push(side.firstVolleyLap);
@@ -596,6 +612,10 @@ export function aggregateMirrorDiag(
             responseNeutralAdvancesPerGame: a.responseNeutralAdvances / Math.max(1, a.games),
             responseNeutralAdvanceProposals: a.responseNeutralAdvanceProposals,
             responseNeutralAdvanceProposalsPerGame: a.responseNeutralAdvanceProposals / Math.max(1, a.games),
+            supportedPrepinEgressSelections: a.supportedPrepinEgressSelections,
+            supportedPrepinEgressSelectionsPerGame: a.supportedPrepinEgressSelections / Math.max(1, a.games),
+            supportedPrepinEgressProposals: a.supportedPrepinEgressProposals,
+            supportedPrepinEgressProposalsPerGame: a.supportedPrepinEgressProposals / Math.max(1, a.games),
             meleeDamagePerGame: a.meleeDamage / Math.max(1, a.games),
             perLap: laps.map((lap) => {
                 const slot = a.byLap.get(lap)!;

@@ -204,6 +204,8 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.red.supportedRangedEscapes).toBe(1);
         expect(first.diag?.green.responseNeutralAdvanceProposals).toBe(1);
         expect(first.diag?.red.supportedRangedEscapeProposals).toBe(1);
+        expect(first.diag?.green.supportedPrepinEgressSelections).toBe(0);
+        expect(first.diag?.red.supportedPrepinEgressProposals).toBe(0);
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -219,6 +221,8 @@ describe("measure_mirror_cohorts", () => {
                     supportedRangedEscapeProposals: number;
                     responseNeutralAdvances: number;
                     responseNeutralAdvanceProposals: number;
+                    supportedPrepinEgressSelections: number;
+                    supportedPrepinEgressProposals: number;
                 }
             >;
         };
@@ -234,8 +238,69 @@ describe("measure_mirror_cohorts", () => {
                 supportedRangedEscapeProposals: 1,
                 responseNeutralAdvances: 1,
                 responseNeutralAdvanceProposals: 1,
+                supportedPrepinEgressSelections: 0,
+                supportedPrepinEgressProposals: 0,
             });
         }
+    });
+
+    test("separates pre-pin egress proposals from retained selections and keeps the control at zero", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            for (const unitId of ["candidate-proposal-a", "candidate-proposal-b"]) {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_prepin_egress",
+                    unitId,
+                    creatureName: "Arbalester",
+                    team: candidateTeam,
+                    lap: 3,
+                });
+            }
+            config.policyEventObserver?.({
+                kind: "v0.8_supported_prepin_egress",
+                unitId: "candidate-proposal-a",
+                creatureName: "Arbalester",
+                team: candidateTeam,
+                lap: 3,
+            });
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        for (const record of records) {
+            const diag = record.diag!;
+            const candidate = diag.green.version === "v0.8" ? diag.green : diag.red;
+            const control = diag.green.version === "v0.8s" ? diag.green : diag.red;
+            expect(candidate.supportedPrepinEgressProposals).toBe(2);
+            expect(candidate.supportedPrepinEgressSelections).toBe(1);
+            expect(control.supportedPrepinEgressProposals).toBe(0);
+            expect(control.supportedPrepinEgressSelections).toBe(0);
+        }
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedPrepinEgressSelections: number;
+                    supportedPrepinEgressSelectionsPerGame: number;
+                    supportedPrepinEgressProposals: number;
+                    supportedPrepinEgressProposalsPerGame: number;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedPrepinEgressSelections: 2,
+            supportedPrepinEgressSelectionsPerGame: 1,
+            supportedPrepinEgressProposals: 4,
+            supportedPrepinEgressProposalsPerGame: 2,
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedPrepinEgressSelections: 0,
+            supportedPrepinEgressSelectionsPerGame: 0,
+            supportedPrepinEgressProposals: 0,
+            supportedPrepinEgressProposalsPerGame: 0,
+        });
     });
 
     test("summary tallies wins per version with a binomial SE over decisive games", () => {

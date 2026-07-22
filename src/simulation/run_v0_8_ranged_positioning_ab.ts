@@ -80,6 +80,9 @@ export interface IV08RangedPositioningABOptions {
     jitNoMeleeFocusCatalogOnly?: boolean;
     supportedRangedDelta?: boolean;
     responseNeutralAdvance?: boolean;
+    supportedPrepinEgress?: boolean;
+    /** Computes the same pre-pin egress catalog for both seats while selecting it for neither seat. */
+    supportedPrepinEgressCatalogOnly?: boolean;
     diag?: boolean;
 }
 
@@ -99,7 +102,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -128,6 +131,8 @@ export interface IV08RangedPositioningABManifest {
         jitNoMeleeFocusDamageFloor: number;
         supportedRangedDelta: boolean;
         responseNeutralAdvance: boolean;
+        supportedPrepinEgress: boolean;
+        supportedPrepinEgressCatalogOnly: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -172,6 +177,7 @@ function validateBehaviorArmGeometry(
     jitNoMeleeFocus: boolean,
     supportedRangedDelta: boolean,
     responseNeutralAdvance: boolean,
+    supportedPrepinEgress: boolean,
 ): void {
     const enabledSpecialArms = [
         noMeleeTerminalPressure,
@@ -180,11 +186,12 @@ function validateBehaviorArmGeometry(
         jitNoMeleeFocus,
         supportedRangedDelta,
         responseNeutralAdvance,
+        supportedPrepinEgress,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
         throw new Error(
             "noMeleeTerminalPressure, deadlineFinisher, paretoNoMeleeFocus, jitNoMeleeFocus, " +
-                "supportedRangedDelta, and responseNeutralAdvance are mutually exclusive",
+                "supportedRangedDelta, responseNeutralAdvance, and supportedPrepinEgress are mutually exclusive",
         );
     }
     if (noMeleeTerminalPressure && (mode !== "off" || moveShots !== 0)) {
@@ -204,6 +211,9 @@ function validateBehaviorArmGeometry(
     }
     if (responseNeutralAdvance && ((mode !== "advance" && mode !== "both") || moveShots !== 0)) {
         throw new Error("responseNeutralAdvance requires mode=advance|both and moveShots=0");
+    }
+    if (supportedPrepinEgress && ((mode !== "retreat" && mode !== "both") || moveShots !== 0)) {
+        throw new Error("supportedPrepinEgress requires mode=retreat|both and moveShots=0");
     }
 }
 
@@ -284,6 +294,18 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.responseNeutralAdvance !== undefined && typeof options.responseNeutralAdvance !== "boolean") {
         throw new Error("responseNeutralAdvance must be a boolean");
     }
+    if (options.supportedPrepinEgress !== undefined && typeof options.supportedPrepinEgress !== "boolean") {
+        throw new Error("supportedPrepinEgress must be a boolean");
+    }
+    if (
+        options.supportedPrepinEgressCatalogOnly !== undefined &&
+        typeof options.supportedPrepinEgressCatalogOnly !== "boolean"
+    ) {
+        throw new Error("supportedPrepinEgressCatalogOnly must be a boolean");
+    }
+    if (options.supportedPrepinEgress && options.supportedPrepinEgressCatalogOnly) {
+        throw new Error("supportedPrepinEgress and supportedPrepinEgressCatalogOnly are mutually exclusive");
+    }
     validateBehaviorArmGeometry(
         options.mode,
         options.moveShots ?? 0,
@@ -293,6 +315,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         (options.jitNoMeleeFocus ?? false) || (options.jitNoMeleeFocusCatalogOnly ?? false),
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
+        (options.supportedPrepinEgress ?? false) || (options.supportedPrepinEgressCatalogOnly ?? false),
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -397,7 +420,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -426,6 +449,8 @@ export function buildV08RangedPositioningABManifest(
             jitNoMeleeFocusDamageFloor: PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR,
             supportedRangedDelta: options.supportedRangedDelta ?? false,
             responseNeutralAdvance: options.responseNeutralAdvance ?? false,
+            supportedPrepinEgress: options.supportedPrepinEgress ?? false,
+            supportedPrepinEgressCatalogOnly: options.supportedPrepinEgressCatalogOnly ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -462,6 +487,8 @@ export function buildV08RangedPositioningABEnvironment(
     paretoNoMeleeFocusCatalogOnly = false,
     jitNoMeleeFocus = false,
     jitNoMeleeFocusCatalogOnly = false,
+    supportedPrepinEgress = false,
+    supportedPrepinEgressCatalogOnly = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -490,6 +517,13 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
     if (typeof responseNeutralAdvance !== "boolean") throw new Error("responseNeutralAdvance must be a boolean");
+    if (typeof supportedPrepinEgress !== "boolean") throw new Error("supportedPrepinEgress must be a boolean");
+    if (typeof supportedPrepinEgressCatalogOnly !== "boolean") {
+        throw new Error("supportedPrepinEgressCatalogOnly must be a boolean");
+    }
+    if (supportedPrepinEgress && supportedPrepinEgressCatalogOnly) {
+        throw new Error("supportedPrepinEgress and supportedPrepinEgressCatalogOnly are mutually exclusive");
+    }
     validateBehaviorArmGeometry(
         mode,
         moveShots,
@@ -499,6 +533,7 @@ export function buildV08RangedPositioningABEnvironment(
         jitNoMeleeFocus || jitNoMeleeFocusCatalogOnly,
         supportedRangedDelta,
         responseNeutralAdvance,
+        supportedPrepinEgress || supportedPrepinEgressCatalogOnly,
     );
 
     const environment = minimalChildEnvironment(sourceEnvironment);
@@ -534,10 +569,16 @@ export function buildV08RangedPositioningABEnvironment(
         : V08_A13_PRODUCTION_VERSION;
     environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_PREPIN_EGRESS = supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? "1" : "0";
+    environment.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = supportedPrepinEgressCatalogOnly
+        ? "supported-prepin-egress-catalog-only-control"
+        : supportedPrepinEgress
+          ? V08_A13_PRODUCTION_VERSION
+          : "";
     // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
     // the baseline and only production v0.8 receives the selected delta.
     environment.V08_RANGED_POSITION_VERSIONS =
-        supportedRangedDelta || responseNeutralAdvance
+        supportedRangedDelta || responseNeutralAdvance || supportedPrepinEgress || supportedPrepinEgressCatalogOnly
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
@@ -565,6 +606,8 @@ export function buildV08RangedPositioningABInvocations(
         options.paretoNoMeleeFocusCatalogOnly ?? false,
         options.jitNoMeleeFocus ?? false,
         options.jitNoMeleeFocusCatalogOnly ?? false,
+        options.supportedPrepinEgress ?? false,
+        options.supportedPrepinEgressCatalogOnly ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -652,6 +695,8 @@ export async function runV08RangedPositioningAB(
     const jitNoMeleeFocusCatalogOnly = options.jitNoMeleeFocusCatalogOnly ?? false;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
     const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
+    const supportedPrepinEgress = options.supportedPrepinEgress ?? false;
+    const supportedPrepinEgressCatalogOnly = options.supportedPrepinEgressCatalogOnly ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
@@ -664,6 +709,8 @@ export async function runV08RangedPositioningAB(
                 `jitNoMeleeFocus=${jitNoMeleeFocus} jitCatalogOnly=${jitNoMeleeFocusCatalogOnly} ` +
                 `supportedRangedDelta=${supportedRangedDelta} ` +
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
+                `supportedPrepinEgress=${supportedPrepinEgress} ` +
+                `supportedPrepinCatalogOnly=${supportedPrepinEgressCatalogOnly} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         await prepareInvocation(invocation);
@@ -698,6 +745,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "jit-catalog-only": { type: "boolean", default: false },
             "supported-ranged-delta": { type: "boolean", default: false },
             "response-neutral-advance": { type: "boolean", default: false },
+            "supported-prepin-egress": { type: "boolean", default: false },
+            "supported-prepin-catalog-only": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -731,6 +780,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         jitNoMeleeFocusCatalogOnly: values["jit-catalog-only"]!,
         supportedRangedDelta: values["supported-ranged-delta"]!,
         responseNeutralAdvance: values["response-neutral-advance"]!,
+        supportedPrepinEgress: values["supported-prepin-egress"]!,
+        supportedPrepinEgressCatalogOnly: values["supported-prepin-catalog-only"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -746,7 +797,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
-                "[--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
+                "[--supported-ranged-delta] [--response-neutral-advance] " +
+                "[--supported-prepin-egress|--supported-prepin-catalog-only] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
