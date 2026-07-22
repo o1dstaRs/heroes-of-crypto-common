@@ -36,6 +36,7 @@ import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processShatterArmorAbility } from "./shatter_armor_ability";
 import { processStunAbility } from "./stun_ability";
+import { processPoisonAuraAbility } from "./poison_aura_ability";
 
 export interface ISkewerStrikeDamage {
     unitId: string;
@@ -159,6 +160,8 @@ export function processSkewerStrikeAbility(
             FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
             sceneLog,
         );
+        // Poison Cloud Aura: an aura'd attacker poisons every unit skewered in the line.
+        processPoisonAuraAbility(fromUnit, nextStandingTarget, damageDealt, sceneLog);
         const amountAfter = nextStandingTarget.getAmountAlive();
 
         damageStatisticHolder.add({

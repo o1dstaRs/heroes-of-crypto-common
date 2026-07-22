@@ -288,7 +288,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "holy_cross",
         "Holy Cross",
         "Holy Cross",
-        "+{}% healing and resurrection; the Troll's ability is not consumed on cast.",
+        "+{}% healing and resurrection; the Troll's ability is not consumed on cast. The whole army is immune to poison.",
     ),
     [Tier2Artifact.CLOVER_OF_FORTUNE]: t2(
         Tier2Artifact.CLOVER_OF_FORTUNE,

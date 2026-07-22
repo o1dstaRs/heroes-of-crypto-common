@@ -28,6 +28,7 @@ import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
+import { processPoisonAuraAbility } from "./poison_aura_ability";
 
 export interface IThroughShotResult {
     landed: boolean;
@@ -174,6 +175,8 @@ export function processThroughShotAbility(
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                 sceneLog,
             );
+            // Poison Cloud Aura: an aura'd attacker poisons every unit the shot passes through.
+            processPoisonAuraAbility(attackerUnit, targetUnit, damageDealt, sceneLog);
             damageStatisticHolder.add({
                 unitName: attackerUnit.getName(),
                 damage: damageDealt,

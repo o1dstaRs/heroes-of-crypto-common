@@ -9,7 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
+import { Tier2Artifact } from "../artifacts/artifact_properties";
 import { EffectFactory } from "../effects/effect_factory";
+import { FightStateManager } from "../fights/fight_state_manager";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 
@@ -25,6 +27,16 @@ const effectFactory = new EffectFactory();
  */
 export function applyPoisonEffect(targetUnit: Unit, poisonHp: number, sceneLog: ISceneLog): void {
     if (targetUnit.isDead() || poisonHp <= 0) {
+        return;
+    }
+
+    // Holy Cross (Tier 2) grants the wielder's whole army immunity to poison — nobody on that team can be
+    // poisoned, so drop the effect entirely for them.
+    if (
+        FightStateManager.getInstance()
+            .getFightProperties()
+            .hasArtifactTier2(targetUnit.getTeam(), Tier2Artifact.HOLY_CROSS)
+    ) {
         return;
     }
 

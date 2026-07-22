@@ -40,6 +40,7 @@ import { processDeepWoundsAbility } from "./deep_wounds_ability";
 import { processMinerAbility } from "./miner_ability";
 import { processAggrAbility } from "./aggr_ability";
 import { processDullingDefenseAblity } from "./dulling_defense_ability";
+import { processPoisonAuraAbility } from "./poison_aura_ability";
 
 export interface ILightningSpinResult {
     landed: boolean;
@@ -193,6 +194,8 @@ export function processLightningSpinAbility(
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
                 sceneLog,
             );
+            // Poison Cloud Aura: an aura'd attacker poisons every enemy caught in the spin.
+            processPoisonAuraAbility(fromUnit, enemy, damageDealt, sceneLog);
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),
                 damage: damageDealt,

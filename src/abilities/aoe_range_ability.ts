@@ -28,6 +28,7 @@ import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
+import { processPoisonAuraAbility } from "./poison_aura_ability";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -174,6 +175,8 @@ export function processRangeAOEAbility(
                     FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                     sceneLog,
                 );
+                // Poison Cloud Aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
+                processPoisonAuraAbility(attackerUnit, unit, damageDealt, sceneLog);
                 const unitsKilled = Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive());
                 perUnitDamage.push({
                     unitId: unit.getId(),
