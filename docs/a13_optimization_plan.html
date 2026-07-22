@@ -1,0 +1,2978 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Measured optimization and validation plan for the Heroes of Crypto v0.8+a13 decision engine."
+        />
+        <title>A13 Decision Engine — Optimization and Validation Plan</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                --ink: #edf4ff;
+                --muted: #9fb0c8;
+                --faint: #718198;
+                --bg: #071018;
+                --panel: #0d1925;
+                --panel-2: #111f2d;
+                --line: #24364a;
+                --cyan: #57d7ff;
+                --green: #58e5a1;
+                --amber: #ffc866;
+                --red: #ff7b86;
+                --violet: #bca5ff;
+                --code: #08141e;
+                --shadow: 0 18px 50px rgb(0 0 0 / 28%);
+                font-family:
+                    Inter,
+                    ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html {
+                scroll-behavior: smooth;
+            }
+
+            body {
+                margin: 0;
+                overflow-x: hidden;
+                color: var(--ink);
+                background:
+                    radial-gradient(circle at 10% -10%, rgb(87 215 255 / 12%), transparent 30rem),
+                    radial-gradient(circle at 95% 10%, rgb(188 165 255 / 10%), transparent 32rem), var(--bg);
+                font-size: 15px;
+                line-height: 1.58;
+            }
+
+            a {
+                color: var(--cyan);
+            }
+
+            a:hover {
+                color: #a7eaff;
+            }
+
+            code,
+            pre,
+            .mono {
+                font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+            }
+
+            code {
+                padding: 0.12rem 0.3rem;
+                border: 1px solid rgb(87 215 255 / 14%);
+                border-radius: 0.28rem;
+                overflow-wrap: anywhere;
+                color: #ccefff;
+                background: var(--code);
+            }
+
+            pre {
+                overflow: auto;
+                padding: 1rem 1.1rem;
+                border: 1px solid var(--line);
+                border-radius: 0.6rem;
+                background: var(--code);
+                color: #ccefff;
+                font-size: 0.82rem;
+                line-height: 1.55;
+            }
+
+            h1,
+            h2,
+            h3,
+            h4 {
+                margin: 0;
+                line-height: 1.18;
+                letter-spacing: -0.02em;
+            }
+
+            h1 {
+                max-width: 18ch;
+                font-size: clamp(2.35rem, 7vw, 5.4rem);
+                font-weight: 760;
+            }
+
+            h2 {
+                margin-bottom: 1rem;
+                font-size: clamp(1.55rem, 3vw, 2.4rem);
+            }
+
+            h3 {
+                margin-bottom: 0.7rem;
+                font-size: 1.15rem;
+            }
+
+            h4 {
+                margin-bottom: 0.45rem;
+                color: #d9e8fb;
+                font-size: 0.98rem;
+            }
+
+            p {
+                margin: 0 0 0.85rem;
+            }
+
+            ul,
+            ol {
+                margin: 0.45rem 0 1rem;
+                padding-left: 1.25rem;
+            }
+
+            li + li {
+                margin-top: 0.32rem;
+            }
+
+            .skip-link {
+                position: fixed;
+                z-index: 50;
+                top: 0.5rem;
+                left: 0.5rem;
+                transform: translateY(-160%);
+                padding: 0.55rem 0.8rem;
+                border-radius: 0.4rem;
+                color: var(--bg);
+                background: var(--cyan);
+            }
+
+            .skip-link:focus {
+                transform: none;
+            }
+
+            .hero {
+                min-height: 72vh;
+                display: grid;
+                align-items: end;
+                padding: clamp(4rem, 10vw, 9rem) 0 clamp(3rem, 7vw, 6rem);
+                border-bottom: 1px solid var(--line);
+            }
+
+            .wrap {
+                width: min(1180px, calc(100% - 2rem));
+                min-width: 0;
+                margin: 0 auto;
+            }
+
+            .eyebrow {
+                margin-bottom: 1rem;
+                color: var(--cyan);
+                font-size: 0.75rem;
+                font-weight: 800;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+            }
+
+            .lede {
+                max-width: 68rem;
+                margin-top: 1.4rem;
+                color: #c3d1e3;
+                font-size: clamp(1rem, 2vw, 1.25rem);
+            }
+
+            .badges {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.55rem;
+                margin-top: 1.4rem;
+            }
+
+            .badge,
+            .status {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.38rem;
+                padding: 0.3rem 0.58rem;
+                border: 1px solid var(--line);
+                border-radius: 999px;
+                color: #c9d8ea;
+                background: rgb(13 25 37 / 75%);
+                font-size: 0.75rem;
+                font-weight: 700;
+                white-space: nowrap;
+            }
+
+            .status::before {
+                width: 0.46rem;
+                height: 0.46rem;
+                border-radius: 50%;
+                background: var(--faint);
+                content: "";
+            }
+
+            .status.done::before {
+                background: var(--green);
+                box-shadow: 0 0 0.75rem rgb(88 229 161 / 55%);
+            }
+
+            .status.active::before {
+                background: var(--amber);
+            }
+
+            .status.queued::before {
+                background: var(--violet);
+            }
+
+            .status.hold::before {
+                background: var(--red);
+            }
+
+            .hero-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.65fr);
+                gap: clamp(2rem, 6vw, 6rem);
+                align-items: end;
+            }
+
+            .hero-grid > *,
+            .grid-2 > *,
+            .grid-3 > *,
+            .metric-grid > *,
+            .decision-flow > * {
+                min-width: 0;
+            }
+
+            .hero-aside {
+                padding: 1.1rem;
+                border: 1px solid var(--line);
+                border-radius: 0.8rem;
+                background: rgb(13 25 37 / 80%);
+                box-shadow: var(--shadow);
+            }
+
+            .hero-aside h2 {
+                margin-bottom: 0.7rem;
+                font-size: 1.15rem;
+            }
+
+            .hero-aside dl {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                gap: 0.38rem 0.8rem;
+                margin: 0;
+            }
+
+            .hero-aside dt {
+                color: var(--muted);
+            }
+
+            .hero-aside dd {
+                margin: 0;
+                min-width: 0;
+                overflow-wrap: anywhere;
+                text-align: right;
+                font-weight: 700;
+            }
+
+            .toc {
+                position: sticky;
+                z-index: 20;
+                top: 0;
+                overflow-x: auto;
+                border-bottom: 1px solid var(--line);
+                background: rgb(7 16 24 / 92%);
+                backdrop-filter: blur(14px);
+            }
+
+            .toc .wrap {
+                display: flex;
+                gap: 1.15rem;
+                padding-top: 0.65rem;
+                padding-bottom: 0.65rem;
+            }
+
+            .toc a {
+                color: var(--muted);
+                font-size: 0.78rem;
+                font-weight: 750;
+                text-decoration: none;
+                white-space: nowrap;
+            }
+
+            .toc a:hover {
+                color: var(--ink);
+            }
+
+            main > section {
+                padding: clamp(3.5rem, 8vw, 7rem) 0;
+                border-bottom: 1px solid var(--line);
+                scroll-margin-top: 4rem;
+            }
+
+            .section-intro {
+                max-width: 72rem;
+                margin-bottom: 1.5rem;
+                color: var(--muted);
+                font-size: 1.02rem;
+            }
+
+            .grid-2,
+            .grid-3,
+            .metric-grid,
+            .decision-flow {
+                display: grid;
+                gap: 1rem;
+            }
+
+            .grid-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .grid-3,
+            .metric-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .card,
+            .metric,
+            details {
+                border: 1px solid var(--line);
+                border-radius: 0.75rem;
+                background: linear-gradient(145deg, rgb(17 31 45 / 92%), rgb(10 21 31 / 92%));
+                box-shadow: 0 9px 28px rgb(0 0 0 / 14%);
+            }
+
+            .card {
+                padding: 1.15rem;
+            }
+
+            .card > :last-child {
+                margin-bottom: 0;
+            }
+
+            .metric {
+                min-height: 8rem;
+                padding: 1.05rem;
+            }
+
+            .metric .value {
+                display: block;
+                margin: 0.24rem 0 0.35rem;
+                color: var(--cyan);
+                font-size: clamp(1.65rem, 4vw, 2.7rem);
+                font-weight: 780;
+                line-height: 1;
+            }
+
+            .metric .label {
+                color: var(--muted);
+                font-size: 0.82rem;
+            }
+
+            .callout {
+                margin: 1rem 0;
+                padding: 1rem 1.1rem;
+                border: 1px solid rgb(87 215 255 / 38%);
+                border-left: 0.28rem solid var(--cyan);
+                border-radius: 0.65rem;
+                background: rgb(87 215 255 / 7%);
+            }
+
+            .callout.warn {
+                border-color: rgb(255 200 102 / 38%);
+                border-left-color: var(--amber);
+                background: rgb(255 200 102 / 7%);
+            }
+
+            .callout.danger {
+                border-color: rgb(255 123 134 / 38%);
+                border-left-color: var(--red);
+                background: rgb(255 123 134 / 7%);
+            }
+
+            .callout.good {
+                border-color: rgb(88 229 161 / 38%);
+                border-left-color: var(--green);
+                background: rgb(88 229 161 / 7%);
+            }
+
+            .callout > :last-child {
+                margin-bottom: 0;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+                margin: 1rem 0 1.5rem;
+                border: 1px solid var(--line);
+                border-radius: 0.7rem;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: rgb(13 25 37 / 72%);
+                font-size: 0.83rem;
+            }
+
+            th,
+            td {
+                padding: 0.72rem 0.75rem;
+                border-bottom: 1px solid var(--line);
+                vertical-align: top;
+                text-align: left;
+            }
+
+            th {
+                color: #d9e8fb;
+                background: #132233;
+                font-size: 0.72rem;
+                letter-spacing: 0.045em;
+                text-transform: uppercase;
+            }
+
+            tr:last-child td {
+                border-bottom: 0;
+            }
+
+            td.num,
+            th.num {
+                text-align: right;
+                font-variant-numeric: tabular-nums;
+                white-space: nowrap;
+            }
+
+            .roadmap td:first-child {
+                width: 3rem;
+                color: var(--cyan);
+                font-weight: 800;
+            }
+
+            .decision-flow {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                align-items: stretch;
+                margin: 1.2rem 0;
+                padding: 0;
+                list-style: none;
+            }
+
+            .flow-step {
+                position: relative;
+                min-height: 7.8rem;
+                padding: 0.9rem;
+                border: 1px solid var(--line);
+                border-radius: 0.65rem;
+                background: var(--panel-2);
+            }
+
+            .flow-step:not(:last-child)::after {
+                position: absolute;
+                top: 50%;
+                right: -0.73rem;
+                z-index: 2;
+                color: var(--cyan);
+                content: "→";
+                font-size: 1.15rem;
+                font-weight: 800;
+            }
+
+            .flow-step strong {
+                display: block;
+                margin-bottom: 0.35rem;
+                color: var(--cyan);
+            }
+
+            .flow-step span {
+                color: var(--muted);
+                font-size: 0.8rem;
+            }
+
+            details {
+                margin: 0.85rem 0;
+                padding: 0;
+            }
+
+            summary {
+                padding: 0.9rem 1rem;
+                cursor: pointer;
+                color: #d9e8fb;
+                font-weight: 750;
+            }
+
+            details[open] summary {
+                border-bottom: 1px solid var(--line);
+            }
+
+            .detail-body {
+                padding: 1rem;
+            }
+
+            .detail-body > :last-child {
+                margin-bottom: 0;
+            }
+
+            .workstream {
+                margin-top: 1.5rem;
+                padding: 1.25rem;
+                border: 1px solid var(--line);
+                border-radius: 0.8rem;
+                background: rgb(13 25 37 / 72%);
+            }
+
+            .workstream-head {
+                display: flex;
+                justify-content: space-between;
+                gap: 1rem;
+                align-items: flex-start;
+                margin-bottom: 1rem;
+            }
+
+            .workstream-head p {
+                margin: 0.35rem 0 0;
+                color: var(--muted);
+            }
+
+            .checklist {
+                list-style: none;
+                padding-left: 0;
+            }
+
+            .checklist li {
+                position: relative;
+                padding-left: 1.45rem;
+            }
+
+            .checklist li::before {
+                position: absolute;
+                left: 0;
+                color: var(--faint);
+                content: "○";
+            }
+
+            .checklist li.done::before {
+                color: var(--green);
+                content: "●";
+            }
+
+            .small {
+                color: var(--muted);
+                font-size: 0.8rem;
+            }
+
+            .sr-only {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            .kicker {
+                color: var(--cyan);
+                font-size: 0.7rem;
+                font-weight: 800;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+
+            footer {
+                padding: 2.2rem 0 4rem;
+                color: var(--muted);
+                font-size: 0.8rem;
+            }
+
+            @media (max-width: 900px) {
+                .hero-grid,
+                .grid-2,
+                .grid-3,
+                .metric-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .decision-flow {
+                    grid-template-columns: 1fr;
+                }
+
+                .flow-step:not(:last-child)::after {
+                    top: auto;
+                    right: 50%;
+                    bottom: -1.05rem;
+                    transform: rotate(90deg);
+                }
+
+                .workstream-head {
+                    display: block;
+                }
+
+                .workstream-head .status {
+                    margin-top: 0.7rem;
+                }
+
+                .hero-aside dl {
+                    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                html {
+                    scroll-behavior: auto;
+                }
+            }
+
+            @media print {
+                :root {
+                    color-scheme: light;
+                    --ink: #101820;
+                    --muted: #425466;
+                    --faint: #607080;
+                    --bg: #ffffff;
+                    --panel: #ffffff;
+                    --panel-2: #f3f6f8;
+                    --line: #9eacba;
+                    --cyan: #006b87;
+                    --green: #12683f;
+                    --amber: #7c4b00;
+                    --red: #9f2430;
+                    --violet: #543c91;
+                    --code: #eef2f5;
+                }
+
+                html,
+                body {
+                    color: var(--ink);
+                    background: #ffffff !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                .toc,
+                .skip-link {
+                    display: none;
+                }
+
+                .hero {
+                    min-height: 0;
+                }
+
+                .card,
+                .metric,
+                details,
+                .hero-aside,
+                .workstream,
+                .flow-step,
+                .callout,
+                table,
+                th,
+                code,
+                pre,
+                .badge,
+                .status {
+                    color: var(--ink) !important;
+                    background: var(--panel-2) !important;
+                    box-shadow: none;
+                }
+
+                .card,
+                .metric,
+                details,
+                .hero-aside,
+                .workstream {
+                    break-inside: avoid;
+                }
+
+                .lede,
+                h4 {
+                    color: var(--ink);
+                }
+
+                a {
+                    color: #005c75;
+                }
+
+                main > section {
+                    padding: 2rem 0;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to plan</a>
+
+        <header class="hero">
+            <div class="wrap hero-grid">
+                <div>
+                    <div class="eyebrow">Heroes of Crypto · v0.8+a13 · engineering plan</div>
+                    <h1>Faster decisions without different decisions.</h1>
+                    <p class="lede">
+                        A measured optimization sequence for reducing per-turn simulation cost on an M4 Max, preserving
+                        deterministic ranked behavior, and buying enough headroom to evaluate horizons beyond 12 unit
+                        turns. Workstream 1—the ranged-ray traversal—is implemented locally and audited in depth.
+                    </p>
+                    <div class="badges">
+                        <span class="badge">Revision 2026-07-22</span>
+                        <span class="badge">Bun 1.3.14 · arm64</span>
+                        <span class="badge">Grid 16×16 · 128 px/cell</span>
+                        <span class="status active">Local candidate, not deployed</span>
+                    </div>
+                </div>
+                <aside class="hero-aside" aria-label="Plan summary">
+                    <h2>Current checkpoint</h2>
+                    <dl>
+                        <dt>Workstreams</dt>
+                        <dd>8</dd>
+                        <dt>Active</dt>
+                        <dd>#1 ray traversal</dd>
+                        <dt>Differential rays</dt>
+                        <dd>2,744,145</dd>
+                        <dt>Mismatches</dt>
+                        <dd style="color: var(--green)">0</dd>
+                        <dt>Mixed micro speedup</dt>
+                        <dd>11.07×</dd>
+                        <dt>Ranked outer replay</dt>
+                        <dd style="color: var(--green)">6/6 exact · f02e base</dd>
+                    </dl>
+                </aside>
+            </div>
+        </header>
+
+        <nav class="toc" aria-label="Document sections">
+            <div class="wrap">
+                <a href="#decision">Decision</a>
+                <a href="#baseline">Baseline</a>
+                <a href="#roadmap">Roadmap</a>
+                <a href="#ray">Workstream 1</a>
+                <a href="#remaining">Workstreams 2–8</a>
+                <a href="#pruning">Pruning</a>
+                <a href="#measurement">Measurement</a>
+                <a href="#gates">Release gates</a>
+                <a href="#risks">Risks</a>
+                <a href="#artifacts">Artifacts</a>
+            </div>
+        </nav>
+
+        <main id="main">
+            <section id="decision">
+                <div class="wrap">
+                    <div class="eyebrow">Decision record 001</div>
+                    <h2>Keep the shot semantics; remove the wasted pixels.</h2>
+                    <p class="section-intro">
+                        The original recommendation said “exact grid-cell DDA/supercover.” The audit found that a
+                        conventional geometric DDA or strict supercover is not behavior-compatible with the shipped
+                        engine. The accepted implementation is therefore a closed-form, cell-jumping traversal of the
+                        exact historical integer Bresenham raster.
+                    </p>
+
+                    <div class="grid-3">
+                        <article class="card">
+                            <div class="kicker">Accepted</div>
+                            <h3>Discrete grid-jump traversal</h3>
+                            <p>
+                                Jump directly to the next grid boundary while analytically reproducing every integer
+                                Bresenham coordinate that could be the first sample in a cell.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <div class="kicker">Rejected</div>
+                            <h3>Thin geometric DDA</h3>
+                            <p>
+                                It drops legacy corner-alias cells for large-unit origins and substitutes geometric
+                                boundary coordinates for the first raster pixel.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <div class="kicker">Rejected</div>
+                            <h3>Strict supercover</h3>
+                            <p>
+                                It emits both side-adjacent cells when a line touches a corner, creating new blockers,
+                                hits, splash anchors, and Through Shot stops.
+                            </p>
+                        </article>
+                    </div>
+
+                    <div class="callout good">
+                        <h3>Compatibility contract</h3>
+                        <p>
+                            For every finite, engine-range ray—where rounded coordinates and the closed-form integer
+                            products stay inside JavaScript’s exact-integer range—output the same ordered
+                            <code>[cell, firstPosition]</code> sequence as the removed pixel walker. This preserves the
+                            first unit or mountain, falloff divisor, Through Shot order, Wingshield termination, Area
+                            Throw interception, affected-cell order, obstacle animation position, and AI candidate
+                            signatures.
+                        </p>
+                    </div>
+                    <div class="callout warn">
+                        <h3>One intentional malformed-input change</h3>
+                        <p>
+                            Non-finite endpoints now fail closed with an empty result. The legacy loop could fail to
+                            advance forever for <code>NaN</code> or <code>Infinity</code>. Finite in-engine behavior is
+                            unchanged.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="baseline">
+                <div class="wrap">
+                    <div class="eyebrow">Exploratory baseline</div>
+                    <h2>Where one a13 decision spends its time</h2>
+                    <p class="section-intro">
+                        These live-tree measurements identified the first optimization target; they are local
+                        diagnostics, not release evidence or cross-host promises. Their raw JSONL/profile hashes are now
+                        recorded, but the exact shared-main source state and original command were not sealed while
+                        peers were editing. Latency distributions still explain the risk: the common a13 profile has a
+                        175 ms decision deadline and a 275 ms per-match circuit breaker. Ranked also has a post-hoc
+                        outer 300 ms server circuit around <code>ensureBotSearchDriver() + chooseDecision()</code>. In
+                        the normal path the match-wide driver is constructed and prepared at fight start, outside that
+                        timer; base-policy evaluation, pre-call snapshots, state restoration, action application,
+                        events, and journaling are outside it as well.
+                    </p>
+
+                    <div class="metric-grid">
+                        <div class="metric">
+                            <span class="label">Retained 2-game trace · p50</span>
+                            <span class="value">40.4 ms</span>
+                            <span class="label">55 searched / 56 decisions</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Retained 2-game trace · p95</span>
+                            <span class="value">70.7 ms</span>
+                            <span class="label">p99/max 85.4 ms</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Retained 20-game trace · p95</span>
+                            <span class="value">71.5 ms</span>
+                            <span class="label">431/455 searched · p50 42.2 · p99 81.2 · max 90.6</span>
+                        </div>
+                    </div>
+
+                    <div class="callout warn">
+                        <h3>Diagnostic provenance limit</h3>
+                        <p>
+                            Use this section to prioritize work only. The later ray micro/macro A/B, differential
+                            traces, and ranked replay use immutable source pairs with explicit hashes; these earlier
+                            latency, attribution, and horizon observations do not. They must not be cited as
+                            final-parent capacity evidence.
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Actual search shape</h3>
+                    <ol class="decision-flow" aria-label="a13 decision flow">
+                        <li class="flow-step">
+                            <strong>1 · Incumbent</strong>
+                            <span>The native v0.8 policy proposes one deterministic action sequence.</span>
+                        </li>
+                        <li class="flow-step">
+                            <strong>2 · Catalog</strong>
+                            <span>Generate legal attacks, moves, waits, throws, and bounded composites.</span>
+                        </li>
+                        <li class="flow-step">
+                            <strong>3 · Shortlist 3</strong>
+                            <span
+                                >Score every candidate once at its immediate post-action leaf; retain the incumbent and
+                                two legal challengers.</span
+                            >
+                        </li>
+                        <li class="flow-step">
+                            <strong>4 · 2 × horizon 12</strong>
+                            <span
+                                >Deep-score only those three: at most 72 future unit turns, in addition to the
+                                all-candidate leaf pre-pass.</span
+                            >
+                        </li>
+                        <li class="flow-step">
+                            <strong>5 · Gate</strong>
+                            <span
+                                >Apply selector rules and override only when the challenger clears the required
+                                gate.</span
+                            >
+                        </li>
+                    </ol>
+
+                    <div class="callout">
+                        <h3>Architecture correction</h3>
+                        <p>
+                            a13 is not currently a 12-ply minimax tree. It branches at the root, then both sides follow
+                            their configured policies through each rollout. Classic alpha–beta pruning has nothing to
+                            prune after the root until the engine deliberately introduces adversarial branching.
+                        </p>
+                    </div>
+
+                    <div class="callout warn">
+                        <h3>Keep the three deadline surfaces separate</h3>
+                        <p>
+                            The common 175 ms deadline is checkpointed, not preemptive: one expensive operation can
+                            overshoot before the next check and fall back to the incumbent. The common 275 ms circuit is
+                            also post-hoc and starts after early classification/state scans. Ranked wraps
+                            <code>ensureBotSearchDriver() + chooseDecision()</code> with a coarse
+                            <code>Date.now()</code> timer and opens its separate circuit only when elapsed time is
+                            strictly greater than 300 ms; the just-computed decision still executes. Reports therefore
+                            retain common fallback, common circuit, and ranked circuit classifications independently.
+                        </p>
+                    </div>
+
+                    <div class="grid-2">
+                        <div>
+                            <h3>Exploratory CPU attribution</h3>
+                            <div class="table-wrap">
+                                <table>
+                                    <caption class="sr-only">
+                                        Measured CPU attribution by search scope
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Scope</th>
+                                            <th scope="col" class="num">Inclusive CPU</th>
+                                            <th scope="col">Meaning</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><code>chooseDecision</code></td>
+                                            <td class="num">96%</td>
+                                            <td>The search wrapper dominates the measured match.</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>scoreCandidates</code></td>
+                                            <td class="num">95–97%</td>
+                                            <td>Almost all search time is candidate simulation.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Rollouts</td>
+                                            <td class="num">92–93%</td>
+                                            <td>Future policy turns, engine actions, and leaf state.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Future policy</td>
+                                            <td class="num">54–55%</td>
+                                            <td>AI decisions inside simulated futures.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Aura work</td>
+                                            <td class="num">15–20%</td>
+                                            <td>Coverage, refresh, applied-effect maintenance.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Path/grid work</td>
+                                            <td class="num">12–17%</td>
+                                            <td>Neighbors, routes, legal destinations, cell objects.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Legacy ranged ray</td>
+                                            <td class="num">5–14%</td>
+                                            <td>Roster/map dependent; first optimization target.</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Snapshot / restore</td>
+                                            <td class="num">0.6% / 2.9%</td>
+                                            <td>Not first, but scales with every scored rollout.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <h3>Horizon scaling on the same 139 decisions</h3>
+                            <div class="table-wrap">
+                                <table>
+                                    <caption class="sr-only">
+                                        Decision latency by rollout horizon
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Horizon</th>
+                                            <th scope="col" class="num">p50</th>
+                                            <th scope="col" class="num">p95</th>
+                                            <th scope="col" class="num">Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>4</td>
+                                            <td class="num">17.0 ms</td>
+                                            <td class="num">29.5 ms</td>
+                                            <td class="num">39.8 ms</td>
+                                        </tr>
+                                        <tr>
+                                            <td>8</td>
+                                            <td class="num">29.8 ms</td>
+                                            <td class="num">48.3 ms</td>
+                                            <td class="num">61.5 ms</td>
+                                        </tr>
+                                        <tr>
+                                            <td>12</td>
+                                            <td class="num">41.3 ms</td>
+                                            <td class="num">64.0 ms</td>
+                                            <td class="num">78.9 ms</td>
+                                        </tr>
+                                        <tr>
+                                            <td>16</td>
+                                            <td class="num">54.4 ms</td>
+                                            <td class="num">74.5 ms</td>
+                                            <td class="num">109.1 ms</td>
+                                        </tr>
+                                        <tr>
+                                            <td>24</td>
+                                            <td class="num">76.5 ms</td>
+                                            <td class="num">104.5 ms</td>
+                                            <td class="num">145.6 ms</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="small">
+                                To run horizon 16 at the current horizon-12 median requires about 24% less work per
+                                simulated turn; horizon 24 requires about 46% less. Depth changes wait valuation and
+                                must receive strength/regression validation, not only performance approval.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="roadmap">
+                <div class="wrap">
+                    <div class="eyebrow">Recommended optimization order</div>
+                    <h2>Eight gated workstreams</h2>
+                    <p class="section-intro">
+                        The sequence starts with isolated hot loops that can be made bit-for-bit compatible, then moves
+                        toward invalidation, shared computation, state representation, exact search bounds, and finally
+                        deeper or wider reasoning. Each item must land independently and keep a quick rollback boundary.
+                    </p>
+
+                    <div class="table-wrap">
+                        <table class="roadmap">
+                            <caption class="sr-only">
+                                Ordered A13 optimization workstreams and acceptance signals
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Workstream</th>
+                                    <th scope="col">Primary mechanism</th>
+                                    <th scope="col">Acceptance signal</th>
+                                    <th scope="col">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><strong>Ranged ray traversal</strong></td>
+                                    <td>Jump between grid cells while reproducing the exact discrete raster.</td>
+                                    <td>Zero differential mismatches; semantic suites; material ray CPU reduction.</td>
+                                    <td><span class="status active">Implemented, gates running</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><strong>Pathfinding and neighbor indices</strong></td>
+                                    <td>Precomputed neighbors, typed scratch buffers, occupancy-version reuse.</td>
+                                    <td>Identical legal routes/destinations; ≥25% path-scope CPU reduction.</td>
+                                    <td><span class="status queued">Queued</span></td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td><strong>Aura invalidation</strong></td>
+                                    <td>Dirty emitters/recipients and cached static coverage masks.</td>
+                                    <td>
+                                        Full-refresh oracle parity through movement, death, dispel, and stat changes.
+                                    </td>
+                                    <td><span class="status queued">Queued</span></td>
+                                </tr>
+                                <tr>
+                                    <td>4</td>
+                                    <td><strong>Shared candidate/path catalog</strong></td>
+                                    <td>Compute reachability and attack geometry once per decision state.</td>
+                                    <td>Exact candidate set, ordering, metadata, and selected action.</td>
+                                    <td><span class="status queued">After #2</span></td>
+                                </tr>
+                                <tr>
+                                    <td>5</td>
+                                    <td><strong>Numeric 256-cell core</strong></td>
+                                    <td>Cell IDs, typed arrays, masks, and object adapters at boundaries.</td>
+                                    <td>State/action hash parity with fewer allocations and lower GC tail latency.</td>
+                                    <td><span class="status queued">After #2–4</span></td>
+                                </tr>
+                                <tr>
+                                    <td>6</td>
+                                    <td><strong>Selector-aware exact pruning</strong></td>
+                                    <td>Score bounds, proven dominance, and safe early candidate rejection.</td>
+                                    <td>Same result as unpruned search on exhaustive selector-mode tests.</td>
+                                    <td><span class="status queued">After stable cost base</span></td>
+                                </tr>
+                                <tr>
+                                    <td>7</td>
+                                    <td><strong>Snapshot / restore redesign</strong></td>
+                                    <td>Reversible deltas or structurally shared battle snapshots.</td>
+                                    <td>Byte/state parity after arbitrary apply/restore sequences.</td>
+                                    <td><span class="status queued">High-risk later item</span></td>
+                                </tr>
+                                <tr>
+                                    <td>8</td>
+                                    <td><strong>Depth and branching</strong></td>
+                                    <td>
+                                        Iterative depth, adaptive horizon, then deliberate beam/minimax experiments.
+                                    </td>
+                                    <td>Latency budget plus paired strength, calibration, and behavioral gates.</td>
+                                    <td><span class="status hold">Blocked on headroom</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="ray">
+                <div class="wrap">
+                    <div class="eyebrow">Workstream 1 · deep dive</div>
+                    <h2>Exact grid-cell traversal of the legacy shot</h2>
+                    <p class="section-intro">
+                        The removed implementation allocated one position object for every world pixel along a shot,
+                        then mapped and deduplicated those positions into cells. Real rays averaged roughly 928–1,434
+                        raster pixels but only 12–17 emitted cells. The replacement calculates the next transition
+                        directly.
+                    </p>
+
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3>Old cost model</h3>
+                            <ol>
+                                <li>Round the start and end coordinates.</li>
+                                <li>Walk Bresenham one integer pixel at a time.</li>
+                                <li>Allocate and retain every <code>{x, y}</code> position.</li>
+                                <li>Map each position back to a grid cell.</li>
+                                <li>Linearly search a key array to deduplicate cells.</li>
+                            </ol>
+                            <p class="small">
+                                Complexity follows world-pixel distance and creates avoidable allocation.
+                            </p>
+                        </div>
+                        <div class="card">
+                            <h3>New cost model</h3>
+                            <ol>
+                                <li>Round endpoints exactly as before.</li>
+                                <li>Represent Bresenham coordinates in closed form.</li>
+                                <li>Invert the monotone displacement at each cell boundary.</li>
+                                <li>Jump to the minimum next-axis transition.</li>
+                                <li>Emit only the exact first legacy pixel in each new cell.</li>
+                            </ol>
+                            <p class="small">Complexity follows crossed cells and allocates only observable output.</p>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Proof sketch and boundary rules</h3>
+                    <p>
+                        Let <code>M = max(|Δx|, |Δy|)</code>, let <code>A</code> be one axis extent, and let
+                        <code>k</code> be a major-axis step. The historical strict Bresenham tie behavior is reproduced
+                        by:
+                    </p>
+                    <pre>
+dA(k) = floor((2 · k · A + M − 1) / (2 · M))
+
+firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
+                    <p>
+                        For positive travel, a cell begins at <code>ceil(upperBoundary)</code>. For negative travel it
+                        begins at <code>ceil(lowerBoundary) − 1</code>. The minus one is not cosmetic: it preserves the
+                        one-pixel interior bias that the obstacle remap and range falloff already observe. At every
+                        iteration the helper jumps to <code>min(nextX, nextY)</code> and calculates the exact legacy
+                        point.
+                    </p>
+
+                    <div class="callout danger">
+                        <h3>Why geometric DDA is a gameplay change</h3>
+                        <p>
+                            Large units originate on a grid vertex. Depending on tie policy, conventional thin DDA
+                            changed 22.3–23.0% of legal large-unit direct paths and 30.2% of projected Through Shot
+                            paths. A strict supercover changes more by adding both cells at corner contact.
+                        </p>
+                        <p>
+                            Example: a large origin at base vertex <code>(1,1)</code> shooting toward target
+                            <code>(2,6)</code>, UP, historically visits
+                            <code>1,1 → 1,2 → 1,3 → 1,4 → 2,4 → 2,5 → 2,6 → 2,7</code>. A geometric DDA drops
+                            <code>2,4</code>, so a unit or mountain there would stop intercepting the shot.
+                        </p>
+                    </div>
+
+                    <div class="callout warn">
+                        <h3>Why exact geometric intersections are also unsafe</h3>
+                        <p>
+                            Even when small-origin cell order matches, the first entry position differs on 85.4% of
+                            legal direct rays and 87.3% of Through rays, by up to 16 pixels. One audited range-5 ray
+                            enters the same cell at legacy pixel <code>(−896,700)</code>, distance 639.21 and divisor 1;
+                            geometric DDA reports <code>(−896,704)</code>, distance 643.19 and divisor 2. Damage
+                            changes.
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Differential evidence</h3>
+                    <p>
+                        Every case compares the ordered cells <em>and</em> each cell’s exact first integer position. The
+                        oracle is a test-only copy of the removed pixel pipeline. Checksums prevent a benchmark or audit
+                        loop from being optimized away.
+                    </p>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Differential ray corpus and mismatch results
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Family</th>
+                                    <th scope="col" class="num">Rays</th>
+                                    <th scope="col" class="num">Legacy pixels</th>
+                                    <th scope="col" class="num">Output pairs</th>
+                                    <th scope="col" class="num">Mismatch</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Small center → center, exhaustive</td>
+                                    <td class="num">65,536</td>
+                                    <td class="num">62,525,440</td>
+                                    <td class="num">748,184</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Small center → 4 adjusted sides, exhaustive</td>
+                                    <td class="num">262,144</td>
+                                    <td class="num">250,933,248</td>
+                                    <td class="num">3,186,672</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Small center → projected Through, exhaustive</td>
+                                    <td class="num">262,144</td>
+                                    <td class="num">376,000,516</td>
+                                    <td class="num">4,447,760</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Large vertex → center, exhaustive</td>
+                                    <td class="num">57,600</td>
+                                    <td class="num">53,260,544</td>
+                                    <td class="num">637,536</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Large vertex → 4 adjusted sides, exhaustive</td>
+                                    <td class="num">230,400</td>
+                                    <td class="num">213,792,256</td>
+                                    <td class="num">2,661,914</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Large vertex → projected Through, exhaustive</td>
+                                    <td class="num">230,400</td>
+                                    <td class="num">320,344,772</td>
+                                    <td class="num">3,712,494</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>33×33 half-cell lattice, all directed pairs</td>
+                                    <td class="num">1,185,921</td>
+                                    <td class="num">1,169,262,721</td>
+                                    <td class="num">14,057,529</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Fractional and out-of-grid, seeded</td>
+                                    <td class="num">250,000</td>
+                                    <td class="num">268,549,497</td>
+                                    <td class="num">3,197,261</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Fractional hypothetical → side / Through, seeded</td>
+                                    <td class="num">200,000</td>
+                                    <td class="num">239,016,834</td>
+                                    <td class="num">2,910,613</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total production-settings fixed-grid audit</strong></td>
+                                    <td class="num"><strong>2,744,145</strong></td>
+                                    <td class="num"><strong>2,953,685,828</strong></td>
+                                    <td class="num"><strong>35,559,963</strong></td>
+                                    <td class="num"><strong>0</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>4 synthetic fractional-cell-size grids</td>
+                                    <td class="num">400,000</td>
+                                    <td class="num">—</td>
+                                    <td class="num">—</td>
+                                    <td class="num">0</td>
+                                </tr>
+                                <tr>
+                                    <td>200 randomized sub-pixel/fractional grid configurations</td>
+                                    <td class="num">200,000</td>
+                                    <td class="num">—</td>
+                                    <td class="num">—</td>
+                                    <td class="num">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="small">
+                        The permanent test runs 1,108,224 exhaustive production endpoint rays (all small/large centers,
+                        four adjusted aim sides, projected Through endpoints, and target centers), plus 20,000 seeded
+                        production/custom-grid fuzz rays, corner, reverse-boundary, zero-length, non-finite, and legacy
+                        packed-key cases.
+                    </p>
+
+                    <h3 style="margin-top: 2rem">Local M4 microbenchmarks</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Legacy and grid-jump ray microbenchmark comparison
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">20,000-ray workload</th>
+                                    <th scope="col" class="num">Legacy median</th>
+                                    <th scope="col" class="num">Grid-jump median</th>
+                                    <th scope="col" class="num">Speedup</th>
+                                    <th scope="col">Protocol</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Normal, 25% large</td>
+                                    <td class="num">159.11 ms</td>
+                                    <td class="num">14.75 ms</td>
+                                    <td class="num">10.78×</td>
+                                    <td>11 alternating warmed trials</td>
+                                </tr>
+                                <tr>
+                                    <td>Through, 25% large</td>
+                                    <td class="num">260.92 ms</td>
+                                    <td class="num">20.72 ms</td>
+                                    <td class="num">12.59×</td>
+                                    <td>11 alternating warmed trials</td>
+                                </tr>
+                                <tr>
+                                    <td>Mixed, 20% large / 10% Through</td>
+                                    <td class="num">173.31 ms</td>
+                                    <td class="num">15.65 ms</td>
+                                    <td class="num">11.07×</td>
+                                    <td>11 alternating warmed trials</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        Independent harnesses on different ray corpora measured 5.32× and 7.47× as well. The consistent
+                        conclusion is “materially faster”; no wall-time threshold belongs in CI because host load, JIT,
+                        and corpus mix move the exact multiplier.
+                    </p>
+
+                    <details>
+                        <summary>Short-ray crossover and benchmark construction</summary>
+                        <div class="detail-body">
+                            <p>
+                                A separate M4/Bun 1.3.14 sweep used 128 deterministic rays per class, calibrated each
+                                batch to about 140 ms, warmed both implementations, and took 15 alternating-order median
+                                samples (nine for the length sweep). Every returned cell and first position matched.
+                            </p>
+                            <div class="table-wrap">
+                                <table>
+                                    <caption class="sr-only">
+                                        Short-ray crossover benchmark
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Ray class</th>
+                                            <th scope="col" class="num">Legacy</th>
+                                            <th scope="col" class="num">Grid jump</th>
+                                            <th scope="col" class="num">Speedup</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Zero-length</td>
+                                            <td class="num">22.53 ns/ray</td>
+                                            <td class="num">16.24 ns/ray</td>
+                                            <td class="num">1.39×</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Within one cell, 4–75 px</td>
+                                            <td class="num">333.16 ns/ray</td>
+                                            <td class="num">61.06 ns/ray</td>
+                                            <td class="num">5.46×</td>
+                                        </tr>
+                                        <tr>
+                                            <td>One-cell span, 128 px</td>
+                                            <td class="num">888.26 ns/ray</td>
+                                            <td class="num">120.23 ns/ray</td>
+                                            <td class="num">7.39×</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Four-cell span, 512 px</td>
+                                            <td class="num">3,906.81 ns/ray</td>
+                                            <td class="num">366.72 ns/ray</td>
+                                            <td class="num">10.65×</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Full-board span, 1,920 px</td>
+                                            <td class="num">16,678.99 ns/ray</td>
+                                            <td class="num">754.42 ns/ray</td>
+                                            <td class="num">22.11×</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="small">
+                                The only measured loss is an exceptionally short non-zero line: 1 px is 1.96× slower, 2
+                                px 1.71×, and 4 px 1.28×; by 8 px the new helper is 1.37× faster. Normal combat rays are
+                                much longer, and the zero-length guard is itself faster. This constant-factor crossover
+                                is a performance side effect, not a gameplay-semantic one.
+                            </p>
+                        </div>
+                    </details>
+
+                    <h3 style="margin-top: 2rem">Controlled A13 macro impact</h3>
+                    <p>
+                        Both sides were immutable archives of
+                        <code>f02e8066cb454e74f28b2b95e29b41502fa0e048</code>. The candidate overlaid only
+                        <code>attack_handler.ts</code> (SHA-256 <code>d4f03424…2c5233</code>) and
+                        <code>ray_traversal.ts</code> (SHA-256 <code>18d4f319…f97eba</code>); no live shared-tree source
+                        was imported. Each fresh process warmed seed 9001 through lap 2, then measured v0.8 self-play
+                        seeds <code>[1, 42, 43, 44, 45, 46]</code> through lap 4. Five trials alternated process order.
+                        Every trial recorded the same 361 actions, zero rejections, and result/action digest
+                        <code>5362e41c…cdfbe</code>.
+                    </p>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Controlled A13 macro and profile comparison
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Same 6-match / 361-action workload</th>
+                                    <th scope="col" class="num">Before</th>
+                                    <th scope="col" class="num">After</th>
+                                    <th scope="col">Interpretation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Wall time, median of 5 alternating trials</td>
+                                    <td class="num">7,613.40 ms</td>
+                                    <td class="num">5,894.10 ms</td>
+                                    <td><strong>22.58% less time / 1.292× throughput.</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Profiled sampled process duration</td>
+                                    <td class="num">9.438 s</td>
+                                    <td class="num">7.282 s</td>
+                                    <td>22.84% reduction with 500 µs profiler sampling.</td>
+                                </tr>
+                                <tr>
+                                    <td>Traversal subtree inclusive samples</td>
+                                    <td class="num">23.01% / 2,172.1 ms</td>
+                                    <td class="num">2.54% / 184.8 ms</td>
+                                    <td>91.49% less absolute sampled traversal time; 11.76×.</td>
+                                </tr>
+                                <tr>
+                                    <td>Named traversal self samples</td>
+                                    <td class="num">22.62% / 2,135.0 ms</td>
+                                    <td class="num">2.46% / 178.8 ms</td>
+                                    <td>91.62% less sampled self time; 11.94×.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <details>
+                        <summary>All five alternating macro trials</summary>
+                        <div class="detail-body">
+                            <div class="table-wrap">
+                                <table>
+                                    <caption class="sr-only">
+                                        Five alternating macro benchmark trials
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Trial</th>
+                                            <th scope="col">First process</th>
+                                            <th scope="col" class="num">Legacy</th>
+                                            <th scope="col" class="num">Grid jump</th>
+                                            <th scope="col" class="num">Reduction</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>1</td>
+                                            <td>Legacy</td>
+                                            <td class="num">7,491.27 ms</td>
+                                            <td class="num">5,836.34 ms</td>
+                                            <td class="num">22.09%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>2</td>
+                                            <td>Grid jump</td>
+                                            <td class="num">7,619.73 ms</td>
+                                            <td class="num">5,894.10 ms</td>
+                                            <td class="num">22.65%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>3</td>
+                                            <td>Legacy</td>
+                                            <td class="num">7,539.49 ms</td>
+                                            <td class="num">5,837.77 ms</td>
+                                            <td class="num">22.57%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>4</td>
+                                            <td>Grid jump</td>
+                                            <td class="num">7,613.40 ms</td>
+                                            <td class="num">5,945.85 ms</td>
+                                            <td class="num">21.90%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>5</td>
+                                            <td>Legacy</td>
+                                            <td class="num">7,635.85 ms</td>
+                                            <td class="num">5,968.99 ms</td>
+                                            <td class="num">21.83%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                    <div class="callout good">
+                        <h3>Deterministic match parity</h3>
+                        <p>
+                            The exact semantic gate disabled wall-clock deadline and circuit decisions while retaining
+                            the rest of the a13 environment. Twenty seeds ran to natural completion (maximum 14 laps),
+                            producing identical outcomes/actions across 1,656 actions and zero rejections. Identical
+                            temporary instrumentation then captured every placement/start/system/action event batch and
+                            six decision/turn state boundaries, including authoritative RNG position, damage stats,
+                            active unit, summon sequence, action-cap state, and stable search state. Both arms matched
+                            all <strong>8,630 ordered boundaries</strong> and <strong>5,375 raw events</strong>; their
+                            ordered unbounded trace SHA-256 is <code>76f47b60…74702</code>. Seed 1 repeated exactly on
+                            both archives. The production common-driver 175/275 ms mode also matched 20/20 seeds and the
+                            same 8,630/5,375 records with ordered trace <code>78f7f94d…01d15</code>, zero deadline
+                            fallbacks, zero circuit opens/skips, and zero rejections. Baseline and candidate are
+                            compared only within each timing mode; the two mode digests are deliberately not treated as
+                            equal.
+                        </p>
+                    </div>
+                    <div class="callout good">
+                        <h3>Ranked outer-300 ms operational replay passed</h3>
+                        <p>
+                            The unchanged ranked server at <code>8519fbd…47f</code> was then replayed against fresh
+                            immutable common archives. The complete common/server source trees, package/lock inputs,
+                            exact two-file A/B delta, and final runner were sealed before and after execution. Six
+                            paired matches covered <code>NORMAL</code>, <code>LAVA_CENTER</code>, and
+                            <code>BLOCK_CENTER</code> with both physical side assignments. All 6/6 completed production
+                            replay/capture and matched uncapped action, event, chosen decision, semantic counter-delta,
+                            per-action state, and final-state digests across 399 decision calls per variant—376 searched
+                            and 23 single-candidate exits—706 journal entries, and 712 server events. Each match
+                            constructed exactly one driver; each arm recorded the same one repaired illegal incumbent,
+                            which was not a server action rejection. Proposal rejects, server errors, common
+                            fallbacks/circuits, ranked outer circuits/warnings, and failed search-state restores were
+                            all zero. Candidate outer-wrapper p50/p95/p99/max were 38.42/82.70/102.77/133.56 ms; those
+                            six correlated matches establish safe operation below the breaker, not a latency
+                            distribution or speedup claim. The recursively symlinked installed dependency contents
+                            remain the explicit provenance limitation.
+                        </p>
+                    </div>
+                    <div class="callout warn">
+                        <p>
+                            The 22.58% figure is a local, warmed six-match workload—not a universal production promise.
+                            It is close to the immutable profile’s 23.01% legacy traversal subtree share; the remaining
+                            difference can come from sampling, allocation/GC effects, and ordinary wall-clock noise. The
+                            full 420-match tail-latency protocol is still required before using this number for capacity
+                            planning.
+                        </p>
+                    </div>
+                    <div class="callout warn">
+                        <h3>Evidence revision is not the final integration parent</h3>
+                        <p>
+                            The isolated A/B evidence intentionally freezes common at <code>f02e8066…e048</code>, while
+                            the shared mainline has since advanced through <code>d2794c4…0349</code> and changed the a13
+                            search/profile path. The ray helper and current AttackHandler overlay still have the exact
+                            measured hashes, so the primitive compatibility proof remains useful; the macro percentage,
+                            bounded behavior, and ranked wrapper result are not a substitute for rerunning the same
+                            gates from the final intended parent SHA before integration.
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Behavior surface and regression matrix</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Ranged behavior invariants and required evidence
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Surface</th>
+                                    <th scope="col">Invariant</th>
+                                    <th scope="col">Required evidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Normal ranged / retaliation</td>
+                                    <td>Same first enemy, friendly pass-through, distance divisor, HP and events.</td>
+                                    <td>Trajectory, action-engine, and AttackHandler suites.</td>
+                                </tr>
+                                <tr>
+                                    <td>Through Shot</td>
+                                    <td>
+                                        Same ordered hits; stop after Arrows Wingshield owner; aura recipient alone does
+                                        not stop.
+                                    </td>
+                                    <td>Projected-ray exhaustive oracle and large-attacker tests.</td>
+                                </tr>
+                                <tr>
+                                    <td>Large Caliber / splash</td>
+                                    <td>
+                                        Same primary, first footprint, splash anchor, affected units, and no 2×2
+                                        duplicates.
+                                    </td>
+                                    <td>Ability processors and large-footprint fixtures.</td>
+                                </tr>
+                                <tr>
+                                    <td>Area Throw</td>
+                                    <td>
+                                        Same empty-cell interception and delivery geometry from small/large origins.
+                                    </td>
+                                    <td>Area Throw router and engine legality tests.</td>
+                                </tr>
+                                <tr>
+                                    <td>Mountains</td>
+                                    <td>
+                                        Same left/right mountain, position, distance, decrement, and clear corridor.
+                                    </td>
+                                    <td>Both travel directions and standing/cleared trajectories.</td>
+                                </tr>
+                                <tr>
+                                    <td>Selection / AOE flags</td>
+                                    <td>
+                                        Mountains block ordinary/Through rays but not selection-mode or AOE evaluation.
+                                    </td>
+                                    <td>Explicit flag matrix, lava/water affected-cell order.</td>
+                                </tr>
+                                <tr>
+                                    <td>AI / UI consumers</td>
+                                    <td>
+                                        Same candidate legality, hit signature, expected damage, highlights, and
+                                        obstacle route.
+                                    </td>
+                                    <td>Candidate tests, fixed-seed action logs, browser smoke later.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Tradeoffs and side effects</h3>
+                    <div class="grid-2">
+                        <article class="card">
+                            <h4>Positive</h4>
+                            <ul>
+                                <li>Work scales with crossed cells rather than world pixels.</li>
+                                <li>Intermediate pixel arrays and the second mapping pass disappear.</li>
+                                <li>Fewer temporary objects reduce GC pressure in rollout-heavy matches.</li>
+                                <li>The helper is isolated, pure for engine-range inputs, and directly fuzzable.</li>
+                                <li>Malformed non-finite rays terminate safely.</li>
+                            </ul>
+                        </article>
+                        <article class="card">
+                            <h4>Costs and retained debt</h4>
+                            <ul>
+                                <li>
+                                    The arithmetic is less obvious than textbook DDA and needs its proof comments/tests.
+                                </li>
+                                <li>
+                                    It intentionally preserves legacy corner aliases, directional asymmetry, and
+                                    y-origin behavior.
+                                </li>
+                                <li>
+                                    It preserves <code>(x &lt;&lt; 4) | y</code> out-of-grid key collisions for exact
+                                    parity.
+                                </li>
+                                <li>
+                                    Very large coordinates still rely on JavaScript Number precision; engine ranges are
+                                    small.
+                                </li>
+                                <li>
+                                    Non-zero 1–4 px rays pay more constant overhead; the measured crossover is between 4
+                                    and 8 px, far below ordinary combat spans.
+                                </li>
+                                <li>
+                                    The exhaustive differential file adds about 8.1 seconds locally; its heaviest case
+                                    has a 60-second per-test allowance for slower CI hosts.
+                                </li>
+                                <li>A future grid rule change must update the oracle and helper together.</li>
+                            </ul>
+                        </article>
+                    </div>
+
+                    <div class="callout">
+                        <h3>Deferred cleanup is deliberate</h3>
+                        <p>
+                            Replacing the 16-wide packed key, changing out-of-grid treatment, using mathematical entry
+                            points, or making corner contact a true supercover may each be desirable game-rule changes.
+                            They must be proposed and balanced separately; combining them with a performance patch would
+                            make regressions impossible to attribute.
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Workstream 1 checklist</h3>
+                    <ul class="checklist">
+                        <li class="done">Audit every caller and observable field derived from ray order/position.</li>
+                        <li class="done">Implement the closed-form discrete traversal in an isolated grid helper.</li>
+                        <li class="done">Retain the removed pixel walker only as a test oracle.</li>
+                        <li class="done">
+                            Add 1,108,224 exhaustive production-ray checks and 20,000 seeded real/custom-grid fuzz rays.
+                        </li>
+                        <li class="done">Run independent 2.74M-ray and synthetic-grid audits with zero mismatches.</li>
+                        <li class="done">Measure alternating normal, Through, and mixed microbenchmarks.</li>
+                        <li class="done">Complete the 211-test focused semantic suite with zero failures.</li>
+                        <li>Run full common test/build and client/server checks in a consistent shared tree.</li>
+                        <li class="done">
+                            Run immutable old/new macro repeats plus complete deadline-free and bounded-driver replays.
+                        </li>
+                        <li class="done">
+                            Match the complete ordered event stream and per-boundary simulator-state hashes in both
+                            timing modes.
+                        </li>
+                        <li class="done">
+                            Replay three maps and both side assignments through the ranked server’s post-hoc outer 300
+                            ms circuit; match 6/6 semantic traces with zero rejects/fallbacks/circuits and report the
+                            one symmetric incumbent repair per variant separately.
+                        </li>
+                        <li>
+                            After main stabilizes, rebuild both archives from the exact intended parent of the ray
+                            commit and rerun unbounded/bounded traces, ranked wrapper replay, latency panel, and
+                            profiles.
+                        </li>
+                        <li>Run the frozen 420-match-per-variant latency panel and fixed-work profiles.</li>
+                        <li>
+                            Run browser sandbox smoke on the final common SHA for normal, Through, mountain, and AOE
+                            targeting, range/highlight rendering, and obstacle-intersection animation.
+                        </li>
+                        <li>Commit common, bump the client submodule and ranked server pin, then deploy together.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="remaining">
+                <div class="wrap">
+                    <div class="eyebrow">Workstreams 2–8</div>
+                    <h2>Precise follow-on plan</h2>
+                    <p class="section-intro">
+                        These are implementation hypotheses until their own baseline and differential oracle exist. Do
+                        not stack multiple items into one commit: each needs an attributable speed measurement and a
+                        deterministic behavior comparison.
+                    </p>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>2 · Pathfinding and neighbor indices</h3>
+                                <p>Reduce repeated object-heavy route discovery inside future policy turns.</p>
+                            </div>
+                            <span class="status queued">Next after #1</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>Assign every legal cell a stable numeric ID 0–255.</li>
+                                    <li>Precompute static neighbor IDs and border/footprint templates.</li>
+                                    <li>
+                                        Use reusable typed-array queues, predecessor arrays, and generation counters.
+                                    </li>
+                                    <li>
+                                        Key the concrete path inputs: grid schema, current anchor cell, matrix/terrain
+                                        and occupancy identity, <code>maxSteps</code>, aggro-board identity/content,
+                                        <code>canFly</code>, <code>isSmallUnit</code>, <code>isMadeOfFire</code>, and
+                                        every route-order or response/hazard mode. Unit/team/ability state may derive
+                                        these values but cannot substitute for them in the cache contract.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>Compare reachable cells, route sequence, cost, and rejection reason.</li>
+                                    <li>
+                                        Cover 1×1/2×2, flying, lava/water, mountains, occupied destinations, and
+                                        response zones.
+                                    </li>
+                                    <li>Replay move and move-shot candidate catalogs in identical order.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Zero path/candidate mismatches over generated legal boards.</li>
+                                    <li>At least 25% lower inclusive path scope in representative profiles.</li>
+                                    <li>No p99 regression from buffer clearing or cache invalidation.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="callout warn">
+                            <p>
+                                Do not deduplicate routes only by destination. Hazards, response attacks, intermediate
+                                occupancy, and future route-sensitive mechanics can make two paths to the same cell
+                                observably different.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>3 · Aura coverage and dirty invalidation</h3>
+                                <p>
+                                    Stop rebuilding every aura relation after events that cannot affect most emitters.
+                                </p>
+                            </div>
+                            <span class="status queued">Parallel design after #1</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>
+                                        Precompute geometry masks only by grid schema, emitter footprint/base cell,
+                                        range, and aura shape; keep team, active-state, source, recipient eligibility,
+                                        stacking, and stat calculation outside that static key.
+                                    </li>
+                                    <li>
+                                        Track dirty emitters and recipients on movement, death/revive, dispel, team
+                                        bonus, and ability state.
+                                    </li>
+                                    <li>
+                                        Separate geometric membership from per-target applicability/stat calculation.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>
+                                        Run current full refresh beside incremental refresh after every randomized
+                                        event.
+                                    </li>
+                                    <li>
+                                        Compare applied aura IDs, source, properties, order, stack stats, and removal
+                                        timing.
+                                    </li>
+                                    <li>
+                                        Cover multi-aura emitters, large units, death chains, summon, cleanse, and team
+                                        bonuses.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Zero state-hash differences through long randomized event sequences.</li>
+                                    <li>At least 30% lower aura-scope CPU on aura-dense rosters.</li>
+                                    <li>No stale effect survives a source/recipient invalidation event.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>4 · Shared per-decision candidate/path catalog</h3>
+                                <p>
+                                    Reuse geometry already proven for enumeration in shortlist features and policy
+                                    queries.
+                                </p>
+                            </div>
+                            <span class="status queued">Depends on #2</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>
+                                        Create an immutable decision context keyed by a non-reused state epoch, active
+                                        unit ID/team/footprint, map/terrain/occupancy revisions, and policy-relevant
+                                        ability/effect state.
+                                    </li>
+                                    <li>
+                                        Share reachability, attack trajectories, target features, and legal delivery
+                                        routes.
+                                    </li>
+                                    <li>Keep candidate canonicalization at one boundary.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>Compare complete candidate objects, not only chosen actions.</li>
+                                    <li>
+                                        Assert stable order, kind, actions, route, shot features, and incumbent
+                                        identity.
+                                    </li>
+                                    <li>
+                                        Invalidate on every engine mutation and restore; never reuse across a rollout
+                                        step merely because a restored numeric revision equals an earlier value.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Bit-identical audit rows and selected candidates over fixed seeds.</li>
+                                    <li>Material reduction in enumeration + future-policy geometry calls.</li>
+                                    <li>Cache bookkeeping consumes less than 10% of saved time.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="callout danger">
+                            <p>
+                                Snapshot/restore is the cache boundary. A revision stored inside the snapshot can move
+                                backward and collide with a discarded future. Either clear decision caches on every
+                                restore or issue a monotonic, non-restored epoch per apply/restore edge; aura/path
+                                entries must never survive into a sibling rollout on a state-value-only key.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>5 · Numeric 256-cell representation</h3>
+                                <p>Move hot inner loops from strings/objects/sets to compact indices and masks.</p>
+                            </div>
+                            <span class="status queued">After #2–4 establish contracts</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>Use <code>id = y × 16 + x</code> only for legal cells behind an adapter.</li>
+                                    <li>
+                                        Represent occupancy, reachability, aura, and target sets with typed
+                                        arrays/bitsets.
+                                    </li>
+                                    <li>Convert to <code>XY</code> only at public and rendering boundaries.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>Compare every set/mask against the current object representation.</li>
+                                    <li>Cover out-of-grid projected rays separately; never coerce them into 0–255.</li>
+                                    <li>Track iteration order wherever order is observable.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Exact battle/action hashes across tournament replay corpora.</li>
+                                    <li>Lower allocations and GC self time; p99 improves with p50.</li>
+                                    <li>No duplicate object↔ID conversion in hot loops.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>6 · Selector-aware exact pruning and bounded rollouts</h3>
+                                <p>
+                                    Stop only when mathematics proves the skipped work cannot alter the selected action.
+                                </p>
+                            </div>
+                            <span class="status queued">Design now, land after #2–5</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>
+                                        Use the leaf value’s known <code>[0,1]</code> range to bound unfinished means.
+                                    </li>
+                                    <li>
+                                        Prune a challenger only when its best possible mean cannot clear the active
+                                        selector threshold.
+                                    </li>
+                                    <li>
+                                        Evaluate structural dominance only for formally identical delivery/state
+                                        effects.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>
+                                        Run pruned and unpruned search together; compare means, chosen index, override,
+                                        and fallback.
+                                    </li>
+                                    <li>
+                                        Exercise ties, <code>−Infinity</code>, gate boundaries, deadline, and every
+                                        special force mode.
+                                    </li>
+                                    <li>Disable pruning where audit/IL output requires complete means.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>
+                                        Zero selector differences in generated score matrices and real replay states.
+                                    </li>
+                                    <li>Meaningful saved turns; with only two rollouts, expect modest gains.</li>
+                                    <li>No increased deadline fallback or circuit-open rate.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>7 · Reversible battle state</h3>
+                                <p>
+                                    Replace repeated deep snapshots/restores only after mutation ownership is explicit.
+                                </p>
+                            </div>
+                            <span class="status queued">High risk, modest current share</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Implementation slice</h4>
+                                <ul>
+                                    <li>
+                                        Instrument all mutable engine, queue, RNG, policy-memory, effect, and
+                                        damage-stat fields.
+                                    </li>
+                                    <li>Prototype mutation journals or copy-on-write pages behind the existing API.</li>
+                                    <li>Retain a full snapshot audit mode.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exact oracle</h4>
+                                <ul>
+                                    <li>Hash state before apply and after restore for arbitrary action sequences.</li>
+                                    <li>
+                                        Include queue order, target memory, RNG cursor/source, buffs/effects, terrain,
+                                        and counters.
+                                    </li>
+                                    <li>
+                                        Stress exceptions, illegal actions, deaths, summons, waits, spells, and nested
+                                        rollouts.
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Exact restoration under millions of randomized apply/undo sequences.</li>
+                                    <li>Combined snapshot + restore scope improves enough to justify complexity.</li>
+                                    <li>No retained references into a future or restored state.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="workstream">
+                        <div class="workstream-head">
+                            <div>
+                                <h3>8 · Deeper horizon and selective branching</h3>
+                                <p>Spend earned headroom on better decisions only after latency is stable.</p>
+                            </div>
+                            <span class="status hold">Requires measured headroom</span>
+                        </div>
+                        <div class="grid-3">
+                            <div>
+                                <h4>Experiment ladder</h4>
+                                <ol>
+                                    <li>Fixed horizon 16 under unchanged root search.</li>
+                                    <li>Adaptive horizon based on remaining deadline and branching cost.</li>
+                                    <li>Iterative deepening with last-complete-result fallback.</li>
+                                    <li>Only then test beam or adversarial reply branching.</li>
+                                </ol>
+                            </div>
+                            <div>
+                                <h4>Correctness/strength</h4>
+                                <ul>
+                                    <li>Paired side-swapped tournaments across maps and roster cohorts.</li>
+                                    <li>Wait/initiative, spell timing, ranged kiting, and finish-specific slices.</li>
+                                    <li>Calibration, illegal/rejected actions, game length, and timeout behavior.</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4>Exit gate</h4>
+                                <ul>
+                                    <li>Common-driver p99 remains well inside 175 ms with headroom.</li>
+                                    <li>No 175/275 ms or ranked outer-300 ms circuit/fallback increase.</li>
+                                    <li>Pre-registered strength gain survives alternate seeds/maps/cohorts.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section id="pruning">
+                <div class="wrap">
+                    <div class="eyebrow">Branch elimination</div>
+                    <h2>What can be skipped safely</h2>
+                    <p class="section-intro">
+                        “This branch looks bad” is useful only if it is either a proof or an explicitly measured
+                        heuristic. Ranked search must keep those categories separate, with exact pruning enabled first
+                        and heuristic pruning evaluated as a new AI policy.
+                    </p>
+
+                    <div class="grid-2">
+                        <article class="card">
+                            <h3>Exact rollout-mean bound</h3>
+                            <p>
+                                Leaf scores lie in <code>[0,1]</code>. After <code>k</code> of <code>R</code> rollouts
+                                with sum <code>S</code>:
+                            </p>
+                            <pre>
+lower = S / R
+upper = (S + R − k) / R</pre>
+                            <p>
+                                A challenger may stop only when <code>upper</code> cannot beat the incumbent under the
+                                current gate, tie rule, and selector mode. An incumbent may stop only when its lower
+                                bound already defeats every challenger’s upper bound.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <h3>Why gains may initially be small</h3>
+                            <p>
+                                Production uses only two rollouts per candidate. After one score, the unfinished
+                                interval is still one-half wide, so few ordinary comparisons can be resolved. The same
+                                bound becomes more useful if validation rollouts or deeper stochastic sampling grows.
+                            </p>
+                            <p>
+                                Lexicographic modes—productive fallback, dominant finish, urgency, target pressure,
+                                aggressive wait ties—and audit/IL completeness need dedicated rules or pruning disabled.
+                            </p>
+                        </article>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Search pruning techniques, proof requirements, and risks
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Technique</th>
+                                    <th scope="col">Safe now?</th>
+                                    <th scope="col">Required proof/state key</th>
+                                    <th scope="col">Main risk</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Bound unfinished rollout means</td>
+                                    <td>Yes, mode by mode</td>
+                                    <td>Leaf bounds plus the exact selector threshold and tie semantics.</td>
+                                    <td>Special selector modes silently use a different ordering.</td>
+                                </tr>
+                                <tr>
+                                    <td>Structural candidate dominance</td>
+                                    <td>Only narrowly</td>
+                                    <td>Same post-action state for all observables, with one candidate no worse.</td>
+                                    <td>Routes, response attacks, RNG consumption, or metadata differ.</td>
+                                </tr>
+                                <tr>
+                                    <td>Transposition reuse</td>
+                                    <td>Not with a shallow key</td>
+                                    <td>
+                                        Battle, queues, buffs/effects, target memory, damage stats, strategy, horizon,
+                                        RNG cursor.
+                                    </td>
+                                    <td>The current simulation seed alone is not a state identity.</td>
+                                </tr>
+                                <tr>
+                                    <td>Alpha–beta</td>
+                                    <td>No current tree</td>
+                                    <td>Explicit alternating adversarial branches and a consistent value ordering.</td>
+                                    <td>Applying the name to policy rollouts yields no valid pruning.</td>
+                                </tr>
+                                <tr>
+                                    <td>Beam/top-k future actions</td>
+                                    <td>Heuristic policy change</td>
+                                    <td>Paired strength and behavioral evaluation, not parity.</td>
+                                    <td>Prunes the surprising tactical line the search was added to find.</td>
+                                </tr>
+                                <tr>
+                                    <td>Early terminal / forced result</td>
+                                    <td>Yes when engine-proven</td>
+                                    <td>Actual fight completion or a formally terminal state.</td>
+                                    <td>Material dominance is not the same as a forced win.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="measurement">
+                <div class="wrap">
+                    <div class="eyebrow">Permanent measurement protocol</div>
+                    <h2>Make improvements attributable</h2>
+                    <p class="section-intro">
+                        Microbenchmarks answer “did the primitive get cheaper?” CPU profiles answer “where did time
+                        move?” and paired game runs answer “did real decisions get faster without changing?” These are
+                        separate experiments and should not be collapsed into one percentage.
+                    </p>
+
+                    <div class="grid-3">
+                        <article class="card">
+                            <h3>Primitive benchmark</h3>
+                            <ul>
+                                <li>Deterministic corpus with normal, Through, small, large, short, and long rays.</li>
+                                <li>Warm both paths, then alternate old/new ordering for at least 11 trials.</li>
+                                <li>Consume a checksum; report median, p90, time/ray, allocations if available.</li>
+                                <li>Informational only in CI; never assert wall time.</li>
+                            </ul>
+                        </article>
+                        <article class="card">
+                            <h3>Decision latency</h3>
+                            <ul>
+                                <li>
+                                    One fixed <code>maxLaps=2</code> warm-up match in every worker isolate, producing at
+                                    least 20 complete decisions before recording.
+                                </li>
+                                <li>
+                                    210 roster/map pair identities × two physical side swaps = 420 matches per variant.
+                                </li>
+                                <li>
+                                    Baseline/candidate pairing therefore yields 420 matched observations and 840 match
+                                    executions per concurrency pass.
+                                </li>
+                                <li>Concurrency 1 is the attribution pass; repeat at 4 and 12 only for saturation.</li>
+                                <li>Report nearest-rank p50/p95/p99/p99.9/max and microseconds per simulated turn.</li>
+                            </ul>
+                        </article>
+                        <article class="card">
+                            <h3>CPU profiles</h3>
+                            <ul>
+                                <li>
+                                    Three independent fixed-work captures per variant at a 500 µs sampling interval.
+                                </li>
+                                <li>
+                                    Each capture repeats the frozen six-match corpus nine times: 3,249 accepted actions;
+                                    60–90 seconds is only the expected sizing range, never a stop condition.
+                                </li>
+                                <li>Same source revision, environment, seeds, maps, rosters, and action count.</li>
+                                <li>Aggregate functions by source scope; retain raw profiles.</li>
+                                <li>Check Amdahl consistency before attributing a macro speedup.</li>
+                            </ul>
+                        </article>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Frozen Workstream 1 panel</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Preregistered Workstream 1 latency panel inputs and estimators
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Field</th>
+                                    <th scope="col">Frozen value</th>
+                                    <th scope="col">Reason / interpretation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Source pair</td>
+                                    <td>
+                                        Baseline <code>f02e8066…e048</code>; candidate is that archive plus only
+                                        <code>attack_handler.ts</code> and <code>ray_traversal.ts</code> at the hashes
+                                        recorded in the evidence manifest.
+                                    </td>
+                                    <td>
+                                        Full source trees, the exact two-file delta, runner bytes, and profile-arm label
+                                        are enforced before use and resealed after every condition.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Pair plan</td>
+                                    <td>
+                                        Base seed <code>85,000,717</code>; 30 pair identities per cohort, assigned ten
+                                        each to <code>NORMAL</code>, <code>LAVA_CENTER</code>, and
+                                        <code>BLOCK_CENTER</code>; <code>maxLaps = 60</code>.
+                                    </td>
+                                    <td>
+                                        Generate once, persist complete setup, and feed the identical plan to both arms.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Seven cohorts</td>
+                                    <td>
+                                        <code>ranked-draft</code>, <code>uniform-mixed</code>,
+                                        <code>ranged-heavy</code>, <code>ground-melee</code>, <code>flyer-heavy</code>,
+                                        <code>caster-support</code>, and <code>cross-archetype</code> from
+                                        <code>ai_meta_cohorts_core.ts</code>.
+                                    </td>
+                                    <td>
+                                        Uses the established complete setup generator: XP-budget stack sizing,
+                                        artifacts, augments, synergies, perks, and non-overlapping armies.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Timing modes</td>
+                                    <td>
+                                        Panel: production common-driver 175 ms deadline / 275 ms circuit. Exact
+                                        unbounded replay and the passed ranked outer-300 ms operational replay remain
+                                        separately labeled evidence.
+                                    </td>
+                                    <td>Does not mix semantic parity, common timeout behavior, and server overhead.</td>
+                                </tr>
+                                <tr>
+                                    <td>Order and warm-up</td>
+                                    <td>
+                                        At least 20 warm decisions per worker. Two persistent variant-isolated pools are
+                                        resident; at c12, 24 workers are warmed but only the selected 12-worker arm is
+                                        active. The 21 blocks alternate AB then BA—gross order balance, not same-block
+                                        ABBA replication. Qualifying runs reject <code>--skip-warmup</code>.
+                                    </td>
+                                    <td>Controls first-run/JIT effects while retaining the actual worker topology.</td>
+                                </tr>
+                                <tr>
+                                    <td>Distribution</td>
+                                    <td>
+                                        Raw unrounded all-decision and searched-decision latency; nearest-rank
+                                        percentiles. Circuit skips are a separate class, not zero-time samples.
+                                    </td>
+                                    <td>Preserves tails and makes censoring visible.</td>
+                                </tr>
+                                <tr>
+                                    <td>Wall and logical work</td>
+                                    <td>
+                                        Active wall is the sum of post-warm-up block durations and includes parent
+                                        scheduling, worker execution, structured-clone serialization, IPC, and promise
+                                        aggregation; it excludes opposite-arm idle time. All ten retained logical-work
+                                        fields—accepted actions plus nine decision/search counters—must match
+                                        task-by-task unless that task has an explicitly counted bounded fallback/circuit
+                                        divergence.
+                                    </td>
+                                    <td>
+                                        Makes c4/c12 saturation honest and prevents a faster arm from silently doing
+                                        less work.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Uncertainty</td>
+                                    <td>
+                                        95% pair-cluster bootstrap, stratified by cohort/map, 10,000 replicates, seed
+                                        <code>0xa13dd001</code>. Resample pair identities, retaining both side swaps.
+                                    </td>
+                                    <td>Decisions within one fight are correlated and must not be treated as IID.</td>
+                                </tr>
+                                <tr>
+                                    <td>Tail gate</td>
+                                    <td>
+                                        Complete matched task set; zero candidate engine rejections; zero candidate-only
+                                        exception, rejection delta, deadline fallback, circuit open, or
+                                        illegal-incumbent increase. At c1, lower 95% bootstrap bounds for both
+                                        total-decision and search reduction must exceed zero. At c1/c4/c12, upper 95%
+                                        bootstrap bounds for candidate/baseline p95 and p99 ratios must be at most
+                                        <code>1.05</code>; at c4/c12 candidate active-phase wall time must also be at
+                                        most <code>1.05×</code>
+                                        baseline. Review max and p99.9 descriptively.
+                                    </td>
+                                    <td>
+                                        Preregisters “material regression” as five percent rather than choosing it
+                                        later.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Host validity</td>
+                                    <td>
+                                        AC power and nominal thermal/memory-pressure state throughout; invalidate a
+                                        block if another build/simulation/profile overlaps, a non-runner process uses
+                                        one full core, or averages 20% of one core for five consecutive one-second
+                                        samples.
+                                    </td>
+                                    <td>
+                                        Contaminated blocks are rerun, never silently retained or selectively discarded.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="callout warn">
+                        <h3>Harness validated; statistical panel intentionally still open</h3>
+                        <p>
+                            The retained runner generated the frozen 210-cluster / 420-task / 21-stratum plan and passed
+                            an exact-source smoke using fresh archives. Warm-ups produced 28 decisions per variant; the
+                            two measured side-swapped matches produced 94 decisions and 144 accepted actions per
+                            variant, matching result/action/outcome/placement digests and the exact ten-field
+                            logical-work vector, including 0/0 illegal-incumbent repairs, with zero rejects, fallbacks,
+                            or circuits. Full-tree and runner seals matched before/after c1 and across the whole
+                            invocation; all workers shut down cleanly. The observed active-wall ratio was
+                            <code>0.98206</code>, but its timing is not interpreted: two observations are not an
+                            estimator. This host currently lacks continuous AC/thermal/memory-pressure/process
+                            attestation and has competing long-lived processes, so the full c1/c4/c12 panel was not run
+                            and cannot be marked qualifying.
+                        </p>
+                    </div>
+
+                    <h3 style="margin-top: 2rem">Required report fields</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Required performance report fields and failure signals
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Category</th>
+                                    <th scope="col">Fields</th>
+                                    <th scope="col">Failure signal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Identity</td>
+                                    <td>
+                                        Full baseline commit SHA, candidate overlay file hashes, immutable source
+                                        manifests, Bun/OS/arch, env, map, cohorts, seeds, concurrency.
+                                    </td>
+                                    <td>Any uncontrolled source/config difference between A and B.</td>
+                                </tr>
+                                <tr>
+                                    <td>Work</td>
+                                    <td>
+                                        Decisions, searched decisions, candidates, scored candidates, rollout turns,
+                                        actions.
+                                    </td>
+                                    <td>A “faster” run simply performed less logical work unexpectedly.</td>
+                                </tr>
+                                <tr>
+                                    <td>Latency</td>
+                                    <td>
+                                        p50/p95/p99/p99.9/max, per-match and per-sim-turn, bootstrap confidence
+                                        interval.
+                                    </td>
+                                    <td>Median improves while p99 or max regresses materially.</td>
+                                </tr>
+                                <tr>
+                                    <td>Safety</td>
+                                    <td>
+                                        Deadline fallbacks, circuit opens/skips, illegal incumbent, rejected actions,
+                                        exceptions.
+                                    </td>
+                                    <td>Any new rejection/exception or fallback-rate increase.</td>
+                                </tr>
+                                <tr>
+                                    <td>Parity</td>
+                                    <td>Winner, lap, ordered action log, event log, state hash per decision/turn.</td>
+                                    <td>
+                                        Any deadline-free divergence; bounded divergence without proved timeout/fallback
+                                        attribution.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Strength</td>
+                                    <td>
+                                        Only for policy/depth changes: paired wins, draws, effect size, cohort/map
+                                        slices.
+                                    </td>
+                                    <td>Aggregate gain driven by one cohort or lost on alternate seeds.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="callout">
+                        <h3>Isolation rule for the shared mainline</h3>
+                        <p>
+                            Create baseline and candidate archives before timing, record the SHA-256 of every overlaid
+                            file, and run only from those immutable directories. If a peer changes imported live source
+                            during A/B, discard the macro comparison; do not stash, restore, reset, or “clean” their
+                            files. Primitive tests that compile only the owned helper remain usable, but full-search
+                            numbers require source snapshots.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="gates">
+                <div class="wrap">
+                    <div class="eyebrow">Validation and rollout</div>
+                    <h2>Definition of done</h2>
+                    <p class="section-intro">
+                        Workstream 1 is not “done” merely because the helper is faster. The <code>f02e806…</code> source
+                        pair is retained historical isolated evidence, not the release candidate. After main stabilizes,
+                        create fresh baseline and candidate archives from the exact parent of the ray commit and rerun
+                        unbounded/bounded exact traces, the ranked outer-300 operational replay, and the qualifying
+                        latency/profile panel. These retained runners are deliberately pinned to f02e identities: first
+                        re-freeze/regenerate their expected source/server/profile identities and every dependent hash,
+                        then regenerate the plan and smoke artifacts before the final-base runs. Package checks do not
+                        substitute for this final-base A/B gate. Completion also requires the shared engine, browser
+                        client, and ranked server to consume the same committed common revision. Result/action hashes
+                        are a smoke gate; exact event logs and per-turn state hashes remain required before release.
+                    </p>
+
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Workstream 1 validation and rollout gates
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Gate</th>
+                                    <th scope="col">Command / evidence</th>
+                                    <th scope="col">Pass criterion</th>
+                                    <th scope="col">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1 · Primitive exactness</td>
+                                    <td><code>bun test test/grid/ray_traversal.test.ts</code></td>
+                                    <td>1,108,224 exhaustive real rays + 20,000 fuzz; exact cells and positions.</td>
+                                    <td><span class="status done">10 passed</span></td>
+                                </tr>
+                                <tr>
+                                    <td>2 · Independent audit</td>
+                                    <td>
+                                        2,744,145 mixed fixed-grid rays + 400,000 custom-grid rays from hashed temporary
+                                        harness/results; an additional 200,000 randomized-config reviewer fuzz rays are
+                                        informational.
+                                    </td>
+                                    <td>Zero mismatches.</td>
+                                    <td><span class="status done">0 mismatches</span></td>
+                                </tr>
+                                <tr>
+                                    <td>3 · Focused semantics</td>
+                                    <td>Grid, AttackHandler, trajectory, engine, candidate, ability suites.</td>
+                                    <td>All pass; no changed event/state fixture.</td>
+                                    <td><span class="status done">211 passed</span></td>
+                                </tr>
+                                <tr>
+                                    <td>4 · Static gates</td>
+                                    <td>Prettier, ESLint, TypeScript on owned files/package.</td>
+                                    <td>No new formatting, lint, or type error.</td>
+                                    <td><span class="status done">All pass</span></td>
+                                </tr>
+                                <tr>
+                                    <td>5 · Full common</td>
+                                    <td><code>bun test --timeout 30000</code> and <code>bun run build</code>.</td>
+                                    <td>All package tests/build pass in a stable shared tree.</td>
+                                    <td>
+                                        <span class="status active">0 candidate-only failures; green gate pending</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>6 · Semantic + operational replay</td>
+                                    <td>
+                                        Seeds 1–20 to natural completion: once without wall-clock limits and once with
+                                        the bounded common-driver 175/275 ms profile. Separately run three maps and both
+                                        side assignments through the ranked server’s outer 300 ms wrapper with uncapped
+                                        journal/event and state-trace capture.
+                                    </td>
+                                    <td>
+                                        Within-mode result/action, full event-log, and per-turn state hashes match. Any
+                                        bounded difference requires timeout/fallback attribution plus safety and
+                                        strength review.
+                                    </td>
+                                    <td>
+                                        <span class="status active"
+                                            ><code>f02e806…</code> exact; final-base replay pending</span
+                                        >
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>7 · Controlled macro perf</td>
+                                    <td>
+                                        Per pass: 210 pair identities × 2 side swaps × 2 variants = 840 executions;
+                                        concurrency 1/4/12 plus three fixed-work CPU profiles per variant.
+                                    </td>
+                                    <td>
+                                        Complete matched task set; zero candidate engine rejections and candidate-only
+                                        safety increases; c1 total and search lower bounds exceed zero; p95/p99 ratio
+                                        UCBs ≤ 1.05; c4/c12 active wall ratio ≤ 1.05.
+                                    </td>
+                                    <td>
+                                        <span class="status active"
+                                            >−22.58% macro; panel harness smoke passed; full panel pending</span
+                                        >
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>8 · Browser/client smoke</td>
+                                    <td>
+                                        Final common SHA in the browser sandbox: normal, Through, mountain, and AOE
+                                        targeting; range/highlight rendering; obstacle-intersection animation.
+                                    </td>
+                                    <td>Same targets/order/positions and no visual or interaction regression.</td>
+                                    <td><span class="status hold">Final-base smoke pending</span></td>
+                                </tr>
+                                <tr>
+                                    <td>9 · Integration</td>
+                                    <td>Common commit → client submodule → server common pin; client/server gates.</td>
+                                    <td>Same common SHA deployed to both authoritative and visual consumers.</td>
+                                    <td><span class="status hold">Not authorized/deployed</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="callout warn">
+                        <h3>Full-suite blocker is outside this workstream</h3>
+                        <p>
+                            The latest recorded live shared-tree run, at <code>77fbbdd…8e2a</code>, completed with 1,747
+                            passes and two pre-existing replay-digest failures:
+                            <code>v0_7_setup_ship_replay.test.ts</code> and the plain-v0.7 digest inside
+                            <code>v0_8s_strategy.test.ts</code>. The exact immutable <code>f02e8066…e048</code> archive
+                            run completed with 1,701 passes and seven failures: those same two digest failures plus five
+                            provenance tests that require a <code>.git</code> repository, which a Git archive does not
+                            contain. Running all seven failure cases on untouched baseline and candidate archives
+                            produced the same failures, received hashes, and Git-context errors—zero candidate-only
+                            regression. This workstream must not rewrite historical digests or weaken provenance tests;
+                            the full-green gate remains open until a stable repository-context run reconciles them.
+                        </p>
+                    </div>
+
+                    <details open>
+                        <summary>Focused ranged semantic command</summary>
+                        <div class="detail-body">
+                            <pre>
+bun test \
+  test/grid/ray_traversal.test.ts \
+  test/grid/range_attack_edge.test.ts \
+  test/grid/grid_math.test.ts \
+  test/handlers/attack_handler.test.ts \
+  test/handlers/through_shot_large_attacker.test.ts \
+  test/handlers/missed_attack_no_effects.test.ts \
+  test/engine/range_attack_trajectory.test.ts \
+  test/engine/action_engine.test.ts \
+  test/ai/candidate_engine_legality.test.ts \
+  test/ai/v0_6_area_throw_router.test.ts \
+  test/abilities/ability_processors.test.ts \
+  test/abilities/abomination_abilities.test.ts \
+  test/abilities/rime_charm_aoe.test.ts \
+  test/abilities/status_resist_aoe.test.ts \
+  test/abilities/petrifying_gaze_flesh_shield.test.ts</pre>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary>Ranked integration sequence after approval</summary>
+                        <div class="detail-body">
+                            <ol>
+                                <li>Run common full test/build and record the common SHA.</li>
+                                <li>
+                                    Commit only the ray helper, AttackHandler integration, regression test, and this
+                                    plan.
+                                </li>
+                                <li>
+                                    Fetch immediately before push; stop on unexpected <code>origin/main</code> movement.
+                                </li>
+                                <li>Push common, then update the client submodule pointer to that exact SHA.</li>
+                                <li>Update the server’s common dependency/pin and reinstall.</li>
+                                <li>
+                                    Run client workspace checks and server <code>npx tsc --noEmit</code> + API game
+                                    tests.
+                                </li>
+                                <li>Restart/deploy ranked server and refresh/deploy the client together.</li>
+                                <li>
+                                    Monitor action rejections, decision p95/p99, deadline fallback, and circuit
+                                    counters.
+                                </li>
+                            </ol>
+                        </div>
+                    </details>
+
+                    <div class="callout danger">
+                        <h3>Rollback trigger</h3>
+                        <p>
+                            Any engine-range primitive mismatch, deadline-free replay divergence, new rejected action,
+                            wrong mountain, or changed falloff/splash target blocks rollout. A bounded-driver or ranked
+                            wrapper replay difference is not automatically semantic drift: first prove whether the only
+                            cause is a changed deadline/circuit fallback. It remains blocked unless safety, rejection,
+                            latency, and strength gates pass. Roll back the isolated common change and pins rather than
+                            patching around an unexplained difference in the client or server.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="risks">
+                <div class="wrap">
+                    <div class="eyebrow">Risk register</div>
+                    <h2>Known failure modes</h2>
+                    <div class="table-wrap">
+                        <table>
+                            <caption class="sr-only">
+                                Optimization risk register
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Risk</th>
+                                    <th scope="col">Likelihood</th>
+                                    <th scope="col">Impact</th>
+                                    <th scope="col">Detection / mitigation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Corner/tie semantics change interception order.</td>
+                                    <td>High with textbook DDA; low with current helper.</td>
+                                    <td>Critical</td>
+                                    <td>Exhaust all real endpoint families; keep large corner-alias golden.</td>
+                                </tr>
+                                <tr>
+                                    <td>First position changes a falloff band or mountain remap.</td>
+                                    <td>High with geometric entries; low now.</td>
+                                    <td>Critical</td>
+                                    <td>Compare exact first pixels, directional boundaries, and threshold goldens.</td>
+                                </tr>
+                                <tr>
+                                    <td>Out-of-grid Through endpoint hits packed-key collision.</td>
+                                    <td>Rare</td>
+                                    <td>Medium</td>
+                                    <td>Preserve legacy key/omission behavior and explicit collision fixture.</td>
+                                </tr>
+                                <tr>
+                                    <td>Micro win fails to improve a13.</td>
+                                    <td>Medium</td>
+                                    <td>Low</td>
+                                    <td>
+                                        Profile full rollouts; accept local cleanup but do not overstate macro gain.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Very short rays lose to fixed helper overhead.</td>
+                                    <td>Measured at 1–4 px</td>
+                                    <td>Low</td>
+                                    <td>
+                                        Keep the zero/1/2/4/8 px benchmark; ordinary ranged rays cross over before 8 px
+                                        and macro profiles still improve.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>A faster bounded search avoids a fallback and changes an action.</td>
+                                    <td>Possible near 175/275 ms or the ranked outer 300 ms circuit</td>
+                                    <td>High</td>
+                                    <td>
+                                        Prove semantics with limits disabled, then audit bounded fallback/circuit traces
+                                        and evaluate safety and strength separately.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Concurrent shared-main edits contaminate A/B.</td>
+                                    <td>High</td>
+                                    <td>Medium</td>
+                                    <td>
+                                        Benchmark immutable archives with overlay hashes; never import the live tree.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Incremental aura/path cache becomes stale.</td>
+                                    <td>Medium in future items</td>
+                                    <td>Critical</td>
+                                    <td>
+                                        Dual-run after every randomized event; clear on restore or key by a non-restored
+                                        monotonic epoch so sibling rollouts cannot collide.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Route dedupe erases response/hazard differences.</td>
+                                    <td>Medium in #2/#4</td>
+                                    <td>High</td>
+                                    <td>Route-aware signatures and action/event replay comparison.</td>
+                                </tr>
+                                <tr>
+                                    <td>Transposition key omits hidden mutable state.</td>
+                                    <td>High if attempted early</td>
+                                    <td>Critical</td>
+                                    <td>
+                                        Defer; inventory and hash queues, memory, RNG, effects, stats, and strategy.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Deeper horizon changes strength non-monotonically.</td>
+                                    <td>High</td>
+                                    <td>High</td>
+                                    <td>
+                                        Pre-registered paired tournaments and behavioral slices; treat as policy change.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="artifacts">
+                <div class="wrap">
+                    <div class="eyebrow">Implementation map</div>
+                    <h2>Files and evidence</h2>
+                    <div class="grid-2">
+                        <article class="card">
+                            <h3>Owned changes</h3>
+                            <ul>
+                                <li>
+                                    <a href="../src/grid/ray_traversal.ts">src/grid/ray_traversal.ts</a> — new helper.
+                                </li>
+                                <li>
+                                    <a href="../src/handlers/attack_handler.ts">src/handlers/attack_handler.ts</a> —
+                                    ranged evaluation integration.
+                                </li>
+                                <li>
+                                    <a href="../test/grid/ray_traversal.test.ts">test/grid/ray_traversal.test.ts</a> —
+                                    oracle, exhaustive production rays, and edge fuzz.
+                                </li>
+                                <li>
+                                    <a href="./a13_optimization_plan.html">docs/a13_optimization_plan.html</a> — this
+                                    plan.
+                                </li>
+                                <li>
+                                    <a href="./evidence/a13_ray_traversal_2026-07-22.json"
+                                        >docs/evidence/a13_ray_traversal_2026-07-22.json</a
+                                    >
+                                    — ray-workstream evidence hashes, configurations, and retained summaries.
+                                </li>
+                                <li>
+                                    <a href="./evidence/a13_ray_exact_trace_unbounded_2026-07-22.json"
+                                        >docs/evidence/a13_ray_exact_trace_unbounded_2026-07-22.json</a
+                                    >
+                                    and
+                                    <a href="./evidence/a13_ray_exact_trace_bounded_2026-07-22.json"
+                                        >the bounded trace result</a
+                                    >
+                                    — 20-seed full event/state comparisons.
+                                </li>
+                                <li>
+                                    <a href="./evidence/tools/a13_exact_trace_runner.ts">exact trace runner</a>,
+                                    <a href="./evidence/tools/a13_exact_trace_compare.ts">fail-closed comparator</a>,
+                                    and
+                                    <a href="./evidence/tools/a13_exact_trace_overlay.patch"
+                                        >identical instrumentation overlay</a
+                                    >.
+                                </li>
+                                <li>
+                                    <a href="./evidence/tools/ranked_outer_300_replay.ts">ranked outer-300 ms replay</a>
+                                    and
+                                    <a href="./evidence/tools/a13_latency_panel.ts">frozen latency-panel runner</a>
+                                    — retained executable evidence tools.
+                                </li>
+                                <li>
+                                    <a href="./evidence/a13_ranked_outer_300_replay_2026-07-22.json"
+                                        >ranked outer-300 ms compact evidence</a
+                                    >
+                                    (<a href="./evidence/a13_ranked_outer_300_replay_2026-07-22.raw.json.gz"
+                                        >lossless compressed raw replay</a
+                                    >) and
+                                    <a href="./evidence/a13_latency_panel_smoke_2026-07-22.json"
+                                        >latency-runner smoke evidence</a
+                                    >
+                                    — operational pass and explicitly non-qualifying harness smoke.
+                                </li>
+                            </ul>
+                        </article>
+                        <article class="card">
+                            <h3>Relevant next-work sources</h3>
+                            <ul>
+                                <li>
+                                    <a href="../src/grid/path_helper.ts">src/grid/path_helper.ts</a> — path hot loops.
+                                </li>
+                                <li>
+                                    <a href="../src/units/units_holder.ts">src/units/units_holder.ts</a> — aura refresh.
+                                </li>
+                                <li>
+                                    <a href="../src/ai/candidates.ts">src/ai/candidates.ts</a> — candidate geometry.
+                                </li>
+                                <li>
+                                    <a href="../src/simulation/search_driver.ts">src/simulation/search_driver.ts</a> —
+                                    shortlist, rollouts, selection, and deadlines.
+                                </li>
+                                <li>
+                                    <a href="../src/simulation/battle_snapshot.ts">src/simulation/battle_snapshot.ts</a>
+                                    — snapshot boundary.
+                                </li>
+                            </ul>
+                        </article>
+                    </div>
+
+                    <details>
+                        <summary>Ephemeral local evidence captured during this investigation</summary>
+                        <div class="detail-body">
+                            <ul>
+                                <li>
+                                    <code>/tmp/hoc-ray-helper-diff.json</code> — nine-family 2.74M differential audit.
+                                    SHA-256 <code>d9c51bf0…adbc5</code>.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ray-helper-bench.json</code> — 11-trial normal/Through/mixed
+                                    benchmark. SHA-256 <code>a2cad8fc…abf7</code>.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ray-fractional-grid.json</code> — synthetic fractional grid settings;
+                                    SHA-256 <code>eab6f008…1e38</code>.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-a13-profile.DpiHpD</code> — exploratory live-tree latency, horizon,
+                                    and CPU-profile artifacts. Their individual hashes are recorded in the manifest, but
+                                    exact source/command provenance was not sealed; they are not release evidence.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ray-f02e-baseline.E0bh28</code> — Git archive of exact common commit
+                                    <code>f02e8066…e048</code>; later received the identical trace-only overlay.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ray-f02e-candidate.e1RSAt</code> — originally the same archive plus
+                                    only the two runtime files, then the same trace-only overlay as baseline. These two
+                                    directories are no longer valid performance inputs; fresh two-file-only archives are
+                                    required for timing.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ray-f02e-profile.Zo9Tts</code> — immutable-pair 500 µs CPU profiles;
+                                    raw profile SHA-256 values <code>0abb4cb0…042c</code> (legacy) and
+                                    <code>57d13ccf…6ba2</code> (candidate).
+                                </li>
+                            </ul>
+                            <p class="small">
+                                <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
+                                encodes the reproducible compatibility corpus and seeds. The dated JSON manifest durably
+                                records configurations, file and artifact hashes, and raw numeric summaries. Exact
+                                event/state runner, comparator, and overlay sources are retained; the earlier one-off
+                                micro/macro harnesses are only summarized. The trace archives symlinked the live common
+                                <code>node_modules</code>; the root <code>bun.lock</code> hash is recorded, but the
+                                dependency installation was not sealed. Regenerate a fully hermetic evidence directory
+                                before a release decision rather than relying on these temporary paths.
+                            </p>
+                        </div>
+                    </details>
+
+                    <div class="callout good">
+                        <h3>Current recommendation</h3>
+                        <p>
+                            Keep the compatibility-preserving grid-jump implementation. It has unusually strong
+                            primitive, full event/state semantic, ranked operational replay, and local CPU evidence on
+                            the frozen historical pair. Before committing or deploying, rebuild the pair from the exact
+                            intended parent, repeat semantic/ranked gates, reconcile the pre-existing baseline digest
+                            tests, run the full attested tail-latency/profile panel, and complete browser/client smoke.
+                            Do not replace it with a conventional supercover merely to match the original algorithm
+                            label.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="wrap">
+                Heroes of Crypto · internal engineering plan · behavior-preserving optimizations remain distinct from AI
+                policy and balance changes.
+            </div>
+        </footer>
+    </body>
+</html>

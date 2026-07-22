@@ -1,0 +1,514 @@
+--- a/src/simulation/battle_engine.ts
++++ b/src/simulation/battle_engine.ts
+@@ -66,6 +66,7 @@
+ import { createV08A13SearchDriver, shouldUseDefaultV08A13Search } from "./v0_8_a13_search";
+ import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
+ import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
++import { emitExactTraceBoundary, exactTraceEnabled, exactTraceRandomSource } from "./exact_trace_hooks";
+ 
+ // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
+ // position features from the acting team's view; at game end each snapshot is labeled with whether that team
+@@ -478,7 +479,8 @@
+     // from every subsequent match in that worker.
+     FightStateManager.getInstance();
+     if (config.seed !== undefined) {
+-        setDeterministicRandomSource(makeRng((config.seed ^ 0x6d2b79f5) >>> 0));
++        const combatRandomSource = makeRng((config.seed ^ 0x6d2b79f5) >>> 0);
++        setDeterministicRandomSource(exactTraceRandomSource(combatRandomSource));
+     }
+     try {
+         return runMatchInner(config);
+@@ -543,6 +545,19 @@
+         });
+     };
+     let summonedUnitSequence = 0;
++    const actions: IRecordedAction[] = [];
++    let rejectedGreen = 0;
++    let rejectedRed = 0;
++    const rejectedDetails: NonNullable<IMatchResult["rejectedDetails"]> = [];
++    let finished = false;
++    let endReason: IMatchResult["endReason"] = "elimination";
++    const attrition: IAttritionInfo = {
++        reachedArmageddon: false,
++        armageddonWaves: 0,
++        unitsKilledByArmageddon: 0,
++        unitsKilledByNarrowing: 0,
++        decidedByArmageddon: false,
++    };
+     const engineContext = {
+         fightProperties,
+         grid,
+@@ -648,6 +663,34 @@
+     const search = shouldUseDefaultV08A13Search(searchMatch)
+         ? createV08A13SearchDriver(driverDeps, searchMatch)
+         : new SearchDriver(driverDeps, searchMatch);
++    const traceBoundary = (kind: string, events: readonly GameEvent[] = [], detail?: unknown): void => {
++        if (!exactTraceEnabled()) {
++            return;
++        }
++        emitExactTraceBoundary({
++            kind,
++            events,
++            detail,
++            unitsHolder,
++            grid,
++            fightProperties,
++            damageStatistics: damageStatisticHolder.get(),
++            currentActiveUnitId,
++            search,
++            outerState: {
++                actionCap: maxLaps * unitsHolder.getAllUnits().size * 4 + 64,
++                actionsLength: actions.length,
++                attrition,
++                endReason,
++                finished,
++                maxLaps,
++                rejectedDetailsLength: rejectedDetails.length,
++                rejectedGreen,
++                rejectedRed,
++                summonedUnitSequence,
++            },
++        });
++    };
+ 
+     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
+     const greenRoster = config.roster;
+@@ -693,6 +736,7 @@
+     for (const unit of [...greenUnits, ...redUnits]) {
+         unitsHolder.addUnit(unit);
+     }
++    traceBoundary("armies_created");
+ 
+     const placements = {
+         green: placeArmy(
+@@ -705,6 +749,13 @@
+             grid,
+             unitsHolder,
+             pathHelper,
++            (action, result) =>
++                traceBoundary("placement_action", result.events, {
++                    action,
++                    completed: result.completed,
++                    rejectionReason: result.rejectionReason,
++                    side: "green",
++                }),
+             config.greenRevealedCreatures,
+             config.greenSetupPlacementPolicy,
+             config.greenPublicOpponentCreatures,
+@@ -719,6 +770,13 @@
+             grid,
+             unitsHolder,
+             pathHelper,
++            (action, result) =>
++                traceBoundary("placement_action", result.events, {
++                    action,
++                    completed: result.completed,
++                    rejectionReason: result.rejectionReason,
++                    side: "red",
++                }),
+             config.redRevealedCreatures,
+             config.redSetupPlacementPolicy,
+             config.redPublicOpponentCreatures,
+@@ -834,20 +892,9 @@
+         unitsHolder.applyAugments(fightProperties);
+         unitsHolder.refreshStackPowerForAllUnits();
+     }
++    traceBoundary("setup_complete");
+ 
+     // --- run the fight ---
+-    const actions: IRecordedAction[] = [];
+-    let rejectedGreen = 0;
+-    let rejectedRed = 0;
+-    const rejectedDetails: NonNullable<IMatchResult["rejectedDetails"]> = [];
+-    let finished = false;
+-    const attrition: IAttritionInfo = {
+-        reachedArmageddon: false,
+-        armageddonWaves: 0,
+-        unitsKilledByArmageddon: 0,
+-        unitsKilledByNarrowing: 0,
+-        decidedByArmageddon: false,
+-    };
+     const applyEvents = (events: GameEvent[]): void => {
+         for (const event of events) {
+             if (event.type === "turn_completed") {
+@@ -881,6 +928,10 @@
+     const startResult = engine.apply({ type: "start_fight" });
+     applyEvents(startResult.events);
+     search.onFightReady();
++    traceBoundary("start_fight", startResult.events, {
++        completed: startResult.completed,
++        rejectionReason: startResult.rejectionReason,
++    });
+ 
+     const advance = (): void => {
+         const maxAttempts = unitsHolder.getAllUnits().size + 2;
+@@ -889,6 +940,10 @@
+                 damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
+             });
+             applyEvents(result.events);
++            traceBoundary("turn_advance", result.events, {
++                attempt: i,
++                fightFinished: result.fightFinished,
++            });
+             if (result.fightFinished) {
+                 finished = true;
+                 return;
+@@ -903,7 +958,6 @@
+     };
+ 
+     const valueSnaps: { f: number[]; team: TeamType }[] = [];
+-    let endReason: IMatchResult["endReason"] = "elimination";
+     const maxTotalActions = maxLaps * unitsHolder.getAllUnits().size * 4 + 64;
+ 
+     while (!finished) {
+@@ -926,6 +980,7 @@
+                 // marking every living unit as having taken its turn, then advance again. This reuses
+                 // the normal lap-flip (re-seeds the queue) instead of stranding the match.
+                 if (forceStalledLap(fightProperties, unitsHolder)) {
++                    traceBoundary("force_stalled_lap");
+                     advance();
+                 }
+                 if (finished) {
+@@ -942,7 +997,9 @@
+         const unit = unitsHolder.getAllUnits().get(currentActiveUnitId);
+         if (!unit || unit.isDead()) {
+             // Never decide a turn for a missing or dead unit — abandon its turn and let the queue advance.
++            const abandonedUnitId = currentActiveUnitId;
+             currentActiveUnitId = "";
++            traceBoundary("dead_active_abandoned", [], { actingUnitId: abandonedUnitId });
+             continue;
+         }
+         const actingUnitId = currentActiveUnitId;
+@@ -981,6 +1038,12 @@
+         const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
+         const targetMemoryBeforeDecision =
+             searchApplies || lookaheadApplies ? captureAITargetMemory(unitsHolder) : undefined;
++        traceBoundary("pre_decision", [], {
++            actingUnitId,
++            strategyVersion: strategy.version,
++            searchApplies,
++            lookaheadApplies,
++        });
+         const decided0 = strategy.decideTurn(unit, decisionContext);
+         if (config.decisionObserver) {
+             config.decisionObserver({
+@@ -990,6 +1053,11 @@
+                 strategyVersion: strategy.version,
+             });
+         }
++        traceBoundary("post_incumbent", [], {
++            actingUnitId,
++            strategyVersion: strategy.version,
++            incumbent: decided0,
++        });
+         // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
+         // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
+         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
+@@ -1014,6 +1082,14 @@
+                 recordAITargetMemory(unitsHolder, actingUnitId, executedAttack.targetId);
+             }
+         }
++        traceBoundary("post_search", [], {
++            actingUnitId,
++            strategyVersion: strategy.version,
++            incumbent: decided0,
++            chosen: decided,
++            searchApplies,
++            lookaheadApplies,
++        });
+ 
+         const turnExecutionObserver = config.turnExecutionObserver;
+         const rawIncumbentForObservation = turnExecutionObserver ? structuredClone(decided0) : undefined;
+@@ -1165,6 +1241,13 @@
+             }
+             recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
+             applyEvents(result.events);
++            traceBoundary("strategy_action", result.events, {
++                actingUnitId,
++                actionIndex,
++                action,
++                completed: result.completed,
++                rejectionReason: result.rejectionReason,
++            });
+             if (finished) {
+                 break;
+             }
+@@ -1211,6 +1294,13 @@
+                     fightProperties.getCurrentLap(),
+                 );
+                 applyEvents(r.events);
++                traceBoundary("recovery_action", r.events, {
++                    actingUnitId,
++                    action,
++                    source,
++                    completed: r.completed,
++                    rejectionReason: r.rejectionReason,
++                });
+                 return r.completed;
+             };
+             const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
+@@ -1235,6 +1325,11 @@
+                 turnEventsForObservation!.push(...structuredClone(endResult.events));
+             }
+             applyEvents(endResult.events);
++            traceBoundary("end_turn", endResult.events, {
++                actingUnitId,
++                completed: endResult.completed,
++                rejectionReason: endResult.rejectionReason,
++            });
+             if (!endResult.completed) {
+                 currentActiveUnitId = ""; // could not even end the turn — bail rather than loop forever
+             }
+@@ -1253,6 +1348,11 @@
+                 events: turnEventsForObservation!,
+             });
+         }
++        traceBoundary("turn_complete", [], {
++            actingUnitId,
++            didSomething,
++            recovery: recoveryForObservation,
++        });
+     }
+ 
+     // Armageddon "decided" the game when it both reached that phase and actually destroyed units —
+@@ -1273,6 +1373,7 @@
+     matchResult.rejectedGreen = rejectedGreen;
+     matchResult.rejectedRed = rejectedRed;
+     matchResult.rejectedDetails = rejectedDetails;
++    traceBoundary("match_result", [], matchResult);
+     if (valueData && valueSnaps.length && matchResult.winner !== "draw") {
+         // Label each position by whether the acting team ultimately won, then append as JSONL. One write per
+         // game keeps concurrent-worker appends atomic enough for data gen (each line is a self-contained row).
+@@ -1303,6 +1404,10 @@
+     }
+     // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
+     search.onMatchEnd(matchResult.winner, matchResult.endReason);
++    traceBoundary("search_match_end", [], {
++        winner: matchResult.winner,
++        endReason: matchResult.endReason,
++    });
+     return matchResult;
+ }
+ 
+@@ -1316,6 +1421,7 @@
+     grid: Grid,
+     unitsHolder: UnitsHolder,
+     pathHelper: PathHelper,
++    traceApplied?: (action: GameAction, result: ReturnType<GameActionEngine["apply"]>) => void,
+     revealedOpponentCreatures?: readonly number[],
+     setupPlacementPolicy?: PlacementPolicyVariant,
+     publicOpponentCreatureIds?: readonly number[],
+@@ -1340,13 +1446,15 @@
+         if (cells.some((c) => !legal.has(cellKey(c)) || occupied.has(cellKey(c)))) {
+             return false;
+         }
+-        const result = engine.apply({
++        const action: GameAction = {
+             type: "place_unit",
+             unitId: unit.getId(),
+             team,
+             unitName: unit.getName(),
+             cells,
+-        });
++        };
++        const result = engine.apply(action);
++        traceApplied?.(action, result);
+         if (!result.completed) {
+             return false;
+         }
+--- a/src/simulation/v0_8_a13_search.ts
++++ b/src/simulation/v0_8_a13_search.ts
+@@ -57,5 +57,14 @@
+ 
+ /** Construct the exact bounded a13 SearchDriver rebound to production v0.8. */
+ export function createV08A13SearchDriver(deps: ILookaheadDeps, match: ISearchMatchInfo): SearchDriver {
+-    return withScopedAIEnvironment(buildV08A13SearchEnvironment(), () => new SearchDriver(deps, match));
++    const environment = buildV08A13SearchEnvironment();
++    const traceEnvironment =
++        process.env.HOC_EXACT_TRACE_MODE === "unbounded"
++            ? {
++                  ...environment,
++                  SEARCH_CIRCUIT_BREAKER_MS: undefined,
++                  SEARCH_DECISION_DEADLINE_MS: undefined,
++              }
++            : environment;
++    return withScopedAIEnvironment(traceEnvironment, () => new SearchDriver(deps, match));
+ }
+--- /dev/null
++++ b/src/simulation/exact_trace_hooks.ts
+@@ -0,0 +1,175 @@
++/*
++ * Temporary, external-only instrumentation for the a13 ray-traversal differential.
++ * This file is installed into immutable source archives by the evidence harness;
++ * it is deliberately not part of production source.
++ */
++
++import type { FightProperties } from "../fights/fight_properties";
++import type { Grid } from "../grid/grid";
++import type { IDamageStatistic } from "../scene/scene_stats";
++import type { UnitsHolder } from "../units/units_holder";
++import { snapshotBattle } from "./battle_snapshot";
++import type { SearchDriver } from "./search_driver";
++
++export interface IExactTraceBoundaryInput {
++    kind: string;
++    events?: readonly unknown[];
++    detail?: unknown;
++    unitsHolder: UnitsHolder;
++    grid: Grid;
++    fightProperties: FightProperties;
++    damageStatistics: readonly IDamageStatistic[];
++    currentActiveUnitId: string;
++    search: SearchDriver;
++    outerState: unknown;
++}
++
++export interface IExactTraceBoundary {
++    kind: string;
++    events: unknown;
++    detail: unknown;
++    state: unknown;
++}
++
++type ExactTraceObserver = (boundary: IExactTraceBoundary) => void;
++
++let observer: ExactTraceObserver | undefined;
++let combatRandomDraws = 0;
++
++export function installExactTraceObserver(next: ExactTraceObserver): void {
++    observer = next;
++    combatRandomDraws = 0;
++}
++
++export function clearExactTraceObserver(): void {
++    observer = undefined;
++    combatRandomDraws = 0;
++}
++
++export function exactTraceEnabled(): boolean {
++    return observer !== undefined;
++}
++
++export function exactTraceRandomSource(source: () => number): () => number {
++    if (!observer) {
++        return source;
++    }
++    combatRandomDraws = 0;
++    return () => {
++        combatRandomDraws += 1;
++        return source();
++    };
++}
++
++function normalize(value: unknown, ancestors: Set<object> = new Set()): unknown {
++    if (typeof value === "function" || typeof value === "symbol") {
++        throw new Error(`exact trace encountered unsupported ${typeof value}`);
++    }
++    if (value === undefined) {
++        return { $undefined: true };
++    }
++    if (typeof value === "number") {
++        if (Number.isNaN(value)) return { $number: "NaN" };
++        if (value === Number.POSITIVE_INFINITY) return { $number: "+Infinity" };
++        if (value === Number.NEGATIVE_INFINITY) return { $number: "-Infinity" };
++        if (Object.is(value, -0)) return { $number: "-0" };
++        return value;
++    }
++    if (typeof value === "bigint") {
++        return { $bigint: value.toString() };
++    }
++    if (value === null || typeof value !== "object") {
++        return value;
++    }
++    if (ancestors.has(value)) {
++        throw new Error("exact trace encountered an unexpected cycle");
++    }
++    if (value instanceof WeakMap || value instanceof WeakSet || value instanceof WeakRef) {
++        throw new Error(`exact trace encountered unsupported ${value.constructor.name}`);
++    }
++    const nextAncestors = new Set(ancestors);
++    nextAncestors.add(value);
++    if (value instanceof Map) {
++        return {
++            $map: [...value.entries()].map(([key, item]) => [
++                normalize(key, nextAncestors),
++                normalize(item, nextAncestors),
++            ]),
++        };
++    }
++    if (value instanceof Set) {
++        return { $set: [...value.values()].map((item) => normalize(item, nextAncestors)) };
++    }
++    if (ArrayBuffer.isView(value)) {
++        const view = value as unknown as { readonly length: number; readonly [index: number]: number };
++        return {
++            $typedArray: value.constructor.name,
++            values: Array.from({ length: view.length }, (_, index) => normalize(view[index], nextAncestors)),
++        };
++    }
++    if (Array.isArray(value)) {
++        return value.map((item) => normalize(item, nextAncestors));
++    }
++    const maybeQueue = value as { toArray?: () => unknown[] };
++    if (value.constructor?.name === "Denque" && typeof maybeQueue.toArray === "function") {
++        return { $denque: maybeQueue.toArray().map((item) => normalize(item, nextAncestors)) };
++    }
++    const record = value as Record<string, unknown>;
++    const out: Record<string, unknown> = {};
++    const constructorName = value.constructor?.name;
++    if (constructorName && constructorName !== "Object") {
++        out.$type = constructorName;
++    }
++    for (const key of Object.keys(record).sort()) {
++        out[key] = normalize(record[key], nextAncestors);
++    }
++    return out;
++}
++
++function stableSearchState(search: SearchDriver): unknown {
++    const raw = search as unknown as Record<string, unknown>;
++    const counters = { ...(raw.counters as Record<string, unknown>) };
++    delete counters.msTotal;
++    return normalize({
++        circuitOpen: raw.circuitOpen,
++        counters,
++        datasetRows: raw.datasetRows,
++        finishPressureState: raw.finishPressureState,
++        finishedSim: raw.finishedSim,
++        ilRows: raw.ilRows,
++        pureRangedTerminalState: raw.pureRangedTerminalState,
++        rolloutEnemyTeam: raw.rolloutEnemyTeam,
++        turnRows: raw.turnRows,
++    });
++}
++
++export function emitExactTraceBoundary(input: IExactTraceBoundaryInput): void {
++    if (!observer) {
++        return;
++    }
++    const snapshot = snapshotBattle(input.unitsHolder, input.grid, input.fightProperties);
++    const fight = { ...snapshot.fight };
++    // UUID construction and timing bookkeeping do not affect combat semantics and are not repeat-stable.
++    delete fight.id;
++    delete fight.currentTurnStart;
++    delete fight.currentTurnEnd;
++    delete fight.currentLapTotalTimePerTeam;
++    observer({
++        kind: input.kind,
++        events: normalize(input.events ?? []),
++        detail: normalize(input.detail),
++        state: normalize({
++            activeUnitId: input.currentActiveUnitId,
++            aiTargetMemory: snapshot.aiTargetMemory,
++            combatRandomDraws,
++            damageStatistics: input.damageStatistics,
++            fight,
++            grid: snapshot.grid,
++            holder: snapshot.holder,
++            outer: input.outerState,
++            search: stableSearchState(input.search),
++            unitOrder: snapshot.unitOrder,
++            units: snapshot.units,
++        }),
++    });
++}

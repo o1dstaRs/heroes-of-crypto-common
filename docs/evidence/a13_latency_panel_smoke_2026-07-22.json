@@ -1,0 +1,293 @@
+{
+    "schema": "hoc.a13-ray-latency-panel-smoke.v1",
+    "recordedDate": "2026-07-22",
+    "status": "PASS — runner functional smoke only; explicitly non-qualifying",
+    "scope": {
+        "purpose": "Validate the frozen pair-plan generator, whole-invocation and per-condition source/runner identity seals, isolated-source loader, warmup enforcement, worker lifecycle, exact per-decision timing/counters including illegalIncumbent, task-level logical-work and safety comparison, accepted-action retention, digest comparison, active-wall accounting, and evidence writers.",
+        "notTheLargePanel": true,
+        "matchesPerVariant": 2,
+        "matchedPhysicalObservations": 2,
+        "measuredExecutions": 4,
+        "discardedWarmupExecutions": 2,
+        "requiredLargePanelMatchesPerVariant": 420,
+        "requiredLargePanelExecutionsPerConcurrencyPass": 840,
+        "bootstrapOmitted": "The smoke does not contain the required 21 strata x 10 pair clusters."
+    },
+    "source": {
+        "baselineCommit": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+        "construction": "Two new git archive exports of baselineCommit; candidate received only the two production overlays below. Neither previously instrumented exact-trace archive nor an earlier latency-smoke archive was reused.",
+        "sourceIsolationExact": true,
+        "fullSourceTreeIdentityExact": true,
+        "differences": [
+            {
+                "path": "src/grid/ray_traversal.ts",
+                "change": "added",
+                "baselineSha256": null,
+                "candidateSha256": "18d4f31971e593d1222bf24f71484dc5ba8a3cb52451eb2ed0d1498a53f97eba"
+            },
+            {
+                "path": "src/handlers/attack_handler.ts",
+                "change": "modified",
+                "baselineSha256": "c4255e2f996d5ad7bdf732dd48bc3d3537f07ec949678acea53e3a17676d51e9",
+                "candidateSha256": "d4f0342487cc6cc8497d997e09a8a65c57f1fcebb02f945117a710cab42c5233"
+            }
+        ],
+        "baselineSrcFiles": 365,
+        "candidateSrcFiles": 366,
+        "baselineSrcBytes": 9753913,
+        "candidateSrcBytes": 9758586,
+        "baselineSrcTreeManifestSha256": "34a1149ae1717e05255c77c630004cb6bdb11bcfa2a701a8acfc500a9bc098eb",
+        "candidateSrcTreeManifestSha256": "a24700ba7694697346e440faf97b0531c330f5b1ff2aaabe611b47eb19c580de",
+        "beforeAfterIntegrity": {
+            "baselineUnchanged": true,
+            "candidateUnchanged": true,
+            "runnerUnchanged": true,
+            "exact": true,
+            "integrityArtifactSha256": "67e3f93af492c8abd75be0be8329f5eb0a2d5833601668b5ddbd8185458a24bb",
+            "perConditionExact": true,
+            "perConditionIntegrityArtifactSha256": "67e3f93af492c8abd75be0be8329f5eb0a2d5833601668b5ddbd8185458a24bb"
+        },
+        "dependencies": {
+            "sealed": false,
+            "nodeModules": "Both archive roots symlinked the live common node_modules directory; the runner records only its resolved path.",
+            "limitation": "Installed dependency and dependency-lock contents remain outside the source/runner before-after invariant.",
+            "packageJsonSha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001"
+        }
+    },
+    "runner": {
+        "path": "docs/evidence/tools/a13_latency_panel.ts",
+        "sha256": "5fe2473862194b5764643f19ac1b0dadc1e0d02dce8f6c9ab1c0f711baa4654a",
+        "bytes": 107406,
+        "readmePath": "docs/evidence/tools/a13_latency_panel.README.md",
+        "readmeSha256": "03ea5dd562d28728fd03620cffbf296452e6c628d3071c5101bf3759e4aae917",
+        "protocolSha256": "d39247656358011d4371593ad72aaea3647c9210dfd0385940dd39ea33c0ffea",
+        "planSha256": "48cec334d1dcb10cda88dce02b338af357c4cdce9687869ee4d1be7936d8dc1b",
+        "planCounts": {
+            "pairClusters": 210,
+            "physicalTasksPerVariant": 420,
+            "strata": 21,
+            "pairsPerStratum": 10
+        },
+        "workerShutdown": "PASS — the command exited normally; no latency-panel worker process remained."
+    },
+    "methodology": {
+        "schedule": "The 21 stable cohort/map blocks alternate AB then BA by block: even blocks run baseline then candidate; odd blocks run candidate then baseline. This is gross order balance, not same-block ABBA replication.",
+        "workerTopology": "Two persistent variant-isolated pools are resident. At c12 this creates and warms 24 workers total, while only the selected 12-worker pool is active during a block phase.",
+        "activeWallDefinition": "Per-variant sum of post-warmup runBlock wall durations, including parent scheduling, worker execution, structured-clone serialization, worker-to-parent IPC, and promise aggregation; excludes warmup and opposite-arm idle time.",
+        "warmupBypassPolicy": "--skip-warmup is rejected for full-evidence runs and is available only for non-qualifying smoke diagnostics.",
+        "sourcePolicy": "Panel and plan operations enforce frozen full src-tree identities plus the exact two-file overlay; seals include current runner bytes. Panel seals are checked before/after every concurrency condition and again across the complete invocation. profile-variant enforces the full-tree identity corresponding to its baseline/candidate label.",
+        "logicalWorkPolicy": "Exactly 10 fields are compared task-by-task: accepted actions plus decisionCount, searchDecisions, searched, candidatesTotal, scoredCandidatesTotal, rolloutTurnsTotal, illegalIncumbent, overrides, and singleCandidate. A mismatch is qualifying only when that same task has an explicitly counted bounded deadline-fallback, circuit-open, or circuit-skip divergence.",
+        "illegalIncumbentSafetyPolicy": "Sum max(0, candidate illegalIncumbent - baseline illegalIncumbent) independently per matched task and require zero; candidate decreases on other tasks cannot mask an increase.",
+        "failurePolicy": "Worker error/exit rejects readiness or pending work, partially created pools are stopped, and condition teardown stops both pools.",
+        "acceptanceContract": {
+            "c1TotalDecisionReductionLower95PercentExclusiveMinimum": 0,
+            "c1SearchReductionLower95PercentExclusiveMinimum": 0,
+            "allConditionAllDecisionP95RatioUpper95Maximum": 1.05,
+            "allConditionAllDecisionP99RatioUpper95Maximum": 1.05,
+            "c4C12ActiveWallCandidateOverBaselineMaximum": 1.05,
+            "completeMatchedTaskSetRequired": true,
+            "candidateEngineRejectedActionsMaximum": 0,
+            "candidateOnlySafetyRegressionsMaximum": 0,
+            "candidateOnlyIllegalIncumbentIncreaseMaximum": 0,
+            "unattributedLogicalWorkMismatchTasksMaximum": 0
+        }
+    },
+    "runtime": {
+        "bunVersion": "1.3.14",
+        "platform": "darwin",
+        "osRelease": "24.6.0",
+        "cpu": "Apple M4 Max",
+        "logicalCpuCount": 16,
+        "memoryBytes": 68719476736
+    },
+    "warmup": {
+        "protocolMinimumDecisionsPerWorker": 20,
+        "baseline": {
+            "decisions": 28,
+            "acceptedActions": 32,
+            "resultDigest": "bf8d86595c63ace36bd79bc4a1aba644e47ace9081444a06fcf865d029bb8f73"
+        },
+        "candidate": {
+            "decisions": 28,
+            "acceptedActions": 32,
+            "resultDigest": "bf8d86595c63ace36bd79bc4a1aba644e47ace9081444a06fcf865d029bb8f73"
+        },
+        "measured": false
+    },
+    "measured": {
+        "cohortMapBlock": "ranked-draft/NORMAL",
+        "pairIdentity": 0,
+        "sideSwaps": ["a-green", "b-green"],
+        "workerTopology": {
+            "workersPerVariant": 1,
+            "residentWorkers": 2,
+            "warmupExecutions": 2
+        },
+        "activeWallMs": {
+            "baseline": 2854.504417,
+            "candidate": 2803.282916,
+            "candidateOverBaseline": 0.9820559041019694
+        },
+        "baseline": {
+            "matches": 2,
+            "decisions": 94,
+            "acceptedActions": 144,
+            "engineRejectedActions": 0,
+            "deadlineFallbacks": 0,
+            "circuitSkips": 0,
+            "circuitOpens": 0,
+            "searchDecisions": 94,
+            "searched": 90,
+            "candidatesTotal": 534,
+            "scoredCandidatesTotal": 260,
+            "rolloutTurnsTotal": 5542,
+            "overrides": 34,
+            "singleCandidate": 4,
+            "illegalIncumbent": 0,
+            "searchMsPer1000RolloutTurns": 502.7208509563335,
+            "decisionTotalMs": {
+                "sum": 2812.9520410000023,
+                "p50": 31.943582999999762,
+                "p95": 51.789416000000074,
+                "p99": 57.49233400000003,
+                "p99_9": 57.49233400000003,
+                "max": 57.49233400000003
+            }
+        },
+        "candidate": {
+            "matches": 2,
+            "decisions": 94,
+            "acceptedActions": 144,
+            "engineRejectedActions": 0,
+            "deadlineFallbacks": 0,
+            "circuitSkips": 0,
+            "circuitOpens": 0,
+            "searchDecisions": 94,
+            "searched": 90,
+            "candidatesTotal": 534,
+            "scoredCandidatesTotal": 260,
+            "rolloutTurnsTotal": 5542,
+            "overrides": 34,
+            "singleCandidate": 4,
+            "illegalIncumbent": 0,
+            "searchMsPer1000RolloutTurns": 494.6590279682431,
+            "decisionTotalMs": {
+                "sum": 2768.7286639999957,
+                "p50": 30.886999999999716,
+                "p95": 51.723417000000154,
+                "p99": 56.621000000000095,
+                "p99_9": 56.621000000000095,
+                "max": 56.621000000000095
+            }
+        },
+        "pairedCorrectness": {
+            "expectedMatchedTasks": 2,
+            "matchedTasks": 2,
+            "completeMatchedTaskSet": true,
+            "resultDigestMatches": 2,
+            "actionDigestMatches": 2,
+            "outcomeDigestMatches": 2,
+            "placementDigestMatches": 2,
+            "candidateOnlyExceptions": 0,
+            "candidateEngineRejectedActions": 0,
+            "candidateOnlyRejectedActions": 0,
+            "candidateOnlyDeadlineFallbacks": 0,
+            "candidateOnlyCircuitOpens": 0,
+            "baselineIllegalIncumbent": 0,
+            "candidateIllegalIncumbent": 0,
+            "candidateWorseIllegalIncumbentTasks": 0,
+            "candidateOnlyIllegalIncumbentIncrease": 0,
+            "illegalIncumbentSafetyPass": true,
+            "boundedDivergenceTasks": 0,
+            "logicalWorkFieldCount": 10,
+            "logicalWorkFieldNames": [
+                "totalActions",
+                "decisionCount",
+                "searchDecisions",
+                "searched",
+                "candidatesTotal",
+                "scoredCandidatesTotal",
+                "rolloutTurnsTotal",
+                "illegalIncumbent",
+                "overrides",
+                "singleCandidate"
+            ],
+            "logicalWorkAllEqual": true,
+            "logicalMismatchTasks": 0,
+            "attributedLogicalMismatchTasks": 0,
+            "unattributedLogicalMismatchTasks": 0,
+            "normalizedSearchCostCandidateOverBaseline": 0.9839636192277399
+        },
+        "performanceInterpretation": "None. Two matched observations are a functional smoke, not an estimator; neither the active-wall ratio nor the decision timing direction is used as performance evidence."
+    },
+    "hostValidity": {
+        "continuousAttestationJoined": false,
+        "qualified": false,
+        "reason": "The runner's load/free-memory snapshots do not prove AC power, nominal thermals, normal memory pressure, or continuous absence of competing processes.",
+        "runnerGate": "hard false",
+        "smokeGate": "hard false"
+    },
+    "validation": {
+        "typescript": {
+            "command": "bunx tsc --noEmit --module ESNext --moduleResolution bundler --target ESNext --types bun --skipLibCheck docs/evidence/tools/a13_latency_panel.ts",
+            "result": "PASS"
+        },
+        "format": {
+            "command": "bunx prettier docs/evidence/tools/a13_latency_panel.ts docs/evidence/tools/a13_latency_panel.README.md docs/evidence/a13_latency_panel_smoke_2026-07-22.json --check",
+            "result": "PASS"
+        },
+        "planOnly": {
+            "result": "PASS",
+            "clusters": 210,
+            "tasks": 420,
+            "strata": 21,
+            "fileSha256": "4f2e1e065b351e138a1199d4a5aedceada4bc527bf109bb3e2fbc368d44ee236"
+        },
+        "fullSkipWarmupRejection": {
+            "result": "PASS",
+            "exitStatus": 1,
+            "message": "--skip-warmup is smoke-only; every full-evidence run must execute the frozen warmup"
+        },
+        "profileVariantMislabelRejection": {
+            "result": "PASS",
+            "candidateRootLabeledBaselineExitStatus": 1,
+            "baselineRootLabeledCandidateExitStatus": 1,
+            "outputFilesWritten": 0
+        },
+        "smoke": {
+            "result": "PASS",
+            "rawArtifactLocation": "/tmp/a13-latency-illegal-sealed.XMBMNc/output",
+            "rawArtifactDurability": "temporary; compact evidence is retained in this file",
+            "manifestSha256": "99adc0c19e8714f6a3e58b71483c99dcf531bf30e678b301c34e20870a8bdfdc",
+            "protocolFileSha256": "9d068327bfa9bd3ea7cb1174bc96b71e7646a6ac9bff865ab99d218a0f1efdcf",
+            "planFileSha256": "4f2e1e065b351e138a1199d4a5aedceada4bc527bf109bb3e2fbc368d44ee236",
+            "conditionIntegrityFileSha256": "67e3f93af492c8abd75be0be8329f5eb0a2d5833601668b5ddbd8185458a24bb",
+            "integrityFileSha256": "67e3f93af492c8abd75be0be8329f5eb0a2d5833601668b5ddbd8185458a24bb",
+            "conditionSummarySha256": "aecd4e31061e5829f1cbbf8e1b2ec1ade795d024cfdeea090fa97ef1a9a13f7c",
+            "summarySha256": "cb556207645491fc020000a6186d72a7855f4f25587741573e87b66f5240a1ee",
+            "baselineDecisionRows": 94,
+            "candidateDecisionRows": 94,
+            "baselineMatchRows": 2,
+            "candidateMatchRows": 2,
+            "illegalIncumbentSerialization": {
+                "baselineDecisionSum": 0,
+                "candidateDecisionSum": 0,
+                "baselineMatchSum": 0,
+                "candidateMatchSum": 0,
+                "decisionRowsMissingField": 0,
+                "matchRowsMissingField": 0
+            }
+        }
+    },
+    "remainingGates": [
+        "After main stabilizes, construct a fresh final-base baseline/candidate archive pair from the exact parent of the ray commit; the f02e806 source pair remains historical isolated evidence.",
+        "Run the complete 420-match-per-variant panel at c1, c4, and c12.",
+        "At c1, require the 95% bootstrap lower bounds for both total-decision and search-time reduction to be greater than 0%.",
+        "At every condition, require the upper 95% pair-cluster bootstrap bounds for all-decision p95 and p99 candidate/baseline ratios to be at most 1.05.",
+        "At c4 and c12, require candidate active-phase wall time to be at most 1.05 times baseline.",
+        "Require the complete matched task set, absolute candidate engineRejectedActions=0, zero candidate-only safety regressions including zero positive per-task illegalIncumbent increases, and zero unattributed task-level logical-work mismatches across the exact 10-field vector.",
+        "Join and validate one-second continuous AC/thermal/memory-pressure/external-process host evidence for every complete block.",
+        "Run three fixed-work CPU-profile captures per variant (nine repeats of seeds 1,42,43,44,45,46; 3,249 accepted actions per capture) with enforced full-tree variant identity.",
+        "Seal the installed dependency tree rather than only identifying package.json/node_modules provenance."
+    ]
+}
