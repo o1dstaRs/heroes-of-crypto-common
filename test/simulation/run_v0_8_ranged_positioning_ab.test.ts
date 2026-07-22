@@ -441,7 +441,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
-                jitNoMeleeFocusStartLap: 6,
+                jitNoMeleeFocusStartLap: 1,
                 jitNoMeleeFocusLastLap: 11,
                 jitNoMeleeFocusActivationBuffer: 1,
                 jitNoMeleeFocusDamageFloor: 0.8,
@@ -463,7 +463,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(buildV08RangedPositioningABManifest(controlInvocation, control, manifest.source).arm).toMatchObject({
             jitNoMeleeFocus: false,
             jitNoMeleeFocusCatalogOnly: true,
-            jitNoMeleeFocusStartLap: 6,
+            jitNoMeleeFocusStartLap: 1,
             jitNoMeleeFocusLastLap: 11,
             jitNoMeleeFocusActivationBuffer: 1,
             jitNoMeleeFocusDamageFloor: 0.8,
@@ -613,7 +613,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 paretoNoMeleeFocusDamageFloor: 1,
                 jitNoMeleeFocus: false,
                 jitNoMeleeFocusCatalogOnly: false,
-                jitNoMeleeFocusStartLap: 6,
+                jitNoMeleeFocusStartLap: 1,
                 jitNoMeleeFocusLastLap: 11,
                 jitNoMeleeFocusActivationBuffer: 1,
                 jitNoMeleeFocusDamageFloor: 0.8,
