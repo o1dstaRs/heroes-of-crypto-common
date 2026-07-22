@@ -1,0 +1,169 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import { describe, expect, it } from "bun:test";
+
+import { buildV08A13SearchEnvironment } from "../../src/ai/versions/v0_8_a13_profile";
+import {
+    buildV08RangedPositioningABEnvironment,
+    buildV08RangedPositioningABInvocations,
+    normalizeV08RangedPositioningCohorts,
+    parseV08RangedPositioningABOptions,
+    runV08RangedPositioningAB,
+    V08_RANGED_POSITIONING_AB_RUNNER,
+    V08_RANGED_POSITIONING_AB_VERSIONS,
+    type IV08RangedPositioningABOptions,
+} from "../../src/simulation/run_v0_8_ranged_positioning_ab";
+
+const BASE_OPTIONS: IV08RangedPositioningABOptions = {
+    cohorts: ["hybrid", "ranged_max_sniper3"],
+    games: 200,
+    seed: 872511,
+    concurrency: 12,
+    out: "/tmp/hoc-v08-ranged-ab-test",
+    mode: "both",
+    timingMode: "operational_bounded",
+};
+
+const argValue = (args: readonly string[], flag: string): string | undefined => {
+    const index = args.indexOf(flag);
+    return index < 0 ? undefined : args[index + 1];
+};
+
+describe("v0.8 ranged-positioning mirrored A/B runner", () => {
+    it("rebinds the exact bounded a13 profile to both seats and scopes only positioning to v0.8", () => {
+        const canonical = buildV08A13SearchEnvironment();
+        const environment = buildV08RangedPositioningABEnvironment("both", "operational_bounded", {
+            PATH: "/bin",
+            SEARCH_GATE: "99",
+            SEARCH_VERSIONS: "v0.4",
+            V08_RANGED_POSITION_VERSIONS: "v0.8s",
+            HOSTILE_EXPERIMENT: "1",
+        });
+
+        for (const [key, value] of Object.entries(canonical)) {
+            if (value === undefined) {
+                expect(environment[key]).toBeUndefined();
+            } else if (
+                [
+                    "SEARCH_VERSIONS",
+                    "V06_MELEE_DIMS_VERSIONS",
+                    "V07_AURA_CASTER_ROUTER_VERSIONS",
+                    "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS",
+                    "V07_PLACEMENT_REVEAL_VERSIONS",
+                ].includes(key)
+            ) {
+                expect(environment[key]).toBe(V08_RANGED_POSITIONING_AB_VERSIONS);
+            } else {
+                expect(environment[key]).toBe(value);
+            }
+        }
+        expect(environment).toMatchObject({
+            PATH: "/bin",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            SEARCH_DECISION_DEADLINE_MS: "175",
+            SEARCH_CIRCUIT_BREAKER_MS: "275",
+            V08_A13_SEARCH: "0",
+            V08_RANGED_POSITION_VERSIONS: "v0.8",
+            V08_RANGED_POSITION_MODE: "both",
+        });
+        expect(environment.HOSTILE_EXPERIMENT).toBeUndefined();
+    });
+
+    it("makes research timing unbounded without changing the a13 genome or seat scopes", () => {
+        const bounded = buildV08RangedPositioningABEnvironment("advance", "operational_bounded", {});
+        const unbounded = buildV08RangedPositioningABEnvironment("advance", "research_unbounded", {});
+        const differingKeys = [...new Set([...Object.keys(bounded), ...Object.keys(unbounded)])].filter(
+            (key) => bounded[key] !== unbounded[key],
+        );
+        expect(differingKeys.sort()).toEqual(["SEARCH_CIRCUIT_BREAKER_MS", "SEARCH_DECISION_DEADLINE_MS"]);
+        expect(unbounded.SEARCH_CIRCUIT_BREAKER_MS).toBe("");
+        expect(unbounded.SEARCH_DECISION_DEADLINE_MS).toBe("");
+        expect(unbounded.SEARCH_GATE).toBe("0.03");
+        expect(unbounded.V08_RANGED_POSITION_MODE).toBe("advance");
+    });
+
+    it("invokes measure_mirror_cohorts for every cohort with fixed v0.8/v0.8s paired geometry", () => {
+        const invocations = buildV08RangedPositioningABInvocations(BASE_OPTIONS, { PATH: "/bin" });
+        expect(V08_RANGED_POSITIONING_AB_RUNNER.endsWith("/measure_mirror_cohorts.ts")).toBe(true);
+        expect(invocations.map(({ cohort }) => cohort)).toEqual(["hybrid", "ranged_max_sniper3"]);
+        for (const invocation of invocations) {
+            expect(invocation.args[0]).toBe(V08_RANGED_POSITIONING_AB_RUNNER);
+            expect(argValue(invocation.args, "--cohort")).toBe(invocation.cohort);
+            expect(argValue(invocation.args, "--games")).toBe("200");
+            expect(argValue(invocation.args, "--seed")).toBe("872511");
+            expect(argValue(invocation.args, "--concurrency")).toBe("12");
+            expect(argValue(invocation.args, "--amount-mode")).toBe("expBudget");
+            expect(argValue(invocation.args, "--livetwin")).toBe("1");
+            expect(argValue(invocation.args, "--vA")).toBe("v0.8");
+            expect(argValue(invocation.args, "--vB")).toBe("v0.8s");
+            expect(argValue(invocation.args, "--out")).toBe(`/tmp/hoc-v08-ranged-ab-test/${invocation.cohort}`);
+        }
+    });
+
+    it("parses all experiment controls and rejects geometry that would break pair swaps", () => {
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "pure_ranged,hybrid",
+                "--games",
+                "400",
+                "--seed",
+                "17",
+                "--concurrency",
+                "6",
+                "--out",
+                "/tmp/ranged-ab",
+                "--mode",
+                "retreat",
+                "--timing",
+                "research_unbounded",
+            ]),
+        ).toEqual({
+            cohorts: ["pure_ranged", "hybrid"],
+            games: 400,
+            seed: 17,
+            concurrency: 6,
+            out: "/tmp/ranged-ab",
+            mode: "retreat",
+            timingMode: "research_unbounded",
+        });
+        expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
+        expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
+        expect(() => normalizeV08RangedPositioningCohorts("hybrid,hybrid")).toThrow("duplicate cohort");
+        expect(() => normalizeV08RangedPositioningCohorts("unknown")).toThrow("unknown cohort");
+    });
+
+    it("supports advance, retreat, both, and off as explicit seat-scoped arms", () => {
+        for (const mode of ["advance", "retreat", "both", "off"] as const) {
+            const environment = buildV08RangedPositioningABEnvironment(mode, "operational_bounded", {});
+            expect(environment.V08_RANGED_POSITION_MODE).toBe(mode);
+            expect(environment.V08_RANGED_POSITION_VERSIONS).toBe("v0.8");
+        }
+    });
+
+    it("runs cohort children sequentially and fails closed on a nonzero child", async () => {
+        const seen: string[] = [];
+        await runV08RangedPositioningAB(BASE_OPTIONS, {
+            runChild: async (invocation) => {
+                seen.push(invocation.cohort);
+                return 0;
+            },
+        });
+        expect(seen).toEqual(["hybrid", "ranged_max_sniper3"]);
+
+        await expect(
+            runV08RangedPositioningAB(BASE_OPTIONS, {
+                runChild: async (invocation) => (invocation.cohort === "hybrid" ? 7 : 0),
+            }),
+        ).rejects.toThrow("hybrid exited with code 7");
+    });
+});
