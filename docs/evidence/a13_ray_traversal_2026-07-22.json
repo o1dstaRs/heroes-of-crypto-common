@@ -1,0 +1,718 @@
+{
+    "schemaVersion": 1,
+    "title": "A13 compatibility-preserving grid-jump ray traversal evidence",
+    "recordedDate": "2026-07-22",
+    "status": "local candidate; not committed, deployed, or release-approved",
+    "host": {
+        "hardware": "Apple M4 Max",
+        "performanceCores": 12,
+        "efficiencyCores": 4,
+        "os": "macOS 15.7.4 (24G517)",
+        "architecture": "arm64",
+        "bun": "1.3.14"
+    },
+    "source": {
+        "baselineCommonCommit": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+        "integrationContext": {
+            "currentMainAtAudit": "d2794c4593311b3707807d1c09b28ace1f4c0349",
+            "latestFullSuiteMain": "77fbbddba852fc4334ba616dacf123ad1faa8e2a",
+            "releaseCandidateBase": "pending",
+            "retainedEvidenceIsNotFinalParent": true,
+            "reason": "f02e..d2794c4 includes material a13 search/profile changes, including 429 changed lines in src/simulation/search_driver.ts; final-parent semantic, ranked-wrapper, and performance reruns remain mandatory",
+            "currentAttackHandlerSha256StillMatchesMeasuredCandidate": "d4f0342487cc6cc8497d997e09a8a65c57f1fcebb02f945117a710cab42c5233",
+            "currentRayTraversalSha256StillMatchesMeasuredCandidate": "18d4f31971e593d1222bf24f71484dc5ba8a3cb52451eb2ed0d1498a53f97eba"
+        },
+        "baselineBundle": {
+            "temporaryPath": "/tmp/hoc-common-f02e806.bundle",
+            "sha256": "66b7f1e9d2fb48590612a15e81f1d444115a9bf12dcda4d9e508fa02bfa223b2"
+        },
+        "archives": {
+            "baselineTemporaryPath": "/tmp/hoc-ray-f02e-baseline.E0bh28",
+            "candidateTemporaryPath": "/tmp/hoc-ray-f02e-candidate.e1RSAt",
+            "construction": "Both began as git archives of baselineCommonCommit. The candidate then received exactly the two runtime overlays listed below. After the original primitive/macro measurements, both paths received one identical temporary exact-trace instrumentation overlay; they are therefore no longer valid as two-file-only performance inputs. Neither path is a branch or worktree.",
+            "runtimeOverlays": [
+                {
+                    "path": "src/handlers/attack_handler.ts",
+                    "baselineSha256": "c4255e2f996d5ad7bdf732dd48bc3d3537f07ec949678acea53e3a17676d51e9",
+                    "candidateSha256": "d4f0342487cc6cc8497d997e09a8a65c57f1fcebb02f945117a710cab42c5233"
+                },
+                {
+                    "path": "src/grid/ray_traversal.ts",
+                    "baselineState": "absent",
+                    "candidateSha256": "18d4f31971e593d1222bf24f71484dc5ba8a3cb52451eb2ed0d1498a53f97eba"
+                }
+            ]
+        },
+        "dependencies": {
+            "sealed": false,
+            "rootBunLockSha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54",
+            "commonPackageJsonSha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001",
+            "nodeModules": "Both archives symlinked /Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules. The dependency graph is lock-identified but the installed directory was live and was not content-sealed."
+        }
+    },
+    "baselineDiagnostics": {
+        "status": "exploratory prioritization evidence only; source state and original commands were not sealed",
+        "temporaryDirectory": "/tmp/hoc-a13-profile.DpiHpD",
+        "host": "Apple M4 Max; Bun 1.3.14; live shared working tree",
+        "sourceCommit": null,
+        "sourceTreeSha256": null,
+        "sourceLimitation": "the files were generated while shared main was changing; timestamps overlap nearby commits, so no exact commit or tree is inferred after the fact",
+        "command": null,
+        "commandLimitation": "the original command line was not retained",
+        "percentileEstimator": "nearest rank over the one-decimal per-turn ms values retained in each JSONL; these recalculated values can differ slightly from unavailable raw-unrounded summaries",
+        "productionTwoGameTrace": {
+            "path": "/tmp/hoc-a13-profile.DpiHpD/production.jsonl",
+            "sha256": "6221017850c6a754ca6c97a17cffa53e3249528d938302184e434c3ea7b4e738",
+            "seeds": [42, 43],
+            "games": 2,
+            "decisions": 56,
+            "searched": 55,
+            "p50Ms": 40.4,
+            "p95Ms": 70.7,
+            "p99Ms": 85.4,
+            "maxMs": 85.4
+        },
+        "productionTwentyGameTrace": {
+            "path": "/tmp/hoc-a13-profile.DpiHpD/production20.jsonl",
+            "sha256": "f6ff943e3695e83ad4e9963dd872c13b76074921cbc53c6814613b574bf10f7d",
+            "seeds": "100..119 inclusive",
+            "games": 20,
+            "decisions": 455,
+            "searched": 431,
+            "p50Ms": 42.2,
+            "p95Ms": 71.5,
+            "p99Ms": 81.2,
+            "maxMs": 90.6
+        },
+        "horizonSweep": {
+            "commonShape": "139 retained per-turn observations per horizon; seeds 200 onward; observe-only search; source/settings not fully sealed",
+            "files": [
+                {
+                    "horizon": 1,
+                    "sha256": "492e11e4c1a8cd4a87a077d1c6255cc8b7104bb8a8794c8dbdf12c2a8f8faa1f"
+                },
+                {
+                    "horizon": 4,
+                    "sha256": "a2378e341c80d52e777b3e87338c7dc50389bfe32ec2e89d8f3de0e6bee6e833",
+                    "p50Ms": 17,
+                    "p95Ms": 29.5,
+                    "maxMs": 39.8
+                },
+                {
+                    "horizon": 8,
+                    "sha256": "336fd8e52f4d1369467daf31c0a28a8efec142a415c89fdcb2fc57c053af0f14",
+                    "p50Ms": 29.8,
+                    "p95Ms": 48.3,
+                    "maxMs": 61.5
+                },
+                {
+                    "horizon": 12,
+                    "sha256": "4db1085c60444006a943fa999e28a6a11ea2b1c113c918b261176a2e02fe5de0",
+                    "p50Ms": 41.3,
+                    "p95Ms": 64,
+                    "maxMs": 78.9
+                },
+                {
+                    "horizon": 16,
+                    "sha256": "01f5e9d0b33937db93d4e837201171404bacaebbeb964851252737bbe107654c",
+                    "p50Ms": 54.4,
+                    "p95Ms": 74.5,
+                    "maxMs": 109.1
+                },
+                {
+                    "horizon": 24,
+                    "sha256": "6618e75ae47378e07ef5603e608c2b1cbd82ee41084ce2585535e12d62dad8d2",
+                    "p50Ms": 76.5,
+                    "p95Ms": 104.5,
+                    "maxMs": 145.6
+                }
+            ]
+        },
+        "profiles": {
+            "productionCpuProfileSha256": "e736241410cf57ab58dc2764a1875947911818f29c86cf2ebba90aa418791769",
+            "productionProfileMarkdownSha256": "c8f3a715dc3489003f4f298c66bfc9eb57b58557587c5a0fbf5a1e210b8a1124",
+            "postRayCpuProfileSha256": "7b4f45cf0395bd58f7b84d360b85ba2d73d9123f390dc7278a7e4569fd4c5988",
+            "postRayProfileMarkdownSha256": "dd17d6fed37e74e285fb15293f47e126c65b581c0bf49b0d5f87fa0837a308e0",
+            "qualification": "none; source and exact command were not sealed"
+        },
+        "removedUnsupportedClaim": "the earlier 660-decision / 627-searched representative summary was removed from the HTML because its source artifact was not retained"
+    },
+    "compatibilityContract": {
+        "input": "finite engine-range rays whose rounded coordinates and closed-form integer products remain within JavaScript's exact-integer range",
+        "output": "same ordered [cell, firstPosition] sequence as the removed integer Bresenham pixel walker, including its packed-key deduplication collisions",
+        "intentionalDifference": "non-finite endpoints return an empty sequence instead of risking a non-advancing legacy loop",
+        "algorithm": "closed-form jumps between cell-boundary crossings on the historical discrete Bresenham raster; this is intentionally not geometric thin DDA or strict supercover"
+    },
+    "differentialValidation": {
+        "permanentTest": {
+            "path": "test/grid/ray_traversal.test.ts",
+            "command": "bun test test/grid/ray_traversal.test.ts",
+            "result": "10 passed, 0 failed",
+            "exhaustiveProductionRays": 1108224,
+            "seededFuzzRays": 20000,
+            "seededFuzz": [
+                {
+                    "seed": "0x51deca11",
+                    "rays": 10000,
+                    "scope": "fractional and out-of-grid rays on production GridSettings"
+                },
+                {
+                    "seed": "0xc311da7a",
+                    "rays": 10000,
+                    "scope": "four fractional/custom GridSettings"
+                }
+            ],
+            "edgeGoldens": [
+                "strict Bresenham tie",
+                "reverse-direction boundary asymmetry",
+                "zero-length and non-finite inputs",
+                "exact falloff boundary",
+                "large-origin corner alias",
+                "legacy packed-key collision"
+            ]
+        },
+        "independentFixedGridAudit": {
+            "harnessTemporaryPath": "/tmp/hoc-ray-helper-diff.ts",
+            "harnessSha256": "f923350587b0179eb95bee6d75a40f62f22bcc2efaf5fa10455941d2439d8d80",
+            "resultTemporaryPath": "/tmp/hoc-ray-helper-diff.json",
+            "resultSha256": "d9c51bf072dca35e354ae665e5ef4ef01de43e68b14dc8925bce252b560adbc5",
+            "grid": "16 x 16, 128 px/cell, x=[-1024,1024], y=[0,2048]",
+            "seedForLastTwoFamilies": "0x51deca11",
+            "totals": {
+                "rays": 2744145,
+                "legacyPixels": 2953685828,
+                "outputPairs": 35559963,
+                "mismatches": 0
+            },
+            "families": [
+                { "name": "small center to center", "rays": 65536, "mismatches": 0 },
+                { "name": "small center to four sides", "rays": 262144, "mismatches": 0 },
+                { "name": "small center to projected Through", "rays": 262144, "mismatches": 0 },
+                { "name": "large vertex to center", "rays": 57600, "mismatches": 0 },
+                { "name": "large vertex to four sides", "rays": 230400, "mismatches": 0 },
+                { "name": "large vertex to projected Through", "rays": 230400, "mismatches": 0 },
+                { "name": "33 x 33 half-cell lattice, directed pairs", "rays": 1185921, "mismatches": 0 },
+                { "name": "fractional and out-of-grid", "rays": 250000, "mismatches": 0 },
+                { "name": "fractional side and projected Through", "rays": 200000, "mismatches": 0 }
+            ]
+        },
+        "independentCustomGridAudit": {
+            "harnessTemporaryPath": "/tmp/hoc-ray-fractional-grid.ts",
+            "harnessSha256": "71d7fdc30cea6e7cd64a233ba50cad818f47ef9fdb04af3150b7248aeca4498c",
+            "resultTemporaryPath": "/tmp/hoc-ray-fractional-grid.json",
+            "resultSha256": "eab6f0086a3b06d2bb9278ae4da812af2b2512a6ce98ec9de45cd04808f31e38",
+            "seed": 123456789,
+            "raysPerGrid": 100000,
+            "totalRays": 400000,
+            "mismatches": 0,
+            "grids": [
+                { "size": 7, "maxY": 1000, "minY": -50, "maxX": 500, "minX": -500 },
+                { "size": 17, "maxY": 1000, "minY": 10, "maxX": 500, "minX": -500 },
+                { "size": 16, "maxY": 2047, "minY": 0, "maxX": 1023.5, "minX": -1023.5 },
+                { "size": 31, "maxY": 997, "minY": -300, "maxX": 498.5, "minX": -498.5 }
+            ]
+        },
+        "additionalReviewerFuzz": {
+            "rays": 200000,
+            "randomizedGridConfigurations": 200,
+            "mismatches": 0,
+            "reproducibleArtifactRetained": false,
+            "status": "informational corroboration only; excluded from the reproducible release gate"
+        }
+    },
+    "microbenchmark": {
+        "harnessTemporaryPath": "/tmp/hoc-ray-helper-bench.ts",
+        "harnessSha256": "6b04b92a6461a410c8f1b02ccac9f2380e12857c77f29b0943802a558a083590",
+        "resultTemporaryPath": "/tmp/hoc-ray-helper-bench.json",
+        "resultSha256": "a2cad8fc42e58297b2a32021fb05b869296f65618435303795f927bcc0d9abf7",
+        "raysPerTrial": 20000,
+        "trials": 11,
+        "workloads": [
+            {
+                "name": "normal, 25% large",
+                "legacyMedianMs": 159.10562499999992,
+                "candidateMedianMs": 14.75283300000001,
+                "speedup": 10.784750630607682
+            },
+            {
+                "name": "Through, 25% large",
+                "legacyMedianMs": 260.91550000000007,
+                "candidateMedianMs": 20.7221669999999,
+                "speedup": 12.591130068587969
+            },
+            {
+                "name": "mixed, 20% large and 10% Through",
+                "legacyMedianMs": 173.3078749999995,
+                "candidateMedianMs": 15.649834000000737,
+                "speedup": 11.074103086332503
+            }
+        ],
+        "interpretation": "Ordinary combat-length rays improve materially. A separate crossover sweep found 1-4 px non-zero rays slower and the candidate faster by 8 px; performance ratios are diagnostics, not CI thresholds."
+    },
+    "macrobenchmark": {
+        "runnerSourceRetained": false,
+        "runnerStatus": "configuration and results are durably summarized here; the one-off harness source was not retained",
+        "workload": {
+            "versions": "v0.8 mirror",
+            "warmup": { "seed": 9001, "maxLaps": 2 },
+            "measuredSeeds": [1, 42, 43, 44, 45, 46],
+            "maxLaps": 4,
+            "matchesPerTrial": 6,
+            "actionsPerTrial": 361,
+            "rejectedActionsPerTrial": 0,
+            "digestDefinition": "SHA-256(JSON.stringify(ordered IMatchResult[]))",
+            "digestSha256": "5362e41ce4d18381bc680b71da30618148bd01b92cc93fe826d0bae926dcdfbe"
+        },
+        "alternatingTrials": [
+            {
+                "trial": 1,
+                "firstProcess": "baseline",
+                "baselineMs": 7491.27,
+                "candidateMs": 5836.34,
+                "reductionPercent": 22.09
+            },
+            {
+                "trial": 2,
+                "firstProcess": "candidate",
+                "baselineMs": 7619.73,
+                "candidateMs": 5894.1,
+                "reductionPercent": 22.65
+            },
+            {
+                "trial": 3,
+                "firstProcess": "baseline",
+                "baselineMs": 7539.49,
+                "candidateMs": 5837.77,
+                "reductionPercent": 22.57
+            },
+            {
+                "trial": 4,
+                "firstProcess": "candidate",
+                "baselineMs": 7613.4,
+                "candidateMs": 5945.85,
+                "reductionPercent": 21.9
+            },
+            {
+                "trial": 5,
+                "firstProcess": "baseline",
+                "baselineMs": 7635.85,
+                "candidateMs": 5968.99,
+                "reductionPercent": 21.83
+            }
+        ],
+        "median": {
+            "baselineMs": 7613.4,
+            "candidateMs": 5894.1,
+            "reductionPercent": 22.58,
+            "throughputMultiplier": 1.292
+        }
+    },
+    "cpuProfile": {
+        "samplingIntervalMicroseconds": 500,
+        "workload": "same warmup and measured six-match workload as macrobenchmark",
+        "temporaryDirectory": "/tmp/hoc-ray-f02e-profile.Zo9Tts",
+        "baseline": {
+            "sampledDurationMs": 9438.087,
+            "rawProfileSha256": "0abb4cb0a9815623930b5624c57c5d0f04a09c420db8cdb5ac416b16392c042c",
+            "markdownSha256": "c25b97c6e615c54eb31522971d402777364807b2b7529e0ba32bb9e83a322085",
+            "traversalInclusiveMs": 2172.141,
+            "traversalInclusivePercent": 23.0146,
+            "traversalSelfMs": 2134.97,
+            "traversalSelfPercent": 22.6208
+        },
+        "candidate": {
+            "sampledDurationMs": 7281.962,
+            "rawProfileSha256": "57d13ccfaf4abc0efe516d31511fc31e6950d08d0ef5605f5ff1fdc0bd1b6ba2",
+            "markdownSha256": "e7a5223c4802664c0894525611bd408b0d9af7e1d0abfab3cf972746a522750d",
+            "traversalInclusiveMs": 184.781,
+            "traversalInclusivePercent": 2.5375,
+            "traversalSelfMs": 178.841,
+            "traversalSelfPercent": 2.4559
+        },
+        "reduction": {
+            "sampledDurationPercent": 22.84,
+            "traversalInclusivePercent": 91.49,
+            "traversalInclusiveMultiplier": 11.76,
+            "traversalSelfPercent": 91.62,
+            "traversalSelfMultiplier": 11.94
+        }
+    },
+    "preRegisteredLatencyPanel": {
+        "status": "protocol frozen; plan generation and isolated functional smoke passed; full panel results pending",
+        "runner": {
+            "path": "docs/evidence/tools/a13_latency_panel.ts",
+            "sha256": "5fe2473862194b5764643f19ac1b0dadc1e0d02dce8f6c9ab1c0f711baa4654a",
+            "readmePath": "docs/evidence/tools/a13_latency_panel.README.md",
+            "readmeSha256": "03ea5dd562d28728fd03620cffbf296452e6c628d3071c5101bf3759e4aae917",
+            "protocolSha256": "d39247656358011d4371593ad72aaea3647c9210dfd0385940dd39ea33c0ffea",
+            "planSha256": "48cec334d1dcb10cda88dce02b338af357c4cdce9687869ee4d1be7936d8dc1b"
+        },
+        "sourcePair": {
+            "baselineCommonCommit": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+            "candidateRuntimeOverlays": ["src/handlers/attack_handler.ts", "src/grid/ray_traversal.ts"],
+            "finalBaseRefreezeRequired": "The retained runners are intentionally pinned to f02e common/server/profile identities. A final-parent run must re-freeze those identities and dependent hashes, then regenerate the plan and smoke before qualification."
+        },
+        "pairPlan": {
+            "baseSeed": 85000717,
+            "pairIdentitiesPerCohort": 30,
+            "pairIdentitiesPerCohortMap": 10,
+            "totalPairIdentities": 210,
+            "physicalSideSwapsPerPairIdentity": 2,
+            "matchesPerVariant": 420,
+            "matchedBaselineCandidateObservations": 420,
+            "matchExecutionsPerConcurrencyPass": 840,
+            "maxLaps": 60,
+            "cohorts": [
+                "ranked-draft",
+                "uniform-mixed",
+                "ranged-heavy",
+                "ground-melee",
+                "flyer-heavy",
+                "caster-support",
+                "cross-archetype"
+            ],
+            "maps": ["NORMAL", "LAVA_CENTER", "BLOCK_CENTER"],
+            "setupGenerator": "ai_meta_cohorts_core.ts; complete XP-budget rosters, artifacts, augments, synergies, perks, and non-overlapping opposing armies are generated once and persisted"
+        },
+        "timing": {
+            "decisionDeadlineMs": 175,
+            "commonCircuitBreakerMs": 275,
+            "minimumWarmupDecisionsPerWorker": 20,
+            "concurrencyPasses": [1, 4, 12],
+            "concurrencyOneIsAttributionPass": true,
+            "blockOrder": "the 21 stable cohort-map blocks alternate AB then BA; this is gross order balance, not same-block ABBA replication",
+            "workerTopology": "two persistent variant-isolated pools per condition; c12 has 24 resident warmed workers, with only the selected 12-worker pool active during each arm",
+            "activeWallDefinition": "sum of post-warmup runBlock wall durations, including parent scheduling, worker execution, structured-clone serialization, IPC, and promise aggregation; excludes warmup and opposite-arm idle time",
+            "warmupBypassPolicy": "--skip-warmup is rejected for qualifying runs and allowed only for explicitly non-qualifying smoke diagnostics",
+            "allDecisionAndSearchedDecisionLatencySeparated": true,
+            "circuitSkipsExcludedFromZeroTimeSamples": true,
+            "percentileEstimator": "nearest-rank on raw unrounded durations",
+            "logicalWorkPolicy": "accepted actions and SearchDriver counters are compared task-by-task; a mismatch is attributed only when that task has an explicitly counted bounded fallback or circuit divergence",
+            "sourceIntegrity": "frozen full source-tree identities, exact two-file delta, runner bytes, and profile-arm label are enforced and resealed after every condition"
+        },
+        "uncertainty": {
+            "confidenceLevel": 0.95,
+            "bootstrapReplicates": 10000,
+            "bootstrapSeed": "0xa13dd001",
+            "unit": "pair identity cluster, retaining both physical side swaps",
+            "strata": "cohort and map"
+        },
+        "acceptance": {
+            "matchedTaskSetComplete": true,
+            "candidateEngineRejectedActions": 0,
+            "candidateOnlyExceptions": 0,
+            "candidateOnlyRejectedActions": 0,
+            "candidateOnlyDeadlineFallbacks": 0,
+            "candidateOnlyCircuitOpens": 0,
+            "candidateOnlyIllegalIncumbentIncrease": 0,
+            "unattributedLogicalWorkMismatchTasks": 0,
+            "concurrencyOneLowerBootstrapBoundForTotalDecisionReductionPercent": "> 0",
+            "concurrencyOneLowerBootstrapBoundForSearchReductionPercent": "> 0",
+            "maximumUpperBootstrapBoundForP95Ratio": 1.05,
+            "maximumUpperBootstrapBoundForP99Ratio": 1.05,
+            "maximumCandidateBaselineActiveWallRatioAtConcurrencyFourAndTwelve": 1.05,
+            "p99_9AndMaximum": "reported descriptively; every outlier retained and investigated"
+        },
+        "hostValidity": {
+            "power": "AC throughout",
+            "thermalState": "nominal throughout",
+            "memoryPressure": "normal throughout",
+            "overlap": "no other build, simulation, or profile process",
+            "externalProcessPeakCpuPercentOfOneCore": 100,
+            "externalProcessSustainedCpuPercentOfOneCore": 20,
+            "externalProcessSustainedSamples": 5,
+            "sampleIntervalSeconds": 1,
+            "policy": "invalidate and rerun the complete block; never selectively discard samples after observing performance"
+        },
+        "cpuProfiles": {
+            "capturesPerVariant": 3,
+            "samplingIntervalMicroseconds": 500,
+            "workload": "nine repeats of the frozen six-match corpus per capture",
+            "acceptedActionsPerCapture": 3249,
+            "expectedDurationSeconds": "60-90 is a sizing expectation, not a stopping rule"
+        },
+        "functionalSmoke": {
+            "status": "passed; deliberately non-qualifying",
+            "resultPath": "docs/evidence/a13_latency_panel_smoke_2026-07-22.json",
+            "resultSha256": "a5ff92dde734cbf57f808260a03781e5d122323e3089d16764c5e4a242b04da6",
+            "freshSourceArchives": "both exported from f02e8066; candidate differed by exactly the frozen attack_handler modification and ray_traversal addition",
+            "plan": {
+                "pairClusters": 210,
+                "physicalTasksPerVariant": 420,
+                "strata": 21
+            },
+            "warmupDecisionsPerVariant": 28,
+            "measuredMatchesPerVariant": 2,
+            "measuredDecisionsPerVariant": 94,
+            "acceptedActionsPerVariant": 144,
+            "resultActionOutcomePlacementDigestMatches": "2/2",
+            "candidateOnlyExceptionsOrRejectionsOrFallbacksOrCircuits": 0,
+            "logicalWorkMatched": "exact 10-field vector: 144 accepted actions, 94 decisions, 94 search decisions, 90 searched, 534 candidates, 260 fully scored, 5,542 rollout turns, 0 illegal-incumbent repairs, 34 overrides, and 4 single-candidate exits per variant",
+            "candidateOnlyIllegalIncumbentIncrease": 0,
+            "activeWallCandidateOverBaseline": 0.9820559041019694,
+            "sourceRunnerPrePostSealsExact": "before/after c1 condition and across the complete invocation",
+            "cleanWorkerShutdown": true,
+            "timingInterpretation": "none; two observations on a host without continuous attestation are not an estimator",
+            "hostQualified": false,
+            "fullPanelRun": false
+        }
+    },
+    "exactEventStateTrace": {
+        "status": "passed in unbounded semantic mode and production-bounded common-driver mode",
+        "source": {
+            "baselineCommonCommit": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+            "productionSourceDifference": "candidate modifies src/handlers/attack_handler.ts and adds src/grid/ray_traversal.ts; no other production difference",
+            "overlayPatch": {
+                "path": "docs/evidence/tools/a13_exact_trace_overlay.patch",
+                "sha256": "02931410335a0a59a7a7705735b2ba69f1491ebffb7a093d3e17dc6d41ba1d2e"
+            },
+            "instrumentationHashes": {
+                "battleEngineSha256": "91d93547531631b2cfea41649fa24833af7ccf1351e1320fe49cced5e43a0cdf",
+                "exactTraceHooksSha256": "39fe7f50e3d8318cbc0feaba72c580d68bfae4bead50ceea0e013dc841818080",
+                "a13SearchSha256": "000054e080237dc4aa117e078fb99115be56a384576a416395d89e780441a00e",
+                "identicalAcrossArchives": true
+            },
+            "runner": {
+                "path": "docs/evidence/tools/a13_exact_trace_runner.ts",
+                "sha256": "8b619b6d84b8167f91f871d4cf9b688f53a403339aeb6851f1ae0ec80e7edf8f"
+            },
+            "comparator": {
+                "path": "docs/evidence/tools/a13_exact_trace_compare.ts",
+                "sha256": "d03cf824c2c181425619bc6c262a6f74eb3f91ae99749e5a8d9be02100ebef1f"
+            }
+        },
+        "traceContract": {
+            "eventBatches": "placement attempts, fight start, every TurnEngine system advance, strategy/recovery/manual-end actions, and match/search completion",
+            "stateBoundaries": "armies/setup/fight-ready, pre-policy, post-incumbent, post-search, post-action/turn, and terminal boundaries",
+            "state": "snapshotBattle units/grid/fight/holder/AI target memory plus damage statistics, active unit, authoritative RNG draw cursor, stable SearchDriver state/counters, action length/cap, finished/endReason, attrition, rejection counts, and summon sequence",
+            "excludedNonsemantic": [
+                "FightProperties.id",
+                "FightProperties.currentTurnStart",
+                "FightProperties.currentTurnEnd",
+                "FightProperties.currentLapTotalTimePerTeam",
+                "SearchDriver.counters.msTotal"
+            ],
+            "canonicalization": "sorted plain-object keys; preserved array/Map/Set order; explicit tags for special values/classes/queues/typed arrays; fail closed on cycles, functions, symbols, and weak collections"
+        },
+        "commonConfig": {
+            "versions": ["v0.8", "v0.8"],
+            "seeds": "1..20 inclusive",
+            "map": "NORMAL",
+            "maxLaps": 60,
+            "roster": "buildRoster(makeRng(seed)); historical level-table amounts"
+        },
+        "unbounded": {
+            "resultPath": "docs/evidence/a13_ray_exact_trace_unbounded_2026-07-22.json",
+            "resultSha256": "a1a809c551cc949b5fdf2f2cd4b8b0fe6765df90a0cf65da1c6acf04a5e23c73",
+            "matches": 20,
+            "exactMatches": 20,
+            "boundaries": 8630,
+            "events": 5375,
+            "actions": 1656,
+            "searchDecisions": 1265,
+            "searchedDecisions": 1170,
+            "rejections": 0,
+            "illegalIncumbents": 0,
+            "deadlineFallbacks": 0,
+            "circuitSkipsOrOpens": 0,
+            "repeatSeed": 1,
+            "repeatDeterminismBothVariants": true,
+            "orderedTraceSha256BothVariants": "76f47b60c90e5575d8ab5a7792534dedf21340614bd93b51d7b6b42e84074702",
+            "orderedResultSha256BothVariants": "eb5aa9116abaf11b57d8f96e8e87bdbb5f3d5dc975ef3678dec6ce92a4501c33"
+        },
+        "boundedCommonDriver": {
+            "resultPath": "docs/evidence/a13_ray_exact_trace_bounded_2026-07-22.json",
+            "resultSha256": "f25cf6cad78b4c8a81a6fcd6147a5b90c3b573512386cf144bef58f8196a5a51",
+            "decisionDeadlineMs": 175,
+            "circuitBreakerMs": 275,
+            "executionOrder": "baseline then candidate, strictly sequential with no other simulation/test/profile process",
+            "matches": 20,
+            "exactMatches": 20,
+            "boundaries": 8630,
+            "events": 5375,
+            "actions": 1656,
+            "searchDecisions": 1265,
+            "searchedDecisions": 1170,
+            "rejections": 0,
+            "illegalIncumbents": 0,
+            "deadlineFallbacks": 0,
+            "circuitSkipsOrOpens": 0,
+            "orderedTraceSha256BothVariants": "78f7f94dd5d793b5d471e6d1fb116f22c9380075824948869434bf576f601d15",
+            "orderedResultSha256BothVariants": "ef94c07e10abfacede9d6cec25bd12a2e25394ef6bdd391d01b95ae57406984a"
+        },
+        "limitations": [
+            "speculative rollout event batches are not retained; pre/post-search restored authoritative state and chosen decisions are retained",
+            "this 20-seed cohort is v0.8 mirror self-play on NORMAL; ranked setup and three-map coverage are separate gates",
+            "trace archives used a lock-identified but live node_modules symlink; the overlay/runner/comparator and raw-output hashes are retained"
+        ]
+    },
+    "completeMatchReplay": {
+        "commonConfiguration": {
+            "greenVersion": "v0.8",
+            "redVersion": "v0.8",
+            "seeds": "1..20 inclusive",
+            "maxLaps": 60,
+            "map": "PBTypes.GridVals.NORMAL",
+            "rosterBuilder": "buildRoster(makeRng(seed))",
+            "rosterComposition": [
+                { "level": 1, "stacks": 2, "amountPerStack": 50 },
+                { "level": 2, "stacks": 2, "amountPerStack": 30 },
+                { "level": 3, "stacks": 1, "amountPerStack": 15 },
+                { "level": 4, "stacks": 1, "amountPerStack": 8 }
+            ],
+            "amountMode": "levelTable",
+            "factionFilter": null,
+            "cohortFilter": null,
+            "digestDefinition": "SHA-256(JSON.stringify(ordered complete IMatchResult[] for seeds 1..20))",
+            "digestCoverage": "placements, ordered actions, outcomes and all other IMatchResult fields; not a separately captured full event stream or per-turn state trace"
+        },
+        "unboundedSemanticMode": {
+            "decisionDeadlineMs": null,
+            "circuitBreakerMs": null,
+            "baseline": {
+                "elapsedMs": 36121.066917000004,
+                "matches": 20,
+                "completed": 20,
+                "actions": 1656,
+                "rejected": 0,
+                "maxLap": 14
+            },
+            "candidate": {
+                "elapsedMs": 30415.108708,
+                "matches": 20,
+                "completed": 20,
+                "actions": 1656,
+                "rejected": 0,
+                "maxLap": 14
+            },
+            "baselineCandidateDigestSha256": "e01027d084238358f3d2b7405ca8b5551815a8cb702d611ac78398b488d0294a",
+            "withinModeParity": true
+        },
+        "boundedCommonDriverMode": {
+            "decisionDeadlineMs": 175,
+            "circuitBreakerMs": 275,
+            "cleanEnvironmentCommandShape": "env -i PATH=/Users/zolotukhin/.bun/bin:/usr/bin:/bin /Users/zolotukhin/.bun/bin/bun -e '<harness>'",
+            "baseline": {
+                "elapsedMs": 33375.974,
+                "matches": 20,
+                "completed": 20,
+                "actions": 1656,
+                "rejected": 0,
+                "maxLap": 14
+            },
+            "candidate": {
+                "elapsedMs": 27829.965,
+                "matches": 20,
+                "completed": 20,
+                "actions": 1656,
+                "rejected": 0,
+                "maxLap": 14
+            },
+            "baselineCandidateDigestSha256": "95064a80991400035786dfb11307cc8ab28456c920a2f61d69b5c1125ae2639f",
+            "allPerSeedDigestsMatched": true,
+            "withinModeParity": true
+        },
+        "crossModeParityAsserted": false,
+        "rankedOuterWrapper": {
+            "deadlineMs": 300,
+            "serverCommitAudited": "8519fbded3c200a159b2062d00ad5f1f929fe47f",
+            "serverLockPinnedCommonCommit": "473373c2c4910fa8879c490273ab9a92e36ffe2c",
+            "includes": "ensureBotSearchDriver plus the complete chooseDecision call, including common pre-timer classification and cleanup",
+            "normallyExcludes": "driver construction/onFightReady, base policy, pre-call metadata and scene-log snapshots, restoration, live action application, events, snapshots, journaling, and logging",
+            "behavior": "post-hoc and strict-greater-than: a call over 300 ms still supplies the current decision, then opens the match-wide circuit for later turns",
+            "existingServerTargetedTests": "112 passed, 0 failed; no existing test forces an outer-300 ms circuit activation",
+            "testedHere": true,
+            "operationalReplay": {
+                "status": "passed; focused operational replay, not latency qualification",
+                "resultPath": "docs/evidence/a13_ranked_outer_300_replay_2026-07-22.json",
+                "resultSha256": "53e0a2bfe8e0ed51afdb38390aa0c124e9d79574cadbaaaa438a49d218646acc",
+                "runnerPath": "docs/evidence/tools/ranked_outer_300_replay.ts",
+                "runnerSha256": "6f87bef057b203f8f8f9ed6dd5410cb9fd6e3f3b02006ca58df3093e46b1281e",
+                "runnerReadmePath": "docs/evidence/tools/ranked_outer_300_replay.README.md",
+                "runnerReadmeSha256": "817a808fa4bdb5939f012a665ece63d325d254bc22f43ad52dad660c0ba7ae1b",
+                "rawTemporaryPath": "/tmp/a13-ranked-outer-300-hardened-3map-6pair-final.json",
+                "rawSha256": "10ee7f2d92529fa468b4048d2a69a5f692443a69669de585a2130d6ddfb91fde",
+                "rawBytes": 129361780,
+                "durableRaw": {
+                    "path": "docs/evidence/a13_ranked_outer_300_replay_2026-07-22.raw.json.gz",
+                    "sha256": "9d2f385d09fa143f178b9de25647d26647ab608220e22e8adaddd552ec5ed64f",
+                    "bytes": 9496129,
+                    "losslessVerification": "gzip -t passed; decompressed SHA-256 and byte count exactly reproduced the volatile raw artifact"
+                },
+                "sourceIntegrity": {
+                    "baselineSrcTreeSha256": "d66eea6fadc27d259743269611e11a8c96c9eb285d5622217da06274f0ce5c29",
+                    "candidateSrcTreeSha256": "bd8bb9fd5ff060fdf3d5092ed2351acdb55b4de46b94d440b85beaddaeecee02",
+                    "serverSrcTreeSha256": "b8177d6920bb72f93b01896629fb1738b4e375bc9af1df22ee0623518d925c92",
+                    "preflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                    "postflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                    "exactDelta": "added grid/ray_traversal.ts; modified handlers/attack_handler.ts; no other src delta",
+                    "dependencyLimitation": "package and resolved lockfiles were sealed, but symlinked node_modules contents were not recursively sealed"
+                },
+                "runnerControls": "final persisted runner passed an identical-source control and a one-pair baseline/candidate smoke before the six-pair panel",
+                "maps": ["NORMAL", "LAVA_CENTER", "BLOCK_CENTER"],
+                "physicalSideSwaps": true,
+                "pairedMatches": 6,
+                "semanticExactMatches": 6,
+                "decisionCallsPerVariant": 399,
+                "searchedDecisionsPerVariant": 376,
+                "singleCandidateDecisionsPerVariant": 23,
+                "illegalIncumbentRepairsPerVariant": 1,
+                "driverCreationsPerVariant": 6,
+                "completeProductionReplaysPerVariant": 6,
+                "completeCapturesPerVariant": 6,
+                "journalEntriesPerVariant": 706,
+                "serverEventsPerVariant": 712,
+                "proposalRejectsOrServerErrorsOrDeadlineFallbacksOrInnerOuterCircuitsOrRestoreFailures": 0,
+                "outerWrapperLatencyMs": {
+                    "baseline": {
+                        "p50": 39.740624999999454,
+                        "p95": 82.72600000000011,
+                        "p99": 99.50908299999992,
+                        "max": 134.05054199999998
+                    },
+                    "candidate": {
+                        "p50": 38.415375000000495,
+                        "p95": 82.7002080000002,
+                        "p99": 102.77362500000004,
+                        "max": 133.56483300000002
+                    }
+                },
+                "timingInterpretation": "descriptive only; six correlated paired matches do not qualify percentiles or establish a performance direction"
+            }
+        }
+    },
+    "validation": {
+        "focusedSuites": "211 passed, 0 failed on the current shared main: 10 exhaustive ray-oracle tests plus 201 combat, trajectory, engine, candidate, and ability integration tests; the isolated f02e candidate slice also passed",
+        "eslintOwnedFiles": "passed for the production integration, helper, and permanent test; docs/evidence tools are outside the repository ESLint file configuration",
+        "prettierOwnedFiles": "passed, including the final HTML and evidence manifest",
+        "typescriptBuildNoEmit": "passed in the immutable f02e candidate archive; a final live-tree bunx tsc -p tsconfig.build.json --noEmit also passed while peer test-only edits remained unstaged",
+        "evidenceTooling": "all retained TypeScript runners passed strict standalone TypeScript 5.9.3 checks with --strict --target ES2022 --module preserve --moduleResolution bundler --types bun; both large runners also passed Bun bundling; all retained JSON parsed; every local HTML link and anchor resolved",
+        "gitDiffCheck": "passed",
+        "fullCommonSuite": {
+            "liveSharedTreeObservation": "1747 passed, 2 failed, 1749 total on the final rerun at common main 77fbbdd; both failures were pre-existing replay digests",
+            "immutableF02eCandidateArchive": "1701 passed, 7 failed, 1708 total",
+            "candidateOnlyFailures": 0,
+            "archiveFailureAttribution": {
+                "historicalDigestFailures": [
+                    "test/simulation/v0_7_setup_ship_replay.test.ts",
+                    "plain-v0.7 digest in test/ai/v0_8s_strategy.test.ts"
+                ],
+                "missingGitRepositoryContextFailures": [
+                    "two tests in test/simulation/run_v0_7_selfplay_passive_audit.test.ts",
+                    "two tests in test/simulation/analyze_v0_7_wait_v2_external.test.ts",
+                    "one test in test/simulation/league_cycle.test.ts"
+                ]
+            },
+            "differentialRerun": "All seven failing cases were rerun on untouched baseline and candidate archives. Both sides produced the same seven failures, same received digest values, and same missing-.git errors."
+        }
+    },
+    "openReleaseGates": [
+        "after main stabilizes, re-freeze/regenerate every f02e-pinned exact-trace, ranked-wrapper, latency, and profile runner identity plus its dependent hashes for the exact final intended parent; regenerate plan/smoke artifacts, then rerun all semantic, ranked-wrapper, and performance gates",
+        "run the predeclared 420-match-per-variant tail-latency panel at concurrency 1, 4, and 12 plus three fixed-work profiles per variant",
+        "join and validate continuous AC, thermal, memory-pressure, and external-process host attestation for every complete latency block",
+        "run browser sandbox smoke on the final common SHA for normal, Through, mountain, and AOE targeting plus range/highlight rendering and obstacle-intersection animation",
+        "pass common, client, and server checks on one consistent committed common SHA",
+        "seal dependencies and retain exact benchmark/replay runner sources with raw outputs",
+        "commit, pin, and deploy common/client/server together only after explicit authorization"
+    ]
+}

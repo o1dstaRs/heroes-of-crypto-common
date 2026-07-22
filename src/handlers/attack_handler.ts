@@ -15,6 +15,7 @@ import * as HoCMath from "../utils/math";
 import * as GridMath from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Grid } from "../grid/grid";
+import { traceGridRayCells } from "../grid/ray_traversal";
 import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
@@ -145,9 +146,7 @@ export class AttackHandler {
                   toPosition.y,
               )
             : toPosition;
-        const intersectedCellsToPositions = this.getCellsToPositions(
-            this.getIntersectedPositions(fromPosition, lineEndPosition),
-        );
+        const intersectedCellsToPositions = traceGridRayCells(this.gridSettings, fromPosition, lineEndPosition);
 
         return this.getAffectedUnitsAndObstacles(
             allUnits,
@@ -2533,60 +2532,6 @@ export class AttackHandler {
             affectedCells,
             attackObstacle,
         };
-    }
-    private getCellsToPositions(positions: HoCMath.XY[]): Array<[HoCMath.XY, HoCMath.XY]> {
-        const cells: Array<[HoCMath.XY, HoCMath.XY]> = [];
-        const cellKeys: number[] = [];
-
-        for (const position of positions) {
-            const cell = GridMath.getCellForPosition(this.gridSettings, position);
-            if (!cell) {
-                continue;
-            }
-            const cellKey = (cell.x << 4) | cell.y;
-            if (cellKeys.includes(cellKey)) {
-                continue;
-            }
-            cells.push([cell, position]);
-            cellKeys.push(cellKey);
-        }
-        return cells;
-    }
-    private getIntersectedPositions(start: HoCMath.XY, end: HoCMath.XY): HoCMath.XY[] {
-        const positions: HoCMath.XY[] = [];
-
-        // Convert world coordinates to grid coordinates
-        const gridStart = start;
-        const gridEnd = end;
-
-        let x0 = Math.round(gridStart.x);
-        let y0 = Math.round(gridStart.y);
-        let x1 = Math.round(gridEnd.x);
-        let y1 = Math.round(gridEnd.y);
-
-        const dx = Math.abs(x1 - x0);
-        const dy = Math.abs(y1 - y0);
-        const sx = x0 < x1 ? 1 : -1;
-        const sy = y0 < y1 ? 1 : -1;
-        let err = dx - dy;
-
-        while (true) {
-            positions.push({ x: x0, y: y0 });
-
-            if (x0 === x1 && y0 === y1) break;
-
-            const e2 = 2 * err;
-            if (e2 > -dy) {
-                err -= dy;
-                x0 += sx;
-            }
-            if (e2 < dx) {
-                err += dx;
-                y0 += sy;
-            }
-        }
-
-        return positions;
     }
     private updateMoraleDecreaseForTheUnitTeam(
         initialRecord: Record<string, number>,

@@ -1,0 +1,1090 @@
+{
+    "schema": "hoc.a13.ranked-outer-300-compact-evidence.v2",
+    "generatedAt": "2026-07-22T22:36:34.588Z",
+    "status": "pass",
+    "conclusion": "The frozen identical-source control, one-pair A/B smoke, and six-pair three-map side-swap panel all passed under the exact persisted runner. The final panel completed 6/6 semantic-exact paired ranked replays with complete production/capture traces, exact chosen-decision and semantic counter-delta traces, one driver per match, inner/outer/counter parity, and no safety event or failed outer search-state restore.",
+    "scope": {
+        "classification": "operational_replay_not_latency_qualification",
+        "pairedMatches": 6,
+        "executedMatches": 12,
+        "matchesPerVariant": 6,
+        "decisionCallsPerVariant": 399,
+        "searchedDecisionsPerVariant": 376,
+        "singleCandidateDecisionsPerVariant": 23,
+        "illegalIncumbentDecisionsPerVariant": 1,
+        "maps": ["NORMAL", "LAVA_CENTER", "BLOCK_CENTER"],
+        "physicalSideSwaps": true,
+        "caveat": "n=6 paired matches is sufficient for this focused operational replay gate, not for latency percentile qualification or a performance-improvement claim. Baseline and candidate workers ran sequentially on one host, decisions within a match are correlated, and symmetric v0.8 side swaps provide operational coverage rather than independent roster scenarios."
+    },
+    "protocol": {
+        "commonBaseSha": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+        "serverSha": "8519fbded3c200a159b2062d00ad5f1f929fe47f",
+        "thresholds": {
+            "serverOuterCircuitBreakerMs": 300,
+            "innerDecisionDeadlineMs": 175,
+            "innerCircuitBreakerMs": 275,
+            "evidence": "300 was imported from the archived server BOT_SEARCH_CIRCUIT_BREAKER_MS. Every constructed archived-common SearchDriver was inspected at runtime and asserted to expose decisionDeadlineMs=175 and circuitBreakerMs=275.",
+            "observedByVariant": {
+                "baseline": {
+                    "bun": "1.3.14",
+                    "platform": "darwin",
+                    "arch": "arm64",
+                    "importedOuterCircuitMs": 300,
+                    "observedInnerDecisionDeadlineMs": 175,
+                    "observedInnerCircuitBreakerMs": 275,
+                    "deterministicRandom": true
+                },
+                "candidate": {
+                    "bun": "1.3.14",
+                    "platform": "darwin",
+                    "arch": "arm64",
+                    "importedOuterCircuitMs": 300,
+                    "observedInnerDecisionDeadlineMs": 175,
+                    "observedInnerCircuitBreakerMs": 275,
+                    "deterministicRandom": true
+                }
+            }
+        },
+        "baseSeed": 930722001,
+        "scenarioCount": 3,
+        "sideSwaps": true,
+        "maps": ["NORMAL", "LAVA_CENTER", "BLOCK_CENTER"],
+        "maxTicksPerMatch": 8000,
+        "runtime": {
+            "bun": "1.3.14",
+            "platform": "darwin",
+            "arch": "arm64",
+            "nodeEnv": "production",
+            "timezone": "UTC",
+            "HOC_BOT_SEARCH": "1",
+            "HOC_JOURNAL_FULL": "1"
+        },
+        "roster": "non-overlapping random 2xL1 + 2xL2 + 1xL3 + 1xL4; 1000xp stack sizing",
+        "setup": "SEE_NONE + unchanged ranked setup policy + deterministic random Tier-1/Tier-2 artifacts",
+        "processIsolation": "The coordinator launched a fresh sequential Bun worker per variant. A Bun resolver redirected every archived server @heroesofcrypto/common import to exactly one immutable common archive.",
+        "deterministicCrypto": "per-match deterministic crypto.randomUUID + crypto.getRandomValues reset; identical paired gameplay randomness and unit/summon ids without production edits",
+        "semanticCapture": {
+            "journal": "Uncapped ordered accepted actions with parsed actionJson and complete GameEvent arrays from eventsJson.",
+            "serverEvents": "Uncapped complete server IPlayEvent stream, including snapshots and journal entries.",
+            "state": "Authoritative snapshotBattle state plus selected server semantic state after every accepted fight action; every state is hashed even when full state payload retention is disabled.",
+            "decision": "Every inner chosen decision, semantic search-counter delta, outer chosen decision, and inner/outer ordinal is retained and hashed.",
+            "drainSchedule": "drain retained journal/events after creation, every publication, and every manager tick",
+            "semanticClockExclusions": [
+                "FightProperties.id",
+                "FightProperties.currentTurnStart",
+                "FightProperties.currentTurnEnd",
+                "FightProperties.currentLapTotalTimePerTeam",
+                "serverTimeMs/placementDeadlineMs/currentTurn*Ms/lastSeenMs/acceptedAtMs",
+                "SearchDriver.counters.msTotal"
+            ]
+        },
+        "restoreValidation": {
+            "included": [
+                "complete semantic snapshotBattle common engine state (units/order/grid/fight/holder/AI target memory)",
+                "damage statistic snapshot",
+                "current active unit",
+                "paired common deterministic-RNG draw cursor",
+                "SearchDriver stable rollout/finish-pressure/terminal/finishedSim state",
+                "server unitMetadata and sceneLog explicitly restored by the production wrapper"
+            ],
+            "excluded": [
+                "SearchDriver counters and circuit flag, which intentionally mutate as observability/safety state",
+                "console output, which is append-only observability rather than restorable match state",
+                "external crypto RNG cursor, which production does not expose or restore",
+                "server session fields not read or mutated by searchBotDecision"
+            ],
+            "scope": "This is the complete authoritative restorable common state exposed by snapshotBattle plus damage/search-stable state and the server metadata/log state the wrapper explicitly restores; it is not a byte-for-byte snapshot of the entire PlaySession object"
+        },
+        "timing": "innerChooseDecisionLatencyMs times real SearchDriver.chooseDecision. outerWrapperLatencyMs surrounds the complete private searchBotDecision call, including metadata snapshot and final restore. The unchanged server circuit flag/log is authoritative for the production 300 ms breaker. Percentiles use nearest-rank ceil(q*n)-1 over all decision calls."
+    },
+    "sourceIntegrity": {
+        "policy": {
+            "callerIdentity": "The runner rejects missing, unknown, or mismatched caller common/server SHA labels before worker launch.",
+            "preflight": "Before launch it recursively seals every file under both common src archives and the complete archived server src tree, validates the frozen expected manifests and exact A/B delta, and seals package/lock inputs.",
+            "postflight": "After both workers finish it recomputes the same trees and package/lock inputs; any mismatch aborts result emission."
+        },
+        "frozenExpected": {
+            "baselineSrc": {
+                "files": 365,
+                "bytes": 9753913,
+                "sha256": "d66eea6fadc27d259743269611e11a8c96c9eb285d5622217da06274f0ce5c29"
+            },
+            "candidateSrc": {
+                "files": 366,
+                "bytes": 9758586,
+                "sha256": "bd8bb9fd5ff060fdf3d5092ed2351acdb55b4de46b94d440b85beaddaeecee02"
+            },
+            "serverSrc": {
+                "files": 148,
+                "bytes": 1385958,
+                "sha256": "b8177d6920bb72f93b01896629fb1738b4e375bc9af1df22ee0623518d925c92"
+            },
+            "commonPackageSha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001",
+            "commonWorkspaceLockSha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54",
+            "serverPackageSha256": "487d4273b5365cfff122f279d4150911911cde416e5dd6c4f4522c5809f6125d",
+            "serverLockSha256": "0246f882a3e7d80a052fab325b6d47e06914d72c76977822bcd9c646f65eed75",
+            "delta": {
+                "added": ["grid/ray_traversal.ts"],
+                "removed": [],
+                "modified": ["handlers/attack_handler.ts"]
+            }
+        },
+        "preflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+        "postflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+        "unchangedDuringRun": true,
+        "preflight": {
+            "commitLabels": {
+                "common": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+                "server": "8519fbded3c200a159b2062d00ad5f1f929fe47f"
+            },
+            "mode": "baseline-candidate",
+            "trees": {
+                "baselineSrc": {
+                    "root": "/tmp/hoc-ranked-f02e-baseline.DeQhvU/src",
+                    "files": 365,
+                    "bytes": 9753913,
+                    "sha256": "d66eea6fadc27d259743269611e11a8c96c9eb285d5622217da06274f0ce5c29"
+                },
+                "candidateSrc": {
+                    "root": "/tmp/hoc-ranked-f02e-candidate.xMxl7d/src",
+                    "files": 366,
+                    "bytes": 9758586,
+                    "sha256": "bd8bb9fd5ff060fdf3d5092ed2351acdb55b4de46b94d440b85beaddaeecee02"
+                },
+                "serverSrc": {
+                    "root": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/src",
+                    "files": 148,
+                    "bytes": 1385958,
+                    "sha256": "b8177d6920bb72f93b01896629fb1738b4e375bc9af1df22ee0623518d925c92"
+                }
+            },
+            "exactDelta": {
+                "added": ["grid/ray_traversal.ts"],
+                "removed": [],
+                "modified": ["handlers/attack_handler.ts"]
+            },
+            "packages": {
+                "baselinePackage": {
+                    "path": "/tmp/hoc-ranked-f02e-baseline.DeQhvU/package.json",
+                    "bytes": 2879,
+                    "sha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001"
+                },
+                "candidatePackage": {
+                    "path": "/tmp/hoc-ranked-f02e-candidate.xMxl7d/package.json",
+                    "bytes": 2879,
+                    "sha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001"
+                },
+                "commonArchiveLock": null,
+                "serverPackage": {
+                    "path": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/package.json",
+                    "bytes": 2041,
+                    "sha256": "487d4273b5365cfff122f279d4150911911cde416e5dd6c4f4522c5809f6125d"
+                },
+                "serverArchiveLock": {
+                    "path": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/bun.lock",
+                    "bytes": 59902,
+                    "sha256": "0246f882a3e7d80a052fab325b6d47e06914d72c76977822bcd9c646f65eed75"
+                }
+            },
+            "dependencies": {
+                "baselineNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules",
+                "candidateNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules",
+                "serverNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-server/node_modules",
+                "commonWorkspaceLock": {
+                    "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/bun.lock",
+                    "bytes": 438981,
+                    "sha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54"
+                },
+                "serverResolvedLock": {
+                    "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-server/bun.lock",
+                    "bytes": 59902,
+                    "sha256": "0246f882a3e7d80a052fab325b6d47e06914d72c76977822bcd9c646f65eed75"
+                },
+                "nodeModulesContentSealed": false,
+                "limitation": "package.json and resolved bun.lock files are sealed, but the symlinked node_modules file contents are not recursively sealed; lock/install drift remains outside this source-equivalence proof"
+            }
+        },
+        "postflight": {
+            "commitLabels": {
+                "common": "f02e8066cb454e74f28b2b95e29b41502fa0e048",
+                "server": "8519fbded3c200a159b2062d00ad5f1f929fe47f"
+            },
+            "mode": "baseline-candidate",
+            "trees": {
+                "baselineSrc": {
+                    "root": "/tmp/hoc-ranked-f02e-baseline.DeQhvU/src",
+                    "files": 365,
+                    "bytes": 9753913,
+                    "sha256": "d66eea6fadc27d259743269611e11a8c96c9eb285d5622217da06274f0ce5c29"
+                },
+                "candidateSrc": {
+                    "root": "/tmp/hoc-ranked-f02e-candidate.xMxl7d/src",
+                    "files": 366,
+                    "bytes": 9758586,
+                    "sha256": "bd8bb9fd5ff060fdf3d5092ed2351acdb55b4de46b94d440b85beaddaeecee02"
+                },
+                "serverSrc": {
+                    "root": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/src",
+                    "files": 148,
+                    "bytes": 1385958,
+                    "sha256": "b8177d6920bb72f93b01896629fb1738b4e375bc9af1df22ee0623518d925c92"
+                }
+            },
+            "exactDelta": {
+                "added": ["grid/ray_traversal.ts"],
+                "removed": [],
+                "modified": ["handlers/attack_handler.ts"]
+            },
+            "packages": {
+                "baselinePackage": {
+                    "path": "/tmp/hoc-ranked-f02e-baseline.DeQhvU/package.json",
+                    "bytes": 2879,
+                    "sha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001"
+                },
+                "candidatePackage": {
+                    "path": "/tmp/hoc-ranked-f02e-candidate.xMxl7d/package.json",
+                    "bytes": 2879,
+                    "sha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001"
+                },
+                "commonArchiveLock": null,
+                "serverPackage": {
+                    "path": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/package.json",
+                    "bytes": 2041,
+                    "sha256": "487d4273b5365cfff122f279d4150911911cde416e5dd6c4f4522c5809f6125d"
+                },
+                "serverArchiveLock": {
+                    "path": "/tmp/hoc-server-8519-ranked300.Ns3Mmy/bun.lock",
+                    "bytes": 59902,
+                    "sha256": "0246f882a3e7d80a052fab325b6d47e06914d72c76977822bcd9c646f65eed75"
+                }
+            },
+            "dependencies": {
+                "baselineNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules",
+                "candidateNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules",
+                "serverNodeModules": "/Users/zolotukhin/Workplace/heroes-of-crypto-server/node_modules",
+                "commonWorkspaceLock": {
+                    "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/bun.lock",
+                    "bytes": 438981,
+                    "sha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54"
+                },
+                "serverResolvedLock": {
+                    "path": "/Users/zolotukhin/Workplace/heroes-of-crypto-server/bun.lock",
+                    "bytes": 59902,
+                    "sha256": "0246f882a3e7d80a052fab325b6d47e06914d72c76977822bcd9c646f65eed75"
+                },
+                "nodeModulesContentSealed": false,
+                "limitation": "package.json and resolved bun.lock files are sealed, but the symlinked node_modules file contents are not recursively sealed; lock/install drift remains outside this source-equivalence proof"
+            }
+        },
+        "relevantProductionFiles": {
+            "baselineAttackHandlerSha256": "c4255e2f996d5ad7bdf732dd48bc3d3537f07ec949678acea53e3a17676d51e9",
+            "candidateAttackHandlerSha256": "d4f0342487cc6cc8497d997e09a8a65c57f1fcebb02f945117a710cab42c5233",
+            "candidateRayTraversalSha256": "18d4f31971e593d1222bf24f71484dc5ba8a3cb52451eb2ed0d1498a53f97eba",
+            "serverPlaySessionSha256": "7450dcdf20c8285d1e75eb319665f8beddf0da10f406f406602bb55b06eca2ba",
+            "serverBotSearchSha256": "f13921e68a246cebb2bdb15308e5a22d9e0cb2e6ce6797a19d8ac8b9371fb45d"
+        },
+        "dependencyLimitation": "package.json and resolved bun.lock files are sealed, but the symlinked node_modules file contents are not recursively sealed; lock/install drift remains outside this source-equivalence proof",
+        "runner": {
+            "path": "docs/evidence/tools/ranked_outer_300_replay.ts",
+            "executedSha256": "6f87bef057b203f8f8f9ed6dd5410cb9fd6e3f3b02006ca58df3093e46b1281e",
+            "persistedSha256": "6f87bef057b203f8f8f9ed6dd5410cb9fd6e3f3b02006ca58df3093e46b1281e",
+            "readmePath": "docs/evidence/tools/ranked_outer_300_replay.README.md",
+            "readmeSha256": "817a808fa4bdb5939f012a665ece63d325d254bc22f43ad52dad660c0ba7ae1b"
+        }
+    },
+    "passContract": [
+        "Every fight must finish, productionReplayComplete and captureComplete must be true, and uncapped replay capture must be complete.",
+        "Journal, GameEvent, server-event semantic stream, per-action state trace, final state, chosen-decision trace, and semantic counter-delta trace must be exact; the first chosen-decision and counter-delta difference ordinals must be null.",
+        "Each match and variant must construct exactly one SearchDriver; inner decisions, outer wrapper calls, and semantic counter decision deltas must have equal counts.",
+        "searched plus singleCandidate must equal total decision calls for every match and variant; illegalIncumbent must match between variants.",
+        "Proposal rejects, server errors, deadline fallbacks, circuit skips/openings/warnings, and unrestored outer decisions must all be zero."
+    ],
+    "runs": {
+        "identicalSourceControl": {
+            "status": "pass",
+            "purpose": "The baseline archive was supplied as both variants; the runner required the identical-source zero delta and baseline frozen manifest.",
+            "raw": {
+                "path": "/tmp/a13-ranked-outer-300-hardened-control-final.json",
+                "sha256": "c309dedc5de5b3524402da31765b32ea543b00a4b1c81c51096b17212ed3c300",
+                "bytes": 13638195
+            },
+            "generatedAt": "2026-07-22T22:35:37.940Z",
+            "sourceIntegrity": {
+                "preflightSha256": "c02be8fe6ff1b8106a31f0940aceaeab845670644a24a952f73e2fe9b4db8ef0",
+                "postflightSha256": "c02be8fe6ff1b8106a31f0940aceaeab845670644a24a952f73e2fe9b4db8ef0",
+                "unchangedDuringRun": true,
+                "mode": "identical-source-control",
+                "exactDelta": {
+                    "added": [],
+                    "removed": [],
+                    "modified": []
+                }
+            },
+            "pairedMatches": 1,
+            "semanticExactMatches": 1,
+            "decisionCallsPerVariant": 43,
+            "searchedDecisionsPerVariant": 41,
+            "singleCandidateDecisionsPerVariant": 2,
+            "illegalIncumbentDecisionsPerVariant": 0,
+            "semanticDigestSha256": "cb20154a2d3f2537a564d050c4aa914ca4db5a46c9dbc79f2ed7bec442711f6c",
+            "chosenDecisionTraceSha256": "4586ac0fdcb8fe2f4daf0a33d0b32c1de3b1de9bc764329e1eaf9c7d8db64ea0",
+            "counterDeltaTraceSha256": "0ad82c7b8d6a4b3d221c79b35f714968d1ab11f2a6941ce822332e735ae9e0bc",
+            "firstChosenDecisionDifferenceOrdinal": null,
+            "firstCounterDeltaDifferenceOrdinal": null,
+            "allSafetyCountersZero": true
+        },
+        "candidateSmoke": {
+            "status": "pass",
+            "purpose": "One native-side baseline/candidate pair using the exact persisted final runner.",
+            "raw": {
+                "path": "/tmp/a13-ranked-outer-300-hardened-smoke-final.json",
+                "sha256": "6e651559d6c0f04fd25de5024029d7cc46b1c967d1fba9ea64fef37325b06640",
+                "bytes": 13638950
+            },
+            "generatedAt": "2026-07-22T22:35:51.149Z",
+            "sourceIntegrity": {
+                "preflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                "postflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                "unchangedDuringRun": true,
+                "mode": "baseline-candidate",
+                "exactDelta": {
+                    "added": ["grid/ray_traversal.ts"],
+                    "removed": [],
+                    "modified": ["handlers/attack_handler.ts"]
+                }
+            },
+            "pairedMatches": 1,
+            "semanticExactMatches": 1,
+            "decisionCallsPerVariant": 43,
+            "searchedDecisionsPerVariant": 41,
+            "singleCandidateDecisionsPerVariant": 2,
+            "illegalIncumbentDecisionsPerVariant": 0,
+            "semanticDigestSha256": "cb20154a2d3f2537a564d050c4aa914ca4db5a46c9dbc79f2ed7bec442711f6c",
+            "chosenDecisionTraceSha256": "4586ac0fdcb8fe2f4daf0a33d0b32c1de3b1de9bc764329e1eaf9c7d8db64ea0",
+            "counterDeltaTraceSha256": "0ad82c7b8d6a4b3d221c79b35f714968d1ab11f2a6941ce822332e735ae9e0bc",
+            "firstChosenDecisionDifferenceOrdinal": null,
+            "firstCounterDeltaDifferenceOrdinal": null,
+            "allSafetyCountersZero": true
+        },
+        "threeMapSideSwapPanel": {
+            "status": "pass",
+            "generatedAt": "2026-07-22T22:36:34.588Z",
+            "raw": {
+                "volatilePath": "/tmp/a13-ranked-outer-300-hardened-3map-6pair-final.json",
+                "sha256": "10ee7f2d92529fa468b4048d2a69a5f692443a69669de585a2130d6ddfb91fde",
+                "bytes": 129361780
+            },
+            "durableRaw": {
+                "path": "docs/evidence/a13_ranked_outer_300_replay_2026-07-22.raw.json.gz",
+                "format": "gzip",
+                "compressionCommand": "gzip -n -9 -c /tmp/a13-ranked-outer-300-hardened-3map-6pair-final.json > docs/evidence/a13_ranked_outer_300_replay_2026-07-22.raw.json.gz",
+                "sha256": "9d2f385d09fa143f178b9de25647d26647ab608220e22e8adaddd552ec5ed64f",
+                "bytes": 9496129,
+                "uncompressedSha256": "10ee7f2d92529fa468b4048d2a69a5f692443a69669de585a2130d6ddfb91fde",
+                "uncompressedBytes": 129361780,
+                "losslessVerification": "gzip -t passed; gzip -cd piped to shasum -a 256 and wc -c reproduced the raw SHA-256 and byte count exactly."
+            },
+            "sourceIntegrity": {
+                "preflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                "postflightSha256": "850eaea1312be0447f5313844a24e46907657fdde1eba7ba77a8e2e1cbd1b282",
+                "unchangedDuringRun": true
+            },
+            "aggregate": {
+                "pairedMatches": 6,
+                "semanticExactMatches": 6,
+                "baseline": {
+                    "matches": 6,
+                    "completed": 6,
+                    "completeReplays": 6,
+                    "productionCompleteReplays": 6,
+                    "completeCaptures": 6,
+                    "journalEntries": 706,
+                    "eventEntries": 712,
+                    "decisionCalls": 399,
+                    "searchedDecisions": 376,
+                    "singleCandidateDecisions": 23,
+                    "illegalIncumbentDecisions": 1,
+                    "overrides": 97,
+                    "driverCreations": 6,
+                    "proposalRejects": 0,
+                    "serverErrors": 0,
+                    "innerDeadlineFallbacks": 0,
+                    "innerCircuitSkipped": 0,
+                    "innerCircuitOpenedMatches": 0,
+                    "outerCircuitOpenedMatches": 0,
+                    "outerCircuitWarnings": 0,
+                    "unrestoredOuterDecisions": 0,
+                    "innerChooseDecisionLatencyMs": {
+                        "count": 399,
+                        "p50": 39.704624999999396,
+                        "p95": 82.68708399999991,
+                        "p99": 99.47112500000003,
+                        "max": 133.809
+                    },
+                    "outerWrapperLatencyMs": {
+                        "count": 399,
+                        "p50": 39.740624999999454,
+                        "p95": 82.72600000000011,
+                        "p99": 99.50908299999992,
+                        "max": 134.05054199999998
+                    }
+                },
+                "candidate": {
+                    "matches": 6,
+                    "completed": 6,
+                    "completeReplays": 6,
+                    "productionCompleteReplays": 6,
+                    "completeCaptures": 6,
+                    "journalEntries": 706,
+                    "eventEntries": 712,
+                    "decisionCalls": 399,
+                    "searchedDecisions": 376,
+                    "singleCandidateDecisions": 23,
+                    "illegalIncumbentDecisions": 1,
+                    "overrides": 97,
+                    "driverCreations": 6,
+                    "proposalRejects": 0,
+                    "serverErrors": 0,
+                    "innerDeadlineFallbacks": 0,
+                    "innerCircuitSkipped": 0,
+                    "innerCircuitOpenedMatches": 0,
+                    "outerCircuitOpenedMatches": 0,
+                    "outerCircuitWarnings": 0,
+                    "unrestoredOuterDecisions": 0,
+                    "innerChooseDecisionLatencyMs": {
+                        "count": 399,
+                        "p50": 38.36858300000131,
+                        "p95": 82.64704200000006,
+                        "p99": 102.72700000000009,
+                        "max": 131.745625
+                    },
+                    "outerWrapperLatencyMs": {
+                        "count": 399,
+                        "p50": 38.415375000000495,
+                        "p95": 82.7002080000002,
+                        "p99": 102.77362500000004,
+                        "max": 133.56483300000002
+                    }
+                }
+            },
+            "scenarioPlans": [
+                {
+                    "scenarioIndex": 0,
+                    "seed": 930722001,
+                    "gridType": 1,
+                    "rosterA": [46, 11, 5, 14, 37, 44],
+                    "rosterB": [3, 31, 34, 25, 38, 42],
+                    "artifactsA": {
+                        "tier1": 9,
+                        "tier2": 12
+                    },
+                    "artifactsB": {
+                        "tier1": 4,
+                        "tier2": 3
+                    },
+                    "map": "NORMAL"
+                },
+                {
+                    "scenarioIndex": 1,
+                    "seed": 930722002,
+                    "gridType": 3,
+                    "rosterA": [22, 47, 36, 6, 7, 30],
+                    "rosterB": [1, 12, 14, 4, 27, 41],
+                    "artifactsA": {
+                        "tier1": 1,
+                        "tier2": 8
+                    },
+                    "artifactsB": {
+                        "tier1": 11,
+                        "tier2": 7
+                    },
+                    "map": "LAVA_CENTER"
+                },
+                {
+                    "scenarioIndex": 2,
+                    "seed": 930722003,
+                    "gridType": 4,
+                    "rosterA": [11, 2, 26, 25, 18, 9],
+                    "rosterB": [32, 3, 16, 6, 7, 20],
+                    "artifactsA": {
+                        "tier1": 6,
+                        "tier2": 12
+                    },
+                    "artifactsB": {
+                        "tier1": 12,
+                        "tier2": 5
+                    },
+                    "map": "BLOCK_CENTER"
+                }
+            ],
+            "matches": [
+                {
+                    "key": "0:930722001:native",
+                    "scenarioIndex": 0,
+                    "seed": 930722001,
+                    "map": "NORMAL",
+                    "swapped": false,
+                    "ticks": 44,
+                    "currentLap": 4,
+                    "journalEntries": 80,
+                    "eventEntries": 81,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 43,
+                            "searched": 41,
+                            "singleCandidate": 2,
+                            "illegalIncumbent": 0,
+                            "overrides": 6
+                        },
+                        "candidate": {
+                            "decisions": 43,
+                            "searched": 41,
+                            "singleCandidate": 2,
+                            "illegalIncumbent": 0,
+                            "overrides": 6
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "cb20154a2d3f2537a564d050c4aa914ca4db5a46c9dbc79f2ed7bec442711f6c",
+                        "journalSha256": "3b62b631037ac456c64b850b205fb4cb04ba2fefb685b1c154a125d2234095e4",
+                        "eventSha256": "6d7ab4120e68a1ec56d70b4ac38eae299991a3479617576c56e8def91f7ecf87",
+                        "stateTraceSha256": "d06925fb9d311463159bfc185298d37c5b2625fce4c5dd7ceedebbd013599d59",
+                        "finalStateSha256": "28b9d68a98d041ceccb018650b3adf954d46e1ec83f651eb690247640adf8777",
+                        "chosenDecisionTraceSha256": "4586ac0fdcb8fe2f4daf0a33d0b32c1de3b1de9bc764329e1eaf9c7d8db64ea0",
+                        "counterDeltaTraceSha256": "0ad82c7b8d6a4b3d221c79b35f714968d1ab11f2a6941ce822332e735ae9e0bc"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 133.809,
+                            "outerWrapper": 134.05054199999998
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 131.745625,
+                            "outerWrapper": 133.56483300000002
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                },
+                {
+                    "key": "0:930722001:swap",
+                    "scenarioIndex": 0,
+                    "seed": 930722001,
+                    "map": "NORMAL",
+                    "swapped": true,
+                    "ticks": 47,
+                    "currentLap": 5,
+                    "journalEntries": 89,
+                    "eventEntries": 90,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 46,
+                            "searched": 41,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 0,
+                            "overrides": 17
+                        },
+                        "candidate": {
+                            "decisions": 46,
+                            "searched": 41,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 0,
+                            "overrides": 17
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "6cf855da6136c15973229a3ef28a6c1de7045a3f7347e2de8142494faa2f142c",
+                        "journalSha256": "0b2b6cfccf093eb5dc15dacd28c48ebaed59d9085df8fb81789634a2578c2ad7",
+                        "eventSha256": "c8726aad6b8966cc06b14f8022b4e469ce4806195cd2338ee5dc2d2ea0cf21d9",
+                        "stateTraceSha256": "0c6a7b0622784859df4eab04fbbab961c49ad1054f0f04a46e836023e1e50a24",
+                        "finalStateSha256": "83a4c7eb43aee5a5ef487b584e3e463daba6e6598cb2cdd7d8b31475eccc9a93",
+                        "chosenDecisionTraceSha256": "52335005f29f36ef08395e2a16b97465cce728a30a9ad600c7888fe1623dd8bb",
+                        "counterDeltaTraceSha256": "81a029719b5475bdae196bfc523c2121690466f9f25ca2160dfff9f852641399"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 86.4434999999994,
+                            "outerWrapper": 86.49299999999948
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 93.32312499999989,
+                            "outerWrapper": 93.37491599999976
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                },
+                {
+                    "key": "1:930722002:native",
+                    "scenarioIndex": 1,
+                    "seed": 930722002,
+                    "map": "LAVA_CENTER",
+                    "swapped": false,
+                    "ticks": 78,
+                    "currentLap": 8,
+                    "journalEntries": 133,
+                    "eventEntries": 134,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 77,
+                            "searched": 73,
+                            "singleCandidate": 4,
+                            "illegalIncumbent": 0,
+                            "overrides": 12
+                        },
+                        "candidate": {
+                            "decisions": 77,
+                            "searched": 73,
+                            "singleCandidate": 4,
+                            "illegalIncumbent": 0,
+                            "overrides": 12
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "43e797545a27d2de9a61042a886fcb6a3adcbdcacd1d1c3fbbf946dbd9b8de4d",
+                        "journalSha256": "73a689ccc3ff3b0eb78c8559dd12b6fb9496f25bb3fa814a14ef6014cab2fa9d",
+                        "eventSha256": "8989c29e0be172b9e027041677e57955cce2312113be916a5995c6f98100dc4a",
+                        "stateTraceSha256": "41115361f52af4ca886533716a41798ab3ac0b7c85aec953731b2f592b00715f",
+                        "finalStateSha256": "e4c52a11a8f13a626e608a81a76e0b8db59e067bfc97595b48c62bdae7e1cb8d",
+                        "chosenDecisionTraceSha256": "e703bb74137c2d588ed14445547992e2f3a00cf132734f458e83c63802c1fe59",
+                        "counterDeltaTraceSha256": "64b4c7ffee066a5331dd99f26604310d36e88f9d9a419516a322238df99039c0"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 60.19537500000024,
+                            "outerWrapper": 60.23083299999962
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 56.584375000000364,
+                            "outerWrapper": 56.6215830000001
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                },
+                {
+                    "key": "1:930722002:swap",
+                    "scenarioIndex": 1,
+                    "seed": 930722002,
+                    "map": "LAVA_CENTER",
+                    "swapped": true,
+                    "ticks": 99,
+                    "currentLap": 13,
+                    "journalEntries": 165,
+                    "eventEntries": 166,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 98,
+                            "searched": 93,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 0,
+                            "overrides": 17
+                        },
+                        "candidate": {
+                            "decisions": 98,
+                            "searched": 93,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 0,
+                            "overrides": 17
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "e032f9eab34d487b3d421c2b730fa6cc0f7cd44037151543f863fec77731466b",
+                        "journalSha256": "d86a4e877428556170f7d11ec9e1ba9ff25ad4e1dd00f283d3b5d79b73c44f0c",
+                        "eventSha256": "fa0bd1dea2224460e7e0b2150031eb43a2460e382ff135c993ad6e3a4d33b618",
+                        "stateTraceSha256": "d47b26c8e83032c9eb833d4ea9f69d88d80154d4927375640ae48d264b57ca01",
+                        "finalStateSha256": "b7328417299e8401ba8ffbfed68992a173c64102605a900a8421cee06c07fd87",
+                        "chosenDecisionTraceSha256": "84587dc0cbc0fcedef6d7276b837d3b5a5c72bfb38cbcac128bb0e2e73201467",
+                        "counterDeltaTraceSha256": "d1d5c5151d98ed6cd0fbb555111f7a69638aab001668b81ed8fc102ccd4611a3"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 54.71650000000045,
+                            "outerWrapper": 54.746250000000146
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 57.29199999999946,
+                            "outerWrapper": 57.33912500000042
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                },
+                {
+                    "key": "2:930722003:native",
+                    "scenarioIndex": 2,
+                    "seed": 930722003,
+                    "map": "BLOCK_CENTER",
+                    "swapped": false,
+                    "ticks": 67,
+                    "currentLap": 6,
+                    "journalEntries": 116,
+                    "eventEntries": 117,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 66,
+                            "searched": 61,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 1,
+                            "overrides": 23
+                        },
+                        "candidate": {
+                            "decisions": 66,
+                            "searched": 61,
+                            "singleCandidate": 5,
+                            "illegalIncumbent": 1,
+                            "overrides": 23
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "a4e5c613c7936fc869080cbd73f5b3e6d553767d96edfba6048cc17b494f83d8",
+                        "journalSha256": "f0f87cc82b7ed758a652cf2dbcd2cf118e05904a4e112ba859e79911f175aa72",
+                        "eventSha256": "1145ad08ddbb00481cf9d1c606942b933a67df1a47e9f370a530348adb02816b",
+                        "stateTraceSha256": "bf875ce32d5eee62b17b3e3a72dd9b8fa1e373839f3ec6a01923084e665e9a5c",
+                        "finalStateSha256": "571d77ae13e1597990cf2175055a62cade166472e414fda235a614a5be782c35",
+                        "chosenDecisionTraceSha256": "493289cb0b0125a7530997e4f97c3460e3698d5d6f9735c1d9d564acd3652253",
+                        "counterDeltaTraceSha256": "f786e44af88c61382242a048c0bfabe68da0f5674f3c58c8c8ce6d138e4bc45c"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 51.22633300000052,
+                            "outerWrapper": 51.25795900000048
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 54.540250000000015,
+                            "outerWrapper": 54.56933299999946
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                },
+                {
+                    "key": "2:930722003:swap",
+                    "scenarioIndex": 2,
+                    "seed": 930722003,
+                    "map": "BLOCK_CENTER",
+                    "swapped": true,
+                    "ticks": 70,
+                    "currentLap": 8,
+                    "journalEntries": 123,
+                    "eventEntries": 124,
+                    "decisionCounters": {
+                        "baseline": {
+                            "decisions": 69,
+                            "searched": 67,
+                            "singleCandidate": 2,
+                            "illegalIncumbent": 0,
+                            "overrides": 22
+                        },
+                        "candidate": {
+                            "decisions": 69,
+                            "searched": 67,
+                            "singleCandidate": 2,
+                            "illegalIncumbent": 0,
+                            "overrides": 22
+                        }
+                    },
+                    "digests": {
+                        "semanticSha256": "02fecb51a1e23e904e2e30d04461256d45818c90a2a2f1cb013319a33289e6bb",
+                        "journalSha256": "e423c4acebd4f6e6de837355d77982c70ed6ea925245c1428e1173c91038d0f2",
+                        "eventSha256": "ad5580261d4a39e90ba94e097da41f0499b7c3a9f7374e924f1439d43b90b6e7",
+                        "stateTraceSha256": "1b135dbd15ed92bad37a5454a136ab0880340f697a6b34c56a5128d190c3f4dc",
+                        "finalStateSha256": "65d54303ee33cf9c05636ffe7f0b88bca08233ec90ce3723dde3f242f2400243",
+                        "chosenDecisionTraceSha256": "0ab01abec777908205a88212199925adeb29fdb6b7d8da23ae47415b68bbda4d",
+                        "counterDeltaTraceSha256": "b20eb9d546ecfe83bc3826b984bea15006b6cdf19d9c96b0fd308107611c96d7"
+                    },
+                    "maximaMs": {
+                        "baseline": {
+                            "innerChooseDecision": 49.53562499999862,
+                            "outerWrapper": 49.59024999999929
+                        },
+                        "candidate": {
+                            "innerChooseDecision": 54.67191699999967,
+                            "outerWrapper": 54.74124999999913
+                        }
+                    },
+                    "drivers": {
+                        "baseline": 1,
+                        "candidate": 1
+                    },
+                    "firstChosenDecisionDifferenceOrdinal": null,
+                    "firstCounterDeltaDifferenceOrdinal": null,
+                    "exact": {
+                        "semantic": true,
+                        "journal": true,
+                        "events": true,
+                        "stateTrace": true,
+                        "finalState": true,
+                        "chosenDecisionTrace": true,
+                        "counterDeltaTrace": true,
+                        "baselineInnerOuterCounterCounts": true,
+                        "candidateInnerOuterCounterCounts": true
+                    },
+                    "complete": {
+                        "finished": true,
+                        "replay": true,
+                        "productionReplay": true,
+                        "capture": true,
+                        "baselineStateTraceCapture": true,
+                        "candidateStateTraceCapture": true
+                    },
+                    "safety": {
+                        "baseline": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        },
+                        "candidate": {
+                            "proposalRejects": 0,
+                            "serverErrors": 0,
+                            "deadlineFallbacks": 0,
+                            "circuitSkipped": 0,
+                            "innerCircuitOpened": false,
+                            "outerCircuitOpened": false,
+                            "outerCircuitWarnings": 0,
+                            "unrestoredOuterDecisions": 0
+                        }
+                    }
+                }
+            ],
+            "perMatchInvariant": "All six comparisons were exact, complete, and production-complete; both variants had one driver and equal inner/outer/counter counts. Every per-match safety field was zero/false, every restorable-state before/after hash matched, and the first chosen-decision and counter-delta difference ordinals were null."
+        }
+    },
+    "knownLimits": [
+        "This is a focused three-map operational gate, not the planned 420-session (210-pair) latency panel and not a statistical latency qualification.",
+        "The common workspace/server locks and package manifests are sealed, but the symlinked installed node_modules contents are not recursively sealed; dependency install drift remains outside the source-equivalence proof.",
+        "All six production retained streams remained below 512 entries, so the uncapped drain path ran but the production retention cap was not crossed.",
+        "The deterministic crypto substitution exists only inside isolated replay workers. It proves paired semantics; it does not reproduce unpredictability of live secure randomness.",
+        "Physical side swaps are included for operational coverage even though symmetric v0.8 self-play does not double the number of independent roster scenarios."
+    ]
+}
