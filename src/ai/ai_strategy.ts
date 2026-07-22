@@ -57,7 +57,25 @@ export interface IPlacementContext {
 }
 
 export type AIPolicyEventKind =
-    "v0.8_supported_ranged_escape" | "v0.8_response_neutral_advance" | "v0.8_supported_prepin_egress";
+    | "v0.8_supported_ranged_escape"
+    | "v0.8_response_neutral_advance"
+    | "v0.8_supported_prepin_egress"
+    | "v0.8_supported_prepin_egress_funnel";
+
+export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
+    "ordinary_shot",
+    "eligible_shooter",
+    "target_no_counter",
+    "current_threat",
+    "fixed_guard",
+    "current_signature",
+    "reachable_route",
+    "safe_route",
+    "causal_guard",
+    "retained_signature",
+] as const;
+
+export type V08SupportedPrepinEgressFunnelStage = (typeof V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES)[number];
 
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export interface IAIPolicyEvent {
@@ -66,6 +84,8 @@ export interface IAIPolicyEvent {
     creatureName: string;
     team: TeamType;
     lap: number;
+    /** Present only on research funnel events; ordinary policy-selection events leave it unset. */
+    stage?: V08SupportedPrepinEgressFunnelStage;
 }
 
 export interface IDecisionContext {

@@ -23,7 +23,7 @@ import { ObstacleType } from "../../obstacles/obstacle_type";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
-import type { IDecisionContext } from "../ai_strategy";
+import type { IDecisionContext, V08SupportedPrepinEgressFunnelStage } from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
@@ -397,7 +397,28 @@ function supportedPrepinEgress(
         decision.length !== 1 ||
         shot?.type !== "range_attack" ||
         !shot.aimCell ||
-        shot.aimSide === undefined ||
+        shot.aimSide === undefined
+    ) {
+        return decision;
+    }
+    const selectorVersions = (process.env[SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const selectorEnabled = selectorVersions.includes(strategyVersion);
+    const emitFunnel = (stage: V08SupportedPrepinEgressFunnelStage): void => {
+        if (!selectorEnabled) return;
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_prepin_egress_funnel",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: fightProperties.getCurrentLap(),
+            stage,
+        });
+    };
+    emitFunnel("ordinary_shot");
+    if (
         unit.getUnitProperties().attack_type !== RANGE ||
         !unit.isRangeCapable() ||
         !unit.canMove() ||
@@ -419,6 +440,7 @@ function supportedPrepinEgress(
     ) {
         return decision;
     }
+    emitFunnel("eligible_shooter");
     const target = context.unitsHolder.getAllUnits().get(shot.targetId);
     if (!target || target.isDead() || isHidden(target)) return decision;
     const targetCanCounter =
@@ -435,13 +457,17 @@ function supportedPrepinEgress(
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
     if (targetCanCounter) return decision;
+    emitFunnel("target_no_counter");
 
     const threats = pendingMeleeThreats(unit, context);
     const currentThreats = threats.filter((threat) =>
         canMeleeFootprintThisActivation(threat, unit.getCells(), context.matrix, context),
     );
+    if (!currentThreats.length) return decision;
+    emitFunnel("current_threat");
     const guards = fixedNativeMeleeGuards(unit, context);
-    if (!currentThreats.length || !guards.length) return decision;
+    if (!guards.length) return decision;
+    emitFunnel("fixed_guard");
 
     const settings = context.grid.getSettings();
     const currentOrigin = unit.getPosition();
@@ -461,9 +487,15 @@ function supportedPrepinEgress(
         false,
     );
     if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) return decision;
+    emitFunnel("current_signature");
 
     const proposals: Array<{ route: IWeightedRoute; footprint: XY[] }> = [];
-    for (const route of reachableRoutes(unit, context)) {
+    const routes = reachableRoutes(unit, context);
+    if (routes.length) emitFunnel("reachable_route");
+    let hasSafeRoute = false;
+    let hasCausalGuardRoute = false;
+    let hasRetainedSignatureRoute = false;
+    for (const route of routes) {
         const footprint = footprintForAnchor(unit, route.cell);
         const matrix = postMoveMatrix(unit, footprint, context);
         const origin = getPositionForCells(settings, footprint);
@@ -474,6 +506,7 @@ function supportedPrepinEgress(
         ) {
             continue;
         }
+        hasSafeRoute = true;
         const hasCausalGuard = guards.some((guard) => {
             const withoutGuard = matrixWithoutGuard(matrix, guard, context);
             return (
@@ -484,6 +517,7 @@ function supportedPrepinEgress(
             );
         });
         if (!hasCausalGuard) continue;
+        hasCausalGuardRoute = true;
         const targetPosition = getRangeAttackSideCenter(
             settings,
             shot.aimCell,
@@ -503,9 +537,13 @@ function supportedPrepinEgress(
             candidateEvaluation.affectedUnits[0]?.[0]?.getId() === target.getId() &&
             hasSameNonRegressingRangeSignature(currentEvaluation, candidateEvaluation)
         ) {
+            hasRetainedSignatureRoute = true;
             proposals.push({ route, footprint });
         }
     }
+    if (hasSafeRoute) emitFunnel("safe_route");
+    if (hasCausalGuardRoute) emitFunnel("causal_guard");
+    if (hasRetainedSignatureRoute) emitFunnel("retained_signature");
     proposals.sort(
         (left, right) =>
             routeCost(left.route) - routeCost(right.route) ||
@@ -515,11 +553,7 @@ function supportedPrepinEgress(
     const best = proposals[0];
     if (!best) return decision;
 
-    const selectorVersions = (process.env[SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV] ?? "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean);
-    if (!selectorVersions.includes(strategyVersion)) return decision;
+    if (!selectorEnabled) return decision;
     context.policyEventObserver?.({
         kind: "v0.8_supported_prepin_egress",
         unitId: unit.getId(),

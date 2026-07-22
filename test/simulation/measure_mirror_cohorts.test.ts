@@ -248,6 +248,16 @@ describe("measure_mirror_cohorts", () => {
         const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
         const matchRunner = (config: IMatchConfig): IMatchResult => {
             const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            for (const stage of ["ordinary_shot", "eligible_shooter", "current_threat"] as const) {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_prepin_egress_funnel",
+                    unitId: `candidate-${stage}`,
+                    creatureName: "Arbalester",
+                    team: candidateTeam,
+                    lap: 3,
+                    stage,
+                });
+            }
             for (const unitId of ["candidate-proposal-a", "candidate-proposal-b"]) {
                 config.policyProposalObserver?.({
                     kind: "v0.8_supported_prepin_egress",
@@ -274,8 +284,15 @@ describe("measure_mirror_cohorts", () => {
             const control = diag.green.version === "v0.8s" ? diag.green : diag.red;
             expect(candidate.supportedPrepinEgressProposals).toBe(2);
             expect(candidate.supportedPrepinEgressSelections).toBe(1);
+            expect(candidate.supportedPrepinEgressFunnel).toMatchObject({
+                ordinary_shot: 1,
+                eligible_shooter: 1,
+                current_threat: 1,
+                fixed_guard: 0,
+            });
             expect(control.supportedPrepinEgressProposals).toBe(0);
             expect(control.supportedPrepinEgressSelections).toBe(0);
+            expect(Object.values(control.supportedPrepinEgressFunnel).every((count) => count === 0)).toBe(true);
         }
 
         const aggregate = aggregateMirrorDiag(records, cfg) as {
@@ -286,6 +303,8 @@ describe("measure_mirror_cohorts", () => {
                     supportedPrepinEgressSelectionsPerGame: number;
                     supportedPrepinEgressProposals: number;
                     supportedPrepinEgressProposalsPerGame: number;
+                    supportedPrepinEgressFunnel: Record<string, number>;
+                    supportedPrepinEgressFunnelPerGame: Record<string, number>;
                 }
             >;
         };
@@ -294,12 +313,48 @@ describe("measure_mirror_cohorts", () => {
             supportedPrepinEgressSelectionsPerGame: 1,
             supportedPrepinEgressProposals: 4,
             supportedPrepinEgressProposalsPerGame: 2,
+            supportedPrepinEgressFunnel: {
+                ordinary_shot: 2,
+                eligible_shooter: 2,
+                target_no_counter: 0,
+                current_threat: 2,
+                fixed_guard: 0,
+                current_signature: 0,
+                reachable_route: 0,
+                safe_route: 0,
+                causal_guard: 0,
+                retained_signature: 0,
+            },
+            supportedPrepinEgressFunnelPerGame: {
+                ordinary_shot: 1,
+                eligible_shooter: 1,
+                target_no_counter: 0,
+                current_threat: 1,
+                fixed_guard: 0,
+                current_signature: 0,
+                reachable_route: 0,
+                safe_route: 0,
+                causal_guard: 0,
+                retained_signature: 0,
+            },
         });
         expect(aggregate.versions["v0.8s"]).toMatchObject({
             supportedPrepinEgressSelections: 0,
             supportedPrepinEgressSelectionsPerGame: 0,
             supportedPrepinEgressProposals: 0,
             supportedPrepinEgressProposalsPerGame: 0,
+            supportedPrepinEgressFunnel: {
+                ordinary_shot: 0,
+                eligible_shooter: 0,
+                target_no_counter: 0,
+                current_threat: 0,
+                fixed_guard: 0,
+                current_signature: 0,
+                reachable_route: 0,
+                safe_route: 0,
+                causal_guard: 0,
+                retained_signature: 0,
+            },
         });
     });
 
