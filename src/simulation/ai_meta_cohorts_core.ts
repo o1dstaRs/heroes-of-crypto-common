@@ -20,17 +20,21 @@ import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setu
 import {
     augmentPlanId,
     enumerateFullBudgetAugmentPlans,
+    resolveSetupPolicy,
     setupAugmentsForPlan,
     setupCohort,
     setupRosterFeatures,
+    V07_NONFIGHT_BEHAVIOR_SHA256,
+    V07_NONFIGHT_SETUP_SPEC,
     type IAugmentPlan,
     type ISetupAugmentChoice,
     type SetupCohort,
 } from "../ai/setup/setup_ship";
-import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
+import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Perk } from "../perks/perk_properties";
+import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../synergies/synergy_properties";
 import {
     creaturesByLevel,
     DEFAULT_AMOUNT_BY_LEVEL,
@@ -56,7 +60,11 @@ import { creatureIdForName, draftRoster } from "./draft";
 export const AI_META_SCHEMA_VERSION = 1;
 export const AI_META_POLICY = "contextual-oracle-v2-cast-buffs-80x20";
 export const AI_META_EXPLORATION_RATE = 0.2;
-export const AI_META_FIGHT_VERSION = "v0.7";
+export const AI_META_FIGHT_VERSION = "v0.8";
+export const AI_META_FIGHT_PROFILE = "v0.8+a13";
+export const AI_META_SYNERGY_POLICY_SPEC = V07_NONFIGHT_SETUP_SPEC;
+export const AI_META_SYNERGY_POLICY_SHA256 = V07_NONFIGHT_BEHAVIOR_SHA256;
+export const AI_META_SYNERGY_TRACKING = "exact-active-choice-level-v1";
 export const AI_META_GAMES_PER_MATCHUP = 2;
 export const AI_META_AUGMENT_BUDGET = 7;
 
@@ -90,6 +98,99 @@ export const AI_META_COHORTS = [
 export type AiMetaCohort = (typeof AI_META_COHORTS)[number];
 export type AiMetaArchetype = "ranked" | "uniform" | "ranged" | "melee" | "flyer" | "caster";
 export type AiMetaSelectionMode = "exploit" | "explore";
+
+export interface IAiMetaSynergyDefinition {
+    faction: number;
+    factionName: string;
+    synergy: number;
+    synergyName: string;
+    imageKey: string;
+}
+
+/** Complete live synergy catalog. Rankings retain every choice at activation levels 1-3, including zero-support rows. */
+export const AI_META_SYNERGY_DEFINITIONS: readonly IAiMetaSynergyDefinition[] = [
+    {
+        faction: PBTypes.FactionVals.LIFE,
+        factionName: "Life",
+        synergy: LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
+        synergyName: "Supply",
+        imageKey: "synergy_supply_256",
+    },
+    {
+        faction: PBTypes.FactionVals.LIFE,
+        factionName: "Life",
+        synergy: LifeSynergy.PLUS_MORALE_AND_LUCK,
+        synergyName: "Morale & Luck",
+        imageKey: "synergy_morale_256",
+    },
+    {
+        faction: PBTypes.FactionVals.CHAOS,
+        factionName: "Chaos",
+        synergy: ChaosSynergy.MOVEMENT,
+        synergyName: "Movement",
+        imageKey: "synergy_movement_256",
+    },
+    {
+        faction: PBTypes.FactionVals.CHAOS,
+        factionName: "Chaos",
+        synergy: ChaosSynergy.BREAK_ON_ATTACK,
+        synergyName: "Break on Attack",
+        imageKey: "synergy_break_on_attack_256",
+    },
+    {
+        faction: PBTypes.FactionVals.MIGHT,
+        factionName: "Might",
+        synergy: MightSynergy.PLUS_AURAS_RANGE,
+        synergyName: "Aura Range",
+        imageKey: "synergy_auras_range_256",
+    },
+    {
+        faction: PBTypes.FactionVals.MIGHT,
+        factionName: "Might",
+        synergy: MightSynergy.PLUS_STACK_ABILITIES_POWER,
+        synergyName: "Ability Power",
+        imageKey: "synergy_abilities_power_256",
+    },
+    {
+        faction: PBTypes.FactionVals.NATURE,
+        factionName: "Nature",
+        synergy: NatureSynergy.INCREASE_BOARD_UNITS,
+        synergyName: "Board Units",
+        imageKey: "synergy_increase_board_units_256",
+    },
+    {
+        faction: PBTypes.FactionVals.NATURE,
+        factionName: "Nature",
+        synergy: NatureSynergy.PLUS_FLY_ARMOR,
+        synergyName: "Fly Armor",
+        imageKey: "synergy_plus_fly_armor_256",
+    },
+] as const;
+
+const AI_META_SYNERGY_POLICY = resolveSetupPolicy(AI_META_SYNERGY_POLICY_SPEC);
+
+export function aiMetaSynergyDefinition(faction: number, synergy: number): IAiMetaSynergyDefinition | undefined {
+    return AI_META_SYNERGY_DEFINITIONS.find(
+        (definition) => definition.faction === faction && definition.synergy === synergy,
+    );
+}
+
+/** Match FightProperties' 2/4/6-stack activation thresholds exactly. */
+export function aiMetaSynergyLevel(creatureIds: readonly number[], faction: number): 0 | 1 | 2 | 3 {
+    const stacks = creatureIds.reduce(
+        (count, creatureId) => count + Number(CreatureFactions[creatureId] === faction),
+        0,
+    );
+    if (stacks >= 6) return 3;
+    if (stacks >= 4) return 2;
+    if (stacks >= 2) return 1;
+    return 0;
+}
+
+export function aiMetaSynergyKey(faction: number, synergy: number, level: 1 | 2 | 3): string {
+    const definition = aiMetaSynergyDefinition(faction, synergy);
+    return `${definition?.factionName ?? `Faction${faction}`}:${synergy}:${level}`;
+}
 
 export const AI_META_COHORT_DESCRIPTIONS: Readonly<Record<AiMetaCohort, string>> = {
     "ranked-draft": "Current melee-coevolution draft scorer choosing from six offers per level.",
@@ -571,7 +672,7 @@ export function chooseMetaArmy(
         artifactT2,
         augment,
         perk: Perk.SEE_NONE,
-        synergies: SETUP_POLICY_V0.pickSynergies(creatureIds),
+        synergies: AI_META_SYNERGY_POLICY.pickSynergies(creatureIds),
     };
 }
 

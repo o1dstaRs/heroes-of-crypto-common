@@ -18,16 +18,25 @@ import { Worker } from "node:worker_threads";
 import { createGzip, type Gzip } from "node:zlib";
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
+import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
     AI_META_EXPLORATION_RATE,
+    AI_META_FIGHT_PROFILE,
     AI_META_FIGHT_VERSION,
     AI_META_GAMES_PER_MATCHUP,
     AI_META_MAPS,
     AI_META_POLICY,
     AI_META_RECORDED_MAPS,
     AI_META_SCHEMA_VERSION,
+    AI_META_SYNERGY_DEFINITIONS,
+    AI_META_SYNERGY_POLICY_SHA256,
+    AI_META_SYNERGY_POLICY_SPEC,
+    AI_META_SYNERGY_TRACKING,
+    aiMetaSynergyDefinition,
+    aiMetaSynergyKey,
+    aiMetaSynergyLevel,
     allAugmentPlans,
     artifactImageKey,
     artifactName,
@@ -146,6 +155,8 @@ export interface IAiMetaMetricRow {
     kind?: string;
     level?: number;
     tier?: number;
+    faction?: number;
+    synergy?: number;
     pairs: number;
     games: number;
     wins: number;
@@ -198,6 +209,7 @@ export interface IAiMetaRankings {
     artifactsT2: IAiMetaMetricRow[];
     augmentPlans: IAiMetaMetricRow[];
     augmentLevels: IAiMetaMetricRow[];
+    synergies: IAiMetaMetricRow[];
 }
 
 export interface IAiMetaSummary {
@@ -271,6 +283,7 @@ export class AiMetaAccumulator {
     private readonly artifactsT2 = new Map<string, IMetricBucket>();
     private readonly augmentPlans = new Map<string, IMetricBucket>();
     private readonly augmentLevels = new Map<string, IMetricBucket>();
+    private readonly synergies = new Map<string, IMetricBucket>();
     public pairs = 0;
     public games = 0;
     public greenWins = 0;
@@ -289,6 +302,11 @@ export class AiMetaAccumulator {
         for (const artifact of TIER1_ARTIFACT_LIST) this.artifactsT1.set(String(artifact.id), emptyBucket());
         for (const artifact of TIER2_ARTIFACT_LIST) this.artifactsT2.set(String(artifact.id), emptyBucket());
         for (const plan of allAugmentPlans()) this.augmentPlans.set(planKey(plan), emptyBucket());
+        for (const definition of AI_META_SYNERGY_DEFINITIONS) {
+            for (const level of [1, 2, 3] as const) {
+                this.synergies.set(aiMetaSynergyKey(definition.faction, definition.synergy, level), emptyBucket());
+            }
+        }
         for (const [kind, cap] of [
             ["Placement", 2],
             ["Armor", 3],
@@ -326,6 +344,7 @@ export class AiMetaAccumulator {
         this.addArtifact(this.artifactsT2, record.armyA, record.armyB, outcomeA, outcomeB, 2);
         this.addAugmentPlans(record.armyA, record.armyB, outcomeA, outcomeB);
         this.addAugmentLevels(record.armyA, record.armyB, outcomeA, outcomeB);
+        this.addSynergies(record.armyA, record.armyB, outcomeA, outcomeB);
     }
     private addUnits(
         armyA: IAiMetaArmy,
@@ -451,6 +470,49 @@ export class AiMetaAccumulator {
             if (armyB.augment.mode === "explore") bucketB.strength.add(outcomeB);
         }
     }
+    private exactSynergies(army: IAiMetaArmy): Map<string, { faction: number; synergy: number; level: 1 | 2 | 3 }> {
+        const exact = new Map<string, { faction: number; synergy: number; level: 1 | 2 | 3 }>();
+        for (const choice of army.synergies) {
+            if (!aiMetaSynergyDefinition(choice.faction, choice.synergy)) {
+                throw new Error(`Unknown AI meta synergy ${choice.faction}:${choice.synergy}`);
+            }
+            const level = aiMetaSynergyLevel(army.creatureIds, choice.faction);
+            if (!level) {
+                throw new Error(`Inactive AI meta synergy ${choice.faction}:${choice.synergy}`);
+            }
+            const key = aiMetaSynergyKey(choice.faction, choice.synergy, level);
+            if (exact.has(key)) throw new Error(`Duplicate AI meta synergy ${key}`);
+            exact.set(key, { ...choice, level });
+        }
+        return exact;
+    }
+    /**
+     * Synergies are deterministic and composition-linked, not randomized treatments. The primary tally uses
+     * exact-key-exclusive matchups; policyScoreRate retains every selected-army outcome, including same-vs-same.
+     */
+    private addSynergies(
+        armyA: IAiMetaArmy,
+        armyB: IAiMetaArmy,
+        outcomeA: ICountedOutcome,
+        outcomeB: ICountedOutcome,
+    ): void {
+        const choicesA = this.exactSynergies(armyA);
+        const choicesB = this.exactSynergies(armyB);
+        for (const key of new Set([...choicesA.keys(), ...choicesB.keys()])) {
+            const selectedA = choicesA.has(key);
+            const selectedB = choicesB.has(key);
+            const bucket = bucketFor(this.synergies, key);
+            bucket.selections += Number(selectedA) + Number(selectedB);
+            bucket.exploitSelections += Number(selectedA) + Number(selectedB);
+            if (selectedA && selectedB) {
+                bucket.policy.addCluster([outcomeA, outcomeB]);
+                continue;
+            }
+            const outcome = selectedA ? outcomeA : outcomeB;
+            bucket.strength.add(outcome);
+            bucket.policy.add(outcome);
+        }
+    }
     private metricRow(
         key: string,
         name: string,
@@ -507,10 +569,28 @@ export class AiMetaAccumulator {
                 imageKey: `${kind.toLowerCase() === "placement" ? "board" : kind.toLowerCase()}_augment_256`,
             });
         });
-        for (const rows of [units, artifactsT1, artifactsT2, augmentPlans, augmentLevels]) {
+        const synergies = [...this.synergies.entries()].map(([key, bucket]) => {
+            const [factionName, synergyText, levelText] = key.split(":");
+            const synergy = Number(synergyText);
+            const level = Number(levelText);
+            const definition = AI_META_SYNERGY_DEFINITIONS.find(
+                (candidate) => candidate.factionName === factionName && candidate.synergy === synergy,
+            );
+            if (!definition || (level !== 1 && level !== 2 && level !== 3)) {
+                throw new Error(`Invalid AI meta synergy ranking key ${key}`);
+            }
+            return this.metricRow(key, `${definition.factionName} · ${definition.synergyName} · L${level}`, bucket, {
+                kind: "synergy",
+                level,
+                faction: definition.faction,
+                synergy: definition.synergy,
+                imageKey: definition.imageKey,
+            });
+        });
+        for (const rows of [units, artifactsT1, artifactsT2, augmentPlans, augmentLevels, synergies]) {
             rows.sort((left, right) => right.scoreRate - left.scoreRate || right.pairs - left.pairs);
         }
-        return { units, artifactsT1, artifactsT2, augmentPlans, augmentLevels };
+        return { units, artifactsT1, artifactsT2, augmentPlans, augmentLevels, synergies };
     }
 }
 
@@ -611,6 +691,7 @@ const AI_META_FIXED_ENVIRONMENT = {
     SIM_NO_ACTIONS: "1",
     LIVETWIN: "1",
     FIGHT_MELEE_ROSTERS: "0",
+    V08_A13_SEARCH: "1",
 } as const;
 
 /** Remove simulation and model experiment flags before a worker statically imports fight-policy modules. */
@@ -751,6 +832,15 @@ export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
     };
 }
 
+function assertAiMetaSourceIdentity(expected: IAiMetaSourceIdentity): void {
+    const current = captureAiMetaSourceIdentity();
+    if (current.commonCommit !== expected.commonCommit || current.sourceSha256 !== expected.sourceSha256) {
+        throw new Error(
+            "AI meta source changed between cohort worker waves; preserving the partial run instead of mixing source identities",
+        );
+    }
+}
+
 function mergeRankings(accumulators: readonly AiMetaAccumulator[]): IAiMetaRankings {
     const merged: IAiMetaRankings = {
         units: [],
@@ -758,6 +848,7 @@ function mergeRankings(accumulators: readonly AiMetaAccumulator[]): IAiMetaRanki
         artifactsT2: [],
         augmentPlans: [],
         augmentLevels: [],
+        synergies: [],
     };
     for (const accumulator of accumulators) {
         const rows = accumulator.rows();
@@ -766,6 +857,7 @@ function mergeRankings(accumulators: readonly AiMetaAccumulator[]): IAiMetaRanki
         merged.artifactsT2.push(...rows.artifactsT2);
         merged.augmentPlans.push(...rows.augmentPlans);
         merged.augmentLevels.push(...rows.augmentLevels);
+        merged.synergies.push(...rows.synergies);
     }
     return merged;
 }
@@ -788,7 +880,7 @@ function writeSummary(
         complete,
         generatedAt: new Date().toISOString(),
         provenance: {
-            title: "Heroes of Crypto — AI Meta Balance Cohorts",
+            title: "Heroes of Crypto — v0.8+a13 AI Meta Balance Cohorts",
             startedAt,
             gamesPerCohort,
             requestedCohorts,
@@ -798,16 +890,36 @@ function writeSummary(
             concurrency,
             parallelCohorts,
             fightVersion: AI_META_FIGHT_VERSION,
+            fightProfile: {
+                name: AI_META_FIGHT_PROFILE,
+                schema: V08_A13_PROFILE.schema,
+                candidateId: V08_A13_PROFILE.candidateId,
+                genomeSha256: V08_A13_PROFILE.genomeSha256,
+                sourceBindingSha256: V08_A13_PROFILE.sourceBindingSha256,
+                sourceBehaviorEnvironmentSha256: V08_A13_PROFILE.sourceBehaviorEnvironmentSha256,
+                search: V08_A13_PROFILE.search,
+                policy: V08_A13_PROFILE.policy,
+                workerOverride: "V08_A13_SEARCH=1",
+            },
             selectionPolicy: AI_META_POLICY,
             explorationRate: AI_META_EXPLORATION_RATE,
+            rankingDimensions: ["units", "artifactsT1", "artifactsT2", "augmentPlans", "augmentLevels", "synergies"],
+            synergyTracking: {
+                schema: AI_META_SYNERGY_TRACKING,
+                policySpec: AI_META_SYNERGY_POLICY_SPEC,
+                policySha256: AI_META_SYNERGY_POLICY_SHA256,
+                catalogRows: AI_META_SYNERGY_DEFINITIONS.length * 3,
+                estimand:
+                    "Exact active faction/choice/level associative performance; same-key mirrors excluded from scoreRate.",
+            },
             maps: AI_META_MAPS,
             rosterSlots: "2xL1, 2xL2, 1xL3, 1xL4",
             stackSizing: "expBudget (1000 XP per stack)",
-            perkAndSynergies: "SEE_NONE (7 points) with setup-v0 faction synergy picks",
+            perkAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
             nonMirroredGuarantee: "Opposing rosters have distinct signatures and no shared creature identities.",
             seatControl: "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
             interpretation:
-                "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
+                "Artifact and augment strength uses uniform exploration assignments; policyScoreRate describes all contextual-policy selections. Synergy rows are exact active choice/level associations confounded by faction composition, not randomized causal effects. Tier-1/Tier-2 contextual selection is a post-draft oracle, not deployable live timing.",
             ...runIdentity,
         },
         cohorts: qualities,
@@ -941,6 +1053,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     );
 
     for (let offset = 0; offset < cohorts.length; offset += parallelCohorts) {
+        assertAiMetaSourceIdentity(runIdentity);
         const wave = cohorts.slice(offset, offset + parallelCohorts);
         const workersBase = Math.floor(concurrency / wave.length);
         const extraWorkers = concurrency % wave.length;

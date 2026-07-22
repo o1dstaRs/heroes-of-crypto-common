@@ -31,6 +31,8 @@ import {
     AI_META_MAPS,
     AI_META_RECORDED_MAPS,
     AI_META_SCHEMA_VERSION,
+    aiMetaSynergyDefinition,
+    aiMetaSynergyLevel,
     type AiMetaCohort,
     type AiMetaRecordedMap,
     type IAiMetaArmy,
@@ -165,6 +167,33 @@ function validateArmy(value: unknown, context: string): asserts value is IAiMeta
             throw new Error(`${context}.roster[${index}] is invalid`);
         }
     }
+    if (!Array.isArray(value.creatureIds) || value.creatureIds.length !== value.roster.length) {
+        throw new Error(`${context}.creatureIds must match its roster length`);
+    }
+    value.creatureIds.forEach((creatureId, index) => {
+        if (!safeInteger(creatureId) || creatureId <= 0) {
+            throw new Error(`${context}.creatureIds[${index}] is invalid`);
+        }
+    });
+    if (!Array.isArray(value.synergies)) throw new Error(`${context}.synergies must be an array`);
+    const synergyFactions = new Set<number>();
+    value.synergies.forEach((choice, index) => {
+        if (
+            !isRecord(choice) ||
+            !safeInteger(choice.faction) ||
+            !safeInteger(choice.synergy) ||
+            !aiMetaSynergyDefinition(choice.faction, choice.synergy)
+        ) {
+            throw new Error(`${context}.synergies[${index}] is invalid`);
+        }
+        if (synergyFactions.has(choice.faction)) {
+            throw new Error(`${context}.synergies contains duplicate faction ${choice.faction}`);
+        }
+        synergyFactions.add(choice.faction);
+        if (!aiMetaSynergyLevel(value.creatureIds as number[], choice.faction)) {
+            throw new Error(`${context}.synergies[${index}] is inactive for its roster`);
+        }
+    });
     for (const tier of ["artifactT1", "artifactT2"] as const) {
         const artifact = value[tier];
         if (
@@ -257,7 +286,7 @@ function assertQualityMatchesRaw(
     }
 }
 
-const RANKING_KEYS = ["units", "artifactsT1", "artifactsT2", "augmentPlans", "augmentLevels"] as const;
+const RANKING_KEYS = ["units", "artifactsT1", "artifactsT2", "augmentPlans", "augmentLevels", "synergies"] as const;
 
 function equivalentRankingValue(left: unknown, right: unknown): boolean {
     if (typeof left === "number" && typeof right === "number") {
@@ -276,7 +305,15 @@ function preserveAllMapRankings(source: UnknownRecord, computed: IAiMetaRankings
     const preserved = {} as IAiMetaRankings;
     for (const category of RANKING_KEYS) {
         const values = source.rankings[category];
-        if (!Array.isArray(values)) throw new Error(`Summary rankings.${category} must be an array`);
+        if (!Array.isArray(values)) {
+            // Pair schema v1 already carried exact synergy choices. Older v1 summaries did not aggregate
+            // them, so enrich those summaries directly from raw records while preserving every existing row.
+            if (category === "synergies") {
+                preserved.synergies = computed.synergies;
+                continue;
+            }
+            throw new Error(`Summary rankings.${category} must be an array`);
+        }
         const sourceRows = values.filter(
             (value) => isRecord(value) && (value.map === undefined || value.map === "all"),
         );

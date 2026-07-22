@@ -49,6 +49,19 @@ describe("render_ai_meta_report", () => {
                         scoreRate: 0.48,
                     },
                 ],
+                synergies: [
+                    {
+                        key: "Chaos:2:1",
+                        name: "Chaos · Break on Attack · L1",
+                        imageKey: "synergy_break_on_attack_256",
+                        kind: "synergy",
+                        level: 1,
+                        cohort: "ranged",
+                        pairs: 2_400,
+                        scoreRate: 0.54,
+                        pickRate: 0.18,
+                    },
+                ],
                 artifactsT1: [
                     {
                         key: "cursed_ward",
@@ -84,7 +97,8 @@ describe("render_ai_meta_report", () => {
 
         expect(html.startsWith("<!doctype html>")).toBe(true);
         expect(html).toContain("AI Meta Performance Report");
-        expect(html).toContain("Strength comes from controlled exploration");
+        expect(html).toContain("Controlled strength and associative composition");
+        expect(html).toContain("composition-confounded associations");
         expect(html).toContain("Score-rate forest plots");
         expect(html).toContain('data-sort="scoreRate">Score rate');
         expect(html).toContain('data-sort="winRate">Win rate');
@@ -97,6 +111,9 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain('id="ranking-body"');
         expect(html).toContain("Tsar Cannon");
         expect(html).toContain("artifact_t1_cursed_ward_256");
+        expect(html).toContain("Chaos · Break on Attack · L1");
+        expect(html).toContain("synergy_break_on_attack_256");
+        expect(html).toContain('"key":"synergies","label":"Synergies"');
         expect(html).toContain('"map":"all"');
         expect(html).toMatch(/data:image\/(?:webp|svg\+xml);base64,/);
         expect(html).not.toContain("<script src=");
@@ -142,7 +159,9 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain("Live rankings exclude Water");
         expect(html).toContain("Water · NON-LIVE");
         expect(html).toContain('var defaultMap=reportedMaps.has("live")?"live"');
-        expect(html).toContain('if(category.key!=="units")candidates=candidates.slice(0,12)');
+        expect(html).toContain(
+            'if(category.key!=="units"&&category.key!=="synergies")candidates=candidates.slice(0,12)',
+        );
         expect(html).not.toContain('slice(0,category.key==="units"?16:12)');
         expect(html).toContain('var unitLevel=row.category==="units"&&row.level?"L"+row.level+" · ":""');
         expect(html).toContain("selectedMapRows(rows).forEach");

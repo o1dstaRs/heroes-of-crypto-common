@@ -169,6 +169,9 @@ test("reaggregates legacy raw files into all, live, and numeric map dimensions w
         );
         expect(enriched.rankings.artifactsT1).toHaveLength(12 * dimensions.size);
         expect(enriched.rankings.artifactsT1.every((row) => row.map !== undefined)).toBe(true);
+        expect(enriched.rankings.synergies).toHaveLength(24 * dimensions.size);
+        expect(new Set(enriched.rankings.synergies.map((row) => `${row.cohort}/${row.map}`))).toEqual(dimensions);
+        expect(enriched.rankings.synergies.every((row) => row.map !== undefined)).toBe(true);
     } finally {
         rmSync(run.directory, { recursive: true, force: true });
     }
@@ -187,6 +190,7 @@ test("marks a future live-only summary as having no recorded non-live water data
             }),
         );
         expect(new Set(enriched.rankings.artifactsT1.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 3, 4]));
+        expect(new Set(enriched.rankings.synergies.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 3, 4]));
     } finally {
         rmSync(run.directory, { recursive: true, force: true });
     }

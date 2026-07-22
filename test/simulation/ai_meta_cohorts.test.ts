@@ -13,8 +13,14 @@ import { describe, expect, it } from "bun:test";
 
 import {
     AI_META_COHORTS,
+    AI_META_FIGHT_PROFILE,
+    AI_META_FIGHT_VERSION,
     AI_META_MAPS,
     AI_META_RECORDED_MAPS,
+    AI_META_SYNERGY_DEFINITIONS,
+    AI_META_SYNERGY_POLICY_SPEC,
+    AI_META_SYNERGY_TRACKING,
+    aiMetaSynergyLevel,
     armyFeatures,
     cohortArchetypes,
     cohortMap,
@@ -54,6 +60,32 @@ const outcome = (aIsGreen: boolean, winner: "a" | "b" | "draw"): IAiMetaGameOutc
 });
 
 describe("AI meta cohort generation", () => {
+    it("pins the current study to the promoted v0.8+a13 profile and deployed synergy policy", () => {
+        expect(AI_META_FIGHT_VERSION).toBe("v0.8");
+        expect(AI_META_FIGHT_PROFILE).toBe("v0.8+a13");
+        expect(AI_META_SYNERGY_POLICY_SPEC).toBe("v07-nonfight-4eda84635fe7");
+        expect(AI_META_SYNERGY_TRACKING).toBe("exact-active-choice-level-v1");
+        expect(AI_META_SYNERGY_DEFINITIONS).toHaveLength(8);
+
+        let sawChaos = false;
+        for (let pair = 0; pair < 80 && !sawChaos; pair += 1) {
+            const prepared = prepareMetaPair(options("uniform-mixed", 200), pair);
+            for (const army of [prepared.armyA, prepared.armyB]) {
+                const chaos = army.synergies.find((choice) => choice.faction === 1);
+                if (!chaos) continue;
+                sawChaos = true;
+                expect(chaos.synergy).toBe(2);
+                const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos.faction) === 1);
+                expect(creatureId).toBeDefined();
+                expect(aiMetaSynergyLevel([creatureId!], chaos.faction)).toBe(0);
+                expect(aiMetaSynergyLevel([creatureId!, creatureId!], chaos.faction)).toBe(1);
+                expect(aiMetaSynergyLevel(Array(4).fill(creatureId!), chaos.faction)).toBe(2);
+                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(3);
+            }
+        }
+        expect(sawChaos).toBe(true);
+    });
+
     it("identifies only units with Tome-amplifiable castable buffs", () => {
         const castableFeatures = armyFeatures([
             { faction: "Life", creatureName: "Healer", level: 2, size: 1, amount: 1 },
@@ -157,6 +189,7 @@ describe("AI meta cohort generation", () => {
         expect(environment.SIM_NO_ACTIONS).toBe("1");
         expect(environment.LIVETWIN).toBe("1");
         expect(environment.FIGHT_MELEE_ROSTERS).toBe("0");
+        expect(environment.V08_A13_SEARCH).toBe("1");
     });
 
     it("only accepts complete three-map seat-swap cycles", () => {
@@ -194,6 +227,9 @@ describe("AI meta aggregation", () => {
         const tier1Rows = aggregation.rows().artifactsT1;
         expect(new Set(tier1Rows.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 2]));
         expect(tier1Rows.every((row) => row.map !== undefined)).toBe(true);
+        const synergyRows = aggregation.rows().synergies;
+        expect(new Set(synergyRows.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 2]));
+        expect(synergyRows.every((row) => row.map !== undefined)).toBe(true);
     });
 
     it("uses the two-game matchup as one confidence cluster and attributes physical seat swaps", () => {
@@ -219,6 +255,15 @@ describe("AI meta aggregation", () => {
         expect(accumulator.redWins).toBe(1);
         expect(accumulator.distinctRosterViolations).toBe(0);
         expect(accumulator.overlappingCreatureViolations).toBe(0);
+        const synergyRows = accumulator.rows().synergies;
+        expect(synergyRows).toHaveLength(AI_META_SYNERGY_DEFINITIONS.length * 3);
+        expect(synergyRows.reduce((sum, row) => sum + row.selected, 0)).toBe(
+            prepared.armyA.synergies.length + prepared.armyB.synergies.length,
+        );
+        expect(synergyRows.reduce((sum, row) => sum + row.exploreSelections, 0)).toBe(0);
+        expect(synergyRows.reduce((sum, row) => sum + row.exploitSelections, 0)).toBe(
+            prepared.armyA.synergies.length + prepared.armyB.synergies.length,
+        );
     });
 
     it("keeps same-choice randomized assignments in one matchup confidence cluster", () => {
