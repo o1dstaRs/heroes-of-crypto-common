@@ -72,6 +72,7 @@ function recordedAction(
     lap: number,
     damage?: number,
     completed = true,
+    impactDamage?: number,
 ): IRecordedAction {
     return {
         index,
@@ -83,6 +84,7 @@ function recordedAction(
         actionType,
         completed,
         ...(damage === undefined ? {} : { damage }),
+        ...(impactDamage === undefined ? {} : { impactDamage }),
     };
 }
 
@@ -137,7 +139,8 @@ describe("measure_mirror_cohorts", () => {
     test("diagnostics aggregate only completed adjacent same-unit same-side same-lap move-shots by version", () => {
         const actions: IRecordedAction[] = [
             recordedAction(0, "move_unit", "green", "green-valid", 1),
-            recordedAction(1, "range_attack", "green", "green-valid", 1, 40),
+            // Through Shot/AOE keeps the legacy visible primary at zero and records real impacts separately.
+            recordedAction(1, "range_attack", "green", "green-valid", 1, 0, true, 40),
             recordedAction(2, "move_unit", "green", "interrupted", 1),
             recordedAction(3, "defend_turn", "green", "interrupted", 1),
             recordedAction(4, "range_attack", "green", "interrupted", 1, 99),

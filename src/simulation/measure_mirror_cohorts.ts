@@ -308,7 +308,7 @@ export function playMirrorGame(
                 continue;
             }
             const actor = action.side === "green" ? diag.green : diag.red;
-            const damage = action.damage ?? 0;
+            const damage = action.impactDamage ?? action.damage ?? 0;
             if (action.actionType === "range_attack") {
                 actor.shots += 1;
                 actor.shotDamage += damage;

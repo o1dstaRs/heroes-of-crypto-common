@@ -330,6 +330,9 @@ export interface IRecordedAction {
     rejectionReason?: string;
     /** Extra enemy stacks hit beyond the primary target (AoE splash + line/secondary damage). */
     secondaryHits?: number;
+    /** Actual direct projectile/strike impact, including all Through Shot/AOE splash entries. */
+    impactDamage?: number;
+    /** Legacy single-target visible amount; zero for Through Shot/AOE even when splash dealt damage. */
     damage?: number;
     unitIdsDied?: string[];
 }
@@ -1394,6 +1397,14 @@ function recordAction(
         toCell = { ...action.path[action.path.length - 1] };
     }
     const targetUnit = targetId ? unitsHolder.getAllUnits().get(targetId) : undefined;
+    const visibleDamage = attackEvent?.type === "unit_attacked" ? attackEvent.damage : undefined;
+    const impactDamage = visibleDamage
+        ? visibleDamage.splash?.length
+            ? visibleDamage.splash.reduce((total, hit) => total + hit.amount, 0)
+            : visibleDamage.hits?.length
+              ? visibleDamage.hits.reduce((total, hit) => total + hit.amount, 0)
+              : visibleDamage.amount
+        : undefined;
     actions.push({
         index: actions.length,
         lap,
@@ -1407,7 +1418,8 @@ function recordAction(
         toCell,
         completed: result.completed,
         rejectionReason: result.completed ? undefined : result.rejectionReason,
-        damage: attackEvent?.type === "unit_attacked" ? attackEvent.damage.amount : undefined,
+        impactDamage,
+        damage: visibleDamage?.amount,
         unitIdsDied:
             attackEvent?.type === "unit_attacked" && attackEvent.unitIdsDied.length
                 ? [...attackEvent.unitIdsDied]
