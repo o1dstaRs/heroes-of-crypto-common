@@ -67,11 +67,13 @@ export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
     "eligible_shooter",
     "target_no_counter",
     "current_threat",
+    "single_current_threat",
     "fixed_guard",
     "current_signature",
     "reachable_route",
     "safe_route",
-    "causal_guard",
+    "screened_guard",
+    "chain_safe",
     "retained_signature",
 ] as const;
 
