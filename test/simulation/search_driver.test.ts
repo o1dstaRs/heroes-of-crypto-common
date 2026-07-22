@@ -1423,6 +1423,19 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(h.unitsHolder.getAllUnits().get(shot!.targetId)?.getName()).toBe("Arbalester");
     });
 
+    it("leaves ordinary ranged shooters on the baseline policy", () => {
+        setEnv({ ...pureRangedTerminalEnvironment });
+        const h = buildBattle(10_306, "v0.8", undefined, pureRangedTerminalRoster(100));
+        const unit = [...h.unitsHolder.getAllUnits().values()].find(
+            (candidate) => candidate.getTeam() === GREEN_TEAM && candidate.getName() === "Arbalester",
+        )!;
+        h.setActiveUnitId(unit.getId());
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
     it("preserves the incumbent on a mixed original board", () => {
         setEnv({ ...pureRangedTerminalEnvironment });
         const mixedRoster: readonly IArmyUnitSpec[] = [
