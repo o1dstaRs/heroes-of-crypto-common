@@ -668,6 +668,50 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(passive.shotFeatures).toBeUndefined();
     });
 
+    it("move-shots: does not enrich an incumbent whose legal move makes its shot melee-pinned", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Pinned after moving",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            speed: 3,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 5,
+        });
+        const pinner = createTestUnit({ team: UPPER, name: "Destination pinner", attackType: MELEE, speed: 1 });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, pinner, { x: 6, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+        const catalog = enumerateCandidates(shooter, context, endTurn(shooter)).candidates;
+        const move = ofKind(catalog, "move").find(
+            (candidate) => candidate.targetCell?.x === 5 && candidate.targetCell.y === 7,
+        );
+        const shot = ofKind(catalog, "shot").find((candidate) => candidate.targetId === pinner.getId());
+        expect(move).toBeDefined();
+        expect(shot).toBeDefined();
+        const incumbent = [...move!.actions, ...shot!.actions];
+
+        const anchor = enumerateCandidates(shooter, context, incumbent, {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(anchor.actions).toBe(incumbent);
+        expect(anchor.targetId).toBeUndefined();
+        expect(anchor.targetCell).toBeUndefined();
+        expect(anchor.shotFeatures).toBeUndefined();
+        expect(anchor.features).toMatchObject({ spendsRangeShot: 1, expectedDamage: 0, expectedKill: 0 });
+
+        // This is the authoritative failure mode guarded above: movement itself succeeds, then the real attack
+        // engine rejects range_attack because the actor now occupies the enemy's melee-aggression band.
+        const engine = startActionEngine(c, shooter, context);
+        expect(engine.apply(incumbent[0]).completed).toBe(true);
+        expect(engine.apply(incumbent[1]).completed).toBe(false);
+    });
+
     it("move-shots: a secondary RANGE selection completes after moving", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
@@ -767,8 +811,24 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         );
         expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(target.getId());
 
+        const reordered = composite!.actions.map((action) =>
+            action.type === "move_unit"
+                ? { ...action, targetCells: [...(action.targetCells ?? [])].reverse() }
+                : action,
+        );
+        const anchor = enumerateCandidates(shooter, context, reordered, {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(anchor.actions).toBe(reordered);
+        expect(anchor.targetId).toBe(target.getId());
+        expect(anchor.targetCell).toEqual(composite!.targetCell);
+        expect(anchor.shotFeatures).toEqual(composite!.shotFeatures);
+        expect(anchor.features.expectedDamage).toBe(composite!.features.expectedDamage);
+        expect(anchor.features.expectedKill).toBe(composite!.features.expectedKill);
+
         const engine = startActionEngine(c, shooter, context);
-        expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+        expect(reordered.map((action) => engine.apply(action).completed)).toEqual([true, true]);
         expect(shooter.getCells()).toEqual(expect.arrayContaining(move.targetCells));
     });
 
