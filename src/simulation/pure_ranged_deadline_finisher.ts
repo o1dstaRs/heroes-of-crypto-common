@@ -20,13 +20,9 @@ interface IDeadlineShot {
     readonly index: number;
     readonly targetId: string;
     readonly primaryDamage: number;
-    readonly shotsNeeded: number;
 }
 
-function stationaryPositiveShot(
-    candidate: IEnumeratedCandidate,
-    index: number,
-): Omit<IDeadlineShot, "shotsNeeded"> | undefined {
+function stationaryPositiveShot(candidate: IEnumeratedCandidate, index: number): IDeadlineShot | undefined {
     const rangedActions = candidate.actions.filter((action) => action.type === "range_attack");
     if (
         rangedActions.length !== 1 ||
@@ -51,7 +47,6 @@ function stationaryPositiveShot(
 
 function compareShots(left: IDeadlineShot, right: IDeadlineShot): number {
     return (
-        right.shotsNeeded - left.shotsNeeded ||
         right.primaryDamage - left.primaryDamage ||
         right.candidate.features.expectedDamage - left.candidate.features.expectedDamage ||
         (left.candidate.shotFeatures?.friendlyFireDamage ?? 0) -
@@ -62,8 +57,8 @@ function compareShots(left: IDeadlineShot, right: IDeadlineShot): number {
 
 /**
  * Rank the deadline-slack terminal finisher. An Endless Quiver shooter keeps its normal target while enough
- * pre-Armageddon activations remain. Once delaying another activation would make the living original No Melee
- * barrier infeasible to finish at the current per-shot damage, the best stationary barrier shot comes first.
+ * pre-Armageddon activations remain, preserves an inherited immediate kill, and rejects barriers that are already
+ * infeasible to finish. At the last feasible activation, the best stationary No Melee barrier shot comes first.
  */
 export function rankPureRangedDeadlineFinisherCandidates(
     actor: Unit,
@@ -92,11 +87,14 @@ export function rankPureRangedDeadlineFinisherCandidates(
     if (!enemyNoMeleeIds.size) {
         return [];
     }
+    if (candidates.some((candidate) => candidate.kind === "incumbent" && candidate.features.expectedKill === 1)) {
+        return [];
+    }
 
     const remainingActivations = Math.max(0, Math.floor(NUMBER_OF_LAPS_FIRST_ARMAGEDDON - currentLap));
     return candidates
         .map(stationaryPositiveShot)
-        .filter((shot): shot is Omit<IDeadlineShot, "shotsNeeded"> => {
+        .filter((shot): shot is IDeadlineShot => {
             if (!shot) return false;
             return enemyNoMeleeIds.has(shot.targetId);
         })
@@ -104,7 +102,7 @@ export function rankPureRangedDeadlineFinisherCandidates(
             const target = unitsHolder.getAllUnits().get(shot.targetId);
             if (!target || target.isDead()) return undefined;
             const shotsNeeded = Math.ceil(Math.max(0, target.getCumulativeHp()) / shot.primaryDamage);
-            return shotsNeeded >= remainingActivations ? { ...shot, shotsNeeded } : undefined;
+            return shotsNeeded === remainingActivations ? shot : undefined;
         })
         .filter((shot): shot is IDeadlineShot => shot !== undefined)
         .sort(compareShots)
