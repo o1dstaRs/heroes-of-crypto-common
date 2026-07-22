@@ -382,7 +382,12 @@ function preferRetreat(left: IRouteView, right: IRouteView): boolean {
 }
 
 /** Correct inherited/late-finish weak melee only for a shooter that is genuinely pinned right now. */
-function pinnedRetreat(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+function pinnedRetreat(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    supportedDelta: boolean,
+): GameAction[] {
     const attackHandler = context.attackHandler;
     if (
         !attackHandler ||
@@ -403,6 +408,7 @@ function pinnedRetreat(unit: Unit, context: IDecisionContext, decision: GameActi
     }
 
     const melee = decision.find((action) => action.type === "melee_attack");
+    let weakMeleeTarget: Unit | undefined;
     if (melee?.type === "melee_attack") {
         const currentLap = context.fightProperties?.getCurrentLap() ?? 0;
         // Ranged preservation is an early/mid-fight positioning concern. Once v0.8 has armed its commanding-lead
@@ -432,6 +438,7 @@ function pinnedRetreat(unit: Unit, context: IDecisionContext, decision: GameActi
         if (!estimate || estimate.secureKill) {
             return decision;
         }
+        weakMeleeTarget = target;
     }
 
     const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
@@ -442,10 +449,23 @@ function pinnedRetreat(unit: Unit, context: IDecisionContext, decision: GameActi
         .getAllAllies(unit.getTeam())
         .filter((ally) => !ally.isDead() && ally.getId() !== unit.getId() && isFrontline(ally));
     const noMelee = unit.hasAbilityActive("No Melee");
+    const currentProtection = protectionAt(unit.getCells(), enemies, frontliners);
+    const currentUnscreened = currentProtection.reachableThreats - currentProtection.screenedThreats;
     let best: IRouteView | undefined;
     for (const route of reachableRoutes(unit, context)) {
         const view = routeView(unit, context, route, enemies, frontliners);
-        if (!view || (!noMelee && !view.protection.eligible)) {
+        if (!view) {
+            continue;
+        }
+        const candidateUnscreened = view.protection.reachableThreats - view.protection.screenedThreats;
+        const partialScreenImprovement =
+            supportedDelta &&
+            !noMelee &&
+            weakMeleeTarget !== undefined &&
+            frontliners.some((ally) => allyScreensThreat(view.footprint, ally, weakMeleeTarget!)) &&
+            candidateUnscreened < currentUnscreened &&
+            view.protection.reachableThreats <= currentProtection.reachableThreats;
+        if (!noMelee && !view.protection.eligible && !partialScreenImprovement) {
             continue;
         }
         if (!best || preferRetreat(view, best)) {
@@ -470,7 +490,12 @@ export function prioritizeV08RangedPositioning(
     if (!versions.includes(strategyVersion)) {
         return decision;
     }
+    const supportedDeltaVersions = (process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const supportedDelta = supportedDeltaVersions.includes(strategyVersion);
     const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
     const advanced = mode === "both" || mode === "advance" ? protectedAdvanceShot(unit, context, decision) : decision;
-    return mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced) : advanced;
+    return mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
 }
