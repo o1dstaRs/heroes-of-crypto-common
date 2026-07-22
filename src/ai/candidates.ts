@@ -191,9 +191,9 @@ export interface IEnumerateOptions {
     /** Opt in to deterministic BLOCK_CENTER melee-mining challengers (v0.8 search only). */
     includeMountainAttacks?: boolean;
     /**
-     * Dataset-only metadata enrichment for candidate 0. When its exact action is rediscovered by the
-     * generator, copy the generated candidate's observations onto the incumbent anchor. Default false;
-     * actions, ordering, deduplication, caps, and live scoring are unchanged.
+     * Metadata enrichment for candidate 0. When its exact action is rediscovered by the generator (or is an
+     * exact legal move-shot handled by the bounded incumbent probe), copy those observations onto the anchor.
+     * Default false; actions, ordering, deduplication, and challenger caps are unchanged.
      */
     enrichIncumbentMetadata?: boolean;
 }
@@ -459,7 +459,7 @@ class CandidateGenerator {
      * Candidate 0 is intentionally retained when enumeration rediscovers the incumbent action. A duplicate
      * generated candidate nevertheless has information the raw incumbent action list cannot carry, so copy
      * that observation onto the anchor without changing its kind, actions, identity, or position. Shot
-     * enrichment predates IL v3 and remains unconditional; other classes are dataset-only and opt-in.
+     * enrichment predates IL v3 and remains unconditional; other classes are explicitly opt-in.
      */
     private enrichIncumbentCandidate(cand: IEnumeratedCandidate, sig = this.signature(cand.actions)): void {
         const incumbent = this.candidates[0];
@@ -928,6 +928,138 @@ class CandidateGenerator {
             ? [{ type: "select_attack_type", unitId: this.unit.getId(), attackType: RANGE }]
             : [];
     }
+    /**
+     * Enrich an exact native move-then-shot incumbent without enabling the experimental move-shot catalog.
+     * This is deliberately a one-candidate probe: the action must match one authoritative reachable route and
+     * the ordinary ranged prefix exactly, and no candidate is pushed. In particular, a zero move-shot cap stays
+     * a zero challenger cap while a13 can still compare its inherited ranged-positioning action fairly.
+     */
+    private enrichIncumbentMoveShot(
+        attackHandler: AttackHandler,
+        shots: number,
+        forcedTargetId: string | undefined,
+    ): void {
+        if (
+            !this.options.enrichIncumbentMetadata ||
+            this.unit.hasAbilityActive("Sniper") ||
+            this.unit.hasAbilityActive("Through Shot") ||
+            this.unit.hasAbilityActive("Large Caliber") ||
+            this.unit.hasAbilityActive("Area Throw") ||
+            !this.unit.canMove()
+        ) {
+            return;
+        }
+        const incumbent = this.candidates[0];
+        const prefix = this.rangePrefix();
+        if (!incumbent || incumbent.kind !== "incumbent" || incumbent.actions.length !== prefix.length + 2) {
+            return;
+        }
+        const move = incumbent.actions[0];
+        const shot = incumbent.actions[incumbent.actions.length - 1];
+        if (
+            move?.type !== "move_unit" ||
+            move.unitId !== this.unit.getId() ||
+            shot?.type !== "range_attack" ||
+            shot.attackerId !== this.unit.getId() ||
+            !shot.aimCell ||
+            shot.aimSide === undefined
+        ) {
+            return;
+        }
+        for (let index = 0; index < prefix.length; index += 1) {
+            const expected = prefix[index];
+            const actual = incumbent.actions[index + 1];
+            if (
+                expected.type !== "select_attack_type" ||
+                actual?.type !== "select_attack_type" ||
+                actual.unitId !== expected.unitId ||
+                actual.attackType !== expected.attackType
+            ) {
+                return;
+            }
+        }
+
+        const sameCells = (left: readonly XY[] | undefined, right: readonly XY[] | undefined): boolean => {
+            if (!left || !right || left.length !== right.length) return false;
+            return left.every((cell, index) => cell.x === right[index]?.x && cell.y === right[index]?.y);
+        };
+        const movePath = this.movePath();
+        if (!movePath) return;
+        let route: IWeightedRoute | undefined;
+        for (const routeList of movePath.knownPaths.values()) {
+            const candidateRoute = routeList[0];
+            if (!candidateRoute?.route.length || candidateRoute.hasLavaCell || candidateRoute.hasWaterCell) continue;
+            const exactMove = this.moveAction(candidateRoute);
+            if (
+                exactMove.type === "move_unit" &&
+                sameCells(move.path, exactMove.path) &&
+                sameCells(move.targetCells, exactMove.targetCells) &&
+                move.hasLavaCell === exactMove.hasLavaCell &&
+                move.hasWaterCell === exactMove.hasWaterCell &&
+                this.footprintOk(candidateRoute.cell)
+            ) {
+                route = candidateRoute;
+                break;
+            }
+        }
+        if (!route) return;
+
+        const target = this.context.unitsHolder.getAllUnits().get(shot.targetId);
+        if (
+            !target ||
+            target.isDead() ||
+            target.getTeam() !== this.enemyTeam ||
+            isHidden(target) ||
+            (forcedTargetId !== undefined && target.getId() !== forcedTargetId) ||
+            (this.unit.hasDebuffActive("Cowardice") && this.unit.getCumulativeHp() < target.getCumulativeHp()) ||
+            !target.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
+            !RANGE_ATTACK_CELL_SIDES.includes(shot.aimSide as RangeAttackCellSide) ||
+            !isRangeAttackSideObservable(
+                this.context.grid.getMatrix(),
+                shot.aimCell,
+                shot.aimSide as RangeAttackCellSide,
+                this.unit.getTeam(),
+                false,
+            )
+        ) {
+            return;
+        }
+        const targetCells = move.targetCells;
+        if (!targetCells) return;
+        const origin = getPositionForCells(this.context.grid.getSettings(), targetCells);
+        if (!origin) return;
+        const to = getRangeAttackSideCenter(
+            this.context.grid.getSettings(),
+            shot.aimCell,
+            shot.aimSide as RangeAttackCellSide,
+            origin,
+        );
+        const evaluation = attackHandler.evaluateRangeAttack(
+            this.context.unitsHolder.getAllUnits(),
+            this.unit,
+            origin,
+            to,
+            false,
+            false,
+            false,
+        );
+        const primaryHit = evaluation.affectedUnits[0]?.[0];
+        if (
+            evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+            primaryHit?.getId() !== target.getId()
+        ) {
+            return;
+        }
+        const damage = this.shotDamage(evaluation, target.getId(), shots, false);
+        this.enrichIncumbentCandidate({
+            kind: "shot",
+            actions: incumbent.actions,
+            targetId: target.getId(),
+            targetCell: { x: route.cell.x, y: route.cell.y },
+            shotFeatures: this.shotFeatures(target, damage),
+            features: this.features({ spendsRangeShot: 1, expectedDamage: damage.value, expectedKill: damage.kill }),
+        });
+    }
     /** n-choose-k for the one/two-shot expected-damage calculation. */
     private combinations(n: number, k: number): number {
         if (k < 0 || k > n) {
@@ -1205,6 +1337,7 @@ class CandidateGenerator {
         }
 
         const moveShotCap = Math.min(2, Math.max(0, Math.floor(this.options.maxMoveShotComposites ?? 0)));
+        this.enrichIncumbentMoveShot(attackHandler, shots, forcedTargetId);
         if (
             moveShotCap === 0 ||
             isAOE ||

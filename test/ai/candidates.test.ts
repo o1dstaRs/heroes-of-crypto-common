@@ -579,6 +579,95 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(composites[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
     });
 
+    it("move-shots: enriches only an exact incumbent at cap zero without adding or reordering challengers", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "a13 advancing archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 3,
+            speed: 3,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 5,
+        });
+        const target = createTestUnit({
+            team: UPPER,
+            name: "a13 pressure target",
+            attackType: MELEE,
+            speed: 1,
+            amountAlive: 20,
+            maxHp: 20,
+        });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+        const generated = enumerateCandidates(shooter, context, endTurn(shooter), {
+            maxMoveShotComposites: 1,
+        }).candidates.find(
+            (candidate) =>
+                candidate.actions.some((action) => action.type === "move_unit") &&
+                candidate.actions.some((action) => action.type === "range_attack"),
+        );
+        expect(generated).toBeDefined();
+
+        const defaultOff = enumerateCandidates(shooter, context, generated!.actions).candidates;
+        const explicitOff = enumerateCandidates(shooter, context, generated!.actions, {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: false,
+        }).candidates;
+        const enriched = enumerateCandidates(shooter, context, generated!.actions, {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: true,
+        }).candidates;
+        const anchor = enriched[0];
+
+        expect(explicitOff).toEqual(defaultOff);
+        expect(anchor.kind).toBe("incumbent");
+        expect(anchor.actions).toBe(generated!.actions);
+        expect(anchor.targetId).toBe(target.getId());
+        expect(anchor.targetCell).toEqual(generated!.targetCell);
+        expect(anchor.shotFeatures).toEqual(generated!.shotFeatures);
+        expect(anchor.features.expectedDamage).toBe(generated!.features.expectedDamage);
+        expect(anchor.features.expectedKill).toBe(generated!.features.expectedKill);
+        expect(selectV08STargetPressureCandidate(shooter, c.unitsHolder, [anchor])).toBe(anchor);
+
+        // The opt-in changes metadata on candidate zero only. The cap-zero candidate identities, exact action
+        // references, ordering, truncation behavior, and challenger catalog remain the default/off catalog.
+        const identity = (candidate: IEnumeratedCandidate): [string, string] => [
+            candidate.kind,
+            ilActionSignature(candidate.actions),
+        ];
+        expect(enriched.map(identity)).toEqual(explicitOff.map(identity));
+        expect(enriched.map((candidate) => candidate.actions)).toEqual(
+            explicitOff.map((candidate) => candidate.actions),
+        );
+        expect(enriched.slice(1)).toEqual(explicitOff.slice(1));
+        expect(
+            enriched
+                .slice(1)
+                .some(
+                    (candidate) =>
+                        candidate.actions.some((action) => action.type === "move_unit") &&
+                        candidate.actions.some((action) => action.type === "range_attack"),
+                ),
+        ).toBe(false);
+
+        const passive = enumerateCandidates(shooter, context, endTurn(shooter), {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(passive).toEqual({
+            kind: "incumbent",
+            actions: endTurn(shooter),
+            features: expect.objectContaining({ expectedDamage: 0, expectedKill: 0, spendsRangeShot: 0 }),
+        });
+        expect(passive.targetId).toBeUndefined();
+        expect(passive.shotFeatures).toBeUndefined();
+    });
+
     it("move-shots: a secondary RANGE selection completes after moving", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
