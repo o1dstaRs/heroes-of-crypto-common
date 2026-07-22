@@ -167,6 +167,7 @@ export function buildV08A13SearchEnvironment(
         // paired runners may override both in their isolated child environment.
         V08_SUPPORTED_PREPIN_EGRESS: "0",
         V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "",
+        V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY: "0",
         V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
     });
 }

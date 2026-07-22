@@ -83,6 +83,8 @@ export interface IV08RangedPositioningABOptions {
     supportedPrepinEgress?: boolean;
     /** Computes the same pre-pin egress catalog for both seats while selecting it for neither seat. */
     supportedPrepinEgressCatalogOnly?: boolean;
+    /** Selects the pre-pin arm only for live/root incumbents while rollouts retain the catalog but not the move. */
+    supportedPrepinEgressLiveOnly?: boolean;
     diag?: boolean;
 }
 
@@ -102,7 +104,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -133,6 +135,7 @@ export interface IV08RangedPositioningABManifest {
         responseNeutralAdvance: boolean;
         supportedPrepinEgress: boolean;
         supportedPrepinEgressCatalogOnly: boolean;
+        supportedPrepinEgressLiveOnly: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -306,6 +309,19 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.supportedPrepinEgress && options.supportedPrepinEgressCatalogOnly) {
         throw new Error("supportedPrepinEgress and supportedPrepinEgressCatalogOnly are mutually exclusive");
     }
+    if (
+        options.supportedPrepinEgressLiveOnly !== undefined &&
+        typeof options.supportedPrepinEgressLiveOnly !== "boolean"
+    ) {
+        throw new Error("supportedPrepinEgressLiveOnly must be a boolean");
+    }
+    if (
+        options.supportedPrepinEgressLiveOnly &&
+        !options.supportedPrepinEgress &&
+        !options.supportedPrepinEgressCatalogOnly
+    ) {
+        throw new Error("supportedPrepinEgressLiveOnly requires a supported pre-pin treatment or catalog control");
+    }
     validateBehaviorArmGeometry(
         options.mode,
         options.moveShots ?? 0,
@@ -420,7 +436,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v4" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -451,6 +467,7 @@ export function buildV08RangedPositioningABManifest(
             responseNeutralAdvance: options.responseNeutralAdvance ?? false,
             supportedPrepinEgress: options.supportedPrepinEgress ?? false,
             supportedPrepinEgressCatalogOnly: options.supportedPrepinEgressCatalogOnly ?? false,
+            supportedPrepinEgressLiveOnly: options.supportedPrepinEgressLiveOnly ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -489,6 +506,7 @@ export function buildV08RangedPositioningABEnvironment(
     jitNoMeleeFocusCatalogOnly = false,
     supportedPrepinEgress = false,
     supportedPrepinEgressCatalogOnly = false,
+    supportedPrepinEgressLiveOnly = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -523,6 +541,12 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (supportedPrepinEgress && supportedPrepinEgressCatalogOnly) {
         throw new Error("supportedPrepinEgress and supportedPrepinEgressCatalogOnly are mutually exclusive");
+    }
+    if (typeof supportedPrepinEgressLiveOnly !== "boolean") {
+        throw new Error("supportedPrepinEgressLiveOnly must be a boolean");
+    }
+    if (supportedPrepinEgressLiveOnly && !supportedPrepinEgress && !supportedPrepinEgressCatalogOnly) {
+        throw new Error("supportedPrepinEgressLiveOnly requires a supported pre-pin treatment or catalog control");
     }
     validateBehaviorArmGeometry(
         mode,
@@ -572,6 +596,7 @@ export function buildV08RangedPositioningABEnvironment(
     environment.V08_SUPPORTED_PREPIN_EGRESS = supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? "1" : "0";
     environment.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS =
         supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY = supportedPrepinEgressLiveOnly ? "1" : "0";
     environment.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = supportedPrepinEgressCatalogOnly
         ? "supported-prepin-egress-catalog-only-control"
         : supportedPrepinEgress
@@ -610,6 +635,7 @@ export function buildV08RangedPositioningABInvocations(
         options.jitNoMeleeFocusCatalogOnly ?? false,
         options.supportedPrepinEgress ?? false,
         options.supportedPrepinEgressCatalogOnly ?? false,
+        options.supportedPrepinEgressLiveOnly ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -699,6 +725,7 @@ export async function runV08RangedPositioningAB(
     const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
     const supportedPrepinEgress = options.supportedPrepinEgress ?? false;
     const supportedPrepinEgressCatalogOnly = options.supportedPrepinEgressCatalogOnly ?? false;
+    const supportedPrepinEgressLiveOnly = options.supportedPrepinEgressLiveOnly ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
@@ -713,6 +740,7 @@ export async function runV08RangedPositioningAB(
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
                 `supportedPrepinEgress=${supportedPrepinEgress} ` +
                 `supportedPrepinCatalogOnly=${supportedPrepinEgressCatalogOnly} ` +
+                `supportedPrepinLiveOnly=${supportedPrepinEgressLiveOnly} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         await prepareInvocation(invocation);
@@ -749,6 +777,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "response-neutral-advance": { type: "boolean", default: false },
             "supported-prepin-egress": { type: "boolean", default: false },
             "supported-prepin-catalog-only": { type: "boolean", default: false },
+            "supported-prepin-live-only": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -784,6 +813,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         responseNeutralAdvance: values["response-neutral-advance"]!,
         supportedPrepinEgress: values["supported-prepin-egress"]!,
         supportedPrepinEgressCatalogOnly: values["supported-prepin-catalog-only"]!,
+        supportedPrepinEgressLiveOnly: values["supported-prepin-live-only"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -800,7 +830,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
                 "[--supported-ranged-delta] [--response-neutral-advance] " +
-                "[--supported-prepin-egress|--supported-prepin-catalog-only] [--diag] " +
+                "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;

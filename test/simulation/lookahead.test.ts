@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getAIStrategy } from "../../src/ai";
+import { getAIStrategy, type IAIStrategy, type IDecisionContext } from "../../src/ai";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -365,6 +365,34 @@ describe("lookahead driver — replay determinism / no RNG leak", () => {
             expect(chosen.length).toBeGreaterThan(0);
             const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
             expect(after).toEqual(before);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
+    it("marks every strategy decision made inside LookaheadDriver as a rollout", () => {
+        try {
+            const h = buildBattle(1313, "v0.5");
+            h.playTurns(10);
+            const unit = h.activeUnit();
+            expect(unit).toBeDefined();
+            const incumbent = h.decideActive();
+            const strategy = getAIStrategy("v0.5");
+            const originalDecideTurn = strategy.decideTurn.bind(strategy);
+            const origins: Array<IDecisionContext["decisionOrigin"]> = [];
+            (strategy as { decideTurn: IAIStrategy["decideTurn"] }).decideTurn = (rolloutUnit, context) => {
+                origins.push(context.decisionOrigin);
+                return originalDecideTurn(rolloutUnit, context);
+            };
+
+            try {
+                h.driver.chooseDecision(unit!, incumbent);
+            } finally {
+                (strategy as { decideTurn: IAIStrategy["decideTurn"] }).decideTurn = originalDecideTurn;
+            }
+
+            expect(origins.length).toBeGreaterThan(0);
+            expect(origins.every((origin) => origin === "rollout")).toBe(true);
         } finally {
             setDeterministicRandomSource(undefined);
         }

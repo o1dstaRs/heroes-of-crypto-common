@@ -353,6 +353,7 @@ afterEach(() => {
     delete process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS;
+    delete process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS;
     setDeterministicRandomSource(undefined);
 });
@@ -386,7 +387,24 @@ describe("v0.8 protected ranged positioning", () => {
             "retained_signature",
             "posture_safe",
         ]);
-        expect(policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress")).toHaveLength(1);
+        const proposal = policyEvents.find(({ kind }) => kind === "v0.8_supported_prepin_egress");
+        expect(proposal?.kind).toBe("v0.8_supported_prepin_egress");
+        if (proposal?.kind !== "v0.8_supported_prepin_egress") throw new Error("missing pre-pin proposal");
+        expect(proposal.details).toEqual({
+            fromCell: { x: 0, y: 1 },
+            toCell: { x: 0, y: 0 },
+            targetId: target.getId(),
+            targetCreatureName: target.getName(),
+            exposureBefore: 1,
+            exposureAfter: 0,
+            divisorBefore: 1,
+            divisorAfter: 1,
+            targetDistanceBefore: 9,
+            targetDistanceAfter: 10,
+            minEnemyDistanceBefore: 4,
+            minEnemyDistanceAfter: 5,
+            rangedSuperior: true,
+        });
     });
 
     it("holds a stronger ranged line but lets the weaker ranged army close across a real damage band", () => {
@@ -461,7 +479,24 @@ describe("v0.8 protected ranged positioning", () => {
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
         expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [weaker.destination] });
         expect(actions[1]).toMatchObject({ type: "range_attack", targetId: weaker.target.getId() });
-        expect(weakerEvents.map(({ kind }) => kind)).toContain("v0.8_supported_prepin_egress");
+        const weakerProposal = weakerEvents.find(({ kind }) => kind === "v0.8_supported_prepin_egress");
+        expect(weakerProposal?.kind).toBe("v0.8_supported_prepin_egress");
+        if (weakerProposal?.kind !== "v0.8_supported_prepin_egress") throw new Error("missing pre-pin proposal");
+        expect(weakerProposal.details).toEqual({
+            fromCell: { x: 5, y: 7 },
+            toCell: weaker.destination,
+            targetId: weaker.target.getId(),
+            targetCreatureName: weaker.target.getName(),
+            exposureBefore: 1,
+            exposureAfter: 0,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 5,
+            minEnemyDistanceBefore: 4,
+            minEnemyDistanceAfter: 5,
+            rangedSuperior: false,
+        });
     });
 
     it("does not let a screen for an escaped threat certify a different unscreened next-lap exposure", () => {
@@ -538,6 +573,57 @@ describe("v0.8 protected ranged positioning", () => {
                 .map(({ stage }) => stage),
         ).toContain("posture_safe");
         expect(catalogEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_prepin_egress");
+    });
+
+    it("selects the live-only arm only at an explicit root while retaining the rollout catalog", () => {
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+
+        const root = setupSupportedPrepinEgress();
+        root.context.decisionOrigin = "root";
+        expect(new StrategyV0_8().decideTurn(root.shooter, root.context).map((action) => action.type)).toEqual([
+            "move_unit",
+            "range_attack",
+        ]);
+
+        const rollout = setupSupportedPrepinEgress();
+        rollout.context.decisionOrigin = "rollout";
+        const rolloutEvents: IAIPolicyEvent[] = [];
+        rollout.context.policyEventObserver = (event) => rolloutEvents.push(event);
+        expect(new StrategyV0_8().decideTurn(rollout.shooter, rollout.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        expect(
+            rolloutEvents
+                .filter(({ kind }) => kind === "v0.8_supported_prepin_egress_funnel")
+                .map(({ stage }) => stage),
+        ).toContain("posture_safe");
+        expect(rolloutEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_prepin_egress");
+
+        const omitted = setupSupportedPrepinEgress();
+        expect(new StrategyV0_8().decideTurn(omitted.shooter, omitted.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+    });
+
+    it("consumes the same seeded rollout catalog stream in live-only treatment and selector-off control", () => {
+        const decideAndReadTail = (selector: string): number[] => {
+            const fixture = setupSupportedPrepinEgress();
+            fixture.context.decisionOrigin = "rollout";
+            process.env.V08_RANGED_POSITION_MODE = "retreat";
+            process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+            process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY = "1";
+            process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = selector;
+            setDeterministicRandomSource(makeRng(0x2468ace0));
+            expect(
+                new StrategyV0_8().decideTurn(fixture.shooter, fixture.context).map((action) => action.type),
+            ).toEqual(["range_attack"]);
+            return [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)];
+        };
+
+        expect(decideAndReadTail("v0.8")).toEqual(decideAndReadTail("supported-prepin-egress-catalog-only-control"));
     });
 
     it("consumes an identical seeded geometry stream before treatment selection and catalog-only rejection", () => {

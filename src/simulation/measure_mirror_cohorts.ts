@@ -32,7 +32,12 @@ import {
 import { GREEN_TEAM, runMatch, type IDecisionObservation, type IMatchConfig, type IMatchResult } from "./battle_engine";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES, type V08SupportedPrepinEgressFunnelStage } from "../ai/ai_strategy";
+import {
+    V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES,
+    type IAIPolicyEvent,
+    type IV08SupportedPrepinEgressDetails,
+    type V08SupportedPrepinEgressFunnelStage,
+} from "../ai/ai_strategy";
 import {
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
@@ -172,6 +177,16 @@ export interface IMirrorGameRecord {
     rejectedRed: number;
     rosterSig?: string;
     diag?: { green: IMirrorSideDiag; red: IMirrorSideDiag };
+    /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
+    supportedPrepinEgressEvents?: IMirrorSupportedPrepinEgressEvent[];
+}
+
+export interface IMirrorSupportedPrepinEgressEvent extends IV08SupportedPrepinEgressDetails {
+    side: "green" | "red";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    retained: boolean;
 }
 
 export interface IMirrorDependencies {
@@ -287,6 +302,8 @@ export function playMirrorGame(
     const redVersion = aIsGreen ? cfg.vB : cfg.vA;
 
     const diag = cfg.diag ? { green: newSideDiag(greenVersion), red: newSideDiag(redVersion) } : undefined;
+    const supportedPrepinEgressEvents: IMirrorSupportedPrepinEgressEvent[] = [];
+    const prepinRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedPrepinEgressEvent>();
     const observer = diag
         ? (obs: IDecisionObservation): void => {
               const side = obs.unit.getTeam() === GREEN_TEAM ? diag.green : diag.red;
@@ -330,6 +347,8 @@ export function playMirrorGame(
                   side.responseNeutralAdvances += 1;
               } else if (event.kind === "v0.8_supported_prepin_egress") {
                   side.supportedPrepinEgressSelections += 1;
+                  const proposal = prepinRecordByEvent.get(event);
+                  if (proposal) proposal.retained = true;
               }
           }
         : undefined;
@@ -342,6 +361,18 @@ export function playMirrorGame(
                   side.responseNeutralAdvanceProposals += 1;
               } else if (event.kind === "v0.8_supported_prepin_egress") {
                   side.supportedPrepinEgressProposals += 1;
+                  const proposal: IMirrorSupportedPrepinEgressEvent = {
+                      ...event.details,
+                      fromCell: { ...event.details.fromCell },
+                      toCell: { ...event.details.toCell },
+                      side: event.team === GREEN_TEAM ? "green" : "red",
+                      unitId: event.unitId,
+                      creatureName: event.creatureName,
+                      lap: event.lap,
+                      retained: false,
+                  };
+                  supportedPrepinEgressEvents.push(proposal);
+                  prepinRecordByEvent.set(event, proposal);
               } else if (event.kind === "v0.8_supported_prepin_egress_funnel" && event.stage) {
                   side.supportedPrepinEgressFunnel[event.stage] += 1;
               }
@@ -435,6 +466,7 @@ export function playMirrorGame(
         rejectedRed: result.rejectedRed ?? 0,
         ...(game === 0 ? { rosterSig: roster.map((u) => `L${u.level}:${u.creatureName}x${u.amount}`).join("|") } : {}),
         ...(diag ? { diag } : {}),
+        ...(supportedPrepinEgressEvents.length ? { supportedPrepinEgressEvents } : {}),
     };
 }
 

@@ -2999,6 +2999,35 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(recoveryActions.every((action) => action === "move_unit" || action === "defend_turn")).toBe(true);
     });
 
+    it("marks every strategy decision made inside SearchDriver as a rollout", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "6",
+            SEARCH_GATE: "0",
+            SEARCH_SHORTLIST: "2",
+        });
+        const origins: Array<IDecisionContext["decisionOrigin"]> = [];
+        const trueStrategy = getAIStrategy("v0.6");
+        const recordingStrategy = {
+            version: "rollout-origin-recorder",
+            decideTurn: (unit: Unit, context: IDecisionContext): GameAction[] => {
+                origins.push(context.decisionOrigin);
+                return trueStrategy.decideTurn(unit, context);
+            },
+        } as unknown as IAIStrategy;
+        const harness = buildBattle(1313, "v0.6", recordingStrategy);
+        harness.playTurns(8);
+        const unit = harness.activeUnit();
+        expect(unit).toBeDefined();
+
+        harness.makeDriver().chooseDecision(unit!, "v0.6", harness.decideActive());
+
+        expect(origins.length).toBeGreaterThan(0);
+        expect(origins.every((origin) => origin === "rollout")).toBe(true);
+    });
+
     it("force-transitions a live stalled lap instead of scoring a premature leaf", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const h = buildBattle(707, "v0.6");

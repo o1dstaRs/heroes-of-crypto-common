@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { IAIPolicyEvent, IAIStrategy } from "../../src/ai/ai_strategy";
+import type { IAIPolicyEvent, IAIStrategy, IDecisionContext } from "../../src/ai/ai_strategy";
 import { STRATEGY_V0_1 } from "../../src/ai/versions/v0_1";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
@@ -69,10 +69,12 @@ describe("battle engine turn execution observer", () => {
         const retainedProposals: IAIPolicyEvent[] = [];
         const overridden: IAIPolicyEvent[] = [];
         const overriddenProposals: IAIPolicyEvent[] = [];
+        const decisionOrigins: Array<IDecisionContext["decisionOrigin"]> = [];
         const originalDecideTurn = STRATEGY_V0_1.decideTurn;
         const originalAppliesTo = SearchDriver.prototype.appliesTo;
         const originalChooseDecision = SearchDriver.prototype.chooseDecision;
         STRATEGY_V0_1.decideTurn = (unit, context) => {
+            decisionOrigins.push(context.decisionOrigin);
             context.policyEventObserver?.({
                 kind: "v0.8_response_neutral_advance",
                 unitId: unit.getId(),
@@ -94,6 +96,7 @@ describe("battle engine turn execution observer", () => {
             });
             expect(retained.length).toBeGreaterThan(0);
             expect(retainedProposals).toEqual(retained);
+            expect(retainedProposals.every((event, index) => event === retained[index])).toBe(true);
 
             SearchDriver.prototype.appliesTo = () => true;
             SearchDriver.prototype.chooseDecision = (_unit, _version, incumbent) => incumbent.slice();
@@ -108,6 +111,8 @@ describe("battle engine turn execution observer", () => {
             });
             expect(overriddenProposals.length).toBeGreaterThan(0);
             expect(overridden).toEqual([]);
+            expect(decisionOrigins.length).toBeGreaterThan(0);
+            expect(decisionOrigins.every((origin) => origin === "root")).toBe(true);
         } finally {
             STRATEGY_V0_1.decideTurn = originalDecideTurn;
             SearchDriver.prototype.appliesTo = originalAppliesTo;
