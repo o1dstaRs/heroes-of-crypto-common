@@ -131,6 +131,10 @@ export interface IMirrorSideDiag {
     moveShotSequences: number;
     /** Recorded range-attack damage dealt by moveShotSequences. */
     moveShotRangeDamage: number;
+    /** Delta-only weak-melee escapes selected by v0.8 ranged positioning. */
+    supportedRangedEscapes: number;
+    /** Delta-only protected advances whose ordinary counter-shot was proven response-neutral. */
+    responseNeutralAdvances: number;
     meleeDamage: number;
     firstVolleyLap: number | null;
     firstVolleyDamage: number | null;
@@ -207,6 +211,8 @@ function newSideDiag(version: string): IMirrorSideDiag {
         shotDamage: 0,
         moveShotSequences: 0,
         moveShotRangeDamage: 0,
+        supportedRangedEscapes: 0,
+        responseNeutralAdvances: 0,
         meleeDamage: 0,
         firstVolleyLap: null,
         firstVolleyDamage: null,
@@ -272,6 +278,16 @@ export function playMirrorGame(
               }
           }
         : undefined;
+    const policyEventObserver: IMatchConfig["policyEventObserver"] = diag
+        ? (event): void => {
+              const side = event.team === GREEN_TEAM ? diag.green : diag.red;
+              if (event.kind === "v0.8_supported_ranged_escape") {
+                  side.supportedRangedEscapes += 1;
+              } else if (event.kind === "v0.8_response_neutral_advance") {
+                  side.responseNeutralAdvances += 1;
+              }
+          }
+        : undefined;
 
     // Prime the lazy singleton outside runMatch's seeded scope (archetype_payoff.ts rationale).
     const matchRunner =
@@ -292,6 +308,7 @@ export function playMirrorGame(
         greenAugments: setup.augments.map((augment) => ({ ...augment })),
         redAugments: setup.augments.map((augment) => ({ ...augment })),
         ...(observer ? { decisionObserver: observer } : {}),
+        ...(policyEventObserver ? { policyEventObserver } : {}),
     });
 
     if (diag) {
@@ -442,6 +459,8 @@ interface IVersionAggregate {
     shotDamage: number;
     moveShotSequences: number;
     moveShotRangeDamage: number;
+    supportedRangedEscapes: number;
+    responseNeutralAdvances: number;
     meleeDamage: number;
     deathsByLap: Map<number, number>;
     dmgByLap: Map<number, number>;
@@ -470,6 +489,8 @@ export function aggregateMirrorDiag(
                 shotDamage: 0,
                 moveShotSequences: 0,
                 moveShotRangeDamage: 0,
+                supportedRangedEscapes: 0,
+                responseNeutralAdvances: 0,
                 meleeDamage: 0,
                 deathsByLap: new Map(),
                 dmgByLap: new Map(),
@@ -497,6 +518,8 @@ export function aggregateMirrorDiag(
             a.shotDamage += side.shotDamage;
             a.moveShotSequences += side.moveShotSequences ?? 0;
             a.moveShotRangeDamage += side.moveShotRangeDamage ?? 0;
+            a.supportedRangedEscapes += side.supportedRangedEscapes ?? 0;
+            a.responseNeutralAdvances += side.responseNeutralAdvances ?? 0;
             a.meleeDamage += side.meleeDamage;
             if (side.firstVolleyLap !== null) {
                 a.firstVolleyLaps.push(side.firstVolleyLap);
@@ -542,6 +565,10 @@ export function aggregateMirrorDiag(
             moveShotRangeDamage: a.moveShotRangeDamage,
             moveShotRangeDamagePerGame: a.moveShotRangeDamage / Math.max(1, a.games),
             meanMoveShotRangeDamage: a.moveShotSequences > 0 ? a.moveShotRangeDamage / a.moveShotSequences : null,
+            supportedRangedEscapes: a.supportedRangedEscapes,
+            supportedRangedEscapesPerGame: a.supportedRangedEscapes / Math.max(1, a.games),
+            responseNeutralAdvances: a.responseNeutralAdvances,
+            responseNeutralAdvancesPerGame: a.responseNeutralAdvances / Math.max(1, a.games),
             meleeDamagePerGame: a.meleeDamage / Math.max(1, a.games),
             perLap: laps.map((lap) => {
                 const slot = a.byLap.get(lap)!;
