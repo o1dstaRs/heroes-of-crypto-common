@@ -32,6 +32,7 @@ import {
 import { GREEN_TEAM, runMatch, type IDecisionObservation, type IMatchConfig, type IMatchResult } from "./battle_engine";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
+import { V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES, type V08SupportedPrepinEgressFunnelStage } from "../ai/ai_strategy";
 import {
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
@@ -143,6 +144,8 @@ export interface IMirrorSideDiag {
     supportedPrepinEgressSelections: number;
     /** Pre-search supported pre-pin egress proposals, including ones later replaced by a13. */
     supportedPrepinEgressProposals: number;
+    /** Selector-scoped, pre-search counts at each supported pre-pin eligibility stage. */
+    supportedPrepinEgressFunnel: Record<V08SupportedPrepinEgressFunnelStage, number>;
     meleeDamage: number;
     firstVolleyLap: number | null;
     firstVolleyDamage: number | null;
@@ -150,6 +153,12 @@ export interface IMirrorSideDiag {
     /** Deaths SUFFERED by this side's units, by lap (action-attributed; narrowing/armageddon excluded). */
     deathsByLap: Record<number, number>;
 }
+
+const newSupportedPrepinEgressFunnel = (): Record<V08SupportedPrepinEgressFunnelStage, number> =>
+    Object.fromEntries(V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES.map((stage) => [stage, 0])) as Record<
+        V08SupportedPrepinEgressFunnelStage,
+        number
+    >;
 
 export interface IMirrorGameRecord {
     game: number;
@@ -225,6 +234,7 @@ function newSideDiag(version: string): IMirrorSideDiag {
         responseNeutralAdvanceProposals: 0,
         supportedPrepinEgressSelections: 0,
         supportedPrepinEgressProposals: 0,
+        supportedPrepinEgressFunnel: newSupportedPrepinEgressFunnel(),
         meleeDamage: 0,
         firstVolleyLap: null,
         firstVolleyDamage: null,
@@ -311,6 +321,8 @@ export function playMirrorGame(
                   side.responseNeutralAdvanceProposals += 1;
               } else if (event.kind === "v0.8_supported_prepin_egress") {
                   side.supportedPrepinEgressProposals += 1;
+              } else if (event.kind === "v0.8_supported_prepin_egress_funnel" && event.stage) {
+                  side.supportedPrepinEgressFunnel[event.stage] += 1;
               }
           }
         : undefined;
@@ -492,6 +504,7 @@ interface IVersionAggregate {
     responseNeutralAdvanceProposals: number;
     supportedPrepinEgressSelections: number;
     supportedPrepinEgressProposals: number;
+    supportedPrepinEgressFunnel: Record<V08SupportedPrepinEgressFunnelStage, number>;
     meleeDamage: number;
     deathsByLap: Map<number, number>;
     dmgByLap: Map<number, number>;
@@ -526,6 +539,7 @@ export function aggregateMirrorDiag(
                 responseNeutralAdvanceProposals: 0,
                 supportedPrepinEgressSelections: 0,
                 supportedPrepinEgressProposals: 0,
+                supportedPrepinEgressFunnel: newSupportedPrepinEgressFunnel(),
                 meleeDamage: 0,
                 deathsByLap: new Map(),
                 dmgByLap: new Map(),
@@ -559,6 +573,9 @@ export function aggregateMirrorDiag(
             a.responseNeutralAdvanceProposals += side.responseNeutralAdvanceProposals ?? 0;
             a.supportedPrepinEgressSelections += side.supportedPrepinEgressSelections ?? 0;
             a.supportedPrepinEgressProposals += side.supportedPrepinEgressProposals ?? 0;
+            for (const stage of V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES) {
+                a.supportedPrepinEgressFunnel[stage] += side.supportedPrepinEgressFunnel?.[stage] ?? 0;
+            }
             a.meleeDamage += side.meleeDamage;
             if (side.firstVolleyLap !== null) {
                 a.firstVolleyLaps.push(side.firstVolleyLap);
@@ -616,6 +633,13 @@ export function aggregateMirrorDiag(
             supportedPrepinEgressSelectionsPerGame: a.supportedPrepinEgressSelections / Math.max(1, a.games),
             supportedPrepinEgressProposals: a.supportedPrepinEgressProposals,
             supportedPrepinEgressProposalsPerGame: a.supportedPrepinEgressProposals / Math.max(1, a.games),
+            supportedPrepinEgressFunnel: a.supportedPrepinEgressFunnel,
+            supportedPrepinEgressFunnelPerGame: Object.fromEntries(
+                V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES.map((stage) => [
+                    stage,
+                    a.supportedPrepinEgressFunnel[stage] / Math.max(1, a.games),
+                ]),
+            ),
             meleeDamagePerGame: a.meleeDamage / Math.max(1, a.games),
             perLap: laps.map((lap) => {
                 const slot = a.byLap.get(lap)!;

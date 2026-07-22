@@ -261,7 +261,21 @@ describe("v0.8 protected ranged positioning", () => {
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
         expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [{ x: 0, y: 0 }] });
         expect(actions[1]).toMatchObject({ type: "range_attack", targetId: target.getId() });
-        expect(policyEvents.map(({ kind }) => kind)).toEqual(["v0.8_supported_prepin_egress"]);
+        expect(
+            policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress_funnel").map(({ stage }) => stage),
+        ).toEqual([
+            "ordinary_shot",
+            "eligible_shooter",
+            "target_no_counter",
+            "current_threat",
+            "fixed_guard",
+            "current_signature",
+            "reachable_route",
+            "safe_route",
+            "causal_guard",
+            "retained_signature",
+        ]);
+        expect(policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress")).toHaveLength(1);
     });
 
     it("keeps the pre-pin experiment default-off and computes but does not select its catalog-only control", () => {
@@ -333,9 +347,14 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
         const { shooter, target, context } = setupSupportedPrepinEgress({ targetRanged: true });
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
 
         expect(target.canRespond(RANGE)).toBe(true);
         expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+        expect(
+            policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress_funnel").map(({ stage }) => stage),
+        ).toEqual(["ordinary_shot", "eligible_shooter"]);
     });
 
     it("requires a current pending pin before considering a guarded destination", () => {
