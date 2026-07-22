@@ -165,7 +165,7 @@ import {
  * one. Both measured seats receive the same catalog; the scoped candidate seat may select the engine-validated
  * redirect.
  * SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS=1 is an independent default-off, version-scoped scheduler for ordinary
- * original shooters on those all-ranged boards. During laps 6..11 it locks an inherited stationary shot already
+ * original shooters on those all-ranged boards. During laps 1..11 it locks an inherited stationary shot already
  * aimed at an armed original No Melee barrier, or redirects another stationary shot when the barrier has at most
  * one spare activation under the current-ammo optimistic upper bound (negative slack remains eligible). A
  * redirect preserves primary-target kill, at least 80% of enemy/net aggregate damage, and friendly-fire safety,

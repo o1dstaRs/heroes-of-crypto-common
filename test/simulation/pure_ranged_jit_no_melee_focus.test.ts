@@ -142,21 +142,23 @@ const rank = (
 ) => rankPureRangedJitNoMeleeFocusCandidates(f.actor, f.unitsHolder, candidates, f.state, lap);
 
 describe("pure-ranged JIT No-Melee focus", () => {
-    it("uses the exact lap 6..11 window and includes the current activation in 12-lap slack", () => {
-        const f = fixture();
-        const focus = shot(f.actor, f.noMelee, "shot", { primary: 20 }); // 5 actions; slack 1 at lap 6
-        expect(rank(f, [f.incumbent, focus], PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP - 1)).toEqual([]);
+    it("uses the exact lap 1..11 window and includes the current activation in pre-Armageddon slack", () => {
+        const f = fixture([], 99);
+        const focus = shot(f.actor, f.noMelee, "shot", { primary: 10 }); // 10 actions; slack 1 at lap 1
+        expect(PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP).toBe(1);
+        expect(rank(f, [f.incumbent, focus], 0)).toEqual([]);
         expect(rank(f, [f.incumbent, focus], PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP)[0]).toMatchObject({
-            availableFullDamageActivationsUpperBound: 6,
-            estimatedRequiredActivations: 5,
+            availableFullDamageActivationsUpperBound: 11,
+            estimatedRequiredActivations: 10,
             deadlineSlack: 1,
         });
         expect(rank(f, [f.incumbent, focus], PURE_RANGED_JIT_NO_MELEE_FOCUS_LAST_LAP)[0]).toMatchObject({
             availableFullDamageActivationsUpperBound: 1,
-            estimatedRequiredActivations: 5,
-            deadlineSlack: -4,
+            estimatedRequiredActivations: 10,
+            deadlineSlack: -9,
         });
         expect(rank(f, [f.incumbent, focus], PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP)).toEqual([]);
+        expect(rank(f, [f.incumbent, focus], PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP + 1)).toEqual([]);
     });
 
     it("rejects slack two while retaining one-buffer, exact, and overdue strata", () => {
@@ -182,8 +184,8 @@ describe("pure-ranged JIT No-Melee focus", () => {
 
         const endless = fixture(["Endless Quiver"], 1);
         expect(
-            rank(endless, [endless.incumbent, shot(endless.actor, endless.noMelee, "shot", { primary: 20 })])[0],
-        ).toMatchObject({ availableFullDamageActivationsUpperBound: 6, deadlineSlack: 1 });
+            rank(endless, [endless.incumbent, shot(endless.actor, endless.noMelee, "shot", { primary: 10 })])[0],
+        ).toMatchObject({ availableFullDamageActivationsUpperBound: 11, deadlineSlack: 1 });
     });
 
     it("excludes collateral, No-Melee, and Double-Shot actor cards using stable ownership", () => {

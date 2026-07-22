@@ -1931,7 +1931,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const primary = red[0];
         const noMelee = red[1];
         noMelee.grantStolenAbility("No Melee");
-        // Keep the barrier large enough to arm the JIT scheduler at lap six without manufacturing a low-HP kill.
+        // Keep the barrier large enough to arm the JIT scheduler from lap one without manufacturing a low-HP kill.
         noMelee.setAmountAlive(100);
         const moveTo = (unit: Unit, cell: XY): void => {
             h.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
@@ -1955,7 +1955,6 @@ describe("search driver — gating, hygiene, determinism", () => {
         moveTo(green[1], { x: 2, y: 12 });
         moveTo(primary, { x: 8, y: 7 });
         moveTo(noMelee, { x: 9, y: 6 });
-        for (let lap = 1; lap < 6; lap += 1) h.fightProperties.flipLap();
         h.setActiveUnitId(actor.getId());
         return { actor, primary, noMelee };
     };
@@ -1987,7 +1986,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(summary).toMatchObject({
             pureRangedJitNoMeleeFocus: true,
             pureRangedJitNoMeleeFocusVersions: ["v0.8"],
-            pureRangedJitNoMeleeFocusStartLap: 6,
+            pureRangedJitNoMeleeFocusStartLap: 1,
             pureRangedJitNoMeleeFocusLastLap: 11,
             pureRangedJitNoMeleeFocusActivationBuffer: 1,
             pureRangedJitNoMeleeFocusDamageFloor: 0.8,
@@ -2004,7 +2003,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             pureRangedJitNoMeleeFocusProposalsByActorName: { Arbalester: 1 },
             pureRangedJitNoMeleeFocusOverridesByActorName: { Arbalester: 1 },
             pureRangedJitNoMeleeFocusOverridesByTargetName: { Arbalester: 1 },
-            pureRangedJitNoMeleeFocusOverridesByLap: { "6": 1 },
+            pureRangedJitNoMeleeFocusOverridesByLap: { "1": 1 },
         });
         expect(summary.pureRangedJitNoMeleeFocusMaximumDeadlineSlack as number).toBeLessThanOrEqual(1);
         expect(summary.pureRangedJitNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThanOrEqual(0.8);
@@ -2044,7 +2043,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             pureRangedJitNoMeleeFocusSelections: 1,
             pureRangedJitNoMeleeFocusLocksByActorName: { Arbalester: 1 },
             pureRangedJitNoMeleeFocusLocksByTargetName: { Arbalester: 1 },
-            pureRangedJitNoMeleeFocusLocksByLap: { "6": 1 },
+            pureRangedJitNoMeleeFocusLocksByLap: { "1": 1 },
         });
     });
 
@@ -2098,7 +2097,9 @@ describe("search driver — gating, hygiene, determinism", () => {
         const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-endless-")), "search.jsonl");
         setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: audit });
         const h = buildBattle(10_408, "v0.8", undefined, pureRangedParetoFocusRoster());
-        const { actor, primary } = positionJitFocusFixture(h);
+        const { actor, primary, noMelee } = positionJitFocusFixture(h);
+        // Unlimited ammo raises the optimistic lap-one ceiling to eleven activations; keep this fixture armed.
+        noMelee.setAmountAlive(200);
         actor.grantStolenAbility("Endless Quiver");
         const driver = h.makeDriver();
         driver.onFightReady();

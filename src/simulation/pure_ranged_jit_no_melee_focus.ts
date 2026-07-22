@@ -19,8 +19,8 @@ import type { PureRangedTerminalState } from "./v0_7_pure_ranged_terminal";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 
-/** Preregistered JIT window: six through one complete pre-Armageddon activations remain. */
-export const PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP = 6;
+/** Preregistered JIT v2 window: every complete pre-Armageddon lap is eligible. */
+export const PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP = 1;
 export const PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON;
 export const PURE_RANGED_JIT_NO_MELEE_FOCUS_LAST_LAP = PURE_RANGED_JIT_NO_MELEE_FOCUS_END_LAP - 1;
 export const PURE_RANGED_JIT_NO_MELEE_FOCUS_ACTIVATION_BUFFER = 1;
