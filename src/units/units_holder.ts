@@ -799,6 +799,17 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
+    public refreshWaterShieldForAllUnits(): void {
+        // Seed the innate one-per-battle Water Shield buff for any unit that owns the ability. trySeedWaterShield
+        // is idempotent and refuses to re-grant a shield that has already been consumed, so it is safe to call on
+        // every stack-power refresh (which runs at fight start and after each attack).
+        for (const unit of this.getAllUnitsIterator()) {
+            if (unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+                continue;
+            }
+            unit.trySeedWaterShield();
+        }
+    }
     public refreshStackPowerForAllUnits(): void {
         FightStateManager.getInstance()
             .getFightProperties()
@@ -810,6 +821,7 @@ export class UnitsHolder {
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsForAllUnits();
         this.refreshAngelicHostForAllUnits();
+        this.refreshWaterShieldForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;

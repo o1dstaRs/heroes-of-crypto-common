@@ -72,7 +72,7 @@ export function processFireShieldAbility(
         const amountAliveBefore = toUnit.getAmountAlive();
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
-            damage: toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog),
+            damage: toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog, false, fromUnit),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });

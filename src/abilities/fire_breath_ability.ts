@@ -138,7 +138,14 @@ export function processFireBreathAbility(
 
         const positionAtImpact = { ...nextStandingTarget.getPosition() };
         const amountAliveBefore = nextStandingTarget.getAmountAlive();
-        const damageDealt = nextStandingTarget.applyDamage(fireBreathAttackDamage, 0 /* magic attack */, sceneLog);
+        // fromUnit (Fire Element) passed so a Water Shield on the target is ignored by fire.
+        const damageDealt = nextStandingTarget.applyDamage(
+            fireBreathAttackDamage,
+            0 /* magic attack */,
+            sceneLog,
+            false,
+            fromUnit,
+        );
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
             damage: damageDealt,
