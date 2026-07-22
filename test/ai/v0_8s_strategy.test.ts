@@ -35,7 +35,14 @@ import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const SEARCH_ENV_KEYS = ["V07_SEARCH", "Q2_WAIT_ABLATION", "Q2_ORACLE", "SEARCH_VERSIONS", "V08_A13_SEARCH"] as const;
+const SEARCH_ENV_KEYS = [
+    "V07_SEARCH",
+    "Q2_WAIT_ABLATION",
+    "Q2_ORACLE",
+    "SEARCH_VERSIONS",
+    "V08_A13_SEARCH",
+    "V08_RANGED_POSITION_VERSIONS",
+] as const;
 const savedSearchEnv = Object.fromEntries(SEARCH_ENV_KEYS.map((key) => [key, process.env[key]]));
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
@@ -141,6 +148,9 @@ describe("v0.8 search measurement alias", () => {
 
     it("plays byte-identically to v0.8 before the lap-6 experiment boundary", () => {
         process.env.V08_A13_SEARCH = "0";
+        // Isolate the measurement alias from the separately scoped production ranged-positioning probe.
+        // By default that probe intentionally applies to v0.8 but not its v0.8s control seat.
+        process.env.V08_RANGED_POSITION_VERSIONS = "";
         const seed = 20260719;
         const roster = buildRoster(makeRng(seed));
         const config = { redVersion: "v0.7", roster, seed, maxLaps: 5 } as const;
@@ -161,8 +171,8 @@ describe("v0.8 search measurement alias", () => {
             return createHash("sha256").update(JSON.stringify(result)).digest("hex");
         };
 
-        expect(digest("v0.7")).toBe("30a30017ad1962110965ded64aa80cfa22ba07f507a10a813b19f76d4b46283c");
-        expect(digest("v0.8")).toBe("b9e2f99dc51422510759a4ab830718f23bcbd97b3421e3a70ec888f9a65fae03");
+        expect(digest("v0.7")).toBe("0a76410be0f38bee72cd4a882f56061c9a6013c0d1e1b66cffc167ea782ea88a");
+        expect(digest("v0.8")).toBe("0c2e35f661fe9bcd9f34bc2f41ebcd41a6a6af3512b5bc9fc90fbd56e5521c92");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

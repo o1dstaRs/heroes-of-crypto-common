@@ -98,6 +98,7 @@ const UNIT_FIELDS = [
     "possibleAttackTypes",
     "maxRangeShots",
     "responded",
+    "waterShieldSpent",
     "onHourglass",
     "movedThisTurn",
     "currentAttackModIncrease",
