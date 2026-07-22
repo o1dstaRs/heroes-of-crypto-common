@@ -2,10 +2,19 @@ import { describe, expect, test } from "bun:test";
 
 import type { IAIStrategy } from "../../src/ai/ai_strategy";
 import { STRATEGY_V0_1 } from "../../src/ai/versions/v0_1";
+import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import {
+    getRangeAttackSideCenter,
+    isRangeAttackSideObservable,
+    RANGE_ATTACK_CELL_SIDES,
+    type RangeAttackCellSide,
+} from "../../src/grid/grid_math";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 import { runMatch, type IMatchResult, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
+import { Spell } from "../../src/spells/spell";
+import type { Unit } from "../../src/units/unit";
 
 const runObservedMatch = (seed: number, maxLaps: number) => {
     const decisions: (readonly GameAction[])[] = [];
@@ -145,6 +154,96 @@ describe("battle engine turn execution observer", () => {
         });
         expect(recovered!.recoveryAttempts.at(-1)).toEqual(recovered!.recovery);
         expect(recovered!.events.map((event) => event.type)).toEqual(["unit_defended", "turn_completed"]);
+    });
+
+    test("attributes a rejected ranged shot to Cowardice against its stronger resolved primary", () => {
+        let injectedUnitId: string | undefined;
+        let resolvedPrimaryId: string | undefined;
+        let attackerHp: number | undefined;
+        let primaryHp: number | undefined;
+        const { result, turns } = runObservedMatchWithV01Transform(25, 40, (unit, context, incumbent) => {
+            const shot = incumbent.find(
+                (action): action is Extract<GameAction, { type: "range_attack" }> => action.type === "range_attack",
+            );
+            const target = shot ? context.unitsHolder.getAllUnits().get(shot.targetId) : undefined;
+            if (injectedUnitId || !shot || !target || !context.attackHandler || unit.hasAbilityActive("Through Shot")) {
+                return incumbent;
+            }
+            let chosenAim: { cell: { x: number; y: number }; side: RangeAttackCellSide } | undefined;
+            let primary: Unit | undefined;
+            for (const cell of target.getCells()) {
+                for (const side of RANGE_ATTACK_CELL_SIDES) {
+                    if (!isRangeAttackSideObservable(context.grid.getMatrix(), cell, side, unit.getTeam(), false)) {
+                        continue;
+                    }
+                    const targetPosition = getRangeAttackSideCenter(
+                        context.grid.getSettings(),
+                        cell,
+                        side,
+                        unit.getPosition(),
+                    );
+                    const candidate = context.attackHandler.evaluateRangeAttack(
+                        context.unitsHolder.getAllUnits(),
+                        unit,
+                        unit.getPosition(),
+                        targetPosition,
+                        false,
+                        false,
+                        unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw"),
+                    ).affectedUnits[0]?.[0];
+                    if (candidate && candidate.getTeam() !== unit.getTeam()) {
+                        chosenAim = { cell: { ...cell }, side };
+                        primary = candidate;
+                        break;
+                    }
+                }
+                if (chosenAim) {
+                    break;
+                }
+            }
+            if (!chosenAim || !primary) {
+                return incumbent;
+            }
+
+            unit.setAmountAlive(1);
+            if (primary.getCumulativeHp() <= unit.getCumulativeHp()) {
+                primary.setAmountAlive(
+                    Math.max(primary.getAmountAlive(), Math.floor(unit.getCumulativeHp() / primary.getMaxHp()) + 2),
+                );
+            }
+            unit.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
+            injectedUnitId = unit.getId();
+            resolvedPrimaryId = primary.getId();
+            attackerHp = unit.getCumulativeHp();
+            primaryHp = primary.getCumulativeHp();
+            return incumbent.map((action) =>
+                action === shot ? { ...action, aimCell: chosenAim.cell, aimSide: chosenAim.side } : action,
+            );
+        });
+
+        expect(injectedUnitId).toBeDefined();
+        expect(resolvedPrimaryId).toBeDefined();
+        expect(attackerHp).toBeLessThan(primaryHp!);
+        expect(result.rejectedDetails).toContainEqual(
+            expect.objectContaining({
+                type: "range_attack",
+                reason: "attack_not_available",
+                cause: "cowardice",
+            }),
+        );
+        const rejected = turns.find(
+            (turn) =>
+                turn.unitId === injectedUnitId &&
+                turn.strategyActions.some(
+                    (execution) => execution.action.type === "range_attack" && !execution.completed,
+                ),
+        );
+        expect(rejected).toBeDefined();
+        expect(rejected!.strategyActions.at(-1)).toMatchObject({
+            action: { type: "range_attack" },
+            completed: false,
+            rejectionReason: "attack_not_available",
+        });
     });
 
     test("counts a rejected attack-type selector once when the following attack succeeds", () => {
