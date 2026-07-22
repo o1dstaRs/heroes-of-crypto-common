@@ -36,6 +36,7 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     noMeleeTerminalPressure: false,
     deadlineFinisher: false,
     supportedRangedDelta: false,
+    responseNeutralAdvance: false,
     diag: false,
 };
 
@@ -89,6 +90,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
+            V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
         });
         expect(environment.HOSTILE_EXPERIMENT).toBeUndefined();
     });
@@ -159,12 +161,14 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             noMeleeTerminalPressure: false,
             deadlineFinisher: false,
             supportedRangedDelta: false,
+            responseNeutralAdvance: false,
             diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
         expect(parseV08RangedPositioningABOptions([]).noMeleeTerminalPressure).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).deadlineFinisher).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
@@ -313,6 +317,50 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("mode=retreat|both");
     });
 
+    it("compares response-neutral advance against the same shipped positioning baseline", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "advance",
+            responseNeutralAdvance: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.environment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "advance",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "v0.8",
+            V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm.responseNeutralAdvance).toBe(true);
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "advance",
+                "--response-neutral-advance",
+            ]).responseNeutralAdvance,
+        ).toBe(true);
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "retreat" })).toThrow(
+            "mode=advance|both",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "off" })).toThrow("mode=advance|both");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, supportedRangedDelta: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "both" })).not.toThrow();
+        expect(() =>
+            buildV08RangedPositioningABEnvironment("retreat", "operational_bounded", {}, 0, false, false, false, true),
+        ).toThrow("mode=advance|both");
+    });
+
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
         const options: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -351,6 +399,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 noMeleeTerminalPressure: false,
                 deadlineFinisher: false,
                 supportedRangedDelta: false,
+                responseNeutralAdvance: false,
                 diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
@@ -371,6 +420,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
+            V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();
         expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).sort());
