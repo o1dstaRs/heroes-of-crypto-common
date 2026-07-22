@@ -40,6 +40,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     noMeleeTerminalPressure: false,
     deadlineFinisher: false,
     paretoNoMeleeFocus: false,
+    paretoNoMeleeFocusCatalogOnly: false,
+    paretoNoMeleeFocusDamageFloor: 1,
     supportedRangedDelta: false,
     responseNeutralAdvance: false,
     diag: false,
@@ -170,6 +172,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             noMeleeTerminalPressure: false,
             deadlineFinisher: false,
             paretoNoMeleeFocus: false,
+            paretoNoMeleeFocusCatalogOnly: false,
+            paretoNoMeleeFocusDamageFloor: 1,
             supportedRangedDelta: false,
             responseNeutralAdvance: false,
             diag: true,
@@ -178,6 +182,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).noMeleeTerminalPressure).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).deadlineFinisher).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocus).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocusCatalogOnly).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocusDamageFloor).toBe(1);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
@@ -293,6 +299,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             cohorts: ["pure_ranged"],
             mode: "off",
             paretoNoMeleeFocus: true,
+            paretoNoMeleeFocusDamageFloor: 0.95,
         };
         const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
         expect(invocation.searchAuditPath).toBe("/tmp/hoc-v08-ranged-ab-test/pure_ranged.search-audit.jsonl");
@@ -300,6 +307,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_AUDIT: invocation.searchAuditPath,
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "1",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "0.95",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
             SEARCH_VERSIONS: "v0.8,v0.8s",
@@ -310,12 +318,26 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest.arm.paretoNoMeleeFocus).toBe(true);
+        expect(manifest.arm.paretoNoMeleeFocusDamageFloor).toBe(0.95);
         expect(manifest.artifacts.searchAudit).toBe(invocation.searchAuditPath);
         expect(manifest.behaviorEnvironment.SEARCH_AUDIT).toBeUndefined();
         expect(
-            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--pareto-no-melee-focus"])
-                .paretoNoMeleeFocus,
-        ).toBe(true);
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "pure_ranged",
+                "--mode",
+                "off",
+                "--pareto-no-melee-focus",
+                "--pareto-damage-floor",
+                "0.95",
+            ]),
+        ).toMatchObject({ paretoNoMeleeFocus: true, paretoNoMeleeFocusDamageFloor: 0.95 });
+        expect(() => parseV08RangedPositioningABOptions(["--pareto-damage-floor", "0.95"])).toThrow(
+            "requires paretoNoMeleeFocus",
+        );
+        expect(() =>
+            parseV08RangedPositioningABOptions(["--pareto-no-melee-focus", "--pareto-damage-floor", "0.89"]),
+        ).toThrow("must be one of 0.9, 0.95, or 1");
         expect(() => buildV08RangedPositioningABInvocations({ ...options, cohorts: ["hybrid"] })).toThrow(
             "requires cohorts=pure_ranged",
         );
@@ -344,6 +366,44 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 true,
             ),
         ).not.toThrow();
+    });
+
+    it("manifests a catalog-matched selector-off Pareto control", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            mode: "off",
+            paretoNoMeleeFocusCatalogOnly: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.environment).toMatchObject({
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "1",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "catalog-only-control",
+        });
+        expect(invocation.searchAuditPath).toBe("/tmp/hoc-v08-ranged-ab-test/pure_ranged.search-audit.jsonl");
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm).toMatchObject({
+            paretoNoMeleeFocus: false,
+            paretoNoMeleeFocusCatalogOnly: true,
+            paretoNoMeleeFocusDamageFloor: 1,
+        });
+        expect(manifest.behaviorEnvironment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS).toBe(
+            "catalog-only-control",
+        );
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--pareto-catalog-only"])
+                .paretoNoMeleeFocusCatalogOnly,
+        ).toBe(true);
+        expect(() =>
+            buildV08RangedPositioningABInvocations({
+                ...options,
+                paretoNoMeleeFocus: true,
+            }),
+        ).toThrow("mutually exclusive");
     });
 
     it("compares supported ranged escape against the same shipped positioning baseline", () => {
@@ -450,7 +510,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v2",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -469,6 +529,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 noMeleeTerminalPressure: false,
                 deadlineFinisher: false,
                 paretoNoMeleeFocus: false,
+                paretoNoMeleeFocusCatalogOnly: false,
+                paretoNoMeleeFocusDamageFloor: 1,
                 supportedRangedDelta: false,
                 responseNeutralAdvance: false,
                 diag: true,

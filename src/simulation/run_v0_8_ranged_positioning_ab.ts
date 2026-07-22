@@ -66,6 +66,9 @@ export interface IV08RangedPositioningABOptions {
     noMeleeTerminalPressure?: boolean;
     deadlineFinisher?: boolean;
     paretoNoMeleeFocus?: boolean;
+    /** Enables identical target-covered catalogs for both seats without allowing either selector to fire. */
+    paretoNoMeleeFocusCatalogOnly?: boolean;
+    paretoNoMeleeFocusDamageFloor?: number;
     supportedRangedDelta?: boolean;
     responseNeutralAdvance?: boolean;
     diag?: boolean;
@@ -87,7 +90,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v2";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -106,6 +109,8 @@ export interface IV08RangedPositioningABManifest {
         noMeleeTerminalPressure: boolean;
         deadlineFinisher: boolean;
         paretoNoMeleeFocus: boolean;
+        paretoNoMeleeFocusCatalogOnly: boolean;
+        paretoNoMeleeFocusDamageFloor: number;
         supportedRangedDelta: boolean;
         responseNeutralAdvance: boolean;
         diag: boolean;
@@ -140,6 +145,8 @@ const isTimingMode = (value: string): value is V08RangedPositioningTimingMode =>
 
 const isMoveShotCap = (value: number): value is V08RangedPositioningMoveShots =>
     value === 0 || value === 1 || value === 2;
+
+const isParetoDamageFloor = (value: number): boolean => value === 0.9 || value === 0.95 || value === 1;
 
 function validateBehaviorArmGeometry(
     mode: V08RangedPositioningMode,
@@ -226,6 +233,22 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.paretoNoMeleeFocus !== undefined && typeof options.paretoNoMeleeFocus !== "boolean") {
         throw new Error("paretoNoMeleeFocus must be a boolean");
     }
+    if (
+        options.paretoNoMeleeFocusCatalogOnly !== undefined &&
+        typeof options.paretoNoMeleeFocusCatalogOnly !== "boolean"
+    ) {
+        throw new Error("paretoNoMeleeFocusCatalogOnly must be a boolean");
+    }
+    if (options.paretoNoMeleeFocus && options.paretoNoMeleeFocusCatalogOnly) {
+        throw new Error("paretoNoMeleeFocus and paretoNoMeleeFocusCatalogOnly are mutually exclusive");
+    }
+    const paretoDamageFloor = options.paretoNoMeleeFocusDamageFloor ?? 1;
+    if (!isParetoDamageFloor(paretoDamageFloor)) {
+        throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
+    }
+    if (!options.paretoNoMeleeFocus && paretoDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusDamageFloor below 1 requires paretoNoMeleeFocus");
+    }
     if (options.supportedRangedDelta !== undefined && typeof options.supportedRangedDelta !== "boolean") {
         throw new Error("supportedRangedDelta must be a boolean");
     }
@@ -237,7 +260,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.moveShots ?? 0,
         options.noMeleeTerminalPressure ?? false,
         options.deadlineFinisher ?? false,
-        options.paretoNoMeleeFocus ?? false,
+        (options.paretoNoMeleeFocus ?? false) || (options.paretoNoMeleeFocusCatalogOnly ?? false),
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
     );
@@ -247,7 +270,10 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.deadlineFinisher && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
-    if (options.paretoNoMeleeFocus && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
+    if (
+        (options.paretoNoMeleeFocus || options.paretoNoMeleeFocusCatalogOnly) &&
+        (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")
+    ) {
         throw new Error("paretoNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
     if (options.diag !== undefined && typeof options.diag !== "boolean") throw new Error("diag must be a boolean");
@@ -335,7 +361,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v1" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v2" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -354,6 +380,8 @@ export function buildV08RangedPositioningABManifest(
             noMeleeTerminalPressure: options.noMeleeTerminalPressure ?? false,
             deadlineFinisher: options.deadlineFinisher ?? false,
             paretoNoMeleeFocus: options.paretoNoMeleeFocus ?? false,
+            paretoNoMeleeFocusCatalogOnly: options.paretoNoMeleeFocusCatalogOnly ?? false,
+            paretoNoMeleeFocusDamageFloor: options.paretoNoMeleeFocusDamageFloor ?? 1,
             supportedRangedDelta: options.supportedRangedDelta ?? false,
             responseNeutralAdvance: options.responseNeutralAdvance ?? false,
             diag: options.diag ?? false,
@@ -388,6 +416,8 @@ export function buildV08RangedPositioningABEnvironment(
     supportedRangedDelta = false,
     responseNeutralAdvance = false,
     paretoNoMeleeFocus = false,
+    paretoNoMeleeFocusDamageFloor = 1,
+    paretoNoMeleeFocusCatalogOnly = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -395,6 +425,18 @@ export function buildV08RangedPositioningABEnvironment(
     if (typeof noMeleeTerminalPressure !== "boolean") throw new Error("noMeleeTerminalPressure must be a boolean");
     if (typeof deadlineFinisher !== "boolean") throw new Error("deadlineFinisher must be a boolean");
     if (typeof paretoNoMeleeFocus !== "boolean") throw new Error("paretoNoMeleeFocus must be a boolean");
+    if (typeof paretoNoMeleeFocusCatalogOnly !== "boolean") {
+        throw new Error("paretoNoMeleeFocusCatalogOnly must be a boolean");
+    }
+    if (paretoNoMeleeFocus && paretoNoMeleeFocusCatalogOnly) {
+        throw new Error("paretoNoMeleeFocus and paretoNoMeleeFocusCatalogOnly are mutually exclusive");
+    }
+    if (!isParetoDamageFloor(paretoNoMeleeFocusDamageFloor)) {
+        throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
+    }
+    if (!paretoNoMeleeFocus && paretoNoMeleeFocusDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusDamageFloor below 1 requires paretoNoMeleeFocus");
+    }
     if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
     if (typeof responseNeutralAdvance !== "boolean") throw new Error("responseNeutralAdvance must be a boolean");
     validateBehaviorArmGeometry(
@@ -402,7 +444,7 @@ export function buildV08RangedPositioningABEnvironment(
         moveShots,
         noMeleeTerminalPressure,
         deadlineFinisher,
-        paretoNoMeleeFocus,
+        paretoNoMeleeFocus || paretoNoMeleeFocusCatalogOnly,
         supportedRangedDelta,
         responseNeutralAdvance,
     );
@@ -426,8 +468,14 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER = deadlineFinisher ? "1" : "0";
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS = V08_A13_PRODUCTION_VERSION;
-    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = paretoNoMeleeFocus ? "1" : "0";
-    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS = V08_A13_PRODUCTION_VERSION;
+    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS =
+        paretoNoMeleeFocus || paretoNoMeleeFocusCatalogOnly ? "1" : "0";
+    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS = paretoNoMeleeFocusCatalogOnly
+        ? "catalog-only-control"
+        : V08_A13_PRODUCTION_VERSION;
+    if (paretoNoMeleeFocus) {
+        environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR = String(paretoNoMeleeFocusDamageFloor);
+    }
     environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
     // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
@@ -457,10 +505,15 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
         options.paretoNoMeleeFocus ?? false,
+        options.paretoNoMeleeFocusDamageFloor ?? 1,
+        options.paretoNoMeleeFocusCatalogOnly ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
-        const searchAuditPath = options.paretoNoMeleeFocus ? `${outBase}.search-audit.jsonl` : undefined;
+        const searchAuditPath =
+            options.paretoNoMeleeFocus || options.paretoNoMeleeFocusCatalogOnly
+                ? `${outBase}.search-audit.jsonl`
+                : undefined;
         const invocationEnvironment = { ...environment };
         if (searchAuditPath) invocationEnvironment.SEARCH_AUDIT = searchAuditPath;
         return {
@@ -532,6 +585,8 @@ export async function runV08RangedPositioningAB(
     const noMeleeTerminalPressure = options.noMeleeTerminalPressure ?? false;
     const deadlineFinisher = options.deadlineFinisher ?? false;
     const paretoNoMeleeFocus = options.paretoNoMeleeFocus ?? false;
+    const paretoNoMeleeFocusCatalogOnly = options.paretoNoMeleeFocusCatalogOnly ?? false;
+    const paretoNoMeleeFocusDamageFloor = options.paretoNoMeleeFocusDamageFloor ?? 1;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
     const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
     for (const invocation of invocations) {
@@ -541,6 +596,8 @@ export async function runV08RangedPositioningAB(
                 `moveShots=${moveShots} diag=${options.diag ?? false} timing=${options.timingMode} ` +
                 `noMeleeTerminalPressure=${noMeleeTerminalPressure} ` +
                 `deadlineFinisher=${deadlineFinisher} paretoNoMeleeFocus=${paretoNoMeleeFocus} ` +
+                `paretoCatalogOnly=${paretoNoMeleeFocusCatalogOnly} ` +
+                `paretoDamageFloor=${paretoNoMeleeFocusDamageFloor} ` +
                 `supportedRangedDelta=${supportedRangedDelta} ` +
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
                 `games=${options.games} seed=${options.seed}`,
@@ -571,6 +628,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "no-melee-terminal-pressure": { type: "boolean", default: false },
             "deadline-finisher": { type: "boolean", default: false },
             "pareto-no-melee-focus": { type: "boolean", default: false },
+            "pareto-catalog-only": { type: "boolean", default: false },
+            "pareto-damage-floor": { type: "string", default: "1" },
             "supported-ranged-delta": { type: "boolean", default: false },
             "response-neutral-advance": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
@@ -582,6 +641,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
     const mode = values.mode!;
     const timingMode = values.timing!;
     const moveShots = Number(values["move-shots"]);
+    const paretoNoMeleeFocusDamageFloor = Number(values["pareto-damage-floor"]);
     if (!isPositioningMode(mode)) throw new Error("--mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) {
         throw new Error("--timing must be research_unbounded|operational_bounded");
@@ -599,6 +659,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         noMeleeTerminalPressure: values["no-melee-terminal-pressure"]!,
         deadlineFinisher: values["deadline-finisher"]!,
         paretoNoMeleeFocus: values["pareto-no-melee-focus"]!,
+        paretoNoMeleeFocusCatalogOnly: values["pareto-catalog-only"]!,
+        paretoNoMeleeFocusDamageFloor,
         supportedRangedDelta: values["supported-ranged-delta"]!,
         responseNeutralAdvance: values["response-neutral-advance"]!,
         diag: values.diag!,
@@ -614,7 +676,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
-                "[--pareto-no-melee-focus] [--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
+                "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
+                "[--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;

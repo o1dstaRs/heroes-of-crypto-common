@@ -29,6 +29,11 @@ export interface IPureRangedParetoNoMeleeFocusCandidate {
     readonly noMeleeTargetId: string;
     readonly expectedNoMeleeDamage: number;
     readonly expectedEnemyDamageDelta: number;
+    readonly expectedNetDamageDelta: number;
+    readonly enemyDamageRatio: number;
+    readonly netDamageRatio: number;
+    /** Worst retained fraction across net and enemy-only aggregate damage. */
+    readonly minimumDamageRatio: number;
 }
 
 interface IStationaryShot {
@@ -92,9 +97,11 @@ function stationaryPositiveShot(
 function compareRanked(
     left: IPureRangedParetoNoMeleeFocusCandidate & { readonly index: number },
     right: IPureRangedParetoNoMeleeFocusCandidate & { readonly index: number },
+    damageFloor: number,
 ): number {
     return (
         right.candidate.features.expectedKill - left.candidate.features.expectedKill ||
+        (damageFloor < 1 ? right.minimumDamageRatio - left.minimumDamageRatio : 0) ||
         right.expectedNoMeleeDamage - left.expectedNoMeleeDamage ||
         (right.candidate.shotFeatures?.enemyDamage ?? 0) - (left.candidate.shotFeatures?.enemyDamage ?? 0) ||
         right.candidate.features.expectedDamage - left.candidate.features.expectedDamage ||
@@ -104,12 +111,16 @@ function compareRanked(
     );
 }
 
+function retainedDamageRatio(challenger: number, incumbent: number): number {
+    return incumbent > 0 ? challenger / incumbent : 1;
+}
+
 /**
- * Prefer a living original No-Melee target only when the engine-generated alternative is aggregate-Pareto-safe.
- * The target-local damage may be lower than the incumbent's because the target intentionally changes; total enemy
- * damage, net damage, the aimed primary's kill estimate, friendly fire, shot spend, and stationary posture may
- * never regress. Candidate metadata does not expose secondary-stack kill counts, so this experiment deliberately
- * makes no stronger claim about which collateral stack receives the aggregate damage.
+ * Prefer a living original No-Melee target only when the engine-generated alternative retains the configured
+ * fraction of both enemy-only and net aggregate damage. The default floor of one is exact Pareto; preregistered
+ * research may lower it no further than 0.9. The aimed primary's kill estimate, friendly fire, shot spend, and
+ * stationary posture may never regress. Candidate metadata does not expose secondary-stack kill counts, so this
+ * experiment deliberately makes no stronger claim about which collateral stack receives the aggregate damage.
  */
 export function rankPureRangedParetoNoMeleeFocusCandidates(
     actor: Unit,
@@ -117,6 +128,7 @@ export function rankPureRangedParetoNoMeleeFocusCandidates(
     candidates: readonly IEnumeratedCandidate[],
     originalState: PureRangedTerminalState | null,
     currentLap: number,
+    damageFloor = 1,
 ): IPureRangedParetoNoMeleeFocusCandidate[] {
     const actorAbility = pureRangedParetoNoMeleeFocusActorAbility(actor);
     if (
@@ -127,6 +139,9 @@ export function rankPureRangedParetoNoMeleeFocusCandidates(
         !Number.isFinite(currentLap) ||
         currentLap < 1 ||
         currentLap >= PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP ||
+        !Number.isFinite(damageFloor) ||
+        damageFloor < 0.9 ||
+        damageFloor > 1 ||
         candidates[0]?.kind !== "incumbent"
     ) {
         return [];
@@ -151,10 +166,18 @@ export function rankPureRangedParetoNoMeleeFocusCandidates(
         const challenger = stationaryPositiveShot(actor, candidates[index], index);
         if (!challenger || !livingOriginalNoMeleeEnemyIds.has(challenger.action.targetId)) continue;
         const candidate = challenger.candidate;
+        const netDamageRatio = retainedDamageRatio(
+            candidate.features.expectedDamage,
+            incumbent.candidate.features.expectedDamage,
+        );
+        const enemyDamageRatio = retainedDamageRatio(
+            challenger.shotFeatures.enemyDamage,
+            incumbent.shotFeatures.enemyDamage,
+        );
         if (
             candidate.features.expectedKill < incumbent.candidate.features.expectedKill ||
-            candidate.features.expectedDamage < incumbent.candidate.features.expectedDamage ||
-            challenger.shotFeatures.enemyDamage < incumbent.shotFeatures.enemyDamage ||
+            netDamageRatio < damageFloor ||
+            enemyDamageRatio < damageFloor ||
             challenger.shotFeatures.friendlyFireDamage > incumbent.shotFeatures.friendlyFireDamage
         ) {
             continue;
@@ -165,9 +188,15 @@ export function rankPureRangedParetoNoMeleeFocusCandidates(
             noMeleeTargetId: challenger.action.targetId,
             expectedNoMeleeDamage: challenger.shotFeatures.primaryTargetDamage,
             expectedEnemyDamageDelta: challenger.shotFeatures.enemyDamage - incumbent.shotFeatures.enemyDamage,
+            expectedNetDamageDelta: candidate.features.expectedDamage - incumbent.candidate.features.expectedDamage,
+            enemyDamageRatio,
+            netDamageRatio,
+            minimumDamageRatio: Math.min(netDamageRatio, enemyDamageRatio),
             index,
         });
     }
 
-    return ranked.sort(compareRanked).map(({ index: _index, ...candidate }) => candidate);
+    return ranked
+        .sort((left, right) => compareRanked(left, right, damageFloor))
+        .map(({ index: _index, ...candidate }) => candidate);
 }
