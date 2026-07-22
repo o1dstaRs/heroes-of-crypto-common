@@ -9,6 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "bun:test";
 
 import { buildV08A13SearchEnvironment } from "../../src/ai/versions/v0_8_a13_profile";
@@ -35,6 +39,7 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     moveShots: 0,
     noMeleeTerminalPressure: false,
     deadlineFinisher: false,
+    paretoNoMeleeFocus: false,
     supportedRangedDelta: false,
     responseNeutralAdvance: false,
     diag: false,
@@ -86,6 +91,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
@@ -125,6 +132,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(invocation.args).not.toContain("--diag");
             expect(argValue(invocation.args, "--out")).toBe(`/tmp/hoc-v08-ranged-ab-test/${invocation.cohort}`);
             expect(invocation.environment.SEARCH_MAX_MOVE_SHOTS).toBe("0");
+            expect(invocation.environment.SEARCH_AUDIT).toBe("0");
+            expect(invocation.searchAuditPath).toBeUndefined();
         }
     });
 
@@ -160,6 +169,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             moveShots: 2,
             noMeleeTerminalPressure: false,
             deadlineFinisher: false,
+            paretoNoMeleeFocus: false,
             supportedRangedDelta: false,
             responseNeutralAdvance: false,
             diag: true,
@@ -167,6 +177,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
         expect(parseV08RangedPositioningABOptions([]).noMeleeTerminalPressure).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).deadlineFinisher).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocus).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
@@ -274,6 +285,65 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(() => buildV08RangedPositioningABEnvironment("off", "operational_bounded", {}, 0, true, true)).toThrow(
             "mutually exclusive",
         );
+    });
+
+    it("exposes Pareto No-Melee focus as a default-off, candidate-only pure-ranged arm", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            mode: "off",
+            paretoNoMeleeFocus: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.searchAuditPath).toBe("/tmp/hoc-v08-ranged-ab-test/pure_ranged.search-audit.jsonl");
+        expect(invocation.environment).toMatchObject({
+            SEARCH_AUDIT: invocation.searchAuditPath,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "1",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm.paretoNoMeleeFocus).toBe(true);
+        expect(manifest.artifacts.searchAudit).toBe(invocation.searchAuditPath);
+        expect(manifest.behaviorEnvironment.SEARCH_AUDIT).toBeUndefined();
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--pareto-no-melee-focus"])
+                .paretoNoMeleeFocus,
+        ).toBe(true);
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, cohorts: ["hybrid"] })).toThrow(
+            "requires cohorts=pure_ranged",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "advance" })).toThrow("mode=off");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
+        for (const conflictingArm of [
+            { noMeleeTerminalPressure: true },
+            { deadlineFinisher: true },
+            { supportedRangedDelta: true },
+            { responseNeutralAdvance: true },
+        ]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...options, ...conflictingArm })).toThrow(
+                "mutually exclusive",
+            );
+        }
+        expect(() =>
+            buildV08RangedPositioningABEnvironment(
+                "off",
+                "operational_bounded",
+                {},
+                0,
+                false,
+                false,
+                false,
+                false,
+                true,
+            ),
+        ).not.toThrow();
     });
 
     it("compares supported ranged escape against the same shipped positioning baseline", () => {
@@ -398,6 +468,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 moveShots: 2,
                 noMeleeTerminalPressure: false,
                 deadlineFinisher: false,
+                paretoNoMeleeFocus: false,
                 supportedRangedDelta: false,
                 responseNeutralAdvance: false,
                 diag: true,
@@ -417,15 +488,30 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();
+        expect(first.behaviorEnvironment.SEARCH_AUDIT).toBeUndefined();
+        expect(first.artifacts.searchAudit).toBeUndefined();
         expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).sort());
         expect(first.fingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
         expect(second.fingerprintSha256).toBe(first.fingerprintSha256);
+
+        const auditRoutingOnly = buildV08RangedPositioningABManifest(
+            {
+                ...invocation,
+                environment: { ...invocation.environment, SEARCH_AUDIT: "/tmp/execution-only-search-audit.jsonl" },
+            },
+            options,
+            source,
+        );
+        expect(auditRoutingOnly.behaviorEnvironment).toEqual(first.behaviorEnvironment);
+        expect(auditRoutingOnly.fingerprintSha256).toBe(first.fingerprintSha256);
 
         const [changedInvocation] = buildV08RangedPositioningABInvocations(
             { ...options, moveShots: 1 },
@@ -449,11 +535,47 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(noDiagManifest.fingerprintSha256).not.toBe(first.fingerprintSha256);
     });
 
+    it("truncates the unique Pareto-focus audit immediately before launch and declares the fresh artifact", async () => {
+        const out = mkdtempSync(join(tmpdir(), "hoc-pareto-focus-runner-"));
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            out,
+            mode: "off",
+            paretoNoMeleeFocus: true,
+        };
+        const [expected] = buildV08RangedPositioningABInvocations(options);
+        expect(expected.searchAuditPath).toBe(join(out, "pure_ranged.search-audit.jsonl"));
+        writeFileSync(expected.searchAuditPath!, "stale-run\n");
+
+        let declaredAudit: string | undefined;
+        await runV08RangedPositioningAB(options, {
+            runChild: async (invocation) => {
+                expect(invocation.searchAuditPath).toBe(expected.searchAuditPath);
+                expect(readFileSync(invocation.searchAuditPath!, "utf8")).toBe("");
+                writeFileSync(invocation.searchAuditPath!, "fresh-child-output\n");
+                return 0;
+            },
+            discoverSourceIdentity: () => ({ head: null, tree: null, dirty: false }),
+            writeManifest: (_path, manifest) => {
+                declaredAudit = manifest.artifacts.searchAudit;
+            },
+        });
+
+        expect(readFileSync(expected.searchAuditPath!, "utf8")).toBe("fresh-child-output\n");
+        expect(declaredAudit).toBe(expected.searchAuditPath);
+    });
+
     it("runs cohort children sequentially and fails closed on a nonzero child", async () => {
         const seen: string[] = [];
+        const lifecycle: string[] = [];
         const manifests: Array<{ path: string; fingerprint: string }> = [];
         await runV08RangedPositioningAB(BASE_OPTIONS, {
+            prepareInvocation: (invocation) => {
+                lifecycle.push(`prepare:${invocation.cohort}`);
+            },
             runChild: async (invocation) => {
+                lifecycle.push(`child:${invocation.cohort}`);
                 seen.push(invocation.cohort);
                 return 0;
             },
@@ -461,6 +583,12 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             writeManifest: (path, manifest) => manifests.push({ path, fingerprint: manifest.fingerprintSha256 }),
         });
         expect(seen).toEqual(["hybrid", "ranged_max_sniper3"]);
+        expect(lifecycle).toEqual([
+            "prepare:hybrid",
+            "child:hybrid",
+            "prepare:ranged_max_sniper3",
+            "child:ranged_max_sniper3",
+        ]);
         expect(manifests.map(({ path }) => path)).toEqual([
             "/tmp/hoc-v08-ranged-ab-test/hybrid.experiment.json",
             "/tmp/hoc-v08-ranged-ab-test/ranged_max_sniper3.experiment.json",

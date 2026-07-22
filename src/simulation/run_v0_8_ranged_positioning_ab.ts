@@ -11,9 +11,9 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -65,6 +65,7 @@ export interface IV08RangedPositioningABOptions {
     moveShots?: V08RangedPositioningMoveShots;
     noMeleeTerminalPressure?: boolean;
     deadlineFinisher?: boolean;
+    paretoNoMeleeFocus?: boolean;
     supportedRangedDelta?: boolean;
     responseNeutralAdvance?: boolean;
     diag?: boolean;
@@ -75,6 +76,8 @@ export interface IV08RangedPositioningABInvocation {
     args: string[];
     environment: NodeJS.ProcessEnv;
     outBase: string;
+    /** Absolute, cohort-local SearchDriver JSONL artifact. Present only for the measured Pareto-focus arm. */
+    searchAuditPath?: string;
 }
 
 export interface IV08RangedPositioningABSourceIdentity {
@@ -102,6 +105,7 @@ export interface IV08RangedPositioningABManifest {
         moveShots: V08RangedPositioningMoveShots;
         noMeleeTerminalPressure: boolean;
         deadlineFinisher: boolean;
+        paretoNoMeleeFocus: boolean;
         supportedRangedDelta: boolean;
         responseNeutralAdvance: boolean;
         diag: boolean;
@@ -111,6 +115,7 @@ export interface IV08RangedPositioningABManifest {
     behaviorEnvironment: Readonly<Record<string, string>>;
     artifacts: {
         summary: string;
+        searchAudit?: string;
     };
     fingerprintSha256: string;
 }
@@ -119,6 +124,8 @@ export interface IV08RangedPositioningABDependencies {
     runChild?: (invocation: IV08RangedPositioningABInvocation) => Promise<number>;
     discoverSourceIdentity?: () => IV08RangedPositioningABSourceIdentity;
     writeManifest?: (path: string, manifest: IV08RangedPositioningABManifest) => void;
+    /** Test seam around artifact preparation; production truncates the audit immediately before launch. */
+    prepareInvocation?: (invocation: IV08RangedPositioningABInvocation) => void | Promise<void>;
 }
 
 const positiveInteger = (value: number, name: string): void => {
@@ -139,18 +146,21 @@ function validateBehaviorArmGeometry(
     moveShots: V08RangedPositioningMoveShots,
     noMeleeTerminalPressure: boolean,
     deadlineFinisher: boolean,
+    paretoNoMeleeFocus: boolean,
     supportedRangedDelta: boolean,
     responseNeutralAdvance: boolean,
 ): void {
     const enabledSpecialArms = [
         noMeleeTerminalPressure,
         deadlineFinisher,
+        paretoNoMeleeFocus,
         supportedRangedDelta,
         responseNeutralAdvance,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
         throw new Error(
-            "noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta, and responseNeutralAdvance are mutually exclusive",
+            "noMeleeTerminalPressure, deadlineFinisher, paretoNoMeleeFocus, supportedRangedDelta, and " +
+                "responseNeutralAdvance are mutually exclusive",
         );
     }
     if (noMeleeTerminalPressure && (mode !== "off" || moveShots !== 0)) {
@@ -158,6 +168,9 @@ function validateBehaviorArmGeometry(
     }
     if (deadlineFinisher && (mode !== "off" || moveShots !== 0)) {
         throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
+    if (paretoNoMeleeFocus && (mode !== "off" || moveShots !== 0)) {
+        throw new Error("paretoNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
     if (supportedRangedDelta && ((mode !== "retreat" && mode !== "both") || moveShots !== 0)) {
         throw new Error("supportedRangedDelta requires mode=retreat|both and moveShots=0");
@@ -210,6 +223,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.deadlineFinisher !== undefined && typeof options.deadlineFinisher !== "boolean") {
         throw new Error("deadlineFinisher must be a boolean");
     }
+    if (options.paretoNoMeleeFocus !== undefined && typeof options.paretoNoMeleeFocus !== "boolean") {
+        throw new Error("paretoNoMeleeFocus must be a boolean");
+    }
     if (options.supportedRangedDelta !== undefined && typeof options.supportedRangedDelta !== "boolean") {
         throw new Error("supportedRangedDelta must be a boolean");
     }
@@ -221,6 +237,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.moveShots ?? 0,
         options.noMeleeTerminalPressure ?? false,
         options.deadlineFinisher ?? false,
+        options.paretoNoMeleeFocus ?? false,
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
     );
@@ -229,6 +246,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     }
     if (options.deadlineFinisher && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
+    }
+    if (options.paretoNoMeleeFocus && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
+        throw new Error("paretoNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
     if (options.diag !== undefined && typeof options.diag !== "boolean") throw new Error("diag must be a boolean");
 }
@@ -246,6 +266,8 @@ function minimalChildEnvironment(sourceEnvironment: NodeJS.ProcessEnv): NodeJS.P
 const EXECUTION_ONLY_ENVIRONMENT_KEYS: ReadonlySet<string> = new Set([
     ...INHERITED_OS_ENVIRONMENT_KEYS,
     "BUN_RUNTIME_TRANSPILER_CACHE_PATH",
+    // The absolute append target is artifact routing, not AI behavior. Its declared manifest artifact binds it.
+    "SEARCH_AUDIT",
 ]);
 
 const compareCanonicalKeys = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
@@ -331,6 +353,7 @@ export function buildV08RangedPositioningABManifest(
             moveShots,
             noMeleeTerminalPressure: options.noMeleeTerminalPressure ?? false,
             deadlineFinisher: options.deadlineFinisher ?? false,
+            paretoNoMeleeFocus: options.paretoNoMeleeFocus ?? false,
             supportedRangedDelta: options.supportedRangedDelta ?? false,
             responseNeutralAdvance: options.responseNeutralAdvance ?? false,
             diag: options.diag ?? false,
@@ -340,6 +363,7 @@ export function buildV08RangedPositioningABManifest(
         behaviorEnvironment: extractV08RangedPositioningBehaviorEnvironment(invocation.environment),
         artifacts: {
             summary: `${invocation.outBase}.summary.json`,
+            ...(invocation.searchAuditPath ? { searchAudit: invocation.searchAuditPath } : {}),
         },
     };
     return { ...payload, fingerprintSha256: fingerprint(payload) };
@@ -363,12 +387,14 @@ export function buildV08RangedPositioningABEnvironment(
     deadlineFinisher = false,
     supportedRangedDelta = false,
     responseNeutralAdvance = false,
+    paretoNoMeleeFocus = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
     if (!isMoveShotCap(moveShots)) throw new Error("moveShots must be 0|1|2");
     if (typeof noMeleeTerminalPressure !== "boolean") throw new Error("noMeleeTerminalPressure must be a boolean");
     if (typeof deadlineFinisher !== "boolean") throw new Error("deadlineFinisher must be a boolean");
+    if (typeof paretoNoMeleeFocus !== "boolean") throw new Error("paretoNoMeleeFocus must be a boolean");
     if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
     if (typeof responseNeutralAdvance !== "boolean") throw new Error("responseNeutralAdvance must be a boolean");
     validateBehaviorArmGeometry(
@@ -376,6 +402,7 @@ export function buildV08RangedPositioningABEnvironment(
         moveShots,
         noMeleeTerminalPressure,
         deadlineFinisher,
+        paretoNoMeleeFocus,
         supportedRangedDelta,
         responseNeutralAdvance,
     );
@@ -399,6 +426,8 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER = deadlineFinisher ? "1" : "0";
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS = V08_A13_PRODUCTION_VERSION;
+    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = paretoNoMeleeFocus ? "1" : "0";
+    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
     // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
@@ -427,13 +456,18 @@ export function buildV08RangedPositioningABInvocations(
         options.deadlineFinisher ?? false,
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
+        options.paretoNoMeleeFocus ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
+        const searchAuditPath = options.paretoNoMeleeFocus ? `${outBase}.search-audit.jsonl` : undefined;
+        const invocationEnvironment = { ...environment };
+        if (searchAuditPath) invocationEnvironment.SEARCH_AUDIT = searchAuditPath;
         return {
             cohort,
             outBase,
-            environment: { ...environment },
+            ...(searchAuditPath ? { searchAuditPath } : {}),
+            environment: invocationEnvironment,
             args: [
                 V08_RANGED_POSITIONING_AB_RUNNER,
                 "--cohort",
@@ -475,6 +509,16 @@ async function spawnInvocation(invocation: IV08RangedPositioningABInvocation): P
     });
 }
 
+/** Create a fresh append target so a rerun can never inherit counters from an earlier experiment. */
+export function prepareV08RangedPositioningABInvocation(invocation: IV08RangedPositioningABInvocation): void {
+    if (!invocation.searchAuditPath) return;
+    if (invocation.environment.SEARCH_AUDIT !== invocation.searchAuditPath) {
+        throw new Error(`search audit routing mismatch for cohort ${invocation.cohort}`);
+    }
+    mkdirSync(dirname(invocation.searchAuditPath), { recursive: true });
+    writeFileSync(invocation.searchAuditPath, "");
+}
+
 export async function runV08RangedPositioningAB(
     options: IV08RangedPositioningABOptions,
     dependencies: IV08RangedPositioningABDependencies = {},
@@ -483,9 +527,11 @@ export async function runV08RangedPositioningAB(
     const runChild = dependencies.runChild ?? spawnInvocation;
     const discoverSourceIdentity = dependencies.discoverSourceIdentity ?? discoverV08RangedPositioningABSourceIdentity;
     const writeManifest = dependencies.writeManifest ?? writeExperimentManifest;
+    const prepareInvocation = dependencies.prepareInvocation ?? prepareV08RangedPositioningABInvocation;
     const moveShots = options.moveShots ?? 0;
     const noMeleeTerminalPressure = options.noMeleeTerminalPressure ?? false;
     const deadlineFinisher = options.deadlineFinisher ?? false;
+    const paretoNoMeleeFocus = options.paretoNoMeleeFocus ?? false;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
     const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
     for (const invocation of invocations) {
@@ -494,10 +540,12 @@ export async function runV08RangedPositioningAB(
             `[v0.8-ranged-positioning-ab] cohort=${invocation.cohort} mode=${options.mode} ` +
                 `moveShots=${moveShots} diag=${options.diag ?? false} timing=${options.timingMode} ` +
                 `noMeleeTerminalPressure=${noMeleeTerminalPressure} ` +
-                `deadlineFinisher=${deadlineFinisher} supportedRangedDelta=${supportedRangedDelta} ` +
+                `deadlineFinisher=${deadlineFinisher} paretoNoMeleeFocus=${paretoNoMeleeFocus} ` +
+                `supportedRangedDelta=${supportedRangedDelta} ` +
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
+        await prepareInvocation(invocation);
         const code = await runChild(invocation);
         if (code !== 0) throw new Error(`ranged-positioning A/B ${invocation.cohort} exited with code ${code}`);
         const manifest = buildV08RangedPositioningABManifest(invocation, options, sourceIdentity);
@@ -522,6 +570,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "move-shots": { type: "string", default: "0" },
             "no-melee-terminal-pressure": { type: "boolean", default: false },
             "deadline-finisher": { type: "boolean", default: false },
+            "pareto-no-melee-focus": { type: "boolean", default: false },
             "supported-ranged-delta": { type: "boolean", default: false },
             "response-neutral-advance": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
@@ -549,6 +598,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         moveShots,
         noMeleeTerminalPressure: values["no-melee-terminal-pressure"]!,
         deadlineFinisher: values["deadline-finisher"]!,
+        paretoNoMeleeFocus: values["pareto-no-melee-focus"]!,
         supportedRangedDelta: values["supported-ranged-delta"]!,
         responseNeutralAdvance: values["response-neutral-advance"]!,
         diag: values.diag!,
@@ -564,7 +614,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
-                "[--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
+                "[--pareto-no-melee-focus] [--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
