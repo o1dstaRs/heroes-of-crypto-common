@@ -1073,7 +1073,7 @@
             "attack_type": "MELEE_MAGIC",
             "attack": 32,
             "attack_damage_min": 55,
-            "attack_damage_max": 75,
+            "attack_damage_max": 70,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
