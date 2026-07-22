@@ -471,7 +471,7 @@
         "name": "Poison Cloud Aura",
         "type": "BUFF_AURA",
         "desc": ["Allies within 2 cells apply {}% of their attack damage to the target as Poison"],
-        "power": 10,
+        "power": 15,
         "power_type": "POISON_ON_HIT",
         "skip_reponse": false,
         "stack_powered": false,

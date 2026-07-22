@@ -12,7 +12,7 @@
         "name": "Poison Cloud",
         "range": 2,
         "desc": "Affected allies apply {}% of their attack damage to the target as Poison.",
-        "power": 10,
+        "power": 15,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
     },
