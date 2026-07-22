@@ -127,6 +127,10 @@ export interface IMirrorSideDiag {
     byLap: IMirrorLapDiag[];
     shots: number;
     shotDamage: number;
+    /** Adjacent completed move_unit -> range_attack pairs by the same side/unit/lap. */
+    moveShotSequences: number;
+    /** Recorded range-attack damage dealt by moveShotSequences. */
+    moveShotRangeDamage: number;
     meleeDamage: number;
     firstVolleyLap: number | null;
     firstVolleyDamage: number | null;
@@ -201,6 +205,8 @@ function newSideDiag(version: string): IMirrorSideDiag {
         byLap: [],
         shots: 0,
         shotDamage: 0,
+        moveShotSequences: 0,
+        moveShotRangeDamage: 0,
         meleeDamage: 0,
         firstVolleyLap: null,
         firstVolleyDamage: null,
@@ -296,7 +302,8 @@ export function playMirrorGame(
         for (const p of result.placements.red) {
             sideOf.set(p.unitId, "red");
         }
-        for (const action of result.actions) {
+        for (let actionIndex = 0; actionIndex < result.actions.length; actionIndex += 1) {
+            const action = result.actions[actionIndex];
             if (!action.completed) {
                 continue;
             }
@@ -305,6 +312,17 @@ export function playMirrorGame(
             if (action.actionType === "range_attack") {
                 actor.shots += 1;
                 actor.shotDamage += damage;
+                const preceding = result.actions[actionIndex - 1];
+                if (
+                    preceding?.completed &&
+                    preceding.actionType === "move_unit" &&
+                    preceding.side === action.side &&
+                    preceding.unitId === action.unitId &&
+                    preceding.lap === action.lap
+                ) {
+                    actor.moveShotSequences += 1;
+                    actor.moveShotRangeDamage += damage;
+                }
                 if (actor.firstVolleyLap === null) {
                     actor.firstVolleyLap = action.lap;
                     actor.firstVolleyDamage = damage;
@@ -422,6 +440,8 @@ interface IVersionAggregate {
     firstVolleyLaps: number[];
     shots: number;
     shotDamage: number;
+    moveShotSequences: number;
+    moveShotRangeDamage: number;
     meleeDamage: number;
     deathsByLap: Map<number, number>;
     dmgByLap: Map<number, number>;
@@ -448,6 +468,8 @@ export function aggregateMirrorDiag(
                 firstVolleyLaps: [],
                 shots: 0,
                 shotDamage: 0,
+                moveShotSequences: 0,
+                moveShotRangeDamage: 0,
                 meleeDamage: 0,
                 deathsByLap: new Map(),
                 dmgByLap: new Map(),
@@ -473,6 +495,8 @@ export function aggregateMirrorDiag(
             a.cfFiresInSupport += side.cfFiresInSupport ?? 0;
             a.shots += side.shots;
             a.shotDamage += side.shotDamage;
+            a.moveShotSequences += side.moveShotSequences ?? 0;
+            a.moveShotRangeDamage += side.moveShotRangeDamage ?? 0;
             a.meleeDamage += side.meleeDamage;
             if (side.firstVolleyLap !== null) {
                 a.firstVolleyLaps.push(side.firstVolleyLap);
@@ -513,6 +537,11 @@ export function aggregateMirrorDiag(
             gamesWithVolley: a.firstVolleyLaps.length,
             shotsPerGame: a.shots / Math.max(1, a.games),
             shotDamagePerGame: a.shotDamage / Math.max(1, a.games),
+            moveShotSequences: a.moveShotSequences,
+            moveShotSequencesPerGame: a.moveShotSequences / Math.max(1, a.games),
+            moveShotRangeDamage: a.moveShotRangeDamage,
+            moveShotRangeDamagePerGame: a.moveShotRangeDamage / Math.max(1, a.games),
+            meanMoveShotRangeDamage: a.moveShotSequences > 0 ? a.moveShotRangeDamage / a.moveShotSequences : null,
             meleeDamagePerGame: a.meleeDamage / Math.max(1, a.games),
             perLap: laps.map((lap) => {
                 const slot = a.byLap.get(lap)!;

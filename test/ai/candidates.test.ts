@@ -385,6 +385,83 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }
     });
 
+    it("shots: Cowardice rejects the stronger resolved primary, leaves a legal lower-HP target, and does not enrich the invalid incumbent", () => {
+        const c = createCombatTestContext();
+        const beholder = createTestUnit({
+            team: LOWER,
+            name: "Beholder-like shooter",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+            maxHp: 10,
+        });
+        const stronger = createTestUnit({
+            team: UPPER,
+            name: "Cowardice-blocked stack",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 10,
+        });
+        const weaker = createTestUnit({
+            team: UPPER,
+            name: "Cowardice-legal stack",
+            attackType: MELEE,
+            amountAlive: 3,
+            maxHp: 10,
+        });
+        placeUnit(c.grid, c.unitsHolder, beholder, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, stronger, { x: 10, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, weaker, { x: 10, y: 11 });
+        beholder.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+        const unrestricted = ofKind(enumerateCandidates(beholder, context, endTurn(beholder)).candidates, "shot");
+        const invalidIncumbent = unrestricted.find((candidate) => candidate.targetId === stronger.getId());
+        expect(invalidIncumbent).toBeDefined();
+
+        beholder.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
+        const candidates = enumerateCandidates(beholder, context, invalidIncumbent!.actions).candidates;
+        const anchor = candidates[0];
+        const shots = ofKind(candidates, "shot");
+        expect(anchor.actions).toBe(invalidIncumbent!.actions);
+        expect(anchor.targetId).toBeUndefined();
+        expect(anchor.shotFeatures).toBeUndefined();
+        expect(anchor.features.expectedDamage).toBe(0);
+        expect(shots.some((candidate) => candidate.targetId === stronger.getId())).toBe(false);
+        const legal = shots.find((candidate) => candidate.targetId === weaker.getId());
+        expect(legal).toBeDefined();
+
+        const engine = startActionEngine(c, beholder, context);
+        expect(legal!.actions.every((action) => engine.apply(action).completed)).toBe(true);
+    });
+
+    it("shots: a live forced target excludes other resolved primaries, while a dead forced target releases them", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Aggr-constrained shooter",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+        });
+        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE });
+        const other = createTestUnit({ team: UPPER, name: "Other", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, forced, { x: 10, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, other, { x: 10, y: 11 });
+        shooter.refreshPossibleAttackTypes(true);
+        shooter.setTarget(forced.getId());
+        const context = ctxFor(c);
+
+        const constrained = ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot");
+        expect(constrained.some((candidate) => candidate.targetId === forced.getId())).toBe(true);
+        expect(constrained.some((candidate) => candidate.targetId === other.getId())).toBe(false);
+
+        forced.applyDamage(forced.getCumulativeHp(), 0, new SceneLogMock());
+        const released = ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot");
+        expect(released.some((candidate) => candidate.targetId === other.getId())).toBe(true);
+    });
+
     it("move-shots: default-off enumeration is unchanged; opt-in emits at most two exact legal composites", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
