@@ -377,9 +377,14 @@ function hasSameNonRegressingRangeSignature(
 }
 
 /**
- * Research-only pre-pin egress. The geometry catalog is intentionally computed for every baseline seat while the
- * global arm is enabled, including the catalog-only control, because PathHelper consumes seeded tie-break RNG.
- * Only the selector-scoped seat may retain the proposal.
+ * Research-only screened pre-pin egress. The geometry catalog is intentionally computed for every baseline seat
+ * while the global arm is enabled, including the catalog-only control, because PathHelper consumes seeded
+ * tie-break RNG. Only the selector-scoped seat may retain the proposal.
+ *
+ * The screen is a calculated-risk formation rule, but the immediate activation is still guarded carefully: only
+ * one enemy may currently pin the shooter, the destination must be unreachable by every pending melee-capable
+ * enemy, and removing the selected guard must not make the destination reachable by a second pending enemy. The
+ * sole current pinner may spend its activation removing the guard, but cannot then also pin the shooter.
  */
 function supportedPrepinEgress(
     unit: Unit,
@@ -465,6 +470,9 @@ function supportedPrepinEgress(
     );
     if (!currentThreats.length) return decision;
     emitFunnel("current_threat");
+    if (currentThreats.length !== 1) return decision;
+    emitFunnel("single_current_threat");
+    const currentThreat = currentThreats[0]!;
     const guards = fixedNativeMeleeGuards(unit, context);
     if (!guards.length) return decision;
     emitFunnel("fixed_guard");
@@ -489,11 +497,12 @@ function supportedPrepinEgress(
     if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) return decision;
     emitFunnel("current_signature");
 
-    const proposals: Array<{ route: IWeightedRoute; footprint: XY[] }> = [];
+    const proposals: Array<{ route: IWeightedRoute; footprint: XY[]; divisor: number }> = [];
     const routes = reachableRoutes(unit, context);
     if (routes.length) emitFunnel("reachable_route");
     let hasSafeRoute = false;
-    let hasCausalGuardRoute = false;
+    let hasScreenedGuardRoute = false;
+    let hasChainSafeRoute = false;
     let hasRetainedSignatureRoute = false;
     for (const route of routes) {
         const footprint = footprintForAnchor(unit, route.cell);
@@ -507,17 +516,21 @@ function supportedPrepinEgress(
             continue;
         }
         hasSafeRoute = true;
-        const hasCausalGuard = guards.some((guard) => {
+        const hasChainSafeScreen = guards.some((guard) => {
+            if (!allyScreensThreat(footprint, guard, currentThreat)) return false;
+            hasScreenedGuardRoute = true;
             const withoutGuard = matrixWithoutGuard(matrix, guard, context);
             return (
                 withoutGuard !== undefined &&
-                currentThreats.every((threat) =>
-                    canMeleeFootprintThisActivation(threat, footprint, withoutGuard, context),
+                threats.every(
+                    (threat) =>
+                        threat.getId() === currentThreat.getId() ||
+                        !canMeleeFootprintThisActivation(threat, footprint, withoutGuard, context),
                 )
             );
         });
-        if (!hasCausalGuard) continue;
-        hasCausalGuardRoute = true;
+        if (!hasChainSafeScreen) continue;
+        hasChainSafeRoute = true;
         const targetPosition = getRangeAttackSideCenter(
             settings,
             shot.aimCell,
@@ -538,14 +551,20 @@ function supportedPrepinEgress(
             hasSameNonRegressingRangeSignature(currentEvaluation, candidateEvaluation)
         ) {
             hasRetainedSignatureRoute = true;
-            proposals.push({ route, footprint });
+            proposals.push({
+                route,
+                footprint,
+                divisor: candidateEvaluation.rangeAttackDivisors[0]!,
+            });
         }
     }
     if (hasSafeRoute) emitFunnel("safe_route");
-    if (hasCausalGuardRoute) emitFunnel("causal_guard");
+    if (hasScreenedGuardRoute) emitFunnel("screened_guard");
+    if (hasChainSafeRoute) emitFunnel("chain_safe");
     if (hasRetainedSignatureRoute) emitFunnel("retained_signature");
     proposals.sort(
         (left, right) =>
+            left.divisor - right.divisor ||
             routeCost(left.route) - routeCost(right.route) ||
             left.route.cell.y - right.route.cell.y ||
             left.route.cell.x - right.route.cell.x,

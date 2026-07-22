@@ -175,6 +175,7 @@ function setupSupportedPrepinEgress(
         targetRanged?: boolean;
         targetCell?: XY;
         threatRanged?: boolean;
+        threatCell?: XY;
         threatSpeed?: number;
         shotDistance?: number;
     } = {},
@@ -221,7 +222,7 @@ function setupSupportedPrepinEgress(
     const wall = createTestUnit({ team: LOWER, name: "Corner wall", attackType: RANGE, speed: 1, rangeShots: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 0, y: 1 });
     placeUnit(combat.grid, combat.unitsHolder, target, options.targetCell ?? { x: 0, y: 10 });
-    placeUnit(combat.grid, combat.unitsHolder, threat, { x: 3, y: 2 });
+    placeUnit(combat.grid, combat.unitsHolder, threat, options.threatCell ?? { x: 3, y: 2 });
     placeUnit(combat.grid, combat.unitsHolder, guard, { x: 1, y: 1 });
     placeUnit(combat.grid, combat.unitsHolder, wall, { x: 1, y: 0 });
     if (options.guardStolenQuiver) {
@@ -268,11 +269,13 @@ describe("v0.8 protected ranged positioning", () => {
             "eligible_shooter",
             "target_no_counter",
             "current_threat",
+            "single_current_threat",
             "fixed_guard",
             "current_signature",
             "reachable_route",
             "safe_route",
-            "causal_guard",
+            "screened_guard",
+            "chain_safe",
             "retained_signature",
         ]);
         expect(policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress")).toHaveLength(1);
@@ -368,6 +371,74 @@ describe("v0.8 protected ranged positioning", () => {
                 .decideTurn(noCurrentThreat.shooter, noCurrentThreat.context)
                 .map((action) => action.type),
         ).toEqual(["range_attack"]);
+    });
+
+    it("uses a screened safe cell even when the guard is not the path's causal blocker", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        const { shooter, threat, context } = setupSupportedPrepinEgress({
+            targetCell: { x: 10, y: 10 },
+            threatCell: { x: 0, y: 5 },
+            threatSpeed: 2,
+        });
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+
+        expect(
+            policyEvents.filter(({ kind }) => kind === "v0.8_supported_prepin_egress_funnel").map(({ stage }) => stage),
+        ).toContain("chain_safe");
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [{ x: 0, y: 0 }] });
+        expect(Math.max(Math.abs(threat.getBaseCell().x - 0), Math.abs(threat.getBaseCell().y - 0))).toBeGreaterThan(
+            threat.getSteps() + 1,
+        );
+    });
+
+    it("fails closed when more than one enemy can currently pin the shooter", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        const { shooter, context } = setupSupportedPrepinEgress();
+        const secondThreat = createTestUnit({
+            team: UPPER,
+            name: "Second pending charger",
+            attackType: MELEE,
+            speed: 1,
+        });
+        placeUnit(context.grid, context.unitsHolder, secondThreat, { x: 0, y: 3 });
+        secondThreat.refreshPossibleAttackTypes(true);
+        context.matrix = context.grid.getMatrix();
+
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+    });
+
+    it("rejects a screen that a second pending threat could exploit after the guard is removed", () => {
+        process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
+        process.env.V08_RANGED_POSITION_MODE = "retreat";
+        const { shooter, context } = setupSupportedPrepinEgress();
+        const secondThreat = createTestUnit({
+            team: UPPER,
+            name: "Second pending charger",
+            attackType: MELEE,
+            speed: 0,
+        });
+        placeUnit(context.grid, context.unitsHolder, secondThreat, { x: 4, y: 1 });
+        secondThreat.refreshPossibleAttackTypes(true);
+        context.matrix = context.grid.getMatrix();
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        const stages = policyEvents
+            .filter(({ kind }) => kind === "v0.8_supported_prepin_egress_funnel")
+            .map(({ stage }) => stage);
+
+        expect(stages).toContain("screened_guard");
+        expect(stages).not.toContain("chain_safe");
+        expect(actions.map((action) => action.type)).toEqual(["range_attack"]);
     });
 
     it("treats a pending native shooter as a melee-pin threat when it can reach the destination", () => {
