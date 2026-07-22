@@ -79,16 +79,47 @@ export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
 
 export type V08SupportedPrepinEgressFunnelStage = (typeof V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES)[number];
 
-/** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
-export interface IAIPolicyEvent {
-    kind: AIPolicyEventKind;
+interface IAIPolicyEventBase {
     unitId: string;
     creatureName: string;
     team: TeamType;
     lap: number;
-    /** Present only on research funnel events; ordinary policy-selection events leave it unset. */
-    stage?: V08SupportedPrepinEgressFunnelStage;
 }
+
+/** Detached geometry for one live supported pre-pin proposal. */
+export interface IV08SupportedPrepinEgressDetails {
+    fromCell: XY;
+    toCell: XY;
+    targetId: string;
+    targetCreatureName: string;
+    exposureBefore: number;
+    exposureAfter: number;
+    divisorBefore: number;
+    divisorAfter: number;
+    targetDistanceBefore: number;
+    targetDistanceAfter: number;
+    minEnemyDistanceBefore: number;
+    minEnemyDistanceAfter: number;
+    rangedSuperior: boolean;
+}
+
+/** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
+export type IAIPolicyEvent =
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_prepin_egress";
+          details: IV08SupportedPrepinEgressDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_prepin_egress_funnel";
+          stage: V08SupportedPrepinEgressFunnelStage;
+          details?: never;
+      })
+    | (IAIPolicyEventBase & {
+          kind: Exclude<AIPolicyEventKind, "v0.8_supported_prepin_egress" | "v0.8_supported_prepin_egress_funnel">;
+          stage?: never;
+          details?: never;
+      });
 
 export interface IDecisionContext {
     grid: Grid;
@@ -114,6 +145,11 @@ export interface IDecisionContext {
      * wire both from the same helper.
      */
     getCurrentEnemiesCellsWithinMovementRange?: () => XY[] | undefined;
+    /**
+     * Explicit origin for policies that must distinguish a live incumbent from a hypothetical future turn.
+     * Research selectors should fail closed when this is absent; ordinary policies ignore it.
+     */
+    decisionOrigin?: "root" | "rollout";
     /** Optional simulation-only policy telemetry. Observers must not mutate strategy or battle state. */
     policyEventObserver?: (event: IAIPolicyEvent) => void;
 }

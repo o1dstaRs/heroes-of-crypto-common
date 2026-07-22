@@ -438,6 +438,7 @@ export class LookaheadDriver {
                 pathHelper: this.deps.pathHelper,
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
+                decisionOrigin: "rollout",
             });
         } catch {
             decided = [];

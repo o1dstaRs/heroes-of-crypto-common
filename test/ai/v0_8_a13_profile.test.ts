@@ -55,6 +55,7 @@ const ENV_KEYS = [
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "V08_SUPPORTED_PREPIN_EGRESS",
     "V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS",
+    "V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY",
     "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS",
     "V07_VALUE_WEIGHTS",
     "V07_VALUE_WEIGHTS_V2",
@@ -124,6 +125,7 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
             V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY: "0",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
             V06_MELEE_DIMS: "0,2",
             V07_PLACEMENT_REVEAL: "on",
@@ -160,6 +162,7 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = "v0.7";
         process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
         process.env.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS = "v0.6";
+        process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY = "1";
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.7";
         process.env.V07_VALUE_WEIGHTS = "material";
         const driver = createV08A13SearchDriver({} as ILookaheadDeps, {
@@ -239,6 +242,7 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS).toBe("v0.7");
         expect(process.env.V08_SUPPORTED_PREPIN_EGRESS).toBe("1");
         expect(process.env.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS).toBe("v0.6");
+        expect(process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY).toBe("1");
         expect(process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS).toBe("v0.7");
         expect(process.env.V07_VALUE_WEIGHTS).toBe("material");
     });

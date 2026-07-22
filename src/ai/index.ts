@@ -28,6 +28,7 @@ export type {
     IAIStrategy,
     IDecisionContext,
     IPlacementContext,
+    IV08SupportedPrepinEgressDetails,
 } from "./ai_strategy";
 
 // Browser-safe identity and immutable configuration for the promoted v0.8+a13

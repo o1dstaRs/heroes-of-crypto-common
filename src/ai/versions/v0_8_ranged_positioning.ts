@@ -34,6 +34,7 @@ const RANGE = PBTypes.AttackVals.RANGE;
 const SUPPORTED_PREPIN_EGRESS_ENABLED_ENV = "V08_SUPPORTED_PREPIN_EGRESS";
 const SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS";
 const SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS";
+const SUPPORTED_PREPIN_EGRESS_LIVE_ONLY_ENV = "V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -327,7 +328,9 @@ function supportedPrepinEgress(
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean);
-    const selectorEnabled = selectorVersions.includes(strategyVersion);
+    const liveOnly = process.env[SUPPORTED_PREPIN_EGRESS_LIVE_ONLY_ENV] === "1";
+    const selectorEnabled =
+        selectorVersions.includes(strategyVersion) && (!liveOnly || context.decisionOrigin === "root");
     const funnelVersions = (
         process.env[SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV] ??
         process.env[SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV] ??
@@ -433,6 +436,7 @@ function supportedPrepinEgress(
         footprint: XY[];
         divisor: number;
         exposure: number;
+        targetDistance: number;
         minEnemyDistance: number;
     }> = [];
     const routes = reachableRoutes(unit, context);
@@ -492,10 +496,9 @@ function supportedPrepinEgress(
         ) {
             hasRetainedSignatureRoute = true;
             const divisor = candidateEvaluation.rangeAttackDivisors[0]!;
+            const targetDistance = cellDistance(footprint, target.getCells());
             const minEnemyDistance = Math.min(...enemies.map((enemy) => cellDistance(footprint, enemy.getCells())));
-            const closes =
-                cellDistance(footprint, target.getCells()) < currentTargetDistance ||
-                minEnemyDistance < currentMinEnemyDistance;
+            const closes = targetDistance < currentTargetDistance || minEnemyDistance < currentMinEnemyDistance;
             if ((rangedSuperior && closes) || (!rangedSuperior && closes && divisor >= currentDivisor)) continue;
             hasPostureSafeRoute = true;
             proposals.push({
@@ -503,6 +506,7 @@ function supportedPrepinEgress(
                 footprint,
                 divisor,
                 exposure,
+                targetDistance,
                 minEnemyDistance,
             });
         }
@@ -531,6 +535,21 @@ function supportedPrepinEgress(
         creatureName: unit.getName(),
         team: unit.getTeam(),
         lap: fightProperties.getCurrentLap(),
+        details: {
+            fromCell: { ...unit.getBaseCell() },
+            toCell: { ...best.route.cell },
+            targetId: target.getId(),
+            targetCreatureName: target.getName(),
+            exposureBefore: futureThreats.length,
+            exposureAfter: best.exposure,
+            divisorBefore: currentDivisor,
+            divisorAfter: best.divisor,
+            targetDistanceBefore: currentTargetDistance,
+            targetDistanceAfter: best.targetDistance,
+            minEnemyDistanceBefore: currentMinEnemyDistance,
+            minEnemyDistanceAfter: best.minEnemyDistance,
+            rangedSuperior,
+        },
     });
     return [moveAction(unit, best.route, best.footprint), shot];
 }

@@ -11,6 +11,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import type { IAIPolicyEvent, IV08SupportedPrepinEgressDetails } from "../../src/ai";
 import {
     aggregateMirrorDiag,
     buildMirrorRoster,
@@ -40,6 +41,22 @@ const BASE_CFG: IMirrorRunConfig = {
     livetwin: true,
     diag: false,
     zeroScorer: false,
+};
+
+const PREPIN_DETAILS: IV08SupportedPrepinEgressDetails = {
+    fromCell: { x: 0, y: 1 },
+    toCell: { x: 0, y: 0 },
+    targetId: "target",
+    targetCreatureName: "Shot target",
+    exposureBefore: 1,
+    exposureAfter: 0,
+    divisorBefore: 1,
+    divisorAfter: 1,
+    targetDistanceBefore: 9,
+    targetDistanceAfter: 10,
+    minEnemyDistanceBefore: 4,
+    minEnemyDistanceAfter: 5,
+    rangedSuperior: true,
 };
 
 function fakeResult(
@@ -229,6 +246,7 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.red.supportedRangedEscapeProposals).toBe(1);
         expect(first.diag?.green.supportedPrepinEgressSelections).toBe(0);
         expect(first.diag?.red.supportedPrepinEgressProposals).toBe(0);
+        expect(first.supportedPrepinEgressEvents).toBeUndefined();
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -281,22 +299,22 @@ describe("measure_mirror_cohorts", () => {
                     stage,
                 });
             }
-            for (const unitId of ["candidate-proposal-a", "candidate-proposal-b"]) {
-                config.policyProposalObserver?.({
-                    kind: "v0.8_supported_prepin_egress",
-                    unitId,
-                    creatureName: "Arbalester",
-                    team: candidateTeam,
-                    lap: 3,
-                });
-            }
-            config.policyEventObserver?.({
+            const proposals: IAIPolicyEvent[] = ["candidate-proposal-a", "candidate-proposal-b"].map((unitId) => ({
                 kind: "v0.8_supported_prepin_egress",
-                unitId: "candidate-proposal-a",
+                unitId,
                 creatureName: "Arbalester",
                 team: candidateTeam,
                 lap: 3,
-            });
+                details: {
+                    ...PREPIN_DETAILS,
+                    fromCell: { ...PREPIN_DETAILS.fromCell },
+                    toCell: { ...PREPIN_DETAILS.toCell },
+                },
+            }));
+            for (const proposal of proposals) {
+                config.policyProposalObserver?.(proposal);
+            }
+            config.policyEventObserver?.(proposals[0]);
             return fakeResult(config, "draw");
         };
         const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
@@ -316,7 +334,22 @@ describe("measure_mirror_cohorts", () => {
             expect(control.supportedPrepinEgressProposals).toBe(0);
             expect(control.supportedPrepinEgressSelections).toBe(0);
             expect(Object.values(control.supportedPrepinEgressFunnel).every((count) => count === 0)).toBe(true);
+            expect(record.supportedPrepinEgressEvents).toHaveLength(candidate.supportedPrepinEgressProposals);
+            expect(record.supportedPrepinEgressEvents?.filter(({ retained }) => retained)).toHaveLength(
+                candidate.supportedPrepinEgressSelections,
+            );
+            expect(record.supportedPrepinEgressEvents?.map(({ retained }) => retained)).toEqual([true, false]);
+            expect(record.supportedPrepinEgressEvents?.[0]).toMatchObject({
+                ...PREPIN_DETAILS,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: "candidate-proposal-a",
+                creatureName: "Arbalester",
+                lap: 3,
+                retained: true,
+            });
         }
+        expect(records[0].supportedPrepinEgressEvents?.[0].side).toBe("green");
+        expect(records[1].supportedPrepinEgressEvents?.[0].side).toBe("red");
 
         const aggregate = aggregateMirrorDiag(records, cfg) as {
             versions: Record<

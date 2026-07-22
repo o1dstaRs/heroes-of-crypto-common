@@ -967,6 +967,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             attackHandler,
             fightProperties,
+            decisionOrigin: "root",
             getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
             ...(incumbentPolicyEvents
                 ? {
