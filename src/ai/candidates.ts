@@ -979,9 +979,20 @@ class CandidateGenerator {
             }
         }
 
-        const sameCells = (left: readonly XY[] | undefined, right: readonly XY[] | undefined): boolean => {
+        const sameCellsInOrder = (left: readonly XY[] | undefined, right: readonly XY[] | undefined): boolean => {
             if (!left || !right || left.length !== right.length) return false;
             return left.every((cell, index) => cell.x === right[index]?.x && cell.y === right[index]?.y);
+        };
+        const sameCellSet = (left: readonly XY[] | undefined, right: readonly XY[] | undefined): boolean => {
+            if (!left || !right || left.length !== right.length) return false;
+            const keys = (cells: readonly XY[]): Set<string> => new Set(cells.map((cell) => `${cell.x},${cell.y}`));
+            const leftKeys = keys(left);
+            const rightKeys = keys(right);
+            return (
+                leftKeys.size === left.length &&
+                rightKeys.size === right.length &&
+                [...leftKeys].every((key) => rightKeys.has(key))
+            );
         };
         const movePath = this.movePath();
         if (!movePath) return;
@@ -992,8 +1003,8 @@ class CandidateGenerator {
             const exactMove = this.moveAction(candidateRoute);
             if (
                 exactMove.type === "move_unit" &&
-                sameCells(move.path, exactMove.path) &&
-                sameCells(move.targetCells, exactMove.targetCells) &&
+                sameCellsInOrder(move.path, exactMove.path) &&
+                sameCellSet(move.targetCells, exactMove.targetCells) &&
                 move.hasLavaCell === exactMove.hasLavaCell &&
                 move.hasWaterCell === exactMove.hasWaterCell &&
                 this.footprintOk(candidateRoute.cell)
@@ -1028,6 +1039,22 @@ class CandidateGenerator {
         if (!targetCells) return;
         const origin = getPositionForCells(this.context.grid.getSettings(), targetCells);
         if (!origin) return;
+        // handleRangeAttack re-checks canLandRangeAttack after the move has updated the actor's position. Mirror
+        // that check at the hypothetical destination: current-cell eligibility is insufficient when the move
+        // lands inside an enemy melee-aggression cell.
+        if (
+            !this.unit.isRangeCapable() ||
+            attackHandler.canBeAttackedByMelee(
+                origin,
+                this.unit.isSmallSize(),
+                this.context.grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
+            ) ||
+            this.unit.getRangeShots() <= 0 ||
+            this.unit.hasDebuffActive("Range Null Field Aura") ||
+            this.unit.hasDebuffActive("Rangebane")
+        ) {
+            return;
+        }
         const to = getRangeAttackSideCenter(
             this.context.grid.getSettings(),
             shot.aimCell,
