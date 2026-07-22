@@ -66,7 +66,9 @@ const runObservedMatchWithV01Transform = (
 describe("battle engine turn execution observer", () => {
     test("emits policy telemetry only when search retains the strategy incumbent", () => {
         const retained: IAIPolicyEvent[] = [];
+        const retainedProposals: IAIPolicyEvent[] = [];
         const overridden: IAIPolicyEvent[] = [];
+        const overriddenProposals: IAIPolicyEvent[] = [];
         const originalDecideTurn = STRATEGY_V0_1.decideTurn;
         const originalAppliesTo = SearchDriver.prototype.appliesTo;
         const originalChooseDecision = SearchDriver.prototype.chooseDecision;
@@ -87,9 +89,11 @@ describe("battle engine turn execution observer", () => {
                 roster: buildRoster(makeRng(35)),
                 seed: 35,
                 maxLaps: 1,
+                policyProposalObserver: (event) => retainedProposals.push(event),
                 policyEventObserver: (event) => retained.push(event),
             });
             expect(retained.length).toBeGreaterThan(0);
+            expect(retainedProposals).toEqual(retained);
 
             SearchDriver.prototype.appliesTo = () => true;
             SearchDriver.prototype.chooseDecision = (_unit, _version, incumbent) => incumbent.slice();
@@ -99,8 +103,10 @@ describe("battle engine turn execution observer", () => {
                 roster: buildRoster(makeRng(35)),
                 seed: 35,
                 maxLaps: 1,
+                policyProposalObserver: (event) => overriddenProposals.push(event),
                 policyEventObserver: (event) => overridden.push(event),
             });
+            expect(overriddenProposals.length).toBeGreaterThan(0);
             expect(overridden).toEqual([]);
         } finally {
             STRATEGY_V0_1.decideTurn = originalDecideTurn;

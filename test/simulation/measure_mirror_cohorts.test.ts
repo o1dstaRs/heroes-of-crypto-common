@@ -163,6 +163,20 @@ describe("measure_mirror_cohorts", () => {
         ];
         const cfg = { ...BASE_CFG, diag: true };
         const matchRunner = (config: IMatchConfig): IMatchResult => {
+            config.policyProposalObserver?.({
+                kind: "v0.8_response_neutral_advance",
+                unitId: "green-proposal",
+                creatureName: "Arbalester",
+                team: GREEN_TEAM,
+                lap: 1,
+            });
+            config.policyProposalObserver?.({
+                kind: "v0.8_supported_ranged_escape",
+                unitId: "red-proposal",
+                creatureName: "Arbalester",
+                team: RED_TEAM,
+                lap: 4,
+            });
             config.policyEventObserver?.({
                 kind: "v0.8_response_neutral_advance",
                 unitId: "green-valid",
@@ -188,6 +202,8 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.red.moveShotRangeDamage).toBe(30);
         expect(first.diag?.green.responseNeutralAdvances).toBe(1);
         expect(first.diag?.red.supportedRangedEscapes).toBe(1);
+        expect(first.diag?.green.responseNeutralAdvanceProposals).toBe(1);
+        expect(first.diag?.red.supportedRangedEscapeProposals).toBe(1);
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -200,7 +216,9 @@ describe("measure_mirror_cohorts", () => {
                     moveShotRangeDamagePerGame: number;
                     meanMoveShotRangeDamage: number | null;
                     supportedRangedEscapes: number;
+                    supportedRangedEscapeProposals: number;
                     responseNeutralAdvances: number;
+                    responseNeutralAdvanceProposals: number;
                 }
             >;
         };
@@ -213,7 +231,9 @@ describe("measure_mirror_cohorts", () => {
                 moveShotRangeDamagePerGame: 35,
                 meanMoveShotRangeDamage: 35,
                 supportedRangedEscapes: 1,
+                supportedRangedEscapeProposals: 1,
                 responseNeutralAdvances: 1,
+                responseNeutralAdvanceProposals: 1,
             });
         }
     });

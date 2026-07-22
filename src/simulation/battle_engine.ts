@@ -273,7 +273,9 @@ export interface IMatchConfig {
     redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
-    /** Optional strategy-policy event instrumentation. Unset in live and ordinary simulation calls. */
+    /** Optional pre-search strategy-policy proposals. Unset in live and ordinary simulation calls. */
+    policyProposalObserver?: (event: IAIPolicyEvent) => void;
+    /** Optional strategy-policy events retained after search arbitration. Unset in live and ordinary calls. */
     policyEventObserver?: (event: IAIPolicyEvent) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
@@ -956,7 +958,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const matrix = grid.getMatrix();
         // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
         // search has made its final choice so diagnostics count only policy actions that actually survive a13.
-        const incumbentPolicyEvents: IAIPolicyEvent[] | undefined = config.policyEventObserver ? [] : undefined;
+        const incumbentPolicyEvents: IAIPolicyEvent[] | undefined =
+            config.policyProposalObserver || config.policyEventObserver ? [] : undefined;
         const decisionContext: IDecisionContext = {
             grid,
             matrix,
@@ -966,7 +969,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             fightProperties,
             getCurrentEnemiesCellsWithinMovementRange: currentEnemiesCellsWithinMovementRange,
             ...(incumbentPolicyEvents
-                ? { policyEventObserver: (event: IAIPolicyEvent): void => void incumbentPolicyEvents.push(event) }
+                ? {
+                      policyEventObserver: (event: IAIPolicyEvent): void => {
+                          incumbentPolicyEvents.push(event);
+                          config.policyProposalObserver?.(event);
+                      },
+                  }
                 : {}),
         };
         const searchApplies = search.appliesTo(strategy.version);
