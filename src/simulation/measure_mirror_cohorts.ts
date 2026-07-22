@@ -182,6 +182,27 @@ export interface IMirrorDependencies {
 export const mirrorGameSeed = (baseSeed: number, game: number): number =>
     (baseSeed + Math.floor(game / 2) * 0x9e3779b1) >>> 0;
 
+/**
+ * Static worker-lane assignment. A treatment may take slightly longer than its control, so completion-order
+ * dispatch can send later games through different long-lived worker isolates and their process-local caches.
+ * Pinning game `workerIndex + n * concurrency` to that worker keeps matched runs comparable without giving up
+ * parallel execution.
+ */
+export function mirrorWorkerGameIndex(workerIndex: number, dispatchedByWorker: number, concurrency: number): number {
+    if (
+        !Number.isSafeInteger(workerIndex) ||
+        workerIndex < 0 ||
+        !Number.isSafeInteger(dispatchedByWorker) ||
+        dispatchedByWorker < 0 ||
+        !Number.isSafeInteger(concurrency) ||
+        concurrency <= 0 ||
+        workerIndex >= concurrency
+    ) {
+        throw new RangeError("workerIndex, dispatchedByWorker, and concurrency must describe a valid worker lane");
+    }
+    return workerIndex + dispatchedByWorker * concurrency;
+}
+
 export function buildMirrorRoster(
     cohort: MirrorCohortName,
     seed: number,
@@ -771,7 +792,7 @@ export async function main(): Promise<void> {
 
     const records: IMirrorGameRecord[] = [];
     await new Promise<void>((resolvePromise, rejectPromise) => {
-        let dispatched = 0;
+        const dispatchedByWorker = new Array<number>(concurrency).fill(0);
         let completed = 0;
         let settled = false;
         const workers: Worker[] = [];
@@ -786,13 +807,14 @@ export async function main(): Promise<void> {
             cleanup();
             rejectPromise(error instanceof Error ? error : new Error(String(error)));
         };
-        const dispatchNext = (worker: Worker): void => {
-            if (dispatched >= cfg.games) {
+        const dispatchNext = (worker: Worker, workerIndex: number): void => {
+            const game = mirrorWorkerGameIndex(workerIndex, dispatchedByWorker[workerIndex]!, concurrency);
+            if (game >= cfg.games) {
                 worker.postMessage({ type: "stop" });
                 return;
             }
-            worker.postMessage({ type: "game", game: dispatched });
-            dispatched += 1;
+            dispatchedByWorker[workerIndex] += 1;
+            worker.postMessage({ type: "game", game });
         };
         for (let i = 0; i < concurrency; i += 1) {
             const worker = new Worker(new URL(import.meta.url), { workerData: cfg });
@@ -813,7 +835,7 @@ export async function main(): Promise<void> {
                         return;
                     }
                     if (message.type === "ready") {
-                        dispatchNext(worker);
+                        dispatchNext(worker, i);
                         return;
                     }
                     records.push(message.record);
@@ -829,7 +851,7 @@ export async function main(): Promise<void> {
                         resolvePromise();
                         return;
                     }
-                    dispatchNext(worker);
+                    dispatchNext(worker, i);
                 },
             );
             worker.on("error", fail);
