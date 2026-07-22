@@ -42,6 +42,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     paretoNoMeleeFocus: false,
     paretoNoMeleeFocusCatalogOnly: false,
     paretoNoMeleeFocusDamageFloor: 1,
+    jitNoMeleeFocus: false,
+    jitNoMeleeFocusCatalogOnly: false,
     supportedRangedDelta: false,
     responseNeutralAdvance: false,
     diag: false,
@@ -95,6 +97,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
@@ -174,6 +178,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             paretoNoMeleeFocus: false,
             paretoNoMeleeFocusCatalogOnly: false,
             paretoNoMeleeFocusDamageFloor: 1,
+            jitNoMeleeFocus: false,
+            jitNoMeleeFocusCatalogOnly: false,
             supportedRangedDelta: false,
             responseNeutralAdvance: false,
             diag: true,
@@ -184,6 +190,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocus).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocusCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).paretoNoMeleeFocusDamageFloor).toBe(1);
+        expect(parseV08RangedPositioningABOptions([]).jitNoMeleeFocus).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).jitNoMeleeFocusCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
@@ -406,6 +414,78 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("mutually exclusive");
     });
 
+    it("exposes fixed JIT No-Melee treatment and catalog-only control with isolated geometry", () => {
+        const treatment: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            mode: "off",
+            jitNoMeleeFocus: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(treatment, { PATH: "/bin" });
+        expect(invocation.searchAuditPath).toBe("/tmp/hoc-v08-ranged-ab-test/pure_ranged.search-audit.jsonl");
+        expect(invocation.environment).toMatchObject({
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "1",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, treatment, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3",
+            arm: {
+                jitNoMeleeFocus: true,
+                jitNoMeleeFocusCatalogOnly: false,
+                jitNoMeleeFocusStartLap: 6,
+                jitNoMeleeFocusLastLap: 11,
+                jitNoMeleeFocusActivationBuffer: 1,
+                jitNoMeleeFocusDamageFloor: 0.8,
+                paretoNoMeleeFocus: false,
+            },
+            artifacts: { searchAudit: invocation.searchAuditPath },
+        });
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--jit-no-melee-focus"])
+                .jitNoMeleeFocus,
+        ).toBe(true);
+
+        const control = { ...treatment, jitNoMeleeFocus: false, jitNoMeleeFocusCatalogOnly: true };
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, { PATH: "/bin" });
+        expect(controlInvocation.environment).toMatchObject({
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "1",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "jit-catalog-only-control",
+        });
+        expect(buildV08RangedPositioningABManifest(controlInvocation, control, manifest.source).arm).toMatchObject({
+            jitNoMeleeFocus: false,
+            jitNoMeleeFocusCatalogOnly: true,
+            jitNoMeleeFocusStartLap: 6,
+            jitNoMeleeFocusLastLap: 11,
+            jitNoMeleeFocusActivationBuffer: 1,
+            jitNoMeleeFocusDamageFloor: 0.8,
+        });
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--jit-catalog-only"])
+                .jitNoMeleeFocusCatalogOnly,
+        ).toBe(true);
+
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, cohorts: ["hybrid"] })).toThrow(
+            "requires cohorts=pure_ranged",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "advance" })).toThrow("mode=off");
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, paretoNoMeleeFocus: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...treatment, jitNoMeleeFocusCatalogOnly: true }),
+        ).toThrow("mutually exclusive");
+    });
+
     it("compares supported ranged escape against the same shipped positioning baseline", () => {
         const options: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -510,7 +590,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v2",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v3",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -531,6 +611,12 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 paretoNoMeleeFocus: false,
                 paretoNoMeleeFocusCatalogOnly: false,
                 paretoNoMeleeFocusDamageFloor: 1,
+                jitNoMeleeFocus: false,
+                jitNoMeleeFocusCatalogOnly: false,
+                jitNoMeleeFocusStartLap: 6,
+                jitNoMeleeFocusLastLap: 11,
+                jitNoMeleeFocusActivationBuffer: 1,
+                jitNoMeleeFocusDamageFloor: 0.8,
                 supportedRangedDelta: false,
                 responseNeutralAdvance: false,
                 diag: true,
@@ -552,6 +638,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",

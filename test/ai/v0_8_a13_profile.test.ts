@@ -51,6 +51,8 @@ const ENV_KEYS = [
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+    "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS",
+    "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "V07_VALUE_WEIGHTS",
     "V07_VALUE_WEIGHTS_V2",
 ] as const;
@@ -116,6 +118,7 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "1",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
             V06_MELEE_DIMS: "0,2",
             V07_PLACEMENT_REVEAL: "on",
             V08_AGGRESSIVE: "1",
@@ -147,6 +150,8 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER = "1";
         process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = "1";
         process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR = "0.9";
+        process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS = "1";
+        process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = "v0.7";
         process.env.V07_VALUE_WEIGHTS = "material";
         const driver = createV08A13SearchDriver({} as ILookaheadDeps, {
             seed: 13,
@@ -169,6 +174,8 @@ describe("v0.8 a13 production profile", () => {
             pureRangedDeadlineFinisher: boolean;
             pureRangedParetoNoMeleeFocus: boolean;
             pureRangedParetoNoMeleeFocusDamageFloor: number;
+            pureRangedJitNoMeleeFocus: boolean;
+            pureRangedJitNoMeleeFocusVersions: ReadonlySet<string>;
             learnedV2: { b: number; w: number[] } | null;
             caps: {
                 maxMoveDestinations: number;
@@ -196,6 +203,7 @@ describe("v0.8 a13 production profile", () => {
             pureRangedDeadlineFinisher: false,
             pureRangedParetoNoMeleeFocus: false,
             pureRangedParetoNoMeleeFocusDamageFloor: 1,
+            pureRangedJitNoMeleeFocus: false,
             caps: {
                 maxMoveDestinations: 1,
                 maxMeleePairs: 6,
@@ -206,6 +214,7 @@ describe("v0.8 a13 production profile", () => {
         expect(internals.moveShotCapForVersion("v0.8")).toBe(0);
         expect(internals.moveShotCapForVersion("v0.7")).toBe(0);
         expect(internals.learnedV2).toEqual(V08_A13_VALUE_LEAF);
+        expect([...internals.pureRangedJitNoMeleeFocusVersions]).toEqual([]);
         expect(process.env.V07_SEARCH).toBe("0");
         expect(process.env.SEARCH_GATE).toBe("99");
         expect(process.env.SEARCH_HORIZON).toBe("999");
@@ -217,6 +226,8 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR).toBe("0.9");
+        expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS).toBe("1");
+        expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS).toBe("v0.7");
         expect(process.env.V07_VALUE_WEIGHTS).toBe("material");
     });
 

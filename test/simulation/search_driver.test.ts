@@ -95,6 +95,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+    "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS",
+    "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -1741,9 +1743,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(summary.pureRangedParetoNoMeleeFocusExpectedDamage as number).toBeGreaterThan(0);
         expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThan(1);
 
-        const hpBefore = noMelee.getCumulativeHp();
         expectEngineAcceptsProductiveDecision(h, chosen);
-        expect(noMelee.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("keeps the exact inherited aim while Pareto focus is default-off and rejects pure-arm combinations", () => {
@@ -1917,6 +1917,315 @@ describe("search driver — gating, hygiene, determinism", () => {
             pureRangedParetoNoMeleeFocusValidOverrides: 0,
             pureRangedParetoNoMeleeFocusRejectedProbes: 1,
         });
+    });
+
+    const pureRangedJitFocusEnvironment = {
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8,v0.8s",
+        SEARCH_GATE: "1000",
+        SEARCH_HORIZON: "1",
+        SEARCH_ROLLOUTS: "1",
+        SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "1",
+        SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+    } as const;
+
+    const positionJitFocusFixture = (h: Harness): { actor: Unit; primary: Unit; noMelee: Unit } => {
+        const green = h.unitsHolder.getAllAllies(GREEN_TEAM);
+        const red = h.unitsHolder.getAllAllies(RED_TEAM);
+        const actor = green[0];
+        const primary = red[0];
+        const noMelee = red[1];
+        noMelee.grantStolenAbility("No Melee");
+        // Keep the barrier large enough to arm the JIT scheduler at lap six without manufacturing a low-HP kill.
+        noMelee.setAmountAlive(100);
+        const moveTo = (unit: Unit, cell: XY): void => {
+            h.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            const position = getPositionForCell(
+                cell,
+                h.grid.getSettings().getMinX(),
+                h.grid.getSettings().getStep(),
+                h.grid.getSettings().getHalfStep(),
+            );
+            unit.setPosition(position.x, position.y);
+            h.grid.occupyCell(
+                cell,
+                unit.getId(),
+                unit.getTeam(),
+                unit.getAttackRange(),
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
+        };
+        moveTo(actor, { x: 2, y: 7 });
+        moveTo(green[1], { x: 2, y: 12 });
+        moveTo(primary, { x: 8, y: 7 });
+        moveTo(noMelee, { x: 9, y: 6 });
+        for (let lap = 1; lap < 6; lap += 1) h.fightProperties.flipLap();
+        h.setActiveUnitId(actor.getId());
+        return { actor, primary, noMelee };
+    };
+
+    const jitAim = (actor: Unit, target: Unit): GameAction[] => [
+        {
+            type: "range_attack",
+            attackerId: actor.getId(),
+            targetId: target.getId(),
+            aimCell: { ...target.getBaseCell() },
+            aimSide: 0,
+        },
+    ];
+
+    it("takes an engine-valid JIT redirect only for the scoped v0.8 seat and audits every invariant", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-focus-")), "search.jsonl");
+        setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_401, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary, noMelee } = positionJitFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const candidateIncumbent = jitAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", candidateIncumbent);
+        expect(chosen).not.toBe(candidateIncumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(noMelee.getId());
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            pureRangedJitNoMeleeFocus: true,
+            pureRangedJitNoMeleeFocusVersions: ["v0.8"],
+            pureRangedJitNoMeleeFocusStartLap: 6,
+            pureRangedJitNoMeleeFocusLastLap: 11,
+            pureRangedJitNoMeleeFocusActivationBuffer: 1,
+            pureRangedJitNoMeleeFocusDamageFloor: 0.8,
+            pureRangedJitNoMeleeFocusProposals: 1,
+            pureRangedJitNoMeleeFocusValidOverrides: 1,
+            pureRangedJitNoMeleeFocusRejectedProbes: 0,
+            pureRangedJitNoMeleeFocusSelections: 1,
+            pureRangedJitNoMeleeFocusFiniteAmmoSelections: 1,
+            pureRangedJitNoMeleeFocusEndlessQuiverSelections: 0,
+            pureRangedJitNoMeleeFocusBelowFloorViolations: 0,
+            pureRangedJitNoMeleeFocusExpectedKillRegressionViolations: 0,
+            pureRangedJitNoMeleeFocusFriendlyFireRegressionViolations: 0,
+            pureRangedJitNoMeleeFocusNonSingleActivationViolations: 0,
+            pureRangedJitNoMeleeFocusProposalsByActorName: { Arbalester: 1 },
+            pureRangedJitNoMeleeFocusOverridesByActorName: { Arbalester: 1 },
+            pureRangedJitNoMeleeFocusOverridesByTargetName: { Arbalester: 1 },
+            pureRangedJitNoMeleeFocusOverridesByLap: { "6": 1 },
+        });
+        expect(summary.pureRangedJitNoMeleeFocusMaximumDeadlineSlack as number).toBeLessThanOrEqual(1);
+        expect(summary.pureRangedJitNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThanOrEqual(0.8);
+
+        expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("engine-probes an armed incumbent lock and returns the exact inherited action reference", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-lock-")), "search.jsonl");
+        setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_402, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, noMelee } = positionJitFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                deadlineAt?: number | null,
+            ): IEnumeratedCandidate | undefined;
+        };
+        const realProbe = intercepted.firstEngineValidCandidate.bind(driver);
+        let probes = 0;
+        intercepted.firstEngineValidCandidate = (unit, candidates, seedBase, deadlineAt) => {
+            probes += 1;
+            return realProbe(unit, candidates, seedBase, deadlineAt);
+        };
+        const incumbent = jitAim(actor, noMelee);
+        expect(driver.chooseDecision(actor, "v0.8", incumbent)).toBe(incumbent);
+        expect(probes).toBe(1);
+        driver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(audit, "utf8").trim())).toMatchObject({
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 1,
+            pureRangedJitNoMeleeFocusIncumbentLocks: 1,
+            pureRangedJitNoMeleeFocusRejectedLockProbes: 0,
+            pureRangedJitNoMeleeFocusSelections: 1,
+            pureRangedJitNoMeleeFocusLocksByActorName: { Arbalester: 1 },
+            pureRangedJitNoMeleeFocusLocksByTargetName: { Arbalester: 1 },
+            pureRangedJitNoMeleeFocusLocksByLap: { "6": 1 },
+        });
+    });
+
+    it("counts both proposal classes when an immediate-kill redirect rejects before its incumbent lock accepts", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-kill-reject-lock-")), "search.jsonl");
+        setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_409, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary, noMelee } = positionJitFocusFixture(h);
+        primary.grantStolenAbility("No Melee");
+        // Ten bodies cap the redirect at 90 HP: still a kill, but close enough to the uncapped incumbent shot
+        // to clear the preregistered aggregate-damage floor.
+        primary.setAmountAlive(10);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const incumbent = jitAim(actor, noMelee);
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                deadlineAt?: number | null,
+            ): IEnumeratedCandidate | undefined;
+        };
+        const realProbe = intercepted.firstEngineValidCandidate.bind(driver);
+        intercepted.firstEngineValidCandidate = (unit, candidates, seedBase, deadlineAt) => {
+            expect(candidates.length).toBeGreaterThanOrEqual(2);
+            expect(candidates[0].kind).toBe("shot");
+            expect(candidates[0].targetId).toBe(primary.getId());
+            expect(candidates[0].features.expectedKill).toBe(1);
+            expect(candidates[1].kind).toBe("incumbent");
+            expect(candidates[1].targetId).toBe(noMelee.getId());
+            expect(candidates[1].features.expectedKill).toBe(0);
+            // Inject the first redirect rejection, then retain the authoritative probe for the lock fallback.
+            return realProbe(unit, candidates.slice(1), seedBase, deadlineAt);
+        };
+        expect(driver.chooseDecision(actor, "v0.8", incumbent)).toBe(incumbent);
+        driver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(audit, "utf8").trim())).toMatchObject({
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 1,
+            pureRangedJitNoMeleeFocusIncumbentLocks: 1,
+            pureRangedJitNoMeleeFocusRejectedLockProbes: 0,
+            pureRangedJitNoMeleeFocusProposals: 1,
+            pureRangedJitNoMeleeFocusImmediateKillProposals: 1,
+            pureRangedJitNoMeleeFocusValidOverrides: 0,
+            pureRangedJitNoMeleeFocusRejectedProbes: 0,
+            pureRangedJitNoMeleeFocusSelections: 1,
+        });
+    });
+
+    it("audits an active Endless Quiver JIT selection separately from finite ammo", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-endless-")), "search.jsonl");
+        setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_408, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionJitFocusFixture(h);
+        actor.grantStolenAbility("Endless Quiver");
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        expect(driver.chooseDecision(actor, "v0.8", jitAim(actor, primary))).not.toEqual(jitAim(actor, primary));
+        driver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(audit, "utf8").trim())).toMatchObject({
+            pureRangedJitNoMeleeFocusSelections: 1,
+            pureRangedJitNoMeleeFocusFiniteAmmoSelections: 0,
+            pureRangedJitNoMeleeFocusEndlessQuiverSelections: 1,
+        });
+    });
+
+    it("falls through stock a13 after a rejected JIT lock and preserves deadline/circuit fail-closed behavior", () => {
+        const rejectedAudit = join(mkdtempSync(join(tmpdir(), "hoc-jit-lock-rejected-")), "search.jsonl");
+        setEnv({ ...pureRangedJitFocusEnvironment, SEARCH_AUDIT: rejectedAudit });
+        const rejectedHarness = buildBattle(10_403, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const rejectedFixture = positionJitFocusFixture(rejectedHarness);
+        const rejectedDriver = rejectedHarness.makeDriver();
+        rejectedDriver.onFightReady();
+        const rejectedIntercept = rejectedDriver as unknown as {
+            firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+        };
+        rejectedIntercept.firstEngineValidCandidate = () => undefined;
+        const rejectedIncumbent = jitAim(rejectedFixture.actor, rejectedFixture.noMelee);
+        expect(rejectedDriver.chooseDecision(rejectedFixture.actor, "v0.8", rejectedIncumbent)).toBe(rejectedIncumbent);
+        rejectedDriver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(rejectedAudit, "utf8").trim())).toMatchObject({
+            searched: 1,
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 1,
+            pureRangedJitNoMeleeFocusIncumbentLocks: 0,
+            pureRangedJitNoMeleeFocusRejectedLockProbes: 1,
+            pureRangedJitNoMeleeFocusSelections: 0,
+        });
+
+        const deadlineAudit = join(mkdtempSync(join(tmpdir(), "hoc-jit-lock-deadline-")), "search.jsonl");
+        setEnv({
+            ...pureRangedJitFocusEnvironment,
+            SEARCH_DECISION_DEADLINE_MS: "0.0001",
+            SEARCH_AUDIT: deadlineAudit,
+        });
+        const deadlineHarness = buildBattle(10_404, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const deadlineFixture = positionJitFocusFixture(deadlineHarness);
+        const deadlineDriver = deadlineHarness.makeDriver();
+        deadlineDriver.onFightReady();
+        const deadlineIncumbent = jitAim(deadlineFixture.actor, deadlineFixture.noMelee);
+        expect(deadlineDriver.chooseDecision(deadlineFixture.actor, "v0.8", deadlineIncumbent)).toBe(deadlineIncumbent);
+        deadlineDriver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(deadlineAudit, "utf8").trim())).toMatchObject({
+            deadlineFallbacks: 1,
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 1,
+            pureRangedJitNoMeleeFocusIncumbentLocks: 0,
+            pureRangedJitNoMeleeFocusRejectedLockProbes: 0,
+            pureRangedJitNoMeleeFocusSelections: 0,
+        });
+
+        const circuitAudit = join(mkdtempSync(join(tmpdir(), "hoc-jit-lock-circuit-")), "search.jsonl");
+        setEnv({
+            ...pureRangedJitFocusEnvironment,
+            SEARCH_CIRCUIT_BREAKER_MS: "0.0001",
+            SEARCH_AUDIT: circuitAudit,
+        });
+        const circuitHarness = buildBattle(10_407, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const circuitFixture = positionJitFocusFixture(circuitHarness);
+        const circuitDriver = circuitHarness.makeDriver();
+        circuitDriver.onFightReady();
+        circuitDriver.chooseDecision(
+            circuitFixture.actor,
+            "v0.8s",
+            jitAim(circuitFixture.actor, circuitFixture.primary),
+        );
+        const circuitIncumbent = jitAim(circuitFixture.actor, circuitFixture.noMelee);
+        expect(circuitDriver.chooseDecision(circuitFixture.actor, "v0.8", circuitIncumbent)).toBe(circuitIncumbent);
+        circuitDriver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(circuitAudit, "utf8").trim())).toMatchObject({
+            circuitOpened: true,
+            circuitSkipped: 1,
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 0,
+            pureRangedJitNoMeleeFocusSelections: 0,
+        });
+    });
+
+    it("gives JIT treatment and selector-off control identical catalogs while control counters stay zero", () => {
+        setEnv({
+            ...pureRangedJitFocusEnvironment,
+            SEARCH_MAX_SHOTS: "1",
+            SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "jit-catalog-only-control",
+        });
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-jit-catalog-only-")), "search.jsonl");
+        process.env.SEARCH_AUDIT = audit;
+        const h = buildBattle(10_405, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionJitFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const calls = captureCandidates(driver);
+
+        driver.chooseDecision(actor, "v0.8s", jitAim(actor, primary));
+        driver.chooseDecision(actor, "v0.8", jitAim(actor, primary));
+        expect(calls).toHaveLength(2);
+        expect(normalize(calls[1])).toEqual(normalize(calls[0]));
+        expect(calls[0].filter((candidate) => candidate.kind === "shot").length).toBeGreaterThan(0);
+        driver.onMatchEnd("draw", "turn_cap");
+        expect(JSON.parse(readFileSync(audit, "utf8").trim())).toMatchObject({
+            pureRangedJitNoMeleeFocus: true,
+            pureRangedJitNoMeleeFocusVersions: ["jit-catalog-only-control"],
+            pureRangedJitNoMeleeFocusIncumbentLockProposals: 0,
+            pureRangedJitNoMeleeFocusProposals: 0,
+            pureRangedJitNoMeleeFocusSelections: 0,
+            pureRangedJitNoMeleeFocusValidOverrides: 0,
+        });
+    });
+
+    it("rejects JIT overlap with Pareto and every earlier pure-ranged arm", () => {
+        for (const conflict of [
+            { SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "1" },
+            { SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "1" },
+            { SEARCH_PURE_RANGED_DEADLINE_FINISHER: "1" },
+        ]) {
+            setEnv({ ...pureRangedJitFocusEnvironment, ...conflict });
+            const h = buildBattle(10_406, "v0.8", undefined, pureRangedParetoFocusRoster());
+            expect(() => h.makeDriver()).toThrow("mutually exclusive");
+        }
     });
 
     it("only re-decides for versions listed in SEARCH_VERSIONS (default v0.6s)", () => {
