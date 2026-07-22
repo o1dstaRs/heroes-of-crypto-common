@@ -29,6 +29,7 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
+import { getPositionForCell } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
@@ -86,6 +87,8 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS",
     "SEARCH_PURE_RANGED_DEADLINE_FINISHER",
     "SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_MAX_MOVES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -1569,6 +1572,255 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
         });
         expect(() => h.makeDriver()).toThrow("mutually exclusive");
+    });
+
+    const pureRangedParetoFocusRoster = (): readonly IArmyUnitSpec[] => [
+        { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: 20 },
+        { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: 18 },
+    ];
+    const pureRangedParetoFocusEnvironment = {
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8,v0.8s",
+        SEARCH_GATE: "1000",
+        SEARCH_HORIZON: "1",
+        SEARCH_ROLLOUTS: "1",
+        SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "1",
+        SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8",
+    } as const;
+
+    const positionParetoFocusFixture = (h: Harness): { actor: Unit; primary: Unit; noMelee: Unit } => {
+        const green = h.unitsHolder.getAllAllies(GREEN_TEAM);
+        const red = h.unitsHolder.getAllAllies(RED_TEAM);
+        const actor = green[0];
+        const primary = red[0];
+        const noMelee = red[1];
+        actor.grantStolenAbility("Through Shot");
+        noMelee.grantStolenAbility("No Melee");
+        const moveTo = (unit: Unit, cell: XY): void => {
+            h.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            const position = getPositionForCell(
+                cell,
+                h.grid.getSettings().getMinX(),
+                h.grid.getSettings().getStep(),
+                h.grid.getSettings().getHalfStep(),
+            );
+            unit.setPosition(position.x, position.y);
+            h.grid.occupyCell(
+                cell,
+                unit.getId(),
+                unit.getTeam(),
+                unit.getAttackRange(),
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
+        };
+        moveTo(actor, { x: 2, y: 7 });
+        moveTo(green[1], { x: 2, y: 12 });
+        moveTo(primary, { x: 8, y: 7 });
+        moveTo(noMelee, { x: 9, y: 6 });
+        h.setActiveUnitId(actor.getId());
+        return { actor, primary, noMelee };
+    };
+
+    const plainAim = (actor: Unit, primary: Unit): GameAction[] => [
+        {
+            type: "range_attack",
+            attackerId: actor.getId(),
+            targetId: primary.getId(),
+            aimCell: { x: 8, y: 7 },
+            aimSide: 0,
+        },
+    ];
+
+    it("takes an engine-valid aggregate-Pareto No-Melee focus only for the scoped v0.8 seat", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-focus-")), "search.jsonl");
+        setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_308, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary, noMelee } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const controlIncumbent = plainAim(actor, primary);
+        expect(driver.chooseDecision(actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+
+        const candidateIncumbent = plainAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", candidateIncumbent);
+        expect(chosen).not.toBe(candidateIncumbent);
+        const shot = chosen.find((action) => action.type === "range_attack");
+        expect(shot?.type).toBe("range_attack");
+        expect(shot?.targetId).toBe(noMelee.getId());
+
+        const postureWait: GameAction[] = [{ type: "wait_turn", unitId: actor.getId() }];
+        expect(driver.chooseDecision(actor, "v0.8", postureWait)).toBe(postureWait);
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = readFileSync(audit, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as Record<string, unknown>)
+            .find((row) => row.t === "game")!;
+        expect(summary).toMatchObject({
+            pureRangedParetoNoMeleeFocus: true,
+            pureRangedParetoNoMeleeFocusVersions: ["v0.8"],
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
+            pureRangedParetoNoMeleeFocusRejectedProbes: 0,
+            pureRangedParetoNoMeleeFocusProposalsByActorAbility: { through_shot: 1 },
+            pureRangedParetoNoMeleeFocusOverridesByActorAbility: { through_shot: 1 },
+            pureRangedParetoNoMeleeFocusProposalsByActorName: { Arbalester: 1 },
+            pureRangedParetoNoMeleeFocusOverridesByActorName: { Arbalester: 1 },
+        });
+        expect(summary.pureRangedParetoNoMeleeFocusExpectedDamage as number).toBeGreaterThan(0);
+
+        const hpBefore = noMelee.getCumulativeHp();
+        expectEngineAcceptsProductiveDecision(h, chosen);
+        expect(noMelee.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
+    it("keeps the exact inherited aim while Pareto focus is default-off and rejects pure-arm combinations", () => {
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: undefined,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: undefined,
+        });
+        const h = buildBattle(10_309, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const incumbent = plainAim(actor, primary);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        expect(driver.chooseDecision(actor, "v0.8", incumbent)).toBe(incumbent);
+
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "1",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
+        });
+        expect(() => h.makeDriver()).toThrow("mutually exclusive");
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "1",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+        });
+        expect(() => h.makeDriver()).toThrow("mutually exclusive");
+    });
+
+    it("does not let Pareto focus bypass an already-open search circuit", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-circuit-")), "search.jsonl");
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_CIRCUIT_BREAKER_MS: "0.0001",
+            SEARCH_AUDIT: audit,
+        });
+        const h = buildBattle(10_310, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const opening = plainAim(actor, primary);
+        driver.chooseDecision(actor, "v0.8s", opening);
+        for (let lap = 1; lap < 7; lap += 1) h.fightProperties.flipLap();
+        for (const enemy of h.unitsHolder.getAllAllies(RED_TEAM)) enemy.setAmountAlive(1);
+        const afterCircuit = plainAim(actor, primary);
+        driver.chooseDecision(actor, "v0.8", afterCircuit);
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            circuitOpened: true,
+            pureRangedParetoNoMeleeFocusProposals: 0,
+            pureRangedParetoNoMeleeFocusValidOverrides: 0,
+        });
+    });
+
+    it("bounds the Pareto engine probe by the ordinary decision deadline", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-deadline-")), "search.jsonl");
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_DECISION_DEADLINE_MS: "0.0001",
+            SEARCH_AUDIT: audit,
+        });
+        const h = buildBattle(10_311, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const incumbent = plainAim(actor, primary);
+        expect(driver.chooseDecision(actor, "v0.8", incumbent)).toBe(incumbent);
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            searched: 1,
+            deadlineFallbacks: 1,
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 0,
+            pureRangedParetoNoMeleeFocusRejectedProbes: 0,
+        });
+    });
+
+    it("keeps ordinary-shooter catalogs exact when Pareto focus is globally enabled", () => {
+        const catalog = (enabled: boolean): unknown => {
+            setEnv({
+                ...pureRangedParetoFocusEnvironment,
+                SEARCH_MAX_SHOTS: "1",
+                SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: enabled ? "1" : undefined,
+                SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: enabled ? "v0.8" : undefined,
+            });
+            const h = buildBattle(10_313, "v0.8", undefined, pureRangedParetoFocusRoster());
+            const { actor, primary } = positionParetoFocusFixture(h);
+            actor.deleteAbility("Through Shot");
+            const driver = h.makeDriver();
+            driver.onFightReady();
+            const calls = captureCandidates(driver);
+
+            expect(driver.chooseDecision(actor, "v0.8", plainAim(actor, primary))).toEqual(plainAim(actor, primary));
+            expect(calls).toHaveLength(1);
+            return normalize(calls[0]);
+        };
+
+        expect(catalog(true)).toEqual(catalog(false));
+    });
+
+    it("continues through ordinary a13 search when the Pareto filter has no proposal", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-no-proposal-")), "search.jsonl");
+        setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_312, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        actor.grantStolenAbility("Area Throw");
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            searched: 1,
+            pureRangedParetoNoMeleeFocusProposals: 0,
+            pureRangedParetoNoMeleeFocusValidOverrides: 0,
+        });
+    });
+
+    it("continues ordinary search after every proposed Pareto redirect fails its engine probe", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-rejected-probe-")), "search.jsonl");
+        setEnv({ ...pureRangedParetoFocusEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_314, "v0.8", undefined, pureRangedParetoFocusRoster());
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+        };
+        intercepted.firstEngineValidCandidate = () => undefined;
+        const incumbent = plainAim(actor, primary);
+        const before = stableSnapshot(h);
+
+        expect(driver.chooseDecision(actor, "v0.8", incumbent)).toBe(incumbent);
+        expect(stableSnapshot(h)).toEqual(before);
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            searched: 1,
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 0,
+            pureRangedParetoNoMeleeFocusRejectedProbes: 1,
+        });
     });
 
     it("only re-decides for versions listed in SEARCH_VERSIONS (default v0.6s)", () => {

@@ -58,6 +58,11 @@ import {
 import { ilCandidateActionEncoding } from "./il_action_features";
 import type { ILookaheadDeps } from "./lookahead";
 import { rankPureRangedDeadlineFinisherCandidates } from "./pure_ranged_deadline_finisher";
+import {
+    PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
+    pureRangedParetoNoMeleeFocusActorAbility,
+    rankPureRangedParetoNoMeleeFocusCandidates,
+} from "./pure_ranged_pareto_no_melee_focus";
 import { rankPureRangedNoMeleePressureCandidates } from "./pure_ranged_no_melee_pressure";
 import {
     canonicalPhaseBSeed,
@@ -141,6 +146,11 @@ import {
  * SEARCH_PURE_RANGED_DEADLINE_FINISHER=1 is a separate default-off, version-scoped deadline arm. On the same
  * all-ranged boards, an Endless Quiver shooter preserves its normal opening targets until the enemy No Melee
  * barrier needs every remaining pre-Armageddon activation, then takes an engine-valid stationary barrier shot.
+ * SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS=1 is a separate default-off, version-scoped target-focus arm. Before
+ * lap nine on the same all-ranged boards, an exact Through Shot or Large Caliber shooter may redirect a positive
+ * stationary shot to a living original No Melee target only when the aimed-primary kill estimate, total enemy/net
+ * damage, friendly fire, and shot spend are aggregate-Pareto-safe. Both measured seats receive the same catalog;
+ * scoped candidate seat may select the engine-validated redirect.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
@@ -440,6 +450,18 @@ interface ISearchCounters {
     pureRangedDeadlineFinisherStartLap: number;
     /** Sum of expected primary No Melee damage across deadline-finisher deliveries. */
     pureRangedDeadlineFinisherPrimaryDamage: number;
+    /** Turns where the aggregate-Pareto filter proposed at least one No Melee redirect. */
+    pureRangedParetoNoMeleeFocusProposals: number;
+    /** Proposed turns whose authoritative engine probe accepted a redirect. */
+    pureRangedParetoNoMeleeFocusValidOverrides: number;
+    /** Proposed turns where every authoritative engine probe rejected. */
+    pureRangedParetoNoMeleeFocusRejectedProbes: number;
+    /** Sum of expected primary No Melee damage across accepted redirects. */
+    pureRangedParetoNoMeleeFocusExpectedDamage: number;
+    pureRangedParetoNoMeleeFocusProposalsByActorAbility: Record<string, number>;
+    pureRangedParetoNoMeleeFocusOverridesByActorAbility: Record<string, number>;
+    pureRangedParetoNoMeleeFocusProposalsByActorName: Record<string, number>;
+    pureRangedParetoNoMeleeFocusOverridesByActorName: Record<string, number>;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -494,6 +516,14 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedDeadlineFinisherOverrides: 0,
     pureRangedDeadlineFinisherStartLap: 0,
     pureRangedDeadlineFinisherPrimaryDamage: 0,
+    pureRangedParetoNoMeleeFocusProposals: 0,
+    pureRangedParetoNoMeleeFocusValidOverrides: 0,
+    pureRangedParetoNoMeleeFocusRejectedProbes: 0,
+    pureRangedParetoNoMeleeFocusExpectedDamage: 0,
+    pureRangedParetoNoMeleeFocusProposalsByActorAbility: {},
+    pureRangedParetoNoMeleeFocusOverridesByActorAbility: {},
+    pureRangedParetoNoMeleeFocusProposalsByActorName: {},
+    pureRangedParetoNoMeleeFocusOverridesByActorName: {},
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -552,6 +582,8 @@ export class SearchDriver {
     private readonly pureRangedNoMeleePressureVersions: ReadonlySet<string>;
     private readonly pureRangedDeadlineFinisher: boolean;
     private readonly pureRangedDeadlineFinisherVersions: ReadonlySet<string>;
+    private readonly pureRangedParetoNoMeleeFocus: boolean;
+    private readonly pureRangedParetoNoMeleeFocusVersions: ReadonlySet<string>;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -785,9 +817,43 @@ export class SearchDriver {
             }
             this.pureRangedDeadlineFinisherVersions = new Set(versions);
         }
-        if (this.pureRangedNoMeleePressure && this.pureRangedDeadlineFinisher) {
+        const rawPureRangedParetoNoMeleeFocus = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS;
+        if (
+            this.mode === "search" &&
+            rawPureRangedParetoNoMeleeFocus !== undefined &&
+            rawPureRangedParetoNoMeleeFocus !== "" &&
+            rawPureRangedParetoNoMeleeFocus !== "0" &&
+            rawPureRangedParetoNoMeleeFocus !== "1"
+        ) {
+            throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS must be 0 or 1");
+        }
+        this.pureRangedParetoNoMeleeFocus = this.mode === "search" && rawPureRangedParetoNoMeleeFocus === "1";
+        const rawPureRangedParetoNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS;
+        if (!this.pureRangedParetoNoMeleeFocus) {
+            this.pureRangedParetoNoMeleeFocusVersions = new Set();
+        } else if (rawPureRangedParetoNoMeleeFocusVersions === undefined) {
+            this.pureRangedParetoNoMeleeFocusVersions = new Set(this.versions);
+        } else {
+            const versions = rawPureRangedParetoNoMeleeFocusVersions.split(",").map((version) => version.trim());
+            if (
+                !versions.length ||
+                versions.some((version) => !version) ||
+                new Set(versions).size !== versions.length
+            ) {
+                throw new Error(
+                    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS must be a comma-separated list of unique versions",
+                );
+            }
+            this.pureRangedParetoNoMeleeFocusVersions = new Set(versions);
+        }
+        if (
+            [this.pureRangedNoMeleePressure, this.pureRangedDeadlineFinisher, this.pureRangedParetoNoMeleeFocus].filter(
+                Boolean,
+            ).length > 1
+        ) {
             throw new Error(
-                "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE and SEARCH_PURE_RANGED_DEADLINE_FINISHER are mutually exclusive",
+                "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE, SEARCH_PURE_RANGED_DEADLINE_FINISHER, and " +
+                    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS are mutually exclusive",
             );
         }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
@@ -870,7 +936,10 @@ export class SearchDriver {
             this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
         }
         if (
-            (this.pureRangedTerminalWeight > 0 || this.pureRangedNoMeleePressure || this.pureRangedDeadlineFinisher) &&
+            (this.pureRangedTerminalWeight > 0 ||
+                this.pureRangedNoMeleePressure ||
+                this.pureRangedDeadlineFinisher ||
+                this.pureRangedParetoNoMeleeFocus) &&
             this.pureRangedTerminalState === null
         ) {
             this.pureRangedTerminalState = capturePureRangedTerminalState(
@@ -900,6 +969,8 @@ export class SearchDriver {
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
         const pureRangedDeadlineFinisherSeat =
             this.pureRangedDeadlineFinisher && this.pureRangedDeadlineFinisherVersions.has(version);
+        const pureRangedParetoNoMeleeFocusSeat =
+            this.pureRangedParetoNoMeleeFocus && this.pureRangedParetoNoMeleeFocusVersions.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -935,7 +1006,8 @@ export class SearchDriver {
             this.lateRangedFinishWeight > 0 ||
             this.pureRangedTerminalWeight > 0 ||
             pureRangedNoMeleePressureSeat ||
-            pureRangedDeadlineFinisherSeat
+            pureRangedDeadlineFinisherSeat ||
+            this.pureRangedParetoNoMeleeFocus
         ) {
             this.onFightReady();
         }
@@ -945,6 +1017,16 @@ export class SearchDriver {
             pureRangedDeadlineFinisherSeat &&
             this.pureRangedTerminalState?.eligible === true &&
             unit.hasAbilityActive("Endless Quiver");
+        // Catalog expansion is global rather than version-scoped: both experiment seats enumerate the exact same
+        // target-covered catalog, while only the scoped candidate seat may select the Pareto redirect below.
+        const pureRangedParetoNoMeleeFocusCatalogBoard =
+            this.pureRangedParetoNoMeleeFocus &&
+            this.pureRangedTerminalState?.eligible === true &&
+            incumbentKind === "shot" &&
+            pureRangedParetoNoMeleeFocusActorAbility(unit) !== undefined &&
+            Number.isFinite(currentLap) &&
+            currentLap >= 1 &&
+            currentLap < PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP;
         const pureRangedDirectInterventionBoard = pureRangedNoMeleePressureBoard || pureRangedDeadlineFinisherBoard;
         // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
         // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
@@ -974,7 +1056,8 @@ export class SearchDriver {
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
             };
-            const preserveBaselineAttackTargetCoverage = prioritizeV08STargetPressure || prioritizeV08SUrgency;
+            const preserveBaselineAttackTargetCoverage =
+                prioritizeV08STargetPressure || prioritizeV08SUrgency || pureRangedParetoNoMeleeFocusCatalogBoard;
             const enumerationOptions = {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
@@ -1017,6 +1100,59 @@ export class SearchDriver {
                           preserveAttackTargetCoverage: true,
                       }).candidates.filter(keepCandidate)
                     : candidates;
+            if (
+                pureRangedParetoNoMeleeFocusSeat &&
+                pureRangedParetoNoMeleeFocusCatalogBoard &&
+                !this.circuitOpen &&
+                !this.observeOnly
+            ) {
+                const focusCandidates = rankPureRangedParetoNoMeleeFocusCandidates(
+                    unit,
+                    this.deps.unitsHolder,
+                    candidates,
+                    this.pureRangedTerminalState,
+                    currentLap,
+                );
+                if (focusCandidates.length) {
+                    const proposal = focusCandidates[0];
+                    this.counters.pureRangedParetoNoMeleeFocusProposals += 1;
+                    bump(this.counters.pureRangedParetoNoMeleeFocusProposalsByActorAbility, proposal.actorAbility);
+                    bump(this.counters.pureRangedParetoNoMeleeFocusProposalsByActorName, unit.getName());
+                }
+                let focusCandidate: IEnumeratedCandidate | undefined;
+                let focusProbeCompleted = true;
+                try {
+                    focusCandidate = this.firstEngineValidCandidate(
+                        unit,
+                        focusCandidates.map(({ candidate }) => candidate),
+                        seedBase,
+                        this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs,
+                    );
+                } catch (error) {
+                    if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
+                    // Preserve ordinary a13 deadline/fallback accounting and selection semantics. The normal
+                    // search below will observe the same expired deadline and use its established fallback path.
+                    focusProbeCompleted = false;
+                }
+                const focus = focusCandidates.find(({ candidate }) => candidate === focusCandidate);
+                if (focusCandidate && focus) {
+                    this.counters.decisions += 1;
+                    this.counters.pureRangedParetoNoMeleeFocusValidOverrides += 1;
+                    this.counters.pureRangedParetoNoMeleeFocusExpectedDamage += focus.expectedNoMeleeDamage;
+                    bump(this.counters.pureRangedParetoNoMeleeFocusOverridesByActorAbility, focus.actorAbility);
+                    bump(this.counters.pureRangedParetoNoMeleeFocusOverridesByActorName, unit.getName());
+                    this.counters.msTotal += performance.now() - t0;
+                    if (focusCandidate.actions !== incumbent) {
+                        this.counters.overrides += 1;
+                        bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                        bump(this.counters.overridesToKind, focusCandidate.kind);
+                    }
+                    return focusCandidate.actions;
+                }
+                if (focusCandidates.length && focusProbeCompleted) {
+                    this.counters.pureRangedParetoNoMeleeFocusRejectedProbes += 1;
+                }
+            }
             if (pureRangedDeadlineFinisherBoard && !this.observeOnly) {
                 const deadlineCandidates = rankPureRangedDeadlineFinisherCandidates(
                     unit,
@@ -1218,6 +1354,16 @@ export class SearchDriver {
             pureRangedDeadlineFinisherOverrides: c.pureRangedDeadlineFinisherOverrides,
             pureRangedDeadlineFinisherStartLap: c.pureRangedDeadlineFinisherStartLap,
             pureRangedDeadlineFinisherPrimaryDamage: Number(c.pureRangedDeadlineFinisherPrimaryDamage.toFixed(3)),
+            pureRangedParetoNoMeleeFocus: this.pureRangedParetoNoMeleeFocus,
+            pureRangedParetoNoMeleeFocusVersions: [...this.pureRangedParetoNoMeleeFocusVersions],
+            pureRangedParetoNoMeleeFocusProposals: c.pureRangedParetoNoMeleeFocusProposals,
+            pureRangedParetoNoMeleeFocusValidOverrides: c.pureRangedParetoNoMeleeFocusValidOverrides,
+            pureRangedParetoNoMeleeFocusRejectedProbes: c.pureRangedParetoNoMeleeFocusRejectedProbes,
+            pureRangedParetoNoMeleeFocusExpectedDamage: Number(c.pureRangedParetoNoMeleeFocusExpectedDamage.toFixed(3)),
+            pureRangedParetoNoMeleeFocusProposalsByActorAbility: c.pureRangedParetoNoMeleeFocusProposalsByActorAbility,
+            pureRangedParetoNoMeleeFocusOverridesByActorAbility: c.pureRangedParetoNoMeleeFocusOverridesByActorAbility,
+            pureRangedParetoNoMeleeFocusProposalsByActorName: c.pureRangedParetoNoMeleeFocusProposalsByActorName,
+            pureRangedParetoNoMeleeFocusOverridesByActorName: c.pureRangedParetoNoMeleeFocusOverridesByActorName,
             pureRangedTerminalEligible: this.pureRangedTerminalState?.eligible ?? false,
             pureRangedTerminalInitialScale: this.pureRangedTerminalState?.initialScale ?? 0,
             pureRangedTerminalLeaves: c.pureRangedTerminalLeaves,
@@ -1645,6 +1791,7 @@ export class SearchDriver {
         unit: Unit,
         candidates: readonly IEnumeratedCandidate[],
         seedBase: number,
+        deadlineAt: number | null = null,
     ): IEnumeratedCandidate | undefined {
         for (const candidate of candidates) {
             const strictCandidate: ISearchCandidate =
@@ -1654,7 +1801,7 @@ export class SearchDriver {
                           actions: candidate.actions,
                       }
                     : candidate;
-            const [score] = this.scoreCandidates(unit, [strictCandidate], seedBase, "leaf", 1, null);
+            const [score] = this.scoreCandidates(unit, [strictCandidate], seedBase, "leaf", 1, deadlineAt);
             if (score !== -Infinity) return candidate;
         }
         return undefined;
