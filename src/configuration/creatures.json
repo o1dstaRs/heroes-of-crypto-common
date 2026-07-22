@@ -279,7 +279,7 @@
             "attack_damage_max": 4,
             "attack_range": 1,
             "range_shots": 5,
-            "shot_distance": 5,
+            "shot_distance": 6.5,
             "magic_resist": 0,
             "movement_type": "WALK",
             "exp": 10,

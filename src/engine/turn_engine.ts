@@ -429,8 +429,17 @@ export class TurnEngine {
         // Poison ticks at the very start of the unit's turn, before it acts (even if it is about to skip).
         const poisonEffect = unit.getEffect("Poison");
         if (poisonEffect && poisonEffect.getPower() > 0) {
+            const amountBefore = unit.getAmountAlive();
             const poisonDamage = unit.applyDamage(poisonEffect.getPower(), 0, this.sceneLog, false);
-            this.sceneLog.updateLog(`${unit.getName()} takes ${poisonDamage} poison damage`);
+            if (poisonDamage > 0) {
+                this.sceneLog.updateLog(`${unit.getName()} takes ${poisonDamage} poison damage`);
+                events.push({
+                    type: "poison_ticked",
+                    unitId: unit.getId(),
+                    damage: poisonDamage,
+                    unitsDied: Math.max(0, amountBefore - unit.getAmountAlive()),
+                });
+            }
             if (unit.isDead() && this.unitsHolder.deleteUnitById(unit.getId())) {
                 events.push({ type: "unit_destroyed", unitId: unit.getId(), reason: "poison" });
                 return events;
