@@ -44,6 +44,12 @@ export function processHamstringAbility(
         targetUnit = absorptionTarget;
     }
 
+    // Hamstring only cuts the wings of a FLYING enemy — grounding/slowing it. Ground units (and a
+    // ground unit that absorbed the penalty) are never Hamstrung. Checked on the final recipient.
+    if (!targetUnit.canFly()) {
+        return;
+    }
+
     if (targetUnit.isDead() || targetUnit.hasDebuffActive("Hamstrung")) {
         return;
     }

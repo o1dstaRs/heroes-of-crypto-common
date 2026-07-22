@@ -1060,7 +1060,16 @@ export class UnitsHolder {
                 if (EffectHelper.canApplyAuraEffect(u, auraEffectProperties)) {
                     u.applyAuraEffect(
                         `${auraEffectProperties.name} Aura`,
-                        auraEffectProperties.desc.replace(/\{\}/g, auraEffectProperties.power.toString()),
+                        auraEffectProperties.desc.replace(
+                            /\{\}/g,
+                            // Poison Cloud's applied % is the base plus the AFFECTED ally's own luck (added at
+                            // hit time in processPoisonAuraAbility), so fold that ally's luck into the shown
+                            // number here instead of a separate "(plus luck)" clause. Other auras keep base.
+                            (auraEffectProperties.name === "Poison Cloud"
+                                ? Math.max(0, auraEffectProperties.power + u.getLuck())
+                                : auraEffectProperties.power
+                            ).toString(),
+                        ),
                         auraEffectProperties.is_buff,
                         Number(auraEffectProperties.power.toFixed(1)),
                         appliedAuraEffectProperties.getSourceCellAsString(),

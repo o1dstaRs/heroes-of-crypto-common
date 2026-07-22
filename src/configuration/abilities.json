@@ -470,7 +470,7 @@
     "Poison Cloud Aura": {
         "name": "Poison Cloud Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells apply {}% (plus their luck) of their attack damage to the target as Poison"],
+        "desc": ["Allies within 2 cells apply {}% of their attack damage to the target as Poison"],
         "power": 10,
         "power_type": "POISON_ON_HIT",
         "skip_reponse": false,
@@ -482,7 +482,7 @@
     "Hamstring": {
         "name": "Hamstring",
         "type": "STATUS",
-        "desc": ["On attack, {}% chance to reduce the enemy's movement range by 30% (Hamstrung) for 3 laps"],
+        "desc": ["On attack, {}% chance to reduce a flying enemy's movement range by 30% (Hamstrung) for 3 laps"],
         "power": 30,
         "power_type": "HAMSTRING",
         "skip_reponse": false,
@@ -1079,7 +1079,7 @@
         "name": "Predatory Assimilation",
         "type": "ATTACK",
         "desc": [
-            "Each landed direct attack has a chance to permanently disable and steal one random active ability from the target"
+            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target"
         ],
         "power": 25,
         "power_type": "STEAL_ABILITY",

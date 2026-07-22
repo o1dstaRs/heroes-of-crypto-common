@@ -11,7 +11,7 @@
     "Poison Cloud": {
         "name": "Poison Cloud",
         "range": 2,
-        "desc": "Affected allies apply {}% (plus their luck) of their attack damage to the target as Poison.",
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison.",
         "power": 10,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
