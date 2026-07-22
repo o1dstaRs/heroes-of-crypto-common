@@ -1210,8 +1210,35 @@ export class GameActionEngine {
             return this.reject("unit_not_found");
         }
         const team = unit.getTeam();
+
+        // Before removing it, find the biggest OTHER stack of the same creature+level on this team so the
+        // deleted models fold back into it (e.g. a split-off single you no longer want returns to the main
+        // stack: 89 / 1 / 1, delete a 1 -> 90 / 1). exp identifies the level/tier and a split copies it, so
+        // merging same-exp stacks only recombines what was split — it never inflates experience or upgrades
+        // models across levels, and it lowers (never raises) the team's same-unit stack count.
+        const deletedAmount = unit.getAmountAlive();
+        const deletedName = unit.getName();
+        const deletedExp = unit.getExp();
+        let mergeTarget: Unit | undefined;
+        for (const other of this.context.unitsHolder.getAllUnits().values()) {
+            if (
+                other.getId() === unit.getId() ||
+                other.getTeam() !== team ||
+                other.getName() !== deletedName ||
+                other.getExp() !== deletedExp
+            ) {
+                continue;
+            }
+            if (!mergeTarget || other.getAmountAlive() > mergeTarget.getAmountAlive()) {
+                mergeTarget = other;
+            }
+        }
+
         if (!this.context.unitsHolder.deleteUnitById(action.unitId)) {
             return this.reject("delete_not_available");
+        }
+        if (mergeTarget && deletedAmount > 0) {
+            mergeTarget.setAmountAlive(mergeTarget.getAmountAlive() + deletedAmount);
         }
 
         return {
