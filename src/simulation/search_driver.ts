@@ -57,6 +57,7 @@ import {
 } from "./il_dataset";
 import { ilCandidateActionEncoding } from "./il_action_features";
 import type { ILookaheadDeps } from "./lookahead";
+import { rankPureRangedDeadlineFinisherCandidates } from "./pure_ranged_deadline_finisher";
 import { rankPureRangedNoMeleePressureCandidates } from "./pure_ranged_no_melee_pressure";
 import {
     canonicalPhaseBSeed,
@@ -137,6 +138,9 @@ import {
  * SEARCH_PURE_RANGED_NO_MELEE_PRESSURE=1 is a default-off, version-scoped terminal-barrier intervention for
  * those same all-ranged original boards. From lap one, a No Melee shooter keeps a legal stationary ranged kill
  * first; otherwise it pressures a living enemy No Melee stack before both terminal barriers exhaust ammunition.
+ * SEARCH_PURE_RANGED_DEADLINE_FINISHER=1 is a separate default-off, version-scoped deadline arm. On the same
+ * all-ranged boards, an Endless Quiver shooter preserves its normal opening targets until the enemy No Melee
+ * barrier needs every remaining pre-Armageddon activation, then takes an engine-valid stationary barrier shot.
  * SEARCH_MAX_MOVE_SHOTS=<0..2> is a default-zero action-space probe. It adds at most one/two ordinary
  * move-then-range-shot challengers whose hypothetical origin crosses a damage band while preserving the exact
  * aimed target and interception. Sniper, piercing, AOE/throw, pinned destinations, and hazardous routes are
@@ -428,6 +432,14 @@ interface ISearchCounters {
     pureRangedTerminalNonzeroLeaves: number;
     /** Signed sum of the pure-ranged terminal logit adjustment. */
     pureRangedTerminalLogitSum: number;
+    /** Endless Quiver decisions redirected by the pure-ranged deadline finisher. */
+    pureRangedDeadlineFinisherDecisions: number;
+    /** Deadline-finisher decisions that replaced the inherited action list. */
+    pureRangedDeadlineFinisherOverrides: number;
+    /** Earliest lap where the deadline finisher found an engine-valid delivery (zero means never). */
+    pureRangedDeadlineFinisherStartLap: number;
+    /** Sum of expected primary No Melee damage across deadline-finisher deliveries. */
+    pureRangedDeadlineFinisherPrimaryDamage: number;
     rolloutTurnsTotal: number;
     msTotal: number;
     circuitSkipped: number;
@@ -478,6 +490,10 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedTerminalLeaves: 0,
     pureRangedTerminalNonzeroLeaves: 0,
     pureRangedTerminalLogitSum: 0,
+    pureRangedDeadlineFinisherDecisions: 0,
+    pureRangedDeadlineFinisherOverrides: 0,
+    pureRangedDeadlineFinisherStartLap: 0,
+    pureRangedDeadlineFinisherPrimaryDamage: 0,
     rolloutTurnsTotal: 0,
     msTotal: 0,
     circuitSkipped: 0,
@@ -534,6 +550,8 @@ export class SearchDriver {
     private readonly pureRangedTerminalWeight: number;
     private readonly pureRangedNoMeleePressure: boolean;
     private readonly pureRangedNoMeleePressureVersions: ReadonlySet<string>;
+    private readonly pureRangedDeadlineFinisher: boolean;
+    private readonly pureRangedDeadlineFinisherVersions: ReadonlySet<string>;
     private readonly circuitBreakerMs: number | null;
     private readonly learned: ILearnedValue | null;
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
@@ -738,6 +756,40 @@ export class SearchDriver {
             }
             this.pureRangedNoMeleePressureVersions = new Set(versions);
         }
+        const rawPureRangedDeadlineFinisher = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER;
+        if (
+            this.mode === "search" &&
+            rawPureRangedDeadlineFinisher !== undefined &&
+            rawPureRangedDeadlineFinisher !== "" &&
+            rawPureRangedDeadlineFinisher !== "0" &&
+            rawPureRangedDeadlineFinisher !== "1"
+        ) {
+            throw new Error("SEARCH_PURE_RANGED_DEADLINE_FINISHER must be 0 or 1");
+        }
+        this.pureRangedDeadlineFinisher = this.mode === "search" && rawPureRangedDeadlineFinisher === "1";
+        const rawPureRangedDeadlineFinisherVersions = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS;
+        if (!this.pureRangedDeadlineFinisher) {
+            this.pureRangedDeadlineFinisherVersions = new Set();
+        } else if (rawPureRangedDeadlineFinisherVersions === undefined) {
+            this.pureRangedDeadlineFinisherVersions = new Set(this.versions);
+        } else {
+            const versions = rawPureRangedDeadlineFinisherVersions.split(",").map((version) => version.trim());
+            if (
+                !versions.length ||
+                versions.some((version) => !version) ||
+                new Set(versions).size !== versions.length
+            ) {
+                throw new Error(
+                    "SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS must be a comma-separated list of unique versions",
+                );
+            }
+            this.pureRangedDeadlineFinisherVersions = new Set(versions);
+        }
+        if (this.pureRangedNoMeleePressure && this.pureRangedDeadlineFinisher) {
+            throw new Error(
+                "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE and SEARCH_PURE_RANGED_DEADLINE_FINISHER are mutually exclusive",
+            );
+        }
         const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
         this.learned =
             rawValueWeights === "material"
@@ -818,7 +870,7 @@ export class SearchDriver {
             this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
         }
         if (
-            (this.pureRangedTerminalWeight > 0 || this.pureRangedNoMeleePressure) &&
+            (this.pureRangedTerminalWeight > 0 || this.pureRangedNoMeleePressure || this.pureRangedDeadlineFinisher) &&
             this.pureRangedTerminalState === null
         ) {
             this.pureRangedTerminalState = capturePureRangedTerminalState(
@@ -846,6 +898,8 @@ export class SearchDriver {
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         const pureRangedNoMeleePressureSeat =
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
+        const pureRangedDeadlineFinisherSeat =
+            this.pureRangedDeadlineFinisher && this.pureRangedDeadlineFinisherVersions.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
         // lap. Only hard passive/no-op incumbents get the lexicographic productive tier. The research aggressive
         // arm scores a wait normally but uses a zero gate against engine-valid productive actions. The separate
@@ -877,14 +931,24 @@ export class SearchDriver {
         if (prioritizeDominantFinish) {
             this.counters.dominantFinishTurns += 1;
         }
-        if (this.lateRangedFinishWeight > 0 || this.pureRangedTerminalWeight > 0 || pureRangedNoMeleePressureSeat) {
+        if (
+            this.lateRangedFinishWeight > 0 ||
+            this.pureRangedTerminalWeight > 0 ||
+            pureRangedNoMeleePressureSeat ||
+            pureRangedDeadlineFinisherSeat
+        ) {
             this.onFightReady();
         }
         const pureRangedNoMeleePressureBoard =
             pureRangedNoMeleePressureSeat && this.pureRangedTerminalState?.eligible === true;
+        const pureRangedDeadlineFinisherBoard =
+            pureRangedDeadlineFinisherSeat &&
+            this.pureRangedTerminalState?.eligible === true &&
+            unit.hasAbilityActive("Endless Quiver");
+        const pureRangedDirectInterventionBoard = pureRangedNoMeleePressureBoard || pureRangedDeadlineFinisherBoard;
         // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
         // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
-        if (this.circuitOpen && !useProductiveFallback && !pureRangedNoMeleePressureBoard) {
+        if (this.circuitOpen && !useProductiveFallback && !pureRangedDirectInterventionBoard) {
             this.counters.circuitSkipped += 1;
             return incumbent;
         }
@@ -943,20 +1007,51 @@ export class SearchDriver {
             const candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
                 keepCandidate,
             );
-            if (pureRangedNoMeleePressureBoard && !this.observeOnly) {
-                // The normal capped catalog remains untouched if this intervention finds no engine-valid shot.
-                // Its private re-enumeration only prevents a legal No-Melee target from disappearing behind the
-                // generic shot cap; no expanded candidate can leak into the fallback search.
-                const pressureCandidateSource = preserveBaselineAttackTargetCoverage
-                    ? candidates
-                    : enumerateCandidates(unit, context, incumbent, {
+            // The normal capped catalog remains untouched if a terminal intervention finds no engine-valid shot.
+            // Private target-coverage re-enumeration prevents the No Melee target from disappearing behind the
+            // generic shot cap, but none of its extra candidates can leak into the fallback search.
+            const terminalCandidateSource =
+                pureRangedDirectInterventionBoard && !preserveBaselineAttackTargetCoverage
+                    ? enumerateCandidates(unit, context, incumbent, {
                           ...enumerationOptions,
                           preserveAttackTargetCoverage: true,
-                      }).candidates.filter(keepCandidate);
+                      }).candidates.filter(keepCandidate)
+                    : candidates;
+            if (pureRangedDeadlineFinisherBoard && !this.observeOnly) {
+                const deadlineCandidates = rankPureRangedDeadlineFinisherCandidates(
+                    unit,
+                    this.deps.unitsHolder,
+                    terminalCandidateSource,
+                    this.pureRangedTerminalState,
+                    currentLap,
+                );
+                const deadlineCandidate = this.firstEngineValidCandidate(unit, deadlineCandidates, seedBase);
+                if (deadlineCandidate) {
+                    this.counters.decisions += 1;
+                    this.counters.pureRangedDeadlineFinisherDecisions += 1;
+                    this.counters.pureRangedDeadlineFinisherPrimaryDamage +=
+                        deadlineCandidate.shotFeatures?.primaryTargetDamage ?? 0;
+                    if (
+                        this.counters.pureRangedDeadlineFinisherStartLap === 0 ||
+                        currentLap < this.counters.pureRangedDeadlineFinisherStartLap
+                    ) {
+                        this.counters.pureRangedDeadlineFinisherStartLap = currentLap;
+                    }
+                    this.counters.msTotal += performance.now() - t0;
+                    if (deadlineCandidate.actions !== incumbent) {
+                        this.counters.overrides += 1;
+                        this.counters.pureRangedDeadlineFinisherOverrides += 1;
+                        bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                        bump(this.counters.overridesToKind, deadlineCandidate.kind);
+                    }
+                    return deadlineCandidate.actions;
+                }
+            }
+            if (pureRangedNoMeleePressureBoard && !this.observeOnly) {
                 const pressureCandidates = rankPureRangedNoMeleePressureCandidates(
                     unit,
                     this.deps.unitsHolder,
-                    pressureCandidateSource,
+                    terminalCandidateSource,
                     this.pureRangedTerminalState,
                 );
                 const pressureCandidate = this.firstEngineValidCandidate(unit, pressureCandidates, seedBase);
@@ -1117,6 +1212,12 @@ export class SearchDriver {
             pureRangedTerminalWeight: this.pureRangedTerminalWeight,
             pureRangedNoMeleePressure: this.pureRangedNoMeleePressure,
             pureRangedNoMeleePressureVersions: [...this.pureRangedNoMeleePressureVersions],
+            pureRangedDeadlineFinisher: this.pureRangedDeadlineFinisher,
+            pureRangedDeadlineFinisherVersions: [...this.pureRangedDeadlineFinisherVersions],
+            pureRangedDeadlineFinisherDecisions: c.pureRangedDeadlineFinisherDecisions,
+            pureRangedDeadlineFinisherOverrides: c.pureRangedDeadlineFinisherOverrides,
+            pureRangedDeadlineFinisherStartLap: c.pureRangedDeadlineFinisherStartLap,
+            pureRangedDeadlineFinisherPrimaryDamage: Number(c.pureRangedDeadlineFinisherPrimaryDamage.toFixed(3)),
             pureRangedTerminalEligible: this.pureRangedTerminalState?.eligible ?? false,
             pureRangedTerminalInitialScale: this.pureRangedTerminalState?.initialScale ?? 0,
             pureRangedTerminalLeaves: c.pureRangedTerminalLeaves,
