@@ -435,6 +435,40 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(legal!.actions.every((action) => engine.apply(action).completed)).toBe(true);
     });
 
+    it("shots: Through Shot remains legal against a stronger primary while the attacker has Cowardice", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Cowardly line shooter",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+            maxHp: 10,
+            abilities: ["Through Shot"],
+        });
+        const stronger = createTestUnit({
+            team: UPPER,
+            name: "Stronger line target",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 10,
+        });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, stronger, { x: 10, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        shooter.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
+        expect(shooter.getCumulativeHp()).toBeLessThan(stronger.getCumulativeHp());
+
+        const context = ctxFor(c, true);
+        const shot = ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot").find(
+            (candidate) => candidate.targetId === stronger.getId(),
+        );
+        expect(shot).toBeDefined();
+        const engine = startActionEngine(c, shooter, context);
+        expect(shot!.actions.every((action) => engine.apply(action).completed)).toBe(true);
+    });
+
     it("shots: a live forced target excludes other resolved primaries, while a dead forced target releases them", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
