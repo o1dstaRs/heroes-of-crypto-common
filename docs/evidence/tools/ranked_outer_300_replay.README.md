@@ -28,11 +28,11 @@ the production-bounded v0.8+a13 path; it is not a latency-qualification benchmar
 
 ```bash
 bun docs/evidence/tools/ranked_outer_300_replay.ts \
-  --baseline-root /tmp/hoc-ranked-f02e-baseline.XXXXXX \
-  --candidate-root /tmp/hoc-ranked-f02e-candidate.XXXXXX \
+  --baseline-root /tmp/hoc-ranked-final-parent-baseline.XXXXXX \
+  --candidate-root /tmp/hoc-ranked-final-parent-candidate.XXXXXX \
   --server-root /tmp/hoc-server-8519-ranked300.XXXXXX \
   --server-sha 8519fbded3c200a159b2062d00ad5f1f929fe47f \
-  --common-base-sha f02e8066cb454e74f28b2b95e29b41502fa0e048 \
+  --common-base-sha 7950492f1e5ca81d5e071c377bb2956c8c01832a \
   --scenario-count 3 \
   --base-seed 930722001 \
   --side-swaps 1 \

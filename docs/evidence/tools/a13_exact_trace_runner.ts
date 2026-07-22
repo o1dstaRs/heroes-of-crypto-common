@@ -5,7 +5,7 @@
  *
  * Example:
  *   bun docs/evidence/tools/a13_exact_trace_runner.ts \
- *     --archive=/tmp/hoc-ray-f02e-baseline.E0bh28 --variant=baseline \
+ *     --archive=/tmp/hoc-ray-final-parent-baseline.XXXXXX --variant=baseline \
  *     --mode=unbounded --seeds=1-20 --repeat-seed=1 --output=/tmp/baseline.json
  */
 

@@ -40,13 +40,13 @@ const EXPECTED_VERSION = "v0.8";
 const GIB = 1024 ** 3;
 const EXPECTED_CANDIDATE_ATTACK_HANDLER_SHA256 = "d4f0342487cc6cc8497d997e09a8a65c57f1fcebb02f945117a710cab42c5233";
 const EXPECTED_CANDIDATE_RAY_TRAVERSAL_SHA256 = "18d4f31971e593d1222bf24f71484dc5ba8a3cb52451eb2ed0d1498a53f97eba";
-const EXPECTED_BASELINE_SRC_TREE_MANIFEST_SHA256 = "34a1149ae1717e05255c77c630004cb6bdb11bcfa2a701a8acfc500a9bc098eb";
-const EXPECTED_CANDIDATE_SRC_TREE_MANIFEST_SHA256 = "a24700ba7694697346e440faf97b0531c330f5b1ff2aaabe611b47eb19c580de";
+const EXPECTED_BASELINE_SRC_TREE_MANIFEST_SHA256 = "351de62cff5903db6850138b31055779b592848618f5b486eb53ec65d3004a76";
+const EXPECTED_CANDIDATE_SRC_TREE_MANIFEST_SHA256 = "48aeb52a953a533ba119b54cd50833c3b393e75d5e86ccc8f21a14d78e89b95d";
 const PROFILE_SEEDS = [1, 42, 43, 44, 45, 46] as const;
 const PROFILE_WARMUP_SEED = 9001;
 const PROFILE_MAX_LAPS = 4;
 const PROFILE_ACTIONS_PER_REPEAT = 361;
-const PROFILE_DIGEST_PER_REPEAT = "5362e41ce4d18381bc680b71da30618148bd01b92cc93fe826d0bae926dcdfbe";
+const PROFILE_DIGEST_PER_REPEAT = "96f75ff536594f358450392b8f74ccdf9f500cc5e45f7a522016bebbeff488d7";
 const RUNNER_PATH = fileURLToPath(import.meta.url);
 
 const COHORTS = [
@@ -2225,7 +2225,7 @@ async function runPanel(args: string[]): Promise<void> {
     };
     if (isolation.exactExpectedTwoFileOverlay !== true || !sourceTreeIdentity.exact) {
         throw new Error(
-            `Source isolation failed; expected the frozen f02e source trees and exact two-file overlay: ${canonicalJson({ isolation, sourceTreeIdentity })}`,
+            `Source isolation failed; expected the frozen final-parent source trees and exact two-file overlay: ${canonicalJson({ isolation, sourceTreeIdentity })}`,
         );
     }
     const plan = await buildPlan(candidateRoot);

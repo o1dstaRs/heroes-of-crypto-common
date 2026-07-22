@@ -11,11 +11,11 @@
  *
  * Example:
  *   bun docs/evidence/tools/ranked_outer_300_replay.ts \
- *     --baseline-root /tmp/hoc-ray-f02e-baseline... \
- *     --candidate-root /tmp/hoc-ray-f02e-candidate... \
+ *     --baseline-root /tmp/hoc-ray-final-parent-baseline... \
+ *     --candidate-root /tmp/hoc-ray-final-parent-candidate... \
  *     --server-root /tmp/hoc-server-8519... \
  *     --server-sha 8519fbded3c200a159b2062d00ad5f1f929fe47f \
- *     --common-base-sha f02e8066cb454e74f28b2b95e29b41502fa0e048 \
+ *     --common-base-sha 7950492f1e5ca81d5e071c377bb2956c8c01832a \
  *     --scenario-count 3 --side-swaps 1 --full-states 0 \
  *     --out /tmp/ranked-outer-300.json
  */
@@ -27,21 +27,21 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCHEMA = "hoc.a13.ranked-outer-300-replay.v2";
-const EXPECTED_COMMON_BASE_SHA = "f02e8066cb454e74f28b2b95e29b41502fa0e048";
+const EXPECTED_COMMON_BASE_SHA = "7950492f1e5ca81d5e071c377bb2956c8c01832a";
 const EXPECTED_SERVER_SHA = "8519fbded3c200a159b2062d00ad5f1f929fe47f";
 const EXPECTED_OUTER_CIRCUIT_MS = 300;
 const EXPECTED_INNER_DECISION_DEADLINE_MS = 175;
 const EXPECTED_INNER_CIRCUIT_MS = 275;
 const EXPECTED_INPUTS = {
     baselineSrc: {
-        files: 365,
-        bytes: 9_753_913,
-        sha256: "d66eea6fadc27d259743269611e11a8c96c9eb285d5622217da06274f0ce5c29",
+        files: 366,
+        bytes: 9_823_974,
+        sha256: "a097853a8ca1fa2b19dafa0d1b181332e02cc5b44440962ab2306326eec26e6c",
     },
     candidateSrc: {
-        files: 366,
-        bytes: 9_758_586,
-        sha256: "bd8bb9fd5ff060fdf3d5092ed2351acdb55b4de46b94d440b85beaddaeecee02",
+        files: 367,
+        bytes: 9_828_647,
+        sha256: "ff8a9099b581d3230a2bc09c4f96082e9f495d49581975003db2df32a2a40112",
     },
     serverSrc: {
         files: 148,

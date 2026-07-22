@@ -118,7 +118,7 @@ same-root smoke inputs are rejected.
 Each invocation executes the frozen seed-9001/max-laps-2 warmup, then nine exact repeats of the six-match
 v0.8-mirror corpus at seeds `[1, 42, 43, 44, 45, 46]`, `maxLaps=4`. Every repeat is required to produce 361
 accepted actions, zero rejections, and digest
-`5362e41ce4d18381bc680b71da30618148bd01b92cc93fe826d0bae926dcdfbe`; each capture therefore has exactly
+`96f75ff536594f358450392b8f74ccdf9f500cc5e45f7a522016bebbeff488d7`; each capture therefore has exactly
 3,249 accepted actions. Run three captures per variant, serially, without another benchmark active.
 
 ```bash
