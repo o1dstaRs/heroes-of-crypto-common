@@ -66,6 +66,7 @@ export interface IV08RangedPositioningABOptions {
     noMeleeTerminalPressure?: boolean;
     deadlineFinisher?: boolean;
     supportedRangedDelta?: boolean;
+    responseNeutralAdvance?: boolean;
     diag?: boolean;
 }
 
@@ -102,6 +103,7 @@ export interface IV08RangedPositioningABManifest {
         noMeleeTerminalPressure: boolean;
         deadlineFinisher: boolean;
         supportedRangedDelta: boolean;
+        responseNeutralAdvance: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -138,10 +140,18 @@ function validateBehaviorArmGeometry(
     noMeleeTerminalPressure: boolean,
     deadlineFinisher: boolean,
     supportedRangedDelta: boolean,
+    responseNeutralAdvance: boolean,
 ): void {
-    const enabledSpecialArms = [noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta].filter(Boolean).length;
+    const enabledSpecialArms = [
+        noMeleeTerminalPressure,
+        deadlineFinisher,
+        supportedRangedDelta,
+        responseNeutralAdvance,
+    ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
-        throw new Error("noMeleeTerminalPressure, deadlineFinisher, and supportedRangedDelta are mutually exclusive");
+        throw new Error(
+            "noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta, and responseNeutralAdvance are mutually exclusive",
+        );
     }
     if (noMeleeTerminalPressure && (mode !== "off" || moveShots !== 0)) {
         throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -151,6 +161,9 @@ function validateBehaviorArmGeometry(
     }
     if (supportedRangedDelta && ((mode !== "retreat" && mode !== "both") || moveShots !== 0)) {
         throw new Error("supportedRangedDelta requires mode=retreat|both and moveShots=0");
+    }
+    if (responseNeutralAdvance && ((mode !== "advance" && mode !== "both") || moveShots !== 0)) {
+        throw new Error("responseNeutralAdvance requires mode=advance|both and moveShots=0");
     }
 }
 
@@ -200,12 +213,16 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.supportedRangedDelta !== undefined && typeof options.supportedRangedDelta !== "boolean") {
         throw new Error("supportedRangedDelta must be a boolean");
     }
+    if (options.responseNeutralAdvance !== undefined && typeof options.responseNeutralAdvance !== "boolean") {
+        throw new Error("responseNeutralAdvance must be a boolean");
+    }
     validateBehaviorArmGeometry(
         options.mode,
         options.moveShots ?? 0,
         options.noMeleeTerminalPressure ?? false,
         options.deadlineFinisher ?? false,
         options.supportedRangedDelta ?? false,
+        options.responseNeutralAdvance ?? false,
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -315,6 +332,7 @@ export function buildV08RangedPositioningABManifest(
             noMeleeTerminalPressure: options.noMeleeTerminalPressure ?? false,
             deadlineFinisher: options.deadlineFinisher ?? false,
             supportedRangedDelta: options.supportedRangedDelta ?? false,
+            responseNeutralAdvance: options.responseNeutralAdvance ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -344,6 +362,7 @@ export function buildV08RangedPositioningABEnvironment(
     noMeleeTerminalPressure = false,
     deadlineFinisher = false,
     supportedRangedDelta = false,
+    responseNeutralAdvance = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -351,7 +370,15 @@ export function buildV08RangedPositioningABEnvironment(
     if (typeof noMeleeTerminalPressure !== "boolean") throw new Error("noMeleeTerminalPressure must be a boolean");
     if (typeof deadlineFinisher !== "boolean") throw new Error("deadlineFinisher must be a boolean");
     if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
-    validateBehaviorArmGeometry(mode, moveShots, noMeleeTerminalPressure, deadlineFinisher, supportedRangedDelta);
+    if (typeof responseNeutralAdvance !== "boolean") throw new Error("responseNeutralAdvance must be a boolean");
+    validateBehaviorArmGeometry(
+        mode,
+        moveShots,
+        noMeleeTerminalPressure,
+        deadlineFinisher,
+        supportedRangedDelta,
+        responseNeutralAdvance,
+    );
 
     const environment = minimalChildEnvironment(sourceEnvironment);
     for (const [key, value] of Object.entries(buildV08A13SearchEnvironment())) {
@@ -373,11 +400,13 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER = deadlineFinisher ? "1" : "0";
     environment.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS = V08_A13_PRODUCTION_VERSION;
     environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
-    // The supported-delta arm compares the new escape rule against the same shipped positioning policy,
-    // so both seats receive the baseline and only production v0.8 receives the incremental delta.
-    environment.V08_RANGED_POSITION_VERSIONS = supportedRangedDelta
-        ? V08_RANGED_POSITIONING_AB_VERSIONS
-        : V08_A13_PRODUCTION_VERSION;
+    environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
+    // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
+    // the baseline and only production v0.8 receives the selected delta.
+    environment.V08_RANGED_POSITION_VERSIONS =
+        supportedRangedDelta || responseNeutralAdvance
+            ? V08_RANGED_POSITIONING_AB_VERSIONS
+            : V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
     return environment;
 }
@@ -397,6 +426,7 @@ export function buildV08RangedPositioningABInvocations(
         options.noMeleeTerminalPressure ?? false,
         options.deadlineFinisher ?? false,
         options.supportedRangedDelta ?? false,
+        options.responseNeutralAdvance ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -457,6 +487,7 @@ export async function runV08RangedPositioningAB(
     const noMeleeTerminalPressure = options.noMeleeTerminalPressure ?? false;
     const deadlineFinisher = options.deadlineFinisher ?? false;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
+    const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
@@ -464,6 +495,7 @@ export async function runV08RangedPositioningAB(
                 `moveShots=${moveShots} diag=${options.diag ?? false} timing=${options.timingMode} ` +
                 `noMeleeTerminalPressure=${noMeleeTerminalPressure} ` +
                 `deadlineFinisher=${deadlineFinisher} supportedRangedDelta=${supportedRangedDelta} ` +
+                `responseNeutralAdvance=${responseNeutralAdvance} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         const code = await runChild(invocation);
@@ -491,6 +523,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "no-melee-terminal-pressure": { type: "boolean", default: false },
             "deadline-finisher": { type: "boolean", default: false },
             "supported-ranged-delta": { type: "boolean", default: false },
+            "response-neutral-advance": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -517,6 +550,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         noMeleeTerminalPressure: values["no-melee-terminal-pressure"]!,
         deadlineFinisher: values["deadline-finisher"]!,
         supportedRangedDelta: values["supported-ranged-delta"]!,
+        responseNeutralAdvance: values["response-neutral-advance"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -530,7 +564,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
-                "[--supported-ranged-delta] [--diag] " +
+                "[--supported-ranged-delta] [--response-neutral-advance] [--diag] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
