@@ -21,6 +21,13 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Grid } from "../grid/grid";
 import { GRID_SIZE, MAX_X, MAX_Y, MIN_X, MIN_Y, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../grid/grid_constants";
+import {
+    getPositionForCell,
+    getRangeAttackSideCenter,
+    isRangeAttackSideObservable,
+    RANGE_ATTACK_CELL_SIDES,
+    type RangeAttackCellSide,
+} from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { PathHelper } from "../grid/path_helper";
 import { PlacementPositionType } from "../grid/placement_properties";
@@ -36,7 +43,7 @@ import { ArtifactTier } from "../artifacts/artifact_properties";
 import { DefaultPlacementLevel1, type AugmentType } from "../augments/augment_properties";
 import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import type { XY } from "../utils/math";
+import { getDistance, type XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
 import { setDeterministicRandomSource } from "../utils/lib";
 import {
@@ -91,6 +98,79 @@ export type Side = "green" | "red";
 export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LOWER;
 export const RED_TEAM: TeamType = PBTypes.TeamVals.UPPER;
 const sideForTeam = (team: TeamType): Side => (team === GREEN_TEAM ? "green" : "red");
+
+/** Mirrors GameActionEngine.resolveRangeTargetPosition for rejected-shot diagnostics. */
+function resolveRangeAttackPrimary(
+    attacker: Unit,
+    target: Unit,
+    action: Extract<GameAction, { type: "range_attack" }>,
+    grid: Grid,
+    attackHandler: AttackHandler,
+    unitsHolder: UnitsHolder,
+): Unit | undefined {
+    const gridSettings = grid.getSettings();
+    const attackerPosition = attacker.getPosition();
+    const targetCells = target.getCells();
+    let cell = action.aimCell
+        ? targetCells.find((candidate) => candidate.x === action.aimCell?.x && candidate.y === action.aimCell?.y)
+        : undefined;
+    if (!cell) {
+        let closestDistance = Number.MAX_VALUE;
+        for (const candidate of targetCells) {
+            const candidatePosition = getPositionForCell(
+                candidate,
+                gridSettings.getMinX(),
+                gridSettings.getStep(),
+                gridSettings.getHalfStep(),
+            );
+            const distance = getDistance(attackerPosition, candidatePosition);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                cell = candidate;
+            }
+        }
+    }
+    if (!cell) {
+        return undefined;
+    }
+
+    const throughShot = attacker.hasAbilityActive("Through Shot");
+    const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
+        isRangeAttackSideObservable(grid.getMatrix(), cell, side, attacker.getTeam(), throughShot),
+    );
+    let targetPosition = target.getPosition();
+    if (observableSides.length) {
+        let side =
+            action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
+                ? (action.aimSide as RangeAttackCellSide)
+                : undefined;
+        if (side === undefined) {
+            let closestDistance = Number.MAX_VALUE;
+            for (const candidate of observableSides) {
+                const candidatePosition = getRangeAttackSideCenter(gridSettings, cell, candidate, attackerPosition);
+                const distance = getDistance(attackerPosition, candidatePosition);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    side = candidate;
+                }
+            }
+        }
+        if (side === undefined) {
+            return undefined;
+        }
+        targetPosition = getRangeAttackSideCenter(gridSettings, cell, side, attackerPosition);
+    }
+
+    return attackHandler.evaluateRangeAttack(
+        unitsHolder.getAllUnits(),
+        attacker,
+        attackerPosition,
+        targetPosition,
+        throughShot,
+        false,
+        attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
+    ).affectedUnits[0]?.[0];
+}
 
 /** Synchronous, read-only view of one strategy decision before search or recovery modifies its execution. */
 export interface IDecisionObservation {
@@ -1034,7 +1114,17 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     } else if (unit.getRangeShots() <= 0) {
                         cause = "no_ammo";
                     } else {
-                        cause = action.aimCell ? "shot_no_hit_aimed" : "shot_no_hit_noaim";
+                        const primary = resolveRangeAttackPrimary(unit, tgt, action, grid, attackHandler, unitsHolder);
+                        cause =
+                            !unit.hasAbilityActive("Through Shot") &&
+                            unit.hasDebuffActive("Cowardice") &&
+                            primary &&
+                            primary.getTeam() !== unit.getTeam() &&
+                            unit.getCumulativeHp() < primary.getCumulativeHp()
+                                ? "cowardice"
+                                : action.aimCell
+                                  ? "shot_no_hit_aimed"
+                                  : "shot_no_hit_noaim";
                     }
                 } else if (action.type === "cast_spell") {
                     cause = `spell:${action.spellName}${action.targetId ? "" : ":self/mass"}`;

@@ -235,7 +235,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_VERSIONS: "v0.8",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();
-        expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).toSorted());
+        expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).sort());
         expect(first.fingerprintSha256).toMatch(/^[a-f0-9]{64}$/);
         expect(second.fingerprintSha256).toBe(first.fingerprintSha256);
 
