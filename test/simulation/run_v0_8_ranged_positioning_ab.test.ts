@@ -34,6 +34,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     timingMode: "operational_bounded",
     moveShots: 0,
     noMeleeTerminalPressure: false,
+    deadlineFinisher: false,
+    supportedRangedDelta: false,
     diag: false,
 };
 
@@ -81,9 +83,12 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
+            V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
         });
         expect(environment.HOSTILE_EXPERIMENT).toBeUndefined();
     });
@@ -152,10 +157,14 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             timingMode: "research_unbounded",
             moveShots: 2,
             noMeleeTerminalPressure: false,
+            deadlineFinisher: false,
+            supportedRangedDelta: false,
             diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
         expect(parseV08RangedPositioningABOptions([]).noMeleeTerminalPressure).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).deadlineFinisher).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
@@ -225,6 +234,85 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
     });
 
+    it("exposes the candidate-only pure-ranged deadline finisher with isolated geometry", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            mode: "off",
+            deadlineFinisher: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.environment).toMatchObject({
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "1",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm.deadlineFinisher).toBe(true);
+        expect(manifest.arm.noMeleeTerminalPressure).toBe(false);
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "pure_ranged", "--mode", "off", "--deadline-finisher"])
+                .deadlineFinisher,
+        ).toBe(true);
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, cohorts: ["hybrid"] })).toThrow(
+            "requires cohorts=pure_ranged",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "retreat" })).toThrow("mode=off");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, noMeleeTerminalPressure: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() => buildV08RangedPositioningABEnvironment("off", "operational_bounded", {}, 0, true, true)).toThrow(
+            "mutually exclusive",
+        );
+    });
+
+    it("compares supported ranged escape against the same shipped positioning baseline", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "retreat",
+            supportedRangedDelta: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.environment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "retreat",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_RANGED_DELTA_VERSIONS: "v0.8",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm.supportedRangedDelta).toBe(true);
+        expect(
+            parseV08RangedPositioningABOptions(["--cohorts", "hybrid", "--mode", "retreat", "--supported-ranged-delta"])
+                .supportedRangedDelta,
+        ).toBe(true);
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "advance" })).toThrow(
+            "mode=retreat|both",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "off" })).toThrow("mode=retreat|both");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, deadlineFinisher: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, noMeleeTerminalPressure: true })).toThrow(
+            "mutually exclusive",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "both" })).not.toThrow();
+        expect(() =>
+            buildV08RangedPositioningABEnvironment("off", "operational_bounded", {}, 0, false, false, true),
+        ).toThrow("mode=retreat|both");
+    });
+
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
         const options: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -261,6 +349,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 timingMode: "research_unbounded",
                 moveShots: 2,
                 noMeleeTerminalPressure: false,
+                deadlineFinisher: false,
+                supportedRangedDelta: false,
                 diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
@@ -276,8 +366,11 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
+            SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
+            V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
         });
         expect(first.behaviorEnvironment.PATH).toBeUndefined();
         expect(Object.keys(first.behaviorEnvironment)).toEqual(Object.keys(first.behaviorEnvironment).sort());
