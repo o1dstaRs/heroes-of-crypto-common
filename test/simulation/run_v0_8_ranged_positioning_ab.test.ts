@@ -33,6 +33,7 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     mode: "both",
     timingMode: "operational_bounded",
     moveShots: 0,
+    noMeleeTerminalPressure: false,
     diag: false,
 };
 
@@ -78,6 +79,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_CIRCUIT_BREAKER_MS: "275",
             SEARCH_MAX_MOVE_SHOTS: "0",
             SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
@@ -148,9 +151,11 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             mode: "retreat",
             timingMode: "research_unbounded",
             moveShots: 2,
+            noMeleeTerminalPressure: false,
             diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
+        expect(parseV08RangedPositioningABOptions([]).noMeleeTerminalPressure).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
@@ -181,6 +186,43 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(probe.environment.SEARCH_MAX_MOVE_SHOTS).toBe("2");
         expect(probe.environment.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8");
         expect(probe.args.filter((arg) => arg === "--diag")).toHaveLength(1);
+    });
+
+    it("exposes a candidate-only terminal-pressure arm and rejects confounded runner geometry", () => {
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["pure_ranged"],
+            mode: "off",
+            moveShots: 0,
+            noMeleeTerminalPressure: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
+        expect(invocation.environment).toMatchObject({
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "1",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+        });
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+            head: "a".repeat(40),
+            tree: "b".repeat(40),
+            dirty: false,
+        });
+        expect(manifest.arm.noMeleeTerminalPressure).toBe(true);
+        expect(manifest.behaviorEnvironment.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE).toBe("1");
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "pure_ranged",
+                "--mode",
+                "off",
+                "--no-melee-terminal-pressure",
+            ]).noMeleeTerminalPressure,
+        ).toBe(true);
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...options, cohorts: ["pure_ranged", "hybrid"] }),
+        ).toThrow("requires cohorts=pure_ranged");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "advance" })).toThrow("mode=off");
+        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
     });
 
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
@@ -218,6 +260,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 mode: "off",
                 timingMode: "research_unbounded",
                 moveShots: 2,
+                noMeleeTerminalPressure: false,
                 diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
@@ -231,6 +274,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_CIRCUIT_BREAKER_MS: "",
             SEARCH_MAX_MOVE_SHOTS: "2",
             SEARCH_MOVE_SHOT_VERSIONS: "v0.8",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
+            SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
         });
