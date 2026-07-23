@@ -1,0 +1,199 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-screened-closer-route-normalized-scout-stop/v1",
+    "recordedAt": "2026-07-23T21:48:40Z",
+    "status": "gate-failure-stop",
+    "candidate": {
+        "head": "9d6a87dac2d28b6b558c267eb3ce3ebce12b0233",
+        "tree": "ce53ca21161e04e499192ca56e73eb44cb2d0ecb",
+        "protocolSha256": "3db2b12fb9459bdac1b7c2454542bdbf896c74ed807d53e7aedccb0f8033309f",
+        "analyzerSha256": "35d25f0c37644b00512cfd94a5db2bbf9c3ae6d197995e33825e2e4ec45b367b",
+        "analyzerSelfTests": "96/96",
+        "sourceCleanAndPushed": true,
+        "defaultEnabled": false
+    },
+    "pilot": {
+        "prelaunchReceiptSha256": "c4cba57b5d0c8ef2004b0dfa82a1a854ae4d9f465f61a936bdb8fc1472e4ab17",
+        "reportSha256": "bdc05411d9a2779f69ac0c94be222e4bdd91647e51373e0ec7ba4e3518c11c23",
+        "gamesPerArm": 2000,
+        "passed": true,
+        "role": "Screening only; passing the pilot authorized only the preregistered scout."
+    },
+    "scout": {
+        "prelaunchReceiptSha256": "8d014cd4328d3e4104bf7f83b03e6198cc25c8fd20fce63e50cb2749622a3473",
+        "reportSha256": "0b95ce233051a4f37bda56c1abc2e84272c192c359d622329c959d9805e1d243",
+        "pathIndependentArtifactCompositeSha256": "e95623884c1077307a87d191ef053dffb8aee4cf42e708c802f80b83cd339bab",
+        "gamesPerArm": 8000,
+        "pairSeedClusters": 4000,
+        "baseSeed": 3821637523,
+        "pairIndices": [1000, 4999],
+        "completionBarrier": {
+            "treatmentExitCode": 0,
+            "controlExitCode": 0,
+            "treatmentRecords": 8000,
+            "controlRecords": 8000
+        },
+        "rawOutcomes": {
+            "treatment": {
+                "candidateScore": 0.499625,
+                "winsA": 3968,
+                "winsB": 3974,
+                "draws": 58,
+                "averageLaps": 6.34575,
+                "armageddonDecided": 160,
+                "rejectedActions": 0
+            },
+            "control": {
+                "candidateScore": 0.5,
+                "winsA": 3971,
+                "winsB": 3971,
+                "draws": 58,
+                "averageLaps": 6.34575,
+                "armageddonDecided": 160,
+                "rejectedActions": 0
+            }
+        },
+        "pairedEffects": {
+            "candidateScoreDelta": {
+                "point": -0.000375,
+                "percentagePoints": -0.0375,
+                "lower95": -0.0010233702432765651,
+                "upper95": 0.0002733702432765651
+            },
+            "candidateGreenScoreDelta": {
+                "point": 0,
+                "lower95": -0.0006932483696195617,
+                "upper95": 0.0006932483696195617
+            },
+            "candidateRedScoreDelta": {
+                "point": -0.00075,
+                "lower95": -0.0018458752609151593,
+                "upper95": 0.0003458752609151593
+            },
+            "armageddonRateDelta": {
+                "point": 0,
+                "lower95": 0,
+                "upper95": 0
+            },
+            "meanLapDelta": {
+                "point": 0,
+                "lower95": -0.0015501504797602397,
+                "upper95": 0.0015501504797602397
+            }
+        },
+        "telemetry": {
+            "treatment": {
+                "eligibleComparisons": 271,
+                "screenedCloserProposals": 34,
+                "selectedComparisons": 34,
+                "retainedActualDifferences": 31,
+                "retainedActualDifferenceGames": 31,
+                "retainedBySeat": {
+                    "green": 12,
+                    "red": 19
+                },
+                "invalidComparisons": 0
+            },
+            "control": {
+                "eligibleComparisons": 270,
+                "screenedCloserProposals": 34,
+                "selectedComparisons": 0,
+                "invalidComparisons": 0
+            }
+        },
+        "attribution": {
+            "selectedDecisionDifferenceGames": 34,
+            "retainedActualDifferenceGames": 31,
+            "changedCoreGames": 15,
+            "outcomeChangedGames": 7,
+            "lapChangedGames": 12,
+            "armageddonChangedGames": 0,
+            "scoreImprovedGames": 2,
+            "scoreWorsenedGames": 5,
+            "netScorePoints": -3,
+            "netLaps": 0,
+            "changedWithoutProposal": 0,
+            "changedWithoutRetainedActualDifference": 1
+        }
+    },
+    "failedGates": {
+        "scoreDeltaPoint": {
+            "value": -0.000375,
+            "required": ">= 0",
+            "passed": false,
+            "interpretation": "The interval crosses zero, so this is not evidence of a statistically demonstrated regression. The preregistered conservative scout rule nevertheless rejects any negative point estimate."
+        },
+        "integrity": {
+            "value": false,
+            "required": true,
+            "passed": false,
+            "reason": "fallback/confinement failure",
+            "game": 3809
+        }
+    },
+    "integrityForensics": {
+        "game": 3809,
+        "seed": 2690819075,
+        "candidateSide": "red",
+        "actor": "Medusa",
+        "lap": 2,
+        "treatment": {
+            "screenedCloserSelected": true,
+            "incumbentPolicyEventRetainedAfterA13": false,
+            "winner": "v0.8",
+            "laps": 7,
+            "armageddon": false
+        },
+        "control": {
+            "screenedCloserSelected": false,
+            "incumbentPolicyEventRetainedAfterA13": true,
+            "winner": "v0.8",
+            "laps": 6,
+            "armageddon": false
+        },
+        "objectiveComparisonCanonicalSha256": "d253c18eb6f4a4684adb99f7d2788897451645531bba7c8ae5e8d8c23e56f297",
+        "objectiveComparisonCanonicalization": "Delete selected and retained, recursively sort object keys, serialize compact JSON plus a trailing newline, and SHA-256 hash the bytes.",
+        "finding": "The treatment and control comparison payloads match after removing selected and retained. Treatment changed candidate zero from shipped to strict, then a13 returned a different action object; control retained shipped candidate zero. Core laps differ, but the cohort did not serialize a13's chosen action.",
+        "codeSemantics": "BattleEngine forwards incumbent policy events as retained only when SearchDriver returns the exact incumbent action-array reference. retained=false therefore means a13 overrode strict; it does not prove that shipped executed.",
+        "disposition": "This is a real search-mediated confinement and missing-executed-action-telemetry failure, not malformed route metadata and not an analyzer false positive. The frozen analyzer correctly failed closed."
+    },
+    "independentAudit": {
+        "verdict": "no-go",
+        "normalizedReproductionSha256": "8d58829c268f82c521c695ebd9245ebf548a57679b687d431a83f6d8c7fbc6f8",
+        "reproducedStoredReportAfterDeletingTimestamps": true,
+        "recomputedFailedGates": ["scoreDeltaPoint", "integrity"],
+        "reportReadOnly": true,
+        "analyzerReadOnly": true,
+        "sourceAndRemoteTipMatched": true
+    },
+    "protocolDisposition": {
+        "candidateStopped": true,
+        "confirmationLaunched": false,
+        "confirmationGamesPerArmNotRun": 20000,
+        "remotePrimaryLaunched": false,
+        "remotePrimaryGamesPerArmNotRun": 40000,
+        "reason": "The preregistration requires an immediate stop after any scout gate or integrity failure. Instrumentation or threshold changes after outcome access create a new candidate, fresh seed master, analyzer, and protocol."
+    },
+    "postOutcomeHypothesisNotUsableForPromotion": {
+        "purpose": "Fresh-candidate design only. These subgroup values are outcome-mined and cannot rescue, qualify, or promote this stopped candidate.",
+        "candidateRule": "finishActive OR strictTargetDistanceBefore - strictTargetDistanceAfter >= 4",
+        "gameplayRationale": "Outside the explicit urgent/dominant finish state, strict and shipped already deliver the same immediate full-damage, zero-reachable-threat shot. Replacing shipped positioning should therefore require a decisive four-cell compression rather than a marginal one-cell-over-shipped nudge.",
+        "sameSampleRetainedGames": 11,
+        "sameSampleScoreImprovedGames": 2,
+        "sameSampleScoreWorsenedGames": 0,
+        "sameSampleOutcomeNeutralGames": 9,
+        "sameSampleNetScorePoints": 2,
+        "sameSampleNetLaps": -2,
+        "requiredBeforeAnyNewOutcomes": [
+            "Serialize the exact post-a13 chosen action and execution result for every screened-closer comparison.",
+            "Define causal exposure from matched final chosen actions, including search-mediated candidate-zero interactions, rather than inferring execution solely from retained incumbent events.",
+            "Implement and test the decisive-compression or finish exception as a separately named default-off selector.",
+            "Commit and push clean source plus a fresh preregistration, fresh randomly generated seed master, and a newly frozen analyzer."
+        ]
+    },
+    "limitations": [
+        "The scout's unchanged 2% raw Armageddon-decided rate is a feature-specific observation, not progress toward the requested global near-zero Armageddon rate.",
+        "This screening phase cannot establish default readiness or promotion.",
+        "The same-sample subgroup arithmetic is explicitly post-hoc and has no confirmatory evidentiary value.",
+        "Renderer projectile endpoints remain outside this strategy experiment."
+    ]
+}
