@@ -1,19 +1,22 @@
 #!/usr/bin/env bun
 
 /**
- * Strict ten-capture aggregation gate for the combined A13 first-layer and unit-stat rounding candidate.
+ * Single-attempt sealed-input reanalysis for the A13 first-layer and unit-stat rounding candidate.
  *
- * The runner executes no matches. It accepts only the ten fresh pair reports preregistered in the companion
- * protocol, verifies their source/runner/profile/schedule/semantic identities, and evaluates the fixed
- * order-balanced robust estimator. Rejected first-layer evidence is never read or pooled.
+ * The runner executes no matches. It revalidates the immutable v2 producer protocol, closed ledger, and every
+ * accepted artifact before evaluating the unchanged order-balanced macro estimator. The sole correction is a
+ * micro-bootstrap interpolation helper whose operation order exactly matches the sealed micro producer.
  */
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
+    closeSync,
     existsSync,
+    fsyncSync,
     lstatSync,
     linkSync,
+    openSync,
     readFileSync,
     readdirSync,
     realpathSync,
@@ -26,17 +29,41 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-const SCHEMA = "heroes-of-crypto/a13-stat-rounding-replication/v2" as const;
+const SCHEMA = "heroes-of-crypto/a13-stat-rounding-reanalysis/v3" as const;
 const CAPTURE_SCHEMA = "heroes-of-crypto/a13-stat-rounding-pair/v2" as const;
-const PROTOCOL_SCHEMA = "heroes-of-crypto/a13-stat-rounding-replication-protocol/v2" as const;
+const PRODUCER_AGGREGATION_SCHEMA = "heroes-of-crypto/a13-stat-rounding-replication/v2" as const;
+const PRODUCER_PROTOCOL_SCHEMA = "heroes-of-crypto/a13-stat-rounding-replication-protocol/v2" as const;
+const REANALYSIS_PROTOCOL_SCHEMA = "heroes-of-crypto/a13-stat-rounding-reanalysis-protocol/v3" as const;
 const MICRO_SCHEMA = "heroes-of-crypto/a13-stat-rounding-micro/v3" as const;
 const PROFILE_SCHEMA = "heroes-of-crypto/a13-stat-rounding-profile/v2" as const;
 const PROFILE_CAPTURE_SCHEMA = "heroes-of-crypto/a13-stat-rounding-capture/v2" as const;
 const PROFILE_TELEMETRY_SCHEMA = "heroes-of-crypto/a13-stat-rounding-telemetry/v2" as const;
 const LEDGER_SCHEMA = "heroes-of-crypto/a13-stat-rounding-attempt-ledger/v2" as const;
+const ANALYSIS_LEDGER_SCHEMA = "heroes-of-crypto/a13-stat-rounding-reanalysis-ledger/v3" as const;
 const CAMPAIGN_SCHEMA = "heroes-of-crypto/a13-stat-rounding-campaign/v1" as const;
 const CAMPAIGN_ID = "a13-stat-rounding-4d8d94a-20260723-v2" as const;
+const REANALYSIS_CAMPAIGN_ID = "a13-stat-rounding-4d8d94a-20260723-v3" as const;
+const REANALYSIS_MODE = "sealed-v2-input-reanalysis" as const;
 const PROTOCOL_DATE = "2026-07-23";
+const PRODUCER_PROTOCOL_COMMIT = "4c8b0fcd9363874396e8bcdf9336fc905b73002c";
+const PRODUCER_AUTHORIZATION_COMMIT = "453b142517195ee068ea9510ffef47bb70e00359";
+const PRODUCER_CLOSED_LEDGER_COMMIT = "30ef1c441c33cf870e482d5a5b282fa6ada51e8d";
+const PRODUCER_AGGREGATION_RUNNER_SHA256 = "e637a848f57785f0f87e7955cb4fac6e8572dddd0b34ff181c85913f0d121f84";
+const PRODUCER_PROTOCOL_SHA256 = "96eaf0ab6753955a853a9f3f3ed91ca4435f92b0166f5c2781a87a8efb181a65";
+const PRODUCER_PROTOCOL_BYTES = 21_370;
+const PRODUCER_LEDGER_SHA256 = "94926abe0565b3151e120ca14c22fd9429927a6c26f7cbb8f040136357d72680";
+const PRODUCER_LEDGER_BYTES = 197_208;
+const PRODUCER_LEDGER_RECORD_COUNT = 29;
+const PRODUCER_LEDGER_CLOSURE_SHA256 = "9a5237cccc06ba16e1aa9f658fb3f5ca358fe78ae42a09d8ab470c54a200f2b4";
+const INCIDENT_SCHEMA = "heroes-of-crypto/a13-stat-rounding-aggregation-incident/v1" as const;
+const INCIDENT_SHA256 = "96474baca02c5b53fbbc6cf1fe1082d08ede4d45fa39950e49288b072ea9ca5c";
+const INCIDENT_BYTES = 3_189;
+const REANALYSIS_OUTPUT_ROOT = "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis";
+const REANALYSIS_OUTPUT_PATH = `${REANALYSIS_OUTPUT_ROOT}/aggregate.json`;
+const REANALYSIS_CLAIM_PATH = `${REANALYSIS_OUTPUT_ROOT}/aggregation-attempt-1.claim.json`;
+const REANALYSIS_CLAIM_SCHEMA = "heroes-of-crypto/a13-stat-rounding-reanalysis-claim/v3" as const;
+const MEASUREMENT_ATTEMPTS = 0;
+const AGGREGATION_ATTEMPTS_MAXIMUM = 1;
 const BASELINE_COMMIT = "188452cad6ec718540b7c452a579ac3cea73a67f";
 const CANDIDATE_COMMIT = "4d8d94a65aeb77ca953e2ee410b40eaa81d236d8";
 const BASELINE_GIT_TREE = "efa549a827ba1ef8d8321c2fa47219859a17ffca";
@@ -163,7 +190,20 @@ const GIT_EXECUTABLE_SHA256 = "7f30f076d0e9c38f772a76449fca9da8cf97f6a3d43b94c90
 const GIT_VERSION = "git version 2.39.5 (Apple Git-154)";
 const RUNNER_PATH = fileURLToPath(import.meta.url);
 const COMMON_ROOT = resolve(dirname(RUNNER_PATH), "../../..");
-const PROTOCOL_PATH = resolve(dirname(RUNNER_PATH), "../a13_stat_rounding_replication_protocol_2026-07-23.json");
+const PRODUCER_PROTOCOL_PATH = resolve(
+    dirname(RUNNER_PATH),
+    "../a13_stat_rounding_replication_protocol_2026-07-23.json",
+);
+const REANALYSIS_PROTOCOL_PATH = resolve(
+    dirname(RUNNER_PATH),
+    "../a13_stat_rounding_reanalysis_protocol_2026-07-23_v3.json",
+);
+const PRODUCER_LEDGER_PATH = resolve(dirname(RUNNER_PATH), "../a13_stat_rounding_attempt_ledger_2026-07-23.jsonl");
+const ANALYSIS_LEDGER_PATH = resolve(
+    dirname(RUNNER_PATH),
+    "../a13_stat_rounding_reanalysis_attempt_ledger_2026-07-23_v3.jsonl",
+);
+const INCIDENT_PATH = resolve(dirname(RUNNER_PATH), "../a13_stat_rounding_v2_aggregation_incident_2026-07-23.json");
 const PAIR_RUNNER_PATH = resolve(dirname(RUNNER_PATH), "a13_stat_rounding_pair.ts");
 const MICRO_RUNNER_PATH = resolve(dirname(RUNNER_PATH), "a13_stat_rounding_micro.ts");
 const PROFILE_RUNNER_PATH = resolve(dirname(RUNNER_PATH), "a13_stat_rounding_profile.ts");
@@ -220,6 +260,45 @@ const EXPECTED_GATES = Object.freeze({
     perMapTotalRatioMaximum: 1.05,
     minimumFasterCaptures: 9,
     captureTotalRatioMaximum: 1.05,
+});
+const EXPECTED_ESTIMATOR = Object.freeze({
+    perTask: "sqrt(median(five AB candidate/baseline ratios) * median(five BA candidate/baseline ratios))",
+    quantile: "Type-7 linear interpolation at p50, p95, and p99",
+    bootstrap:
+        "20,000 deterministic replicates jointly resampling five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained.",
+    interval: "Type-7 percentile interval [2.5%, 97.5%]",
+    rawDataPolicy: "Retain every observation. Do not trim, winsorize, selectively rerun, or remove a slow row.",
+});
+const EXPECTED_FIXED_WORK = Object.freeze({
+    aiVersion: "v0.8",
+    captureCount: 10,
+    tasksPerCapture: TASKS_PER_CAPTURE,
+    totalTaskPairs: TASKS_PER_CAPTURE * 10,
+    measuredMatches: TASKS_PER_CAPTURE * 10 * 2,
+    maxLaps: MAX_LAPS,
+    warmupSeed: WARMUP_SEED,
+    warmupMatchesPerCapture: NATURAL_GRID_TYPES.length * 2,
+    bootstrapSeed: BOOTSTRAP_SEED,
+    bootstrapSamples: BOOTSTRAP_SAMPLES,
+    bootstrapUnit:
+        "joint resampling of five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained",
+});
+const MICRO_QUANTILE_SELF_TEST = Object.freeze({
+    probability: 0.025,
+    lower: 0.200000005,
+    upper: 0.2000000056,
+    producerResult: 0.20000000501499998,
+    rejectedResult: 0.200000005015,
+    producerBitsHex: "3fc99999a45ea01a",
+    rejectedBitsHex: "3fc99999a45ea01b",
+    ulpDistance: 1,
+});
+const EXPECTED_ARITHMETIC_CORRECTION = Object.freeze({
+    scope: "micro-bootstrap-validation-only",
+    producerInterpolation: "lower * (1 - fraction) + upper * fraction",
+    rejectedInterpolation: "lower + (upper - lower) * fraction",
+    macroQuantileUnchanged: true,
+    deterministicSelfTest: MICRO_QUANTILE_SELF_TEST,
 });
 const EXPECTED_INJECTION_EXEC_ARGV_FLAGS = Object.freeze([
     "-r",
@@ -573,6 +652,7 @@ interface IRobustTask {
 interface ICli {
     captures: Record<string, string>;
     ledger: string;
+    analysisLedger: string;
     semantic: string;
     micro: string;
     profile: string;
@@ -633,6 +713,17 @@ interface IValidatedLedger {
         artifact: IFileSeal;
     }>;
     closure: Record<string, unknown>;
+}
+
+interface IValidatedAnalysisLedger {
+    file: IFileSeal;
+    protocolCommit: string;
+    attemptId: string;
+    startedAt: string;
+    recordCount: 3;
+    lastSequence: 2;
+    chainTipSha256: string;
+    records: Record<string, unknown>[];
 }
 
 interface IMicroMeasurement {
@@ -1254,6 +1345,7 @@ function commandLine(): ICli | undefined {
         ["help", { type: "boolean" as const, default: false }],
         ["out", { type: "string" as const }],
         ["ledger", { type: "string" as const }],
+        ["analysis-ledger", { type: "string" as const }],
         ["semantic", { type: "string" as const }],
         ["micro", { type: "string" as const }],
         ["profile", { type: "string" as const }],
@@ -1270,7 +1362,8 @@ function commandLine(): ICli | undefined {
     if (values.help) {
         console.log(
             "Usage: bun docs/evidence/tools/a13_stat_rounding_replication.ts " +
-                "--ledger=ATTEMPTS.jsonl --semantic=SEMANTIC.json --micro=MICRO.json " +
+                "--ledger=PRODUCER_ATTEMPTS.jsonl --analysis-ledger=REANALYSIS_ATTEMPTS.jsonl " +
+                "--semantic=SEMANTIC.json --micro=MICRO.json " +
                 "--profile=PROFILE.json --profile-dir=PROFILE.json.profiles " +
                 CAPTURE_IDS.map((id) => `--${id}=REPORT.json`).join(" ") +
                 " --out=AGGREGATE.json",
@@ -1278,10 +1371,11 @@ function commandLine(): ICli | undefined {
         return undefined;
     }
     if (typeof values.out !== "string") throw new Error("--out is required");
-    for (const option of ["ledger", "semantic", "micro", "profile", "profile-dir"] as const) {
+    for (const option of ["ledger", "analysis-ledger", "semantic", "micro", "profile", "profile-dir"] as const) {
         if (typeof values[option] !== "string") throw new Error(`--${option} is required`);
     }
     const out = resolve(values.out);
+    assertEqual(out, REANALYSIS_OUTPUT_PATH, "reanalysis output path");
     if (existsSync(out)) throw new Error(`Refusing to overwrite ${out}`);
     const outputParent = dirname(out);
     if (
@@ -1299,6 +1393,9 @@ function commandLine(): ICli | undefined {
         captures[id] = resolve(value);
     }
     const ledger = resolve(values.ledger as string);
+    const analysisLedger = resolve(values["analysis-ledger"] as string);
+    assertEqual(ledger, PRODUCER_LEDGER_PATH, "producer ledger path");
+    assertEqual(analysisLedger, ANALYSIS_LEDGER_PATH, "reanalysis ledger path");
     const semantic = resolve(values.semantic as string);
     const micro = resolve(values.micro as string);
     const profile = resolve(values.profile as string);
@@ -1306,10 +1403,10 @@ function commandLine(): ICli | undefined {
     if (!existsSync(profileDir) || !statSync(profileDir).isDirectory()) {
         throw new Error(`Missing profile directory ${profileDir}`);
     }
-    const reportPaths = [ledger, semantic, micro, profile, ...Object.values(captures)];
+    const reportPaths = [ledger, analysisLedger, semantic, micro, profile, ...Object.values(captures)];
     const realPaths = reportPaths.map((path) => fileSeal(path).realPath);
     if (new Set(realPaths).size !== reportPaths.length) {
-        throw new Error("Ledger, semantic, micro, profile, and capture paths must all be distinct");
+        throw new Error("Ledgers, semantic, micro, profile, and capture paths must all be distinct");
     }
     if (
         pathIsWithin(out, profileDir) ||
@@ -1318,13 +1415,18 @@ function commandLine(): ICli | undefined {
     ) {
         throw new Error("Evidence and output paths overlap a governed path");
     }
-    return { captures, ledger, semantic, micro, profile, profileDir, out };
+    return { captures, ledger, analysisLedger, semantic, micro, profile, profileDir, out };
 }
 
-function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
-    const seal = fileSeal(PROTOCOL_PATH);
-    const value = requireRecord(JSON.parse(readFileSync(PROTOCOL_PATH, "utf8")), "protocol");
-    assertEqual(value.schema, PROTOCOL_SCHEMA, "protocol schema");
+function loadProducerProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
+    const seal = fileSeal(PRODUCER_PROTOCOL_PATH);
+    assertEqual(
+        { bytes: seal.bytes, sha256: seal.sha256 },
+        { bytes: PRODUCER_PROTOCOL_BYTES, sha256: PRODUCER_PROTOCOL_SHA256 },
+        "producer protocol immutable seal",
+    );
+    const value = requireRecord(JSON.parse(readFileSync(PRODUCER_PROTOCOL_PATH, "utf8")), "producer protocol");
+    assertEqual(value.schema, PRODUCER_PROTOCOL_SCHEMA, "protocol schema");
     assertEqual(value.protocolDate, PROTOCOL_DATE, "protocol date");
     assertEqual(value.status, "prepared-before-zero-retry-thirteen-stage-qualification", "protocol prepared status");
     const baseline = requireRecord(value.baseline, "protocol baseline");
@@ -1359,18 +1461,7 @@ function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
         },
         "protocol schedule rule",
     );
-    assertEqual(
-        value.estimator,
-        {
-            perTask: "sqrt(median(five AB candidate/baseline ratios) * median(five BA candidate/baseline ratios))",
-            quantile: "Type-7 linear interpolation at p50, p95, and p99",
-            bootstrap:
-                "20,000 deterministic replicates jointly resampling five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained.",
-            interval: "Type-7 percentile interval [2.5%, 97.5%]",
-            rawDataPolicy: "Retain every observation. Do not trim, winsorize, selectively rerun, or remove a slow row.",
-        },
-        "protocol estimator",
-    );
+    assertEqual(value.estimator, EXPECTED_ESTIMATOR, "protocol estimator");
     assertEqual(
         value.stoppingRule,
         {
@@ -1401,20 +1492,7 @@ function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
             bootstrapSamples: fixed.bootstrapSamples,
             bootstrapUnit: fixed.bootstrapUnit,
         },
-        {
-            aiVersion: "v0.8",
-            captureCount: 10,
-            tasksPerCapture: TASKS_PER_CAPTURE,
-            totalTaskPairs: TASKS_PER_CAPTURE * 10,
-            measuredMatches: TASKS_PER_CAPTURE * 10 * 2,
-            maxLaps: MAX_LAPS,
-            warmupSeed: WARMUP_SEED,
-            warmupMatchesPerCapture: NATURAL_GRID_TYPES.length * 2,
-            bootstrapSeed: BOOTSTRAP_SEED,
-            bootstrapSamples: BOOTSTRAP_SAMPLES,
-            bootstrapUnit:
-                "joint resampling of five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained",
-        },
+        EXPECTED_FIXED_WORK,
         "protocol fixed work",
     );
     const dependencies = requireRecord(value.dependencyInputs, "protocol dependencies");
@@ -1426,8 +1504,12 @@ function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
     assertEqual(dependencies.runtimeDependencies, PAIR_RUNTIME_DEPENDENCIES, "protocol pair runtime dependencies");
     assertEqual(value.producerManifests, PRODUCER_MANIFESTS, "protocol producer manifest domains");
     const aggregationRunner = requireRecord(value.aggregationRunner, "protocol aggregationRunner");
-    assertEqual(aggregationRunner.schema, SCHEMA, "protocol aggregation schema");
-    assertEqual(aggregationRunner.sha256, fileSeal(RUNNER_PATH).sha256, "protocol aggregation runner hash");
+    assertEqual(aggregationRunner.schema, PRODUCER_AGGREGATION_SCHEMA, "protocol aggregation schema");
+    assertEqual(
+        aggregationRunner.sha256,
+        PRODUCER_AGGREGATION_RUNNER_SHA256,
+        "protocol frozen aggregation runner hash",
+    );
     const captureRunner = requireRecord(value.captureRunner, "protocol captureRunner");
     const microRunner = requireRecord(value.microRunner, "protocol microRunner");
     const profileRunner = requireRecord(value.profileRunner, "protocol profileRunner");
@@ -1442,7 +1524,10 @@ function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
         pair: { schema: CAPTURE_SCHEMA, sha256: CAPTURE_RUNNER_SHA256 },
         micro: { schema: MICRO_SCHEMA, sha256: MICRO_RUNNER_SHA256 },
         profile: { schema: PROFILE_SCHEMA, sha256: PROFILE_RUNNER_SHA256 },
-        replication: { schema: SCHEMA, sha256: fileSeal(RUNNER_PATH).sha256 },
+        replication: {
+            schema: PRODUCER_AGGREGATION_SCHEMA,
+            sha256: PRODUCER_AGGREGATION_RUNNER_SHA256,
+        },
     };
     assertEqual(value.runners, expectedRunners, "protocol runner registry");
     assertEqual(captureRunner, expectedRunners.pair, "protocol pair runner alias");
@@ -1545,22 +1630,270 @@ function loadProtocol(): { value: Record<string, unknown>; seal: IFileSeal } {
     return { value, seal };
 }
 
+function repositoryBinding(path: string): { path: string; bytes: number; sha256: string } {
+    const seal = fileSeal(path);
+    const repositoryPath = relative(COMMON_ROOT, seal.path);
+    if (repositoryPath === "" || repositoryPath.startsWith("..") || isAbsolute(repositoryPath)) {
+        throw new Error(`Bound file is outside the common repository: ${seal.path}`);
+    }
+    return { path: repositoryPath, bytes: seal.bytes, sha256: seal.sha256 };
+}
+
+function validateRepositoryBinding(
+    value: unknown,
+    expectedPath: string,
+    label: string,
+): { path: string; bytes: number; sha256: string } {
+    const binding = requireRecord(value, label);
+    assertExactKeys(binding, ["path", "bytes", "sha256"], label);
+    const expected = repositoryBinding(expectedPath);
+    assertEqual(binding, expected, label);
+    return expected;
+}
+
+function validateIncident(): { file: IFileSeal; value: Record<string, unknown> } {
+    const file = fileSeal(INCIDENT_PATH);
+    assertEqual(
+        { bytes: file.bytes, sha256: file.sha256 },
+        { bytes: INCIDENT_BYTES, sha256: INCIDENT_SHA256 },
+        "v2 aggregation incident immutable seal",
+    );
+    const value = readJsonObject(INCIDENT_PATH, "v2 aggregation incident");
+    assertEqual(value.schema, INCIDENT_SCHEMA, "v2 aggregation incident schema");
+    const campaign = requireRecord(value.campaign, "v2 incident campaign");
+    assertEqual(
+        {
+            id: campaign.id,
+            status: campaign.status,
+            protocolCommit: campaign.protocolCommit,
+            authorizationCommit: campaign.authorizationCommit,
+            closedLedgerCommit: campaign.closedLedgerCommit,
+            zeroRetryHonored: campaign.zeroRetryHonored,
+        },
+        {
+            id: CAMPAIGN_ID,
+            status: "invalidated-before-aggregate-output",
+            protocolCommit: PRODUCER_PROTOCOL_COMMIT,
+            authorizationCommit: PRODUCER_AUTHORIZATION_COMMIT,
+            closedLedgerCommit: PRODUCER_CLOSED_LEDGER_COMMIT,
+            zeroRetryHonored: true,
+        },
+        "v2 incident campaign provenance",
+    );
+    const evidence = requireRecord(value.evidence, "v2 incident evidence");
+    assertEqual(
+        evidence.formalOutputRoot,
+        "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2",
+        "v2 output root",
+    );
+    assertEqual(evidence.aggregateExists, false, "v2 aggregate absence");
+    assertEqual(evidence.allProducerStagesAccepted, true, "v2 producer acceptance");
+    assertEqual(evidence.acceptedProducerStageCount, REQUIRED_LEDGER_STAGES.length, "v2 producer stage count");
+    assertEqual(evidence.noShadowAttemptsAttestation, true, "v2 shadow-attempt attestation");
+    const failure = requireRecord(value.failure, "v2 incident failure");
+    assertEqual(
+        {
+            stage: failure.stage,
+            runner: failure.runner,
+            assertion: failure.assertion,
+            field: failure.field,
+            producerStored: failure.producerStored,
+            replicationRecomputed: failure.replicationRecomputed,
+            absoluteDifference: failure.absoluteDifference,
+            ulpDistance: failure.ulpDistance,
+            producerInterpolation: failure.producerInterpolation,
+            replicationInterpolation: failure.replicationInterpolation,
+            scope: failure.scope,
+        },
+        {
+            stage: "aggregation",
+            runner: {
+                path: "docs/evidence/tools/a13_stat_rounding_replication.ts",
+                bytes: 207_847,
+                sha256: PRODUCER_AGGREGATION_RUNNER_SHA256,
+            },
+            assertion: "micro actualTrace bootstrap",
+            field: "ratioOfTotalsBootstrap95.lower95",
+            producerStored: 0.32440328365332727,
+            replicationRecomputed: 0.3244032836533272,
+            absoluteDifference: 5.551115123125783e-17,
+            ulpDistance: 1,
+            producerInterpolation: EXPECTED_ARITHMETIC_CORRECTION.producerInterpolation,
+            replicationInterpolation: EXPECTED_ARITHMETIC_CORRECTION.rejectedInterpolation,
+            scope: "The aggregate stopped at the exact micro prerequisite assertion before constructing or writing any macro-performance aggregate.",
+        },
+        "v2 incident failure diagnosis",
+    );
+    const decision = requireRecord(value.decision, "v2 incident decision");
+    assertEqual(decision.v2PerformanceVerdict, "invalid", "v2 performance verdict");
+    assertEqual(decision.campaignWillNotBeRetried, true, "v2 campaign retry disposition");
+    assertEqual(
+        decision.macroPerformanceValuesInspectedBeforeRemediationFreeze,
+        false,
+        "v2 macro metric noninspection attestation",
+    );
+    return { file, value };
+}
+
+function loadReanalysisProtocol(
+    producerProtocol: { value: Record<string, unknown>; seal: IFileSeal },
+    producerLedgerSeal: IFileSeal,
+    incident: { file: IFileSeal; value: Record<string, unknown> },
+    runnerSeal: IFileSeal,
+): { value: Record<string, unknown>; seal: IFileSeal } {
+    const seal = fileSeal(REANALYSIS_PROTOCOL_PATH);
+    const value = readJsonObject(REANALYSIS_PROTOCOL_PATH, "reanalysis protocol");
+    assertExactKeys(
+        value,
+        [
+            "schema",
+            "protocolDate",
+            "status",
+            "campaignId",
+            "mode",
+            "measurementAttempts",
+            "aggregationAttemptsMaximum",
+            "zeroRetry",
+            "output",
+            "producerEvidence",
+            "arithmeticCorrection",
+            "estimator",
+            "fixedWork",
+            "gates",
+            "reanalysisRunner",
+        ],
+        "reanalysis protocol",
+    );
+    assertEqual(value.schema, REANALYSIS_PROTOCOL_SCHEMA, "reanalysis protocol schema");
+    assertEqual(value.protocolDate, PROTOCOL_DATE, "reanalysis protocol date");
+    assertEqual(value.status, "prepared-before-single-sealed-input-reanalysis", "reanalysis protocol prepared status");
+    assertEqual(value.campaignId, REANALYSIS_CAMPAIGN_ID, "reanalysis protocol campaign");
+    assertEqual(value.mode, REANALYSIS_MODE, "reanalysis protocol mode");
+    assertEqual(value.measurementAttempts, MEASUREMENT_ATTEMPTS, "reanalysis measurement attempts");
+    assertEqual(
+        value.aggregationAttemptsMaximum,
+        AGGREGATION_ATTEMPTS_MAXIMUM,
+        "reanalysis aggregation-attempt maximum",
+    );
+    assertEqual(value.zeroRetry, true, "reanalysis zero-retry policy");
+    assertEqual(
+        value.output,
+        {
+            root: REANALYSIS_OUTPUT_ROOT,
+            path: REANALYSIS_OUTPUT_PATH,
+            claimPath: REANALYSIS_CLAIM_PATH,
+        },
+        "reanalysis output namespace",
+    );
+    assertEqual(value.arithmeticCorrection, EXPECTED_ARITHMETIC_CORRECTION, "reanalysis arithmetic correction");
+    assertEqual(value.estimator, EXPECTED_ESTIMATOR, "reanalysis unchanged estimator");
+    assertEqual(value.fixedWork, EXPECTED_FIXED_WORK, "reanalysis unchanged fixed work");
+    assertEqual(value.gates, EXPECTED_GATES, "reanalysis unchanged gates");
+
+    const producerEvidence = requireRecord(value.producerEvidence, "reanalysis producer evidence");
+    assertExactKeys(
+        producerEvidence,
+        [
+            "campaignId",
+            "protocolCommit",
+            "authorizationCommit",
+            "closedLedgerCommit",
+            "protocol",
+            "ledger",
+            "incident",
+            "originalAggregationRunner",
+            "inputsClosed",
+            "allProducerStagesAccepted",
+        ],
+        "reanalysis producer evidence",
+    );
+    assertEqual(producerEvidence.campaignId, CAMPAIGN_ID, "producer campaign ID");
+    assertEqual(producerEvidence.protocolCommit, PRODUCER_PROTOCOL_COMMIT, "producer protocol commit");
+    assertEqual(producerEvidence.authorizationCommit, PRODUCER_AUTHORIZATION_COMMIT, "producer authorization commit");
+    assertEqual(producerEvidence.closedLedgerCommit, PRODUCER_CLOSED_LEDGER_COMMIT, "producer closed-ledger commit");
+    assertEqual(producerEvidence.inputsClosed, true, "producer input closure");
+    assertEqual(producerEvidence.allProducerStagesAccepted, true, "producer stage acceptance");
+    const declaredProducerProtocol = validateRepositoryBinding(
+        producerEvidence.protocol,
+        PRODUCER_PROTOCOL_PATH,
+        "reanalysis producer protocol binding",
+    );
+    assertEqual(
+        declaredProducerProtocol,
+        {
+            path: relative(COMMON_ROOT, producerProtocol.seal.path),
+            bytes: producerProtocol.seal.bytes,
+            sha256: producerProtocol.seal.sha256,
+        },
+        "loaded producer protocol binding",
+    );
+    const declaredProducerLedger = requireRecord(producerEvidence.ledger, "reanalysis producer ledger binding");
+    assertExactKeys(
+        declaredProducerLedger,
+        ["path", "bytes", "sha256", "recordCount", "closureRecordSha256"],
+        "reanalysis producer ledger binding",
+    );
+    assertEqual(
+        declaredProducerLedger,
+        {
+            path: relative(COMMON_ROOT, PRODUCER_LEDGER_PATH),
+            bytes: PRODUCER_LEDGER_BYTES,
+            sha256: PRODUCER_LEDGER_SHA256,
+            recordCount: PRODUCER_LEDGER_RECORD_COUNT,
+            closureRecordSha256: PRODUCER_LEDGER_CLOSURE_SHA256,
+        },
+        "reanalysis producer ledger binding",
+    );
+    assertEqual(
+        { bytes: producerLedgerSeal.bytes, sha256: producerLedgerSeal.sha256 },
+        { bytes: PRODUCER_LEDGER_BYTES, sha256: PRODUCER_LEDGER_SHA256 },
+        "loaded producer ledger immutable seal",
+    );
+    validateRepositoryBinding(producerEvidence.incident, INCIDENT_PATH, "reanalysis incident binding");
+    assertEqual(fileSeal(INCIDENT_PATH), incident.file, "loaded incident binding");
+    assertEqual(
+        producerEvidence.originalAggregationRunner,
+        {
+            schema: PRODUCER_AGGREGATION_SCHEMA,
+            sha256: PRODUCER_AGGREGATION_RUNNER_SHA256,
+        },
+        "reanalysis original aggregation runner",
+    );
+
+    const reanalysisRunner = requireRecord(value.reanalysisRunner, "reanalysis runner binding");
+    assertExactKeys(reanalysisRunner, ["path", "schema", "bytes", "sha256"], "reanalysis runner binding");
+    assertEqual(
+        reanalysisRunner,
+        {
+            path: relative(COMMON_ROOT, RUNNER_PATH),
+            schema: SCHEMA,
+            bytes: runnerSeal.bytes,
+            sha256: runnerSeal.sha256,
+        },
+        "reanalysis current runner binding",
+    );
+    assertEqual(producerProtocol.value.estimator, value.estimator, "producer/reanalysis estimator identity");
+    assertEqual(producerProtocol.value.gates, value.gates, "producer/reanalysis gate identity");
+    return { value, seal };
+}
+
 function validateAggregatorRuntimeBinding(
     runtime: Record<string, unknown>,
-    protocol: Record<string, unknown>,
+    reanalysisProtocol: Record<string, unknown>,
+    producerProtocol: Record<string, unknown>,
     label: string,
 ): void {
     const runner = requireRecord(runtime.runner, `${label} runner`);
     assertEqual(runner, fileSeal(RUNNER_PATH), `${label} runner seal`);
     assertEqual(
         runner.sha256,
-        requireRecord(protocol.aggregationRunner, "protocol aggregation runner").sha256,
-        `${label} protocol runner binding`,
+        requireRecord(reanalysisProtocol.reanalysisRunner, "reanalysis protocol runner").sha256,
+        `${label} reanalysis protocol runner binding`,
     );
     const workspace = requireRecord(runtime.workspace, `${label} workspace`);
     const { identitySha256, ...identityPayload } = workspace;
     assertEqual(identitySha256, pairDigest(identityPayload), `${label} workspace identity arithmetic`);
-    const dependencies = requireRecord(protocol.dependencyInputs, "protocol dependencies");
+    const dependencies = requireRecord(producerProtocol.dependencyInputs, "producer protocol dependencies");
     assertEqual(
         {
             packageJson: requireRecord(workspace.packageJson, `${label} package`).sha256,
@@ -1762,7 +2095,7 @@ function validateCapture(
         `${schedule.id} command`,
     );
     const protocolEvidence = requireRecord(report.protocol, `${schedule.id} protocol`);
-    assertEqual(protocolEvidence.schema, PROTOCOL_SCHEMA, `${schedule.id} protocol schema`);
+    assertEqual(protocolEvidence.schema, PRODUCER_PROTOCOL_SCHEMA, `${schedule.id} protocol schema`);
     assertEqual(protocolEvidence.before, protocolSeal, `${schedule.id} protocol before`);
     assertEqual(protocolEvidence.after, protocolSeal, `${schedule.id} protocol after`);
     assertEqual(protocolEvidence.unchanged, true, `${schedule.id} protocol unchanged`);
@@ -2249,6 +2582,85 @@ function makeDeterministicRandom(seed: number): () => number {
     };
 }
 
+function microQuantile(values: readonly number[], probability: number): number {
+    if (
+        !values.length ||
+        !Number.isFinite(probability) ||
+        probability < 0 ||
+        probability > 1 ||
+        values.some((value) => !Number.isFinite(value) || value <= 0)
+    ) {
+        throw new Error("Ratio quantile requires a non-empty finite-positive sample and probability in [0,1]");
+    }
+    const sorted = [...values].sort((left, right) => left - right);
+    const position = (sorted.length - 1) * probability;
+    const lower = Math.floor(position);
+    const upper = Math.ceil(position);
+    const fraction = position - lower;
+    const result = sorted[lower] * (1 - fraction) + sorted[upper] * fraction;
+    if (!Number.isFinite(result) || result <= 0)
+        throw new Error(`ratio quantile ${probability} must be finite-positive`);
+    return result;
+}
+
+function float64BitsHex(value: number): string {
+    const bytes = new ArrayBuffer(8);
+    const view = new DataView(bytes);
+    view.setFloat64(0, value, false);
+    return view.getBigUint64(0, false).toString(16).padStart(16, "0");
+}
+
+function auditMicroQuantileCorrection(): Record<string, unknown> {
+    const { probability, lower, upper } = MICRO_QUANTILE_SELF_TEST;
+    const producerResult = microQuantile([lower, upper], probability);
+    const rejectedResult = lower + (upper - lower) * probability;
+    const producerBitsHex = float64BitsHex(producerResult);
+    const rejectedBitsHex = float64BitsHex(rejectedResult);
+    const producerBits = BigInt(`0x${producerBitsHex}`);
+    const rejectedBits = BigInt(`0x${rejectedBitsHex}`);
+    const ulpDistance = Number(producerBits > rejectedBits ? producerBits - rejectedBits : rejectedBits - producerBits);
+    const observed = {
+        probability,
+        lower,
+        upper,
+        producerResult,
+        rejectedResult,
+        producerBitsHex,
+        rejectedBitsHex,
+        ulpDistance,
+    };
+    assertEqual(observed, MICRO_QUANTILE_SELF_TEST, "micro quantile deterministic one-ULP self-test");
+    const edgeChecks = {
+        probabilityZero: microQuantile([lower, upper], 0),
+        probabilityOne: microQuantile([lower, upper], 1),
+        equalNeighbors: microQuantile([lower, lower], 0.375),
+    };
+    assertEqual(
+        edgeChecks,
+        { probabilityZero: lower, probabilityOne: upper, equalNeighbors: lower },
+        "micro quantile endpoint/equal-neighbor self-test",
+    );
+    const invalidCases: Array<{ label: string; values: number[]; probability: number }> = [
+        { label: "empty", values: [], probability: 0.5 },
+        { label: "nonfinite-value", values: [lower, Number.NaN], probability: 0.5 },
+        { label: "nonpositive-value", values: [0, upper], probability: 0.5 },
+        { label: "nonfinite-probability", values: [lower, upper], probability: Number.NaN },
+        { label: "negative-probability", values: [lower, upper], probability: -0.01 },
+        { label: "probability-above-one", values: [lower, upper], probability: 1.01 },
+    ];
+    const rejectedInvalidCases = invalidCases.map(({ label, values, probability: invalidProbability }) => {
+        let rejected = false;
+        try {
+            microQuantile(values, invalidProbability);
+        } catch {
+            rejected = true;
+        }
+        if (!rejected) throw new Error(`micro quantile accepted invalid self-test case: ${label}`);
+        return label;
+    });
+    return { ...observed, edgeChecks, rejectedInvalidCases, passed: true };
+}
+
 function microRatioOfTotals(rows: readonly IMicroBlock[], workload: string): number {
     const legacy = sum(rows.map((row) => row.workloads[workload].legacy.durationNs));
     const candidate = sum(rows.map((row) => row.workloads[workload].candidate.durationNs));
@@ -2273,9 +2685,9 @@ function microBootstrapRatio(
         return microRatioOfTotals(sample, workload);
     });
     return {
-        lower95: quantile(estimates, 0.025),
-        median: quantile(estimates, 0.5),
-        upper95: quantile(estimates, 0.975),
+        lower95: microQuantile(estimates, 0.025),
+        median: microQuantile(estimates, 0.5),
+        upper95: microQuantile(estimates, 0.975),
         samples: MICRO_BOOTSTRAP_SAMPLES,
     };
 }
@@ -3297,6 +3709,12 @@ function validateLedger(
     profileDirectory: IValidatedProfile["directory"],
 ): IValidatedLedger {
     const file = fileSeal(path);
+    assertEqual(resolve(path), PRODUCER_LEDGER_PATH, "producer ledger canonical path");
+    assertEqual(
+        { bytes: file.bytes, sha256: file.sha256 },
+        { bytes: PRODUCER_LEDGER_BYTES, sha256: PRODUCER_LEDGER_SHA256 },
+        "producer closed-ledger immutable seal",
+    );
     const text = readFileSync(path, "utf8");
     if (!text.endsWith("\n")) throw new Error("attempt ledger must end with a newline");
     const lines = text.slice(0, -1).split("\n");
@@ -3369,6 +3787,7 @@ function validateLedger(
         encoding: "utf8",
     }).trim();
     assertEqual(resolvedProtocolCommit, protocolCommit, "ledger protocol commit resolution");
+    assertEqual(protocolCommit, PRODUCER_PROTOCOL_COMMIT, "ledger frozen producer protocol commit");
     assertEqual(frozen.protocol, protocolSeal, "ledger protocol seal");
     assertEqual(frozen.genesisLedgerSha256, sha256(lines[0]), "ledger committed genesis hash");
     assertEqual(frozen.zeroRetry, true, "ledger protocol zero-retry policy");
@@ -3391,7 +3810,25 @@ function validateLedger(
         const declared = requireRecord(protocolRunners[name], `protocol ${name} runner`);
         assertEqual(runner.schema, declared.schema, `ledger frozen ${name} schema`);
         assertEqual(runner.sha256, declared.sha256, `ledger frozen ${name} SHA`);
-        validateRecordedFileSeal(runner, expectedPath, `ledger frozen ${name} runner`);
+        if (name === "replication") {
+            assertEqual(
+                {
+                    path: resolve(requireString(runner.path, "ledger frozen replication path")),
+                    realPath: requireString(runner.realPath, "ledger frozen replication realpath"),
+                    bytes: requireInteger(runner.bytes, "ledger frozen replication bytes", 1),
+                    sha256: requireSha256(runner.sha256, "ledger frozen replication SHA"),
+                },
+                {
+                    path: expectedPath,
+                    realPath: expectedPath,
+                    bytes: 207_847,
+                    sha256: PRODUCER_AGGREGATION_RUNNER_SHA256,
+                },
+                "ledger frozen replication committed-file descriptor",
+            );
+        } else {
+            validateRecordedFileSeal(runner, expectedPath, `ledger frozen ${name} runner`);
+        }
     }
     for (const committedFile of [
         protocolSeal,
@@ -3764,6 +4201,7 @@ function validateLedger(
         "ledger closure",
     );
     assertEqual(closure.event, "qualification-inputs-closed", "ledger closure event");
+    assertEqual(sha256(lines[cursor]), PRODUCER_LEDGER_CLOSURE_SHA256, "ledger frozen closure-record SHA");
     assertEqual(closure.stageOrder, REQUIRED_LEDGER_STAGES, "ledger closure stages");
     assertEqual(closure.zeroRetry, true, "ledger closure zero-retry policy");
     assertEqual(closure.noShadowAttemptsAttestation, true, "ledger closure shadow-attempt attestation");
@@ -3802,6 +4240,245 @@ function validateLedger(
         stages,
         closure,
     };
+}
+
+function validateAnalysisLedger(
+    path: string,
+    reanalysisProtocolSeal: IFileSeal,
+    runnerSeal: IFileSeal,
+    incidentSeal: IFileSeal,
+    producerProtocolSeal: IFileSeal,
+    producerLedgerSeal: IFileSeal,
+): IValidatedAnalysisLedger {
+    const file = fileSeal(path);
+    assertEqual(file.path, ANALYSIS_LEDGER_PATH, "reanalysis ledger canonical path");
+    const text = readFileSync(path, "utf8");
+    if (!text.endsWith("\n")) throw new Error("reanalysis ledger must end with a newline");
+    const lines = text.slice(0, -1).split("\n");
+    if (lines.length !== 3 || lines.some((line) => line.length === 0)) {
+        throw new Error("reanalysis ledger must contain exactly three non-empty records");
+    }
+    let previousTimestamp = Number.NEGATIVE_INFINITY;
+    const records = lines.map((line, index) => {
+        const record = requireRecord(JSON.parse(line), `reanalysis ledger record ${index}`);
+        if (line !== ledgerCompactJson(record)) {
+            throw new Error(`reanalysis ledger record ${index} is not exact canonical compact JSON`);
+        }
+        assertEqual(record.schema, ANALYSIS_LEDGER_SCHEMA, `reanalysis ledger record ${index} schema`);
+        assertEqual(record.campaignId, REANALYSIS_CAMPAIGN_ID, `reanalysis ledger record ${index} campaign`);
+        assertEqual(record.sequence, index, `reanalysis ledger record ${index} sequence`);
+        assertEqual(
+            record.previousRecordSha256,
+            index === 0 ? null : sha256(lines[index - 1]),
+            `reanalysis ledger record ${index} previous hash`,
+        );
+        if (index === 0) {
+            assertEqual(record.recordedAt, null, "reanalysis ledger genesis timestamp");
+        } else {
+            const recordedAt = requireIsoTimestamp(record.recordedAt, `reanalysis ledger record ${index} timestamp`);
+            const timestamp = Date.parse(recordedAt);
+            if (timestamp <= previousTimestamp) {
+                throw new Error(`reanalysis ledger timestamps are not strictly increasing at sequence ${index}`);
+            }
+            previousTimestamp = timestamp;
+        }
+        return record;
+    });
+
+    const genesis = records[0];
+    assertExactKeys(
+        genesis,
+        [...LEDGER_COMMON_KEYS, "event", "mode", "measurementAttempts", "aggregationAttemptsMaximum", "zeroRetry"],
+        "reanalysis ledger genesis",
+    );
+    assertEqual(genesis.event, "reanalysis-prepared", "reanalysis ledger genesis event");
+    assertEqual(genesis.mode, REANALYSIS_MODE, "reanalysis ledger genesis mode");
+    assertEqual(genesis.measurementAttempts, MEASUREMENT_ATTEMPTS, "reanalysis genesis measurement attempts");
+    assertEqual(
+        genesis.aggregationAttemptsMaximum,
+        AGGREGATION_ATTEMPTS_MAXIMUM,
+        "reanalysis genesis aggregation maximum",
+    );
+    assertEqual(genesis.zeroRetry, true, "reanalysis genesis zero-retry policy");
+
+    const runner = { ...runnerSeal, schema: SCHEMA };
+    const output = {
+        root: REANALYSIS_OUTPUT_ROOT,
+        path: REANALYSIS_OUTPUT_PATH,
+        claimPath: REANALYSIS_CLAIM_PATH,
+    };
+    const frozen = records[1];
+    assertExactKeys(
+        frozen,
+        [
+            ...LEDGER_COMMON_KEYS,
+            "event",
+            "status",
+            "mode",
+            "protocolCommit",
+            "protocol",
+            "runner",
+            "incident",
+            "producerProtocol",
+            "producerLedger",
+            "output",
+            "measurementAttempts",
+            "aggregationAttemptsMaximum",
+            "zeroRetry",
+            "gates",
+        ],
+        "reanalysis ledger freeze",
+    );
+    assertEqual(frozen.event, "reanalysis-frozen", "reanalysis freeze event");
+    assertEqual(frozen.status, "authorized", "reanalysis freeze status");
+    assertEqual(frozen.mode, REANALYSIS_MODE, "reanalysis freeze mode");
+    assertEqual(frozen.protocol, reanalysisProtocolSeal, "reanalysis frozen protocol");
+    assertEqual(frozen.runner, runner, "reanalysis frozen runner");
+    assertEqual(frozen.incident, incidentSeal, "reanalysis frozen incident");
+    assertEqual(frozen.producerProtocol, producerProtocolSeal, "reanalysis frozen producer protocol");
+    assertEqual(frozen.producerLedger, producerLedgerSeal, "reanalysis frozen producer ledger");
+    assertEqual(frozen.output, output, "reanalysis frozen output");
+    assertEqual(frozen.measurementAttempts, MEASUREMENT_ATTEMPTS, "reanalysis frozen measurement attempts");
+    assertEqual(
+        frozen.aggregationAttemptsMaximum,
+        AGGREGATION_ATTEMPTS_MAXIMUM,
+        "reanalysis frozen aggregation maximum",
+    );
+    assertEqual(frozen.zeroRetry, true, "reanalysis frozen zero-retry policy");
+    assertEqual(frozen.gates, EXPECTED_GATES, "reanalysis frozen gates");
+    const protocolCommit = requireString(frozen.protocolCommit, "reanalysis protocol commit");
+    if (!/^[0-9a-f]{40}$/.test(protocolCommit)) {
+        throw new Error("reanalysis protocol commit must be a full SHA-1");
+    }
+    assertEqual(
+        execFileSync(GIT_EXECUTABLE, ["rev-parse", `${protocolCommit}^{commit}`], {
+            cwd: COMMON_ROOT,
+            encoding: "utf8",
+        }).trim(),
+        protocolCommit,
+        "reanalysis protocol commit resolution",
+    );
+    for (const committedFile of [
+        reanalysisProtocolSeal,
+        runnerSeal,
+        incidentSeal,
+        producerProtocolSeal,
+        producerLedgerSeal,
+    ]) {
+        const repositoryPath = relative(COMMON_ROOT, committedFile.path);
+        if (repositoryPath.startsWith("..") || isAbsolute(repositoryPath)) {
+            throw new Error(`Reanalysis frozen file is outside the common repository: ${committedFile.path}`);
+        }
+        const committedBytes = execFileSync(GIT_EXECUTABLE, ["show", `${protocolCommit}:${repositoryPath}`], {
+            cwd: COMMON_ROOT,
+            encoding: "buffer",
+            maxBuffer: 16 * 1024 * 1024,
+        });
+        assertEqual(committedBytes.byteLength, committedFile.bytes, `reanalysis committed ${repositoryPath} bytes`);
+        assertEqual(sha256(committedBytes), committedFile.sha256, `reanalysis committed ${repositoryPath} SHA`);
+    }
+    const ledgerRepositoryPath = relative(COMMON_ROOT, file.path);
+    const committedGenesis = execFileSync(GIT_EXECUTABLE, ["show", `${protocolCommit}:${ledgerRepositoryPath}`], {
+        cwd: COMMON_ROOT,
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024,
+    });
+    assertEqual(committedGenesis, `${lines[0]}\n`, "reanalysis committed genesis prefix");
+
+    const start = records[2];
+    assertExactKeys(
+        start,
+        [
+            ...LEDGER_COMMON_KEYS,
+            "event",
+            "attempt",
+            "attemptId",
+            "mode",
+            "protocol",
+            "runner",
+            "incident",
+            "producerProtocol",
+            "producerLedger",
+            "outputPath",
+            "claimPath",
+            "measurementAttempts",
+        ],
+        "reanalysis aggregation start",
+    );
+    assertEqual(start.event, "aggregation-started", "reanalysis aggregation start event");
+    assertEqual(start.attempt, 1, "reanalysis aggregation attempt");
+    const attemptId = requireUuidV4(start.attemptId, "reanalysis aggregation attempt ID");
+    assertEqual(start.mode, REANALYSIS_MODE, "reanalysis aggregation mode");
+    assertEqual(start.protocol, reanalysisProtocolSeal, "reanalysis started protocol");
+    assertEqual(start.runner, runner, "reanalysis started runner");
+    assertEqual(start.incident, incidentSeal, "reanalysis started incident");
+    assertEqual(start.producerProtocol, producerProtocolSeal, "reanalysis started producer protocol");
+    assertEqual(start.producerLedger, producerLedgerSeal, "reanalysis started producer ledger");
+    assertEqual(start.outputPath, REANALYSIS_OUTPUT_PATH, "reanalysis started output");
+    assertEqual(start.claimPath, REANALYSIS_CLAIM_PATH, "reanalysis started claim path");
+    assertEqual(start.measurementAttempts, MEASUREMENT_ATTEMPTS, "reanalysis started measurement attempts");
+    const committedPrelude = execFileSync(GIT_EXECUTABLE, ["show", `HEAD:${ledgerRepositoryPath}`], {
+        cwd: COMMON_ROOT,
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024,
+    });
+    assertEqual(committedPrelude, text, "committed three-record reanalysis ledger prelude");
+    return {
+        file,
+        protocolCommit,
+        attemptId,
+        startedAt: requireString(start.recordedAt, "reanalysis aggregation start timestamp"),
+        recordCount: 3,
+        lastSequence: 2,
+        chainTipSha256: sha256(lines[2]),
+        records,
+    };
+}
+
+function claimAggregationAttempt(
+    analysisLedger: IValidatedAnalysisLedger,
+    reanalysisProtocolSeal: IFileSeal,
+    runnerSeal: IFileSeal,
+    incidentSeal: IFileSeal,
+    producerProtocolSeal: IFileSeal,
+    producerLedgerSeal: IFileSeal,
+): IFileSeal {
+    const claim = {
+        schema: REANALYSIS_CLAIM_SCHEMA,
+        campaignId: REANALYSIS_CAMPAIGN_ID,
+        attempt: 1,
+        attemptId: analysisLedger.attemptId,
+        claimedAt: new Date().toISOString(),
+        mode: REANALYSIS_MODE,
+        protocol: reanalysisProtocolSeal,
+        runner: { ...runnerSeal, schema: SCHEMA },
+        incident: incidentSeal,
+        producerProtocol: producerProtocolSeal,
+        producerLedger: producerLedgerSeal,
+        analysisLedger: analysisLedger.file,
+        outputPath: REANALYSIS_OUTPUT_PATH,
+        claimPath: REANALYSIS_CLAIM_PATH,
+        measurementAttempts: MEASUREMENT_ATTEMPTS,
+        aggregationAttemptsMaximum: AGGREGATION_ATTEMPTS_MAXIMUM,
+        zeroRetry: true,
+    };
+    const descriptor = openSync(REANALYSIS_CLAIM_PATH, "wx", 0o600);
+    try {
+        writeFileSync(descriptor, `${ledgerCompactJson(claim)}\n`, { encoding: "utf8" });
+        fsyncSync(descriptor);
+    } finally {
+        closeSync(descriptor);
+    }
+    const directoryDescriptor = openSync(REANALYSIS_OUTPUT_ROOT, "r");
+    try {
+        fsyncSync(directoryDescriptor);
+    } finally {
+        closeSync(directoryDescriptor);
+    }
+    const seal = fileSeal(REANALYSIS_CLAIM_PATH);
+    const persisted = readFileSync(REANALYSIS_CLAIM_PATH, "utf8");
+    assertEqual(persisted, `${ledgerCompactJson(claim)}\n`, "persisted reanalysis attempt claim");
+    return seal;
 }
 
 function validateAttemptBinding(
@@ -3969,8 +4646,38 @@ async function main(): Promise<void> {
     const cli = commandLine();
     if (!cli) return;
     const runnerBefore = fileSeal(RUNNER_PATH);
-    const loadedProtocol = loadProtocol();
-    validateAggregatorRuntimeBinding(aggregatorRuntimeBefore, loadedProtocol.value, "aggregator preflight");
+    const loadedProtocol = loadProducerProtocol();
+    const producerLedgerBefore = fileSeal(cli.ledger);
+    const incident = validateIncident();
+    const loadedReanalysisProtocol = loadReanalysisProtocol(
+        loadedProtocol,
+        producerLedgerBefore,
+        incident,
+        runnerBefore,
+    );
+    const analysisLedger = validateAnalysisLedger(
+        cli.analysisLedger,
+        loadedReanalysisProtocol.seal,
+        runnerBefore,
+        incident.file,
+        loadedProtocol.seal,
+        producerLedgerBefore,
+    );
+    const microQuantileAudit = auditMicroQuantileCorrection();
+    validateAggregatorRuntimeBinding(
+        aggregatorRuntimeBefore,
+        loadedReanalysisProtocol.value,
+        loadedProtocol.value,
+        "aggregator preflight",
+    );
+    const attemptClaim = claimAggregationAttempt(
+        analysisLedger,
+        loadedReanalysisProtocol.seal,
+        runnerBefore,
+        incident.file,
+        loadedProtocol.seal,
+        producerLedgerBefore,
+    );
     const semanticSchedule: ICaptureSchedule = {
         id: "semantic",
         seeds: [...NATURAL_SEEDS],
@@ -3996,14 +4703,14 @@ async function main(): Promise<void> {
         ...Object.fromEntries(CAPTURE_IDS.map((id) => [id, cli.captures[id]])),
     };
     const ledger = validateLedger(cli.ledger, loadedProtocol.seal, loadedProtocol.value, stagePaths, profile.directory);
-    assertEqual(cli.out, join(ledger.outputRoot, "aggregate.json"), "campaign aggregate output path");
+    assertEqual(cli.out, REANALYSIS_OUTPUT_PATH, "reanalysis aggregate output path");
     assertEqual(
         requireRecord(
             requireRecord(aggregatorRuntimeBefore.workspace, "aggregator workspace before").configurationAbsence,
             "aggregator configuration absence before",
         ),
-        expectedCampaignConfigurationAbsence(ledger.outputRoot, "aggregate"),
-        "aggregator campaign configuration namespace",
+        expectedCampaignConfigurationAbsence(REANALYSIS_OUTPUT_ROOT, "aggregate"),
+        "reanalysis configuration namespace",
     );
     for (const immutableRoot of [ledger.roots.baseline, ledger.roots.candidate, COMMON_ROOT, cli.profileDir]) {
         if (pathIsWithin(cli.out, immutableRoot)) {
@@ -4185,15 +4892,24 @@ async function main(): Promise<void> {
     const eligible = prerequisiteEvidenceValid;
     const qualified = eligible && Object.values(gates).every((gate) => gate.passed);
     const aggregatorRuntimeAfter = auditAggregatorRuntime();
-    validateAggregatorRuntimeBinding(aggregatorRuntimeAfter, loadedProtocol.value, "aggregator postflight");
+    validateAggregatorRuntimeBinding(
+        aggregatorRuntimeAfter,
+        loadedReanalysisProtocol.value,
+        loadedProtocol.value,
+        "aggregator postflight",
+    );
     assertEqual(aggregatorRuntimeAfter, aggregatorRuntimeBefore, "aggregator runtime pre/post");
     const runnerAfter = fileSeal(RUNNER_PATH);
     assertEqual(runnerAfter, runnerBefore, "aggregation runner pre/post");
-    assertEqual(fileSeal(PROTOCOL_PATH), loadedProtocol.seal, "protocol pre/post");
+    assertEqual(fileSeal(PRODUCER_PROTOCOL_PATH), loadedProtocol.seal, "producer protocol pre/post");
+    assertEqual(fileSeal(REANALYSIS_PROTOCOL_PATH), loadedReanalysisProtocol.seal, "reanalysis protocol pre/post");
+    assertEqual(fileSeal(INCIDENT_PATH), incident.file, "incident pre/post");
     assertEqual(fileSeal(semantic.file.path), semantic.file, "semantic corpus file pre/post");
     assertEqual(fileSeal(micro.file.path), micro.file, "micro file pre/post");
     assertEqual(fileSeal(profile.file.path), profile.file, "profile file pre/post");
     assertEqual(fileSeal(ledger.file.path), ledger.file, "ledger file pre/post");
+    assertEqual(fileSeal(cli.analysisLedger), analysisLedger.file, "reanalysis ledger pre/post");
+    assertEqual(fileSeal(REANALYSIS_CLAIM_PATH), attemptClaim, "reanalysis attempt claim pre/post");
     if (
         !lstatSync(profile.directory.path).isDirectory() ||
         lstatSync(profile.directory.path).isSymbolicLink() ||
@@ -4242,12 +4958,55 @@ async function main(): Promise<void> {
     const report = {
         schema: SCHEMA,
         generatedAt: new Date().toISOString(),
-        protocol: {
-            file: loadedProtocol.seal,
-            schema: PROTOCOL_SCHEMA,
-            date: PROTOCOL_DATE,
-            baselineCommit: BASELINE_COMMIT,
-            candidateCommit: CANDIDATE_COMMIT,
+        producerProvenance: {
+            campaignId: CAMPAIGN_ID,
+            protocolCommit: PRODUCER_PROTOCOL_COMMIT,
+            authorizationCommit: PRODUCER_AUTHORIZATION_COMMIT,
+            closedLedgerCommit: PRODUCER_CLOSED_LEDGER_COMMIT,
+            protocol: {
+                file: loadedProtocol.seal,
+                schema: PRODUCER_PROTOCOL_SCHEMA,
+                date: PROTOCOL_DATE,
+                baselineCommit: BASELINE_COMMIT,
+                candidateCommit: CANDIDATE_COMMIT,
+            },
+            ledger,
+            originalAggregationRunner: {
+                schema: PRODUCER_AGGREGATION_SCHEMA,
+                sha256: PRODUCER_AGGREGATION_RUNNER_SHA256,
+            },
+            inputsClosed: true,
+            allProducerStagesAccepted: true,
+        },
+        reanalysisProvenance: {
+            campaignId: REANALYSIS_CAMPAIGN_ID,
+            mode: REANALYSIS_MODE,
+            measurementAttempts: MEASUREMENT_ATTEMPTS,
+            aggregationAttempt: 1,
+            aggregationAttemptsMaximum: AGGREGATION_ATTEMPTS_MAXIMUM,
+            zeroRetry: true,
+            attemptId: analysisLedger.attemptId,
+            protocol: {
+                file: loadedReanalysisProtocol.seal,
+                schema: REANALYSIS_PROTOCOL_SCHEMA,
+                date: PROTOCOL_DATE,
+            },
+            analysisLedger,
+            incident: {
+                file: incident.file,
+                schema: INCIDENT_SCHEMA,
+            },
+            arithmeticCorrection: {
+                ...EXPECTED_ARITHMETIC_CORRECTION,
+                deterministicSelfTestObserved: microQuantileAudit,
+            },
+            macroQuantileUnchanged: true,
+            attemptClaim,
+            output: {
+                root: REANALYSIS_OUTPUT_ROOT,
+                path: REANALYSIS_OUTPUT_PATH,
+                claimPath: REANALYSIS_CLAIM_PATH,
+            },
         },
         aggregationRunner: { before: runnerBefore, after: runnerAfter, unchanged: true },
         aggregationRuntime: {
@@ -4276,6 +5035,7 @@ async function main(): Promise<void> {
                 hostIdentity: micro.hostIdentity,
                 sourceIdentity: micro.sourceIdentity,
                 gates: micro.gates,
+                bootstrapInterpolationAudit: microQuantileAudit,
             },
             profile: {
                 file: profile.file,
@@ -4341,7 +5101,7 @@ async function main(): Promise<void> {
             prerequisiteEvidenceValid,
             rejectedFirstLayerEvidencePooled: false,
             stoppingRule:
-                "Exactly r0-r9; no selective rerun, added capture, trimming, winsorization, or threshold change.",
+                "One sealed-input aggregation attempt; zero measurement attempts, no selective rerun, added capture, trimming, winsorization, or threshold change.",
         },
     };
     writeJsonAtomicExclusive(cli.out, report);

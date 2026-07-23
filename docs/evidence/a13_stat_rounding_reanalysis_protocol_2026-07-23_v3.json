@@ -1,0 +1,104 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-reanalysis-protocol/v3",
+    "protocolDate": "2026-07-23",
+    "status": "prepared-before-single-sealed-input-reanalysis",
+    "campaignId": "a13-stat-rounding-4d8d94a-20260723-v3",
+    "mode": "sealed-v2-input-reanalysis",
+    "measurementAttempts": 0,
+    "aggregationAttemptsMaximum": 1,
+    "zeroRetry": true,
+    "output": {
+        "root": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis",
+        "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis/aggregate.json",
+        "claimPath": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis/aggregation-attempt-1.claim.json"
+    },
+    "producerEvidence": {
+        "campaignId": "a13-stat-rounding-4d8d94a-20260723-v2",
+        "protocolCommit": "4c8b0fcd9363874396e8bcdf9336fc905b73002c",
+        "authorizationCommit": "453b142517195ee068ea9510ffef47bb70e00359",
+        "closedLedgerCommit": "30ef1c441c33cf870e482d5a5b282fa6ada51e8d",
+        "protocol": {
+            "path": "docs/evidence/a13_stat_rounding_replication_protocol_2026-07-23.json",
+            "bytes": 21370,
+            "sha256": "96eaf0ab6753955a853a9f3f3ed91ca4435f92b0166f5c2781a87a8efb181a65"
+        },
+        "ledger": {
+            "path": "docs/evidence/a13_stat_rounding_attempt_ledger_2026-07-23.jsonl",
+            "bytes": 197208,
+            "sha256": "94926abe0565b3151e120ca14c22fd9429927a6c26f7cbb8f040136357d72680",
+            "recordCount": 29,
+            "closureRecordSha256": "9a5237cccc06ba16e1aa9f658fb3f5ca358fe78ae42a09d8ab470c54a200f2b4"
+        },
+        "incident": {
+            "path": "docs/evidence/a13_stat_rounding_v2_aggregation_incident_2026-07-23.json",
+            "bytes": 3189,
+            "sha256": "96474baca02c5b53fbbc6cf1fe1082d08ede4d45fa39950e49288b072ea9ca5c"
+        },
+        "originalAggregationRunner": {
+            "schema": "heroes-of-crypto/a13-stat-rounding-replication/v2",
+            "sha256": "e637a848f57785f0f87e7955cb4fac6e8572dddd0b34ff181c85913f0d121f84"
+        },
+        "inputsClosed": true,
+        "allProducerStagesAccepted": true
+    },
+    "arithmeticCorrection": {
+        "scope": "micro-bootstrap-validation-only",
+        "producerInterpolation": "lower * (1 - fraction) + upper * fraction",
+        "rejectedInterpolation": "lower + (upper - lower) * fraction",
+        "macroQuantileUnchanged": true,
+        "deterministicSelfTest": {
+            "probability": 0.025,
+            "lower": 0.200000005,
+            "upper": 0.2000000056,
+            "producerResult": 0.20000000501499998,
+            "rejectedResult": 0.200000005015,
+            "producerBitsHex": "3fc99999a45ea01a",
+            "rejectedBitsHex": "3fc99999a45ea01b",
+            "ulpDistance": 1
+        }
+    },
+    "estimator": {
+        "perTask": "sqrt(median(five AB candidate/baseline ratios) * median(five BA candidate/baseline ratios))",
+        "quantile": "Type-7 linear interpolation at p50, p95, and p99",
+        "bootstrap": "20,000 deterministic replicates jointly resampling five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained.",
+        "interval": "Type-7 percentile interval [2.5%, 97.5%]",
+        "rawDataPolicy": "Retain every observation. Do not trim, winsorize, selectively rerun, or remove a slow row."
+    },
+    "fixedWork": {
+        "aiVersion": "v0.8",
+        "captureCount": 10,
+        "tasksPerCapture": 160,
+        "totalTaskPairs": 1600,
+        "measuredMatches": 3200,
+        "maxLaps": 2,
+        "warmupSeed": 4294967295,
+        "warmupMatchesPerCapture": 8,
+        "bootstrapSeed": 2704611998,
+        "bootstrapSamples": 20000,
+        "bootstrapUnit": "joint resampling of five exact even/odd capture-pair clusters and forty seed clusters; all four maps retained"
+    },
+    "gates": {
+        "exactTaskPairs": 1600,
+        "semanticMismatches": 0,
+        "rejectedActions": 0,
+        "stuckMatches": 0,
+        "exceptions": 0,
+        "totalRatioBootstrapUpper95Maximum": 0.99,
+        "geometricRatioBootstrapUpper95MaximumExclusive": 1,
+        "robustP50MaximumExclusive": 1,
+        "robustP99MaximumExclusive": 1,
+        "robustP99BootstrapUpper95Maximum": 1.05,
+        "minimumRobustFasterTasks": 158,
+        "robustMaximumRatio": 1.05,
+        "orderTotalBootstrapUpper95MaximumExclusive": 1,
+        "perMapTotalRatioMaximum": 1.05,
+        "minimumFasterCaptures": 9,
+        "captureTotalRatioMaximum": 1.05
+    },
+    "reanalysisRunner": {
+        "path": "docs/evidence/tools/a13_stat_rounding_replication.ts",
+        "schema": "heroes-of-crypto/a13-stat-rounding-reanalysis/v3",
+        "bytes": 241097,
+        "sha256": "1aab6e3f1e3ac766e0470b4eca6c0c14eaf188e4b4300cf223bc348903c179c3"
+    }
+}
