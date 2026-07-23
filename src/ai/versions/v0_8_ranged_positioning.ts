@@ -24,9 +24,11 @@ import { canUnitLandAt } from "../ai";
 import type {
     IAIPolicyEvent,
     IDecisionContext,
+    IV08SupportedBandDominanceComparisonDetails,
     IV08SupportedBandDuelDecisionSummary,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
+    V08SupportedBandDominanceReason,
     V08SupportedBandDuelDifference,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
@@ -59,6 +61,9 @@ const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ON
 const SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS_ENV =
+    "V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS";
 const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
 const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
 const PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE";
@@ -1155,6 +1160,139 @@ function supportedBandDuelDifference(
     return "other";
 }
 
+interface ISupportedBandDominanceComparison {
+    dominant: boolean;
+    metadataValid: boolean;
+    reason: V08SupportedBandDominanceReason;
+    strictDivisorAfter: number | null;
+    strictReachableThreatsAfter: number | null;
+    shippedDivisorAfter: number | null;
+    shippedReachableThreatsAfter: number | null;
+}
+
+const finiteNonnegativeCount = (value: unknown): number | null => {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+};
+
+const finitePositivePowerOfTwo = (value: unknown): number | null =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && Number.isInteger(Math.log2(value))
+        ? value
+        : null;
+
+const isMoveShotSummary = (summary: IV08SupportedBandDuelDecisionSummary): boolean =>
+    summary.actionTypes.length === 2 &&
+    summary.actionTypes[0] === "move_unit" &&
+    summary.actionTypes[1] === "range_attack" &&
+    summary.movePath !== null &&
+    summary.movePath.length > 0 &&
+    summary.moveTargetCells !== null &&
+    summary.moveTargetCells.length > 0 &&
+    summary.rangeTargetId !== null &&
+    summary.rangeAimCell !== null &&
+    summary.rangeAimSide !== null;
+
+const isShotOnlySummary = (summary: IV08SupportedBandDuelDecisionSummary): boolean =>
+    summary.actionTypes.length === 1 &&
+    summary.actionTypes[0] === "range_attack" &&
+    summary.movePath === null &&
+    summary.moveTargetCells === null &&
+    summary.rangeTargetId !== null &&
+    summary.rangeAimCell !== null &&
+    summary.rangeAimSide !== null;
+
+const hasSameRangeAim = (
+    strict: IV08SupportedBandDuelDecisionSummary,
+    shipped: IV08SupportedBandDuelDecisionSummary,
+): boolean =>
+    strict.rangeTargetId === shipped.rangeTargetId &&
+    strict.rangeAimSide === shipped.rangeAimSide &&
+    strict.rangeAimCell !== null &&
+    shipped.rangeAimCell !== null &&
+    strict.rangeAimCell.x === shipped.rangeAimCell.x &&
+    strict.rangeAimCell.y === shipped.rangeAimCell.y;
+
+/** Apply the preregistered dominance rules in order and fail closed on malformed catalog metadata. */
+function compareSupportedBandDominance(
+    strictProposal: Extract<IAIPolicyEvent, { kind: "v0.8_supported_band_advance" }>,
+    strictSummary: IV08SupportedBandDuelDecisionSummary,
+    shippedMetadata: IProtectedAdvanceMetadata | undefined,
+    shippedSummary: IV08SupportedBandDuelDecisionSummary,
+): ISupportedBandDominanceComparison {
+    const strictDivisorBefore = finitePositivePowerOfTwo(strictProposal.details.divisorBefore);
+    const strictDivisorAfter = finitePositivePowerOfTwo(strictProposal.details.divisorAfter);
+    const strictReachableThreatsBefore = finiteNonnegativeCount(strictProposal.details.exposureBefore);
+    const strictReachableThreatsAfter = finiteNonnegativeCount(strictProposal.details.exposureAfter);
+    const strictDistanceBefore = finiteNonnegativeCount(strictProposal.details.targetDistanceBefore);
+    const strictDistanceAfter = finiteNonnegativeCount(strictProposal.details.targetDistanceAfter);
+    const shippedDivisorBefore =
+        shippedMetadata === undefined ? null : finitePositivePowerOfTwo(shippedMetadata.divisorBefore);
+    const shippedDivisorAfter =
+        shippedMetadata === undefined ? null : finitePositivePowerOfTwo(shippedMetadata.divisorAfter);
+    const shippedReachableThreatsAfter =
+        shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.reachableThreatsAfter);
+    const targetIdentityValid =
+        strictProposal.details.targetId.length > 0 &&
+        strictProposal.details.targetCreatureName.length > 0 &&
+        strictSummary.rangeTargetId === strictProposal.details.targetId &&
+        shippedSummary.rangeTargetId === strictProposal.details.targetId &&
+        hasSameRangeAim(strictSummary, shippedSummary) &&
+        (shippedMetadata === undefined ||
+            (shippedMetadata.targetId === strictProposal.details.targetId &&
+                shippedMetadata.targetCreatureName === strictProposal.details.targetCreatureName));
+    const strictMetadataValid =
+        strictDivisorBefore !== null &&
+        strictDivisorAfter === 1 &&
+        strictDivisorBefore > strictDivisorAfter &&
+        strictReachableThreatsBefore !== null &&
+        strictReachableThreatsAfter === 0 &&
+        strictDistanceBefore !== null &&
+        strictDistanceAfter !== null &&
+        strictDistanceAfter < strictDistanceBefore &&
+        isMoveShotSummary(strictSummary);
+    const shippedMetadataValid =
+        shippedMetadata === undefined
+            ? isShotOnlySummary(shippedSummary)
+            : shippedDivisorBefore !== null &&
+              shippedDivisorAfter !== null &&
+              shippedDivisorBefore === strictDivisorBefore &&
+              shippedDivisorAfter < shippedDivisorBefore &&
+              shippedReachableThreatsAfter !== null &&
+              isMoveShotSummary(shippedSummary);
+    const metadataValid = strictMetadataValid && shippedMetadataValid && targetIdentityValid;
+    if (!metadataValid) {
+        return {
+            dominant: false,
+            metadataValid: false,
+            reason: "filtered",
+            strictDivisorAfter,
+            strictReachableThreatsAfter,
+            shippedDivisorAfter,
+            shippedReachableThreatsAfter,
+        };
+    }
+
+    let reason: V08SupportedBandDominanceReason = "filtered";
+    if (shippedMetadata === undefined) {
+        reason = "no_shipped_advance";
+    } else if (strictDivisorAfter < shippedDivisorAfter!) {
+        reason = "lower_divisor";
+    } else if (
+        strictDivisorAfter === shippedDivisorAfter &&
+        strictReachableThreatsAfter < shippedReachableThreatsAfter!
+    ) {
+        reason = "lower_reachable_threats";
+    }
+    return {
+        dominant: reason !== "filtered",
+        metadataValid: true,
+        reason,
+        strictDivisorAfter,
+        strictReachableThreatsAfter,
+        shippedDivisorAfter,
+        shippedReachableThreatsAfter,
+    };
+}
+
 function protectedAdvanceGuardrailsMode(
     context: IDecisionContext,
     strategyVersion: string,
@@ -1244,10 +1382,11 @@ function protectedAdvanceShotWithGuardrails(
  * root every participating version builds both catalogs, shipped legacy first and strict second, before its version
  * chooses a result. Legacy therefore receives the incumbent's incoming RNG state; both seats then share the same
  * total catalog consumption even when their chosen actions differ. The strict-replacement arm always selects strict
- * for its configured version. The distinct overlay treatment selects strict only when that catalog emitted a real
- * supported-band proposal; every other root falls back to shipped legacy. Its matched selector-off control still
- * computes both catalogs but always selects legacy. Branch events are buffered and only the selected policy's
- * events are published, so a speculative catalog can never masquerade as a live proposal.
+ * for its configured version. The original overlay treatment selects any real strict proposal. The separate
+ * dominance overlay selects one only when its divisor/exposure metadata objectively improves shipped; equal-quality
+ * alternate paths preserve shipped. Each matched selector-off control still computes both catalogs but always
+ * selects legacy. Branch events are buffered and only the selected policy's events are published, while neutral
+ * dominance funnel stages expose eligible/dominant/filtered comparison counts in both matched arms.
  */
 function supportedBandAdvanceVsLegacy(
     unit: Unit,
@@ -1280,34 +1419,100 @@ function supportedBandAdvanceVsLegacy(
             .map((value) => value.trim())
             .filter(Boolean),
     );
+    const dominanceOverlayVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const dominanceOverlayControlVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
     const selectsStrict = strictVersions.has(strategyVersion);
     const selectsLegacy = legacyVersions.has(strategyVersion);
     if (!selectsStrict && !selectsLegacy) return decision;
 
     const strictEvents: IAIPolicyEvent[] = [];
     const legacyEvents: IAIPolicyEvent[] = [];
-    const legacyDecision = protectedAdvanceShot(
+    const legacyCatalog = protectedAdvanceShotCatalog(
         unit,
         { ...context, policyEventObserver: (event) => legacyEvents.push(event) },
         decision,
         responseNeutralAdvance,
     );
+    const legacyDecision = legacyCatalog.decision;
     const strictDecision = supportedBandAdvance(
         unit,
         { ...context, policyEventObserver: (event) => strictEvents.push(event) },
         decision,
         strategyVersion,
     );
-    const strictProposal = strictEvents.some((event) => event.kind === "v0.8_supported_band_advance");
+    const strictProposal = strictEvents.find(
+        (event): event is Extract<IAIPolicyEvent, { kind: "v0.8_supported_band_advance" }> =>
+            event.kind === "v0.8_supported_band_advance",
+    );
     const selectsStrictOverlay = selectsStrict && overlayVersions.has(strategyVersion);
     const selectsOverlayControl = selectsStrictOverlay && overlayControlVersions.has(strategyVersion);
-    const choosesStrict = selectsStrict && (!selectsStrictOverlay || (!selectsOverlayControl && strictProposal));
+    const selectsDominanceOverlay = selectsStrict && dominanceOverlayVersions.has(strategyVersion);
+    const selectsDominanceOverlayControl =
+        selectsDominanceOverlay && dominanceOverlayControlVersions.has(strategyVersion);
+    const strictSummary = supportedBandDuelDecisionSummary(strictDecision);
+    const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
+    const dominanceComparison =
+        selectsDominanceOverlay && strictProposal
+            ? compareSupportedBandDominance(strictProposal, strictSummary, legacyCatalog.metadata, shippedSummary)
+            : undefined;
+    const strictDominatesShipped = dominanceComparison?.dominant ?? false;
+    const choosesStrict =
+        selectsStrict &&
+        (selectsDominanceOverlay
+            ? !selectsDominanceOverlayControl && strictDominatesShipped
+            : !selectsStrictOverlay || (!selectsOverlayControl && strictProposal !== undefined));
     const selectedDecision = choosesStrict ? strictDecision : legacyDecision;
     const selectedEvents = choosesStrict ? strictEvents : legacyEvents;
     for (const event of selectedEvents) context.policyEventObserver?.(event);
+    if (strictProposal && dominanceComparison) {
+        const dominanceDetails: IV08SupportedBandDominanceComparisonDetails = {
+            selected: choosesStrict,
+            dominant: dominanceComparison.dominant,
+            metadataValid: dominanceComparison.metadataValid,
+            reason: dominanceComparison.reason,
+            targetId: strictProposal.details.targetId,
+            targetCreatureName: strictProposal.details.targetCreatureName,
+            strict: strictSummary,
+            shipped: shippedSummary,
+            strictDivisorAfter: dominanceComparison.strictDivisorAfter,
+            strictReachableThreatsAfter: dominanceComparison.strictReachableThreatsAfter,
+            shippedDivisorAfter: dominanceComparison.shippedDivisorAfter,
+            shippedReachableThreatsAfter: dominanceComparison.shippedReachableThreatsAfter,
+        };
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_band_dominance_comparison",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: context.fightProperties?.getCurrentLap() ?? 0,
+            details: dominanceDetails,
+        });
+        for (const stage of [
+            "dominance_eligible",
+            strictDominatesShipped ? "dominance_dominant" : "dominance_filtered",
+        ] as const) {
+            context.policyEventObserver?.({
+                kind: "v0.8_supported_band_advance_funnel",
+                unitId: unit.getId(),
+                creatureName: unit.getName(),
+                team: unit.getTeam(),
+                lap: context.fightProperties?.getCurrentLap() ?? 0,
+                stage,
+            });
+        }
+    }
     if (selectsStrict && context.policyEventObserver) {
         const selectedSummary = supportedBandDuelDecisionSummary(selectedDecision);
-        const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
         if (!sameSupportedBandDuelDecision(selectedSummary, shippedSummary)) {
             context.policyEventObserver({
                 kind: "v0.8_supported_band_duel_difference",

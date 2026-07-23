@@ -66,6 +66,7 @@ export type AIPolicyEventKind =
     | "v0.8_supported_prepin_egress_funnel"
     | "v0.8_supported_band_advance"
     | "v0.8_supported_band_advance_funnel"
+    | "v0.8_supported_band_dominance_comparison"
     | "v0.8_supported_band_duel_difference";
 
 export const V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES = [
@@ -127,6 +128,12 @@ export const V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES = [
     "strictly_closer",
     "retained_signature",
     "damage_band_improved",
+    /** Neutral matched-arm comparison: strict emitted a real proposal and is eligible for dominance filtering. */
+    "dominance_eligible",
+    /** Neutral matched-arm comparison: strict objectively improves shipped divisor/exposure metadata. */
+    "dominance_dominant",
+    /** Neutral matched-arm comparison: shipped is equal or better and therefore remains selected. */
+    "dominance_filtered",
 ] as const;
 
 export type V08SupportedBandAdvanceFunnelStage = (typeof V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES)[number];
@@ -209,6 +216,29 @@ export interface IV08SupportedBandDuelDetails {
     shipped: IV08SupportedBandDuelDecisionSummary;
 }
 
+export type V08SupportedBandDominanceReason =
+    "no_shipped_advance" | "lower_divisor" | "lower_reachable_threats" | "filtered";
+
+/** Neutral strict-vs-shipped metadata comparison emitted identically by matched dominance catalogs. */
+export interface IV08SupportedBandDominanceComparisonDetails {
+    /** Whether the arm selected strict; false in the matched selector-off control. */
+    selected: boolean;
+    /** Objective comparison result before the matched control selector is applied. */
+    dominant: boolean;
+    /** False when strict or present shipped metadata is non-finite, negative, or otherwise malformed. */
+    metadataValid: boolean;
+    /** First satisfied dominance rule in preregistered order, or filtered when shipped is equal/better/invalid. */
+    reason: V08SupportedBandDominanceReason;
+    targetId: string;
+    targetCreatureName: string;
+    strict: IV08SupportedBandDuelDecisionSummary;
+    shipped: IV08SupportedBandDuelDecisionSummary;
+    strictDivisorAfter: number | null;
+    strictReachableThreatsAfter: number | null;
+    shippedDivisorAfter: number | null;
+    shippedReachableThreatsAfter: number | null;
+}
+
 export type V08ProtectedAdvanceGuardrailReason = "ranged_superior_hold" | "partial_band";
 export type V08ProtectedAdvanceGuardrailMode = "both" | "catalog_only" | V08ProtectedAdvanceGuardrailReason;
 
@@ -261,6 +291,11 @@ export type IAIPolicyEvent =
           stage?: never;
       })
     | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_band_dominance_comparison";
+          details: IV08SupportedBandDominanceComparisonDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
           kind: "v0.8_supported_prepin_egress";
           details: IV08SupportedPrepinEgressDetails;
           stage?: never;
@@ -277,6 +312,7 @@ export type IAIPolicyEvent =
               | "v0.8_supported_ranged_escape_funnel"
               | "v0.8_supported_band_advance"
               | "v0.8_supported_band_advance_funnel"
+              | "v0.8_supported_band_dominance_comparison"
               | "v0.8_supported_band_duel_difference"
               | "v0.8_protected_advance_guardrail"
               | "v0.8_supported_prepin_egress"

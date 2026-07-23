@@ -104,6 +104,10 @@ export interface IV08RangedPositioningABOptions {
     supportedBandAdvanceOverlayVsLegacy?: boolean;
     /** Matched overlay selector-off control: both catalogs run, but v0.8 always selects shipped legacy. */
     supportedBandAdvanceOverlayControl?: boolean;
+    /** Dominance overlay: strict wins only with a real proposal and objectively better divisor/exposure metadata. */
+    supportedBandAdvanceDominanceOverlay?: boolean;
+    /** Matched dominance selector-off control: both catalogs and comparisons run, but v0.8 selects shipped. */
+    supportedBandAdvanceDominanceOverlayControl?: boolean;
     /** Live-root post-catalog vetoes over shipped legacy; rollouts and v0.8s remain exact incumbent controls. */
     protectedAdvanceGuardrails?: boolean;
     /** Selects both guardrails, an isolated reason, or the exact catalog-only control. */
@@ -127,7 +131,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -168,6 +172,8 @@ export interface IV08RangedPositioningABManifest {
         supportedBandAdvanceVsLegacy: boolean;
         supportedBandAdvanceOverlayVsLegacy: boolean;
         supportedBandAdvanceOverlayControl: boolean;
+        supportedBandAdvanceDominanceOverlay: boolean;
+        supportedBandAdvanceDominanceOverlayControl: boolean;
         protectedAdvanceGuardrails: boolean;
         protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode;
         diag: boolean;
@@ -225,6 +231,8 @@ function validateBehaviorArmGeometry(
     supportedBandAdvanceVsLegacy: boolean,
     supportedBandAdvanceOverlayVsLegacy: boolean,
     supportedBandAdvanceOverlayControl: boolean,
+    supportedBandAdvanceDominanceOverlay: boolean,
+    supportedBandAdvanceDominanceOverlayControl: boolean,
     protectedAdvanceGuardrails: boolean,
 ): void {
     const enabledSpecialArms = [
@@ -239,6 +247,8 @@ function validateBehaviorArmGeometry(
         supportedBandAdvanceVsLegacy,
         supportedBandAdvanceOverlayVsLegacy,
         supportedBandAdvanceOverlayControl,
+        supportedBandAdvanceDominanceOverlay,
+        supportedBandAdvanceDominanceOverlayControl,
         protectedAdvanceGuardrails,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
@@ -246,7 +256,8 @@ function validateBehaviorArmGeometry(
             "noMeleeTerminalPressure, deadlineFinisher, paretoNoMeleeFocus, jitNoMeleeFocus, " +
                 "supportedRangedDelta, responseNeutralAdvance, supportedPrepinEgress, supportedBandAdvance, and " +
                 "supportedBandAdvanceVsLegacy, supportedBandAdvanceOverlayVsLegacy, " +
-                "supportedBandAdvanceOverlayControl, and protectedAdvanceGuardrails " +
+                "supportedBandAdvanceOverlayControl, supportedBandAdvanceDominanceOverlay, " +
+                "supportedBandAdvanceDominanceOverlayControl, and protectedAdvanceGuardrails " +
                 "are mutually exclusive",
         );
     }
@@ -282,6 +293,12 @@ function validateBehaviorArmGeometry(
     }
     if (supportedBandAdvanceOverlayControl && (mode !== "both" || moveShots !== 0)) {
         throw new Error("supportedBandAdvanceOverlayControl requires mode=both and moveShots=0");
+    }
+    if (supportedBandAdvanceDominanceOverlay && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandAdvanceDominanceOverlay requires mode=both and moveShots=0");
+    }
+    if (supportedBandAdvanceDominanceOverlayControl && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandAdvanceDominanceOverlayControl requires mode=both and moveShots=0");
     }
     if (protectedAdvanceGuardrails && (mode !== "both" || moveShots !== 0)) {
         throw new Error("protectedAdvanceGuardrails requires mode=both and moveShots=0");
@@ -456,7 +473,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         !options.supportedBandAdvanceCatalogOnly &&
         !options.supportedBandAdvanceVsLegacy &&
         !options.supportedBandAdvanceOverlayVsLegacy &&
-        !options.supportedBandAdvanceOverlayControl
+        !options.supportedBandAdvanceOverlayControl &&
+        !options.supportedBandAdvanceDominanceOverlay &&
+        !options.supportedBandAdvanceDominanceOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -487,17 +506,33 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         throw new Error("supportedBandAdvanceOverlayControl must be a boolean");
     }
     if (
+        options.supportedBandAdvanceDominanceOverlay !== undefined &&
+        typeof options.supportedBandAdvanceDominanceOverlay !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceDominanceOverlay must be a boolean");
+    }
+    if (
+        options.supportedBandAdvanceDominanceOverlayControl !== undefined &&
+        typeof options.supportedBandAdvanceDominanceOverlayControl !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceDominanceOverlayControl must be a boolean");
+    }
+    if (
         [
             options.supportedBandAdvance,
             options.supportedBandAdvanceCatalogOnly,
             options.supportedBandAdvanceVsLegacy,
             options.supportedBandAdvanceOverlayVsLegacy,
             options.supportedBandAdvanceOverlayControl,
+            options.supportedBandAdvanceDominanceOverlay,
+            options.supportedBandAdvanceDominanceOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
-                "supportedBandAdvanceOverlayVsLegacy, and supportedBandAdvanceOverlayControl are mutually exclusive",
+                "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
+                "supportedBandAdvanceDominanceOverlay, and supportedBandAdvanceDominanceOverlayControl " +
+                "are mutually exclusive",
         );
     }
     if (options.supportedBandAdvanceVsLegacy && !options.supportedBandAdvanceLiveOnly) {
@@ -508,6 +543,12 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     }
     if (options.supportedBandAdvanceOverlayControl && !options.supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandAdvanceDominanceOverlay && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceDominanceOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandAdvanceDominanceOverlayControl && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceDominanceOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (options.protectedAdvanceGuardrails !== undefined && typeof options.protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -533,6 +574,8 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.supportedBandAdvanceVsLegacy ?? false,
         options.supportedBandAdvanceOverlayVsLegacy ?? false,
         options.supportedBandAdvanceOverlayControl ?? false,
+        options.supportedBandAdvanceDominanceOverlay ?? false,
+        options.supportedBandAdvanceDominanceOverlayControl ?? false,
         options.protectedAdvanceGuardrails ?? false,
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
@@ -639,7 +682,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -680,6 +723,8 @@ export function buildV08RangedPositioningABManifest(
             supportedBandAdvanceVsLegacy: options.supportedBandAdvanceVsLegacy ?? false,
             supportedBandAdvanceOverlayVsLegacy: options.supportedBandAdvanceOverlayVsLegacy ?? false,
             supportedBandAdvanceOverlayControl: options.supportedBandAdvanceOverlayControl ?? false,
+            supportedBandAdvanceDominanceOverlay: options.supportedBandAdvanceDominanceOverlay ?? false,
+            supportedBandAdvanceDominanceOverlayControl: options.supportedBandAdvanceDominanceOverlayControl ?? false,
             protectedAdvanceGuardrails: options.protectedAdvanceGuardrails ?? false,
             protectedAdvanceGuardrailsMode: options.protectedAdvanceGuardrailsMode ?? "both",
             diag: options.diag ?? false,
@@ -732,6 +777,8 @@ export function buildV08RangedPositioningABEnvironment(
     supportedRangedDeltaLiveOnly = false,
     supportedBandAdvanceOverlayVsLegacy = false,
     supportedBandAdvanceOverlayControl = false,
+    supportedBandAdvanceDominanceOverlay = false,
+    supportedBandAdvanceDominanceOverlayControl = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -820,7 +867,9 @@ export function buildV08RangedPositioningABEnvironment(
         !supportedBandAdvanceCatalogOnly &&
         !supportedBandAdvanceVsLegacy &&
         !supportedBandAdvanceOverlayVsLegacy &&
-        !supportedBandAdvanceOverlayControl
+        !supportedBandAdvanceOverlayControl &&
+        !supportedBandAdvanceDominanceOverlay &&
+        !supportedBandAdvanceDominanceOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -832,6 +881,12 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (typeof supportedBandAdvanceOverlayControl !== "boolean") {
         throw new Error("supportedBandAdvanceOverlayControl must be a boolean");
+    }
+    if (typeof supportedBandAdvanceDominanceOverlay !== "boolean") {
+        throw new Error("supportedBandAdvanceDominanceOverlay must be a boolean");
+    }
+    if (typeof supportedBandAdvanceDominanceOverlayControl !== "boolean") {
+        throw new Error("supportedBandAdvanceDominanceOverlayControl must be a boolean");
     }
     if (supportedBandAdvanceVsLegacy && (supportedBandAdvance || supportedBandAdvanceCatalogOnly)) {
         throw new Error(
@@ -845,11 +900,15 @@ export function buildV08RangedPositioningABEnvironment(
             supportedBandAdvanceVsLegacy,
             supportedBandAdvanceOverlayVsLegacy,
             supportedBandAdvanceOverlayControl,
+            supportedBandAdvanceDominanceOverlay,
+            supportedBandAdvanceDominanceOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
-                "supportedBandAdvanceOverlayVsLegacy, and supportedBandAdvanceOverlayControl are mutually exclusive",
+                "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
+                "supportedBandAdvanceDominanceOverlay, and supportedBandAdvanceDominanceOverlayControl " +
+                "are mutually exclusive",
         );
     }
     if (supportedBandAdvanceVsLegacy && !supportedBandAdvanceLiveOnly) {
@@ -860,6 +919,12 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (supportedBandAdvanceOverlayControl && !supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandAdvanceDominanceOverlay && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceDominanceOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandAdvanceDominanceOverlayControl && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceDominanceOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (typeof protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -884,6 +949,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceVsLegacy,
         supportedBandAdvanceOverlayVsLegacy,
         supportedBandAdvanceOverlayControl,
+        supportedBandAdvanceDominanceOverlay,
+        supportedBandAdvanceDominanceOverlayControl,
         protectedAdvanceGuardrails,
     );
 
@@ -941,7 +1008,10 @@ export function buildV08RangedPositioningABEnvironment(
           : "";
     const supportedBandExperiment = supportedBandAdvance || supportedBandAdvanceCatalogOnly;
     const supportedBandOverlayDuel = supportedBandAdvanceOverlayVsLegacy || supportedBandAdvanceOverlayControl;
-    const supportedBandLegacyDuel = supportedBandAdvanceVsLegacy || supportedBandOverlayDuel;
+    const supportedBandDominanceOverlayDuel =
+        supportedBandAdvanceDominanceOverlay || supportedBandAdvanceDominanceOverlayControl;
+    const supportedBandLegacyDuel =
+        supportedBandAdvanceVsLegacy || supportedBandOverlayDuel || supportedBandDominanceOverlayDuel;
     environment.V08_SUPPORTED_BAND_ADVANCE = supportedBandExperiment ? "1" : "0";
     environment.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS =
         supportedBandExperiment || supportedBandLegacyDuel ? V08_A13_PRODUCTION_VERSION : "";
@@ -949,6 +1019,11 @@ export function buildV08RangedPositioningABEnvironment(
         ? V08_A13_SOURCE_VERSION
         : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = supportedBandAdvanceLiveOnly ? "1" : "0";
+    environment.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS =
+        supportedBandAdvanceDominanceOverlayControl ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS = supportedBandDominanceOverlayDuel
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS = supportedBandAdvanceOverlayControl
         ? V08_A13_PRODUCTION_VERSION
         : "";
@@ -978,6 +1053,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceVsLegacy ||
         supportedBandAdvanceOverlayVsLegacy ||
         supportedBandAdvanceOverlayControl ||
+        supportedBandAdvanceDominanceOverlay ||
+        supportedBandAdvanceDominanceOverlayControl ||
         protectedAdvanceGuardrails
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
@@ -1020,6 +1097,8 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedRangedDeltaLiveOnly ?? false,
         options.supportedBandAdvanceOverlayVsLegacy ?? false,
         options.supportedBandAdvanceOverlayControl ?? false,
+        options.supportedBandAdvanceDominanceOverlay ?? false,
+        options.supportedBandAdvanceDominanceOverlayControl ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -1119,6 +1198,8 @@ export async function runV08RangedPositioningAB(
     const supportedBandAdvanceVsLegacy = options.supportedBandAdvanceVsLegacy ?? false;
     const supportedBandAdvanceOverlayVsLegacy = options.supportedBandAdvanceOverlayVsLegacy ?? false;
     const supportedBandAdvanceOverlayControl = options.supportedBandAdvanceOverlayControl ?? false;
+    const supportedBandAdvanceDominanceOverlay = options.supportedBandAdvanceDominanceOverlay ?? false;
+    const supportedBandAdvanceDominanceOverlayControl = options.supportedBandAdvanceDominanceOverlayControl ?? false;
     const protectedAdvanceGuardrails = options.protectedAdvanceGuardrails ?? false;
     const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
     for (const invocation of invocations) {
@@ -1145,6 +1226,8 @@ export async function runV08RangedPositioningAB(
                 `supportedBandVsLegacy=${supportedBandAdvanceVsLegacy} ` +
                 `supportedBandOverlayVsLegacy=${supportedBandAdvanceOverlayVsLegacy} ` +
                 `supportedBandOverlayControl=${supportedBandAdvanceOverlayControl} ` +
+                `supportedBandDominanceOverlay=${supportedBandAdvanceDominanceOverlay} ` +
+                `supportedBandDominanceOverlayControl=${supportedBandAdvanceDominanceOverlayControl} ` +
                 `protectedAdvanceGuardrails=${protectedAdvanceGuardrails} ` +
                 `protectedAdvanceGuardrailsMode=${protectedAdvanceGuardrailsMode} ` +
                 `games=${options.games} seed=${options.seed}`,
@@ -1193,6 +1276,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-band-vs-legacy": { type: "boolean", default: false },
             "supported-band-overlay-vs-legacy": { type: "boolean", default: false },
             "supported-band-overlay-control": { type: "boolean", default: false },
+            "supported-band-dominance-overlay": { type: "boolean", default: false },
+            "supported-band-dominance-overlay-control": { type: "boolean", default: false },
             "protected-advance-guardrails": { type: "boolean", default: false },
             "protected-advance-guardrails-mode": { type: "string", default: "both" },
             diag: { type: "boolean", default: false },
@@ -1250,6 +1335,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedBandAdvanceVsLegacy: values["supported-band-vs-legacy"]!,
         supportedBandAdvanceOverlayVsLegacy: values["supported-band-overlay-vs-legacy"]!,
         supportedBandAdvanceOverlayControl: values["supported-band-overlay-control"]!,
+        supportedBandAdvanceDominanceOverlay: values["supported-band-dominance-overlay"]!,
+        supportedBandAdvanceDominanceOverlayControl: values["supported-band-dominance-overlay-control"]!,
         protectedAdvanceGuardrails: values["protected-advance-guardrails"]!,
         protectedAdvanceGuardrailsMode,
         diag: values.diag!,
@@ -1272,7 +1359,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--supported-ranged-delta-live-only] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
                 "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy|" +
-                "--supported-band-overlay-vs-legacy|--supported-band-overlay-control] " +
+                "--supported-band-overlay-vs-legacy|--supported-band-overlay-control|" +
+                "--supported-band-dominance-overlay|--supported-band-dominance-overlay-control] " +
                 "[--supported-band-live-only] " +
                 "[--protected-advance-guardrails] " +
                 "[--protected-advance-guardrails-mode both|catalog_only|partial_band|ranged_superior_hold] " +

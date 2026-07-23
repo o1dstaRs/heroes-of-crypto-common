@@ -358,6 +358,7 @@ function setupSupportedBandAdvance(
         targetRanged?: boolean;
         targetAmount?: number;
         targetAbilities?: string[];
+        targetCell?: XY;
         targetMaxHp?: number;
         withActedReachableThreat?: boolean;
         withCurrentPinner?: boolean;
@@ -397,7 +398,7 @@ function setupSupportedBandAdvance(
     });
     const destination = options.destination ?? { x: 5, y: 6 };
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 7 });
-    placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 1 });
+    placeUnit(combat.grid, combat.unitsHolder, target, options.targetCell ?? { x: 5, y: 1 });
 
     let guard: Unit | undefined;
     if (options.includeGuard ?? true) {
@@ -493,6 +494,8 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
@@ -1181,6 +1184,281 @@ describe("v0.8 protected ranged positioning", () => {
         expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
         expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
         expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+    });
+
+    it("filters an equal-quality dominance proposal so alternate catalog paths cannot replace shipped", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+
+        const run = (arm: "treatment" | "control" | "shipped") => {
+            if (arm === "control") {
+                process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS = "v0.8";
+            } else {
+                delete process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS;
+            }
+            const { shooter, context, destination } = setupSupportedBandAdvance();
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            let catalogCalls = 0;
+            context.pathHelper = {
+                getMovePath: () => {
+                    const firstCatalog = catalogCalls === 0;
+                    catalogCalls += 1;
+                    getRandomInt(0, 1_000_000);
+                    const destinationHash = (destination.x << 4) | destination.y;
+                    const route = firstCatalog ? [{ x: 4, y: 7 }, destination] : [destination];
+                    return {
+                        cells: [destination],
+                        hashes: new Set([destinationHash]),
+                        knownPaths: new Map([
+                            [
+                                destinationHash,
+                                [
+                                    {
+                                        cell: destination,
+                                        route,
+                                        weight: 1,
+                                        firstAggrMet: false,
+                                        hasLavaCell: false,
+                                        hasWaterCell: false,
+                                    },
+                                ],
+                            ],
+                        ]),
+                    };
+                },
+            } as PathHelper;
+            setDeterministicRandomSource(makeRng(0xd041aace));
+            const actions = (arm === "shipped" ? new StrategyV0_8S() : new StrategyV0_8()).decideTurn(shooter, context);
+            return {
+                actions: actions.map(({ type }) => type),
+                path: actions.find((action) => action.type === "move_unit")?.path,
+                catalogCalls,
+                events,
+                dominanceStages: events
+                    .filter(
+                        (event): event is Extract<IAIPolicyEvent, { kind: "v0.8_supported_band_advance_funnel" }> =>
+                            event.kind === "v0.8_supported_band_advance_funnel",
+                    )
+                    .map(({ stage }) => stage)
+                    .filter((stage) => stage.startsWith("dominance_")),
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const treatment = run("treatment");
+        const control = run("control");
+        const shipped = run("shipped");
+        expect(treatment.actions).toEqual(["move_unit", "range_attack"]);
+        expect(treatment.path).toEqual(shipped.path);
+        expect(treatment.path).toEqual([
+            { x: 4, y: 7 },
+            { x: 5, y: 6 },
+        ]);
+        expect(control.actions).toEqual(shipped.actions);
+        expect(control.path).toEqual(shipped.path);
+        expect(treatment.catalogCalls).toBe(2);
+        expect(control.catalogCalls).toBe(2);
+        expect(shipped.catalogCalls).toBe(2);
+        expect(treatment.tail).toEqual(control.tail);
+        expect(treatment.tail).toEqual(shipped.tail);
+        expect(treatment.dominanceStages).toEqual(["dominance_eligible", "dominance_filtered"]);
+        expect(control.dominanceStages).toEqual(treatment.dominanceStages);
+        expect(shipped.dominanceStages).toEqual([]);
+        const treatmentComparison = treatment.events.find(
+            (event) => event.kind === "v0.8_supported_band_dominance_comparison",
+        );
+        const controlComparison = control.events.find(
+            (event) => event.kind === "v0.8_supported_band_dominance_comparison",
+        );
+        expect(treatmentComparison?.kind).toBe("v0.8_supported_band_dominance_comparison");
+        expect(controlComparison?.kind).toBe("v0.8_supported_band_dominance_comparison");
+        if (
+            treatmentComparison?.kind !== "v0.8_supported_band_dominance_comparison" ||
+            controlComparison?.kind !== "v0.8_supported_band_dominance_comparison"
+        ) {
+            throw new Error("missing matched equal-quality dominance comparison");
+        }
+        expect(controlComparison.details).toMatchObject({
+            ...treatmentComparison.details,
+            targetId: expect.any(String),
+            strict: { ...treatmentComparison.details.strict, rangeTargetId: expect.any(String) },
+            shipped: { ...treatmentComparison.details.shipped, rangeTargetId: expect.any(String) },
+        });
+        expect(treatmentComparison.details).toMatchObject({
+            selected: false,
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strict: { movePath: [{ x: 5, y: 6 }] },
+            shipped: {
+                movePath: [
+                    { x: 4, y: 7 },
+                    { x: 5, y: 6 },
+                ],
+            },
+            strictDivisorAfter: 1,
+            strictReachableThreatsAfter: 0,
+            shippedDivisorAfter: 1,
+            shippedReachableThreatsAfter: 0,
+        });
+        expect(treatmentComparison.details.targetCreatureName).toBe("Band target");
+        expect(treatmentComparison.details.strict.rangeTargetId).toBe(treatmentComparison.details.targetId);
+        expect(treatmentComparison.details.shipped.rangeTargetId).toBe(treatmentComparison.details.targetId);
+        for (const matched of [treatment, control]) {
+            expect(matched.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+            expect(matched.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        }
+    });
+
+    it("selects a strict route with fewer reachable threats but keeps the exposed shipped route in matched control", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+
+        const run = (selectorOff: boolean) => {
+            if (selectorOff) {
+                process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS = "v0.8";
+            } else {
+                delete process.env.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS;
+            }
+            const { shooter, context } = setupSupportedBandAdvance({
+                guardCell: { x: 3, y: 5 },
+                targetCell: { x: 4, y: 1 },
+            });
+            const actedThreat = createTestUnit({
+                team: UPPER,
+                name: "Acted screened threat",
+                attackType: MELEE,
+                maxHp: 1,
+            });
+            placeUnit(context.grid, context.unitsHolder, actedThreat, { x: 0, y: 6 });
+            actedThreat.applyBuff(
+                new Spell({
+                    spellProperties: getSpellConfig("System", "Hidden"),
+                    amount: 1,
+                }),
+            );
+            context.fightProperties!.addAlreadyMadeTurn(UPPER, actedThreat.getId());
+            context.matrix = context.grid.getMatrix();
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            const destinations = [
+                { x: 4, y: 6 },
+                { x: 5, y: 6 },
+            ];
+            let catalogCalls = 0;
+            context.pathHelper = {
+                getMovePath: () => {
+                    const destination = destinations[catalogCalls]!;
+                    catalogCalls += 1;
+                    getRandomInt(0, 1_000_000);
+                    const destinationHash = (destination.x << 4) | destination.y;
+                    return {
+                        cells: [destination],
+                        hashes: new Set([destinationHash]),
+                        knownPaths: new Map([
+                            [
+                                destinationHash,
+                                [
+                                    {
+                                        cell: destination,
+                                        route: [destination],
+                                        weight: 1,
+                                        firstAggrMet: false,
+                                        hasLavaCell: false,
+                                        hasWaterCell: false,
+                                    },
+                                ],
+                            ],
+                        ]),
+                    };
+                },
+            } as unknown as PathHelper;
+            setDeterministicRandomSource(makeRng(0xd041aace));
+            const actions = new StrategyV0_8().decideTurn(shooter, context);
+            return {
+                actions: actions.map(({ type }) => type),
+                destination: actions.find((action) => action.type === "move_unit")?.targetCells?.[0],
+                catalogCalls,
+                events,
+                dominanceStages: events
+                    .filter(
+                        (event): event is Extract<IAIPolicyEvent, { kind: "v0.8_supported_band_advance_funnel" }> =>
+                            event.kind === "v0.8_supported_band_advance_funnel",
+                    )
+                    .map(({ stage }) => stage)
+                    .filter((stage) => stage.startsWith("dominance_")),
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const treatment = run(false);
+        const control = run(true);
+        expect(treatment.actions).toEqual(["move_unit", "range_attack"]);
+        expect(control.actions).toEqual(["move_unit", "range_attack"]);
+        expect(treatment.destination).toEqual({ x: 5, y: 6 });
+        expect(control.destination).toEqual({ x: 4, y: 6 });
+        expect(treatment.catalogCalls).toBe(2);
+        expect(control.catalogCalls).toBe(2);
+        expect(treatment.tail).toEqual(control.tail);
+        expect(treatment.dominanceStages).toEqual(["dominance_eligible", "dominance_dominant"]);
+        expect(control.dominanceStages).toEqual(treatment.dominanceStages);
+        const treatmentComparison = treatment.events.find(
+            (event) => event.kind === "v0.8_supported_band_dominance_comparison",
+        );
+        const controlComparison = control.events.find(
+            (event) => event.kind === "v0.8_supported_band_dominance_comparison",
+        );
+        expect(treatmentComparison?.kind).toBe("v0.8_supported_band_dominance_comparison");
+        expect(controlComparison?.kind).toBe("v0.8_supported_band_dominance_comparison");
+        if (
+            treatmentComparison?.kind !== "v0.8_supported_band_dominance_comparison" ||
+            controlComparison?.kind !== "v0.8_supported_band_dominance_comparison"
+        ) {
+            throw new Error("missing matched dominant comparison");
+        }
+        expect(treatmentComparison.details).toMatchObject({
+            selected: true,
+            dominant: true,
+            metadataValid: true,
+            reason: "lower_reachable_threats",
+            strict: { actionTypes: ["move_unit", "range_attack"] },
+            shipped: { actionTypes: ["move_unit", "range_attack"] },
+            strictDivisorAfter: 1,
+            strictReachableThreatsAfter: 0,
+            shippedDivisorAfter: 1,
+            shippedReachableThreatsAfter: 1,
+        });
+        expect(treatmentComparison.details.targetCreatureName).toBe("Band target");
+        expect(treatmentComparison.details.strict.rangeTargetId).toBe(treatmentComparison.details.targetId);
+        expect(treatmentComparison.details.shipped.rangeTargetId).toBe(treatmentComparison.details.targetId);
+        expect(controlComparison.details.strict.rangeTargetId).toBe(controlComparison.details.targetId);
+        expect(controlComparison.details.shipped.rangeTargetId).toBe(controlComparison.details.targetId);
+        expect(controlComparison.details).toMatchObject({
+            ...treatmentComparison.details,
+            selected: false,
+            targetId: expect.any(String),
+            strict: { ...treatmentComparison.details.strict, rangeTargetId: expect.any(String) },
+            shipped: { ...treatmentComparison.details.shipped, rangeTargetId: expect.any(String) },
+        });
+        expect(treatment.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance");
+        expect(treatment.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_duel_difference");
+        expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
     });
 
     it("does not duplicate pinned retreat after duel branch selection", () => {

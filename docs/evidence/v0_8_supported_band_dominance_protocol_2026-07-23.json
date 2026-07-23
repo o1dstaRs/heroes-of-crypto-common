@@ -1,0 +1,281 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-dominance-protocol/v1",
+    "recordedAt": "2026-07-23T17:45:00Z",
+    "status": "preregistered-before-outcomes",
+    "purpose": "Test whether a strict supported ranged advance should replace the shipped protected advance only when it objectively improves damage-band or next-activation melee-threat metadata.",
+    "sourceRequirement": {
+        "candidate": "The clean pushed commit containing this protocol and the dominance-overlay implementation.",
+        "dirty": false,
+        "manifestHeadAndTreeRequired": true,
+        "analyzerHashRequiredBeforePilot": true,
+        "configurationChangesAfterOutcomeOpenCreateNewCandidate": true
+    },
+    "selector": {
+        "catalogOrder": ["shipped", "strict"],
+        "incumbent": "shipped",
+        "strictProposalRequired": true,
+        "orderedDominanceReasons": [
+            {
+                "reason": "no_shipped_advance",
+                "condition": "The shipped catalog has no advance metadata and returns the incumbent shot."
+            },
+            {
+                "reason": "lower_divisor",
+                "condition": "strict.divisorAfter < shipped.divisorAfter"
+            },
+            {
+                "reason": "lower_reachable_threats",
+                "condition": "strict.divisorAfter === shipped.divisorAfter && strict.reachableThreatsAfter < shipped.reachableThreatsAfter"
+            }
+        ],
+        "fallback": "Return the exact shipped decision object and publish shipped branch events when no ordered reason matches.",
+        "malformedMetadata": "Fail closed to shipped and fail the integrity audit.",
+        "equalDivisorAndThreats": "Preserve shipped, including when strict and shipped merely choose alternate full-damage paths.",
+        "treatment": "v0.8 may select a dominance-qualified strict proposal; v0.8s remains shipped.",
+        "control": "v0.8 computes the identical catalogs, comparison, neutral telemetry, and RNG stream but always returns shipped; v0.8s remains shipped.",
+        "soleBehaviorDifference": "The v0.8 dominance selector-off control environment key.",
+        "defaultEnabled": false
+    },
+    "geometry": {
+        "cohort": "hybrid",
+        "amountMode": "expBudget",
+        "mode": "both",
+        "livetwin": true,
+        "pairedSideSwap": true,
+        "symmetricRosters": true,
+        "moveShots": 0,
+        "decisionOrigin": "root",
+        "diagnostics": true,
+        "researchUnbounded": true,
+        "m4WorkersPerArm": 6,
+        "m4ConcurrentArms": 2,
+        "remoteWorkersPerProcess": 6,
+        "remoteConcurrentProcesses": 8
+    },
+    "seedAllocation": {
+        "masterHex": "0xA11D0A51",
+        "masterUnsigned": 2703034961,
+        "pairStrideHex": "0x9e3779b1",
+        "pairStrideUnsigned": 2654435761,
+        "formula": "pairSeed(i) = (masterUnsigned + i * pairStrideUnsigned) mod 2^32",
+        "lanes": {
+            "pilot": {
+                "baseSeed": 2703034961,
+                "pairIndices": [0, 999],
+                "pairSeedClusters": 1000,
+                "gamesPerArm": 2000
+            },
+            "scout": {
+                "baseSeed": 2849007033,
+                "pairIndices": [1000, 4999],
+                "pairSeedClusters": 4000,
+                "gamesPerArm": 8000
+            },
+            "confirmation": {
+                "baseSeed": 3432895321,
+                "pairIndices": [5000, 14999],
+                "pairSeedClusters": 10000,
+                "gamesPerArm": 20000
+            },
+            "remotePrimary": {
+                "gamesPerArm": 40000,
+                "pairSeedClusters": 20000,
+                "shards": [
+                    {
+                        "baseSeed": 597648745,
+                        "pairIndices": [15000, 19999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 1327509105,
+                        "pairIndices": [20000, 24999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 2057369465,
+                        "pairIndices": [25000, 29999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 2787229825,
+                        "pairIndices": [30000, 34999],
+                        "gamesPerArm": 10000
+                    }
+                ]
+            },
+            "bounded": {
+                "baseSeed": 3517090185,
+                "pairIndices": [35000, 38999],
+                "pairSeedClusters": 4000,
+                "gamesPerArm": 8000
+            }
+        },
+        "disjointnessProof": {
+            "method": "The odd stride is invertible modulo 2^32. Prior bases were converted to the same pair-index cycle and compared with the reserved new index interval.",
+            "reservedNewPairIndices": [0, 38999],
+            "nearestPriorLaneDistancePairSteps": 518882161,
+            "priorBasesChecked": [
+                8241200, 92373000, 92374500, 92376000, 92377500, 10134723, 10144723, 10154723, 10164723, 10174723,
+                3561465089, 3707437161, 4145353377, 215316261, 580246441, 945176621, 1310106801
+            ],
+            "overlaps": 0
+        }
+    },
+    "statistics": {
+        "causalContrast": "Treatment minus matched selector-off control.",
+        "cluster": "Independent pair-seed cluster containing the two physical-seat swaps.",
+        "confidenceInterval": "Two-sided 95% Student-t interval over pair-seed cluster means.",
+        "physicalSeats": ["candidate-green", "candidate-red"],
+        "m4PhasesAreScreeningOnly": true,
+        "crossPhasePoolingForbidden": true
+    },
+    "gates": {
+        "pilot": {
+            "exposure": {
+                "strictEligibleMinimum": 40,
+                "dominanceProposalsMinimum": 3,
+                "retainedActualDifferencesMinimum": 2,
+                "zeroDominanceDisposition": "not-testable-stop"
+            },
+            "scoreDeltaPointPpMinimum": -0.5,
+            "eachSeatDeltaPointPpMinimum": -1,
+            "armageddonDeltaPointPpMaximum": 0.1,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0.02
+        },
+        "scout": {
+            "exposure": {
+                "strictEligibleMinimum": 160,
+                "dominanceProposalsMinimum": 20,
+                "retainedActualDifferencesMinimum": 15,
+                "retainedActualDifferencesPerSeatMinimum": 4
+            },
+            "scoreDeltaPointPpMinimum": 0,
+            "scoreDeltaLower95PpMinimum": -0.15,
+            "eachSeatDeltaPointPpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.1,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.03
+        },
+        "confirmation": {
+            "exposure": {
+                "strictEligibleMinimum": 400,
+                "dominanceProposalsMinimum": 50,
+                "retainedActualDifferencesMinimum": 40,
+                "retainedActualDifferencesPerSeatMinimum": 12,
+                "retainedActualDifferencesPerEnabledReasonMinimum": 3
+            },
+            "scoreDeltaPointPpMinimum": 0.05,
+            "scoreDeltaLower95PpMinimum": -0.05,
+            "directTreatmentScorePercentMinimum": 50,
+            "directTreatmentScoreLower95PercentMinimum": 49.9,
+            "eachSeatDeltaPointPpMinimum": 0,
+            "eachSeatDeltaLower95PpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.05,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.02
+        },
+        "remotePrimary": {
+            "exposure": {
+                "strictEligibleMinimum": 800,
+                "dominanceProposalsMinimum": 100,
+                "retainedActualDifferencesMinimum": 80,
+                "retainedActualDifferenceGamesMinimum": 65,
+                "retainedActualDifferencesPerSeatMinimum": 25,
+                "retainedActualDifferencesPerEnabledReasonMinimum": 5
+            },
+            "scoreDeltaPointPpMinimum": 0.05,
+            "scoreDeltaLower95PpStrictlyGreaterThan": 0,
+            "directTreatmentScorePercentMinimum": 50,
+            "directTreatmentScoreLower95PercentMinimum": 49.9,
+            "eachSeatDeltaPointPpMinimum": 0,
+            "eachSeatDeltaLower95PpMinimum": -0.05,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.025,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.01,
+            "nonnegativeScoreShardMinimum": 3,
+            "shardCount": 4,
+            "perShardScoreDeltaPointPpMinimum": -0.1,
+            "perShardArmageddonDeltaPointPpMaximum": 0.05,
+            "perShardMeanLapDeltaPointMaximum": 0.02
+        },
+        "bounded": {
+            "exposure": {
+                "strictEligibleMinimum": 160,
+                "dominanceProposalsMinimum": 20,
+                "retainedActualDifferencesMinimum": 15,
+                "retainedActualDifferencesPerSeatMinimum": 4
+            },
+            "scoreDeltaPointPpMinimum": 0,
+            "scoreDeltaLower95PpMinimum": -0.1,
+            "eachSeatDeltaPointPpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.1,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.03,
+            "extraRejectedActionsMaximum": 0,
+            "extraDeadlineFallbacksMaximum": 0,
+            "extraCircuitOpensMaximum": 0,
+            "materialP95LatencyRegressionAllowed": false
+        }
+    },
+    "telemetryRequirements": {
+        "neutralComparisonInBothArms": ["strict-eligible", "dominance-condition-true", "dominance-filtered"],
+        "perComparison": [
+            "ordered reason",
+            "strict and shipped action summaries",
+            "strict divisor and reachable-threat metadata",
+            "shipped divisor and reachable-threat metadata or explicit no-advance",
+            "physical seat",
+            "actor",
+            "target",
+            "lap"
+        ],
+        "selectedStrictEvents": "Treatment only when dominance is true and selector is enabled.",
+        "actualDifferenceDefinition": "Strict and shipped completed decision summaries differ; identical actions never count as causal exposure."
+    },
+    "integrityGates": [
+        "Frozen clean source head/tree and recomputed manifest fingerprints.",
+        "Complete unique game IDs and exact pair-seed formula.",
+        "Treatment/control geometry identical.",
+        "Exact shared arm/environment allowlist and sole selector-off behavior difference.",
+        "Shipped-first then strict catalog order and equal RNG tails.",
+        "Control selects zero strict actions and emits zero selected strict/difference events.",
+        "All selected strict events satisfy their recorded dominance reason and strict safety invariants.",
+        "Malformed, nonfinite, negative, or inconsistent metadata fails closed and fails integrity.",
+        "Exact shipped decision and branch telemetry when dominance is false.",
+        "Every outcome, lap, or Armageddon difference has a dominance proposal.",
+        "No-proposal games have identical core records; normalized records differ only by neutral diagnostics.",
+        "Zero rejected actions, stuck endings, turn caps, or other non-elimination endings."
+    ],
+    "noPeekAndStopRule": {
+        "duringPhase": "Inspect process liveness and record counts only. Do not open records, summaries, result lines, or one-arm statistics until both arms finish.",
+        "prePeekFailure": "Discard both arms and restart both on the same lane.",
+        "postPeekFailure": "The lane is burned.",
+        "gateFailure": "Stop the candidate. Do not launch the next phase.",
+        "underexposure": "Stop as underexposed; never extend adaptively or call it a pass.",
+        "codeConfigThresholdChange": "Creates a new candidate with a new seed master and preregistration.",
+        "forbidden": [
+            "optional stopping",
+            "cross-phase pooling",
+            "seed cherry-picking",
+            "post-hoc subgroup rescue",
+            "launching remote before confirmation passes",
+            "launching bounded before remote passes"
+        ]
+    },
+    "promotionMeaning": {
+        "pilotScoutConfirmation": "Screening only.",
+        "remotePrimary": "Positive causal research qualification only.",
+        "remotePlusBounded": "Required before default readiness.",
+        "globalNearZeroArmageddonClaim": "Not tested by this feature-specific protocol.",
+        "projectileEndpointClaim": "Out of scope; this strategy experiment cannot validate renderer projectile endpoints."
+    }
+}

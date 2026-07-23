@@ -30,11 +30,13 @@ export type {
     IPlacementContext,
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
+    IV08SupportedBandDominanceComparisonDetails,
     IV08SupportedBandDuelDecisionSummary,
     IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
+    V08SupportedBandDominanceReason,
     V08SupportedBandDuelDifference,
 } from "./ai_strategy";
 

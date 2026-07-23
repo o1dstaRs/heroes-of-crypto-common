@@ -15,6 +15,7 @@ import type {
     IAIPolicyEvent,
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
+    IV08SupportedBandDominanceComparisonDetails,
     IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
     IV08SupportedRangedEscapeDetails,
@@ -704,6 +705,220 @@ describe("measure_mirror_cohorts", () => {
         expect(Object.values(aggregate.versions["v0.8s"].supportedBandAdvanceFunnelPerGame)).toEqual(
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 0),
         );
+    });
+
+    test("tracks supported-band dominance comparisons, reasons, retention, and side swaps", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const sourceDetails: IV08SupportedBandDominanceComparisonDetails[] = [];
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            const controlTeam = candidateTeam === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+            const emitPair = (team: typeof GREEN_TEAM | typeof RED_TEAM, selectDominant: boolean): void => {
+                const dominantDetails: IV08SupportedBandDominanceComparisonDetails = {
+                    selected: selectDominant,
+                    dominant: true,
+                    metadataValid: true,
+                    reason: "lower_reachable_threats",
+                    targetId: "duel-target",
+                    targetCreatureName: "Band target",
+                    strict: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 2, y: 1 }],
+                        moveTargetCells: [{ x: 2, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                    shipped: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 1, y: 1 }],
+                        moveTargetCells: [{ x: 1, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                    strictDivisorAfter: 1,
+                    strictReachableThreatsAfter: 0,
+                    shippedDivisorAfter: 1,
+                    shippedReachableThreatsAfter: 1,
+                };
+                const filteredDetails: IV08SupportedBandDominanceComparisonDetails = {
+                    ...dominantDetails,
+                    selected: false,
+                    dominant: false,
+                    reason: "filtered",
+                    strict: {
+                        ...dominantDetails.strict,
+                        actionTypes: [...dominantDetails.strict.actionTypes],
+                        movePath: dominantDetails.strict.movePath?.map((cell) => ({ ...cell })) ?? null,
+                        moveTargetCells: dominantDetails.strict.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
+                        rangeAimCell: dominantDetails.strict.rangeAimCell
+                            ? { ...dominantDetails.strict.rangeAimCell }
+                            : null,
+                    },
+                    shipped: {
+                        ...dominantDetails.shipped,
+                        actionTypes: [...dominantDetails.shipped.actionTypes],
+                        movePath: dominantDetails.shipped.movePath?.map((cell) => ({ ...cell })) ?? null,
+                        moveTargetCells: dominantDetails.shipped.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
+                        rangeAimCell: dominantDetails.shipped.rangeAimCell
+                            ? { ...dominantDetails.shipped.rangeAimCell }
+                            : null,
+                    },
+                    shippedReachableThreatsAfter: 0,
+                };
+                const retained: IAIPolicyEvent = {
+                    kind: "v0.8_supported_band_dominance_comparison",
+                    unitId: `dominance-retained-${team}`,
+                    creatureName: "Arbalester",
+                    team,
+                    lap: 3,
+                    details: dominantDetails,
+                };
+                const replaced: IAIPolicyEvent = {
+                    kind: "v0.8_supported_band_dominance_comparison",
+                    unitId: `dominance-replaced-${team}`,
+                    creatureName: "Elf",
+                    team,
+                    lap: 4,
+                    details: filteredDetails,
+                };
+                sourceDetails.push(dominantDetails, filteredDetails);
+                config.policyProposalObserver?.(retained);
+                config.policyProposalObserver?.(replaced);
+                config.policyEventObserver?.(retained);
+            };
+            emitPair(candidateTeam, true);
+            emitPair(controlTeam, false);
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        records.forEach((record, game) => {
+            const candidate = record.diag!.green.version === "v0.8" ? record.diag!.green : record.diag!.red;
+            const control = record.diag!.green.version === "v0.8s" ? record.diag!.green : record.diag!.red;
+            expect(candidate).toMatchObject({
+                supportedBandDominanceEligibleComparisons: 2,
+                supportedBandDominanceDominantComparisons: 1,
+                supportedBandDominanceFilteredComparisons: 1,
+                supportedBandDominanceSelectedComparisons: 1,
+                supportedBandDominanceInvalidComparisons: 0,
+                supportedBandDominanceComparisonsByReason: {
+                    no_shipped_advance: 0,
+                    lower_divisor: 0,
+                    lower_reachable_threats: 1,
+                    filtered: 1,
+                },
+            });
+            expect(control).toMatchObject({
+                supportedBandDominanceEligibleComparisons: 2,
+                supportedBandDominanceDominantComparisons: 1,
+                supportedBandDominanceFilteredComparisons: 1,
+                supportedBandDominanceSelectedComparisons: 0,
+                supportedBandDominanceInvalidComparisons: 0,
+                supportedBandDominanceComparisonsByReason: {
+                    no_shipped_advance: 0,
+                    lower_divisor: 0,
+                    lower_reachable_threats: 1,
+                    filtered: 1,
+                },
+            });
+            expect(record.supportedBandDominanceComparisonEvents?.map(({ retained }) => retained)).toEqual([
+                true,
+                false,
+                true,
+                false,
+            ]);
+            expect(record.supportedBandDominanceComparisonEvents?.[0]).toMatchObject({
+                ...sourceDetails[game * 4],
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: `dominance-retained-${record.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM}`,
+                creatureName: "Arbalester",
+                lap: 3,
+                retained: true,
+            });
+            expect(record.supportedBandDominanceComparisonEvents?.[0]?.strict).not.toBe(
+                sourceDetails[game * 4]!.strict,
+            );
+            expect(record.supportedBandDominanceComparisonEvents?.[0]?.shipped.movePath).not.toBe(
+                sourceDetails[game * 4]!.shipped.movePath,
+            );
+            expect(record.supportedBandDominanceComparisonEvents?.[2]).toMatchObject({
+                selected: false,
+                dominant: true,
+                reason: "lower_reachable_threats",
+                side: record.greenVersion === "v0.8s" ? "green" : "red",
+                retained: true,
+            });
+        });
+        expect(records[0].supportedBandDominanceComparisonEvents?.[0]?.side).toBe("green");
+        expect(records[1].supportedBandDominanceComparisonEvents?.[0]?.side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedBandDominanceEligibleComparisons: number;
+                    supportedBandDominanceEligibleComparisonsPerGame: number;
+                    supportedBandDominanceDominantComparisons: number;
+                    supportedBandDominanceDominantComparisonsPerGame: number;
+                    supportedBandDominanceFilteredComparisons: number;
+                    supportedBandDominanceFilteredComparisonsPerGame: number;
+                    supportedBandDominanceSelectedComparisons: number;
+                    supportedBandDominanceSelectedComparisonsPerGame: number;
+                    supportedBandDominanceInvalidComparisons: number;
+                    supportedBandDominanceInvalidComparisonsPerGame: number;
+                    supportedBandDominanceComparisonsByReason: Record<string, number>;
+                    supportedBandDominanceComparisonsByReasonPerGame: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedBandDominanceEligibleComparisons: 4,
+            supportedBandDominanceEligibleComparisonsPerGame: 2,
+            supportedBandDominanceDominantComparisons: 2,
+            supportedBandDominanceDominantComparisonsPerGame: 1,
+            supportedBandDominanceFilteredComparisons: 2,
+            supportedBandDominanceFilteredComparisonsPerGame: 1,
+            supportedBandDominanceSelectedComparisons: 2,
+            supportedBandDominanceSelectedComparisonsPerGame: 1,
+            supportedBandDominanceInvalidComparisons: 0,
+            supportedBandDominanceInvalidComparisonsPerGame: 0,
+            supportedBandDominanceComparisonsByReason: {
+                no_shipped_advance: 0,
+                lower_divisor: 0,
+                lower_reachable_threats: 2,
+                filtered: 2,
+            },
+            supportedBandDominanceComparisonsByReasonPerGame: {
+                no_shipped_advance: 0,
+                lower_divisor: 0,
+                lower_reachable_threats: 1,
+                filtered: 1,
+            },
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedBandDominanceEligibleComparisons: 4,
+            supportedBandDominanceEligibleComparisonsPerGame: 2,
+            supportedBandDominanceDominantComparisons: 2,
+            supportedBandDominanceDominantComparisonsPerGame: 1,
+            supportedBandDominanceFilteredComparisons: 2,
+            supportedBandDominanceFilteredComparisonsPerGame: 1,
+            supportedBandDominanceSelectedComparisons: 0,
+            supportedBandDominanceSelectedComparisonsPerGame: 0,
+            supportedBandDominanceInvalidComparisons: 0,
+            supportedBandDominanceInvalidComparisonsPerGame: 0,
+            supportedBandDominanceComparisonsByReason: {
+                no_shipped_advance: 0,
+                lower_divisor: 0,
+                lower_reachable_threats: 2,
+                filtered: 2,
+            },
+            supportedBandDominanceComparisonsByReasonPerGame: {
+                no_shipped_advance: 0,
+                lower_divisor: 0,
+                lower_reachable_threats: 1,
+                filtered: 1,
+            },
+        });
     });
 
     test("tracks strict-vs-shipped decision differences through search retention and side swaps", () => {
