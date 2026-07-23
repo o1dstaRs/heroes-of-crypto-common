@@ -579,6 +579,39 @@ describe("v0.8 protected ranged positioning", () => {
         });
     });
 
+    it("releases the stronger-ranged hold for the full five-lap finishing runway", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_MODE = "ranged_superior_hold";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+
+        const runAtLap = (lap: number): { actions: string[]; reasons: string[] } => {
+            const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+            context.decisionOrigin = "root";
+            while (context.fightProperties!.getCurrentLap() < lap) {
+                context.fightProperties!.flipLap();
+            }
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            return {
+                actions: new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type),
+                reasons: events.flatMap((event) =>
+                    event.kind === "v0.8_protected_advance_guardrail" ? [event.details.reason] : [],
+                ),
+            };
+        };
+
+        expect(runAtLap(V08_DOMINANT_FINISH_START_LAP - 1)).toEqual({
+            actions: ["range_attack"],
+            reasons: ["ranged_superior_hold"],
+        });
+        expect(runAtLap(V08_DOMINANT_FINISH_START_LAP)).toEqual({
+            actions: ["move_unit", "range_attack"],
+            reasons: [],
+        });
+    });
+
     it("selects protected-advance guardrail reasons independently while both preserves priority", () => {
         process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
