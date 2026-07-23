@@ -130,6 +130,7 @@ export interface IV08SupportedBandAdvanceDetails extends IV08SupportedPrepinEgre
 }
 
 export type V08ProtectedAdvanceGuardrailReason = "ranged_superior_hold" | "partial_band";
+export type V08ProtectedAdvanceGuardrailMode = "both" | "catalog_only" | V08ProtectedAdvanceGuardrailReason;
 
 /** Detached incumbent proposal that a live-root guardrail converted back to the original ranged shot. */
 export interface IV08ProtectedAdvanceGuardrailDetails {

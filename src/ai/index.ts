@@ -31,6 +31,7 @@ export type {
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
     IV08SupportedPrepinEgressDetails,
+    V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
 } from "./ai_strategy";
 

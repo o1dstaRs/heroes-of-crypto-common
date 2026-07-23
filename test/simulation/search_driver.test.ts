@@ -90,6 +90,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE",
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_INCLUDE_MOVES",
@@ -1737,6 +1738,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
         expect(summary.pureRangedParetoNoMeleeFocusExpectedDamage as number).toBeGreaterThan(0);
         expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThan(1);
+        expect(summary).not.toHaveProperty("pureRangedParetoNoMeleeFocusScope");
 
         expectEngineAcceptsProductiveDecision(h, chosen);
     });
@@ -1772,6 +1774,84 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "0.89",
         });
         expect(() => h.makeDriver()).toThrow("must be between 0.9 and 1");
+
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "everywhere",
+        });
+        expect(() => h.makeDriver()).toThrow("must be pure_ranged or any_board");
+
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "any_board",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "0.95",
+        });
+        expect(() => h.makeDriver()).toThrow("requires damage floor 1");
+    });
+
+    it("selects strict Pareto focus only for production v0.8 on a mixed original board", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-any-board-")), "search.jsonl");
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "any_board",
+            // Even an over-broad direct env cannot allow the source alias to select this widened arm.
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8,v0.8s",
+            SEARCH_AUDIT: audit,
+        });
+        const mixedRoster: readonly IArmyUnitSpec[] = [
+            ...pureRangedParetoFocusRoster(),
+            { faction: "Life", creatureName: "Peasant", level: 1, size: 1, amount: 20 },
+        ];
+        const h = buildBattle(10_317, "v0.8", undefined, mixedRoster);
+        const { actor, primary, noMelee } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const controlIncumbent = plainAim(actor, primary);
+        expect(driver.chooseDecision(actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const candidateIncumbent = plainAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", candidateIncumbent);
+        expect(chosen).not.toBe(candidateIncumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(noMelee.getId());
+
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            pureRangedParetoNoMeleeFocusScope: "any_board",
+            pureRangedParetoNoMeleeFocusDamageFloor: 1,
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
+            pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
+        });
+        expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("gives both mixed-board seats the same strict target-covered catalog", () => {
+        setEnv({
+            ...pureRangedParetoFocusEnvironment,
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "any_board",
+            SEARCH_MAX_SHOTS: "1",
+        });
+        const mixedRoster: readonly IArmyUnitSpec[] = [
+            ...pureRangedParetoFocusRoster(),
+            { faction: "Life", creatureName: "Peasant", level: 1, size: 1, amount: 20 },
+        ];
+        const h = buildBattle(10_318, "v0.8", undefined, mixedRoster);
+        const { actor, primary } = positionParetoFocusFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const calls = captureCandidates(driver);
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+        };
+        intercepted.firstEngineValidCandidate = () => undefined;
+
+        driver.chooseDecision(actor, "v0.8s", plainAim(actor, primary));
+        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+
+        expect(calls).toHaveLength(2);
+        expect(normalize(calls[1])).toEqual(normalize(calls[0]));
+        expect(calls[0].filter((candidate) => candidate.kind === "shot").length).toBeGreaterThan(1);
     });
 
     it("does not let Pareto focus bypass an already-open search circuit", () => {

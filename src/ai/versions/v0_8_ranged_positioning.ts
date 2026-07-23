@@ -25,6 +25,7 @@ import { canUnitLandAt } from "../ai";
 import type {
     IAIPolicyEvent,
     IDecisionContext,
+    V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
@@ -48,6 +49,7 @@ const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ON
 const SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS";
 const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
 const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
+const PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE";
 const PROTECTED_ADVANCE_GUARDRAILS_VERSIONS_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
@@ -1082,19 +1084,27 @@ function protectedAdvanceShot(
     return protectedAdvanceShotCatalog(unit, context, decision, responseNeutralAdvance).decision;
 }
 
-function protectedAdvanceGuardrailsActive(context: IDecisionContext, strategyVersion: string): boolean {
+function protectedAdvanceGuardrailsMode(
+    context: IDecisionContext,
+    strategyVersion: string,
+): V08ProtectedAdvanceGuardrailMode | undefined {
     if (
         process.env[PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV] !== "1" ||
         process.env[PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV] !== "1" ||
         context.decisionOrigin !== "root"
     ) {
-        return false;
+        return undefined;
     }
-    return (process.env[PROTECTED_ADVANCE_GUARDRAILS_VERSIONS_ENV] ?? "")
+    const versionSelected = (process.env[PROTECTED_ADVANCE_GUARDRAILS_VERSIONS_ENV] ?? "")
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean)
         .includes(strategyVersion);
+    if (!versionSelected) return undefined;
+    const mode = process.env[PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV] ?? "both";
+    return mode === "both" || mode === "catalog_only" || mode === "partial_band" || mode === "ranged_superior_hold"
+        ? mode
+        : undefined;
 }
 
 /**
@@ -1109,6 +1119,7 @@ function protectedAdvanceShotWithGuardrails(
     context: IDecisionContext,
     decision: GameAction[],
     responseNeutralAdvance: boolean,
+    mode: V08ProtectedAdvanceGuardrailMode,
 ): GameAction[] {
     const legacyEvents: IAIPolicyEvent[] = [];
     const catalog = protectedAdvanceShotCatalog(
@@ -1118,11 +1129,19 @@ function protectedAdvanceShotWithGuardrails(
         responseNeutralAdvance,
     );
     const metadata = catalog.metadata;
+    // A deterministic factorial control: enter the same live-root wrapper and consume the same catalog/RNG,
+    // but publish no veto proposal and return the incumbent catalog decision untouched.
+    if (mode === "catalog_only") {
+        for (const event of legacyEvents) context.policyEventObserver?.(event);
+        return catalog.decision;
+    }
     let reason: V08ProtectedAdvanceGuardrailReason | undefined;
     if (metadata && !metadata.finishActive) {
-        if (metadata.ownRangedOutput > metadata.enemyRangedOutput) {
+        const rangedSuperiorHold = metadata.ownRangedOutput > metadata.enemyRangedOutput;
+        const partialBand = !Number.isFinite(metadata.divisorAfter) || metadata.divisorAfter !== 1;
+        if ((mode === "both" || mode === "ranged_superior_hold") && rangedSuperiorHold) {
             reason = "ranged_superior_hold";
-        } else if (!Number.isFinite(metadata.divisorAfter) || metadata.divisorAfter !== 1) {
+        } else if ((mode === "both" || mode === "partial_band") && partialBand) {
             reason = "partial_band";
         }
     }
@@ -1366,12 +1385,18 @@ export function prioritizeV08RangedPositioning(
         process.env[SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV] === "1" &&
         bandAdvanceLegacyControlVersions.size > 0 &&
         (bandAdvanceSelectorVersions.has(strategyVersion) || bandAdvanceLegacyControlVersions.has(strategyVersion));
-    const protectedAdvanceGuardrails = protectedAdvanceGuardrailsActive(context, strategyVersion);
+    const protectedAdvanceGuardrailMode = protectedAdvanceGuardrailsMode(context, strategyVersion);
     const advanced = bandAdvanceVsLegacy
         ? supportedBandAdvanceVsLegacy(unit, context, decision, strategyVersion, responseNeutralAdvance)
         : !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
-          ? protectedAdvanceGuardrails
-              ? protectedAdvanceShotWithGuardrails(unit, context, decision, responseNeutralAdvance)
+          ? protectedAdvanceGuardrailMode
+              ? protectedAdvanceShotWithGuardrails(
+                    unit,
+                    context,
+                    decision,
+                    responseNeutralAdvance,
+                    protectedAdvanceGuardrailMode,
+                )
               : protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
           : decision;
     const retreated =
