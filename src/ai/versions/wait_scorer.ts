@@ -154,12 +154,16 @@ export interface IWaitWeights {
  * distribution its training labels came from. Every scored wait the engine would then reject anyway is
  * the alreadyHourglass desync seam (ranked-skip-rejections); Gate-1 measured 0 across 14k games.
  */
-export function canWaitOnHourglassMirror(unit: Unit, fightProperties: FightProperties): boolean {
+export function canWaitOnHourglassMirror(
+    unit: Unit,
+    fightProperties: FightProperties,
+    allUnits: ReadonlyMap<string, Unit>,
+): boolean {
     const team = unit.getTeam();
     const id = unit.getId();
     return (
         (team === LOWER || team === UPPER) &&
-        fightProperties.getTeamUnitsAlive(team) > 1 &&
+        fightProperties.hasUnactedTeammate(team, id, allUnits) &&
         !fightProperties.hourglassIncludes(id) &&
         !fightProperties.hasAlreadyMadeTurn(id) &&
         !fightProperties.hasAlreadyHourglass(id)
@@ -183,7 +187,7 @@ export function incumbentRuleWaits(
         return false; // hourglass is a melee-unit tool in the incumbent rule (V05_HG_RANGED default)
     }
     const isCharge = incumbent.some((a) => a.type === "melee_attack" && Array.isArray(a.path) && a.path.length > 0);
-    if (!isCharge || !canWaitOnHourglassMirror(unit, fightProperties)) {
+    if (!isCharge || !canWaitOnHourglassMirror(unit, fightProperties, unitsHolder.getAllUnits())) {
         return false;
     }
     return fmExposureOf(unit, unitsHolder, fightProperties) >= INCUMBENT_FM_THRESHOLD;
@@ -769,7 +773,7 @@ export function applyWaitScorerWeights(
     if (incumbent.some((a) => a.type === "wait_turn")) {
         return incumbent; // keep policy waits — the oracle's degenerate {wait, wait} handling
     }
-    if (!canWaitOnHourglassMirror(unit, fightProperties)) {
+    if (!canWaitOnHourglassMirror(unit, fightProperties, context.unitsHolder.getAllUnits())) {
         return incumbent; // not a wait-eligible decision point
     }
     if (!waitScorerInSupport(unit, context.unitsHolder)) {
@@ -802,7 +806,7 @@ export function applyWaitScorerWeightsV2(
     if (incumbent.some((a) => a.type === "wait_turn")) {
         return incumbent; // keep policy waits — the oracle's degenerate {wait, wait} handling
     }
-    if (!canWaitOnHourglassMirror(unit, fightProperties)) {
+    if (!canWaitOnHourglassMirror(unit, fightProperties, context.unitsHolder.getAllUnits())) {
         return incumbent; // not a wait-eligible decision point
     }
     const features = extractWaitFeaturesV2(unit, context.unitsHolder, fightProperties, incumbent);
@@ -841,7 +845,7 @@ export function applyWaitScorerWeightsV3(
     if (!waitV3CanReplaceIncumbentKind(waitIncumbentKindOf(incumbent))) {
         return incumbent;
     }
-    if (!canWaitOnHourglassMirror(unit, fightProperties)) {
+    if (!canWaitOnHourglassMirror(unit, fightProperties, context.unitsHolder.getAllUnits())) {
         return incumbent;
     }
     const features = extractWaitFeaturesV3(unit, context.unitsHolder, fightProperties, incumbent);

@@ -181,6 +181,26 @@ export class FightProperties {
     public hasAlreadyMadeTurn(unitId: string): boolean {
         return this.alreadyMadeTurn.has(unitId);
     }
+    /**
+     * Whether another living unit on `teamType` still has its real turn pending in this lap.
+     * Hourglassed units count because waiting does not mark their turn complete.
+     */
+    public hasUnactedTeammate(teamType: TeamType, currentUnitId: string, allUnits: ReadonlyMap<string, Unit>): boolean {
+        if ((this.teamUnitsAlive.get(teamType) ?? 0) <= 1) {
+            return false;
+        }
+        for (const [unitId, unit] of allUnits) {
+            if (
+                unitId !== currentUnitId &&
+                !unit.isDead() &&
+                unit.getTeam() === teamType &&
+                !this.alreadyMadeTurn.has(unitId)
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
     public hasAlreadyHourglass(unitId: string): boolean {
         return this.alreadyHourglass.has(unitId);
     }

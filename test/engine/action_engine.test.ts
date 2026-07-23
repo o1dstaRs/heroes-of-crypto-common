@@ -350,6 +350,26 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hourglassIncludes(setup.lower.getId())).toBe(false);
     });
 
+    it("rejects hourglass when every living teammate already completed its turn this lap", () => {
+        const setup = setupActionFight();
+        setup.fightProperties.addAlreadyMadeTurn(
+            PBTypes.TeamVals.LOWER,
+            setup.lowerSupport.getId(),
+            setup.fightProperties.getCurrentTurnStart(),
+        );
+
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+
+        expect(result).toEqual({
+            completed: false,
+            events: [],
+            rejectionReason: "hourglass_not_available",
+            message: undefined,
+        });
+        expect(setup.lower.isOnHourglass()).toBe(false);
+        expect(setup.fightProperties.hourglassIncludes(setup.lower.getId())).toBe(false);
+    });
+
     it("rejects actions for units that are not currently active", () => {
         const setup = setupActionFight();
 

@@ -248,7 +248,7 @@ export function playMirrorGame(
                   }
                   return;
               }
-              if (!fp || !canWaitOnHourglassMirror(obs.unit, fp)) {
+              if (!fp || !canWaitOnHourglassMirror(obs.unit, fp, obs.context.unitsHolder.getAllUnits())) {
                   return;
               }
               side.eligible += 1;

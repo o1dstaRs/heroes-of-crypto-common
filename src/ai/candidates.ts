@@ -495,7 +495,7 @@ class CandidateGenerator {
         if (
             !fp ||
             (team !== LOWER && team !== UPPER) ||
-            fp.getTeamUnitsAlive(team) <= 1 ||
+            !fp.hasUnactedTeammate(team, id, this.context.unitsHolder.getAllUnits()) ||
             fp.hourglassIncludes(id) ||
             fp.hasAlreadyMadeTurn(id) ||
             fp.hasAlreadyHourglass(id)

@@ -1636,7 +1636,7 @@ export class SearchDriver {
      * applicability domain is EXACTLY the domain the oracle's training labels came from.
      */
     private canHourglass(unit: Unit): boolean {
-        return canWaitOnHourglassMirror(unit, this.deps.fightProperties);
+        return canWaitOnHourglassMirror(unit, this.deps.fightProperties, this.deps.unitsHolder.getAllUnits());
     }
     /** The dataset featurization: v1 (41 dims) by default, WAIT_FEATURE_NAMES_V2_RAW (49) under Q2_DATASET_V2=1. */
     private datasetFeaturesOf(unit: Unit, incumbent: readonly GameAction[]): number[] {
