@@ -708,7 +708,8 @@
                     <p class="lede">
                         A measured optimization sequence for reducing per-turn simulation cost on an M4 Max, preserving
                         deterministic ranked behavior, and buying enough headroom to evaluate horizons beyond 12 unit
-                        turns. Workstream 1—the ranged-ray traversal—is implemented locally and audited in depth.
+                        turns. The ranged-ray candidate remains under release gates; pathfinding and aura-refresh
+                        workstreams now have sealed, qualifying local results.
                     </p>
                     <div class="badges">
                         <span class="badge">Revision 2026-07-22</span>
@@ -722,16 +723,16 @@
                     <dl>
                         <dt>Workstreams</dt>
                         <dd>8</dd>
-                        <dt>Active</dt>
-                        <dd>#1 ray traversal</dd>
-                        <dt>Differential rays</dt>
-                        <dd>2,744,145</dd>
-                        <dt>Mismatches</dt>
-                        <dd style="color: var(--green)">0</dd>
-                        <dt>Mixed micro speedup</dt>
-                        <dd>11.07×</dd>
-                        <dt>Ranked outer replay</dt>
-                        <dd style="color: var(--green)">6/6 exact · f02e base</dd>
+                        <dt>Latest qualified</dt>
+                        <dd>#3 aura refresh</dd>
+                        <dt>Exact boundaries</dt>
+                        <dd style="color: var(--green)">40/40</dd>
+                        <dt>Deep fuzz events</dt>
+                        <dd style="color: var(--green)">12,288</dd>
+                        <dt>Aura median reduction</dt>
+                        <dd>37.19%</dd>
+                        <dt>Next</dt>
+                        <dd>#4 shared catalog</dd>
                     </dl>
                 </aside>
             </div>
@@ -1076,18 +1077,21 @@
                                 <tr>
                                     <td>3</td>
                                     <td><strong>Aura invalidation</strong></td>
-                                    <td>Dirty emitters/recipients and cached static coverage masks.</td>
                                     <td>
-                                        Full-refresh oracle parity through movement, death, dispel, and stat changes.
+                                        Cached static coverage plus a fail-closed exact unchanged-state fingerprint.
                                     </td>
-                                    <td><span class="status queued">Next</span></td>
+                                    <td>
+                                        40/40 sealed exact boundaries; 37.19% median aura reduction; deep differential
+                                        pass.
+                                    </td>
+                                    <td><span class="status done">Qualified</span></td>
                                 </tr>
                                 <tr>
                                     <td>4</td>
                                     <td><strong>Shared candidate/path catalog</strong></td>
                                     <td>Compute reachability and attack geometry once per decision state.</td>
                                     <td>Exact candidate set, ordering, metadata, and selected action.</td>
-                                    <td><span class="status queued">Ready after #3</span></td>
+                                    <td><span class="status queued">Next</span></td>
                                 </tr>
                                 <tr>
                                     <td>5</td>
@@ -1767,9 +1771,9 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                     <div class="eyebrow">Workstreams 2–8</div>
                     <h2>Precise follow-on plan</h2>
                     <p class="section-intro">
-                        Workstream 2 now has a sealed baseline, differential oracle, and qualifying M4 Max result.
-                        Workstreams 3–8 remain implementation hypotheses until they receive the same treatment. Keep
-                        each landed slice attributable, deterministic, and independently reversible.
+                        Workstreams 2 and 3 now have sealed baselines, differential oracles, and qualifying M4 Max
+                        results. Workstreams 4–8 remain implementation hypotheses until they receive the same treatment.
+                        Keep each landed slice attributable, deterministic, and independently reversible.
                     </p>
 
                     <article class="workstream">
@@ -1909,54 +1913,146 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                             <div>
                                 <h3>3 · Aura coverage and dirty invalidation</h3>
                                 <p>
-                                    Stop rebuilding every aura relation after events that cannot affect most emitters.
+                                    Avoid rebuilding the aura relation graph when every refresh-relevant value is
+                                    unchanged.
                                 </p>
                             </div>
-                            <span class="status queued">Next</span>
+                            <span class="status done">Qualified · 37.19%</span>
                         </div>
                         <div class="grid-3">
                             <div>
                                 <h4>Implementation slice</h4>
                                 <ul>
-                                    <li>
-                                        Precompute geometry masks only by grid schema, emitter footprint/base cell,
-                                        range, and aura shape; keep team, active-state, source, recipient eligibility,
-                                        stacking, and stat calculation outside that static key.
+                                    <li class="done">
+                                        Cache ordered geometry only by immutable <code>GridSettings</code> identity,
+                                        safe source cell, and integer range.
                                     </li>
-                                    <li>
-                                        Track dirty emitters and recipients on movement, death/revive, dispel, team
-                                        bonus, and ability state.
+                                    <li class="done">
+                                        Keep the public geometry result caller-owned; expose a frozen shared view only
+                                        to the production refresh loop.
                                     </li>
-                                    <li>
-                                        Separate geometric membership from per-target applicability/stat calculation.
+                                    <li class="done">
+                                        Fingerprint unit order, geometry, aura definitions, team bonuses, eligibility,
+                                        stack/luck power inputs, and applied effect state using exact primitive values.
+                                    </li>
+                                    <li class="done">
+                                        Skip only an exact match; use the old full refresh as the forced oracle and for
+                                        every malformed or unknown shape.
+                                    </li>
+                                    <li class="done">
+                                        Snapshot the dynamic fingerprint and known-empty marker beside the derived aura
+                                        map.
                                     </li>
                                 </ul>
                             </div>
                             <div>
                                 <h4>Exact oracle</h4>
                                 <ul>
-                                    <li>
-                                        Run current full refresh beside incremental refresh after every randomized
-                                        event.
+                                    <li class="done">
+                                        Compare exact Float64 state and ordering against a forced full refresh after
+                                        every event.
                                     </li>
-                                    <li>
-                                        Compare applied aura IDs, source, properties, order, stack stats, and removal
-                                        timing.
+                                    <li class="done">
+                                        Run 64 deterministic seeds × 192 mixed events: movement, Break, cleanse,
+                                        eligibility, power/range, deletion/reinsertion, and no-op.
                                     </li>
-                                    <li>
-                                        Cover multi-aura emitters, large units, death chains, summon, cleanse, and team
-                                        bonuses.
+                                    <li class="done">
+                                        Hand-check team bonus changes, stolen/restored auras, large units, dead and
+                                        off-grid units, public live-array mutation, malformed parallel arrays, and
+                                        snapshot restore.
+                                    </li>
+                                    <li class="done">
+                                        Exhaust every 16×16 source through range four and preserve malformed/custom
+                                        geometry fallbacks, ordering, mutation ownership, and cache isolation.
                                     </li>
                                 </ul>
                             </div>
                             <div>
                                 <h4>Exit gate</h4>
                                 <ul>
-                                    <li>Zero state-hash differences through long randomized event sequences.</li>
-                                    <li>At least 30% lower aura-scope CPU on aura-dense rosters.</li>
-                                    <li>No stale effect survives a source/recipient invalidation event.</li>
+                                    <li class="done">0 differences at 40/40 sealed semantic boundaries.</li>
+                                    <li class="done">0 differences through 12,288 deep randomized events.</li>
+                                    <li class="done">37.19% median reduction; bootstrap 95% interval 36.61–38.10%.</li>
+                                    <li class="done">p95/p99 ratio upper bounds 0.610/0.600.</li>
                                 </ul>
                             </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <caption class="sr-only">
+                                    Workstream 3 sealed local aura-refresh benchmark
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">31-block paired workload</th>
+                                        <th scope="col" class="num">Median</th>
+                                        <th scope="col" class="num">p95</th>
+                                        <th scope="col" class="num">p99</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Forced full-refresh baseline</td>
+                                        <td class="num">113.22 µs</td>
+                                        <td class="num">129.54 µs</td>
+                                        <td class="num">133.70 µs</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Conditional candidate · 50% dirty / 50% no-op</td>
+                                        <td class="num">71.11 µs</td>
+                                        <td class="num">73.13 µs</td>
+                                        <td class="num">73.90 µs</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Candidate / baseline</strong></td>
+                                        <td class="num"><strong>0.628</strong></td>
+                                        <td class="num"><strong>0.565</strong></td>
+                                        <td class="num"><strong>0.553</strong></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="grid-2">
+                            <div class="callout good">
+                                <h4>Why this slice</h4>
+                                <p>
+                                    A primitive fingerprint scan is still O(units + effects), but it is far cheaper than
+                                    cleaning, rebuilding, deduplicating, and reapplying every relation. It also avoids a
+                                    distributed invalidation-hook matrix while the mutation surface is still changing.
+                                    Dirty calls remain full refreshes, with only static geometry reuse; a later
+                                    per-emitter delta system must beat this simpler qualified base.
+                                </p>
+                                <p>
+                                    Split timing makes the tradeoff concrete: an invalidated refresh is about 10.43%
+                                    slower, while a true no-op is about 92.06% cheaper. The simple median model crosses
+                                    over near a 10.18% no-op rate. The sealed qualification workload is 50/50; an
+                                    always-dirty workload regresses and is not hidden by the aggregate result.
+                                </p>
+                            </div>
+                            <div class="callout warn">
+                                <h4>Observable compatibility boundary</h4>
+                                <p>
+                                    A no-op preserves aura-related object identities where the oracle reallocates them.
+                                    No retained-reference consumer was found in common, client, or server. Native game
+                                    objects are covered; injected proxies/throwing getters and runtime mutation of a
+                                    readonly <code>GridSettings</code> instance are explicitly unsupported.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="callout">
+                            <p>
+                                Canonical evidence IDs — baseline source
+                                <code>df09407517a74cebfd8177571aed8bf1cc67b6568570ac7cd3351b00bf546b48</code>; candidate
+                                source <code>9b2b76ad9d7d8eb8676b38c07f10cd67aaa881a1b0898cbd2276c0c7f233becd</code>;
+                                conservative measured runner
+                                <code>ea6f3df05f3fafe372631c827ac1e6fba8bde8e0aae6b6539d8bf011c851d637</code>; current
+                                split-instrumented runner
+                                <code>1ff7f4b5371bc5ab485f6a923ccd902370a82fc3d6a92c03ee19bc8be01145be</code>; compact
+                                evidence
+                                <a href="./evidence/a13_aura_refresh_2026-07-22.json"
+                                    >a13_aura_refresh_2026-07-22.json</a
+                                >. This is a local microbenchmark qualification, not a deployed ranked result.
+                            </p>
                         </div>
                     </article>
 
@@ -1969,7 +2065,7 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                     queries.
                                 </p>
                             </div>
-                            <span class="status queued">#2 prerequisite met</span>
+                            <span class="status queued">Next</span>
                         </div>
                         <div class="grid-3">
                             <div>
@@ -2856,11 +2952,12 @@ bun test \
                                 </tr>
                                 <tr>
                                     <td>Incremental aura/path cache becomes stale.</td>
-                                    <td>Medium in future items</td>
+                                    <td>Low for qualified aura slice; medium for future partial caches</td>
                                     <td>Critical</td>
                                     <td>
-                                        Dual-run after every randomized event; clear on restore or key by a non-restored
-                                        monotonic epoch so sibling rollouts cannot collide.
+                                        Exact primitive fingerprint, forced-full fallback, snapshot the dynamic marker,
+                                        and dual-run after every randomized event. Future partial caches still require
+                                        an equally strong oracle.
                                     </td>
                                 </tr>
                                 <tr>
@@ -2943,6 +3040,17 @@ bun test \
                                     and
                                     <a href="./evidence/tools/a13_latency_panel.ts">frozen latency-panel runner</a>
                                     — retained executable evidence tools.
+                                </li>
+                                <li>
+                                    <a href="./evidence/a13_aura_refresh_2026-07-22.json"
+                                        >docs/evidence/a13_aura_refresh_2026-07-22.json</a
+                                    >
+                                    and
+                                    <a href="./evidence/tools/a13_aura_pair_microbench.ts"
+                                        >the sealed aura A/B runner</a
+                                    >
+                                    — Workstream 3 source seals, exact traces, raw block timings, gates, and
+                                    compatibility waivers.
                                 </li>
                                 <li>
                                     <a href="./evidence/a13_ranked_outer_300_replay_2026-07-22.json"
