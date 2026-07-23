@@ -1,0 +1,145 @@
+{
+    "schema": "heroes-of-crypto/a13-melee-first-layer-replication-protocol/v1",
+    "protocolDate": "2026-07-23",
+    "status": "preregistered-before-six-capture-replication",
+    "baseline": {
+        "commit": "188452cad6ec718540b7c452a579ac3cea73a67f",
+        "srcTreeManifestSha256": "73f78af822eace14fbe63c22115922732e0255b431a24403bc8ec794aaf98369",
+        "aiSha256": "02f56c80806b28b29e393c07d77a83ebeb532b780440bc59897673b8268efe7d",
+        "decisionPathCatalogSha256": "03ca1f30bde3cf2177b1e6d0a5c86036fd08878f444b90fc497885c685096c7d",
+        "meleeTargetLayersSha256": "18114a5eb7205de721b2cd6788445b0c8ac352759d017b112813e177a9ebe069"
+    },
+    "candidate": {
+        "commit": "ce6719c37f2c6e56b95abdf9cbc2a966db5169a4",
+        "srcTreeManifestSha256": "1d6d25cf78d6c415b2492d3a8a7dcb033b920bb9a42030c588b785a94af1c15f",
+        "aiSha256": "84b1dee9f7178c195ac25cbc5f01b62b093cce3981883f1543fec99165dbc9c4",
+        "decisionPathCatalogSha256": "f10673fddaf8f09485aed7e272ec894bdb5f50261957895f4d4eb9072a3d502d",
+        "meleeTargetLayersSha256": "5235aed52cecce8f6c3d9be89dcbc38f76dc46cdb4b34f9042270f05245ed99e"
+    },
+    "runtimeDelta": [
+        {
+            "path": "ai/ai.ts",
+            "change": "modified",
+            "baselineSha256": "02f56c80806b28b29e393c07d77a83ebeb532b780440bc59897673b8268efe7d",
+            "candidateSha256": "84b1dee9f7178c195ac25cbc5f01b62b093cce3981883f1543fec99165dbc9c4"
+        },
+        {
+            "path": "ai/decision_path_catalog.ts",
+            "change": "modified",
+            "baselineSha256": "03ca1f30bde3cf2177b1e6d0a5c86036fd08878f444b90fc497885c685096c7d",
+            "candidateSha256": "f10673fddaf8f09485aed7e272ec894bdb5f50261957895f4d4eb9072a3d502d"
+        },
+        {
+            "path": "ai/internal/melee_target_layers.ts",
+            "change": "modified",
+            "baselineSha256": "18114a5eb7205de721b2cd6788445b0c8ac352759d017b112813e177a9ebe069",
+            "candidateSha256": "5235aed52cecce8f6c3d9be89dcbc38f76dc46cdb4b34f9042270f05245ed99e"
+        }
+    ],
+    "dependencyInputs": {
+        "packageJsonSha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001",
+        "workspaceLockSha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54",
+        "installedDependencyContentsSealed": false,
+        "limitation": "Package and workspace-lock bytes plus dependency realpaths are sealed. Installed dependency contents are not recursively hashed."
+    },
+    "predecessorEvidence": {
+        "reportSha256": "12a271c5cb190b1e2d7e8c36a7a14e7f09b14740ded08336020c7f3c92c20b9d",
+        "disposition": "qualified-predecessor-baseline-not-pooled",
+        "relationship": "Qualified fused-layer evidence for the baseline runtime; retained as provenance and never pooled into this first-layer replication."
+    },
+    "captureRunner": {
+        "schema": "heroes-of-crypto/a13-melee-first-layer-pair/v1",
+        "sha256": "8cebd3f2678214a2a22e3dae2536d73a5569dc6cf3ac9ceec1459a3250a7b53f"
+    },
+    "aggregationRunner": {
+        "schema": "heroes-of-crypto/a13-melee-first-layer-replication/v1",
+        "sha256": "7ba5f177bb6aa386fba3ac534b7e84ca5b5712a62c35a31b3e762cc5fe57b500"
+    },
+    "fixedWork": {
+        "aiVersion": "v0.8",
+        "captureCount": 6,
+        "tasksPerCapture": 80,
+        "totalTaskPairs": 480,
+        "maxLaps": 2,
+        "warmupSeed": 4294967295,
+        "bootstrapSeed": 2704611998,
+        "bootstrapSamples": 20000,
+        "bootstrapUnit": "crossed resampling of three original-order captures, three inverse-order captures, and twenty seed clusters; all four maps retained"
+    },
+    "captures": [
+        {
+            "id": "r0",
+            "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+            "gridTypes": [1, 2, 3, 4],
+            "invertOrder": false
+        },
+        {
+            "id": "r1",
+            "seeds": [20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+            "gridTypes": [4, 3, 2, 1],
+            "invertOrder": true
+        },
+        {
+            "id": "r2",
+            "seeds": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5],
+            "gridTypes": [2, 3, 4, 1],
+            "invertOrder": false
+        },
+        {
+            "id": "r3",
+            "seeds": [5, 4, 3, 2, 1, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6],
+            "gridTypes": [1, 4, 3, 2],
+            "invertOrder": true
+        },
+        {
+            "id": "r4",
+            "seeds": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            "gridTypes": [3, 4, 1, 2],
+            "invertOrder": false
+        },
+        {
+            "id": "r5",
+            "seeds": [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11],
+            "gridTypes": [2, 1, 4, 3],
+            "invertOrder": true
+        }
+    ],
+    "scheduleRule": {
+        "defaultOrder": "AB when (seed-list index + grid-list index) is even, otherwise BA",
+        "inversion": "--invert-order flips every measured and warmup AB/BA pair",
+        "balance": "Every (seed,map) task has exactly three AB and three BA observations. Traversal pairs r0/r1, r2/r3, and r4/r5 are exact reversals."
+    },
+    "estimator": {
+        "perTask": "sqrt(median(three AB candidate/baseline ratios) * median(three BA candidate/baseline ratios))",
+        "quantile": "Type-7 linear interpolation at p50, p95, and p99",
+        "bootstrap": "20,000 deterministic replicates. Resample three captures with replacement inside each inversion stratum and twenty seeds with replacement; retain all four maps.",
+        "interval": "Type-7 percentile interval [2.5%, 97.5%]",
+        "rawDataPolicy": "Retain every observation. Do not trim, winsorize, selectively rerun, or remove the slowest rows."
+    },
+    "gates": {
+        "exactTaskPairs": 480,
+        "semanticMismatches": 0,
+        "rejectedActions": 0,
+        "stuckMatches": 0,
+        "exceptions": 0,
+        "totalRatioBootstrapUpper95Maximum": 0.99,
+        "geometricRatioBootstrapUpper95MaximumExclusive": 1,
+        "robustP50MaximumExclusive": 1,
+        "robustP99MaximumExclusive": 1,
+        "robustP99BootstrapUpper95Maximum": 1.05,
+        "minimumRobustFasterTasks": 79,
+        "robustMaximumRatio": 1.05,
+        "orderTotalBootstrapUpper95MaximumExclusive": 1,
+        "perMapTotalRatioMaximum": 1.05,
+        "minimumFasterCaptures": 5,
+        "captureTotalRatioMaximum": 1.05
+    },
+    "stoppingRule": {
+        "validCaptures": "Run exactly r0 through r5; do not add captures after inspecting performance.",
+        "hostInvalidation": "Only an independently recorded, predeclared host-attestation failure may invalidate a complete capture. Retain the invalid artifact and permit at most one full-capture replacement attempt.",
+        "semanticOrSourceFailure": "A source, runner, profile, semantic, rejection, stuck, or exception failure ends the protocol; it is not replaceable.",
+        "performanceFailure": "Any failed performance gate after r5 leaves the optimization unqualified. Never rerun only a slow task.",
+        "r0ExitHandling": "R0 may exit nonzero after atomically writing a valid report when its legacy standalone performance gate fails. Continue only if that report exists and passes this aggregator; any pre-report failure stops the protocol.",
+        "operatorAttestation": "This offline aggregator cannot prove the absence of shadow attempts or establish chronology. Commit the protocol and runners before R0 and retain an external append-only attempt ledger with every artifact hash."
+    }
+}
