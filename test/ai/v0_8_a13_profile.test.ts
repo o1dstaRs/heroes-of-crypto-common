@@ -51,10 +51,12 @@ const ENV_KEYS = [
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS",
     "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+    "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE",
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "V08_PROTECTED_ADVANCE_GUARDRAILS",
     "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY",
+    "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE",
     "V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS",
     "V08_SUPPORTED_BAND_ADVANCE",
     "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS",
@@ -130,9 +132,11 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "1",
+            SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "pure_ranged",
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
             V08_PROTECTED_ADVANCE_GUARDRAILS: "0",
             V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY: "0",
+            V08_PROTECTED_ADVANCE_GUARDRAILS_MODE: "both",
             V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE: "0",
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
@@ -174,10 +178,12 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER = "1";
         process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = "1";
         process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR = "0.9";
+        process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE = "any_board";
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS = "1";
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = "v0.7";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_MODE = "partial_band";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.7";
         process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
         process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.6";
@@ -210,6 +216,7 @@ describe("v0.8 a13 production profile", () => {
             pureRangedDeadlineFinisher: boolean;
             pureRangedParetoNoMeleeFocus: boolean;
             pureRangedParetoNoMeleeFocusDamageFloor: number;
+            pureRangedParetoNoMeleeFocusScope: string;
             pureRangedJitNoMeleeFocus: boolean;
             pureRangedJitNoMeleeFocusVersions: ReadonlySet<string>;
             learnedV2: { b: number; w: number[] } | null;
@@ -239,6 +246,7 @@ describe("v0.8 a13 production profile", () => {
             pureRangedDeadlineFinisher: false,
             pureRangedParetoNoMeleeFocus: false,
             pureRangedParetoNoMeleeFocusDamageFloor: 1,
+            pureRangedParetoNoMeleeFocusScope: "pure_ranged",
             pureRangedJitNoMeleeFocus: false,
             caps: {
                 maxMoveDestinations: 1,
@@ -262,10 +270,12 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR).toBe("0.9");
+        expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE).toBe("any_board");
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS).toBe("v0.7");
         expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS).toBe("1");
         expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY).toBe("1");
+        expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_MODE).toBe("partial_band");
         expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS).toBe("v0.7");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE).toBe("1");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS).toBe("v0.6");

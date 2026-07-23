@@ -135,6 +135,22 @@ describe("v0.7 pure-ranged terminal value", () => {
         expect(pureRangedTerminalAdvantage(state, combat.unitsHolder, LOWER, 10)).toBe(0);
     });
 
+    it("captures fight-ready active ability names by value for later intrinsic-card checks", () => {
+        const lower = ranged(LOWER, { abilities: ["Through Shot"] });
+        const upper = ranged(UPPER, { abilities: ["No Melee"] });
+        const combat = board([lower], [upper]);
+        const state = capturePureRangedTerminalState(combat.unitsHolder, 1);
+
+        lower.deleteAbility("Through Shot");
+        lower.grantStolenAbility("Large Caliber");
+        upper.deleteAbility("No Melee");
+
+        expect(state.originalUnits.find(({ id }) => id === lower.getId())?.activeAbilityNames).toEqual([
+            "Through Shot",
+        ]);
+        expect(state.originalUnits.find(({ id }) => id === upper.getId())?.activeAbilityNames).toEqual(["No Melee"]);
+    });
+
     it("normalizes by the average initial army budget and is perspective-antisymmetric and bounded", () => {
         const lower = ranged(LOWER, { rangeShots: 4, damageMax: 12 });
         const upper = ranged(UPPER, { rangeShots: 4, damageMax: 8 });

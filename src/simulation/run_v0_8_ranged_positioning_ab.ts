@@ -21,6 +21,7 @@ import {
     V08_A13_PRODUCTION_VERSION,
     V08_A13_SOURCE_VERSION,
 } from "../ai/versions/v0_8_a13_profile";
+import type { V08ProtectedAdvanceGuardrailMode } from "../ai/ai_strategy";
 import { MIRROR_COHORTS, type MirrorCohortName } from "./measure_mirror_cohorts";
 import {
     PURE_RANGED_JIT_NO_MELEE_FOCUS_ACTIVATION_BUFFER,
@@ -28,6 +29,7 @@ import {
     PURE_RANGED_JIT_NO_MELEE_FOCUS_LAST_LAP,
     PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP,
 } from "./pure_ranged_jit_no_melee_focus";
+import type { PureRangedParetoNoMeleeFocusScope } from "./pure_ranged_pareto_no_melee_focus";
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 export const V08_RANGED_POSITIONING_AB_RUNNER = join(REPOSITORY_ROOT, "src/simulation/measure_mirror_cohorts.ts");
@@ -75,6 +77,8 @@ export interface IV08RangedPositioningABOptions {
     /** Enables identical target-covered catalogs for both seats without allowing either selector to fire. */
     paretoNoMeleeFocusCatalogOnly?: boolean;
     paretoNoMeleeFocusDamageFloor?: number;
+    /** Keeps the legacy all-ranged eligibility or catalogs the strict exact-Pareto arm across every board. */
+    paretoNoMeleeFocusScope?: PureRangedParetoNoMeleeFocusScope;
     jitNoMeleeFocus?: boolean;
     /** Enables the JIT arm's target-covered catalog for both seats while disabling its selector. */
     jitNoMeleeFocusCatalogOnly?: boolean;
@@ -94,6 +98,8 @@ export interface IV08RangedPositioningABOptions {
     supportedBandAdvanceVsLegacy?: boolean;
     /** Live-root post-catalog vetoes over shipped legacy; rollouts and v0.8s remain exact incumbent controls. */
     protectedAdvanceGuardrails?: boolean;
+    /** Selects both guardrails, an isolated reason, or the exact catalog-only control. */
+    protectedAdvanceGuardrailsMode?: V08ProtectedAdvanceGuardrailMode;
     diag?: boolean;
 }
 
@@ -113,7 +119,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v8";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v11";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -134,6 +140,7 @@ export interface IV08RangedPositioningABManifest {
         paretoNoMeleeFocus: boolean;
         paretoNoMeleeFocusCatalogOnly: boolean;
         paretoNoMeleeFocusDamageFloor: number;
+        paretoNoMeleeFocusScope: PureRangedParetoNoMeleeFocusScope;
         jitNoMeleeFocus: boolean;
         jitNoMeleeFocusCatalogOnly: boolean;
         jitNoMeleeFocusStartLap: number;
@@ -150,6 +157,7 @@ export interface IV08RangedPositioningABManifest {
         supportedBandAdvanceLiveOnly: boolean;
         supportedBandAdvanceVsLegacy: boolean;
         protectedAdvanceGuardrails: boolean;
+        protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -183,7 +191,13 @@ const isTimingMode = (value: string): value is V08RangedPositioningTimingMode =>
 const isMoveShotCap = (value: number): value is V08RangedPositioningMoveShots =>
     value === 0 || value === 1 || value === 2;
 
+const isProtectedAdvanceGuardrailMode = (value: string): value is V08ProtectedAdvanceGuardrailMode =>
+    value === "both" || value === "catalog_only" || value === "partial_band" || value === "ranged_superior_hold";
+
 const isParetoDamageFloor = (value: number): boolean => value === 0.9 || value === 0.95 || value === 1;
+
+const isParetoScope = (value: string): value is PureRangedParetoNoMeleeFocusScope =>
+    value === "pure_ranged" || value === "any_board";
 
 function validateBehaviorArmGeometry(
     mode: V08RangedPositioningMode,
@@ -226,7 +240,7 @@ function validateBehaviorArmGeometry(
         throw new Error("deadlineFinisher requires cohorts=pure_ranged, mode=off, and moveShots=0");
     }
     if (paretoNoMeleeFocus && (mode !== "off" || moveShots !== 0)) {
-        throw new Error("paretoNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
+        throw new Error("paretoNoMeleeFocus requires mode=off and moveShots=0");
     }
     if (jitNoMeleeFocus && (mode !== "off" || moveShots !== 0)) {
         throw new Error("jitNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -307,11 +321,23 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         throw new Error("paretoNoMeleeFocus and paretoNoMeleeFocusCatalogOnly are mutually exclusive");
     }
     const paretoDamageFloor = options.paretoNoMeleeFocusDamageFloor ?? 1;
+    const paretoScope = options.paretoNoMeleeFocusScope ?? "pure_ranged";
+    if (!isParetoScope(paretoScope)) {
+        throw new Error("paretoNoMeleeFocusScope must be pure_ranged or any_board");
+    }
     if (!isParetoDamageFloor(paretoDamageFloor)) {
         throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
     }
     if (!options.paretoNoMeleeFocus && paretoDamageFloor !== 1) {
         throw new Error("paretoNoMeleeFocusDamageFloor below 1 requires paretoNoMeleeFocus");
+    }
+    if (paretoScope === "any_board" && paretoDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocusDamageFloor=1");
+    }
+    if (paretoScope === "any_board" && !options.paretoNoMeleeFocus && !options.paretoNoMeleeFocusCatalogOnly) {
+        throw new Error(
+            "paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
+        );
     }
     if (options.jitNoMeleeFocus !== undefined && typeof options.jitNoMeleeFocus !== "boolean") {
         throw new Error("jitNoMeleeFocus must be a boolean");
@@ -399,6 +425,13 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.protectedAdvanceGuardrails !== undefined && typeof options.protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
     }
+    const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
+    if (!isProtectedAdvanceGuardrailMode(protectedAdvanceGuardrailsMode)) {
+        throw new Error("protectedAdvanceGuardrailsMode must be both|catalog_only|partial_band|ranged_superior_hold");
+    }
+    if (protectedAdvanceGuardrailsMode !== "both" && !options.protectedAdvanceGuardrails) {
+        throw new Error("a non-both protectedAdvanceGuardrailsMode requires protectedAdvanceGuardrails");
+    }
     validateBehaviorArmGeometry(
         options.mode,
         options.moveShots ?? 0,
@@ -421,6 +454,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     }
     if (
         (options.paretoNoMeleeFocus || options.paretoNoMeleeFocusCatalogOnly) &&
+        paretoScope === "pure_ranged" &&
         (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")
     ) {
         throw new Error("paretoNoMeleeFocus requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -516,7 +550,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v8" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v11" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -537,6 +571,7 @@ export function buildV08RangedPositioningABManifest(
             paretoNoMeleeFocus: options.paretoNoMeleeFocus ?? false,
             paretoNoMeleeFocusCatalogOnly: options.paretoNoMeleeFocusCatalogOnly ?? false,
             paretoNoMeleeFocusDamageFloor: options.paretoNoMeleeFocusDamageFloor ?? 1,
+            paretoNoMeleeFocusScope: options.paretoNoMeleeFocusScope ?? "pure_ranged",
             jitNoMeleeFocus: options.jitNoMeleeFocus ?? false,
             jitNoMeleeFocusCatalogOnly: options.jitNoMeleeFocusCatalogOnly ?? false,
             jitNoMeleeFocusStartLap: PURE_RANGED_JIT_NO_MELEE_FOCUS_START_LAP,
@@ -553,6 +588,7 @@ export function buildV08RangedPositioningABManifest(
             supportedBandAdvanceLiveOnly: options.supportedBandAdvanceLiveOnly ?? false,
             supportedBandAdvanceVsLegacy: options.supportedBandAdvanceVsLegacy ?? false,
             protectedAdvanceGuardrails: options.protectedAdvanceGuardrails ?? false,
+            protectedAdvanceGuardrailsMode: options.protectedAdvanceGuardrailsMode ?? "both",
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -597,6 +633,8 @@ export function buildV08RangedPositioningABEnvironment(
     supportedBandAdvanceLiveOnly = false,
     supportedBandAdvanceVsLegacy = false,
     protectedAdvanceGuardrails = false,
+    protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode = "both",
+    paretoNoMeleeFocusScope: PureRangedParetoNoMeleeFocusScope = "pure_ranged",
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -613,8 +651,19 @@ export function buildV08RangedPositioningABEnvironment(
     if (!isParetoDamageFloor(paretoNoMeleeFocusDamageFloor)) {
         throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
     }
+    if (!isParetoScope(paretoNoMeleeFocusScope)) {
+        throw new Error("paretoNoMeleeFocusScope must be pure_ranged or any_board");
+    }
     if (!paretoNoMeleeFocus && paretoNoMeleeFocusDamageFloor !== 1) {
         throw new Error("paretoNoMeleeFocusDamageFloor below 1 requires paretoNoMeleeFocus");
+    }
+    if (paretoNoMeleeFocusScope === "any_board" && paretoNoMeleeFocusDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocusDamageFloor=1");
+    }
+    if (paretoNoMeleeFocusScope === "any_board" && !paretoNoMeleeFocus && !paretoNoMeleeFocusCatalogOnly) {
+        throw new Error(
+            "paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
+        );
     }
     if (typeof jitNoMeleeFocus !== "boolean") throw new Error("jitNoMeleeFocus must be a boolean");
     if (typeof jitNoMeleeFocusCatalogOnly !== "boolean") {
@@ -670,6 +719,12 @@ export function buildV08RangedPositioningABEnvironment(
     if (typeof protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
     }
+    if (!isProtectedAdvanceGuardrailMode(protectedAdvanceGuardrailsMode)) {
+        throw new Error("protectedAdvanceGuardrailsMode must be both|catalog_only|partial_band|ranged_superior_hold");
+    }
+    if (protectedAdvanceGuardrailsMode !== "both" && !protectedAdvanceGuardrails) {
+        throw new Error("a non-both protectedAdvanceGuardrailsMode requires protectedAdvanceGuardrails");
+    }
     validateBehaviorArmGeometry(
         mode,
         moveShots,
@@ -709,6 +764,7 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS = paretoNoMeleeFocusCatalogOnly
         ? "catalog-only-control"
         : V08_A13_PRODUCTION_VERSION;
+    environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE = paretoNoMeleeFocusScope;
     if (paretoNoMeleeFocus) {
         environment.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR = String(paretoNoMeleeFocusDamageFloor);
     }
@@ -742,6 +798,7 @@ export function buildV08RangedPositioningABEnvironment(
           : "";
     environment.V08_PROTECTED_ADVANCE_GUARDRAILS = protectedAdvanceGuardrails ? "1" : "0";
     environment.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = protectedAdvanceGuardrails ? "1" : "0";
+    environment.V08_PROTECTED_ADVANCE_GUARDRAILS_MODE = protectedAdvanceGuardrailsMode;
     environment.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = protectedAdvanceGuardrails
         ? V08_A13_PRODUCTION_VERSION
         : "";
@@ -791,6 +848,8 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedBandAdvanceLiveOnly ?? false,
         options.supportedBandAdvanceVsLegacy ?? false,
         options.protectedAdvanceGuardrails ?? false,
+        options.protectedAdvanceGuardrailsMode ?? "both",
+        options.paretoNoMeleeFocusScope ?? "pure_ranged",
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -874,6 +933,7 @@ export async function runV08RangedPositioningAB(
     const paretoNoMeleeFocus = options.paretoNoMeleeFocus ?? false;
     const paretoNoMeleeFocusCatalogOnly = options.paretoNoMeleeFocusCatalogOnly ?? false;
     const paretoNoMeleeFocusDamageFloor = options.paretoNoMeleeFocusDamageFloor ?? 1;
+    const paretoNoMeleeFocusScope = options.paretoNoMeleeFocusScope ?? "pure_ranged";
     const jitNoMeleeFocus = options.jitNoMeleeFocus ?? false;
     const jitNoMeleeFocusCatalogOnly = options.jitNoMeleeFocusCatalogOnly ?? false;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
@@ -886,6 +946,7 @@ export async function runV08RangedPositioningAB(
     const supportedBandAdvanceLiveOnly = options.supportedBandAdvanceLiveOnly ?? false;
     const supportedBandAdvanceVsLegacy = options.supportedBandAdvanceVsLegacy ?? false;
     const protectedAdvanceGuardrails = options.protectedAdvanceGuardrails ?? false;
+    const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
@@ -895,6 +956,7 @@ export async function runV08RangedPositioningAB(
                 `deadlineFinisher=${deadlineFinisher} paretoNoMeleeFocus=${paretoNoMeleeFocus} ` +
                 `paretoCatalogOnly=${paretoNoMeleeFocusCatalogOnly} ` +
                 `paretoDamageFloor=${paretoNoMeleeFocusDamageFloor} ` +
+                `paretoScope=${paretoNoMeleeFocusScope} ` +
                 `jitNoMeleeFocus=${jitNoMeleeFocus} jitCatalogOnly=${jitNoMeleeFocusCatalogOnly} ` +
                 `supportedRangedDelta=${supportedRangedDelta} ` +
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
@@ -906,6 +968,7 @@ export async function runV08RangedPositioningAB(
                 `supportedBandLiveOnly=${supportedBandAdvanceLiveOnly} ` +
                 `supportedBandVsLegacy=${supportedBandAdvanceVsLegacy} ` +
                 `protectedAdvanceGuardrails=${protectedAdvanceGuardrails} ` +
+                `protectedAdvanceGuardrailsMode=${protectedAdvanceGuardrailsMode} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         await prepareInvocation(invocation);
@@ -936,6 +999,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "pareto-no-melee-focus": { type: "boolean", default: false },
             "pareto-catalog-only": { type: "boolean", default: false },
             "pareto-damage-floor": { type: "string", default: "1" },
+            "pareto-scope": { type: "string", default: "pure_ranged" },
             "jit-no-melee-focus": { type: "boolean", default: false },
             "jit-catalog-only": { type: "boolean", default: false },
             "supported-ranged-delta": { type: "boolean", default: false },
@@ -948,6 +1012,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-band-live-only": { type: "boolean", default: false },
             "supported-band-vs-legacy": { type: "boolean", default: false },
             "protected-advance-guardrails": { type: "boolean", default: false },
+            "protected-advance-guardrails-mode": { type: "string", default: "both" },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -958,11 +1023,21 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
     const timingMode = values.timing!;
     const moveShots = Number(values["move-shots"]);
     const paretoNoMeleeFocusDamageFloor = Number(values["pareto-damage-floor"]);
+    const paretoNoMeleeFocusScope = values["pareto-scope"]!;
+    const protectedAdvanceGuardrailsMode = values["protected-advance-guardrails-mode"]!;
     if (!isPositioningMode(mode)) throw new Error("--mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) {
         throw new Error("--timing must be research_unbounded|operational_bounded");
     }
     if (!isMoveShotCap(moveShots)) throw new Error("--move-shots must be 0|1|2");
+    if (!isParetoScope(paretoNoMeleeFocusScope)) {
+        throw new Error("--pareto-scope must be pure_ranged|any_board");
+    }
+    if (!isProtectedAdvanceGuardrailMode(protectedAdvanceGuardrailsMode)) {
+        throw new Error(
+            "--protected-advance-guardrails-mode must be both|catalog_only|partial_band|ranged_superior_hold",
+        );
+    }
     const options: IV08RangedPositioningABOptions = {
         cohorts: normalizeV08RangedPositioningCohorts(values.cohorts!),
         games: Number(values.games),
@@ -977,6 +1052,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         paretoNoMeleeFocus: values["pareto-no-melee-focus"]!,
         paretoNoMeleeFocusCatalogOnly: values["pareto-catalog-only"]!,
         paretoNoMeleeFocusDamageFloor,
+        paretoNoMeleeFocusScope,
         jitNoMeleeFocus: values["jit-no-melee-focus"]!,
         jitNoMeleeFocusCatalogOnly: values["jit-catalog-only"]!,
         supportedRangedDelta: values["supported-ranged-delta"]!,
@@ -989,6 +1065,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedBandAdvanceLiveOnly: values["supported-band-live-only"]!,
         supportedBandAdvanceVsLegacy: values["supported-band-vs-legacy"]!,
         protectedAdvanceGuardrails: values["protected-advance-guardrails"]!,
+        protectedAdvanceGuardrailsMode,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -1003,12 +1080,14 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
+                "[--pareto-scope pure_ranged|any_board] " +
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
                 "[--supported-ranged-delta] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
                 "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy] " +
                 "[--supported-band-live-only] " +
                 "[--protected-advance-guardrails] " +
+                "[--protected-advance-guardrails-mode both|catalog_only|partial_band|ranged_superior_hold] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;

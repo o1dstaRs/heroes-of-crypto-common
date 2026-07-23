@@ -17,7 +17,10 @@ import {
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     rankPureRangedParetoNoMeleeFocusCandidates,
 } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
-import type { PureRangedTerminalState } from "../../src/simulation/v0_7_pure_ranged_terminal";
+import {
+    capturePureRangedTerminalState,
+    type PureRangedTerminalState,
+} from "../../src/simulation/v0_7_pure_ranged_terminal";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
@@ -106,7 +109,11 @@ function fixture(actorAbilities: readonly string[] = ["Through Shot"]): IFixture
     const state: PureRangedTerminalState = {
         eligible: true,
         initialScale: 1,
-        originalUnits: [actor, primary, noMelee].map((unit) => ({ id: unit.getId(), team: unit.getTeam() })),
+        originalUnits: [actor, primary, noMelee].map((unit) => ({
+            id: unit.getId(),
+            team: unit.getTeam(),
+            activeAbilityNames: unit.getAbilities().map((ability) => ability.getName()),
+        })),
     };
     return {
         actor,
@@ -276,5 +283,163 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
                 1,
             ),
         ).toEqual([]);
+    });
+
+    it("widens exact Pareto to mixed boards only under the explicit any-board scope", () => {
+        const f = fixture(["Large Caliber"]);
+        const mixedState = { ...f.state, eligible: false };
+
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(f.actor, f.unitsHolder, [f.incumbent, f.focus], mixedState, 3),
+        ).toEqual([]);
+        const [selected] = rankPureRangedParetoNoMeleeFocusCandidates(
+            f.actor,
+            f.unitsHolder,
+            [f.incumbent, f.focus],
+            mixedState,
+            3,
+            1,
+            "any_board",
+        );
+        expect(selected).toMatchObject({
+            candidate: f.focus,
+            actorAbility: "large_caliber",
+            noMeleeTargetId: f.noMelee.getId(),
+            minimumDamageRatio: 1.2,
+        });
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, f.focus],
+                mixedState,
+                3,
+                0.95,
+                "any_board",
+            ),
+        ).toEqual([]);
+    });
+
+    it("requires original native living actors and intrinsic-active No-Melee targets on any board", () => {
+        const missingActor = fixture();
+        const actorOmitted = {
+            ...missingActor.state,
+            eligible: false,
+            originalUnits: missingActor.state.originalUnits.filter(({ id }) => id !== missingActor.actor.getId()),
+        };
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                missingActor.actor,
+                missingActor.unitsHolder,
+                [missingActor.incumbent, missingActor.focus],
+                actorOmitted,
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+
+        const inactiveActor = fixture();
+        inactiveActor.actor.disableAbilityAsStolen("Through Shot");
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                inactiveActor.actor,
+                inactiveActor.unitsHolder,
+                [inactiveActor.incumbent, inactiveActor.focus],
+                { ...inactiveActor.state, eligible: false },
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+
+        const inactiveTarget = fixture();
+        inactiveTarget.noMelee.disableAbilityAsStolen("No Melee");
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                inactiveTarget.actor,
+                inactiveTarget.unitsHolder,
+                [inactiveTarget.incumbent, inactiveTarget.focus],
+                { ...inactiveTarget.state, eligible: false },
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+
+        const combination = fixture(["Through Shot", "Large Caliber"]);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                combination.actor,
+                combination.unitsHolder,
+                [combination.incumbent, combination.focus],
+                { ...combination.state, eligible: false },
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+    });
+
+    it("does not let post-capture stolen grants masquerade as intrinsic any-board cards", () => {
+        const grantedActor = fixture([]);
+        const beforeActorGrant = capturePureRangedTerminalState(grantedActor.unitsHolder, 1);
+        grantedActor.actor.grantStolenAbility("Through Shot");
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                grantedActor.actor,
+                grantedActor.unitsHolder,
+                [grantedActor.incumbent, grantedActor.focus],
+                { ...beforeActorGrant, eligible: false },
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+
+        const grantedTarget = fixture();
+        grantedTarget.noMelee.deleteAbility("No Melee");
+        const beforeTargetGrant = capturePureRangedTerminalState(grantedTarget.unitsHolder, 1);
+        grantedTarget.noMelee.grantStolenAbility("No Melee");
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                grantedTarget.actor,
+                grantedTarget.unitsHolder,
+                [grantedTarget.incumbent, grantedTarget.focus],
+                { ...beforeTargetGrant, eligible: false },
+                1,
+                1,
+                "any_board",
+            ),
+        ).toEqual([]);
+
+        const intrinsic = fixture(["Large Caliber"]);
+        const intrinsicSnapshot = capturePureRangedTerminalState(intrinsic.unitsHolder, 1);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                intrinsic.actor,
+                intrinsic.unitsHolder,
+                [intrinsic.incumbent, intrinsic.focus],
+                { ...intrinsicSnapshot, eligible: false },
+                1,
+                1,
+                "any_board",
+            )[0]?.candidate,
+        ).toBe(intrinsic.focus);
+    });
+
+    it("keeps the legacy pure-ranged default path identical to an explicit pure-ranged scope", () => {
+        const f = fixture();
+        expect(rank(f, [f.incumbent, f.focus])).toEqual(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                f.actor,
+                f.unitsHolder,
+                [f.incumbent, f.focus],
+                f.state,
+                1,
+                1,
+                "pure_ranged",
+            ),
+        );
     });
 });

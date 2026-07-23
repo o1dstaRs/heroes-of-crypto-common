@@ -144,6 +144,7 @@ export function buildV08A13SearchEnvironment(
         SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS: version,
         SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS: "0",
         SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR: "1",
+        SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "pure_ranged",
         SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: version,
         SEARCH_PURE_RANGED_TERMINAL_WEIGHT: "0",
         SEARCH_ROLLOUTS: String(V08_A13_SEARCH.rollouts),
@@ -167,6 +168,7 @@ export function buildV08A13SearchEnvironment(
         // sealed default-off; the paired runner supplies all three gates together for its live-root arm.
         V08_PROTECTED_ADVANCE_GUARDRAILS: "0",
         V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY: "0",
+        V08_PROTECTED_ADVANCE_GUARDRAILS_MODE: "both",
         V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS: "",
         V08_SUPPORTED_BAND_ADVANCE: "0",
         V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",

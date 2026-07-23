@@ -18,6 +18,8 @@ import type { UnitsHolder } from "../units/units_holder";
 export interface PureRangedTerminalOriginalUnit {
     readonly id: string;
     readonly team: TeamType;
+    /** Active cards captured at fight-ready; optional so historical/manual snapshots remain source-compatible. */
+    readonly activeAbilityNames?: readonly string[];
 }
 
 export interface PureRangedTerminalState {
@@ -94,7 +96,11 @@ export function capturePureRangedTerminalState(unitsHolder: UnitsHolder, current
             continue;
         }
         const team = unit.getTeam();
-        originalUnits.push({ id: unit.getId(), team });
+        originalUnits.push({
+            id: unit.getId(),
+            team,
+            activeAbilityNames: unit.getAbilities().map((ability) => ability.getName()),
+        });
         if (team !== LOWER && team !== UPPER) {
             allRanged = false;
             continue;
