@@ -349,6 +349,7 @@ function setupProactiveScreenedClose(
 function setupSupportedBandAdvance(
     options: {
         destination?: XY;
+        guardCell?: XY;
         guardRanged?: boolean;
         includeGuard?: boolean;
         shotDistance?: number;
@@ -356,6 +357,7 @@ function setupSupportedBandAdvance(
         targetCanCounter?: boolean;
         targetRanged?: boolean;
         targetAmount?: number;
+        targetAbilities?: string[];
         targetMaxHp?: number;
         withActedReachableThreat?: boolean;
         withCurrentPinner?: boolean;
@@ -391,6 +393,7 @@ function setupSupportedBandAdvance(
         damageMax: 1,
         amountAlive: options.targetAmount ?? 20,
         maxHp: options.targetMaxHp ?? 20,
+        abilities: options.targetAbilities ?? [],
     });
     const destination = options.destination ?? { x: 5, y: 6 };
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 7 });
@@ -406,7 +409,7 @@ function setupSupportedBandAdvance(
             rangeShots: options.guardRanged ? 1 : 0,
         });
         // Offset from the firing ray, but strictly between the proposed destination and the target.
-        placeUnit(combat.grid, combat.unitsHolder, guard, { x: 6, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, guard, options.guardCell ?? { x: 6, y: 5 });
     }
 
     const context = decisionContext(combat);
@@ -674,7 +677,7 @@ describe("v0.8 protected ranged positioning", () => {
         ).not.toContain("zero_exposure_route");
     });
 
-    it("requires a strict close and a strictly improved exact damage divisor", () => {
+    it("requires a strict close into full damage rather than merely a better partial band", () => {
         process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
         process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
 
@@ -701,6 +704,53 @@ describe("v0.8 protected ranged positioning", () => {
             .map(({ stage }) => stage);
         expect(sameBandStages).toContain("retained_signature");
         expect(sameBandStages).not.toContain("damage_band_improved");
+
+        const partialBand = setupSupportedBandAdvance({
+            destination: { x: 5, y: 5 },
+            guardCell: { x: 6, y: 4 },
+            shotDistance: 3,
+            targetAbilities: ["No Melee"],
+        });
+        partialBand.context.decisionOrigin = "root";
+        const partialBandEvents: IAIPolicyEvent[] = [];
+        partialBand.context.policyEventObserver = (event) => partialBandEvents.push(event);
+        const partialBandActions = new StrategyV0_8().decideTurn(partialBand.shooter, partialBand.context);
+        expect(partialBandActions.map((action) => action.type)).toEqual(["range_attack"]);
+        const partialBandShot = partialBandActions[0];
+        if (
+            partialBandShot?.type !== "range_attack" ||
+            !partialBandShot.aimCell ||
+            partialBandShot.aimSide === undefined
+        ) {
+            throw new Error("expected retained ordinary shot");
+        }
+        const partialOrigin = getPositionForCell(
+            partialBand.destination,
+            testGridSettings.getMinX(),
+            testGridSettings.getStep(),
+            testGridSettings.getHalfStep(),
+        );
+        const currentAim = getRangeAttackSideCenter(
+            testGridSettings,
+            partialBandShot.aimCell,
+            partialBandShot.aimSide,
+            partialBand.shooter.getPosition(),
+        );
+        const partialAim = getRangeAttackSideCenter(
+            testGridSettings,
+            partialBandShot.aimCell,
+            partialBandShot.aimSide,
+            partialOrigin,
+        );
+        expect([
+            partialBand.context.attackHandler!.getRangeAttackDivisor(partialBand.shooter, currentAim),
+            partialBand.context.attackHandler!.getRangeAttackDivisor(partialBand.shooter, partialAim, partialOrigin),
+        ]).toEqual([4, 2]);
+        const partialBandStages = partialBandEvents
+            .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+            .map(({ stage }) => stage);
+        expect(partialBandStages).toContain("retained_signature");
+        expect(partialBandStages).not.toContain("damage_band_improved");
     });
 
     it("holds every stronger ranged line before finish, including against zero enemy ranged output", () => {

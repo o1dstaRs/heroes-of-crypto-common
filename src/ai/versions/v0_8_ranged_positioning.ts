@@ -582,7 +582,8 @@ function supportedBandAdvanceActiveHere(context: IDecisionContext): boolean {
  * same route catalog (and therefore consume the same seeded path tie-breaks); only the selector-scoped seat may
  * retain the proposal. A move is eligible only when a native melee guard remains interposed, every living enemy is
  * outside its optimistic next-activation melee horizon, the exact shot signature is unchanged, and the primary
- * target crosses into a strictly better ranged damage band.
+ * target reaches the full-damage ranged band. The earlier 4x-to-2x trial created an Armageddon by lengthening a
+ * losing fight; requiring a 1x destination keeps the observed 2x-to-1x tempo wins and removes that partial close.
  */
 function supportedBandAdvance(
     unit: Unit,
@@ -761,7 +762,9 @@ function supportedBandAdvance(
         }
         hasRetainedSignatureRoute = true;
         const divisor = candidateEvaluation.rangeAttackDivisors[0];
-        if (divisor === undefined || !Number.isFinite(divisor) || divisor >= currentDivisor) continue;
+        if (divisor === undefined || !Number.isFinite(divisor) || divisor >= currentDivisor || divisor !== 1) {
+            continue;
+        }
         hasImprovedBandRoute = true;
         if (!best || preferAdvance(view, divisor, best, bestDivisor)) {
             best = view;
