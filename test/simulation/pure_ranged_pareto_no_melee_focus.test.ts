@@ -51,6 +51,7 @@ function shot(
         enemy?: number;
         friendly?: number;
         primary?: number;
+        aim?: number;
     } = {},
 ): IEnumeratedCandidate {
     const enemy = overrides.enemy ?? 120;
@@ -71,6 +72,7 @@ function shot(
             enemyDamage: enemy,
             friendlyFireDamage: friendly,
             primaryTargetDamage: overrides.primary ?? enemy,
+            aimTargetDamage: overrides.aim ?? overrides.primary ?? enemy,
             targetFirepower: 0,
             targetLevel: 1,
             targetIsRanged: 1,
@@ -214,6 +216,54 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
         expect(selected.enemyDamageRatio).toBe(1.2);
         expect(selected.netDamageRatio).toBe(1.2);
         expect(selected.minimumDamageRatio).toBeGreaterThanOrEqual(1);
+    });
+
+    it("uses declared-target damage for an intentional line/AOE aim whose metadata names the first hit", () => {
+        for (const ability of ["Through Shot", "Large Caliber"] as const) {
+            const f = fixture([ability]);
+            const canonicalized = {
+                ...f.focus,
+                targetId: f.primary.getId(),
+                shotFeatures: {
+                    ...f.focus.shotFeatures!,
+                    primaryTargetDamage: 25,
+                    aimTargetDamage: 60,
+                },
+            };
+            const [selected] = rank(f, [f.incumbent, canonicalized]);
+
+            expect(selected.candidate).toBe(canonicalized);
+            expect(selected.noMeleeTargetId).toBe(f.noMelee.getId());
+            expect(selected.expectedNoMeleeDamage).toBe(60);
+            expect(selected.candidate.actions.find((action) => action.type === "range_attack")?.targetId).toBe(
+                f.noMelee.getId(),
+            );
+        }
+    });
+
+    it("rejects a split special aim when the declared target receives no damage", () => {
+        const f = fixture(["Large Caliber"]);
+        const canonicalized = {
+            ...f.focus,
+            targetId: f.primary.getId(),
+            shotFeatures: { ...f.focus.shotFeatures!, aimTargetDamage: 0 },
+        };
+
+        expect(rank(f, [f.incumbent, canonicalized])).toEqual([]);
+    });
+
+    it("requires explicit bounded-aim metadata only when a special action and primary target split", () => {
+        const f = fixture(["Through Shot"]);
+        const action = f.focus.actions[0];
+        if (action.type !== "range_attack") throw new Error("fixture must contain a ranged attack");
+        const implicitAim = {
+            ...f.focus,
+            targetId: f.primary.getId(),
+            actions: [{ type: "range_attack", attackerId: action.attackerId, targetId: action.targetId } as const],
+        };
+
+        expect(rank(f, [f.incumbent, implicitAim])).toEqual([]);
+        expect(rank(f, [f.incumbent, { ...implicitAim, targetId: action.targetId }])).toHaveLength(1);
     });
 
     it("admits a preregistered five-percent aggregate sacrifice but not a larger one", () => {

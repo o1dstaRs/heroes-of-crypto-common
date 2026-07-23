@@ -2071,29 +2071,53 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
-    it("attributes a target-covered catalog with no exact-Pareto redirect to the proposal stage", () => {
+    it("keeps a rear-aim Pareto redirect when its canonical first hit preserves the incumbent kill", () => {
         const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-no-proposal-")), "search.jsonl");
         setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_AUDIT: audit });
         const h = buildBattle(10_324, "v0.8", undefined, mixedSupportedParetoRoster());
-        const { actor, primary } = positionMixedSupportedParetoFixture(h);
+        const { actor, primary, noMelee } = positionMixedSupportedParetoFixture(h);
         primary.applyDamage(primary.getCumulativeHp() - 1, 0, new SceneLogMock(), false);
         const driver = h.makeDriver();
         driver.onFightReady();
 
-        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+        const incumbent = plainAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", incumbent);
+        expect(chosen).not.toBe(incumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(noMelee.getId());
+
         driver.onMatchEnd("draw", "turn_cap");
-        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
-        expect(summary).toMatchObject({
-            pureRangedParetoNoMeleeFocusProposals: 0,
+        const rows = readFileSync(audit, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as Record<string, unknown>);
+        expect(rows.find((row) => row.t === "pareto_focus")).toMatchObject({
+            status: "valid_override",
+            incumbent: {
+                targetId: primary.getId(),
+                expectedKill: 1,
+                primaryTargetDamage: 1,
+            },
+            proposal: {
+                targetId: noMelee.getId(),
+                expectedKill: 1,
+            },
+        });
+        const proposal = rows.find((row) => row.t === "pareto_focus")?.proposal as
+            { aimTargetDamage?: number; expectedNoMeleeDamage?: number } | undefined;
+        expect(proposal?.aimTargetDamage).toBeGreaterThan(0);
+        expect(proposal?.expectedNoMeleeDamage).toBe(proposal?.aimTargetDamage);
+        expect(rows.find((row) => row.t === "game")).toMatchObject({
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
             mixedSupportedParetoNoMeleeFocusFunnel: {
                 opportunities: 1,
                 cumulative: {
                     catalog_expansion: 1,
-                    exact_pareto_proposal: 0,
-                    valid_override: 0,
+                    exact_pareto_proposal: 1,
+                    valid_override: 1,
                 },
                 failures: {
-                    exact_pareto_proposal: 1,
+                    exact_pareto_proposal: 0,
                     valid_override: 0,
                 },
             },

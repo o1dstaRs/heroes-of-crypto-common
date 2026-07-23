@@ -425,6 +425,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(action!.targetId).toBe(front.getId());
         expect(front.getCells()).toContainEqual(action!.aimCell!);
         expect(rear.getCells()).not.toContainEqual(action!.aimCell!);
+        expect(candidate.shotFeatures?.aimTargetDamage).toBe(candidate.shotFeatures?.primaryTargetDamage);
         expect(
             isRangeAttackSideObservable(
                 c.grid.getMatrix(),
@@ -494,6 +495,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(rearAim).toBeDefined();
             expect(rearAim!.targetId).toBe(front.getId());
             expect(rearAim!.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
+            expect(rearAim!.shotFeatures?.aimTargetDamage).toBeGreaterThan(0);
 
             const action = rearAim!.actions.find(
                 (entry): entry is Extract<GameAction, { type: "range_attack" }> => entry.type === "range_attack",

@@ -406,7 +406,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
     it("matches the exact committed linear scorer at an eligible decision point", () => {
         const { actor, context, incumbent } = buildBoard();
         const fightProperties = context.fightProperties!;
-        expect(canWaitOnHourglassMirror(actor, fightProperties)).toBe(true);
+        expect(canWaitOnHourglassMirror(actor, fightProperties, context.unitsHolder.getAllUnits())).toBe(true);
         const score = waitScore(
             DISTILLED_WAIT_WEIGHTS_2026_07_10,
             extractWaitFeatures(actor, context.unitsHolder, fightProperties, incumbent),
@@ -506,7 +506,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
             fightProperties,
         };
         const incumbent: GameAction[] = [{ type: "range_attack", attackerId: actor.getId(), targetId: enemy.getId() }];
-        expect(canWaitOnHourglassMirror(actor, fightProperties)).toBe(true);
+        expect(canWaitOnHourglassMirror(actor, fightProperties, context.unitsHolder.getAllUnits())).toBe(true);
         // even a z=+1000-everywhere override cannot make the baked stage wait a ranged unit...
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
         expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
@@ -519,7 +519,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
     it("a V07_WAIT_WEIGHTS override steers v0.7's act-vs-wait decision", () => {
         const { actor, context } = buildBoard();
-        expect(canWaitOnHourglassMirror(actor, context.fightProperties!)).toBe(true);
+        expect(canWaitOnHourglassMirror(actor, context.fightProperties!, context.unitsHolder.getAllUnits())).toBe(true);
         const plainV06 = getAIStrategy("v0.6").decideTurn(actor, context);
         const strategy = getAIStrategy("v0.7");
         primeArmyProfile(strategy, context);

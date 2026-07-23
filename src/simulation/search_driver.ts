@@ -1709,6 +1709,7 @@ export class SearchDriver {
                                 enemyDamage: incumbentCandidate.shotFeatures?.enemyDamage ?? null,
                                 friendlyFireDamage: incumbentCandidate.shotFeatures?.friendlyFireDamage ?? null,
                                 primaryTargetDamage: incumbentCandidate.shotFeatures?.primaryTargetDamage ?? null,
+                                aimTargetDamage: incumbentCandidate.shotFeatures?.aimTargetDamage ?? null,
                             },
                             proposal: {
                                 targetId: auditedProposal.noMeleeTargetId,
@@ -1720,6 +1721,7 @@ export class SearchDriver {
                                 friendlyFireDamage: auditedProposal.candidate.shotFeatures?.friendlyFireDamage ?? null,
                                 primaryTargetDamage:
                                     auditedProposal.candidate.shotFeatures?.primaryTargetDamage ?? null,
+                                aimTargetDamage: auditedProposal.candidate.shotFeatures?.aimTargetDamage ?? null,
                                 expectedNoMeleeDamage: auditedProposal.expectedNoMeleeDamage,
                                 expectedEnemyDamageDelta: auditedProposal.expectedEnemyDamageDelta,
                                 expectedNetDamageDelta: auditedProposal.expectedNetDamageDelta,

@@ -74,6 +74,7 @@ function shot(
             enemyDamage: enemy,
             friendlyFireDamage: friendly,
             primaryTargetDamage: overrides.primary ?? enemy,
+            aimTargetDamage: overrides.primary ?? enemy,
             targetFirepower: 0,
             targetLevel: 1,
             targetIsRanged: 1,

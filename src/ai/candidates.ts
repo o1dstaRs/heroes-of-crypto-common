@@ -129,6 +129,11 @@ export interface IShotCandidateFeatures {
     friendlyFireDamage: number;
     /** Expected effective damage dealt specifically to the authoritative first stack hit by the trajectory. */
     primaryTargetDamage: number;
+    /**
+     * Expected effective damage dealt specifically to the stack whose visible edge anchors the action aim.
+     * Absent on historical/frozen IL-v3 metadata, which deliberately keeps its existing feature schema.
+     */
+    aimTargetDamage?: number;
     /** v0.5's target firepower proxy, normalized by 1,000. */
     targetFirepower: number;
     targetLevel: number;
@@ -1112,18 +1117,21 @@ class CandidateGenerator {
         primaryTargetId: string | undefined,
         shots: number,
         isAOE: boolean,
+        aimTargetId = primaryTargetId,
     ): {
         value: number;
         kill: 0 | 1;
         enemyDamage: number;
         friendlyFireDamage: number;
         primaryTargetDamage: number;
+        aimTargetDamage: number;
     } {
         let value = 0;
         let kill: 0 | 1 = 0;
         let enemyDamage = 0;
         let friendlyFireDamage = 0;
         let primaryTargetDamage = 0;
+        let aimTargetDamage = 0;
         const counted = new Set<string>();
         const fightProperties = this.context.fightProperties;
         const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(this.unit.getTeam()) ?? 0;
@@ -1191,18 +1199,24 @@ class CandidateGenerator {
                     if (primaryTargetId && target.getId() === primaryTargetId) {
                         primaryTargetDamage = effective;
                     }
+                    if (aimTargetId && target.getId() === aimTargetId) {
+                        aimTargetDamage = effective;
+                    }
                 } else {
                     value -= effective;
                     friendlyFireDamage += effective;
                 }
             }
         }
-        return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage };
+        return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */
     private shotFeatures(
         target: Unit,
-        damage: Pick<IShotCandidateFeatures, "enemyDamage" | "friendlyFireDamage" | "primaryTargetDamage">,
+        damage: Pick<
+            IShotCandidateFeatures,
+            "enemyDamage" | "friendlyFireDamage" | "primaryTargetDamage" | "aimTargetDamage"
+        >,
     ): IShotCandidateFeatures {
         const died = target.getAmountDied();
         const alive = target.getAmountAlive();
@@ -1322,7 +1336,7 @@ class CandidateGenerator {
                         continue;
                     }
                     hitSetSeen.add(hitSig);
-                    const damage = this.shotDamage(evaluation, primaryHit.getId(), shots, isAOE);
+                    const damage = this.shotDamage(evaluation, primaryHit.getId(), shots, isAOE, enemy.getId());
                     found.push({
                         target: primaryHit,
                         targetId: primaryHit.getId(),
