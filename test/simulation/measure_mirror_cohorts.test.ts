@@ -46,7 +46,9 @@ import {
     type IMatchConfig,
     type IMatchResult,
     type IRecordedAction,
+    type ITurnExecutionObservation,
 } from "../../src/simulation/battle_engine";
+import type { GameAction } from "../../src/engine/actions";
 
 const BASE_CFG: IMirrorRunConfig = {
     cohort: "ranged_max_sniper3",
@@ -150,6 +152,151 @@ const PROTECTED_ADVANCE_GUARDRAIL_DETAILS: IV08ProtectedAdvanceGuardrailDetails 
     finishActive: false,
     reachableThreatsAfter: 0,
 };
+
+function screenedCloserDetails(selected = true): IV08SupportedBandScreenedCloserComparisonDetails {
+    return {
+        selected,
+        dominant: true,
+        metadataValid: true,
+        reason: "screened_closer",
+        targetId: "screened-target",
+        targetCreatureName: "Screened target",
+        strict: {
+            actionTypes: ["move_unit", "range_attack"],
+            movePath: [
+                { x: 1, y: 1 },
+                { x: 2, y: 1 },
+            ],
+            moveTargetCells: [{ x: 2, y: 1 }],
+            moveHasLavaCell: false,
+            moveHasWaterCell: false,
+            rangeTargetId: "screened-target",
+            rangeAimCell: { x: 4, y: 5 },
+            rangeAimSide: 2,
+        },
+        shipped: {
+            actionTypes: ["move_unit", "range_attack"],
+            movePath: [
+                { x: 1, y: 1 },
+                { x: 1, y: 2 },
+            ],
+            moveTargetCells: [{ x: 1, y: 2 }],
+            moveHasLavaCell: false,
+            moveHasWaterCell: false,
+            rangeTargetId: "screened-target",
+            rangeAimCell: { x: 4, y: 5 },
+            rangeAimSide: 2,
+        },
+        strictFromCell: { x: 1, y: 1 },
+        strictToCell: { x: 2, y: 1 },
+        shippedFromCell: { x: 1, y: 1 },
+        shippedToCell: { x: 1, y: 2 },
+        strictDivisorBefore: 2,
+        strictDivisorAfter: 1,
+        strictReachableThreatsBefore: 0,
+        strictReachableThreatsAfter: 0,
+        strictTargetDistanceBefore: 6,
+        strictTargetDistanceAfter: 3,
+        strictTargetDistanceCompression: 3,
+        strictFinishActive: false,
+        strictTargetScreenedAfter: true,
+        strictScreeningGuardId: "native-guard",
+        strictRetainedSignatureAfter: true,
+        shippedDivisorBefore: 2,
+        shippedDivisorAfter: 1,
+        shippedReachableThreatsAfter: 0,
+        shippedTargetDistanceBefore: 6,
+        shippedTargetDistanceAfter: 4,
+        shippedTargetDistanceCompression: 2,
+        shippedFinishActive: false,
+        shippedTargetScreenedAfter: false,
+        shippedScreeningGuardId: null,
+        shippedRetainedSignatureAfter: true,
+    };
+}
+
+function screenedCloserActions(unitId: string): { strict: GameAction[]; shipped: GameAction[] } {
+    const shot = (): GameAction => ({
+        type: "range_attack",
+        attackerId: unitId,
+        targetId: "screened-target",
+        aimCell: { x: 4, y: 5 },
+        aimSide: 2,
+    });
+    return {
+        strict: [
+            {
+                type: "move_unit",
+                unitId,
+                path: [
+                    { x: 1, y: 1 },
+                    { x: 2, y: 1 },
+                ],
+                targetCells: [{ x: 2, y: 1 }],
+                hasLavaCell: false,
+                hasWaterCell: false,
+            },
+            shot(),
+        ],
+        shipped: [
+            {
+                type: "move_unit",
+                unitId,
+                path: [
+                    { x: 1, y: 1 },
+                    { x: 1, y: 2 },
+                ],
+                targetCells: [{ x: 1, y: 2 }],
+                hasLavaCell: false,
+                hasWaterCell: false,
+            },
+            shot(),
+        ],
+    };
+}
+
+function screenedCloserTurnObservation({
+    unitId,
+    side,
+    strategyVersion = "v0.8",
+    rawIncumbent,
+    chosenDecision,
+    completed = chosenDecision.map(() => true),
+    rejectionReasons = chosenDecision.map(() => undefined),
+    recoveryAttempts = [],
+}: {
+    unitId: string;
+    side: "green" | "red";
+    strategyVersion?: string;
+    rawIncumbent: GameAction[];
+    chosenDecision: GameAction[];
+    completed?: boolean[];
+    rejectionReasons?: Array<string | undefined>;
+    recoveryAttempts?: ITurnExecutionObservation["recoveryAttempts"];
+}): ITurnExecutionObservation {
+    const recovery = recoveryAttempts.at(-1) ?? {
+        source: "none",
+        completed: false,
+        events: [],
+    };
+    return {
+        unitId,
+        creatureName: "Medusa",
+        side,
+        strategyVersion,
+        rawIncumbent,
+        chosenDecision,
+        strategyActions: chosenDecision.map((action, index) => ({
+            action,
+            completed: completed[index] ?? false,
+            ...(rejectionReasons[index] === undefined ? {} : { rejectionReason: rejectionReasons[index] }),
+            events: [],
+        })),
+        recoveryAttempts,
+        recovery,
+        events: [],
+    };
+}
 
 function fakeResult(
     config: IMatchConfig,
@@ -966,6 +1113,8 @@ describe("measure_mirror_cohorts", () => {
                     strictReachableThreatsAfter: 0,
                     strictTargetDistanceBefore: 6,
                     strictTargetDistanceAfter: 3,
+                    strictTargetDistanceCompression: 3,
+                    strictFinishActive: false,
                     strictTargetScreenedAfter: true,
                     strictScreeningGuardId: "native-guard",
                     strictRetainedSignatureAfter: true,
@@ -974,6 +1123,8 @@ describe("measure_mirror_cohorts", () => {
                     shippedReachableThreatsAfter: 0,
                     shippedTargetDistanceBefore: 6,
                     shippedTargetDistanceAfter: 4,
+                    shippedTargetDistanceCompression: 2,
+                    shippedFinishActive: false,
                     shippedTargetScreenedAfter: false,
                     shippedScreeningGuardId: null,
                     shippedRetainedSignatureAfter: true,
@@ -1040,7 +1191,11 @@ describe("measure_mirror_cohorts", () => {
                 supportedBandScreenedCloserFilteredComparisons: 1,
                 supportedBandScreenedCloserSelectedComparisons: 1,
                 supportedBandScreenedCloserInvalidComparisons: 1,
-                supportedBandScreenedCloserComparisonsByReason: { screened_closer: 1, filtered: 1 },
+                supportedBandScreenedCloserComparisonsByReason: {
+                    screened_closer: 1,
+                    decisive_screened_closer: 0,
+                    filtered: 1,
+                },
             });
             expect(control).toMatchObject({
                 supportedBandScreenedCloserEligibleComparisons: 2,
@@ -1048,7 +1203,11 @@ describe("measure_mirror_cohorts", () => {
                 supportedBandScreenedCloserFilteredComparisons: 1,
                 supportedBandScreenedCloserSelectedComparisons: 0,
                 supportedBandScreenedCloserInvalidComparisons: 1,
-                supportedBandScreenedCloserComparisonsByReason: { screened_closer: 1, filtered: 1 },
+                supportedBandScreenedCloserComparisonsByReason: {
+                    screened_closer: 1,
+                    decisive_screened_closer: 0,
+                    filtered: 1,
+                },
             });
             expect(record.supportedBandScreenedCloserComparisonEvents?.map(({ retained }) => retained)).toEqual([
                 true,
@@ -1099,8 +1258,16 @@ describe("measure_mirror_cohorts", () => {
             supportedBandScreenedCloserFilteredComparisons: 2,
             supportedBandScreenedCloserSelectedComparisons: 2,
             supportedBandScreenedCloserInvalidComparisons: 2,
-            supportedBandScreenedCloserComparisonsByReason: { screened_closer: 2, filtered: 2 },
-            supportedBandScreenedCloserComparisonsByReasonPerGame: { screened_closer: 1, filtered: 1 },
+            supportedBandScreenedCloserComparisonsByReason: {
+                screened_closer: 2,
+                decisive_screened_closer: 0,
+                filtered: 2,
+            },
+            supportedBandScreenedCloserComparisonsByReasonPerGame: {
+                screened_closer: 1,
+                decisive_screened_closer: 0,
+                filtered: 1,
+            },
         });
         expect(aggregate.versions["v0.8s"]).toMatchObject({
             supportedBandScreenedCloserEligibleComparisons: 4,
@@ -1109,8 +1276,357 @@ describe("measure_mirror_cohorts", () => {
             supportedBandScreenedCloserFilteredComparisons: 2,
             supportedBandScreenedCloserSelectedComparisons: 0,
             supportedBandScreenedCloserInvalidComparisons: 2,
-            supportedBandScreenedCloserComparisonsByReason: { screened_closer: 2, filtered: 2 },
-            supportedBandScreenedCloserComparisonsByReasonPerGame: { screened_closer: 1, filtered: 1 },
+            supportedBandScreenedCloserComparisonsByReason: {
+                screened_closer: 2,
+                decisive_screened_closer: 0,
+                filtered: 2,
+            },
+            supportedBandScreenedCloserComparisonsByReasonPerGame: {
+                screened_closer: 1,
+                decisive_screened_closer: 0,
+                filtered: 1,
+            },
+        });
+    });
+
+    test("attaches detached post-a13 strict, shipped, and arbitrary final choices to the exact actor turn", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const sourceActions: GameAction[][] = [];
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const emit = (unitId: string): IAIPolicyEvent => {
+                const event: IAIPolicyEvent = {
+                    kind: "v0.8_supported_band_screened_closer_comparison",
+                    unitId,
+                    creatureName: "Medusa",
+                    team: GREEN_TEAM,
+                    lap: 2,
+                    details: screenedCloserDetails(true),
+                };
+                config.policyProposalObserver?.(event);
+                return event;
+            };
+
+            const strictActions = screenedCloserActions("strict-actor");
+            const strictEvent = emit("strict-actor");
+            config.policyEventObserver?.(strictEvent);
+            const strictObservation = screenedCloserTurnObservation({
+                unitId: "strict-actor",
+                side: "green",
+                rawIncumbent: strictActions.strict,
+                chosenDecision: strictActions.strict,
+            });
+            config.turnExecutionObserver?.(strictObservation);
+            sourceActions.push(strictActions.strict);
+
+            const shippedActions = screenedCloserActions("shipped-actor");
+            emit("shipped-actor");
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "shipped-actor",
+                    side: "green",
+                    rawIncumbent: shippedActions.strict,
+                    chosenDecision: shippedActions.shipped,
+                }),
+            );
+            sourceActions.push(shippedActions.strict, shippedActions.shipped);
+
+            const neitherActions = screenedCloserActions("neither-actor");
+            const neitherDecision: GameAction[] = [{ type: "defend_turn", unitId: "neither-actor" }];
+            emit("neither-actor");
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "neither-actor",
+                    side: "green",
+                    rawIncumbent: neitherActions.strict,
+                    chosenDecision: neitherDecision,
+                }),
+            );
+            sourceActions.push(neitherActions.strict, neitherDecision);
+
+            const wrongOwnerActions = screenedCloserActions("wrong-owner-actor");
+            (wrongOwnerActions.strict[0] as Extract<GameAction, { type: "move_unit" }>).unitId = "other-unit";
+            (wrongOwnerActions.strict[1] as Extract<GameAction, { type: "range_attack" }>).attackerId = "other-unit";
+            emit("wrong-owner-actor");
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "wrong-owner-actor",
+                    side: "green",
+                    rawIncumbent: wrongOwnerActions.strict,
+                    chosenDecision: wrongOwnerActions.strict,
+                }),
+            );
+
+            const strictMove = strictActions.strict[0] as Extract<GameAction, { type: "move_unit" }>;
+            strictMove.path[1]!.x = 15;
+            const shippedMove = shippedActions.shipped[0] as Extract<GameAction, { type: "move_unit" }>;
+            shippedMove.targetCells![0]!.y = 15;
+            neitherDecision[0] = { type: "wait_turn", unitId: "mutated-after-observation" };
+            return fakeResult(config, "draw");
+        };
+
+        const record = playMirrorGame(cfg, 0, { matchRunner });
+        const [strict, shipped, neither, wrongOwner] = record.supportedBandScreenedCloserComparisonEvents ?? [];
+        expect(strict).toMatchObject({
+            retained: true,
+            postA13: {
+                bindingStatus: "resolved",
+                actor: {
+                    unitId: "strict-actor",
+                    creatureName: "Medusa",
+                    side: "green",
+                    strategyVersion: "v0.8",
+                },
+                rawIncumbentMatchesStrict: true,
+                rawIncumbentMatchesShipped: false,
+                chosenMatchesStrict: true,
+                chosenMatchesShipped: false,
+                finalChoice: "strict",
+                execution: {
+                    strategyActionCompletions: [true, true],
+                    strategyActionRejectionReasons: [null, null],
+                    strategyActionCountMatchesChosen: true,
+                    chosenDecisionCompleted: true,
+                    substantiveActionCompleted: true,
+                    recoveryAttemptCount: 0,
+                    recoverySource: "none",
+                    recoveryCompleted: false,
+                    recoveryRejectionReason: null,
+                },
+            },
+        });
+        expect(shipped).toMatchObject({
+            retained: false,
+            postA13: {
+                bindingStatus: "resolved",
+                actor: { unitId: "shipped-actor", side: "green" },
+                rawIncumbentMatchesStrict: true,
+                rawIncumbentMatchesShipped: false,
+                chosenMatchesStrict: false,
+                chosenMatchesShipped: true,
+                finalChoice: "shipped",
+            },
+        });
+        expect(neither).toMatchObject({
+            retained: false,
+            postA13: {
+                bindingStatus: "resolved",
+                actor: { unitId: "neither-actor", side: "green" },
+                rawIncumbentMatchesStrict: true,
+                rawIncumbentMatchesShipped: false,
+                chosenMatchesStrict: false,
+                chosenMatchesShipped: false,
+                finalChoice: "neither",
+            },
+        });
+        expect(wrongOwner).toMatchObject({
+            postA13: {
+                bindingStatus: "resolved",
+                actor: { unitId: "wrong-owner-actor", side: "green" },
+                rawIncumbentMatchesStrict: false,
+                rawIncumbentMatchesShipped: false,
+                chosenMatchesStrict: false,
+                chosenMatchesShipped: false,
+                finalChoice: "neither",
+            },
+        });
+        expect(strict?.postA13.rawIncumbent).not.toBe(sourceActions[0]);
+        expect(strict?.postA13.chosenDecision).not.toBe(sourceActions[0]);
+        expect((strict?.postA13.chosenDecision?.[0] as Extract<GameAction, { type: "move_unit" }>).path[1]).toEqual({
+            x: 2,
+            y: 1,
+        });
+        expect(
+            (shipped?.postA13.chosenDecision?.[0] as Extract<GameAction, { type: "move_unit" }>).targetCells?.[0],
+        ).toEqual({ x: 1, y: 2 });
+        expect(neither?.postA13.chosenDecision).toEqual([{ type: "defend_turn", unitId: "neither-actor" }]);
+    });
+
+    test("records failed chosen execution and ordered recovery completion without treating recovery as the choice", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const unitId = "recovery-actor";
+            const event: IAIPolicyEvent = {
+                kind: "v0.8_supported_band_screened_closer_comparison",
+                unitId,
+                creatureName: "Medusa",
+                team: GREEN_TEAM,
+                lap: 2,
+                details: screenedCloserDetails(true),
+            };
+            const rawIncumbent = screenedCloserActions(unitId).strict;
+            const chosenDecision: GameAction[] = [
+                {
+                    type: "range_attack",
+                    attackerId: unitId,
+                    targetId: "arbitrary-search-target",
+                    aimCell: { x: 7, y: 7 },
+                    aimSide: 1,
+                },
+            ];
+            const recoveryAttempts: ITurnExecutionObservation["recoveryAttempts"] = [
+                {
+                    source: "advance",
+                    completed: false,
+                    action: {
+                        type: "move_unit",
+                        unitId,
+                        path: [{ x: 1, y: 2 }],
+                        targetCells: [{ x: 1, y: 2 }],
+                    },
+                    rejectionReason: "blocked",
+                    events: [],
+                },
+                {
+                    source: "defend",
+                    completed: true,
+                    action: { type: "defend_turn", unitId },
+                    events: [],
+                },
+            ];
+            config.policyProposalObserver?.(event);
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId,
+                    side: "green",
+                    rawIncumbent,
+                    chosenDecision,
+                    completed: [false],
+                    rejectionReasons: ["target gone"],
+                    recoveryAttempts,
+                }),
+            );
+            return fakeResult(config, "draw");
+        };
+
+        const record = playMirrorGame(cfg, 0, { matchRunner });
+        expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.postA13).toMatchObject({
+            bindingStatus: "resolved",
+            finalChoice: "neither",
+            chosenMatchesStrict: false,
+            chosenMatchesShipped: false,
+            execution: {
+                strategyActionCompletions: [false],
+                strategyActionRejectionReasons: ["target gone"],
+                strategyActionCountMatchesChosen: true,
+                chosenDecisionCompleted: false,
+                substantiveActionCompleted: false,
+                recoveryAttemptCount: 2,
+                recoverySource: "defend",
+                recoveryCompleted: true,
+                recoveryRejectionReason: null,
+            },
+        });
+    });
+
+    test("fails post-a13 binding closed for multiple, mismatched, and missing current-turn comparisons", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const emit = (unitId: string): void => {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_band_screened_closer_comparison",
+                    unitId,
+                    creatureName: "Medusa",
+                    team: GREEN_TEAM,
+                    lap: 2,
+                    details: screenedCloserDetails(true),
+                });
+            };
+
+            emit("multiple-actor");
+            emit("multiple-actor");
+            const multipleActions = screenedCloserActions("multiple-actor").strict;
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "multiple-actor",
+                    side: "green",
+                    rawIncumbent: multipleActions,
+                    chosenDecision: multipleActions,
+                }),
+            );
+
+            emit("expected-actor");
+            const mismatchedActions = screenedCloserActions("observed-other-actor").strict;
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "observed-other-actor",
+                    side: "red",
+                    rawIncumbent: mismatchedActions,
+                    chosenDecision: mismatchedActions,
+                }),
+            );
+
+            emit("strategy-mismatch-actor");
+            const strategyMismatchedActions = screenedCloserActions("strategy-mismatch-actor").strict;
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "strategy-mismatch-actor",
+                    side: "green",
+                    strategyVersion: "v0.8s",
+                    rawIncumbent: strategyMismatchedActions,
+                    chosenDecision: strategyMismatchedActions,
+                }),
+            );
+
+            const noProposalActions = screenedCloserActions("no-proposal-observation").strict;
+            config.turnExecutionObserver?.(
+                screenedCloserTurnObservation({
+                    unitId: "no-proposal-observation",
+                    side: "green",
+                    rawIncumbent: noProposalActions,
+                    chosenDecision: noProposalActions,
+                }),
+            );
+            emit("missing-observation");
+            return fakeResult(config, "draw");
+        };
+
+        const record = playMirrorGame(cfg, 0, { matchRunner });
+        const comparisons = record.supportedBandScreenedCloserComparisonEvents ?? [];
+        expect(comparisons.slice(0, 2).map(({ postA13 }) => postA13.bindingStatus)).toEqual([
+            "multiple_current_turn_comparisons",
+            "multiple_current_turn_comparisons",
+        ]);
+        for (const comparison of comparisons.slice(0, 2)) {
+            expect(comparison.postA13).toMatchObject({
+                actor: { unitId: "multiple-actor", side: "green" },
+                rawIncumbentMatchesStrict: null,
+                rawIncumbentMatchesShipped: null,
+                chosenMatchesStrict: null,
+                chosenMatchesShipped: null,
+                finalChoice: "unresolved",
+            });
+            expect(comparison.postA13.rawIncumbent).not.toBeNull();
+            expect(comparison.postA13.chosenDecision).not.toBeNull();
+        }
+        expect(comparisons[2]?.postA13).toMatchObject({
+            bindingStatus: "no_matching_current_turn_comparison",
+            actor: { unitId: "observed-other-actor", side: "red" },
+            rawIncumbentMatchesStrict: null,
+            chosenMatchesStrict: null,
+            finalChoice: "unresolved",
+        });
+        expect(comparisons[3]?.postA13).toMatchObject({
+            bindingStatus: "no_matching_current_turn_comparison",
+            actor: {
+                unitId: "strategy-mismatch-actor",
+                side: "green",
+                strategyVersion: "v0.8s",
+            },
+            rawIncumbentMatchesStrict: null,
+            chosenMatchesStrict: null,
+            finalChoice: "unresolved",
+        });
+        expect(comparisons[4]?.postA13).toEqual({
+            bindingStatus: "missing_turn_execution",
+            actor: null,
+            rawIncumbent: null,
+            chosenDecision: null,
+            rawIncumbentMatchesStrict: null,
+            rawIncumbentMatchesShipped: null,
+            chosenMatchesStrict: null,
+            chosenMatchesShipped: null,
+            finalChoice: "unresolved",
+            execution: null,
         });
     });
 

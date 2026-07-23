@@ -564,6 +564,17 @@ function enableScreenedCloserOverlay(): void {
     process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS = "v0.8";
 }
 
+function enableDecisiveScreenedCloserOverlay(): void {
+    process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+    process.env.V08_RANGED_POSITION_MODE = "both";
+    process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+    process.env.V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS = "v0.8";
+}
+
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
@@ -584,6 +595,8 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS;
@@ -1616,6 +1629,8 @@ describe("v0.8 protected ranged positioning", () => {
             strictReachableThreatsAfter: 0,
             strictTargetDistanceBefore: 7,
             strictTargetDistanceAfter: 5,
+            strictTargetDistanceCompression: 2,
+            strictFinishActive: false,
             strictTargetScreenedAfter: true,
             strictScreeningGuardId: treatment.fixture.guard.getId(),
             strictRetainedSignatureAfter: true,
@@ -1630,6 +1645,8 @@ describe("v0.8 protected ranged positioning", () => {
             shippedReachableThreatsAfter: 0,
             shippedTargetDistanceBefore: 7,
             shippedTargetDistanceAfter: 6,
+            shippedTargetDistanceCompression: 1,
+            shippedFinishActive: false,
             shippedTargetScreenedAfter: false,
             shippedScreeningGuardId: null,
             shippedRetainedSignatureAfter: true,
@@ -1655,6 +1672,32 @@ describe("v0.8 protected ranged positioning", () => {
         expect(treatment.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_duel_difference");
         expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
         expect(shipped.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_screened_closer_comparison");
+    });
+
+    it("keeps the decisive screened-closer selector separate and filters modest compression", () => {
+        enableDecisiveScreenedCloserOverlay();
+        const fixture = setupScreenedCloserDuel();
+        const events: IAIPolicyEvent[] = [];
+        fixture.context.policyEventObserver = (event) => events.push(event);
+
+        const actions = new StrategyV0_8().decideTurn(fixture.shooter, fixture.context);
+        const comparison = events.find(({ kind }) => kind === "v0.8_supported_band_screened_closer_comparison");
+
+        expect(actions.find(({ type }) => type === "move_unit")?.targetCells?.[0]).toEqual(fixture.shippedDestination);
+        expect(comparison?.kind).toBe("v0.8_supported_band_screened_closer_comparison");
+        if (comparison?.kind !== "v0.8_supported_band_screened_closer_comparison") {
+            throw new Error("missing decisive screened-closer comparison");
+        }
+        expect(comparison.details).toMatchObject({
+            selected: false,
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strictTargetDistanceCompression: 2,
+            strictFinishActive: false,
+            shippedTargetDistanceCompression: 1,
+            shippedFinishActive: false,
+        });
     });
 
     it("filters a same-route screened-closer comparison without manufacturing a decision difference", () => {
@@ -1827,6 +1870,23 @@ describe("v0.8 protected ranged positioning", () => {
         });
         expect(canonical.strictFromCell).not.toBe(strictDetails.fromCell);
         expect(canonical.strictToCell).not.toBe(strictDetails.toCell);
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                summary([{ ...strictDetails.fromCell }, { x: 5, y: 6 }, { x: 5, y: 5 }, { ...strictDetails.toCell }]),
+                undefined,
+                shotOnlySummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strictTargetDistanceCompression: 3,
+            strictFinishActive: false,
+            shippedTargetDistanceCompression: null,
+            shippedFinishActive: null,
+        });
         expect(compare(strictDetails, [{ x: 5, y: 6 }, { x: 5, y: 5 }, { ...strictDetails.toCell }])).toMatchObject({
             dominant: false,
             metadataValid: true,
@@ -1840,6 +1900,25 @@ describe("v0.8 protected ranged positioning", () => {
         expect(
             compare(strictDetails, [
                 { ...strictDetails.fromCell },
+                { ...strictDetails.fromCell },
+                { x: 5, y: 6 },
+                { x: 5, y: 5 },
+                { ...strictDetails.toCell },
+            ]),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        expect(
+            compare(strictDetails, [
+                { ...strictDetails.fromCell },
+                { x: 5, y: 6 },
+                { ...strictDetails.fromCell },
+                { x: 5, y: 6 },
+                { x: 5, y: 5 },
+                { ...strictDetails.toCell },
+            ]),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        expect(
+            compare(strictDetails, [
+                { x: 5, y: 6 },
                 { ...strictDetails.fromCell },
                 { x: 5, y: 6 },
                 { x: 5, y: 5 },
@@ -1971,6 +2050,115 @@ describe("v0.8 protected ranged positioning", () => {
         expect(
             compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, shippedMetadata, shippedSummary),
         ).toMatchObject({ dominant: true, metadataValid: true, reason: "screened_closer" });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                { ...strictDetails, finishActive: "malformed" } as unknown as IV08SupportedBandAdvanceDetails,
+                strictSummary,
+                { ...shippedMetadata, finishActive: true },
+                shippedSummary,
+            ),
+        ).toMatchObject({
+            dominant: true,
+            metadataValid: true,
+            reason: "screened_closer",
+            strictFinishActive: null,
+            shippedFinishActive: true,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                strictSummary,
+                shippedMetadata,
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strictTargetDistanceCompression: 3,
+            strictFinishActive: false,
+            shippedTargetDistanceCompression: 2,
+            shippedFinishActive: false,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                { ...strictDetails, targetDistanceAfter: 2 },
+                strictSummary,
+                shippedMetadata,
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: true,
+            metadataValid: true,
+            reason: "decisive_screened_closer",
+            strictTargetDistanceCompression: 4,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                { ...strictDetails, finishActive: true },
+                strictSummary,
+                { ...shippedMetadata, finishActive: true },
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: true,
+            metadataValid: true,
+            reason: "decisive_screened_closer",
+            strictTargetDistanceCompression: 3,
+            strictFinishActive: true,
+            shippedFinishActive: true,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                strictSummary,
+                { ...shippedMetadata, finishActive: true },
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: false,
+            reason: "filtered",
+            strictFinishActive: false,
+            shippedFinishActive: true,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                { ...strictDetails, finishActive: "malformed" } as unknown as IV08SupportedBandAdvanceDetails,
+                strictSummary,
+                shippedMetadata,
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: false,
+            reason: "filtered",
+            strictFinishActive: null,
+            shippedFinishActive: false,
+        });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                strictSummary,
+                {
+                    ...shippedMetadata,
+                    finishActive: "malformed",
+                } as unknown as IV08ProtectedAdvanceCatalogMetadata,
+                shippedSummary,
+                "decisive_screened_closer",
+            ),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: false,
+            reason: "filtered",
+            strictFinishActive: false,
+            shippedFinishActive: null,
+        });
         const shotOnlySummary: IV08SupportedBandDuelDecisionSummary = {
             actionTypes: ["range_attack"],
             movePath: null,

@@ -112,6 +112,10 @@ export interface IV08RangedPositioningABOptions {
     supportedBandScreenedCloserOverlay?: boolean;
     /** Matched screened-closer selector-off control: both catalogs/comparisons run, but v0.8 selects shipped. */
     supportedBandScreenedCloserOverlayControl?: boolean;
+    /** Fresh screened-closer arm requiring a four-cell compression or an active matched finish state. */
+    supportedBandDecisiveScreenedCloserOverlay?: boolean;
+    /** Matched selector-off control for the separately named decisive screened-closer arm. */
+    supportedBandDecisiveScreenedCloserOverlayControl?: boolean;
     /** Immutable preregistration receipt hashed before either screened-closer child is launched. */
     prelaunchReceipt?: string;
     /** Live-root post-catalog vetoes over shipped legacy; rollouts and v0.8s remain exact incumbent controls. */
@@ -143,7 +147,7 @@ export interface IV08RangedPositioningABPrelaunchReceipt {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v18";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -188,6 +192,8 @@ export interface IV08RangedPositioningABManifest {
         supportedBandAdvanceDominanceOverlayControl: boolean;
         supportedBandScreenedCloserOverlay: boolean;
         supportedBandScreenedCloserOverlayControl: boolean;
+        supportedBandDecisiveScreenedCloserOverlay: boolean;
+        supportedBandDecisiveScreenedCloserOverlayControl: boolean;
         protectedAdvanceGuardrails: boolean;
         protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode;
         diag: boolean;
@@ -250,6 +256,8 @@ function validateBehaviorArmGeometry(
     supportedBandAdvanceDominanceOverlayControl: boolean,
     supportedBandScreenedCloserOverlay: boolean,
     supportedBandScreenedCloserOverlayControl: boolean,
+    supportedBandDecisiveScreenedCloserOverlay: boolean,
+    supportedBandDecisiveScreenedCloserOverlayControl: boolean,
     protectedAdvanceGuardrails: boolean,
 ): void {
     const enabledSpecialArms = [
@@ -268,6 +276,8 @@ function validateBehaviorArmGeometry(
         supportedBandAdvanceDominanceOverlayControl,
         supportedBandScreenedCloserOverlay,
         supportedBandScreenedCloserOverlayControl,
+        supportedBandDecisiveScreenedCloserOverlay,
+        supportedBandDecisiveScreenedCloserOverlayControl,
         protectedAdvanceGuardrails,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
@@ -277,7 +287,8 @@ function validateBehaviorArmGeometry(
                 "supportedBandAdvanceVsLegacy, supportedBandAdvanceOverlayVsLegacy, " +
                 "supportedBandAdvanceOverlayControl, supportedBandAdvanceDominanceOverlay, " +
                 "supportedBandAdvanceDominanceOverlayControl, supportedBandScreenedCloserOverlay, " +
-                "supportedBandScreenedCloserOverlayControl, and protectedAdvanceGuardrails " +
+                "supportedBandScreenedCloserOverlayControl, supportedBandDecisiveScreenedCloserOverlay, " +
+                "supportedBandDecisiveScreenedCloserOverlayControl, and protectedAdvanceGuardrails " +
                 "are mutually exclusive",
         );
     }
@@ -325,6 +336,12 @@ function validateBehaviorArmGeometry(
     }
     if (supportedBandScreenedCloserOverlayControl && (mode !== "both" || moveShots !== 0)) {
         throw new Error("supportedBandScreenedCloserOverlayControl requires mode=both and moveShots=0");
+    }
+    if (supportedBandDecisiveScreenedCloserOverlay && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlay requires mode=both and moveShots=0");
+    }
+    if (supportedBandDecisiveScreenedCloserOverlayControl && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlayControl requires mode=both and moveShots=0");
     }
     if (protectedAdvanceGuardrails && (mode !== "both" || moveShots !== 0)) {
         throw new Error("protectedAdvanceGuardrails requires mode=both and moveShots=0");
@@ -503,7 +520,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         !options.supportedBandAdvanceDominanceOverlay &&
         !options.supportedBandAdvanceDominanceOverlayControl &&
         !options.supportedBandScreenedCloserOverlay &&
-        !options.supportedBandScreenedCloserOverlayControl
+        !options.supportedBandScreenedCloserOverlayControl &&
+        !options.supportedBandDecisiveScreenedCloserOverlay &&
+        !options.supportedBandDecisiveScreenedCloserOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -558,6 +577,18 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         throw new Error("supportedBandScreenedCloserOverlayControl must be a boolean");
     }
     if (
+        options.supportedBandDecisiveScreenedCloserOverlay !== undefined &&
+        typeof options.supportedBandDecisiveScreenedCloserOverlay !== "boolean"
+    ) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlay must be a boolean");
+    }
+    if (
+        options.supportedBandDecisiveScreenedCloserOverlayControl !== undefined &&
+        typeof options.supportedBandDecisiveScreenedCloserOverlayControl !== "boolean"
+    ) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlayControl must be a boolean");
+    }
+    if (
         [
             options.supportedBandAdvance,
             options.supportedBandAdvanceCatalogOnly,
@@ -568,13 +599,17 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
             options.supportedBandAdvanceDominanceOverlayControl,
             options.supportedBandScreenedCloserOverlay,
             options.supportedBandScreenedCloserOverlayControl,
+            options.supportedBandDecisiveScreenedCloserOverlay,
+            options.supportedBandDecisiveScreenedCloserOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
                 "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
                 "supportedBandAdvanceDominanceOverlay, supportedBandAdvanceDominanceOverlayControl, " +
-                "supportedBandScreenedCloserOverlay, and supportedBandScreenedCloserOverlayControl " +
+                "supportedBandScreenedCloserOverlay, supportedBandScreenedCloserOverlayControl, " +
+                "supportedBandDecisiveScreenedCloserOverlay, and " +
+                "supportedBandDecisiveScreenedCloserOverlayControl " +
                 "are mutually exclusive",
         );
     }
@@ -599,9 +634,17 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.supportedBandScreenedCloserOverlayControl && !options.supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
     }
+    if (options.supportedBandDecisiveScreenedCloserOverlay && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandDecisiveScreenedCloserOverlayControl && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
     const screenedCloserArm =
         (options.supportedBandScreenedCloserOverlay ?? false) ||
-        (options.supportedBandScreenedCloserOverlayControl ?? false);
+        (options.supportedBandScreenedCloserOverlayControl ?? false) ||
+        (options.supportedBandDecisiveScreenedCloserOverlay ?? false) ||
+        (options.supportedBandDecisiveScreenedCloserOverlayControl ?? false);
     if (screenedCloserArm && !options.prelaunchReceipt) {
         throw new Error("screened-closer overlays require --prelaunch-receipt");
     }
@@ -639,6 +682,8 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.supportedBandAdvanceDominanceOverlayControl ?? false,
         options.supportedBandScreenedCloserOverlay ?? false,
         options.supportedBandScreenedCloserOverlayControl ?? false,
+        options.supportedBandDecisiveScreenedCloserOverlay ?? false,
+        options.supportedBandDecisiveScreenedCloserOverlayControl ?? false,
         options.protectedAdvanceGuardrails ?? false,
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
@@ -778,7 +823,7 @@ export function buildV08RangedPositioningABManifest(
         ? readV08RangedPositioningABPrelaunchReceipt(options.prelaunchReceipt)
         : undefined;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v18" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -823,6 +868,9 @@ export function buildV08RangedPositioningABManifest(
             supportedBandAdvanceDominanceOverlayControl: options.supportedBandAdvanceDominanceOverlayControl ?? false,
             supportedBandScreenedCloserOverlay: options.supportedBandScreenedCloserOverlay ?? false,
             supportedBandScreenedCloserOverlayControl: options.supportedBandScreenedCloserOverlayControl ?? false,
+            supportedBandDecisiveScreenedCloserOverlay: options.supportedBandDecisiveScreenedCloserOverlay ?? false,
+            supportedBandDecisiveScreenedCloserOverlayControl:
+                options.supportedBandDecisiveScreenedCloserOverlayControl ?? false,
             protectedAdvanceGuardrails: options.protectedAdvanceGuardrails ?? false,
             protectedAdvanceGuardrailsMode: options.protectedAdvanceGuardrailsMode ?? "both",
             diag: options.diag ?? false,
@@ -880,6 +928,8 @@ export function buildV08RangedPositioningABEnvironment(
     supportedBandAdvanceDominanceOverlayControl = false,
     supportedBandScreenedCloserOverlay = false,
     supportedBandScreenedCloserOverlayControl = false,
+    supportedBandDecisiveScreenedCloserOverlay = false,
+    supportedBandDecisiveScreenedCloserOverlayControl = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -972,7 +1022,9 @@ export function buildV08RangedPositioningABEnvironment(
         !supportedBandAdvanceDominanceOverlay &&
         !supportedBandAdvanceDominanceOverlayControl &&
         !supportedBandScreenedCloserOverlay &&
-        !supportedBandScreenedCloserOverlayControl
+        !supportedBandScreenedCloserOverlayControl &&
+        !supportedBandDecisiveScreenedCloserOverlay &&
+        !supportedBandDecisiveScreenedCloserOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -997,6 +1049,12 @@ export function buildV08RangedPositioningABEnvironment(
     if (typeof supportedBandScreenedCloserOverlayControl !== "boolean") {
         throw new Error("supportedBandScreenedCloserOverlayControl must be a boolean");
     }
+    if (typeof supportedBandDecisiveScreenedCloserOverlay !== "boolean") {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlay must be a boolean");
+    }
+    if (typeof supportedBandDecisiveScreenedCloserOverlayControl !== "boolean") {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlayControl must be a boolean");
+    }
     if (supportedBandAdvanceVsLegacy && (supportedBandAdvance || supportedBandAdvanceCatalogOnly)) {
         throw new Error(
             "supportedBandAdvanceVsLegacy, supportedBandAdvance, and supportedBandAdvanceCatalogOnly are mutually exclusive",
@@ -1013,13 +1071,17 @@ export function buildV08RangedPositioningABEnvironment(
             supportedBandAdvanceDominanceOverlayControl,
             supportedBandScreenedCloserOverlay,
             supportedBandScreenedCloserOverlayControl,
+            supportedBandDecisiveScreenedCloserOverlay,
+            supportedBandDecisiveScreenedCloserOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
                 "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
                 "supportedBandAdvanceDominanceOverlay, supportedBandAdvanceDominanceOverlayControl, " +
-                "supportedBandScreenedCloserOverlay, and supportedBandScreenedCloserOverlayControl " +
+                "supportedBandScreenedCloserOverlay, supportedBandScreenedCloserOverlayControl, " +
+                "supportedBandDecisiveScreenedCloserOverlay, and " +
+                "supportedBandDecisiveScreenedCloserOverlayControl " +
                 "are mutually exclusive",
         );
     }
@@ -1043,6 +1105,12 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (supportedBandScreenedCloserOverlayControl && !supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandDecisiveScreenedCloserOverlay && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandDecisiveScreenedCloserOverlayControl && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandDecisiveScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (typeof protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -1071,6 +1139,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceDominanceOverlayControl,
         supportedBandScreenedCloserOverlay,
         supportedBandScreenedCloserOverlayControl,
+        supportedBandDecisiveScreenedCloserOverlay,
+        supportedBandDecisiveScreenedCloserOverlayControl,
         protectedAdvanceGuardrails,
     );
 
@@ -1132,11 +1202,14 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceDominanceOverlay || supportedBandAdvanceDominanceOverlayControl;
     const supportedBandScreenedCloserOverlayDuel =
         supportedBandScreenedCloserOverlay || supportedBandScreenedCloserOverlayControl;
+    const supportedBandDecisiveScreenedCloserOverlayDuel =
+        supportedBandDecisiveScreenedCloserOverlay || supportedBandDecisiveScreenedCloserOverlayControl;
     const supportedBandLegacyDuel =
         supportedBandAdvanceVsLegacy ||
         supportedBandOverlayDuel ||
         supportedBandDominanceOverlayDuel ||
-        supportedBandScreenedCloserOverlayDuel;
+        supportedBandScreenedCloserOverlayDuel ||
+        supportedBandDecisiveScreenedCloserOverlayDuel;
     environment.V08_SUPPORTED_BAND_ADVANCE = supportedBandExperiment ? "1" : "0";
     environment.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS =
         supportedBandExperiment || supportedBandLegacyDuel ? V08_A13_PRODUCTION_VERSION : "";
@@ -1149,6 +1222,10 @@ export function buildV08RangedPositioningABEnvironment(
     environment.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS = supportedBandDominanceOverlayDuel
         ? V08_A13_PRODUCTION_VERSION
         : "";
+    environment.V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS =
+        supportedBandDecisiveScreenedCloserOverlayControl ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS =
+        supportedBandDecisiveScreenedCloserOverlayDuel ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS = supportedBandScreenedCloserOverlayControl
         ? V08_A13_PRODUCTION_VERSION
         : "";
@@ -1188,6 +1265,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceDominanceOverlayControl ||
         supportedBandScreenedCloserOverlay ||
         supportedBandScreenedCloserOverlayControl ||
+        supportedBandDecisiveScreenedCloserOverlay ||
+        supportedBandDecisiveScreenedCloserOverlayControl ||
         protectedAdvanceGuardrails
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
@@ -1234,6 +1313,8 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedBandAdvanceDominanceOverlayControl ?? false,
         options.supportedBandScreenedCloserOverlay ?? false,
         options.supportedBandScreenedCloserOverlayControl ?? false,
+        options.supportedBandDecisiveScreenedCloserOverlay ?? false,
+        options.supportedBandDecisiveScreenedCloserOverlayControl ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -1337,6 +1418,9 @@ export async function runV08RangedPositioningAB(
     const supportedBandAdvanceDominanceOverlayControl = options.supportedBandAdvanceDominanceOverlayControl ?? false;
     const supportedBandScreenedCloserOverlay = options.supportedBandScreenedCloserOverlay ?? false;
     const supportedBandScreenedCloserOverlayControl = options.supportedBandScreenedCloserOverlayControl ?? false;
+    const supportedBandDecisiveScreenedCloserOverlay = options.supportedBandDecisiveScreenedCloserOverlay ?? false;
+    const supportedBandDecisiveScreenedCloserOverlayControl =
+        options.supportedBandDecisiveScreenedCloserOverlayControl ?? false;
     const protectedAdvanceGuardrails = options.protectedAdvanceGuardrails ?? false;
     const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
     for (const invocation of invocations) {
@@ -1367,6 +1451,8 @@ export async function runV08RangedPositioningAB(
                 `supportedBandDominanceOverlayControl=${supportedBandAdvanceDominanceOverlayControl} ` +
                 `supportedBandScreenedCloserOverlay=${supportedBandScreenedCloserOverlay} ` +
                 `supportedBandScreenedCloserOverlayControl=${supportedBandScreenedCloserOverlayControl} ` +
+                `supportedBandDecisiveScreenedCloserOverlay=${supportedBandDecisiveScreenedCloserOverlay} ` +
+                `supportedBandDecisiveScreenedCloserOverlayControl=${supportedBandDecisiveScreenedCloserOverlayControl} ` +
                 `protectedAdvanceGuardrails=${protectedAdvanceGuardrails} ` +
                 `protectedAdvanceGuardrailsMode=${protectedAdvanceGuardrailsMode} ` +
                 `games=${options.games} seed=${options.seed}`,
@@ -1420,6 +1506,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-band-dominance-overlay-control": { type: "boolean", default: false },
             "supported-band-screened-closer-overlay": { type: "boolean", default: false },
             "supported-band-screened-closer-overlay-control": { type: "boolean", default: false },
+            "supported-band-decisive-screened-closer-overlay": { type: "boolean", default: false },
+            "supported-band-decisive-screened-closer-overlay-control": { type: "boolean", default: false },
             "prelaunch-receipt": { type: "string" },
             "protected-advance-guardrails": { type: "boolean", default: false },
             "protected-advance-guardrails-mode": { type: "string", default: "both" },
@@ -1482,6 +1570,9 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedBandAdvanceDominanceOverlayControl: values["supported-band-dominance-overlay-control"]!,
         supportedBandScreenedCloserOverlay: values["supported-band-screened-closer-overlay"]!,
         supportedBandScreenedCloserOverlayControl: values["supported-band-screened-closer-overlay-control"]!,
+        supportedBandDecisiveScreenedCloserOverlay: values["supported-band-decisive-screened-closer-overlay"]!,
+        supportedBandDecisiveScreenedCloserOverlayControl:
+            values["supported-band-decisive-screened-closer-overlay-control"]!,
         prelaunchReceipt: values["prelaunch-receipt"],
         protectedAdvanceGuardrails: values["protected-advance-guardrails"]!,
         protectedAdvanceGuardrailsMode,
@@ -1508,6 +1599,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "--supported-band-overlay-vs-legacy|--supported-band-overlay-control|" +
                 "--supported-band-dominance-overlay|--supported-band-dominance-overlay-control|" +
                 "--supported-band-screened-closer-overlay|--supported-band-screened-closer-overlay-control] " +
+                "[--supported-band-decisive-screened-closer-overlay|" +
+                "--supported-band-decisive-screened-closer-overlay-control] " +
                 "[--prelaunch-receipt /absolute/path/to/receipt.json] " +
                 "[--supported-band-live-only] " +
                 "[--protected-advance-guardrails] " +

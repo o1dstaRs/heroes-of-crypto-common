@@ -252,7 +252,7 @@ export interface IV08SupportedBandDominanceComparisonDetails {
     shippedReachableThreatsAfter: number | null;
 }
 
-export type V08SupportedBandScreenedCloserReason = "screened_closer" | "filtered";
+export type V08SupportedBandScreenedCloserReason = "screened_closer" | "decisive_screened_closer" | "filtered";
 
 /** Neutral strict-vs-shipped proof for the separately sealed screened-closer overlay. */
 export interface IV08SupportedBandScreenedCloserComparisonDetails {
@@ -277,6 +277,8 @@ export interface IV08SupportedBandScreenedCloserComparisonDetails {
     strictReachableThreatsAfter: number | null;
     strictTargetDistanceBefore: number | null;
     strictTargetDistanceAfter: number | null;
+    strictTargetDistanceCompression: number | null;
+    strictFinishActive: boolean | null;
     strictTargetScreenedAfter: boolean | null;
     strictScreeningGuardId: string | null;
     strictRetainedSignatureAfter: boolean | null;
@@ -285,6 +287,8 @@ export interface IV08SupportedBandScreenedCloserComparisonDetails {
     shippedReachableThreatsAfter: number | null;
     shippedTargetDistanceBefore: number | null;
     shippedTargetDistanceAfter: number | null;
+    shippedTargetDistanceCompression: number | null;
+    shippedFinishActive: boolean | null;
     shippedTargetScreenedAfter: boolean | null;
     shippedScreeningGuardId: string | null;
     shippedRetainedSignatureAfter: boolean | null;

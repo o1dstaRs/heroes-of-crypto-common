@@ -1,0 +1,279 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-decisive-screened-closer-protocol/v3",
+    "name": "v0.8_supported_band_decisive_screened_closer_v3",
+    "recordedAt": "2026-07-23T22:24:33Z",
+    "status": "preregistered-before-outcomes",
+    "purpose": "Fresh-seed screening of a default-off v0.8+a13 positioning rule that may replace shipped with a strict native-screened ranged route only for an explicit finish state or a decisive four-cell target-distance compression, with exact post-a13 chosen-action and execution telemetry.",
+    "hypothesisProvenance": {
+        "outcomeMined": true,
+        "sourceReportSha256": "0b95ce233051a4f37bda56c1abc2e84272c192c359d622329c959d9805e1d243",
+        "sourceStopEvidenceSha256": "45596ee837c2ef8bf15ba61d7235c7e24454e1ca34655f51b2818df399c6db53",
+        "candidateRule": "strictFinishActive === true OR strictTargetDistanceCompression >= 4",
+        "allowedUseOfOldData": "Opportunity-rate sizing and hypothesis generation only.",
+        "forbiddenUseOfOldData": "No old outcome, effect, confidence interval, subgroup result, lane, or report may be pooled with or used to qualify this candidate.",
+        "interpretation": "The four-cell threshold was selected after inspecting a stopped scout. It has zero confirmatory value in that scout and must stand or fail entirely on the fresh lanes below."
+    },
+    "sourceRequirement": {
+        "candidate": "One clean pushed commit containing this protocol, the distinct decisive selector, its default-off environment/profile keys, CLI/manifest plumbing, exact neutral finish/compression fields, authoritative post-a13 action/execution telemetry, and focused tests.",
+        "dirty": false,
+        "manifestHeadAndTreeRequired": true,
+        "analyzerHashRequiredBeforePilot": true,
+        "configurationChangesAfterOutcomeOpenCreateNewCandidate": true
+    },
+    "selector": {
+        "name": "decisive_screened_closer",
+        "defaultEnabled": false,
+        "treatmentFlag": "--supported-band-decisive-screened-closer-overlay",
+        "controlFlag": "--supported-band-decisive-screened-closer-overlay-control",
+        "treatmentEnvironmentKey": "V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS",
+        "controlEnvironmentKey": "V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS",
+        "candidateReason": "decisive_screened_closer",
+        "catalogOrder": ["shipped", "strict"],
+        "incumbent": "shipped",
+        "baseRouteProof": [
+            "Both decisions are distinct move_unit plus ordinary range_attack decisions.",
+            "Both preserve the same declared target and visible aim edge.",
+            "Both preserve the complete non-regressing first-hit, affected-unit, and divisor signature.",
+            "Both improve from the same finite power-of-two divisorBefore to divisorAfter=1.",
+            "Both have zero reachable threats after movement.",
+            "Strict alone has a valid living native-melee target screen and a non-null screening guard.",
+            "Shipped is unscreened, closes relative to the shared source distance, and ends at a distinct footprint.",
+            "Strict ends strictly closer to the target than shipped."
+        ],
+        "routeValidity": [
+            "Serialize strict/shipped source, destination, path, target footprint, divisor-before, divisor-after, threats, target distances, finish state, screen, guard, and retained signature.",
+            "Accept exactly one optional leading origin in each moved path, then require nonempty cell-adjacent normalized travel ending at the serialized destination.",
+            "Require safe unique target-footprint cells containing the destination anchor.",
+            "Require equal strict/shipped source cells and equal finite source target distances.",
+            "Malformed, omitted-required, nonfinite, negative, inconsistent, repeated-origin, nonadjacent, or endpoint-mismatched data fails closed."
+        ],
+        "decisiveGate": {
+            "strictTargetDistanceCompressionDefinition": "strictTargetDistanceBefore - strictTargetDistanceAfter",
+            "shippedTargetDistanceCompressionDefinition": "shippedTargetDistanceBefore - shippedTargetDistanceAfter",
+            "ordinaryMinimumStrictCompression": 4,
+            "finishException": "strictFinishActive and shippedFinishActive are both non-null true and exactly equal.",
+            "matchedFinishRequirement": "For every moved shipped comparison, strictFinishActive and shippedFinishActive must be booleans and equal. A mismatch is malformed and fails closed. A structurally valid shipped shot-only fallback serializes shippedFinishActive=null and cannot qualify.",
+            "qualification": "The complete base route proof passes and either the matched finish exception is active or strictTargetDistanceCompression is at least four.",
+            "filtered": "A structurally valid comparison that misses the decisive gate returns the exact shipped decision and emits neutral reason=filtered."
+        },
+        "treatment": "v0.8 selects strict only for reason=decisive_screened_closer; v0.8s remains shipped.",
+        "control": "Both catalogs and the objective decisive comparison run, but v0.8 returns shipped at the matched root; v0.8s remains shipped.",
+        "soleConfiguredDifference": "The decisive selector-off environment key is the sole behavior-environment difference. The treatment/control CLI aliases and their two complementary manifest booleans necessarily differ as arm labels but introduce no second behavior difference."
+    },
+    "postA13CausalContract": {
+        "unitOfExposure": "The first matched pre-divergence qualified root in one physical-seat game where treatment and control return different complete chosen-action signatures. There can be at most one authoritative exposure per physical game.",
+        "requiredPerComparison": [
+            "bindingStatus, actor unitId/creatureName/side/strategyVersion",
+            "detached complete rawIncumbent GameAction array",
+            "detached complete chosenDecision GameAction array returned by a13",
+            "rawIncumbentMatchesStrict, rawIncumbentMatchesShipped, chosenMatchesStrict, and chosenMatchesShipped",
+            "finalChoice classified as strict, shipped, neither, ambiguous, or unresolved",
+            "per-action completion and rejection reason",
+            "chosen-action count agreement, complete chosen-decision success, substantive-action success",
+            "recovery-attempt count, recovery source, recovery completion, and recovery rejection"
+        ],
+        "resolvedBinding": [
+            "Exactly one current-turn comparison binds to the exact actor, side, creature, and strategy version.",
+            "At a qualified matched root, treatment raw incumbent matches the complete serialized strict policy signature and control raw incumbent matches the complete serialized shipped policy signature: exact action-type order, path, footprint, terrain flags, target, aim cell, and aim side, with move unitId and range attackerId both equal to the bound actor unitId.",
+            "Both chosen decisions are nonempty detached complete action arrays.",
+            "Every chosen action completes, action counts match, a substantive action completes, there are zero rejection reasons, zero recovery attempts, and recovery source is none."
+        ],
+        "directExposure": "Treatment and control chosen signatures differ and each final choice is strict or shipped.",
+        "searchMediatedExposure": "Treatment and control chosen signatures differ and at least one final choice is neither; this is a causal effect of changing a13 candidate zero within the tested v0.8+a13 composite.",
+        "notExposure": [
+            "Treatment and control final chosen signatures are identical, regardless of object identity, candidate index, or incumbent-retained diagnostics.",
+            "A qualified policy proposal with unresolved, ambiguous, rejected, recovered, missing, or multiply bound execution telemetry.",
+            "Any later root after the first executed divergence in that physical-seat game."
+        ],
+        "rootPairingAndCountDefinitions": {
+            "preDivergenceDomain": "For each physical game ID, traverse treatment and control comparison events in emission order while every earlier paired root has an identical exact final chosen-action array and two complete, unrejected, unrecovered executions. The registered seed, roster, engine, search catalog, and behavior environment are otherwise identical, so this inductively keeps the sealed selector as the only possible behavior divergence. Stop pairing that physical game permanently at the first different final chosen-action signature. The game record does not claim to serialize a full all-turn action history.",
+            "rootIdentity": "Within the pre-divergence domain, pair events only at the same emission ordinal when lap, side, unitId, creatureName, expected strategy version, target identity, and the complete objective comparison body agree. For the objective body, delete selected, retained, and postA13, recursively sort keys, serialize compact JSON plus LF, and compare bytes. Missing, excess, reordered, or mismatched events fail integrity.",
+            "baseEligibleComparisons": "Count once per matched treatment/control root, never once per arm, when both emitted comparison events have metadataValid=true and resolved postA13 binding. This deliberately includes well-formed filtered moved or shipped-shot-only comparisons. Any emitted metadata-invalid or unresolved event fails global integrity and is not silently removed from the denominator.",
+            "qualifiedMatchedRoots": "Subset of baseEligibleComparisons for which the analyzer independently reconstructs every serialized comparator predicate and the decisive gate; requires the source-derived strictTargetScreenedAfter, screeningGuardId, and retained-signature proof fields; observes treatment selected=true/dominant=true/reason=decisive_screened_closer and control selected=false/dominant=true/reason=decisive_screened_closer; and verifies every other objective field is identical. Living/native-melee guard identity, board-state aim visibility, and first-hit/affected-unit derivation remain source-locked semantics rather than analyzer-reconstructed state.",
+            "authoritativeDifferingChosenCompletedRoots": "Count the first qualifiedMatchedRoot per physical game whose two exact canonical chosen GameAction arrays differ and whose two bound executions are nonempty, actor-owned, complete, substantive, unrejected, and unrecovered.",
+            "uniqueCausalGames": "Number of distinct physical game IDs containing an authoritativeDifferingChosenCompletedRoot. It must equal authoritativeDifferingChosenCompletedRoots because later roots in that physical game are outside the causal matching frontier."
+        },
+        "retainedSemantics": "The historical retained boolean means only that SearchDriver returned the exact incumbent action-array object. It remains diagnostic and is never treated as proof of the executed action.",
+        "integrity": [
+            "At every matched pre-divergence root, objective comparison fields match after normalizing selected, retained, postA13, and the sole control environment key.",
+            "The first paired root with different final chosen-action signatures must itself be a qualified authoritative exposure; a filtered, malformed, unresolved, rejected, or recovered first divergence fails the phase even if the final core results later reconverge.",
+            "Every core outcome, lap, or Armageddon difference has an earlier authoritative executed exposure.",
+            "Every game with no authoritative executed exposure has an identical normalized core result.",
+            "Any missing chosen/execution trace, malformed binding, rejected causal action, recovery, or unexplained core difference fails the phase."
+        ]
+    },
+    "geometry": {
+        "cohort": "hybrid",
+        "amountMode": "expBudget",
+        "mode": "both",
+        "livetwin": true,
+        "pairedSideSwap": true,
+        "symmetricRosters": true,
+        "moveShots": 0,
+        "decisionOrigin": "root",
+        "diagnostics": true,
+        "researchUnbounded": true,
+        "manifestSchema": "hoc.v0_8_ranged_positioning_ab_experiment.v18",
+        "m4WorkersPerArm": 6,
+        "m4ConcurrentArms": 2,
+        "hardwareMeaning": "Pilot and scout are deterministic screening runs. Hardware changes throughput only; it cannot change the registered source, seeds, geometry, or gates."
+    },
+    "seedAllocation": {
+        "rejectedDraw": {
+            "masterHex": "0x3E2208F8",
+            "masterUnsigned": 1042417912,
+            "outcomesGenerated": false,
+            "reusable": false,
+            "reason": "Eight conservative prior one-million-cluster spans wrap across this draw's proposed envelope."
+        },
+        "masterHex": "0x87D0E430",
+        "masterUnsigned": 2278614064,
+        "pairStrideHex": "0x9E3779B1",
+        "pairStrideUnsigned": 2654435761,
+        "formula": "pairSeed(i) = (masterUnsigned + i * pairStrideUnsigned) mod 2^32",
+        "lanes": {
+            "pilot": {
+                "baseSeed": 2278614064,
+                "baseSeedHex": "0x87D0E430",
+                "pairIndices": [0, 5999],
+                "pairSeedClusters": 6000,
+                "gamesPerArm": 12000
+            },
+            "scout": {
+                "baseSeed": 3154446496,
+                "baseSeedHex": "0xBC0508A0",
+                "pairIndices": [6000, 25999],
+                "pairSeedClusters": 20000,
+                "gamesPerArm": 40000
+            }
+        },
+        "disjointnessAudit": {
+            "status": "conservative-campaign-history-assumption",
+            "knownPriorBaseExtraction": "At protocol creation, take every numeric evidence-JSON leaf whose final key is seed, baseSeed, or masterUnsigned; union it with the route-normalized-v2 priorBasesChecked array and rejectedDraw.masterUnsigned; numeric-sort unique values; encode one decimal value plus LF per line.",
+            "knownPriorBaseCount": 68,
+            "knownPriorBaseListSha256": "68438d4e5869c4a68871ee535030ab9b47bf806632a39393cf6f12d41e84b801",
+            "knownPriorBases": [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 24, 9001, 8241200, 10134723,
+                10144723, 10154723, 10164723, 10174723, 85000717, 92373000, 92374500, 92376000, 92377500, 110558515,
+                123456789, 177300033, 194753379, 215316261, 580246441, 597648745, 907160393, 930722001, 930722002,
+                930722003, 945176621, 1042417912, 1310106801, 1327509105, 1552825889, 1570279235, 1637020753,
+                1654474099, 1698797961, 2057369465, 2282686249, 2690819075, 2703034961, 2787229825, 2849007033,
+                3029999955, 3432895321, 3517090185, 3561465089, 3675665451, 3707437161, 3742406969, 3821637523,
+                4145353377
+            ],
+            "dominatingPriorPairIndicesPerListedBase": [0, 999999],
+            "newReservedPairIndices": [0, 25999],
+            "overlaps": 0,
+            "nearestPriorForwardBase": 15,
+            "nearestPriorForwardCoordinate": 18530959,
+            "unusedPairIndicesStrictlyBetweenNewEnvelopeAndNearestPriorForwardSpan": 18504959,
+            "nearestPriorBeforeBase": 10144723,
+            "nearestPriorBeforeDistance": 118868077,
+            "unusedPairIndicesStrictlyBetweenNearestPriorMillionClusterSpanAndNewMaster": 117868077,
+            "registryLimitation": "This is deliberately conservative over known evidence but is not a cryptographically complete registry of every historical seed ever executed."
+        }
+    },
+    "opportunityOnlySizing": {
+        "outcomeBlindUse": "Only candidate-opportunity counts from stopped default-off experiments are used; winner, score, lap, and Armageddon effects are excluded from sizing.",
+        "observedOldOpportunities": {
+            "pilotQualified": 6,
+            "pilotGamesPerArm": 2000,
+            "scoutQualified": 11,
+            "scoutGamesPerArm": 8000,
+            "combinedQualified": 17,
+            "combinedGamesPerArm": 10000,
+            "scoutPointRate": 0.001375,
+            "scoutWilson95LowerRate": 0.000768,
+            "worstSeatScoutQualified": 4,
+            "worstSeatScoutGames": 4000,
+            "worstSeatWilson95LowerRate": 0.000389
+        },
+        "pilotExpectedQualifiedAtScoutPointRate": 16.5,
+        "pilotExpectedQualifiedAtScoutLowerRate": 9.216,
+        "scoutExpectedQualifiedAtScoutPointRate": 55,
+        "scoutExpectedQualifiedAtScoutLowerRate": 30.72,
+        "adaptiveExtensionForbidden": true
+    },
+    "statistics": {
+        "causalContrast": "Treatment minus matched decisive-selector-off control for the complete v0.8+a13 composite.",
+        "cluster": "Independent pair-seed cluster containing both physical-seat swaps.",
+        "confidenceInterval": "Two-sided 95% Student-t interval over pair-seed cluster means.",
+        "physicalSeats": ["candidate-green", "candidate-red"],
+        "crossPhasePoolingForbidden": true,
+        "phasesAreScreeningOnly": true
+    },
+    "gates": {
+        "pilot": {
+            "exposure": {
+                "baseEligibleComparisonsMinimum": 240,
+                "qualifiedMatchedRootsMinimum": 8,
+                "authoritativeDifferingChosenCompletedRootsMinimum": 6,
+                "uniqueCausalGamesMinimum": 6,
+                "causalGamesPerCandidateSeatMinimum": 2,
+                "underexposureDisposition": "not-testable-stop"
+            },
+            "scoreDeltaPointPpMinimum": -0.25,
+            "eachSeatDeltaPointPpMinimum": -0.5,
+            "armageddonDeltaPointPpMaximum": 0.05,
+            "treatmentOnlyArmageddonInCausalGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0.02
+        },
+        "scout": {
+            "exposure": {
+                "baseEligibleComparisonsMinimum": 800,
+                "qualifiedMatchedRootsMinimum": 30,
+                "authoritativeDifferingChosenCompletedRootsMinimum": 24,
+                "uniqueCausalGamesMinimum": 24,
+                "causalGamesPerCandidateSeatMinimum": 6,
+                "underexposureDisposition": "not-testable-stop"
+            },
+            "scoreDeltaPointPpMinimum": 0,
+            "scoreDeltaLower95PpMinimum": -0.15,
+            "eachSeatDeltaPointPpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.1,
+            "treatmentOnlyArmageddonInCausalGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.03
+        }
+    },
+    "globalIntegrityGates": [
+        "Clean pushed source head/tree and exact manifest fingerprints.",
+        "Frozen analyzer, protocol, prelaunch receipt, source, shared-arm hash, and shared-environment hash.",
+        "Exact unique game IDs, pair-seed formula, and complete paired-seat clusters.",
+        "Treatment/control geometry is identical and only the decisive selector-off key differs.",
+        "Control selects zero decisive strict policy incumbents.",
+        "Every emitted comparison pair is metadata-valid, canonically matched, and has resolved postA13 binding plus valid chosen-action and execution metadata; well-formed filtered and shipped-shot-only comparisons are allowed.",
+        "Every selected decisive policy incumbent satisfies the four-cell-or-finish gate.",
+        "Every authoritative causal exposure has two completed, unrecovered, different final chosen-action signatures at a matched pre-divergence root.",
+        "authoritativeDifferingChosenCompletedRoots equals uniqueCausalGames in every phase and each physical game contributes at most one.",
+        "Every core difference has an earlier authoritative causal exposure; every no-exposure game has identical core results.",
+        "Zero malformed comparison records, rejected actions, recovery attempts, stuck endings, turn caps, deadline fallbacks, or circuit fallbacks.",
+        "No cross-phase pooling, post-hoc subgroup rescue, threshold relaxation, adaptive extension, or seed cherry-picking."
+    ],
+    "phaseOrderAndNoPeek": {
+        "pilotThenScout": true,
+        "duringPhase": "Inspect process liveness and exact record counts only. Do not open logs, records, summaries, result lines, or one-arm statistics until both arms finish.",
+        "prelaunchReceipt": "Before each phase, create and lock a read-only receipt outside output directories with source head/tree, protocol/analyzer hashes, self-test result, exact commands, lane, geometry, output paths, and prior passing report when applicable. The runner must hash that exact receipt into each manifest.",
+        "completionBarrier": "Both arms must exit successfully and contain exactly the registered record count before any outcome-bearing artifact is parsed.",
+        "analyzerMutation": "Any analyzer byte change after receipt publication invalidates the phase. Before outcome access rerun both arms under a new receipt; after outcome access stop and create a new candidate/master.",
+        "gateFailure": "Stop the candidate and do not launch the next phase.",
+        "underexposure": "Stop as not testable; never extend or relax adaptively.",
+        "passingPilot": "Authorizes only the registered scout.",
+        "passingScout": "Screening success only. It does not promote or default the feature and authorizes only a separately preregistered fresh-master confirmation.",
+        "prePeekFailure": "Discard both arms and restart both on the same lane.",
+        "postPeekFailure": "Burn the lane and stop."
+    },
+    "limitations": [
+        "The threshold is outcome-mined and may regress to the mean; only fresh evidence can support it.",
+        "Qualified roots are rare. Underexposure is possible even at the fixed sizes and must stop the candidate.",
+        "The exact raw incumbent, final chosen action, and execution are serialized, but the complete pre-deduplication a13 challenger catalog, private search RNG state, target-memory state, and pre/post-turn state hashes are not. Any unexplained same-action/core divergence therefore fails closed rather than being inferred away.",
+        "The analyzer can validate serialized paths, action signatures, aim identity, numeric route predicates, screen/guard fields, and retained-signature booleans. It cannot reconstruct from the game record whether the guard was living native melee, whether the aim edge was visible in full board state, or the full first-hit/affected-unit calculation; those derivations are bound to the clean source hash and focused tests.",
+        "Structured-clone instrumentation is active identically in both arms; research-unbounded search is required so telemetry overhead cannot alter deadline arbitration.",
+        "This tests the composite effect of changing a13 candidate zero, including search-mediated third-candidate selections; it is not a standalone policy-only estimate.",
+        "This feature-specific study does not establish or materially target a global near-zero Armageddon rate.",
+        "Passing pilot or scout does not establish bounded operational readiness, default readiness, or promotion.",
+        "The 9800X3D host was offline at preregistration time; unavailable remote hardware cannot change lanes, gates, or source identity.",
+        "Renderer projectile endpoints remain outside this strategy protocol."
+    ]
+}

@@ -29,8 +29,17 @@ import {
     type IArmyUnitSpec,
     type StackAmountMode,
 } from "./army";
-import { GREEN_TEAM, runMatch, type IDecisionObservation, type IMatchConfig, type IMatchResult } from "./battle_engine";
+import {
+    GREEN_TEAM,
+    runMatch,
+    type IDecisionObservation,
+    type IMatchConfig,
+    type IMatchResult,
+    type ITurnExecutionObservation,
+    type TurnRecoverySource,
+} from "./battle_engine";
 import { FightStateManager } from "../fights/fight_state_manager";
+import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES,
@@ -280,11 +289,13 @@ const newSupportedBandDominanceReasonCounts = (): Record<V08SupportedBandDominan
 
 const SUPPORTED_BAND_SCREENED_CLOSER_REASONS: readonly V08SupportedBandScreenedCloserReason[] = [
     "screened_closer",
+    "decisive_screened_closer",
     "filtered",
 ];
 
 const newSupportedBandScreenedCloserReasonCounts = (): Record<V08SupportedBandScreenedCloserReason, number> => ({
     screened_closer: 0,
+    decisive_screened_closer: 0,
     filtered: 0,
 });
 
@@ -350,12 +361,56 @@ export interface IMirrorSupportedBandDominanceComparisonEvent extends IV08Suppor
     retained: boolean;
 }
 
+export type MirrorSupportedBandScreenedCloserPostA13BindingStatus =
+    "resolved" | "missing_turn_execution" | "no_matching_current_turn_comparison" | "multiple_current_turn_comparisons";
+
+export type MirrorSupportedBandScreenedCloserFinalChoice =
+    "strict" | "shipped" | "neither" | "ambiguous" | "unresolved";
+
+export interface IMirrorSupportedBandScreenedCloserPostA13Actor {
+    unitId: string;
+    creatureName: string;
+    side: "green" | "red";
+    strategyVersion: string;
+}
+
+export interface IMirrorSupportedBandScreenedCloserPostA13Execution {
+    strategyActionCompletions: boolean[];
+    strategyActionRejectionReasons: Array<string | null>;
+    strategyActionCountMatchesChosen: boolean;
+    chosenDecisionCompleted: boolean;
+    substantiveActionCompleted: boolean;
+    recoveryAttemptCount: number;
+    recoverySource: TurnRecoverySource;
+    recoveryCompleted: boolean;
+    recoveryRejectionReason: string | null;
+}
+
+/**
+ * Post-SearchDriver evidence for the exact turn that produced a screened-closer comparison. Full actions are
+ * retained because a13 may select an arbitrary melee, spell, move, or other challenger that the ranged summary
+ * cannot represent. A non-resolved binding is deliberately unclassified and must fail closed downstream.
+ */
+export interface IMirrorSupportedBandScreenedCloserPostA13Evidence {
+    bindingStatus: MirrorSupportedBandScreenedCloserPostA13BindingStatus;
+    actor: IMirrorSupportedBandScreenedCloserPostA13Actor | null;
+    rawIncumbent: GameAction[] | null;
+    chosenDecision: GameAction[] | null;
+    rawIncumbentMatchesStrict: boolean | null;
+    rawIncumbentMatchesShipped: boolean | null;
+    chosenMatchesStrict: boolean | null;
+    chosenMatchesShipped: boolean | null;
+    finalChoice: MirrorSupportedBandScreenedCloserFinalChoice;
+    execution: IMirrorSupportedBandScreenedCloserPostA13Execution | null;
+}
+
 export interface IMirrorSupportedBandScreenedCloserComparisonEvent extends IV08SupportedBandScreenedCloserComparisonDetails {
     side: "green" | "red";
     unitId: string;
     creatureName: string;
     lap: number;
     retained: boolean;
+    postA13: IMirrorSupportedBandScreenedCloserPostA13Evidence;
 }
 
 export interface IMirrorSupportedBandDuelDifferenceEvent extends IV08SupportedBandDuelDetails {
@@ -395,6 +450,161 @@ const detachSupportedBandDuelDecision = (
     moveTargetCells: decision.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
     rangeAimCell: decision.rangeAimCell ? { ...decision.rangeAimCell } : null,
 });
+
+const detachGameActions = (actions: ITurnExecutionObservation["chosenDecision"]): GameAction[] =>
+    structuredClone(actions) as GameAction[];
+
+const summarizeSupportedBandDecision = (
+    decision: ITurnExecutionObservation["chosenDecision"],
+): IV08SupportedBandDuelDecisionSummary => {
+    const move = decision.find(
+        (action): action is Readonly<Extract<GameAction, { type: "move_unit" }>> => action.type === "move_unit",
+    );
+    const shot = decision.find(
+        (action): action is Readonly<Extract<GameAction, { type: "range_attack" }>> => action.type === "range_attack",
+    );
+    return {
+        actionTypes: decision.map((action) => action.type),
+        movePath: move ? move.path.map((cell) => ({ ...cell })) : null,
+        moveTargetCells: move?.targetCells ? move.targetCells.map((cell) => ({ ...cell })) : null,
+        moveHasLavaCell: move?.hasLavaCell ?? null,
+        moveHasWaterCell: move?.hasWaterCell ?? null,
+        rangeTargetId: shot?.targetId ?? null,
+        rangeAimCell: shot?.aimCell ? { ...shot.aimCell } : null,
+        rangeAimSide: shot?.aimSide ?? null,
+    };
+};
+
+const sameCells = (
+    left: readonly { x: number; y: number }[] | null,
+    right: readonly { x: number; y: number }[] | null,
+) =>
+    left === right ||
+    (left !== null &&
+        right !== null &&
+        left.length === right.length &&
+        left.every((cell, index) => cell.x === right[index]!.x && cell.y === right[index]!.y));
+
+const sameSupportedBandDecision = (
+    left: IV08SupportedBandDuelDecisionSummary,
+    right: IV08SupportedBandDuelDecisionSummary,
+): boolean =>
+    left.actionTypes.length === right.actionTypes.length &&
+    left.actionTypes.every((type, index) => type === right.actionTypes[index]) &&
+    sameCells(left.movePath, right.movePath) &&
+    sameCells(left.moveTargetCells, right.moveTargetCells) &&
+    left.moveHasLavaCell === right.moveHasLavaCell &&
+    left.moveHasWaterCell === right.moveHasWaterCell &&
+    left.rangeTargetId === right.rangeTargetId &&
+    ((left.rangeAimCell === null && right.rangeAimCell === null) ||
+        (left.rangeAimCell !== null &&
+            right.rangeAimCell !== null &&
+            left.rangeAimCell.x === right.rangeAimCell.x &&
+            left.rangeAimCell.y === right.rangeAimCell.y)) &&
+    left.rangeAimSide === right.rangeAimSide;
+
+const supportedBandDecisionUsesActor = (
+    decision: ITurnExecutionObservation["chosenDecision"],
+    actorUnitId: string,
+): boolean =>
+    decision.every((action) => {
+        if (action.type === "move_unit") return action.unitId === actorUnitId;
+        if (action.type === "range_attack") return action.attackerId === actorUnitId;
+        return true;
+    });
+
+const unresolvedSupportedBandScreenedCloserPostA13Evidence = (): IMirrorSupportedBandScreenedCloserPostA13Evidence => ({
+    bindingStatus: "missing_turn_execution",
+    actor: null,
+    rawIncumbent: null,
+    chosenDecision: null,
+    rawIncumbentMatchesStrict: null,
+    rawIncumbentMatchesShipped: null,
+    chosenMatchesStrict: null,
+    chosenMatchesShipped: null,
+    finalChoice: "unresolved",
+    execution: null,
+});
+
+const supportedBandScreenedCloserPostA13Evidence = (
+    observation: ITurnExecutionObservation,
+    comparison: IMirrorSupportedBandScreenedCloserComparisonEvent,
+    bindingStatus: Exclude<MirrorSupportedBandScreenedCloserPostA13BindingStatus, "missing_turn_execution">,
+): IMirrorSupportedBandScreenedCloserPostA13Evidence => {
+    const rawIncumbent = detachGameActions(observation.rawIncumbent);
+    const chosenDecision = detachGameActions(observation.chosenDecision);
+    const resolved = bindingStatus === "resolved";
+    const rawSummary = resolved ? summarizeSupportedBandDecision(observation.rawIncumbent) : null;
+    const chosenSummary = resolved ? summarizeSupportedBandDecision(observation.chosenDecision) : null;
+    const rawUsesActor = resolved && supportedBandDecisionUsesActor(observation.rawIncumbent, observation.unitId);
+    const chosenUsesActor = resolved && supportedBandDecisionUsesActor(observation.chosenDecision, observation.unitId);
+    const rawIncumbentMatchesStrict =
+        rawSummary && rawUsesActor
+            ? sameSupportedBandDecision(rawSummary, comparison.strict)
+            : rawSummary
+              ? false
+              : null;
+    const rawIncumbentMatchesShipped =
+        rawSummary && rawUsesActor
+            ? sameSupportedBandDecision(rawSummary, comparison.shipped)
+            : rawSummary
+              ? false
+              : null;
+    const chosenMatchesStrict =
+        chosenSummary && chosenUsesActor
+            ? sameSupportedBandDecision(chosenSummary, comparison.strict)
+            : chosenSummary
+              ? false
+              : null;
+    const chosenMatchesShipped =
+        chosenSummary && chosenUsesActor
+            ? sameSupportedBandDecision(chosenSummary, comparison.shipped)
+            : chosenSummary
+              ? false
+              : null;
+    const finalChoice: MirrorSupportedBandScreenedCloserFinalChoice =
+        chosenMatchesStrict === null || chosenMatchesShipped === null
+            ? "unresolved"
+            : chosenMatchesStrict && chosenMatchesShipped
+              ? "ambiguous"
+              : chosenMatchesStrict
+                ? "strict"
+                : chosenMatchesShipped
+                  ? "shipped"
+                  : "neither";
+    return {
+        bindingStatus,
+        actor: {
+            unitId: observation.unitId,
+            creatureName: observation.creatureName,
+            side: observation.side,
+            strategyVersion: observation.strategyVersion,
+        },
+        rawIncumbent,
+        chosenDecision,
+        rawIncumbentMatchesStrict,
+        rawIncumbentMatchesShipped,
+        chosenMatchesStrict,
+        chosenMatchesShipped,
+        finalChoice,
+        execution: {
+            strategyActionCompletions: observation.strategyActions.map((action) => action.completed),
+            strategyActionRejectionReasons: observation.strategyActions.map((action) => action.rejectionReason ?? null),
+            strategyActionCountMatchesChosen: observation.strategyActions.length === observation.chosenDecision.length,
+            chosenDecisionCompleted:
+                observation.chosenDecision.length > 0 &&
+                observation.strategyActions.length === observation.chosenDecision.length &&
+                observation.strategyActions.every((action) => action.completed),
+            substantiveActionCompleted: observation.strategyActions.some(
+                ({ action, completed }) => completed && action.type !== "select_attack_type",
+            ),
+            recoveryAttemptCount: observation.recoveryAttempts.length,
+            recoverySource: observation.recovery.source,
+            recoveryCompleted: observation.recovery.completed,
+            recoveryRejectionReason: observation.recovery.rejectionReason ?? null,
+        },
+    };
+};
 
 /** Pair seed rule shared with archetype_payoff: games 2k / 2k+1 replay the same seed with seats swapped. */
 export const mirrorGameSeed = (baseSeed: number, game: number): number =>
@@ -539,6 +749,7 @@ export function playMirrorGame(
     const supportedBandDominanceComparisonEvents: IMirrorSupportedBandDominanceComparisonEvent[] = [];
     const bandDominanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandDominanceComparisonEvent>();
     const supportedBandScreenedCloserComparisonEvents: IMirrorSupportedBandScreenedCloserComparisonEvent[] = [];
+    const pendingSupportedBandScreenedCloserComparisons: IMirrorSupportedBandScreenedCloserComparisonEvent[] = [];
     const bandScreenedCloserRecordByEvent = new WeakMap<
         IAIPolicyEvent,
         IMirrorSupportedBandScreenedCloserComparisonEvent
@@ -695,8 +906,10 @@ export function playMirrorGame(
                       creatureName: event.creatureName,
                       lap: event.lap,
                       retained: false,
+                      postA13: unresolvedSupportedBandScreenedCloserPostA13Evidence(),
                   };
                   supportedBandScreenedCloserComparisonEvents.push(proposal);
+                  pendingSupportedBandScreenedCloserComparisons.push(proposal);
                   bandScreenedCloserRecordByEvent.set(event, proposal);
               } else if (event.kind === "v0.8_supported_band_duel_difference") {
                   side.supportedBandDuelDifferenceProposals += 1;
@@ -749,6 +962,38 @@ export function playMirrorGame(
               }
           }
         : undefined;
+    const turnExecutionObserver: IMatchConfig["turnExecutionObserver"] = diag
+        ? (observation): void => {
+              const currentTurnComparisons = pendingSupportedBandScreenedCloserComparisons.splice(
+                  0,
+                  pendingSupportedBandScreenedCloserComparisons.length,
+              );
+              if (!currentTurnComparisons.length) return;
+              const exactActorComparisons = currentTurnComparisons.filter(
+                  (comparison) =>
+                      comparison.unitId === observation.unitId &&
+                      comparison.creatureName === observation.creatureName &&
+                      comparison.side === observation.side &&
+                      observation.strategyVersion === (comparison.side === "green" ? greenVersion : redVersion),
+              );
+              const bindingStatus: Exclude<
+                  MirrorSupportedBandScreenedCloserPostA13BindingStatus,
+                  "missing_turn_execution"
+              > =
+                  currentTurnComparisons.length !== 1
+                      ? "multiple_current_turn_comparisons"
+                      : exactActorComparisons.length === 1
+                        ? "resolved"
+                        : "no_matching_current_turn_comparison";
+              for (const comparison of currentTurnComparisons) {
+                  comparison.postA13 = supportedBandScreenedCloserPostA13Evidence(
+                      observation,
+                      comparison,
+                      bindingStatus,
+                  );
+              }
+          }
+        : undefined;
 
     // Prime the lazy singleton outside runMatch's seeded scope (archetype_payoff.ts rationale).
     const matchRunner =
@@ -771,6 +1016,7 @@ export function playMirrorGame(
         ...(observer ? { decisionObserver: observer } : {}),
         ...(policyProposalObserver ? { policyProposalObserver } : {}),
         ...(policyEventObserver ? { policyEventObserver } : {}),
+        ...(turnExecutionObserver ? { turnExecutionObserver } : {}),
     });
 
     if (diag) {

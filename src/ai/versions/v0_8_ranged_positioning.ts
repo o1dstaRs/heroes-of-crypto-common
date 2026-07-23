@@ -70,6 +70,10 @@ const SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS_ENV =
 const SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS";
 const SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS_ENV =
     "V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS";
+const SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS_ENV =
+    "V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS";
+const SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS_ENV =
+    "V08_SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS";
 const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
 const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
 const PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE";
@@ -1224,6 +1228,8 @@ interface ISupportedBandScreenedCloserComparison {
     strictReachableThreatsAfter: number | null;
     strictTargetDistanceBefore: number | null;
     strictTargetDistanceAfter: number | null;
+    strictTargetDistanceCompression: number | null;
+    strictFinishActive: boolean | null;
     strictTargetScreenedAfter: boolean | null;
     strictScreeningGuardId: string | null;
     strictRetainedSignatureAfter: boolean | null;
@@ -1232,6 +1238,8 @@ interface ISupportedBandScreenedCloserComparison {
     shippedReachableThreatsAfter: number | null;
     shippedTargetDistanceBefore: number | null;
     shippedTargetDistanceAfter: number | null;
+    shippedTargetDistanceCompression: number | null;
+    shippedFinishActive: boolean | null;
     shippedTargetScreenedAfter: boolean | null;
     shippedScreeningGuardId: string | null;
     shippedRetainedSignatureAfter: boolean | null;
@@ -1247,6 +1255,12 @@ const finitePositivePowerOfTwo = (value: unknown): number | null =>
         : null;
 
 const finiteBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+
+const finiteCompression = (before: number | null, after: number | null): number | null => {
+    if (before === null || after === null) return null;
+    const compression = before - after;
+    return Number.isSafeInteger(compression) ? compression : null;
+};
 
 const nonemptyString = (value: unknown): string | null =>
     typeof value === "string" && value.length > 0 ? value : null;
@@ -1342,7 +1356,7 @@ const isValidatedMoveShotSummary = (
         return false;
     }
     const travelledPath = sameCell(summary.movePath[0]!, fromCell) ? summary.movePath.slice(1) : summary.movePath;
-    if (!travelledPath.length) return false;
+    if (!travelledPath.length || travelledPath.some((cell) => sameCell(cell, fromCell))) return false;
     let prior = fromCell;
     for (const cell of travelledPath) {
         if (!adjacentCell(prior, cell)) return false;
@@ -1438,19 +1452,24 @@ function compareSupportedBandDominance(
  * qualification: ordinary shipped fallbacks and well-formed, non-qualifying advances are valid filtered controls.
  * The selector changes the executable root only when both routes are full-damage and unreachable, strict alone has
  * a native-melee target screen, shipped really closes, both signatures are retained, and strict is strictly closer.
+ * The separately named decisive selector further requires four cells of strict compression or a matched active finish.
  */
 export function compareV08SupportedBandScreenedCloser(
     strictDetails: IV08SupportedBandAdvanceDetails,
     strictSummary: IV08SupportedBandDuelDecisionSummary,
     shippedMetadata: IV08ProtectedAdvanceCatalogMetadata | undefined,
     shippedSummary: IV08SupportedBandDuelDecisionSummary,
+    candidateReason: Exclude<V08SupportedBandScreenedCloserReason, "filtered"> = "screened_closer",
 ): ISupportedBandScreenedCloserComparison {
+    const requiresDecisiveGate = candidateReason === "decisive_screened_closer";
     const strictDivisorBefore = finitePositivePowerOfTwo(strictDetails.divisorBefore);
     const strictDivisorAfter = finitePositivePowerOfTwo(strictDetails.divisorAfter);
     const strictReachableThreatsBefore = finiteNonnegativeCount(strictDetails.exposureBefore);
     const strictReachableThreatsAfter = finiteNonnegativeCount(strictDetails.exposureAfter);
     const strictTargetDistanceBefore = finiteNonnegativeCount(strictDetails.targetDistanceBefore);
     const strictTargetDistanceAfter = finiteNonnegativeCount(strictDetails.targetDistanceAfter);
+    const strictTargetDistanceCompression = finiteCompression(strictTargetDistanceBefore, strictTargetDistanceAfter);
+    const strictFinishActive = finiteBoolean(strictDetails.finishActive);
     const strictTargetScreenedAfter = finiteBoolean(strictDetails.targetScreenedAfter);
     const strictScreeningGuardId = nonemptyString(strictDetails.screeningGuardId);
     const strictRetainedSignatureAfter = finiteBoolean(strictDetails.retainedSignatureAfter);
@@ -1464,6 +1483,8 @@ export function compareV08SupportedBandScreenedCloser(
         shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.targetDistanceBefore);
     const shippedTargetDistanceAfter =
         shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.targetDistanceAfter);
+    const shippedTargetDistanceCompression = finiteCompression(shippedTargetDistanceBefore, shippedTargetDistanceAfter);
+    const shippedFinishActive = shippedMetadata === undefined ? null : finiteBoolean(shippedMetadata.finishActive);
     const shippedTargetScreenedAfter =
         shippedMetadata === undefined ? null : finiteBoolean(shippedMetadata.targetScreenedAfter);
     const shippedScreeningGuardId =
@@ -1494,6 +1515,7 @@ export function compareV08SupportedBandScreenedCloser(
         strictTargetDistanceBefore !== null &&
         strictTargetDistanceAfter !== null &&
         strictTargetDistanceAfter < strictTargetDistanceBefore &&
+        (!requiresDecisiveGate || strictFinishActive !== null) &&
         strictScreenMetadataValid &&
         strictRetainedSignatureAfter === true &&
         isValidatedMoveShotSummary(strictSummary, strictDetails.fromCell, strictDetails.toCell);
@@ -1507,6 +1529,8 @@ export function compareV08SupportedBandScreenedCloser(
               shippedReachableThreatsAfter !== null &&
               shippedTargetDistanceBefore === strictTargetDistanceBefore &&
               shippedTargetDistanceAfter !== null &&
+              shippedFinishActive !== null &&
+              (!requiresDecisiveGate || shippedFinishActive === strictFinishActive) &&
               shippedScreenMetadataStructurallyValid &&
               shippedRetainedSignatureAfter !== null &&
               typeof shippedMetadata.ownRangedOutput === "number" &&
@@ -1515,11 +1539,10 @@ export function compareV08SupportedBandScreenedCloser(
               typeof shippedMetadata.enemyRangedOutput === "number" &&
               Number.isFinite(shippedMetadata.enemyRangedOutput) &&
               shippedMetadata.enemyRangedOutput >= 0 &&
-              typeof shippedMetadata.finishActive === "boolean" &&
               isValidatedMoveShotSummary(shippedSummary, shippedMetadata.fromCell, shippedMetadata.toCell) &&
               sameCell(shippedMetadata.fromCell, strictDetails.fromCell);
     const metadataValid = strictMetadataValid && shippedMetadataValid && targetIdentityValid;
-    const dominant =
+    const routeDominant =
         metadataValid &&
         shippedMetadata !== undefined &&
         strictDivisorAfter === 1 &&
@@ -1536,10 +1559,15 @@ export function compareV08SupportedBandScreenedCloser(
         strictTargetDistanceAfter! < shippedTargetDistanceAfter! &&
         !sameCellFootprint(strictSummary.moveTargetCells, shippedSummary.moveTargetCells) &&
         !sameSupportedBandDuelDecision(strictSummary, shippedSummary);
+    const dominant =
+        routeDominant &&
+        (!requiresDecisiveGate ||
+            strictFinishActive === true ||
+            (strictTargetDistanceCompression !== null && strictTargetDistanceCompression >= 4));
     return {
         dominant,
         metadataValid,
-        reason: dominant ? "screened_closer" : "filtered",
+        reason: dominant ? candidateReason : "filtered",
         strictFromCell: { ...strictDetails.fromCell },
         strictToCell: { ...strictDetails.toCell },
         shippedFromCell: shippedMetadata === undefined ? null : { ...shippedMetadata.fromCell },
@@ -1550,6 +1578,8 @@ export function compareV08SupportedBandScreenedCloser(
         strictReachableThreatsAfter,
         strictTargetDistanceBefore,
         strictTargetDistanceAfter,
+        strictTargetDistanceCompression,
+        strictFinishActive,
         strictTargetScreenedAfter,
         strictScreeningGuardId,
         strictRetainedSignatureAfter,
@@ -1558,6 +1588,8 @@ export function compareV08SupportedBandScreenedCloser(
         shippedReachableThreatsAfter,
         shippedTargetDistanceBefore,
         shippedTargetDistanceAfter,
+        shippedTargetDistanceCompression,
+        shippedFinishActive,
         shippedTargetScreenedAfter,
         shippedScreeningGuardId,
         shippedRetainedSignatureAfter,
@@ -1716,6 +1748,18 @@ function supportedBandAdvanceVsLegacy(
             .map((value) => value.trim())
             .filter(Boolean),
     );
+    const decisiveScreenedCloserOverlayVersions = new Set(
+        (process.env[SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const decisiveScreenedCloserOverlayControlVersions = new Set(
+        (process.env[SUPPORTED_BAND_DECISIVE_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
     const selectsStrict = strictVersions.has(strategyVersion);
     const selectsLegacy = legacyVersions.has(strategyVersion);
     if (!selectsStrict && !selectsLegacy) return decision;
@@ -1744,9 +1788,25 @@ function supportedBandAdvanceVsLegacy(
     const selectsDominanceOverlay = selectsStrict && dominanceOverlayVersions.has(strategyVersion);
     const selectsDominanceOverlayControl =
         selectsDominanceOverlay && dominanceOverlayControlVersions.has(strategyVersion);
-    const selectsScreenedCloserOverlay = selectsStrict && screenedCloserOverlayVersions.has(strategyVersion);
+    const selectsOriginalScreenedCloserOverlay = selectsStrict && screenedCloserOverlayVersions.has(strategyVersion);
+    const selectsDecisiveScreenedCloserOverlay =
+        selectsStrict && decisiveScreenedCloserOverlayVersions.has(strategyVersion);
+    const screenedCloserSelectorConflict = selectsOriginalScreenedCloserOverlay && selectsDecisiveScreenedCloserOverlay;
+    const screenedCloserCandidateReason: Exclude<V08SupportedBandScreenedCloserReason, "filtered"> | undefined =
+        screenedCloserSelectorConflict
+            ? undefined
+            : selectsDecisiveScreenedCloserOverlay
+              ? "decisive_screened_closer"
+              : selectsOriginalScreenedCloserOverlay
+                ? "screened_closer"
+                : undefined;
+    const selectsScreenedCloserOverlay = selectsOriginalScreenedCloserOverlay || selectsDecisiveScreenedCloserOverlay;
     const selectsScreenedCloserOverlayControl =
-        selectsScreenedCloserOverlay && screenedCloserOverlayControlVersions.has(strategyVersion);
+        selectsScreenedCloserOverlay &&
+        (screenedCloserSelectorConflict ||
+            (selectsOriginalScreenedCloserOverlay && screenedCloserOverlayControlVersions.has(strategyVersion)) ||
+            (selectsDecisiveScreenedCloserOverlay &&
+                decisiveScreenedCloserOverlayControlVersions.has(strategyVersion)));
     const strictSummary = supportedBandDuelDecisionSummary(strictDecision);
     const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
     const dominanceComparison =
@@ -1754,12 +1814,13 @@ function supportedBandAdvanceVsLegacy(
             ? compareSupportedBandDominance(strictProposal, strictSummary, legacyCatalog.metadata, shippedSummary)
             : undefined;
     const screenedCloserComparison =
-        selectsScreenedCloserOverlay && strictProposal
+        screenedCloserCandidateReason && strictProposal
             ? compareV08SupportedBandScreenedCloser(
                   strictProposal.details,
                   strictSummary,
                   legacyCatalog.metadata,
                   shippedSummary,
+                  screenedCloserCandidateReason,
               )
             : undefined;
     const strictDominatesShipped = dominanceComparison?.dominant ?? false;
@@ -1835,6 +1896,8 @@ function supportedBandAdvanceVsLegacy(
             strictReachableThreatsAfter: screenedCloserComparison.strictReachableThreatsAfter,
             strictTargetDistanceBefore: screenedCloserComparison.strictTargetDistanceBefore,
             strictTargetDistanceAfter: screenedCloserComparison.strictTargetDistanceAfter,
+            strictTargetDistanceCompression: screenedCloserComparison.strictTargetDistanceCompression,
+            strictFinishActive: screenedCloserComparison.strictFinishActive,
             strictTargetScreenedAfter: screenedCloserComparison.strictTargetScreenedAfter,
             strictScreeningGuardId: screenedCloserComparison.strictScreeningGuardId,
             strictRetainedSignatureAfter: screenedCloserComparison.strictRetainedSignatureAfter,
@@ -1843,6 +1906,8 @@ function supportedBandAdvanceVsLegacy(
             shippedReachableThreatsAfter: screenedCloserComparison.shippedReachableThreatsAfter,
             shippedTargetDistanceBefore: screenedCloserComparison.shippedTargetDistanceBefore,
             shippedTargetDistanceAfter: screenedCloserComparison.shippedTargetDistanceAfter,
+            shippedTargetDistanceCompression: screenedCloserComparison.shippedTargetDistanceCompression,
+            shippedFinishActive: screenedCloserComparison.shippedFinishActive,
             shippedTargetScreenedAfter: screenedCloserComparison.shippedTargetScreenedAfter,
             shippedScreeningGuardId: screenedCloserComparison.shippedScreeningGuardId,
             shippedRetainedSignatureAfter: screenedCloserComparison.shippedRetainedSignatureAfter,
