@@ -13,7 +13,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Grid } from "../grid/grid";
 import type { IMovePath, IReadonlyMovePath } from "../grid/path_definitions";
 import { PathHelper } from "../grid/path_helper";
-import type { Unit } from "../units/unit";
+import { Unit, type IUnitAIRepr } from "../units/unit";
 import type { XY } from "../utils/math";
 
 const BASE_GET_MOVE_PATH = PathHelper.prototype.getMovePath;
@@ -28,6 +28,9 @@ const BASE_FILTER_UNALLOWED_DESTINATIONS = (
         filterUnallowedDestinations: unknown;
     }
 ).filterUnallowedDestinations;
+const BASE_UNIT_GET_CELLS = Unit.prototype.getCells;
+const BASE_UNIT_GET_POSITION = Unit.prototype.getPosition;
+const BASE_UNIT_IS_SMALL_SIZE = Unit.prototype.isSmallSize;
 
 export type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 
@@ -73,6 +76,7 @@ interface ICanonicalMovePathInput {
  * is unreachable. Custom helpers, malformed anchors, and non-production grids always delegate without caching.
  */
 export class DecisionPathCatalog implements IDecisionPathSource {
+    readonly #canonicalDecisionBrand = true;
     private readonly cacheSafe: boolean;
     private cached: IMovePath | undefined;
     private rootClaimed = false;
@@ -118,6 +122,32 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         collectStats = false,
     ): DecisionPathCatalog {
         return new DecisionPathCatalog(grid, delegate, unit, canonicalInput(grid, unit, matrix), collectStats);
+    }
+    /**
+     * Authorize an optimization that observes only the distance-one melee target layer.
+     *
+     * The private brand check is intentionally first: structural lookalikes and Proxy-wrapped catalogs fail
+     * closed without any property access. The remaining identity checks constrain the optimization to the
+     * exact production decision epoch and native Unit footprint methods used to create this catalog.
+     */
+    public static canElideUnconsumedMeleeLayers(
+        source: IDecisionPathSource,
+        grid: Grid,
+        unit: IUnitAIRepr,
+        matrix: number[][],
+    ): boolean {
+        if (typeof source !== "object" || source === null || !(#canonicalDecisionBrand in source)) {
+            return false;
+        }
+        return (
+            source.cacheSafe &&
+            source.grid === grid &&
+            source.unit === unit &&
+            source.canonical.matrix === matrix &&
+            unit.getCells === BASE_UNIT_GET_CELLS &&
+            unit.isSmallSize === BASE_UNIT_IS_SMALL_SIZE &&
+            (unit as IUnitAIRepr & Pick<Unit, "getPosition">).getPosition === BASE_UNIT_GET_POSITION
+        );
     }
     public getStats(): IDecisionPathCatalogStats {
         return this.stats ? { ...this.stats } : { requests: 0, hits: 0, misses: 0, bypasses: 0 };

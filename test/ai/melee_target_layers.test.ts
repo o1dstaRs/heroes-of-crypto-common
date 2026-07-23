@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { buildMeleeTargetLayers } from "../../src/ai/internal/melee_target_layers";
+import { buildFirstMeleeTargetLayers, buildMeleeTargetLayers } from "../../src/ai/internal/melee_target_layers";
 import type { IUnitAIRepr } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 
@@ -218,6 +218,31 @@ const expectEquivalent = ({
         return actual.value;
     }
     throw new Error("Outcome kinds differed after assertion");
+};
+
+const expectFirstLayerEquivalent = ({
+    anchor,
+    attackerFactory,
+    currentSmall,
+    matrixFactory,
+    targetSmall = true,
+}: IEquivalenceCase): XY[][] => {
+    const expected = legacyBuildMeleeTargetLayers(
+        { x: anchor.x, y: anchor.y },
+        matrixFactory([]),
+        attackerFactory([]),
+        currentSmall,
+        targetSmall,
+    ).slice(0, 1);
+    const actual = buildFirstMeleeTargetLayers(
+        { x: anchor.x, y: anchor.y },
+        matrixFactory([]),
+        attackerFactory([]),
+        currentSmall,
+        targetSmall,
+    );
+    expectCoordinateArraysToBeSameValue(actual, expected);
+    return actual;
 };
 
 const zeroMatrix = (height: number, width = height): number[][] =>
@@ -636,5 +661,126 @@ describe("buildMeleeTargetLayers legacy differential", () => {
         first[0].push({ x: 123, y: 456 });
         expect(second[0][0]).toEqual(untouchedSecond);
         expect(second[0].some((cell) => cell.x === 123 && cell.y === 456)).toBe(false);
+    });
+});
+
+describe("buildFirstMeleeTargetLayers legacy differential", () => {
+    it("distinguishes a missing distance-one layer from a present but fully blocked layer", () => {
+        expectFirstLayerEquivalent({
+            anchor: { x: 0, y: 0 },
+            attackerFactory: freshAttackerWithCells([]),
+            currentSmall: true,
+            matrixFactory: denseMatrixFactory([]),
+        });
+        expect(buildFirstMeleeTargetLayers({ x: 0, y: 0 }, [], freshAttackerWithCells([])([]))).toEqual([]);
+
+        const blocked = matrixFromPattern(16, 16, "obstacle");
+        const blockedResult = expectFirstLayerEquivalent({
+            anchor: { x: 7, y: 7 },
+            attackerFactory: freshAttackerWithCells([]),
+            currentSmall: true,
+            matrixFactory: denseMatrixFactory(blocked),
+        });
+        expect(blockedResult).toEqual([[]]);
+    });
+
+    it("matches the legacy first layer at every production anchor across attacker sizes and matrix families", () => {
+        const patterns = ["zero", "checker", "single", "team", "obstacle"] as const;
+        let cases = 0;
+        for (const pattern of patterns) {
+            const matrix = matrixFromPattern(16, 16, pattern);
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 16; x++) {
+                    for (const currentSmall of [true, false]) {
+                        expectFirstLayerEquivalent({
+                            anchor: { x, y },
+                            attackerFactory: freshAttackerWithCells([
+                                { x: 0, y: 0 },
+                                { x: 1, y: 0 },
+                                { x: 0, y: 1 },
+                                { x: 1, y: 1 },
+                            ]),
+                            currentSmall,
+                            matrixFactory: denseMatrixFactory(matrix),
+                        });
+                        cases++;
+                    }
+                }
+            }
+        }
+        expect(cases).toBe(2_560);
+    });
+
+    it("matches dimensions 1..17, odd cutoffs, rectangular boards, edges, and outside anchors", () => {
+        const patterns = ["zero", "obstacle", "team", "checker", "single"] as const;
+        let cases = 0;
+        for (let dimension = 1; dimension <= 17; dimension++) {
+            const width = 18 - dimension;
+            const anchors = [
+                { x: 0, y: 0 },
+                { x: width - 1, y: dimension - 1 },
+                { x: Math.floor(width / 2), y: Math.floor(dimension / 2) },
+                { x: -2, y: -1 },
+                { x: width + 1, y: dimension + 2 },
+            ];
+            for (const pattern of patterns) {
+                const matrix = matrixFromPattern(dimension, width, pattern);
+                for (const anchor of anchors) {
+                    for (const currentSmall of [true, false]) {
+                        for (const targetSmall of [true, false]) {
+                            expectFirstLayerEquivalent({
+                                anchor,
+                                attackerFactory: freshAttackerWithCells([
+                                    { x: 0, y: 0 },
+                                    { x: Math.max(0, width - 1), y: Math.max(0, dimension - 1) },
+                                ]),
+                                currentSmall,
+                                matrixFactory: denseMatrixFactory(matrix),
+                                targetSmall,
+                            });
+                            cases++;
+                        }
+                    }
+                }
+            }
+        }
+        expect(cases).toBe(1_700);
+    });
+
+    it("matches 4096 seeded production-value boards and owns every emitted object", () => {
+        const random = makeLcg(0xa13_f1a5);
+        for (let caseIndex = 0; caseIndex < 4_096; caseIndex++) {
+            const matrix = zeroMatrix(16);
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 16; x++) {
+                    const roll = random() % 10;
+                    matrix[y][x] = roll < 6 ? 0 : [-4, -3, -2, -1, 1, 2][random() % 6];
+                }
+            }
+            const actual = expectFirstLayerEquivalent({
+                anchor: { x: (random() % 22) - 3, y: (random() % 22) - 3 },
+                attackerFactory: freshAttackerWithCells([
+                    { x: random() % 16, y: random() % 16 },
+                    { x: random() % 16, y: random() % 16 },
+                    { x: random() % 16, y: random() % 16 },
+                    { x: random() % 16, y: random() % 16 },
+                ]),
+                currentSmall: (random() & 1) === 0,
+                matrixFactory: denseMatrixFactory(matrix),
+            });
+            expectEveryCellReferenceUnique(actual);
+        }
+
+        const matrix = zeroMatrix(16);
+        const attacker = freshAttackerWithCells([{ x: 1, y: 1 }])([]);
+        const first = buildFirstMeleeTargetLayers({ x: 7, y: 7 }, matrix, attacker, true, true);
+        const second = buildFirstMeleeTargetLayers({ x: 7, y: 7 }, matrix, attacker, true, true);
+        expect(first).not.toBe(second);
+        expect(first[0]).not.toBe(second[0]);
+        expect(first[0][0]).not.toBe(second[0][0]);
+        const secondSnapshot = structuredClone(second);
+        first[0][0].x = 99;
+        first[0].push({ x: 100, y: 100 });
+        expect(second).toEqual(secondSnapshot);
     });
 });

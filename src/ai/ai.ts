@@ -24,8 +24,8 @@ import { AbilityPowerType } from "../abilities/ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
 import type { IReadonlyKnownPaths, IReadonlyWeightedRoute } from "../grid/path_definitions";
-import type { IDecisionPathSource } from "./decision_path_catalog";
-import { buildMeleeTargetLayers } from "./internal/melee_target_layers";
+import { DecisionPathCatalog, type IDecisionPathSource } from "./decision_path_catalog";
+import { buildFirstMeleeTargetLayers, buildMeleeTargetLayers } from "./internal/melee_target_layers";
 
 const DEBUG_AI = false;
 
@@ -1468,6 +1468,12 @@ function doFindTarget(
     if (numRows !== numCols) {
         return undefined;
     }
+    const canElideUnconsumedMeleeLayers = DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+        pathHelper,
+        grid,
+        unit,
+        matrix,
+    );
     // closest enemy unit
     let closestTarget: HoCMath.XY | undefined;
     let closestTargetDistance = Infinity;
@@ -1707,13 +1713,9 @@ function doFindTarget(
                     }
 
                     // get the list of cells that atacker can go to in order to attack the unit, return the layers, i.e bfs cells
-                    cellsByDepthFromTarget = getLayersForAttacker_2(
-                        { x: x, y: y },
-                        matrix,
-                        unit,
-                        unit.isSmallSize(),
-                        true,
-                    );
+                    cellsByDepthFromTarget = canElideUnconsumedMeleeLayers
+                        ? buildFirstMeleeTargetLayers({ x: x, y: y }, matrix, unit, unit.isSmallSize(), true)
+                        : getLayersForAttacker_2({ x: x, y: y }, matrix, unit, unit.isSmallSize(), true);
                     // go through all cells in a layer, check the actual min distance for attcker unit and save
                     for (let depth = 0; depth < cellsByDepthFromTarget.length; depth++) {
                         if (debug) {

@@ -14,11 +14,15 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { IDecisionContext } from "../../src/ai";
 import { AIActionType, BasicAIAction } from "../../src/ai/ai";
 import { enumerateCandidates } from "../../src/ai/candidates";
-import { createDecisionPathCatalog } from "../../src/ai/decision_path_catalog";
+import {
+    createDecisionPathCatalog,
+    DecisionPathCatalog,
+    type IDecisionPathSource,
+} from "../../src/ai/decision_path_catalog";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
-import type { Unit } from "../../src/units/unit";
+import { Unit } from "../../src/units/unit";
 import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
 import type { XY } from "../../src/utils/math";
 import {
@@ -283,6 +287,193 @@ describe("decision-scoped path catalog", () => {
         expect(second).toEqual(first);
         expect(second).not.toBe(first);
         expect(catalog.getStats()).toEqual({ requests: 2, hits: 0, misses: 0, bypasses: 2 });
+    });
+
+    it("authorizes first-layer elision only for the exact cache-safe catalog epoch", () => {
+        const { combat, unit, matrix } = placeCanonicalPair();
+        const delegate = new PathHelper(testGridSettings);
+        const catalog = createDecisionPathCatalog(combat.grid, delegate, unit, matrix);
+
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(catalog, combat.grid, unit, matrix)).toBe(true);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                catalog,
+                combat.grid,
+                unit,
+                matrix.map((row) => [...row]),
+            ),
+        ).toBe(false);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(catalog, createCombatTestContext().grid, unit, matrix),
+        ).toBe(false);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                catalog,
+                combat.grid,
+                createTestUnit({ team: LOWER }),
+                matrix,
+            ),
+        ).toBe(false);
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(delegate, combat.grid, unit, matrix)).toBe(false);
+
+        class CustomPathHelper extends PathHelper {}
+        const customCatalog = createDecisionPathCatalog(
+            combat.grid,
+            new CustomPathHelper(testGridSettings),
+            unit,
+            matrix,
+        );
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(customCatalog, combat.grid, unit, matrix)).toBe(false);
+
+        const nonProductionMatrix = Array.from({ length: 15 }, () => Array<number>(15).fill(0));
+        const nonProductionCatalog = createDecisionPathCatalog(
+            combat.grid,
+            new PathHelper(testGridSettings),
+            unit,
+            nonProductionMatrix,
+        );
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                nonProductionCatalog,
+                combat.grid,
+                unit,
+                nonProductionMatrix,
+            ),
+        ).toBe(false);
+    });
+
+    it("fails closed for structural copies, proxy catalogs, invalid runtime sources, and overridden Unit geometry", () => {
+        const { combat, unit, matrix } = placeCanonicalPair();
+        const catalog = createDecisionPathCatalog(combat.grid, new PathHelper(testGridSettings), unit, matrix);
+        const structuralCopy = {
+            getMovePath: catalog.getMovePath.bind(catalog),
+        } as IDecisionPathSource;
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(structuralCopy, combat.grid, unit, matrix)).toBe(
+            false,
+        );
+
+        let proxyTraps = 0;
+        const proxyCatalog = new Proxy(catalog, {
+            get(target, property, receiver): unknown {
+                proxyTraps++;
+                return Reflect.get(target, property, receiver);
+            },
+            getPrototypeOf(target): object | null {
+                proxyTraps++;
+                return Reflect.getPrototypeOf(target);
+            },
+            has(target, property): boolean {
+                proxyTraps++;
+                return Reflect.has(target, property);
+            },
+        });
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(proxyCatalog, combat.grid, unit, matrix)).toBe(false);
+        expect(proxyTraps).toBe(0);
+
+        let revokedProxyTraps = 0;
+        const revokedCatalog = Proxy.revocable(catalog, {
+            get(target, property, receiver): unknown {
+                revokedProxyTraps++;
+                return Reflect.get(target, property, receiver);
+            },
+            getPrototypeOf(target): object | null {
+                revokedProxyTraps++;
+                return Reflect.getPrototypeOf(target);
+            },
+            has(target, property): boolean {
+                revokedProxyTraps++;
+                return Reflect.has(target, property);
+            },
+        });
+        revokedCatalog.revoke();
+        let revokedResult: boolean | undefined;
+        expect(() => {
+            revokedResult = DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                revokedCatalog.proxy,
+                combat.grid,
+                unit,
+                matrix,
+            );
+        }).not.toThrow();
+        expect(revokedResult).toBe(false);
+        expect(revokedProxyTraps).toBe(0);
+
+        for (const invalidSource of [null, undefined, false, 0, "catalog", Symbol("catalog")]) {
+            expect(
+                DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                    invalidSource as unknown as IDecisionPathSource,
+                    combat.grid,
+                    unit,
+                    matrix,
+                ),
+            ).toBe(false);
+        }
+
+        setDeterministicRandomSource(makeRng(0xa13_e11d));
+        const expectedTail = rngTail();
+        setDeterministicRandomSource(makeRng(0xa13_e11d));
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(catalog, combat.grid, unit, matrix)).toBe(true);
+        expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(proxyCatalog, combat.grid, unit, matrix)).toBe(false);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                null as unknown as IDecisionPathSource,
+                combat.grid,
+                unit,
+                matrix,
+            ),
+        ).toBe(false);
+        expect(rngTail()).toEqual(expectedTail);
+
+        const overriddenCells = placeCanonicalPair();
+        const cellsCatalog = createDecisionPathCatalog(
+            overriddenCells.combat.grid,
+            new PathHelper(testGridSettings),
+            overriddenCells.unit,
+            overriddenCells.matrix,
+        );
+        overriddenCells.unit.getCells = () => Unit.prototype.getCells.call(overriddenCells.unit);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                cellsCatalog,
+                overriddenCells.combat.grid,
+                overriddenCells.unit,
+                overriddenCells.matrix,
+            ),
+        ).toBe(false);
+
+        const overriddenSize = placeCanonicalPair();
+        const sizeCatalog = createDecisionPathCatalog(
+            overriddenSize.combat.grid,
+            new PathHelper(testGridSettings),
+            overriddenSize.unit,
+            overriddenSize.matrix,
+        );
+        overriddenSize.unit.isSmallSize = () => Unit.prototype.isSmallSize.call(overriddenSize.unit);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                sizeCatalog,
+                overriddenSize.combat.grid,
+                overriddenSize.unit,
+                overriddenSize.matrix,
+            ),
+        ).toBe(false);
+
+        const overriddenPosition = placeCanonicalPair();
+        const positionCatalog = createDecisionPathCatalog(
+            overriddenPosition.combat.grid,
+            new PathHelper(testGridSettings),
+            overriddenPosition.unit,
+            overriddenPosition.matrix,
+        );
+        overriddenPosition.unit.getPosition = () => Unit.prototype.getPosition.call(overriddenPosition.unit);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                positionCatalog,
+                overriddenPosition.combat.grid,
+                overriddenPosition.unit,
+                overriddenPosition.matrix,
+            ),
+        ).toBe(false);
     });
 
     it("keeps full root candidate order, metadata, identity, and RNG exact across the one-shot handoff", () => {

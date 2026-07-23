@@ -107,6 +107,14 @@ describe("SearchDriver decision path catalog lifecycle", () => {
         expect(first.decisionOrigin).toBe("rollout");
         expect(first.pathHelper).toBe(pathHelper);
         expect(first.decisionPathCatalog).toBeInstanceOf(DecisionPathCatalog);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                first.decisionPathCatalog!,
+                combat.grid,
+                actor,
+                first.matrix,
+            ),
+        ).toBe(true);
 
         const enemyTeam = PBTypes.TeamVals.UPPER;
         const firstPath = first.decisionPathCatalog!.getMovePath(
@@ -136,6 +144,30 @@ describe("SearchDriver decision path catalog lifecycle", () => {
         expect(second.matrix[0][0]).not.toBe(999);
         expect(second.decisionPathCatalog).toBeInstanceOf(DecisionPathCatalog);
         expect(second.decisionPathCatalog).not.toBe(first.decisionPathCatalog);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                second.decisionPathCatalog!,
+                combat.grid,
+                actor,
+                second.matrix,
+            ),
+        ).toBe(true);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                first.decisionPathCatalog!,
+                combat.grid,
+                actor,
+                second.matrix,
+            ),
+        ).toBe(false);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                second.decisionPathCatalog!,
+                combat.grid,
+                actor,
+                first.matrix,
+            ),
+        ).toBe(false);
 
         const secondPath = second.decisionPathCatalog!.getMovePath(
             actor.getBaseCell(),
@@ -156,5 +188,21 @@ describe("SearchDriver decision path catalog lifecycle", () => {
         expect(contexts[2].decisionPathCatalog).toBeInstanceOf(DecisionPathCatalog);
         expect(contexts[2].decisionPathCatalog).not.toBe(second.decisionPathCatalog);
         expect(new Set(contexts.map(({ decisionPathCatalog }) => decisionPathCatalog)).size).toBe(3);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                contexts[2].decisionPathCatalog!,
+                combat.grid,
+                actor,
+                contexts[2].matrix,
+            ),
+        ).toBe(true);
+        expect(
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(
+                contexts[2].decisionPathCatalog!,
+                combat.grid,
+                actor,
+                second.matrix,
+            ),
+        ).toBe(false);
     });
 });

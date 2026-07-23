@@ -170,3 +170,32 @@ export function buildMeleeTargetLayers(
     }
     return [];
 }
+
+/**
+ * Build only the distance-one melee landing layer.
+ *
+ * This narrower internal helper is valid only when the caller has independently
+ * proved that no later layer can be observed. Its emitted values, order,
+ * duplicate occurrences, and ownership match
+ * `buildMeleeTargetLayers(...).slice(0, 1)`.
+ *
+ * @internal
+ */
+export function buildFirstMeleeTargetLayers(
+    cellToAttack: XY,
+    matrix: number[][],
+    attacker: IUnitAIRepr,
+    isCurrentUnitSmall = true,
+    isTargetUnitSmall = true,
+): XY[][] {
+    if (!isTargetUnitSmall || 1 >= matrix.length / 2) {
+        return [];
+    }
+    const layer: XY[] = [];
+    if (isCurrentUnitSmall) {
+        appendSmallLayer(layer, cellToAttack.x, cellToAttack.y, 1, matrix, attacker);
+    } else {
+        appendBigLayer(layer, cellToAttack.x, cellToAttack.y, 1, matrix, attacker);
+    }
+    return [layer];
+}
