@@ -224,6 +224,10 @@ export function prioritizeV08Decision(unit: Unit, context: IDecisionContext, dec
 /** v0.8 starts from v0.7 and makes attack/advance lexicographically stronger than avoidable passive turns. */
 export class StrategyV0_8 extends StrategyV0_7 {
     public override readonly version: string = "v0.8";
+    /** Plain v0.8 shots name and aim at the stack that the authoritative trajectory actually hits first. */
+    protected override requireResolvedPrimaryRangeTarget(): boolean {
+        return true;
+    }
     /** a13 uses living-stack ranged output, not the historical per-creature proxy. */
     protected override rangedOutput(team: number, unitsHolder: UnitsHolder): number {
         return v08TeamRangedOutput(team as TeamType, unitsHolder);

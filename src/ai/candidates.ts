@@ -127,7 +127,7 @@ export interface IShotCandidateFeatures {
     enemyDamage: number;
     /** Expected effective damage to allied stacks caught by the shot. */
     friendlyFireDamage: number;
-    /** Expected effective damage dealt specifically to the aimed stack. */
+    /** Expected effective damage dealt specifically to the authoritative first stack hit by the trajectory. */
     primaryTargetDamage: number;
     /** v0.5's target firepower proxy, normalized by 1,000. */
     targetFirepower: number;
@@ -145,7 +145,7 @@ export interface IEnumeratedCandidate {
     kind: CandidateKind;
     /** Ordered engine actions implementing the candidate (same convention as IAIStrategy.decideTurn). */
     actions: GameAction[];
-    /** Primary target unit id (attacks, targeted spells). */
+    /** Engine-resolved primary target unit id (attacks) or declared recipient (targeted spells). */
     targetId?: string;
     /** Enemy stack used by v0.8s target-pressure scheduling when engine interception makes targetId an ally. */
     pressureTargetId?: string;
@@ -1244,8 +1244,11 @@ class CandidateGenerator {
         const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
 
         interface IShot {
+            /** Engine-resolved first stack hit and used by every target-local score/feature. */
             target: Unit;
             targetId: string;
+            /** Unit whose visible cell edge anchors the exact trajectory sent to the action engine. */
+            aimTargetId: string;
             aimCell: XY;
             aimSide: RangeAttackCellSide;
             value: number;
@@ -1295,6 +1298,15 @@ class CandidateGenerator {
                     ) {
                         continue;
                     }
+                    // A plain ranged attack has no strategic reason to advertise a rear stack while an
+                    // intervening enemy is the unit the engine will actually damage. The primary's own
+                    // visible-edge iteration emits the canonical action instead. Special line/AOE attacks are
+                    // different: a rear aim can deliberately select a Through Shot line or a Large Caliber
+                    // impact cell, so retain that exact aim anchor while exposing the resolved first hit as the
+                    // candidate target and target-local feature source.
+                    if (!isThroughShot && !isAOE && primaryHit.getId() !== enemy.getId()) {
+                        continue;
+                    }
                     // Alternative aims are only interesting when they change WHAT the shot hits: dedupe
                     // aims resolving to the identical (unit set, divisors) outcome per target.
                     const hitSig =
@@ -1310,15 +1322,16 @@ class CandidateGenerator {
                         continue;
                     }
                     hitSetSeen.add(hitSig);
-                    const damage = this.shotDamage(evaluation, enemy.getId(), shots, isAOE);
+                    const damage = this.shotDamage(evaluation, primaryHit.getId(), shots, isAOE);
                     found.push({
-                        target: enemy,
-                        targetId: enemy.getId(),
+                        target: primaryHit,
+                        targetId: primaryHit.getId(),
+                        aimTargetId: enemy.getId(),
                         aimCell: { x: cell.x, y: cell.y },
                         aimSide: side,
                         value: damage.value,
                         kill: damage.kill,
-                        shotFeatures: this.shotFeatures(enemy, damage),
+                        shotFeatures: this.shotFeatures(primaryHit, damage),
                         hitUnitSignature: evaluation.affectedUnits
                             .map((group) => group.map((unit) => unit.getId()).join(","))
                             .join(";"),
@@ -1330,7 +1343,10 @@ class CandidateGenerator {
         let kept = found;
         if (cap > 0 && found.length > cap) {
             kept = capAttackCandidates(found, cap, this.options.preserveAttackTargetCoverage === true, (shot) => ({
-                targetId: shot.targetId,
+                // Coverage preserves every declared visible-edge anchor. For ordinary shots this is the
+                // resolved primary too; special line/AOE shots may intentionally aim through a different rear
+                // stack, and collapsing those anchors by first hit would erase distinct legal geometry.
+                targetId: shot.aimTargetId,
                 expectedDamage: shot.value,
                 expectedKill: shot.kill,
                 stationary: true,
@@ -1344,7 +1360,7 @@ class CandidateGenerator {
                 {
                     type: "range_attack",
                     attackerId: this.unit.getId(),
-                    targetId: s.targetId,
+                    targetId: s.aimTargetId,
                     aimCell: s.aimCell,
                     aimSide: s.aimSide,
                 },
