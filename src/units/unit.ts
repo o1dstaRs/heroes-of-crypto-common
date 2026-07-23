@@ -279,7 +279,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         effectFactory: EffectFactory,
         summoned: boolean,
     ) {
-        this.unitProperties = unitProperties;
+        // Deep-copy so this unit OWNS its properties (nested arrays included). Client factories stamp
+        // same-type stacks by shallow-spreading a shared template (Unit.createUnit({ ...template, id, team }))
+        // and stack-splits reuse the source unit's live props — both alias the nested `abilities` /
+        // `abilities_descriptions` / ... arrays. Without this clone, grantAbility() pushing to one unit's
+        // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
+        this.unitProperties = structuredClone(unitProperties);
         this.initialUnitProperties = structuredClone(unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
