@@ -43,7 +43,7 @@ export interface IPureRangedParetoNoMeleeFocusCandidate {
 }
 
 export interface IMixedSupportedParetoNoMeleeFocusSupport {
-    /** Living original native melee or melee-magic allies available to form a screen. */
+    /** Living original native melee or melee-magic allies within three cells of the actor. */
     readonly guardCount: number;
     /** Living melee-capable enemies inside their optimistic next-activation reach. */
     readonly reachableThreats: number;
@@ -63,7 +63,7 @@ export const MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES = [
     "stationary_lap_candidate_shape",
     "original_native_guard_presence",
     "original_native_tsar_no_melee_target",
-    "reachable_threat_presence",
+    "reachable_threat_assessment",
     "all_reachable_threats_screened",
     "catalog_expansion",
     "exact_pareto_proposal",
@@ -233,7 +233,8 @@ function inspectMixedSupportedParetoNoMeleeFocus(
         if (
             unit.getTeam() === actor.getTeam() &&
             unit.getId() !== actor.getId() &&
-            (attackType === MELEE || attackType === MELEE_MAGIC)
+            (attackType === MELEE || attackType === MELEE_MAGIC) &&
+            cellDistance(actor.getCells(), unit.getCells()) <= 3
         ) {
             guards.push(unit);
         }
@@ -264,7 +265,6 @@ function inspectMixedSupportedParetoNoMeleeFocus(
             !unit.hasAbilityActive("No Melee") &&
             cellDistance(actor.getCells(), unit.getCells()) <= Math.ceil(Math.max(0, unit.getSteps())) + 1,
     );
-    if (!reachableThreats.length) return base;
     const screenedThreats = reachableThreats.filter((threat) =>
         guards.some((guard) => mixedSupportedGuardScreensThreat(actor, guard, threat)),
     ).length;
@@ -292,9 +292,10 @@ function inspectMixedSupportedParetoNoMeleeFocus(
 /**
  * Eligibility shared by catalog generation and selection for the conservative mixed-board arm.
  * It admits only the fixed native Cyclops/Large-Caliber and Tsar-Cannon/Through-Shot identities, rejects
- * structurally pure-ranged boards, and requires every enemy inside an optimistic one-activation melee horizon
- * to be screened by a living original native melee ally. The target is equally narrow: a living original native
- * Tsar Cannon whose captured, owned, and currently active card is No Melee.
+ * structurally pure-ranged boards, requires a living original native melee ally within three cells, and requires
+ * every enemy inside an optimistic one-activation melee horizon to be screened by such an ally. An empty threat
+ * set is therefore vacuously fully screened, but only with that close native support. The target is equally
+ * narrow: a living original native Tsar Cannon whose captured, owned, and currently active card is No Melee.
  */
 export function mixedSupportedParetoNoMeleeFocusContext(
     actor: Unit,
@@ -364,8 +365,7 @@ export function probeMixedSupportedParetoNoMeleeFocusFunnel(
     passedStages.push("original_native_guard_presence");
     if (inspection.noMeleeTargetIds.length === 0) return result("original_native_tsar_no_melee_target");
     passedStages.push("original_native_tsar_no_melee_target");
-    if (inspection.reachableThreats === 0) return result("reachable_threat_presence");
-    passedStages.push("reachable_threat_presence");
+    passedStages.push("reachable_threat_assessment");
     if (inspection.screenedThreats !== inspection.reachableThreats) {
         return result("all_reachable_threats_screened");
     }
