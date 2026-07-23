@@ -48,6 +48,66 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Crafted Double Shot": {
+        "name": "Crafted Double Shot",
+        "type": "ADDITIONAL_ATTACK",
+        "desc": ["Crafted: lands a second shot with {}% of the calculated damage"],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Crafted Double Punch": {
+        "name": "Crafted Double Punch",
+        "type": "ADDITIONAL_ATTACK",
+        "desc": ["Crafted: lands a second attack with {}% of the calculated damage"],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Crafted Frozen Bow": {
+        "name": "Crafted Frozen Bow",
+        "type": "STATUS",
+        "desc": ["Crafted: on attack, {}% chance to freeze an enemy (Status) for 2 turns"],
+        "power": 30,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Freeze",
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Crafted Frozen Sword": {
+        "name": "Crafted Frozen Sword",
+        "type": "STATUS",
+        "desc": ["Crafted: on attack, {}% chance to freeze an enemy (Status) for 2 turns"],
+        "power": 30,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Freeze",
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Blacksmith Tools": {
+        "name": "Blacksmith Tools",
+        "type": "INFO",
+        "desc": ["Allows the caster to access the following spells:", "Craft"],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Shadow Touch": {
         "name": "Shadow Touch",
         "type": "ATTACK",

@@ -26,7 +26,8 @@ export interface IDoublePunchResult {
 }
 
 export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog: ISceneLog): IDoublePunchResult {
-    const doublePunchAbility = fromUnit.getAbility("Double Punch");
+    // Crafted Double Punch (granted by the Blacksmith's Craft) behaves identically to Double Punch.
+    const doublePunchAbility = fromUnit.getAbility("Double Punch") ?? fromUnit.getAbility("Crafted Double Punch");
     let secondPunchLanded = false;
     let damageFromAttack = 0;
     let moraleIncrease = 0;

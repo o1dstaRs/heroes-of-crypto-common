@@ -27,6 +27,7 @@ import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
+import { processFreezeAbility } from "./freeze_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
 
@@ -231,6 +232,7 @@ export function processRangeAOEAbility(
                 continue;
             }
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
+            processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }

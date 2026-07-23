@@ -65,6 +65,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
+    "Blacksmith Tools": new Set(["Craft"]),
 };
 
 function isSpellOwnedBySpellbook(entry: string, abilityName: string): boolean {
@@ -654,7 +655,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public isSkippingThisTurn(): boolean {
         const effects = this.getEffects();
         for (const e of effects) {
-            if (e.getName() === "Stun" || e.getName() === "Blindness") {
+            if (e.getName() === "Stun" || e.getName() === "Blindness" || e.getName() === "Freeze") {
                 return true;
             }
         }
@@ -1997,7 +1998,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public canRespond(attackType: AttackType): boolean {
         for (const e of this.effects) {
-            if (e.getName() === "Stun" || e.getName() === "Blindness") {
+            if (e.getName() === "Stun" || e.getName() === "Blindness" || e.getName() === "Freeze") {
                 return false;
             }
         }

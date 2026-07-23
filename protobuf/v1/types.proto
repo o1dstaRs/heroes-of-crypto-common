@@ -163,4 +163,5 @@ enum CreatureVals {
     ARACHNA_SPIDER = 45 [(creature_level) = NO_LEVEL, (creature_faction) = NATURE];
     MERMAID = 46 [(creature_level) = FIRST, (creature_faction) = MIGHT];
     DRYAD = 47 [(creature_level) = FIRST, (creature_faction) = NATURE];
+    BLACKSMITH = 48 [(creature_level) = FIRST, (creature_faction) = LIFE];
 }

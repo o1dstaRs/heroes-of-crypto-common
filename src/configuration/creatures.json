@@ -1,6 +1,27 @@
 {
     "version": 1.0,
     "Life": {
+        "Blacksmith": {
+            "name": "Blacksmith",
+            "hp": 11,
+            "steps": 3,
+            "speed": 3,
+            "armor": 11,
+            "attack_type": "MELEE",
+            "attack": 9,
+            "attack_damage_min": 2,
+            "attack_damage_max": 4,
+            "attack_range": 1,
+            "range_shots": 0,
+            "shot_distance": 0,
+            "magic_resist": 0,
+            "movement_type": "WALK",
+            "exp": 9.5,
+            "size": 1,
+            "level": 1,
+            "spells": ["System:Craft"],
+            "abilities": ["Blacksmith Tools"]
+        },
         "Squire": {
             "name": "Squire",
             "hp": 9,

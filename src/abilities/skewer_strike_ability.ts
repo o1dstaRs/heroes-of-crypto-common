@@ -36,6 +36,7 @@ import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
 import { processShatterArmorAbility } from "./shatter_armor_ability";
 import { processStunAbility } from "./stun_ability";
+import { processFreezeAbility } from "./freeze_ability";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
 
 export interface ISkewerStrikeDamage {
@@ -193,6 +194,7 @@ export function processSkewerStrikeAbility(
         // just in case if we have more inherited/stolen abilities
         processMinerAbility(fromUnit, nextStandingTarget, sceneLog);
         processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+        processFreezeAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
         processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
         processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
         processPetrifyingGazeAbility(

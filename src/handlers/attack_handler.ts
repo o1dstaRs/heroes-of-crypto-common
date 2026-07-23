@@ -952,6 +952,7 @@ export class AttackHandler {
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
                 // and still Stun it).
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 // Area Throw / Large Caliber already resolved Gaze for every struck unit in the AOE
                 // processor. Keep the outer primary on-hit pass for its other effects, but do not petrify
@@ -1029,6 +1030,7 @@ export class AttackHandler {
                     // Same rule for the return shot: a dodged/missed counter lands no on-hit effects
                     // (mirrors the melee response path's isResponseMissed gate).
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
@@ -1177,6 +1179,7 @@ export class AttackHandler {
         if (!secondShotResult.aoeRangeAttackLanded) {
             if (!targetUnit.isDead() && secondShotResult.applied) {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -1796,6 +1799,7 @@ export class AttackHandler {
                         fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
                     );
                     AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
@@ -1895,6 +1899,7 @@ export class AttackHandler {
 
             AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
             AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+            AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processPetrifyingGazeAbility(
                 attackerUnit,
@@ -2053,6 +2058,7 @@ export class AttackHandler {
             if (!secondPunchResult.missed) {
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
@@ -2216,7 +2222,8 @@ export class AttackHandler {
 
         // range second attack
         if (FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft()) {
-            const doubleShotAbility = attackerUnit.getAbility("Double Shot");
+            const doubleShotAbility =
+                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
             if (
                 doubleShotAbility &&
                 attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
@@ -2331,7 +2338,7 @@ export class AttackHandler {
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     if (
                         FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
-                        attackerUnit.getAbility("Double Punch")
+                        (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
                     ) {
                         FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
@@ -2403,7 +2410,7 @@ export class AttackHandler {
 
                     if (
                         FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
-                        attackerUnit.getAbility("Double Punch")
+                        (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
                     ) {
                         FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);

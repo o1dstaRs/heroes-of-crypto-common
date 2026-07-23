@@ -6,6 +6,12 @@
         "power": 0,
         "desc": "The unit skips turn and unable to respond."
     },
+    "Freeze": {
+        "name": "Freeze",
+        "laps": 2,
+        "power": 0,
+        "desc": "The unit is frozen solid, skipping its turns and unable to respond."
+    },
     "Blindness": {
         "name": "Blindness",
         "laps": 2,
