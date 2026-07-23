@@ -124,6 +124,86 @@ describe("roundUnitStat", () => {
         }
     });
 
+    it("matches native conversion around the guarded near-grid boundary", () => {
+        const offsets = [
+            -0.5,
+            nextUp(-0.5),
+            nextDown(-0.25),
+            -0.25,
+            nextUp(-0.25),
+            -Number.EPSILON,
+            0,
+            Number.EPSILON,
+            nextDown(0.25),
+            0.25,
+            nextUp(0.25),
+            nextDown(0.5),
+            0.5,
+        ];
+        const scaledIntegers = [
+            -(2 ** 30),
+            -(2 ** 30) + 1,
+            -1_000_003,
+            -(2 ** 24) - 1,
+            -(2 ** 24) + 1,
+            -101,
+            -29,
+            -3,
+            -1,
+            0,
+            1,
+            3,
+            29,
+            101,
+            2 ** 24 - 1,
+            2 ** 24 + 1,
+            1_000_003,
+            2 ** 30 - 1,
+            2 ** 30,
+            2 ** 31 - 1,
+        ];
+
+        for (const scale of [10, 100] as const) {
+            const fractionDigits: UnitStatFractionDigits = scale === 10 ? 1 : 2;
+            for (const scaledInteger of scaledIntegers) {
+                for (const offset of offsets) {
+                    const value = (scaledInteger + offset) / scale;
+                    expectExactLegacyResult(nextDown(value), fractionDigits);
+                    expectExactLegacyResult(value, fractionDigits);
+                    expectExactLegacyResult(nextUp(value), fractionDigits);
+                }
+            }
+        }
+
+        for (const value of [-(0.1 + 0.2), -0.006, -0.004, -Number.MIN_VALUE]) {
+            for (const fractionDigits of [1, 2] as const) {
+                expectExactLegacyResult(value, fractionDigits);
+                expect(Object.is(roundUnitStat(value, fractionDigits), -0)).toBe(
+                    Object.is(legacyRoundUnitStat(value, fractionDigits), -0),
+                );
+            }
+        }
+    });
+
+    it("matches native conversion over deterministic near-grid int32 values", () => {
+        const offsets = [-0.500001, -0.499999, -0.250001, -0.249999, 0, 0.249999, 0.250001, 0.499999, 0.500001];
+        let state = 0x6d2b79f5;
+
+        for (let i = 0; i < 50_000; i++) {
+            state = (state * 1_664_525 + 1_013_904_223) >>> 0;
+            const scaledInteger = (state % (2 ** 31 - 1)) - (2 ** 30 - 1);
+            const offset = offsets[state % offsets.length];
+
+            for (const scale of [10, 100] as const) {
+                const fractionDigits: UnitStatFractionDigits = scale === 10 ? 1 : 2;
+                const value = (scaledInteger + offset) / scale;
+                expectExactLegacyResult(nextDown(value), fractionDigits);
+                expectExactLegacyResult(value, fractionDigits);
+                expectExactLegacyResult(nextUp(value), fractionDigits);
+            }
+        }
+    });
+
     it("matches native conversion over deterministic raw binary64 patterns", () => {
         let state = 0x9e3779b97f4a7c15n;
         const mask = (1n << 64n) - 1n;
@@ -142,6 +222,7 @@ describe("roundUnitStat", () => {
     it("preserves a replaced toFixed lookup, receiver, result, and failure", () => {
         const originalDescriptor = Object.getOwnPropertyDescriptor(Number.prototype, "toFixed");
         expect(originalDescriptor).toBeDefined();
+        const nearGridValue = 15.000000000000002;
 
         try {
             let gets = 0;
@@ -154,13 +235,13 @@ describe("roundUnitStat", () => {
                     return function (this: unknown, fractionDigits: number): string {
                         "use strict";
                         calls++;
-                        receiverMatches = this === 1.2;
+                        receiverMatches = this === nearGridValue;
                         return fractionDigits === 1 ? "7.7" : "7.77";
                     };
                 },
             });
 
-            expect(roundUnitStat(1.2, 1)).toBe(7.7);
+            expect(roundUnitStat(nearGridValue, 1)).toBe(7.7);
             expect(gets).toBe(1);
             expect(calls).toBe(1);
             expect(receiverMatches).toBe(true);
@@ -169,7 +250,7 @@ describe("roundUnitStat", () => {
                 configurable: true,
                 value: 42,
             });
-            expect(() => roundUnitStat(1.2, 1)).toThrow(TypeError);
+            expect(() => roundUnitStat(nearGridValue, 1)).toThrow(TypeError);
         } finally {
             if (originalDescriptor) {
                 Object.defineProperty(Number.prototype, "toFixed", originalDescriptor);
@@ -211,7 +292,7 @@ describe("roundUnitStat", () => {
         }
     });
 
-    it("does not introduce observable Math calls on the fast path", () => {
+    it("does not introduce observable Math calls on exact- or near-grid fast paths", () => {
         const originalAbs = Math.abs;
         try {
             Math.abs = () => {
@@ -219,6 +300,8 @@ describe("roundUnitStat", () => {
             };
             expect(roundUnitStat(6.3, 1)).toBe(6.3);
             expect(roundUnitStat(7.75, 2)).toBe(7.75);
+            expect(roundUnitStat(0.1 + 0.2, 1)).toBe(0.3);
+            expect(roundUnitStat(44 * 1.15, 2)).toBe(50.6);
         } finally {
             Math.abs = originalAbs;
         }

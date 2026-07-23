@@ -16,6 +16,8 @@ const INTRINSIC_NUMBER_IS_SAFE_INTEGER = Number.isSafeInteger;
 const INTRINSIC_TO_FIXED = Number.prototype.toFixed;
 const INTRINSIC_APPLY = Reflect.apply;
 const MAX_EXACT_SCALED_INTEGER = 2 ** 52;
+const NEAR_GRID_SCALED_LIMIT = 2 ** 30;
+const NEAR_GRID_MAX_DISTANCE = 0.25;
 
 /**
  * Numeric equivalent of `Number(value.toFixed(fractionDigits))`.
@@ -60,6 +62,33 @@ export function roundUnitStat(value: number, fractionDigits: UnitStatFractionDig
     ) {
         // Number((-0).toFixed(...)) is positive zero.
         return value === 0 ? 0 : value;
+    }
+
+    /*
+     * Arithmetic that should land on the decimal grid often misses it by a few
+     * binary64 ULPs. Recover only values whose scaled representation is within
+     * 0.25 of an integer. At |scaled| < 2^30, multiplication rounding is less
+     * than 2^-23, leaving more than 0.2499998 between an admitted value and the
+     * nearest half-integer tie. The chosen integer is therefore exactly the one
+     * required by toFixed. Dividing that exact int32 by 10 or 100 and parsing
+     * the same decimal both correctly round the rational n / scale to binary64,
+     * while all ambiguous values retain the native path.
+     *
+     * Adding or subtracting 0.5 and truncating through int32 implements
+     * half-away-from-zero rounding inside this deliberately narrow range. A
+     * negative result rounded to zero must retain the "-0.0" / "-0.00" parse
+     * result; an input that is already -0 was handled by the exact-grid branch
+     * above and intentionally normalizes to positive zero.
+     */
+    if (scaled > -NEAR_GRID_SCALED_LIMIT && scaled < NEAR_GRID_SCALED_LIMIT) {
+        const nearestScaledInteger = scaled < 0 ? (scaled - 0.5) | 0 : (scaled + 0.5) | 0;
+        const distance = scaled - nearestScaledInteger;
+        if (distance > -NEAR_GRID_MAX_DISTANCE && distance < NEAR_GRID_MAX_DISTANCE) {
+            if (nearestScaledInteger === 0) {
+                return value < 0 ? -0 : 0;
+            }
+            return nearestScaledInteger / scale;
+        }
     }
 
     return INTRINSIC_NUMBER(INTRINSIC_APPLY(toFixed, value, [fractionDigits]));
