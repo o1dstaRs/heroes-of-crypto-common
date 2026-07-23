@@ -1066,9 +1066,12 @@
                                 <tr>
                                     <td>2</td>
                                     <td><strong>Pathfinding and neighbor indices</strong></td>
-                                    <td>Precomputed neighbors, typed scratch buffers, occupancy-version reuse.</td>
-                                    <td>Identical legal routes/destinations; ≥25% path-scope CPU reduction.</td>
-                                    <td><span class="status queued">Queued</span></td>
+                                    <td>Guarded budget arrays, allocation-free aggression reads, reused neighbors.</td>
+                                    <td>
+                                        98/98 exact cases; 33.20% median path reduction; stable block-average throughput
+                                        quantiles.
+                                    </td>
+                                    <td><span class="status done">Qualified</span></td>
                                 </tr>
                                 <tr>
                                     <td>3</td>
@@ -1077,14 +1080,14 @@
                                     <td>
                                         Full-refresh oracle parity through movement, death, dispel, and stat changes.
                                     </td>
-                                    <td><span class="status queued">Queued</span></td>
+                                    <td><span class="status queued">Next</span></td>
                                 </tr>
                                 <tr>
                                     <td>4</td>
                                     <td><strong>Shared candidate/path catalog</strong></td>
                                     <td>Compute reachability and attack geometry once per decision state.</td>
                                     <td>Exact candidate set, ordering, metadata, and selected action.</td>
-                                    <td><span class="status queued">After #2</span></td>
+                                    <td><span class="status queued">Ready after #3</span></td>
                                 </tr>
                                 <tr>
                                     <td>5</td>
@@ -1764,9 +1767,9 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                     <div class="eyebrow">Workstreams 2–8</div>
                     <h2>Precise follow-on plan</h2>
                     <p class="section-intro">
-                        These are implementation hypotheses until their own baseline and differential oracle exist. Do
-                        not stack multiple items into one commit: each needs an attributable speed measurement and a
-                        deterministic behavior comparison.
+                        Workstream 2 now has a sealed baseline, differential oracle, and qualifying M4 Max result.
+                        Workstreams 3–8 remain implementation hypotheses until they receive the same treatment. Keep
+                        each landed slice attributable, deterministic, and independently reversible.
                     </p>
 
                     <article class="workstream">
@@ -1775,45 +1778,122 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 <h3>2 · Pathfinding and neighbor indices</h3>
                                 <p>Reduce repeated object-heavy route discovery inside future policy turns.</p>
                             </div>
-                            <span class="status queued">Next after #1</span>
+                            <span class="status done">Qualified · 33.20%</span>
                         </div>
                         <div class="grid-3">
                             <div>
                                 <h4>Implementation slice</h4>
                                 <ul>
-                                    <li>Assign every legal cell a stable numeric ID 0–255.</li>
-                                    <li>Precompute static neighbor IDs and border/footprint templates.</li>
+                                    <li class="done">Use collision-free cell IDs 0–255 for remaining-step budgets.</li>
                                     <li>
-                                        Use reusable typed-array queues, predecessor arrays, and generation counters.
+                                        Read dense x-major aggression boards directly; retain the legacy allocation and
+                                        exception path for custom or malformed inputs.
                                     </li>
                                     <li>
-                                        Key the concrete path inputs: grid schema, current anchor cell, matrix/terrain
-                                        and occupancy identity, <code>maxSteps</code>, aggro-board identity/content,
-                                        <code>canFly</code>, <code>isSmallUnit</code>, <code>isMadeOfFire</code>, and
-                                        every route-order or response/hazard mode. Unit/team/ability state may derive
-                                        these values but cannot substitute for them in the cache contract.
+                                        Reuse one neighbor container while preserving fresh route-owned XY objects and
+                                        the exact cardinal-then-diagonal processing order.
+                                    </li>
+                                    <li>
+                                        Keep generic Map, neighbor override, and malformed-coordinate fallbacks intact.
                                     </li>
                                 </ul>
                             </div>
                             <div>
                                 <h4>Exact oracle</h4>
                                 <ul>
-                                    <li>Compare reachable cells, route sequence, cost, and rejection reason.</li>
-                                    <li>
-                                        Cover 1×1/2×2, flying, lava/water, mountains, occupied destinations, and
-                                        response zones.
+                                    <li class="done">
+                                        Compare ordered cells, hashes, routes, costs, and Float64 bits.
                                     </li>
-                                    <li>Replay move and move-shot candidate catalogs in identical order.</li>
+                                    <li>
+                                        Cover 1×1/2×2, flying, terrain/occupancy, aggression, boundary anchors, custom
+                                        grids, ragged inputs, NaN/infinities, and exact exceptions.
+                                    </li>
+                                    <li class="done">Preserve reference aliases, RNG tail, and input immutability.</li>
                                 </ul>
                             </div>
                             <div>
                                 <h4>Exit gate</h4>
                                 <ul>
-                                    <li>Zero path/candidate mismatches over generated legal boards.</li>
-                                    <li>At least 25% lower inclusive path scope in representative profiles.</li>
-                                    <li>No p99 regression from buffer clearing or cache invalidation.</li>
+                                    <li class="done">0 mismatches across 64 live-shaped and 34 edge cases.</li>
+                                    <li class="done">33.20% median reduction versus the sealed original baseline.</li>
+                                    <li class="done">
+                                        p95/p99 block-average ratio upper bounds 0.690/0.689; no regression in those
+                                        aggregate quantiles.
+                                    </li>
                                 </ul>
                             </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <caption class="sr-only">
+                                    Workstream 2 measured optimization results
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Slice</th>
+                                        <th scope="col">Median reduction</th>
+                                        <th scope="col">95% reduction interval</th>
+                                        <th scope="col">Decision</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Budget index + direct aggression reads</td>
+                                        <td>15.20%</td>
+                                        <td>13.23–18.09%</td>
+                                        <td><span class="status done">Landed</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Reusable ordered neighbor buffer</td>
+                                        <td>19.31% incremental</td>
+                                        <td>17.59–22.02%</td>
+                                        <td><span class="status done">Qualified</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Original → final</td>
+                                        <td><strong>33.20%</strong></td>
+                                        <td><strong>31.11–34.78%</strong></td>
+                                        <td><span class="status done">Exit gate met</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Static indexed-neighbor tables</td>
+                                        <td>Exploratory only</td>
+                                        <td>Did not advance to sealed evidence</td>
+                                        <td><span class="status hold">Rejected before qualification</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Guarded direct route capture</td>
+                                        <td>−0.91%</td>
+                                        <td>−2.74–2.58%</td>
+                                        <td><span class="status hold">Rejected</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="callout good">
+                            <p>
+                                The sealed v2 runner compares two isolated source roots, uses order-balanced full-size
+                                settling blocks, and keeps malformed-edge semantics after timing so edge-only JIT type
+                                feedback cannot contaminate production throughput. The final source passed 98/98 exact
+                                cases; the committed unit oracle also covers 1,260 end-to-end path cases.
+                            </p>
+                            <p>
+                                Canonical original-to-final evidence IDs — baseline source
+                                <code>ae76828721c9df098c2b668fee4ff82a45f6c1882507d881a6d6adfc9f9fcaeb</code>; final
+                                source <code>c5f0db5ba78eda9ab82207d8ece260c588d16b653b8bf501feac2b8bd4f2543e</code>;
+                                runner <code>5d83c56ae03cd4c565c073222676f66cf93874c98ac87995af8bb25d1ca6e762</code>;
+                                report <code>eb6ffac5d2e5ce47408fd7e669350d5cbe56bbed754ea3ed08289745737ef1e3</code>.
+                            </p>
+                            <p>
+                                Supporting report file hashes — budget/aggression slice
+                                <code>3ca66922e55f89adb91aaeb4dc21c4693e1295e8c59f45e4358daa4540789ebe</code>;
+                                neighbor-buffer increment
+                                <code>90b1b220c008a1fac1c847e02690aaec2b7f379d716ff9e06ce2aae878fa89f0</code>; rejected
+                                route-capture increment
+                                <code>cef9c835dd17466dda7a49b7ebd30d62f46c63cdedbee3f1f5a8bec1cfcbec03</code>. The
+                                indexed-neighbor-table prototype was an exploratory rejection and is not presented as
+                                sealed evidence.
+                            </p>
                         </div>
                         <div class="callout warn">
                             <p>
@@ -1889,7 +1969,7 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                     queries.
                                 </p>
                             </div>
-                            <span class="status queued">Depends on #2</span>
+                            <span class="status queued">#2 prerequisite met</span>
                         </div>
                         <div class="grid-3">
                             <div>
