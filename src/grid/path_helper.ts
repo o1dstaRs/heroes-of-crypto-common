@@ -1194,8 +1194,27 @@ export class PathHelper {
         const initialCellKeys: Set<number> = new Set(currentCellKeys);
         const visited: Set<number> = new Set([(currentCell.x << 4) | currentCell.y]);
         const allowedToMoveThere: Set<number> = new Set();
-        const stepsRemaining: Map<number, number> = new Map();
-        stepsRemaining.set((currentCell.x << 4) | currentCell.y, maxSteps);
+        // Packed cell keys are collision-free 0..255 on the standard board. Use a dynamic array there to preserve the
+        // exact iteratively-subtracted Float64 budgets without Map traffic; malformed/custom inputs keep the Map path.
+        const usesIndexedStepsRemaining =
+            this.getNeighborCells === PathHelper.prototype.getNeighborCells &&
+            this.gridSettings.getGridSize() === 16 &&
+            Number.isInteger(currentCell.x) &&
+            Number.isInteger(currentCell.y) &&
+            !Object.is(currentCell.x, -0) &&
+            !Object.is(currentCell.y, -0) &&
+            currentCell.x >= (isSmallUnit ? 0 : 1) &&
+            currentCell.x < 16 &&
+            currentCell.y >= (isSmallUnit ? 0 : 1) &&
+            currentCell.y < 16;
+        const indexedStepsRemaining: number[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
+        const mappedStepsRemaining: Map<number, number> | undefined = usesIndexedStepsRemaining ? undefined : new Map();
+        const currentCellKey = (currentCell.x << 4) | currentCell.y;
+        if (indexedStepsRemaining) {
+            indexedStepsRemaining[currentCellKey] = maxSteps;
+        } else {
+            mappedStepsRemaining!.set(currentCellKey, maxSteps);
+        }
         const queue: IWeightedRoute[] = [
             {
                 cell: currentCell,
@@ -1207,28 +1226,59 @@ export class PathHelper {
             },
         ];
 
-        const aggr = (cells: XY[], weightedRoute: IWeightedRoute): number => {
-            if (!cells.length) {
+        // Production aggression boards are dense and x-major. Read them directly without allocating footprint cells;
+        // malformed/custom boards retain the legacy cell list and access expression so read order/errors stay exact.
+        let usesDirectAggression =
+            usesIndexedStepsRemaining && !canFly && Array.isArray(aggrBoard) && aggrBoard.length === 16;
+        if (usesDirectAggression) {
+            for (let x = 0; x < 16; x++) {
+                if (!Array.isArray(aggrBoard![x]) || aggrBoard![x].length !== 16) {
+                    usesDirectAggression = false;
+                    break;
+                }
+            }
+        }
+
+        const aggr = (cell: XY, weightedRoute: IWeightedRoute): number => {
+            if (!aggrBoard) {
                 return 1;
             }
 
-            if (aggrBoard) {
-                let sumAggr = 0;
+            let sumAggr = 0;
+            let cellCount: number;
+            if (usesDirectAggression) {
+                sumAggr += aggrBoard[cell.x][cell.y] || 1;
+                if (isSmallUnit) {
+                    cellCount = 1;
+                } else {
+                    sumAggr += aggrBoard[cell.x - 1][cell.y] || 1;
+                    sumAggr += aggrBoard[cell.x - 1][cell.y - 1] || 1;
+                    sumAggr += aggrBoard[cell.x][cell.y - 1] || 1;
+                    cellCount = 4;
+                }
+            } else {
+                const cells = isSmallUnit
+                    ? [cell]
+                    : [
+                          cell,
+                          { x: cell.x - 1, y: cell.y },
+                          { x: cell.x - 1, y: cell.y - 1 },
+                          { x: cell.x, y: cell.y - 1 },
+                      ];
                 for (const cell of cells) {
                     sumAggr += aggrBoard[cell.x][cell.y] || 1;
                 }
-
-                const aggrValue = sumAggr / cells.length;
-                if (aggrValue > 1) {
-                    if (!weightedRoute.firstAggrMet) {
-                        weightedRoute.firstAggrMet = true;
-                        return 1;
-                    }
-                }
-                return aggrValue;
+                cellCount = cells.length;
             }
 
-            return 1;
+            const aggrValue = sumAggr / cellCount;
+            if (aggrValue > 1) {
+                if (!weightedRoute.firstAggrMet) {
+                    weightedRoute.firstAggrMet = true;
+                    return 1;
+                }
+            }
+            return aggrValue;
         };
 
         while (queue.length) {
@@ -1286,24 +1336,15 @@ export class PathHelper {
                 }
 
                 const isDiagMove = cur.x !== n.x && cur.y !== n.y;
-                const remaining = stepsRemaining.get(key) ?? maxSteps;
+                const remaining = indexedStepsRemaining
+                    ? (indexedStepsRemaining[key] ?? maxSteps)
+                    : (mappedStepsRemaining!.get(key) ?? maxSteps);
                 if (isDiagMove) {
                     let moveCost: number;
-                    if (isSmallUnit) {
-                        if (canFly) {
-                            moveCost = PathHelper.DIAGONAL_MOVE_COST;
-                        } else {
-                            moveCost = PathHelper.DIAGONAL_MOVE_COST * aggr([n], curWeightedRoute);
-                        }
-                    } else if (canFly) {
+                    if (canFly || !aggrBoard) {
                         moveCost = PathHelper.DIAGONAL_MOVE_COST;
                     } else {
-                        moveCost =
-                            PathHelper.DIAGONAL_MOVE_COST *
-                            aggr(
-                                [n, { x: n.x - 1, y: n.y }, { x: n.x - 1, y: n.y - 1 }, { x: n.x, y: n.y - 1 }],
-                                curWeightedRoute,
-                            );
+                        moveCost = PathHelper.DIAGONAL_MOVE_COST * aggr(n, curWeightedRoute);
                     }
 
                     if (remaining >= moveCost) {
@@ -1372,7 +1413,11 @@ export class PathHelper {
                             }
                         }
 
-                        stepsRemaining.set(keyNeighbor, remaining - moveCost);
+                        if (indexedStepsRemaining) {
+                            indexedStepsRemaining[keyNeighbor] = remaining - moveCost;
+                        } else {
+                            mappedStepsRemaining!.set(keyNeighbor, remaining - moveCost);
+                        }
                         const weightedRoute = {
                             cell: { x: n.x, y: n.y },
                             route: [...curWeightedRoute.route, n],
@@ -1409,22 +1454,17 @@ export class PathHelper {
                     }
                 } else {
                     let moveCost: number;
-                    if (isSmallUnit) {
-                        if (canFly) {
-                            moveCost = 1;
-                        } else {
-                            moveCost = aggr([n], curWeightedRoute);
-                        }
-                    } else if (canFly) {
+                    if (canFly || !aggrBoard) {
                         moveCost = 1;
                     } else {
-                        moveCost = aggr(
-                            [n, { x: n.x - 1, y: n.y }, { x: n.x - 1, y: n.y - 1 }, { x: n.x, y: n.y - 1 }],
-                            curWeightedRoute,
-                        );
+                        moveCost = aggr(n, curWeightedRoute);
                     }
                     if (remaining >= moveCost) {
-                        stepsRemaining.set(keyNeighbor, remaining - moveCost);
+                        if (indexedStepsRemaining) {
+                            indexedStepsRemaining[keyNeighbor] = remaining - moveCost;
+                        } else {
+                            mappedStepsRemaining!.set(keyNeighbor, remaining - moveCost);
+                        }
                         const weightedRoute = {
                             cell: { x: n.x, y: n.y },
                             route: [...curWeightedRoute.route, n],
