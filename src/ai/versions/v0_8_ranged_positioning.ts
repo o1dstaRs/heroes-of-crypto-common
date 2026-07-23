@@ -57,6 +57,8 @@ const SUPPORTED_BAND_ADVANCE_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_VERSIONS
 const SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY";
 const SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS";
 const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
 const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
 const PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE";
@@ -1241,8 +1243,11 @@ function protectedAdvanceShotWithGuardrails(
  * Research-only direct duel between the strict full-damage close and the shipped protected advance. At a measured
  * root every participating version builds both catalogs, shipped legacy first and strict second, before its version
  * chooses a result. Legacy therefore receives the incumbent's incoming RNG state; both seats then share the same
- * total catalog consumption even when their chosen actions differ. Branch events are buffered and only the selected
- * policy's events are published, so a speculative catalog can never masquerade as a live proposal.
+ * total catalog consumption even when their chosen actions differ. The strict-replacement arm always selects strict
+ * for its configured version. The distinct overlay treatment selects strict only when that catalog emitted a real
+ * supported-band proposal; every other root falls back to shipped legacy. Its matched selector-off control still
+ * computes both catalogs but always selects legacy. Branch events are buffered and only the selected policy's
+ * events are published, so a speculative catalog can never masquerade as a live proposal.
  */
 function supportedBandAdvanceVsLegacy(
     unit: Unit,
@@ -1259,6 +1264,18 @@ function supportedBandAdvanceVsLegacy(
     );
     const legacyVersions = new Set(
         (process.env[SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const overlayVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const overlayControlVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS_ENV] ?? "")
             .split(",")
             .map((value) => value.trim())
             .filter(Boolean),
@@ -1281,12 +1298,17 @@ function supportedBandAdvanceVsLegacy(
         decision,
         strategyVersion,
     );
-    const selectedEvents = selectsStrict ? strictEvents : legacyEvents;
+    const strictProposal = strictEvents.some((event) => event.kind === "v0.8_supported_band_advance");
+    const selectsStrictOverlay = selectsStrict && overlayVersions.has(strategyVersion);
+    const selectsOverlayControl = selectsStrictOverlay && overlayControlVersions.has(strategyVersion);
+    const choosesStrict = selectsStrict && (!selectsStrictOverlay || (!selectsOverlayControl && strictProposal));
+    const selectedDecision = choosesStrict ? strictDecision : legacyDecision;
+    const selectedEvents = choosesStrict ? strictEvents : legacyEvents;
     for (const event of selectedEvents) context.policyEventObserver?.(event);
     if (selectsStrict && context.policyEventObserver) {
-        const strictSummary = supportedBandDuelDecisionSummary(strictDecision);
+        const selectedSummary = supportedBandDuelDecisionSummary(selectedDecision);
         const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
-        if (!sameSupportedBandDuelDecision(strictSummary, shippedSummary)) {
+        if (!sameSupportedBandDuelDecision(selectedSummary, shippedSummary)) {
             context.policyEventObserver({
                 kind: "v0.8_supported_band_duel_difference",
                 unitId: unit.getId(),
@@ -1294,14 +1316,14 @@ function supportedBandAdvanceVsLegacy(
                 team: unit.getTeam(),
                 lap: context.fightProperties?.getCurrentLap() ?? 0,
                 details: {
-                    difference: supportedBandDuelDifference(strictSummary, shippedSummary),
-                    strict: strictSummary,
+                    difference: supportedBandDuelDifference(selectedSummary, shippedSummary),
+                    strict: selectedSummary,
                     shipped: shippedSummary,
                 },
             });
         }
     }
-    return selectsStrict ? strictDecision : legacyDecision;
+    return selectedDecision;
 }
 
 function preferRetreat(left: IRouteView, right: IRouteView): boolean {
@@ -1561,9 +1583,9 @@ export function prioritizeV08RangedPositioning(
         .filter(Boolean);
     const responseNeutralAdvance = responseNeutralAdvanceVersions.includes(strategyVersion);
     const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
-    // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. A direct duel
-    // computes shipped and strict catalogs in the same order for both seats before choosing by version. Rollouts
-    // and omitted-origin callers retain the incumbent policy.
+    // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. The direct and
+    // overlay duels compute shipped and strict catalogs in the same order for both seats before choosing by arm.
+    // Rollouts and omitted-origin callers retain the incumbent policy.
     const bandAdvanceActiveHere = mode === "both" && supportedBandAdvanceActiveHere(context);
     const bandAdvanceLegacyControlVersions = new Set(
         (process.env[SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV] ?? "")

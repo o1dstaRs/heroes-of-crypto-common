@@ -493,6 +493,8 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY;
@@ -1018,6 +1020,46 @@ describe("v0.8 protected ranged positioning", () => {
         expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
     });
 
+    it("overlays a real strict proposal but otherwise falls back to the shipped legacy decision and events", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS = "v0.8";
+
+        const run = (version: "v0.8" | "v0.8s") => {
+            const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            setDeterministicRandomSource(makeRng(0x0f411bac));
+            const actions = (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S()).decideTurn(
+                shooter,
+                context,
+            );
+            return {
+                actions: actions.map((action) => action.type),
+                destination: actions.find((action) => action.type === "move_unit")?.targetCells[0],
+                events,
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const candidate = run("v0.8");
+        const control = run("v0.8s");
+        expect(candidate.destination).toEqual(control.destination);
+        expect(candidate.tail).toEqual(control.tail);
+        for (const result of [candidate, control]) {
+            expect(result.actions).toEqual(["move_unit", "range_attack"]);
+            expect(result.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+            expect(result.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+            expect(result.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        }
+    });
+
     it("computes both duel catalogs with equal RNG tails and publishes only the selected branch telemetry", () => {
         process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
         process.env.V08_RANGED_POSITION_MODE = "both";
@@ -1028,7 +1070,14 @@ describe("v0.8 protected ranged positioning", () => {
         // Deliberately scope funnels to both versions: the legacy seat must still suppress its speculative strict arm.
         process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8,v0.8s";
 
-        const run = (version: "v0.8" | "v0.8s") => {
+        const run = (version: "v0.8" | "v0.8s", arm: "replacement" | "overlay" | "overlay_control" = "replacement") => {
+            if (arm !== "replacement") process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS = "v0.8";
+            else delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS;
+            if (arm === "overlay_control") {
+                process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS = "v0.8";
+            } else {
+                delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS;
+            }
             const { shooter, context } = setupSupportedBandAdvance();
             context.decisionOrigin = "root";
             const events: IAIPolicyEvent[] = [];
@@ -1081,6 +1130,9 @@ describe("v0.8 protected ranged positioning", () => {
 
         const strict = run("v0.8");
         const legacy = run("v0.8s");
+        const overlayStrict = run("v0.8", "overlay");
+        const overlayLegacy = run("v0.8s", "overlay");
+        const overlayControl = run("v0.8", "overlay_control");
         expect(strict.actions).toEqual(["move_unit", "range_attack"]);
         expect(legacy.actions).toEqual(["move_unit", "range_attack"]);
         // Legacy receives the first catalog and strict the second, regardless of which version selects each branch.
@@ -1110,6 +1162,25 @@ describe("v0.8 protected ranged positioning", () => {
         expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
         expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
         expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        expect(overlayStrict.actions).toEqual(strict.actions);
+        expect(overlayStrict.destination).toEqual(strict.destination);
+        expect(overlayStrict.catalogCalls).toBe(2);
+        expect(overlayStrict.tail).toEqual(overlayLegacy.tail);
+        expect(overlayStrict.tail).toEqual(strict.tail);
+        expect(overlayStrict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance");
+        expect(overlayStrict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_duel_difference");
+        expect(overlayLegacy.actions).toEqual(legacy.actions);
+        expect(overlayLegacy.destination).toEqual(legacy.destination);
+        expect(overlayLegacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(overlayLegacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        expect(overlayControl.actions).toEqual(legacy.actions);
+        expect(overlayControl.destination).toEqual(legacy.destination);
+        expect(overlayControl.catalogCalls).toBe(2);
+        expect(overlayControl.tail).toEqual(overlayStrict.tail);
+        expect(overlayControl.events.map(({ kind }) => kind)).toEqual(legacy.events.map(({ kind }) => kind));
+        expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+        expect(overlayControl.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
     });
 
     it("does not duplicate pinned retreat after duel branch selection", () => {

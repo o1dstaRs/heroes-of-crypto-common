@@ -100,6 +100,10 @@ export interface IV08RangedPositioningABOptions {
     supportedBandAdvanceLiveOnly?: boolean;
     /** Direct live-root duel: v0.8 selects the strict full-damage catalog; v0.8s selects shipped legacy. */
     supportedBandAdvanceVsLegacy?: boolean;
+    /** Live-root overlay duel: v0.8 selects a real strict proposal and otherwise falls back to shipped legacy. */
+    supportedBandAdvanceOverlayVsLegacy?: boolean;
+    /** Matched overlay selector-off control: both catalogs run, but v0.8 always selects shipped legacy. */
+    supportedBandAdvanceOverlayControl?: boolean;
     /** Live-root post-catalog vetoes over shipped legacy; rollouts and v0.8s remain exact incumbent controls. */
     protectedAdvanceGuardrails?: boolean;
     /** Selects both guardrails, an isolated reason, or the exact catalog-only control. */
@@ -123,7 +127,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -162,6 +166,8 @@ export interface IV08RangedPositioningABManifest {
         supportedBandAdvanceCatalogOnly: boolean;
         supportedBandAdvanceLiveOnly: boolean;
         supportedBandAdvanceVsLegacy: boolean;
+        supportedBandAdvanceOverlayVsLegacy: boolean;
+        supportedBandAdvanceOverlayControl: boolean;
         protectedAdvanceGuardrails: boolean;
         protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode;
         diag: boolean;
@@ -217,6 +223,8 @@ function validateBehaviorArmGeometry(
     supportedPrepinEgress: boolean,
     supportedBandAdvance: boolean,
     supportedBandAdvanceVsLegacy: boolean,
+    supportedBandAdvanceOverlayVsLegacy: boolean,
+    supportedBandAdvanceOverlayControl: boolean,
     protectedAdvanceGuardrails: boolean,
 ): void {
     const enabledSpecialArms = [
@@ -229,13 +237,16 @@ function validateBehaviorArmGeometry(
         supportedPrepinEgress,
         supportedBandAdvance,
         supportedBandAdvanceVsLegacy,
+        supportedBandAdvanceOverlayVsLegacy,
+        supportedBandAdvanceOverlayControl,
         protectedAdvanceGuardrails,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
         throw new Error(
             "noMeleeTerminalPressure, deadlineFinisher, paretoNoMeleeFocus, jitNoMeleeFocus, " +
                 "supportedRangedDelta, responseNeutralAdvance, supportedPrepinEgress, supportedBandAdvance, and " +
-                "supportedBandAdvanceVsLegacy, and protectedAdvanceGuardrails " +
+                "supportedBandAdvanceVsLegacy, supportedBandAdvanceOverlayVsLegacy, " +
+                "supportedBandAdvanceOverlayControl, and protectedAdvanceGuardrails " +
                 "are mutually exclusive",
         );
     }
@@ -265,6 +276,12 @@ function validateBehaviorArmGeometry(
     }
     if (supportedBandAdvanceVsLegacy && (mode !== "both" || moveShots !== 0)) {
         throw new Error("supportedBandAdvanceVsLegacy requires mode=both and moveShots=0");
+    }
+    if (supportedBandAdvanceOverlayVsLegacy && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandAdvanceOverlayVsLegacy requires mode=both and moveShots=0");
+    }
+    if (supportedBandAdvanceOverlayControl && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandAdvanceOverlayControl requires mode=both and moveShots=0");
     }
     if (protectedAdvanceGuardrails && (mode !== "both" || moveShots !== 0)) {
         throw new Error("protectedAdvanceGuardrails requires mode=both and moveShots=0");
@@ -437,7 +454,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.supportedBandAdvanceLiveOnly &&
         !options.supportedBandAdvance &&
         !options.supportedBandAdvanceCatalogOnly &&
-        !options.supportedBandAdvanceVsLegacy
+        !options.supportedBandAdvanceVsLegacy &&
+        !options.supportedBandAdvanceOverlayVsLegacy &&
+        !options.supportedBandAdvanceOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -455,8 +474,40 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
             "supportedBandAdvanceVsLegacy, supportedBandAdvance, and supportedBandAdvanceCatalogOnly are mutually exclusive",
         );
     }
+    if (
+        options.supportedBandAdvanceOverlayVsLegacy !== undefined &&
+        typeof options.supportedBandAdvanceOverlayVsLegacy !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceOverlayVsLegacy must be a boolean");
+    }
+    if (
+        options.supportedBandAdvanceOverlayControl !== undefined &&
+        typeof options.supportedBandAdvanceOverlayControl !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceOverlayControl must be a boolean");
+    }
+    if (
+        [
+            options.supportedBandAdvance,
+            options.supportedBandAdvanceCatalogOnly,
+            options.supportedBandAdvanceVsLegacy,
+            options.supportedBandAdvanceOverlayVsLegacy,
+            options.supportedBandAdvanceOverlayControl,
+        ].filter(Boolean).length > 1
+    ) {
+        throw new Error(
+            "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
+                "supportedBandAdvanceOverlayVsLegacy, and supportedBandAdvanceOverlayControl are mutually exclusive",
+        );
+    }
     if (options.supportedBandAdvanceVsLegacy && !options.supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceVsLegacy requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandAdvanceOverlayVsLegacy && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceOverlayVsLegacy requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandAdvanceOverlayControl && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (options.protectedAdvanceGuardrails !== undefined && typeof options.protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -480,6 +531,8 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         (options.supportedPrepinEgress ?? false) || (options.supportedPrepinEgressCatalogOnly ?? false),
         (options.supportedBandAdvance ?? false) || (options.supportedBandAdvanceCatalogOnly ?? false),
         options.supportedBandAdvanceVsLegacy ?? false,
+        options.supportedBandAdvanceOverlayVsLegacy ?? false,
+        options.supportedBandAdvanceOverlayControl ?? false,
         options.protectedAdvanceGuardrails ?? false,
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
@@ -586,7 +639,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -625,6 +678,8 @@ export function buildV08RangedPositioningABManifest(
             supportedBandAdvanceCatalogOnly: options.supportedBandAdvanceCatalogOnly ?? false,
             supportedBandAdvanceLiveOnly: options.supportedBandAdvanceLiveOnly ?? false,
             supportedBandAdvanceVsLegacy: options.supportedBandAdvanceVsLegacy ?? false,
+            supportedBandAdvanceOverlayVsLegacy: options.supportedBandAdvanceOverlayVsLegacy ?? false,
+            supportedBandAdvanceOverlayControl: options.supportedBandAdvanceOverlayControl ?? false,
             protectedAdvanceGuardrails: options.protectedAdvanceGuardrails ?? false,
             protectedAdvanceGuardrailsMode: options.protectedAdvanceGuardrailsMode ?? "both",
             diag: options.diag ?? false,
@@ -675,6 +730,8 @@ export function buildV08RangedPositioningABEnvironment(
     paretoNoMeleeFocusScope: PureRangedParetoNoMeleeFocusScope = "pure_ranged",
     supportedRangedDeltaCatalogOnly = false,
     supportedRangedDeltaLiveOnly = false,
+    supportedBandAdvanceOverlayVsLegacy = false,
+    supportedBandAdvanceOverlayControl = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -761,20 +818,48 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceLiveOnly &&
         !supportedBandAdvance &&
         !supportedBandAdvanceCatalogOnly &&
-        !supportedBandAdvanceVsLegacy
+        !supportedBandAdvanceVsLegacy &&
+        !supportedBandAdvanceOverlayVsLegacy &&
+        !supportedBandAdvanceOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
     if (typeof supportedBandAdvanceVsLegacy !== "boolean") {
         throw new Error("supportedBandAdvanceVsLegacy must be a boolean");
     }
+    if (typeof supportedBandAdvanceOverlayVsLegacy !== "boolean") {
+        throw new Error("supportedBandAdvanceOverlayVsLegacy must be a boolean");
+    }
+    if (typeof supportedBandAdvanceOverlayControl !== "boolean") {
+        throw new Error("supportedBandAdvanceOverlayControl must be a boolean");
+    }
     if (supportedBandAdvanceVsLegacy && (supportedBandAdvance || supportedBandAdvanceCatalogOnly)) {
         throw new Error(
             "supportedBandAdvanceVsLegacy, supportedBandAdvance, and supportedBandAdvanceCatalogOnly are mutually exclusive",
         );
     }
+    if (
+        [
+            supportedBandAdvance,
+            supportedBandAdvanceCatalogOnly,
+            supportedBandAdvanceVsLegacy,
+            supportedBandAdvanceOverlayVsLegacy,
+            supportedBandAdvanceOverlayControl,
+        ].filter(Boolean).length > 1
+    ) {
+        throw new Error(
+            "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
+                "supportedBandAdvanceOverlayVsLegacy, and supportedBandAdvanceOverlayControl are mutually exclusive",
+        );
+    }
     if (supportedBandAdvanceVsLegacy && !supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceVsLegacy requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandAdvanceOverlayVsLegacy && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceOverlayVsLegacy requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandAdvanceOverlayControl && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandAdvanceOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (typeof protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -797,6 +882,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedPrepinEgress || supportedPrepinEgressCatalogOnly,
         supportedBandAdvance || supportedBandAdvanceCatalogOnly,
         supportedBandAdvanceVsLegacy,
+        supportedBandAdvanceOverlayVsLegacy,
+        supportedBandAdvanceOverlayControl,
         protectedAdvanceGuardrails,
     );
 
@@ -853,16 +940,24 @@ export function buildV08RangedPositioningABEnvironment(
           ? V08_A13_PRODUCTION_VERSION
           : "";
     const supportedBandExperiment = supportedBandAdvance || supportedBandAdvanceCatalogOnly;
+    const supportedBandOverlayDuel = supportedBandAdvanceOverlayVsLegacy || supportedBandAdvanceOverlayControl;
+    const supportedBandLegacyDuel = supportedBandAdvanceVsLegacy || supportedBandOverlayDuel;
     environment.V08_SUPPORTED_BAND_ADVANCE = supportedBandExperiment ? "1" : "0";
     environment.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS =
-        supportedBandExperiment || supportedBandAdvanceVsLegacy ? V08_A13_PRODUCTION_VERSION : "";
-    environment.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = supportedBandAdvanceVsLegacy
+        supportedBandExperiment || supportedBandLegacyDuel ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = supportedBandLegacyDuel
         ? V08_A13_SOURCE_VERSION
         : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = supportedBandAdvanceLiveOnly ? "1" : "0";
+    environment.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS = supportedBandAdvanceOverlayControl
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
+    environment.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS = supportedBandOverlayDuel
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = supportedBandAdvanceCatalogOnly
         ? "supported-band-advance-catalog-only-control"
-        : supportedBandAdvance || supportedBandAdvanceVsLegacy
+        : supportedBandAdvance || supportedBandLegacyDuel
           ? V08_A13_PRODUCTION_VERSION
           : "";
     environment.V08_PROTECTED_ADVANCE_GUARDRAILS = protectedAdvanceGuardrails ? "1" : "0";
@@ -881,6 +976,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvance ||
         supportedBandAdvanceCatalogOnly ||
         supportedBandAdvanceVsLegacy ||
+        supportedBandAdvanceOverlayVsLegacy ||
+        supportedBandAdvanceOverlayControl ||
         protectedAdvanceGuardrails
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
@@ -921,6 +1018,8 @@ export function buildV08RangedPositioningABInvocations(
         options.paretoNoMeleeFocusScope ?? "pure_ranged",
         options.supportedRangedDeltaCatalogOnly ?? false,
         options.supportedRangedDeltaLiveOnly ?? false,
+        options.supportedBandAdvanceOverlayVsLegacy ?? false,
+        options.supportedBandAdvanceOverlayControl ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -1018,6 +1117,8 @@ export async function runV08RangedPositioningAB(
     const supportedBandAdvanceCatalogOnly = options.supportedBandAdvanceCatalogOnly ?? false;
     const supportedBandAdvanceLiveOnly = options.supportedBandAdvanceLiveOnly ?? false;
     const supportedBandAdvanceVsLegacy = options.supportedBandAdvanceVsLegacy ?? false;
+    const supportedBandAdvanceOverlayVsLegacy = options.supportedBandAdvanceOverlayVsLegacy ?? false;
+    const supportedBandAdvanceOverlayControl = options.supportedBandAdvanceOverlayControl ?? false;
     const protectedAdvanceGuardrails = options.protectedAdvanceGuardrails ?? false;
     const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
     for (const invocation of invocations) {
@@ -1042,6 +1143,8 @@ export async function runV08RangedPositioningAB(
                 `supportedBandCatalogOnly=${supportedBandAdvanceCatalogOnly} ` +
                 `supportedBandLiveOnly=${supportedBandAdvanceLiveOnly} ` +
                 `supportedBandVsLegacy=${supportedBandAdvanceVsLegacy} ` +
+                `supportedBandOverlayVsLegacy=${supportedBandAdvanceOverlayVsLegacy} ` +
+                `supportedBandOverlayControl=${supportedBandAdvanceOverlayControl} ` +
                 `protectedAdvanceGuardrails=${protectedAdvanceGuardrails} ` +
                 `protectedAdvanceGuardrailsMode=${protectedAdvanceGuardrailsMode} ` +
                 `games=${options.games} seed=${options.seed}`,
@@ -1088,6 +1191,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-band-catalog-only": { type: "boolean", default: false },
             "supported-band-live-only": { type: "boolean", default: false },
             "supported-band-vs-legacy": { type: "boolean", default: false },
+            "supported-band-overlay-vs-legacy": { type: "boolean", default: false },
+            "supported-band-overlay-control": { type: "boolean", default: false },
             "protected-advance-guardrails": { type: "boolean", default: false },
             "protected-advance-guardrails-mode": { type: "string", default: "both" },
             diag: { type: "boolean", default: false },
@@ -1143,6 +1248,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedBandAdvanceCatalogOnly: values["supported-band-catalog-only"]!,
         supportedBandAdvanceLiveOnly: values["supported-band-live-only"]!,
         supportedBandAdvanceVsLegacy: values["supported-band-vs-legacy"]!,
+        supportedBandAdvanceOverlayVsLegacy: values["supported-band-overlay-vs-legacy"]!,
+        supportedBandAdvanceOverlayControl: values["supported-band-overlay-control"]!,
         protectedAdvanceGuardrails: values["protected-advance-guardrails"]!,
         protectedAdvanceGuardrailsMode,
         diag: values.diag!,
@@ -1164,7 +1271,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--supported-ranged-delta|--supported-ranged-delta-catalog-only] " +
                 "[--supported-ranged-delta-live-only] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
-                "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy] " +
+                "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy|" +
+                "--supported-band-overlay-vs-legacy|--supported-band-overlay-control] " +
                 "[--supported-band-live-only] " +
                 "[--protected-advance-guardrails] " +
                 "[--protected-advance-guardrails-mode both|catalog_only|partial_band|ranged_superior_hold] " +

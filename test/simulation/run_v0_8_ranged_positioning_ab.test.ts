@@ -57,6 +57,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     supportedBandAdvanceCatalogOnly: false,
     supportedBandAdvanceLiveOnly: false,
     supportedBandAdvanceVsLegacy: false,
+    supportedBandAdvanceOverlayVsLegacy: false,
+    supportedBandAdvanceOverlayControl: false,
     protectedAdvanceGuardrails: false,
     protectedAdvanceGuardrailsMode: "both",
     diag: false,
@@ -124,6 +126,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
@@ -221,6 +225,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             supportedBandAdvanceCatalogOnly: false,
             supportedBandAdvanceLiveOnly: false,
             supportedBandAdvanceVsLegacy: false,
+            supportedBandAdvanceOverlayVsLegacy: false,
+            supportedBandAdvanceOverlayControl: false,
             protectedAdvanceGuardrails: false,
             protectedAdvanceGuardrailsMode: "both",
             diag: true,
@@ -245,6 +251,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceLiveOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceVsLegacy).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceOverlayVsLegacy).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceOverlayControl).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).protectedAdvanceGuardrails).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).protectedAdvanceGuardrailsMode).toBe("both");
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
@@ -267,6 +275,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(log).toHaveBeenCalledTimes(1);
             expect(String(log.mock.calls[0]?.[0])).toContain("mixed_cyclops_tsar");
             expect(String(log.mock.calls[0]?.[0])).toContain("mixed_supported");
+            expect(String(log.mock.calls[0]?.[0])).toContain("supported-band-overlay-control");
         } finally {
             log.mockRestore();
         }
@@ -513,7 +522,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 paretoNoMeleeFocus: true,
                 paretoNoMeleeFocusScope: "any_board",
@@ -582,7 +591,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             geometry: {
                 cohort: "mixed_cyclops_tsar",
                 amountMode: "expBudget",
@@ -668,7 +677,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
@@ -761,7 +770,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 supportedRangedDelta: true,
                 supportedRangedDeltaCatalogOnly: false,
@@ -912,7 +921,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 supportedPrepinEgress: true,
                 supportedPrepinEgressCatalogOnly: false,
@@ -1023,7 +1032,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 supportedBandAdvance: true,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1114,13 +1123,15 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
         });
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         const manifest = buildV08RangedPositioningABManifest(invocation, duel, source);
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 supportedBandAdvance: false,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1149,6 +1160,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         for (const conflictingArm of [
             { supportedBandAdvance: true },
             { supportedBandAdvanceCatalogOnly: true },
+            { supportedBandAdvanceOverlayVsLegacy: true },
+            { supportedBandAdvanceOverlayControl: true },
             { noMeleeTerminalPressure: true },
             { deadlineFinisher: true },
             { paretoNoMeleeFocus: true },
@@ -1161,6 +1174,213 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             { supportedPrepinEgressCatalogOnly: true },
         ]) {
             expect(() => buildV08RangedPositioningABInvocations({ ...duel, ...conflictingArm })).toThrow(
+                "mutually exclusive",
+            );
+        }
+    });
+
+    it("configures a distinct live-root supported-band overlay against shipped legacy", () => {
+        const overlay: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "both",
+            supportedBandAdvanceLiveOnly: true,
+            supportedBandAdvanceOverlayVsLegacy: true,
+            diag: true,
+        };
+        const [invocation] = buildV08RangedPositioningABInvocations(overlay, {
+            PATH: "/bin",
+            V08_SUPPORTED_BAND_ADVANCE: "1",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "v0.6",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "v0.7",
+        });
+
+        expect(invocation.environment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "both",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE: "0",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
+            V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
+        });
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
+        const manifest = buildV08RangedPositioningABManifest(invocation, overlay, source);
+        expect(manifest).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
+            arm: {
+                supportedBandAdvance: false,
+                supportedBandAdvanceCatalogOnly: false,
+                supportedBandAdvanceLiveOnly: true,
+                supportedBandAdvanceVsLegacy: false,
+                supportedBandAdvanceOverlayVsLegacy: true,
+                supportedBandAdvanceOverlayControl: false,
+            },
+            behaviorEnvironment: {
+                V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
+                V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+                V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "v0.8",
+            },
+        });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-overlay-vs-legacy",
+                "--supported-band-live-only",
+            ]),
+        ).toMatchObject({
+            supportedBandAdvanceOverlayVsLegacy: true,
+            supportedBandAdvanceVsLegacy: false,
+            supportedBandAdvanceLiveOnly: true,
+        });
+
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...overlay, supportedBandAdvanceLiveOnly: false }),
+        ).toThrow("requires supportedBandAdvanceLiveOnly");
+        for (const mode of ["advance", "retreat", "off"] as const) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...overlay, mode })).toThrow("mode=both");
+        }
+        expect(() => buildV08RangedPositioningABInvocations({ ...overlay, moveShots: 1 })).toThrow("moveShots=0");
+        for (const conflictingArm of [
+            { supportedBandAdvance: true },
+            { supportedBandAdvanceCatalogOnly: true },
+            { supportedBandAdvanceVsLegacy: true },
+            { supportedBandAdvanceOverlayControl: true },
+            { protectedAdvanceGuardrails: true },
+            { noMeleeTerminalPressure: true },
+            { deadlineFinisher: true },
+            { paretoNoMeleeFocus: true },
+            { paretoNoMeleeFocusCatalogOnly: true },
+            { jitNoMeleeFocus: true },
+            { jitNoMeleeFocusCatalogOnly: true },
+            { supportedRangedDelta: true },
+            { responseNeutralAdvance: true },
+            { supportedPrepinEgress: true },
+            { supportedPrepinEgressCatalogOnly: true },
+        ]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...overlay, ...conflictingArm })).toThrow(
+                "mutually exclusive",
+            );
+        }
+    });
+
+    it("matches the overlay selector-off control to treatment except for its sealed control selector", () => {
+        const treatment: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "both",
+            supportedBandAdvanceLiveOnly: true,
+            supportedBandAdvanceOverlayVsLegacy: true,
+            diag: true,
+        };
+        const control: IV08RangedPositioningABOptions = {
+            ...treatment,
+            supportedBandAdvanceOverlayVsLegacy: false,
+            supportedBandAdvanceOverlayControl: true,
+        };
+        const hostileEnvironment = {
+            PATH: "/bin",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "v0.7",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "hostile",
+        };
+        const [treatmentInvocation] = buildV08RangedPositioningABInvocations(treatment, hostileEnvironment);
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, hostileEnvironment);
+
+        const expectedCommonEnvironment = {
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "both",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE: "0",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
+        };
+        expect(treatmentInvocation.environment).toMatchObject({
+            ...expectedCommonEnvironment,
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+        });
+        expect(controlInvocation.environment).toMatchObject({
+            ...expectedCommonEnvironment,
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "v0.8",
+        });
+        const changedEnvironmentKeys = [
+            ...new Set([
+                ...Object.keys(treatmentInvocation.environment),
+                ...Object.keys(controlInvocation.environment),
+            ]),
+        ]
+            .filter((key) => treatmentInvocation.environment[key] !== controlInvocation.environment[key])
+            .sort();
+        expect(changedEnvironmentKeys).toEqual(["V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS"]);
+
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
+        const treatmentManifest = buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source);
+        const controlManifest = buildV08RangedPositioningABManifest(controlInvocation, control, source);
+        expect(controlManifest).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
+            arm: {
+                supportedBandAdvanceLiveOnly: true,
+                supportedBandAdvanceVsLegacy: false,
+                supportedBandAdvanceOverlayVsLegacy: false,
+                supportedBandAdvanceOverlayControl: true,
+            },
+            behaviorEnvironment: {
+                V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
+                V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "v0.8",
+                V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "v0.8",
+                V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
+            },
+        });
+        const changedBehaviorKeys = [
+            ...new Set([
+                ...Object.keys(treatmentManifest.behaviorEnvironment),
+                ...Object.keys(controlManifest.behaviorEnvironment),
+            ]),
+        ]
+            .filter((key) => treatmentManifest.behaviorEnvironment[key] !== controlManifest.behaviorEnvironment[key])
+            .sort();
+        expect(changedBehaviorKeys).toEqual(["V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS"]);
+
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-overlay-control",
+                "--supported-band-live-only",
+            ]),
+        ).toMatchObject({
+            supportedBandAdvanceOverlayControl: true,
+            supportedBandAdvanceOverlayVsLegacy: false,
+            supportedBandAdvanceVsLegacy: false,
+            supportedBandAdvanceLiveOnly: true,
+        });
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...control, supportedBandAdvanceLiveOnly: false }),
+        ).toThrow("requires supportedBandAdvanceLiveOnly");
+        for (const mode of ["advance", "retreat", "off"] as const) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...control, mode })).toThrow("mode=both");
+        }
+        expect(() => buildV08RangedPositioningABInvocations({ ...control, moveShots: 1 })).toThrow("moveShots=0");
+        for (const conflictingArm of [
+            { supportedBandAdvance: true },
+            { supportedBandAdvanceCatalogOnly: true },
+            { supportedBandAdvanceVsLegacy: true },
+            { supportedBandAdvanceOverlayVsLegacy: true },
+            { protectedAdvanceGuardrails: true },
+        ]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...control, ...conflictingArm })).toThrow(
                 "mutually exclusive",
             );
         }
@@ -1205,7 +1425,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         });
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(invocation, guardrails, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             arm: {
                 protectedAdvanceGuardrails: true,
                 protectedAdvanceGuardrailsMode: "both",
@@ -1277,7 +1497,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(catalogInvocation.args, "--vA")).toBe("v0.8");
             expect(argValue(catalogInvocation.args, "--vB")).toBe("v0.8s");
             expect(buildV08RangedPositioningABManifest(catalogInvocation, catalogControl, source)).toMatchObject({
-                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
                 geometry: { pairedSideSwap: true, symmetricRosters: true },
                 arm: { protectedAdvanceGuardrails: true, protectedAdvanceGuardrailsMode: "catalog_only" },
             });
@@ -1332,6 +1552,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             { supportedBandAdvance: true },
             { supportedBandAdvanceCatalogOnly: true },
             { supportedBandAdvanceVsLegacy: true, supportedBandAdvanceLiveOnly: true },
+            { supportedBandAdvanceOverlayVsLegacy: true, supportedBandAdvanceLiveOnly: true },
+            { supportedBandAdvanceOverlayControl: true, supportedBandAdvanceLiveOnly: true },
         ]) {
             expect(() => buildV08RangedPositioningABInvocations({ ...guardrails, ...conflictingArm })).toThrow(
                 "mutually exclusive",
@@ -1358,7 +1580,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v15",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -1397,6 +1619,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 supportedBandAdvanceCatalogOnly: false,
                 supportedBandAdvanceLiveOnly: false,
                 supportedBandAdvanceVsLegacy: false,
+                supportedBandAdvanceOverlayVsLegacy: false,
+                supportedBandAdvanceOverlayControl: false,
                 protectedAdvanceGuardrails: false,
                 protectedAdvanceGuardrailsMode: "both",
                 diag: true,
@@ -1427,6 +1651,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
