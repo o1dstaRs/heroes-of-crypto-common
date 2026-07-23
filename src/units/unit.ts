@@ -46,6 +46,7 @@ import { Spell } from "../spells/spell";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
+import { roundUnitStat } from "./stat_rounding";
 import { UnitProperties } from "./unit_properties";
 import type { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -2415,8 +2416,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // base-stat recomputation: it applies only at the unit-cast buff boundary (spells/castable_buff.ts).
         const pendantOfVitalityBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityBuff) {
-            this.unitProperties.max_hp += Number(
-                ((this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower()).toFixed(2),
+            this.unitProperties.max_hp += roundUnitStat(
+                (this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower(),
+                2,
             );
         }
 
@@ -2532,12 +2534,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // ARMOR
         const pegasusMightAura = this.getAppliedAuraEffect("Pegasus Might Aura");
-        this.unitProperties.base_armor = Number(
-            (
-                (madeOfFireBuff
-                    ? this.initialUnitProperties.base_armor + this.initialUnitProperties.base_armor / 10
-                    : this.initialUnitProperties.base_armor) + baseStatsDiff.baseStats.armor
-            ).toFixed(2),
+        this.unitProperties.base_armor = roundUnitStat(
+            (madeOfFireBuff
+                ? this.initialUnitProperties.base_armor + this.initialUnitProperties.base_armor / 10
+                : this.initialUnitProperties.base_armor) + baseStatsDiff.baseStats.armor,
+            2,
         );
         if (pegasusMightAura) {
             this.unitProperties.base_armor += pegasusMightAura.getPower();
@@ -2548,8 +2549,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const armorAugmentBuff = this.getBuff("Armor Augment");
         if (armorAugmentBuff) {
-            this.unitProperties.base_armor += Number(
-                ((this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower()).toFixed(2),
+            this.unitProperties.base_armor += roundUnitStat(
+                (this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower(),
+                2,
             );
         }
 
@@ -2560,7 +2562,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
         const titanPlateBuff = this.getBuff("Titan Plate");
         const titanPlateArmorBonus = titanPlateBuff
-            ? Number(((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower()).toFixed(2))
+            ? roundUnitStat((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower(), 2)
             : 0;
         const ironPlateBuff = this.getBuff("Iron Plate");
         if (ironPlateBuff) {
@@ -2595,7 +2597,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                         this.getStackPower());
         }
 
-        this.unitProperties.base_armor = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
+        this.unitProperties.base_armor = roundUnitStat(this.unitProperties.base_armor * baseArmorMultiplier, 2);
 
         // mod
         const shatterArmorEffect = this.getEffect("Shatter Armor");
@@ -2615,11 +2617,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         if (armorModMultiplier) {
-            this.unitProperties.armor_mod = Number(
-                (
-                    Math.max(this.unitProperties.base_armor - shatterArmorEffectPower, 1) * armorModMultiplier -
-                    shatterArmorEffectPower
-                ).toFixed(2),
+            this.unitProperties.armor_mod = roundUnitStat(
+                Math.max(this.unitProperties.base_armor - shatterArmorEffectPower, 1) * armorModMultiplier -
+                    shatterArmorEffectPower,
+                2,
             );
         }
 
@@ -2630,21 +2631,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // it never compounds with other % defense buffs.
         const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
         if (veteranHelmArmorBuff) {
-            this.unitProperties.armor_mod += Number(
-                ((this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower()).toFixed(2),
+            this.unitProperties.armor_mod += roundUnitStat(
+                (this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower(),
+                2,
             );
         }
 
         // Titan Plate's +% defense (captured pre-multiplier above) lands here as an additional armor_mod, exactly
         // like Veteran Helm — additive off base, non-compounding, guarding melee + ranged.
         if (titanPlateArmorBonus) {
-            this.unitProperties.armor_mod = Number((this.unitProperties.armor_mod + titanPlateArmorBonus).toFixed(2));
+            this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + titanPlateArmorBonus, 2);
         }
 
         const angelicHostBuff = this.getBuff("Angelic Host");
         if (angelicHostBuff) {
-            this.unitProperties.armor_mod = Number(
-                (this.unitProperties.armor_mod + angelicHostBuff.getPower()).toFixed(2),
+            this.unitProperties.armor_mod = roundUnitStat(
+                this.unitProperties.armor_mod + angelicHostBuff.getPower(),
+                2,
             );
         }
 
@@ -2652,8 +2655,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // first spell property (set in enchantCast), so a unit enchanted N times carries +N here and on its card.
         const enchantArmorBuff = this.getBuff("Enchant Armor");
         if (enchantArmorBuff) {
-            this.unitProperties.armor_mod = Number(
-                (this.unitProperties.armor_mod + (enchantArmorBuff.getFirstSpellProperty() ?? 0)).toFixed(2),
+            this.unitProperties.armor_mod = roundUnitStat(
+                this.unitProperties.armor_mod + (enchantArmorBuff.getFirstSpellProperty() ?? 0),
+                2,
             );
         }
 
@@ -2687,9 +2691,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
             }
 
-            this.unitProperties.magic_resist = Number(
-                (winningAtLeastOneEventProbability(magicResists) * 100).toFixed(2),
-            );
+            this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);
         }
 
         // NOTE: Helm of Focus is intentionally NOT folded into magic_resist (which is magic armor — flat % off
@@ -2721,7 +2723,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // STEPS
         this.unitProperties.steps_mod =
-            Number((stepsMoraleMultiplier * this.getMorale()).toFixed(1)) + synergyMovementStepsIncrease;
+            roundUnitStat(stepsMoraleMultiplier * this.getMorale(), 1) + synergyMovementStepsIncrease;
         const skyRunnerAbility = this.getAbility("Sky Runner");
         if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.initialUnitProperties.steps += 1;
@@ -2752,8 +2754,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const swiftBootsBuff = this.getBuff("Swift Boots");
         if (swiftBootsBuff) {
             // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
-            this.unitProperties.steps += Number(
-                ((this.unitProperties.steps / 100) * swiftBootsBuff.getPower()).toFixed(2),
+            this.unitProperties.steps += roundUnitStat(
+                (this.unitProperties.steps / 100) * swiftBootsBuff.getPower(),
+                2,
             );
         }
         const wingedBootsBuff = this.getBuff("Winged Boots");
@@ -2782,11 +2785,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (hamstrungDebuff) {
             stepsMultiplier *= (100 - hamstrungDebuff.getPower()) / 100;
         }
-        this.unitProperties.steps = Number((this.unitProperties.steps * stepsMultiplier).toFixed(1));
-        this.unitProperties.steps_mod = Number((this.unitProperties.steps_mod * stepsMultiplier).toFixed(1));
+        this.unitProperties.steps = roundUnitStat(this.unitProperties.steps * stepsMultiplier, 1);
+        this.unitProperties.steps_mod = roundUnitStat(this.unitProperties.steps_mod * stepsMultiplier, 1);
         if (angelicHostBuff) {
-            this.unitProperties.steps_mod = Number(
-                (this.unitProperties.steps_mod + angelicHostBuff.getPower()).toFixed(2),
+            this.unitProperties.steps_mod = roundUnitStat(
+                this.unitProperties.steps_mod + angelicHostBuff.getPower(),
+                2,
             );
         }
 
@@ -2818,8 +2822,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const mightAugmentBuff = this.getBuff("Might Augment");
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
-            this.unitProperties.base_attack += Number(
-                ((this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower()).toFixed(2),
+            this.unitProperties.base_attack += roundUnitStat(
+                (this.unitProperties.base_attack / 100) * mightAugmentBuff.getPower(),
+                2,
             );
         }
 
@@ -2827,12 +2832,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
-                this.unitProperties.base_attack += Number(
-                    ((this.unitProperties.base_attack / 100) * parseInt(buffProperties[0])).toFixed(2),
+                this.unitProperties.base_attack += roundUnitStat(
+                    (this.unitProperties.base_attack / 100) * parseInt(buffProperties[0]),
+                    2,
                 );
                 // SHOT DISTANCE
-                this.unitProperties.shot_distance += Number(
-                    ((this.unitProperties.shot_distance / 100) * parseInt(buffProperties[1])).toFixed(2),
+                this.unitProperties.shot_distance += roundUnitStat(
+                    (this.unitProperties.shot_distance / 100) * parseInt(buffProperties[1]),
+                    2,
                 );
             }
         }
@@ -2843,8 +2850,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // rather than removing falloff entirely (which is what it used to do).
         const farsightQuiverBuff = this.getBuff("Farsight Quiver");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
-            this.unitProperties.shot_distance += Number(
-                ((this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower()).toFixed(2),
+            this.unitProperties.shot_distance += roundUnitStat(
+                (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
+                2,
             );
         }
 
@@ -2863,7 +2871,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
         const warlordsEdgeBuff = this.getBuff("Warlords Edge");
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
-            ? Number(((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower()).toFixed(2))
+            ? roundUnitStat((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower(), 2)
             : 0;
         const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
@@ -2875,8 +2883,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (pendantOfVitalityAttackBuff) {
             // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
             const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
-            this.unitProperties.base_attack -= Number(
-                ((this.unitProperties.base_attack / 100) * pendantAttackPenaltyPercent).toFixed(2),
+            this.unitProperties.base_attack -= roundUnitStat(
+                (this.unitProperties.base_attack / 100) * pendantAttackPenaltyPercent,
+                2,
             );
         }
 
@@ -2921,10 +2930,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // Warlord's Edge's +% attack (captured pre-aura above) lands here as an additional attack_mod — additive
         // off base, non-compounding, surviving the Riot/Weakness attack_mod overwrites; getAttack = base + mod.
-        this.unitProperties.attack_mod = Number((this.unitProperties.attack_mod + warlordsEdgeAttackBonus).toFixed(2));
+        this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + warlordsEdgeAttackBonus, 2);
         if (angelicHostBuff) {
-            this.unitProperties.attack_mod = Number(
-                (this.unitProperties.attack_mod + angelicHostBuff.getPower()).toFixed(2),
+            this.unitProperties.attack_mod = roundUnitStat(
+                this.unitProperties.attack_mod + angelicHostBuff.getPower(),
+                2,
             );
         }
 
@@ -2932,14 +2942,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // spell property (set in enchantCast). getAttack() = base_attack + attack_mod, so this lands as flat +N.
         const enchantWeaponBuff = this.getBuff("Enchant Weapon");
         if (enchantWeaponBuff) {
-            this.unitProperties.attack_mod = Number(
-                (this.unitProperties.attack_mod + (enchantWeaponBuff.getFirstSpellProperty() ?? 0)).toFixed(2),
+            this.unitProperties.attack_mod = roundUnitStat(
+                this.unitProperties.attack_mod + (enchantWeaponBuff.getFirstSpellProperty() ?? 0),
+                2,
             );
         }
-        this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));
-        this.unitProperties.shot_distance = Number(this.unitProperties.shot_distance.toFixed(2));
+        this.unitProperties.base_attack = roundUnitStat(this.unitProperties.base_attack * baseAttackMultiplier, 2);
+        this.unitProperties.shot_distance = roundUnitStat(this.unitProperties.shot_distance, 2);
 
-        this.unitProperties.range_armor = Number((this.unitProperties.base_armor * rangeArmorMultiplier).toFixed(2));
+        this.unitProperties.range_armor = roundUnitStat(this.unitProperties.base_armor * rangeArmorMultiplier, 2);
 
         if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
             this.adjustedBaseStatsLaps.push(currentLap);
