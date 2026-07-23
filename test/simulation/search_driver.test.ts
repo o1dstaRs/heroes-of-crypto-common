@@ -1639,10 +1639,68 @@ describe("search driver — gating, hygiene, determinism", () => {
             type: "range_attack",
             attackerId: actor.getId(),
             targetId: primary.getId(),
-            aimCell: { x: 8, y: 7 },
+            aimCell: { ...primary.getBaseCell() },
             aimSide: 0,
         },
     ];
+
+    const mixedSupportedParetoRoster = (): readonly IArmyUnitSpec[] =>
+        buildMirrorRoster("mixed_cyclops_tsar", 10_319, "expBudget");
+
+    const positionMixedSupportedParetoFixture = (h: Harness): { actor: Unit; primary: Unit; noMelee: Unit } => {
+        const named = (team: TeamType, name: string): Unit =>
+            [...h.unitsHolder.getAllUnits().values()].find(
+                (candidate) => candidate.getTeam() === team && candidate.getName() === name,
+            )!;
+        const placements: Array<readonly [Unit, XY]> = [
+            [named(GREEN_TEAM, "Cyclops"), { x: 2, y: 7 }],
+            [named(GREEN_TEAM, "Squire"), { x: 3, y: 8 }],
+            [named(GREEN_TEAM, "Pikeman"), { x: 1, y: 14 }],
+            [named(GREEN_TEAM, "Arbalester"), { x: 1, y: 2 }],
+            [named(GREEN_TEAM, "Elf"), { x: 1, y: 4 }],
+            [named(GREEN_TEAM, "Tsar Cannon"), { x: 3, y: 13 }],
+            [named(RED_TEAM, "Squire"), { x: 5, y: 7 }],
+            [named(RED_TEAM, "Tsar Cannon"), { x: 9, y: 7 }],
+            [named(RED_TEAM, "Arbalester"), { x: 10, y: 8 }],
+            [named(RED_TEAM, "Cyclops"), { x: 10, y: 5 }],
+            [named(RED_TEAM, "Pikeman"), { x: 14, y: 13 }],
+            [named(RED_TEAM, "Elf"), { x: 14, y: 2 }],
+        ];
+        for (const [unit] of placements) {
+            h.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+        }
+        for (const [unit, base] of placements) {
+            const position = getPositionForCell(
+                base,
+                h.grid.getSettings().getMinX(),
+                h.grid.getSettings().getStep(),
+                h.grid.getSettings().getHalfStep(),
+            );
+            unit.setPosition(position.x, position.y);
+            expect(
+                h.grid.occupyCells(
+                    footprint(unit, base),
+                    unit.getId(),
+                    unit.getTeam(),
+                    unit.getAttackRange(),
+                    unit.hasAbilityActive("Made of Fire"),
+                    unit.hasAbilityActive("Made of Water"),
+                ),
+            ).toBe(true);
+        }
+        const actor = named(GREEN_TEAM, "Cyclops");
+        const primary = named(RED_TEAM, "Squire");
+        const noMelee = named(RED_TEAM, "Tsar Cannon");
+        h.setActiveUnitId(actor.getId());
+        return { actor, primary, noMelee };
+    };
+
+    const mixedSupportedParetoEnvironment = {
+        ...pureRangedParetoFocusEnvironment,
+        SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "mixed_supported",
+        // The selector remains candidate-only even if a hand-written environment includes both version names.
+        SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8,v0.8s",
+    } as const;
 
     it("wires the 0.95 floor through SearchDriver while the scoped control remains exact", () => {
         const exactAudit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-exact-floor-")), "search.jsonl");
@@ -1784,7 +1842,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             ...pureRangedParetoFocusEnvironment,
             SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: "everywhere",
         });
-        expect(() => h.makeDriver()).toThrow("must be pure_ranged or any_board");
+        expect(() => h.makeDriver()).toThrow("must be pure_ranged, any_board, or mixed_supported");
 
         setEnv({
             ...pureRangedParetoFocusEnvironment,
@@ -1857,6 +1915,117 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(calls).toHaveLength(2);
         expect(normalize(calls[1])).toEqual(normalize(calls[0]));
         expect(calls[0].filter((candidate) => candidate.kind === "shot").length).toBeGreaterThan(1);
+    });
+
+    it("selects mixed-supported focus only for v0.8 and emits one sparse causal v13 proposal row", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-supported-")), "search.jsonl");
+        setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_319, "v0.8", undefined, mixedSupportedParetoRoster());
+        const { actor, primary, noMelee } = positionMixedSupportedParetoFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const controlIncumbent = plainAim(actor, primary);
+        expect(driver.chooseDecision(actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const candidateIncumbent = plainAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", candidateIncumbent);
+        expect(chosen).not.toBe(candidateIncumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(noMelee.getId());
+
+        driver.onMatchEnd("draw", "turn_cap");
+        const rows = readFileSync(audit, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as Record<string, unknown>);
+        const proposalRows = rows.filter((row) => row.t === "pareto_focus");
+        expect(proposalRows).toHaveLength(1);
+        expect(proposalRows[0]).toMatchObject({
+            schema: "hoc.search.pareto_focus.v13",
+            t: "pareto_focus",
+            seed: 10_319,
+            side: "green",
+            unitId: actor.getId(),
+            decisionOrdinal: 1,
+            lap: 1,
+            scope: "mixed_supported",
+            status: "valid_override",
+            actor: { name: "Cyclops", ability: "large_caliber" },
+            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+            incumbent: { targetId: primary.getId(), targetName: "Squire" },
+            proposal: { targetId: noMelee.getId(), targetName: "Tsar Cannon" },
+        });
+        expect(proposalRows[0].proposalCount as number).toBeGreaterThan(0);
+        expect((proposalRows[0].proposal as { minimumDamageRatio: number }).minimumDamageRatio).toBeGreaterThanOrEqual(
+            1,
+        );
+        expect(rows.find((row) => row.t === "game")).toMatchObject({
+            pureRangedParetoNoMeleeFocusScope: "mixed_supported",
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
+            pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
+        });
+        expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("gives mixed-supported candidate and control seats identical target-covered catalogs", () => {
+        setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_MAX_SHOTS: "1" });
+        const h = buildBattle(10_320, "v0.8", undefined, mixedSupportedParetoRoster());
+        const { actor, primary } = positionMixedSupportedParetoFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+        const calls = captureCandidates(driver);
+        const intercepted = driver as unknown as {
+            firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+        };
+        intercepted.firstEngineValidCandidate = () => undefined;
+
+        driver.chooseDecision(actor, "v0.8s", plainAim(actor, primary));
+        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+
+        expect(calls).toHaveLength(2);
+        expect(normalize(calls[1])).toEqual(normalize(calls[0]));
+        expect(calls[0].filter((candidate) => candidate.kind === "shot").length).toBeGreaterThan(1);
+    });
+
+    it("audits mixed-supported rejected probes and deadline fallbacks without per-turn audit mode", () => {
+        const auditStatus = (deadline: boolean): Record<string, unknown> => {
+            const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-status-")), "search.jsonl");
+            setEnv({
+                ...mixedSupportedParetoEnvironment,
+                SEARCH_AUDIT: audit,
+                SEARCH_DECISION_DEADLINE_MS: deadline ? "0.0001" : undefined,
+            });
+            const h = buildBattle(deadline ? 10_322 : 10_321, "v0.8", undefined, mixedSupportedParetoRoster());
+            const { actor, primary } = positionMixedSupportedParetoFixture(h);
+            const driver = h.makeDriver();
+            driver.onFightReady();
+            if (!deadline) {
+                const intercepted = driver as unknown as {
+                    firstEngineValidCandidate(): IEnumeratedCandidate | undefined;
+                };
+                intercepted.firstEngineValidCandidate = () => undefined;
+            }
+            driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+            driver.onMatchEnd("draw", "turn_cap");
+            return readFileSync(audit, "utf8")
+                .trim()
+                .split("\n")
+                .map((line) => JSON.parse(line) as Record<string, unknown>)
+                .find((row) => row.t === "pareto_focus")!;
+        };
+
+        expect(auditStatus(false)).toMatchObject({
+            schema: "hoc.search.pareto_focus.v13",
+            status: "rejected_probe",
+            lap: 1,
+            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+        });
+        expect(auditStatus(true)).toMatchObject({
+            schema: "hoc.search.pareto_focus.v13",
+            status: "deadline_fallback",
+            lap: 1,
+            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+        });
     });
 
     it("does not let Pareto focus bypass an already-open search circuit", () => {

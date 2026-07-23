@@ -14,6 +14,7 @@ import { describe, expect, it } from "bun:test";
 import type { IEnumeratedCandidate } from "../../src/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    mixedSupportedParetoNoMeleeFocusContext,
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     rankPureRangedParetoNoMeleeFocusCandidates,
 } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
@@ -128,6 +129,73 @@ function fixture(actorAbilities: readonly string[] = ["Through Shot"]): IFixture
 
 function rank(f: IFixture, candidates: readonly IEnumeratedCandidate[], lap = 1) {
     return rankPureRangedParetoNoMeleeFocusCandidates(f.actor, f.unitsHolder, candidates, f.state, lap);
+}
+
+interface IMixedSupportedFixture extends IFixture {
+    guard: Unit;
+    threat: Unit;
+    grid: ReturnType<typeof createCombatTestContext>["grid"];
+}
+
+function mixedSupportedFixture(
+    actorName = "Cyclops",
+    actorAbilities: readonly string[] = ["Large Caliber"],
+    noMeleeName = "Tsar Cannon",
+): IMixedSupportedFixture {
+    const context = createCombatTestContext();
+    const actor = createTestUnit({
+        team: LOWER,
+        attackType: RANGE,
+        rangeShots: 9,
+        name: actorName,
+        abilities: [...actorAbilities],
+    });
+    const guard = createTestUnit({ team: LOWER, attackType: PBTypes.AttackVals.MELEE, name: "Squire" });
+    const primary = createTestUnit({
+        team: UPPER,
+        attackType: RANGE,
+        rangeShots: 9,
+        name: "Incumbent target",
+    });
+    const threat = createTestUnit({
+        team: UPPER,
+        attackType: PBTypes.AttackVals.MELEE,
+        name: "Enemy Squire",
+        speed: 2,
+    });
+    const noMelee = createTestUnit({
+        team: UPPER,
+        attackType: RANGE,
+        rangeShots: 9,
+        name: noMeleeName,
+        abilities: ["No Melee"],
+    });
+    placeUnit(context.grid, context.unitsHolder, actor, { x: 2, y: 7 });
+    placeUnit(context.grid, context.unitsHolder, guard, { x: 3, y: 7 });
+    placeUnit(context.grid, context.unitsHolder, threat, { x: 5, y: 7 });
+    placeUnit(context.grid, context.unitsHolder, primary, { x: 8, y: 3 });
+    placeUnit(context.grid, context.unitsHolder, noMelee, { x: 9, y: 7 });
+    const state: PureRangedTerminalState = {
+        eligible: false,
+        initialScale: 1,
+        originalUnits: [actor, guard, primary, threat, noMelee].map((unit) => ({
+            id: unit.getId(),
+            team: unit.getTeam(),
+            activeAbilityNames: unit.getAbilities().map((ability) => ability.getName()),
+        })),
+    };
+    return {
+        actor,
+        guard,
+        primary,
+        threat,
+        noMelee,
+        grid: context.grid,
+        unitsHolder: context.unitsHolder,
+        state,
+        incumbent: shot(actor, primary, "incumbent", { enemy: 100, net: 100, primary: 100 }),
+        focus: shot(actor, noMelee, "shot", { enemy: 120, net: 120, primary: 60 }),
+    };
 }
 
 describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
@@ -441,5 +509,134 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
                 "pure_ranged",
             ),
         );
+    });
+
+    it("admits only the fixed native actor identities behind a complete original melee screen", () => {
+        const cyclops = mixedSupportedFixture();
+        const cyclopsContext = mixedSupportedParetoNoMeleeFocusContext(
+            cyclops.actor,
+            cyclops.unitsHolder,
+            cyclops.state,
+        );
+        expect(cyclopsContext).toMatchObject({
+            actorAbility: "large_caliber",
+            noMeleeTargetIds: [cyclops.noMelee.getId()],
+            support: { guardCount: 1, reachableThreats: 1, screenedThreats: 1 },
+        });
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                cyclops.actor,
+                cyclops.unitsHolder,
+                [cyclops.incumbent, cyclops.focus],
+                cyclops.state,
+                3,
+                1,
+                "mixed_supported",
+            )[0],
+        ).toMatchObject({
+            candidate: cyclops.focus,
+            actorAbility: "large_caliber",
+            noMeleeTargetId: cyclops.noMelee.getId(),
+            support: { guardCount: 1, reachableThreats: 1, screenedThreats: 1 },
+            minimumDamageRatio: 1.2,
+        });
+
+        const tsar = mixedSupportedFixture("Tsar Cannon", ["Mechanism", "No Melee", "Through Shot"]);
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                tsar.actor,
+                tsar.unitsHolder,
+                [tsar.incumbent, tsar.focus],
+                tsar.state,
+                3,
+                1,
+                "mixed_supported",
+            )[0]?.actorAbility,
+        ).toBe("through_shot");
+    });
+
+    it("structurally excludes pure boards, wrong name/card maps, and non-native Tsar targets", () => {
+        const cyclops = mixedSupportedFixture();
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                cyclops.actor,
+                cyclops.unitsHolder,
+                [cyclops.incumbent, cyclops.focus],
+                { ...cyclops.state, eligible: true },
+                3,
+                1,
+                "mixed_supported",
+            ),
+        ).toEqual([]);
+
+        for (const [name, abilities] of [
+            ["Arbalester", ["Large Caliber"]],
+            ["Cyclops", ["Through Shot"]],
+            ["Tsar Cannon", ["Large Caliber"]],
+        ] as const) {
+            const wrongActor = mixedSupportedFixture(name, abilities);
+            expect(
+                rankPureRangedParetoNoMeleeFocusCandidates(
+                    wrongActor.actor,
+                    wrongActor.unitsHolder,
+                    [wrongActor.incumbent, wrongActor.focus],
+                    wrongActor.state,
+                    3,
+                    1,
+                    "mixed_supported",
+                ),
+            ).toEqual([]);
+        }
+
+        const wrongTarget = mixedSupportedFixture("Cyclops", ["Large Caliber"], "Arbalester");
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                wrongTarget.actor,
+                wrongTarget.unitsHolder,
+                [wrongTarget.incumbent, wrongTarget.focus],
+                wrongTarget.state,
+                3,
+                1,
+                "mixed_supported",
+            ),
+        ).toEqual([]);
+    });
+
+    it("fails closed when support is not original, does not screen every reachable threat, or floor is relaxed", () => {
+        const nonOriginalGuard = mixedSupportedFixture();
+        const guardOmitted = {
+            ...nonOriginalGuard.state,
+            originalUnits: nonOriginalGuard.state.originalUnits.filter(
+                ({ id }) => id !== nonOriginalGuard.guard.getId(),
+            ),
+        };
+        expect(
+            mixedSupportedParetoNoMeleeFocusContext(nonOriginalGuard.actor, nonOriginalGuard.unitsHolder, guardOmitted),
+        ).toBeUndefined();
+
+        const unscreened = mixedSupportedFixture();
+        const extraThreat = createTestUnit({
+            team: UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Flanking threat",
+            speed: 2,
+        });
+        placeUnit(unscreened.grid, unscreened.unitsHolder, extraThreat, { x: 2, y: 10 });
+        expect(
+            mixedSupportedParetoNoMeleeFocusContext(unscreened.actor, unscreened.unitsHolder, unscreened.state),
+        ).toBeUndefined();
+
+        const relaxed = mixedSupportedFixture();
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                relaxed.actor,
+                relaxed.unitsHolder,
+                [relaxed.incumbent, relaxed.focus],
+                relaxed.state,
+                3,
+                0.95,
+                "mixed_supported",
+            ),
+        ).toEqual([]);
     });
 });

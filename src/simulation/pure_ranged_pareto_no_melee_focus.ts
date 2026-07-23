@@ -17,12 +17,14 @@ import type { UnitsHolder } from "../units/units_holder";
 import type { PureRangedTerminalState } from "./v0_7_pure_ranged_terminal";
 
 const RANGE = PBTypes.AttackVals.RANGE;
+const MELEE = PBTypes.AttackVals.MELEE;
+const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
 /** The universal lap-nine a13 finish policy remains authoritative. */
 export const PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP = 9;
 
 export type PureRangedParetoFocusActorAbility = "through_shot" | "large_caliber";
-export type PureRangedParetoNoMeleeFocusScope = "pure_ranged" | "any_board";
+export type PureRangedParetoNoMeleeFocusScope = "pure_ranged" | "any_board" | "mixed_supported";
 
 export const DEFAULT_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE: PureRangedParetoNoMeleeFocusScope = "pure_ranged";
 
@@ -30,6 +32,7 @@ export interface IPureRangedParetoNoMeleeFocusCandidate {
     readonly candidate: IEnumeratedCandidate;
     readonly actorAbility: PureRangedParetoFocusActorAbility;
     readonly noMeleeTargetId: string;
+    readonly support?: IMixedSupportedParetoNoMeleeFocusSupport;
     readonly expectedNoMeleeDamage: number;
     readonly expectedEnemyDamageDelta: number;
     readonly expectedNetDamageDelta: number;
@@ -37,6 +40,21 @@ export interface IPureRangedParetoNoMeleeFocusCandidate {
     readonly netDamageRatio: number;
     /** Worst retained fraction across net and enemy-only aggregate damage. */
     readonly minimumDamageRatio: number;
+}
+
+export interface IMixedSupportedParetoNoMeleeFocusSupport {
+    /** Living original native melee or melee-magic allies available to form a screen. */
+    readonly guardCount: number;
+    /** Living melee-capable enemies inside their optimistic next-activation reach. */
+    readonly reachableThreats: number;
+    /** Reachable threats with at least one original native guard geometrically between them and the actor. */
+    readonly screenedThreats: number;
+}
+
+export interface IMixedSupportedParetoNoMeleeFocusContext {
+    readonly actorAbility: PureRangedParetoFocusActorAbility;
+    readonly noMeleeTargetIds: readonly string[];
+    readonly support: IMixedSupportedParetoNoMeleeFocusSupport;
 }
 
 interface IStationaryShot {
@@ -119,6 +137,101 @@ export function anyBoardParetoNoMeleeFocusActorAbility(
         return "large_caliber";
     }
     return undefined;
+}
+
+const cellDistance = (
+    left: readonly { x: number; y: number }[],
+    right: readonly { x: number; y: number }[],
+): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (const a of left) {
+        for (const b of right) {
+            best = Math.min(best, Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
+        }
+    }
+    return best;
+};
+
+function mixedSupportedGuardScreensThreat(actor: Unit, guard: Unit, threat: Unit): boolean {
+    const actorToThreat = cellDistance(actor.getCells(), threat.getCells());
+    const guardToThreat = cellDistance(guard.getCells(), threat.getCells());
+    const actorToGuard = cellDistance(actor.getCells(), guard.getCells());
+    return guardToThreat < actorToThreat && actorToGuard <= 3 && guardToThreat + actorToGuard <= actorToThreat + 1;
+}
+
+/**
+ * Eligibility shared by catalog generation and selection for the conservative mixed-board arm.
+ * It admits only the fixed native Cyclops/Large-Caliber and Tsar-Cannon/Through-Shot identities, rejects
+ * structurally pure-ranged boards, and requires every enemy inside an optimistic one-activation melee horizon
+ * to be screened by a living original native melee ally. The target is equally narrow: a living original native
+ * Tsar Cannon whose captured, owned, and currently active card is No Melee.
+ */
+export function mixedSupportedParetoNoMeleeFocusContext(
+    actor: Unit,
+    unitsHolder: UnitsHolder,
+    originalState: PureRangedTerminalState | null,
+): IMixedSupportedParetoNoMeleeFocusContext | undefined {
+    if (originalState?.eligible !== false) return undefined;
+    const actorAbility = anyBoardParetoNoMeleeFocusActorAbility(actor, originalState);
+    if (
+        !actorAbility ||
+        (actor.getName() === "Cyclops" && actorAbility !== "large_caliber") ||
+        (actor.getName() === "Tsar Cannon" && actorAbility !== "through_shot") ||
+        (actor.getName() !== "Cyclops" && actor.getName() !== "Tsar Cannon")
+    ) {
+        return undefined;
+    }
+
+    const units = unitsHolder.getAllUnits();
+    const guards: Unit[] = [];
+    const noMeleeTargetIds: string[] = [];
+    for (const original of originalState.originalUnits) {
+        const unit = units.get(original.id);
+        if (!unit || original.team !== unit.getTeam() || unit.isDead() || unit.isSummoned()) {
+            continue;
+        }
+        const attackType = unit.getAttackType();
+        if (
+            unit.getTeam() === actor.getTeam() &&
+            unit.getId() !== actor.getId() &&
+            (attackType === MELEE || attackType === MELEE_MAGIC)
+        ) {
+            guards.push(unit);
+        }
+        if (
+            unit.getTeam() !== actor.getTeam() &&
+            unit.getName() === "Tsar Cannon" &&
+            original.activeAbilityNames?.includes("No Melee") === true &&
+            ownsParetoClassifyingAbility(unit, "No Melee") &&
+            unit.hasAbilityActive("No Melee")
+        ) {
+            noMeleeTargetIds.push(unit.getId());
+        }
+    }
+    if (!guards.length || !noMeleeTargetIds.length) return undefined;
+
+    const reachableThreats = [...units.values()].filter(
+        (unit) =>
+            !unit.isDead() &&
+            unit.getTeam() !== actor.getTeam() &&
+            !unit.hasAbilityActive("No Melee") &&
+            cellDistance(actor.getCells(), unit.getCells()) <= Math.ceil(Math.max(0, unit.getSteps())) + 1,
+    );
+    if (!reachableThreats.length) return undefined;
+    const screenedThreats = reachableThreats.filter((threat) =>
+        guards.some((guard) => mixedSupportedGuardScreensThreat(actor, guard, threat)),
+    ).length;
+    if (screenedThreats !== reachableThreats.length) return undefined;
+
+    return {
+        actorAbility,
+        noMeleeTargetIds,
+        support: {
+            guardCount: guards.length,
+            reachableThreats: reachableThreats.length,
+            screenedThreats,
+        },
+    };
 }
 
 export function pureRangedParetoNoMeleeFocusLapEligible(currentLap: number): boolean {
@@ -218,6 +331,62 @@ export function rankPureRangedParetoNoMeleeFocusCandidates(
     damageFloor = 1,
     scope: PureRangedParetoNoMeleeFocusScope = DEFAULT_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE,
 ): IPureRangedParetoNoMeleeFocusCandidate[] {
+    if (scope === "mixed_supported") {
+        const context = mixedSupportedParetoNoMeleeFocusContext(actor, unitsHolder, originalState);
+        if (
+            !context ||
+            damageFloor !== 1 ||
+            !pureRangedParetoNoMeleeFocusLapEligible(currentLap) ||
+            candidates[0]?.kind !== "incumbent"
+        ) {
+            return [];
+        }
+
+        const incumbent = stationaryPositiveShot(actor, candidates[0], 0);
+        if (!incumbent) return [];
+        const livingOriginalNoMeleeEnemyIds = new Set(context.noMeleeTargetIds);
+        if (livingOriginalNoMeleeEnemyIds.has(incumbent.action.targetId)) return [];
+
+        const ranked: Array<IPureRangedParetoNoMeleeFocusCandidate & { readonly index: number }> = [];
+        for (let index = 1; index < candidates.length; index += 1) {
+            const challenger = stationaryPositiveShot(actor, candidates[index], index);
+            if (!challenger || !livingOriginalNoMeleeEnemyIds.has(challenger.action.targetId)) continue;
+            const candidate = challenger.candidate;
+            const netDamageRatio = retainedDamageRatio(
+                candidate.features.expectedDamage,
+                incumbent.candidate.features.expectedDamage,
+            );
+            const enemyDamageRatio = retainedDamageRatio(
+                challenger.shotFeatures.enemyDamage,
+                incumbent.shotFeatures.enemyDamage,
+            );
+            if (
+                candidate.features.expectedKill < incumbent.candidate.features.expectedKill ||
+                netDamageRatio < 1 ||
+                enemyDamageRatio < 1 ||
+                challenger.shotFeatures.friendlyFireDamage > incumbent.shotFeatures.friendlyFireDamage
+            ) {
+                continue;
+            }
+            ranked.push({
+                candidate,
+                actorAbility: context.actorAbility,
+                noMeleeTargetId: challenger.action.targetId,
+                support: context.support,
+                expectedNoMeleeDamage: challenger.shotFeatures.primaryTargetDamage,
+                expectedEnemyDamageDelta: challenger.shotFeatures.enemyDamage - incumbent.shotFeatures.enemyDamage,
+                expectedNetDamageDelta: candidate.features.expectedDamage - incumbent.candidate.features.expectedDamage,
+                enemyDamageRatio,
+                netDamageRatio,
+                minimumDamageRatio: Math.min(netDamageRatio, enemyDamageRatio),
+                index,
+            });
+        }
+
+        return ranked
+            .sort((left, right) => compareRanked(left, right, 1))
+            .map(({ index: _index, ...candidate }) => candidate);
+    }
     if (scope === "any_board") {
         const actorAbility = anyBoardParetoNoMeleeFocusActorAbility(actor, originalState);
         if (
