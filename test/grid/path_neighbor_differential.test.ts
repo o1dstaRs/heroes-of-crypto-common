@@ -706,4 +706,75 @@ describe("PathHelper neighbor compatibility oracle", () => {
 
         expect(moveCases.length).toBe(1_260);
     });
+
+    test("the canonical 16x16 path branch never reaches randomized equal-route insertion", () => {
+        const helper = new PathHelper(makeGridSettings(PRODUCTION_GRID_SIZE));
+        let totalDraws = 0;
+        const cases = 4_096;
+
+        for (let index = 0; index < cases; index++) {
+            const moveCase = makeRandomMoveCase(0x20_000 + index);
+            let caseDraws = 0;
+            const source = makeRng(moveCase.randomSeed);
+            setDeterministicRandomSource(() => {
+                caseDraws++;
+                return source();
+            });
+            helper.getMovePath(
+                moveCase.currentCell,
+                moveCase.matrix,
+                moveCase.maxSteps,
+                moveCase.aggrBoard,
+                moveCase.canFly,
+                moveCase.isSmallUnit,
+                moveCase.isMadeOfFire,
+            );
+            if (caseDraws !== 0) {
+                throw new Error(`${moveCase.name}: canonical path traversal consumed ${caseDraws} raw RNG draws`);
+            }
+            totalDraws += caseDraws;
+        }
+
+        expect(totalDraws).toBe(0);
+        expect(cases).toBe(4_096);
+    });
+
+    test("custom packed-key collisions prove the generic fallback can consume route-tie RNG", () => {
+        class CollidingNeighborPathHelper extends PathHelper {
+            private calls = 0;
+
+            public override getNeighborCells(): XY[] {
+                if (this.calls++ !== 0) {
+                    return [];
+                }
+                return [
+                    { x: 2, y: 2 },
+                    { x: 0, y: 16 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 16 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                ];
+            }
+        }
+
+        const helper = new CollidingNeighborPathHelper(makeGridSettings(PRODUCTION_GRID_SIZE));
+        const collidingMatrix = emptyMatrix(17);
+        const aggression = Array.from({ length: 17 }, () => Array<number>(17).fill(1));
+        const diagonal = PathHelper.DIAGONAL_MOVE_COST;
+        aggression[2][2] = 2;
+        aggression[0][16] = 3 / diagonal;
+        aggression[1][0] = 1 / diagonal;
+        aggression[1][16] = 2 / diagonal;
+
+        let rawDraws = 0;
+        setDeterministicRandomSource(() => {
+            rawDraws++;
+            return 0.37;
+        });
+        const result = helper.getMovePath({ x: 8, y: 8 }, collidingMatrix, 20, aggression, false, true, false);
+
+        expect(rawDraws).toBe(2);
+        expect(result.knownPaths.get(16)?.map((route) => route.weight)).toEqual([3, 1, 1, 1, 2, 1, 1]);
+    });
 });

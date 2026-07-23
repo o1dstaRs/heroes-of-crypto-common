@@ -20,7 +20,6 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import { canCastSpell, canCastSummon, canMassCastSpell } from "../../spells/spell_helper";
 import type { Spell } from "../../spells/spell";
@@ -30,6 +29,7 @@ import type { UnitsHolder } from "../../units/units_holder";
 import { getDistance, type XY } from "../../utils/math";
 import { auraCoverageScore, planAuraMove } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam, StrategyV0_1 } from "./v0_1";
 
 const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
@@ -410,9 +410,9 @@ export class StrategyV0_2 extends StrategyV0_1 {
         if (decision.some((a) => a.type === "melee_attack" || a.type === "range_attack" || a.type === "cast_spell")) {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const gridSettings = grid.getSettings();
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -1010,9 +1010,9 @@ export class StrategyV0_2 extends StrategyV0_1 {
         if (!this.hasFlyingSupport(unit, context, enemyRanged)) {
             return undefined; // never dive the backline solo
         }
-        const { grid, matrix, pathHelper } = context;
+        const { grid, matrix } = context;
         const auraR = this.nullFieldRange(unit);
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -1099,13 +1099,13 @@ export class StrategyV0_2 extends StrategyV0_1 {
         if (!unit.canMove()) {
             return undefined;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead() && !u.hasBuffActive("Hidden"));
         if (!enemies.length) {
             return undefined;
         }
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -1118,7 +1118,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             return undefined;
         }
 
-        let best: { attackFrom: XY; targetId: string; route: IWeightedRoute } | undefined;
+        let best: { attackFrom: XY; targetId: string; route: IReadonlyWeightedRoute } | undefined;
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];
             if (!route?.route.length) {

@@ -10,7 +10,6 @@
  */
 
 import type { GameAction } from "../../engine/actions";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import {
@@ -26,6 +25,7 @@ import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_3 } from "./v0_3";
 
@@ -324,8 +324,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return this.canHourglass(unit, context) ? [{ type: "wait_turn", unitId: unit.getId() }] : decision;
         }
         if (!FRONT_TANKS.has(unit.getName())) return decision;
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -335,7 +335,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canTraverseLava(),
         );
         const nearest = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
-        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
         let bestDist = nearest(unit.getBaseCell());
         for (const [key, routes] of movePath.knownPaths) {
             const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
@@ -561,7 +561,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!strike || strike.type !== "melee_attack") {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (enemies.length < 2) {
@@ -590,7 +590,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             }
             return affected.size;
         };
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -601,14 +601,14 @@ export class StrategyV0_4 extends StrategyV0_3 {
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseReach = baseTarget ? chainReach(baseTarget) : 1;
-        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
             if (r?.route.length) {
                 cands.push({ cell: r.cell, route: r });
             }
         }
-        let best: { cell: XY; target: Unit; route?: IWeightedRoute; reach: number } | undefined;
+        let best: { cell: XY; target: Unit; route?: IReadonlyWeightedRoute; reach: number } | undefined;
         for (const cand of cands) {
             const fp = this.footprintForCell(unit, cand.cell, context);
             for (const e of enemies) {
@@ -655,7 +655,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!strike || strike.type !== "melee_attack") {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (enemies.length < 2) {
@@ -666,7 +666,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             const fp = this.footprintForCell(unit, cell, context);
             return enemies.filter((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
         };
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -676,14 +676,14 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canTraverseLava(),
         );
         const baseCount = adjEnemies(strike.attackFrom ?? unit.getBaseCell()).length;
-        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
             if (r?.route.length) {
                 cands.push({ cell: r.cell, route: r });
             }
         }
-        let best: { cell: XY; target: Unit; route?: IWeightedRoute; count: number } | undefined;
+        let best: { cell: XY; target: Unit; route?: IReadonlyWeightedRoute; count: number } | undefined;
         for (const cand of cands) {
             const adj = adjEnemies(cand.cell);
             if (!adj.length) {
@@ -741,8 +741,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
                     enemies.some((e) => e.getCells().some((ec) => a.getCells().some((ac) => isAdjacentCell(ec, ac)))),
             );
         if (!clash) return this.canHourglass(unit, context) ? [{ type: "wait_turn", unitId: unit.getId() }] : decision;
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -752,7 +752,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canTraverseLava(),
         );
         const nearest = (cell: XY): number => Math.min(...ranges.map((t) => getDistance(cell, t.getBaseCell())));
-        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
         let bestDist = nearest(unit.getBaseCell());
         for (const [key, routes] of movePath.knownPaths) {
             const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
@@ -787,7 +787,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!strike || strike.type !== "melee_attack") {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (enemies.length < 2) {
@@ -816,7 +816,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             }
             return hit.size;
         };
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -828,14 +828,14 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseHits = baseTarget ? lineHits(strike.attackFrom ?? unit.getBaseCell(), baseTarget) : 1;
 
-        const cands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
+        const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
             if (r?.route.length) {
                 cands.push({ cell: r.cell, route: r });
             }
         }
-        let best: { cell: XY; target: Unit; route?: IWeightedRoute; hits: number } | undefined;
+        let best: { cell: XY; target: Unit; route?: IReadonlyWeightedRoute; hits: number } | undefined;
         for (const cand of cands) {
             const footprint = this.footprintForCell(unit, cand.cell, context);
             for (const e of enemies) {
@@ -1120,8 +1120,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!target) {
             return decision;
         }
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -1131,7 +1131,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canTraverseLava(),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
-        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
         let bestLen = strike.path && strike.path.length > 0 ? strike.path.length : 0;
         for (const [key, routes] of movePath.knownPaths) {
             const cell = { x: (key >> 4) & 0xf, y: key & 0xf };
@@ -1241,8 +1241,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         }
         const currentCell = strike.attackFrom ?? unit.getBaseCell();
         const currentCover = this.friendlyAuraCover(currentCell, unit, context);
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -1362,8 +1362,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!siege.length) {
             return undefined; // no live siege to mute -> behave like a normal flyer
         }
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),

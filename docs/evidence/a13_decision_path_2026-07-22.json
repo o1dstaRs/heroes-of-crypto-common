@@ -1,0 +1,249 @@
+{
+    "schema": "heroes-of-crypto/a13-decision-path-qualification/v1",
+    "generatedAt": "2026-07-23T06:13:57.200Z",
+    "localDate": "2026-07-22",
+    "status": "qualified-local-not-deployed",
+    "summary": {
+        "scope": "Decision-scoped reuse of the active unit's exact canonical PathHelper.getMovePath result.",
+        "macroExact": true,
+        "macroTaskCount": 80,
+        "macroTotalReduction": 0.0500421546872095,
+        "macroTotalReductionSeedClusterBootstrap95": [0.03832593089592, 0.0625735511690833],
+        "microNetReduction": 0.3212372576213859,
+        "microNetReductionBlockBootstrap95": [0.3151579485812794, 0.3274165793843561],
+        "catalogOverheadToGrossSaved": 0.01245782756485847,
+        "catalogOverheadToGrossSavedBlockBootstrapUpper95": 0.030490845891218334,
+        "rejectedActions": 0,
+        "stuckMatches": 0
+    },
+    "qualification": {
+        "passed": true,
+        "gates": {
+            "focusedDifferentialAndLifecycleTests": true,
+            "microValueRngAndOwnershipExact": true,
+            "microCatalogOverheadUpper95Below10Percent": true,
+            "macroResultActionPlacementAndRosterExact": true,
+            "macroZeroRejectedOrStuck": true,
+            "macroSeedClusterBootstrapUpperRatioBelowOne": true
+        },
+        "limits": [
+            "This is local M4 Max qualification, not a ranked deployment record.",
+            "TypeScript readonly is not Object.freeze; occupancy and aggression matrices must not mutate in place during one admitted synchronous decision.",
+            "Instrumentation counters cover live-root catalogs only; rollout counters are intentionally disabled to avoid timing contamination.",
+            "The isolated source roots resolved the same sealed package.json and exact shared dependency path; dependencies were not independently installed per archive."
+        ]
+    },
+    "sourcePair": {
+        "baselineCommit": "01b9a9518f5fa54d0294f1da2b36f3e5827cdebb",
+        "baselineSourceTreeManifestSha256": "42000531a42a45eae21bec14d9706625db759ebccc005112ff242eb46c5db215",
+        "candidateSourceTreeManifestSha256": "03e838da7c132c44eafacb661c12d1c6bc195afec9296a37876688ec6f789f64",
+        "packageJsonSha256": "990a779e01b64fab88bdb72cb7fd6fa790eabc66a2f550d1e3481d620e1cf001",
+        "deltaManifestSha256": "e28120ceb1a6bafdc87683e0639e38588f14caed17379d25b1914f99fe8c88ce",
+        "deltaExact": true,
+        "changedRuntimeEntries": [
+            "ai/ai.ts",
+            "ai/ai_strategy.ts",
+            "ai/candidates.ts",
+            "ai/decision_path_catalog.ts",
+            "ai/versions/v0_1.ts",
+            "ai/versions/v0_2.ts",
+            "ai/versions/v0_3.ts",
+            "ai/versions/v0_4.ts",
+            "ai/versions/v0_5.ts",
+            "ai/versions/v0_6.ts",
+            "ai/versions/v0_8_ranged_positioning.ts",
+            "grid/path_definitions.ts",
+            "simulation/battle_engine.ts",
+            "simulation/search_driver.ts"
+        ],
+        "selectedSourceSha256": {
+            "decisionPathCatalog": "03ca1f30bde3cf2177b1e6d0a5c86036fd08878f444b90fc497885c685096c7d",
+            "pathHelper": "c5f0db5ba78eda9ab82207d8ece260c588d16b653b8bf501feac2b8bd4f2543e"
+        }
+    },
+    "macro": {
+        "schema": "heroes-of-crypto/a13-decision-path-pair/v2",
+        "generatedAt": "2026-07-23T06:06:09.453Z",
+        "runner": "docs/evidence/tools/a13_decision_path_pair.ts",
+        "runnerSha256": "050dd5d5e1e6ab009883675a3cf71e00440eb68dd98873ac086a43fc3fcc828b",
+        "fullLocalReportSha256": "efa198c256b7d8b5aa09a98f4bbb06e831d1cade43438c9faa5d45f65cb3a04c",
+        "mode": "a13-unbounded",
+        "searchConstruction": "generic-unbounded-explicit-rollback",
+        "deadlinePolicy": "V08_A13_SEARCH=0 with SEARCH_DECISION_DEADLINE_MS and SEARCH_CIRCUIT_BREAKER_MS unset",
+        "profile": {
+            "candidate": "a13",
+            "strategy": "v0.8",
+            "horizon": 12,
+            "rollouts": 2,
+            "genomeSha256": "a46ac7ef0c18da1f3fb3b82a3fc1cd53e5565747d4d1673ac5340af5bf92ba49",
+            "activeEnvironmentSha256": "a45dedcb49597aa29f49e011d42074ae2c2c77a44da784b97f4ff99ca756a50e"
+        },
+        "command": {
+            "seeds": "1-20",
+            "gridTypes": [1, 2, 3, 4],
+            "maxLaps": 2,
+            "warmupSeed": 4294967295,
+            "bootstrapSeed": 169069262,
+            "bootstrapSamples": 20000,
+            "taskCount": 80,
+            "order": "map-balanced AB/BA",
+            "bootstrapUnit": "seed with all four maps retained as one cluster"
+        },
+        "exactness": {
+            "passed": true,
+            "warmupPassed": true,
+            "taskCount": 80,
+            "semanticMismatchCount": 0,
+            "instrumentationMismatchCount": 0,
+            "rejected": 0,
+            "stuck": 0,
+            "rowsSha256": "fea812d967f3c16d993b7306996cd5bbbf203b3c869b6055179f637d762d4a65",
+            "resultsSha256": "80a1661e61015e279c2edfcdeea5bba5b966684acf3974cff9075c819c1e3b86",
+            "actionsSha256": "1ba0791f850b1c86f193ad44c27ea87e24e2f177876fc1d6bd1b754113bc1f9a",
+            "placementsSha256": "16cb6a5214be140d4bd8d8e063ee6dd9a8435d20ce645bf5e458a6b8dcfb48ce",
+            "rostersSha256": "e0df0976ba42f617fc25635556db65d07c17b8bbaabec7576b3916b209b4eb94"
+        },
+        "performance": {
+            "baselineTotalMs": 45479.264037,
+            "candidateTotalMs": 43203.383671,
+            "totalRatio": 0.9499578453127905,
+            "totalRatioSeedClusterBootstrap95": [0.9374264488309167, 0.96167406910408],
+            "geometricMeanPairedRatio": 0.9493354771019599,
+            "geometricMeanPairedRatioSeedClusterBootstrap95": [0.938174555590769, 0.9604796047010405],
+            "medianPairedRatio": 0.9521606550618095,
+            "p05PairedRatio": 0.8947879914304658,
+            "p95PairedRatio": 1.0104435064630326,
+            "candidateFasterTasks": 72,
+            "tiedTasks": 0,
+            "abTasks": 40,
+            "baTasks": 40
+        },
+        "rootCatalogReuse": {
+            "decisionsObserved": 2138,
+            "catalogsObserved": 2138,
+            "uniqueCatalogsRequired": true,
+            "catalogsMissing": 0,
+            "requests": 8292,
+            "hits": 4961,
+            "misses": 2123,
+            "bypasses": 1208,
+            "decisionsWithHits": 1632,
+            "requestHitRate": 0.5982875060299083,
+            "canonicalHitRate": 0.7003105590062112
+        }
+    },
+    "micro": {
+        "schema": "heroes-of-crypto/a13-decision-path-micro/v2",
+        "generatedAt": "2026-07-23T06:13:57.200Z",
+        "runner": "docs/evidence/tools/a13_decision_path_micro.ts",
+        "runnerSha256": "f688376f2e4fb5d3f83eaa2bd72493a878107aa039d4053986feeca4fdb172a8",
+        "fullLocalReportSha256": "615f4b994ead2a7a567ac53a09a4dea31a0f8e5313de5bb562838124d64642d4",
+        "host": {
+            "platform": "darwin",
+            "release": "24.6.0",
+            "arch": "arm64",
+            "cpu": "Apple M4 Max",
+            "logicalCpus": 16,
+            "bun": "1.3.14"
+        },
+        "command": {
+            "blocks": 60,
+            "balancedArmOrders": 4,
+            "cyclesPerBlock": 2400,
+            "targetMs": 100,
+            "warmupMs": 750,
+            "exactCyclesPerArm": 100,
+            "bootstrapSamples": 20000,
+            "bootstrapSeed": 2705185402
+        },
+        "workload": {
+            "cases": 5,
+            "gridSize": 16,
+            "longBudgetBypassesPer100Decisions": 57,
+            "canonicalRequestsPer100Decisions": 289,
+            "meanRequestsPerDecision": 3.46,
+            "meanCanonicalRequestsPerDecision": 2.89,
+            "arms": ["passThrough", "bookkeepingControl", "idealReuse", "cachedCatalog"]
+        },
+        "exactness": {
+            "passed": true,
+            "callsPerArm": 346,
+            "valueSha256": "af27a32da91fcdd9bb660895fb3a8985d9bc76c8e07e3a6e8a4352bb2dcbf93b",
+            "checksum": 3601164296,
+            "pathRngDrawsPerArm": 0,
+            "rngTail": [312109, 681811, 495056, 383574, 968737, 597960, 73246, 739830],
+            "cachedStats": {
+                "requests": 346,
+                "hits": 189,
+                "misses": 100,
+                "bypasses": 57
+            },
+            "canonicalOwnershipViolations": 0,
+            "requestStartReferenceEscaped": false,
+            "shapeStableAfterRequestMutation": true,
+            "repeatReturnedSameObject": true,
+            "ownershipShapeSha256": "1496fd92d541c25987106b27f6c6e869c9f110528179c1824aae6e34fbf5ef04"
+        },
+        "performance": {
+            "passThroughNsPerDecision": 43964.038472222215,
+            "bookkeepingControlNsPerDecision": 44150.318875,
+            "idealReuseNsPerDecision": 29662.99134027777,
+            "cachedCatalogNsPerDecision": 29841.15131944445,
+            "grossRecomputeSavedNsPerDecision": 14301.047131944444,
+            "catalogOverheadNsPerDecision": 178.15997916667766,
+            "netSavedNsPerDecision": 14122.887152777766,
+            "cachedToPassThroughRatio": 0.6787627423786141,
+            "cachedToPassThroughRatioBlockBootstrap95": [0.6725834206156439, 0.6848420514187206],
+            "catalogOverheadToGrossSaved": 0.01245782756485847,
+            "catalogOverheadToGrossSavedBlockBootstrap95": [-0.007041157321314055, 0.030490845891218334],
+            "catalogOverheadGateThresholdExclusive": 0.1,
+            "gatePassed": true
+        }
+    },
+    "permanentTests": {
+        "focused": {
+            "files": [
+                "test/ai/decision_path_catalog.test.ts",
+                "test/grid/path_neighbor_differential.test.ts",
+                "test/simulation/decision_path_catalog_lifecycle.test.ts"
+            ],
+            "passed": 13,
+            "failed": 0,
+            "expectations": 463423
+        },
+        "clientCore": {
+            "file": "game/core/src/scenes/AIController.test.ts",
+            "passed": 22,
+            "failed": 0,
+            "expectations": 98
+        },
+        "fullCommon": {
+            "passed": 1848,
+            "failed": 13,
+            "baselineReproduction": {
+                "sameFailuresReproduced": 13,
+                "targetedBaselinePassed": 174,
+                "targetedBaselineFailed": 13,
+                "note": "All current full-suite failures reproduce on the untouched 01b9a951 baseline and are unrelated to this source delta."
+            }
+        }
+    },
+    "rejectedBroaderDesigns": [
+        {
+            "design": "generic range-ray memoizer",
+            "reason": "Exact but bookkeeping consumed approximately 38.9% of saved time."
+        },
+        {
+            "design": "visible-edge range-ray cache",
+            "reason": "Exact but bookkeeping consumed approximately 37.5% of saved time."
+        },
+        {
+            "design": "PathHelper subclass",
+            "reason": "Violated the public fresh mutable-result ownership contract."
+        },
+        {
+            "design": "clone cached paths on every hit",
+            "reason": "Deep cloning measured roughly 7-10 times slower than recomputation."
+        }
+    ]
+}

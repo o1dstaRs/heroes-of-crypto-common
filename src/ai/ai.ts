@@ -13,9 +13,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import { ObstacleType } from "../obstacles/obstacle_type";
 import * as HoCMath from "../utils/math";
-import { PathHelper } from "../grid/path_helper";
 import * as GridMath from "../grid/grid_math";
-import type { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
 import type { IUnitAIRepr } from "./../units/unit";
 import { UnitsHolder } from "../units/units_holder";
@@ -25,6 +23,8 @@ import type { AuraEffect } from "../effects/aura_effect";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
+import type { IReadonlyKnownPaths, IReadonlyWeightedRoute } from "../grid/path_definitions";
+import type { IDecisionPathSource } from "./decision_path_catalog";
 
 const DEBUG_AI = false;
 
@@ -154,23 +154,25 @@ export interface IAIAction {
     actionType(): AIActionType;
     cellToMove(): HoCMath.XY | undefined;
     cellToAttack(): HoCMath.XY | undefined;
-    currentActiveKnownPaths(): Map<number, IWeightedRoute[]>;
+    currentActiveKnownPaths(): IReadonlyKnownPaths;
 }
 
 export class BasicAIAction implements IAIAction {
     private readonly type: AIActionType;
     private readonly cellToMoveTo: HoCMath.XY | undefined;
     private readonly cellToAttackTo: HoCMath.XY | undefined;
-    private readonly activeKnownPaths: Map<number, IWeightedRoute[]>;
+    private readonly activeKnownPaths: IReadonlyKnownPaths;
     public constructor(
         type: AIActionType,
         cellToMoveTo: HoCMath.XY | undefined,
         cellToAttackTo: HoCMath.XY | undefined,
-        activeKnownPaths: Map<number, IWeightedRoute[]>,
+        activeKnownPaths: IReadonlyKnownPaths,
     ) {
         this.type = type;
-        this.cellToMoveTo = cellToMoveTo;
-        this.cellToAttackTo = cellToAttackTo;
+        // A cached route is shared read-only for one decision. Snapshot exposed action cells so a mutable
+        // consumer cannot reach back through BasicAIAction and poison the catalog's route/cell objects.
+        this.cellToMoveTo = cellToMoveTo ? { x: cellToMoveTo.x, y: cellToMoveTo.y } : undefined;
+        this.cellToAttackTo = cellToAttackTo ? { x: cellToAttackTo.x, y: cellToAttackTo.y } : undefined;
         this.activeKnownPaths = activeKnownPaths;
     }
     public actionType(): AIActionType {
@@ -182,7 +184,7 @@ export class BasicAIAction implements IAIAction {
     public cellToAttack(): HoCMath.XY | undefined {
         return this.cellToAttackTo;
     }
-    public currentActiveKnownPaths(): Map<number, IWeightedRoute[]> {
+    public currentActiveKnownPaths(): IReadonlyKnownPaths {
         return this.activeKnownPaths;
     }
 }
@@ -195,7 +197,7 @@ export function findTarget(
     grid: Grid,
     matrix: number[][], // matrix for big unit has 4 cells filled
     unitsHolder: UnitsHolder,
-    pathHelper: PathHelper,
+    pathHelper: IDecisionPathSource,
 ): BasicAIAction | undefined {
     const previousTargets = previousTargetsFor(unitsHolder);
     if (DEBUG_AI) {
@@ -997,8 +999,14 @@ export function findMountainMeleeStrike(
     unit: IUnitAIRepr,
     grid: Grid,
     matrix: number[][],
-    pathHelper: PathHelper,
-): { attackFrom: HoCMath.XY; targetCell: HoCMath.XY; knownPaths: Map<number, IWeightedRoute[]> } | undefined {
+    pathHelper: IDecisionPathSource,
+):
+    | {
+          attackFrom: HoCMath.XY;
+          targetCell: HoCMath.XY;
+          knownPaths: IReadonlyKnownPaths;
+      }
+    | undefined {
     const outerCells = grid.getCenterCells(true);
     if (!outerCells.length) {
         return undefined;
@@ -1054,7 +1062,7 @@ function evaluateMountainStrategy(
     grid: Grid,
     matrix: number[][],
     unitsHolder: UnitsHolder,
-    pathHelper: PathHelper,
+    pathHelper: IDecisionPathSource,
     engagement: ITeamEngagement,
 ): BasicAIAction | undefined {
     if (mountainHitsLeft(grid) <= 0) {
@@ -1138,7 +1146,7 @@ function preferBackstabAttackCell(
     action: BasicAIAction,
     grid: Grid,
     matrix: number[][],
-    pathHelper: PathHelper,
+    pathHelper: IDecisionPathSource,
     unitsHolder: UnitsHolder,
 ): BasicAIAction {
     const type = action.actionType();
@@ -1236,7 +1244,7 @@ function preferBackstabAttackCell(
  */
 export function findSaferMoveCell(
     preferredCell: HoCMath.XY | undefined,
-    knownPaths: Map<number, IWeightedRoute[]> | undefined,
+    knownPaths: IReadonlyKnownPaths | undefined,
     matrix: number[][],
     enemyTeam: number,
     isRangedUnit: boolean,
@@ -1373,7 +1381,7 @@ export interface IAuraMovePlan {
  */
 export function planAuraMove(
     unit: Unit,
-    knownPaths: Map<number, IWeightedRoute[]> | undefined,
+    knownPaths: IReadonlyKnownPaths | undefined,
     gridSettings: GridSettings,
     matrix: number[][],
     unitsHolder: UnitsHolder,
@@ -1449,7 +1457,7 @@ function doFindTarget(
     unitsHolder: UnitsHolder,
     grid: Grid,
     matrix: number[][],
-    pathHelper: PathHelper,
+    pathHelper: IDecisionPathSource,
     debug: boolean,
 ): BasicAIAction | undefined {
     const previousTargets = previousTargetsFor(unitsHolder);
@@ -1463,7 +1471,7 @@ function doFindTarget(
     let closestTarget: HoCMath.XY | undefined;
     let closestTargetDistance = Infinity;
     let cellsByDepthFromTarget: HoCMath.XY[][];
-    let resultRoute: IWeightedRoute | undefined;
+    let resultRoute: IReadonlyWeightedRoute | undefined;
     let resultRouteIndex: number | undefined;
     let resultMovementDistance: number = Infinity;
     let resultDistanceLeftToTarget: number = Infinity;

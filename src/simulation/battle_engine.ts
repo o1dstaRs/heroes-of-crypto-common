@@ -11,6 +11,7 @@
 
 import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../ai";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
+import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
@@ -956,6 +957,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
         const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
         const matrix = grid.getMatrix();
+        const searchApplies = search.appliesTo(strategy.version);
+        const decisionPathCatalog = searchApplies
+            ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
+            : undefined;
         // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
         // search has made its final choice so diagnostics count only policy actions that actually survive a13.
         const incumbentPolicyEvents: IAIPolicyEvent[] | undefined =
@@ -965,6 +970,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             matrix,
             unitsHolder,
             pathHelper,
+            decisionPathCatalog,
             attackHandler,
             fightProperties,
             decisionOrigin: "root",
@@ -978,7 +984,6 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                   }
                 : {}),
         };
-        const searchApplies = search.appliesTo(strategy.version);
         const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
         const targetMemoryBeforeDecision =
             searchApplies || lookaheadApplies ? captureAITargetMemory(unitsHolder) : undefined;
@@ -997,7 +1002,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
         const decided = searchApplies
-            ? search.chooseDecision(unit, strategy.version, decided0)
+            ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
             : lookaheadApplies
               ? lookahead.chooseDecision(unit, decided0)
               : decided0;

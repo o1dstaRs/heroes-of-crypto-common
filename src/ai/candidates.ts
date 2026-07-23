@@ -24,7 +24,6 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../grid/grid_math";
-import type { IWeightedRoute } from "../grid/path_definitions";
 import type { AttackHandler } from "../handlers/attack_handler";
 import { canCastSpell, canCastSummon, canMassCastSpell } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
@@ -32,6 +31,7 @@ import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
+import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -327,7 +327,7 @@ class CandidateGenerator {
     private readonly truncated: CandidateKind[] = [];
     private readonly seen = new Set<string>();
     private readonly shared: Pick<ICandidateFeatures, "enemiesNotYetActedFrac" | "alliesNotYetActedFrac" | "lap">;
-    private movePathCache?: ReturnType<IDecisionContext["pathHelper"]["getMovePath"]>;
+    private movePathCache?: IReadonlyMovePath;
     public constructor(unit: Unit, context: IDecisionContext, options: IEnumerateOptions) {
         this.unit = unit;
         this.context = context;
@@ -517,14 +517,14 @@ class CandidateGenerator {
         });
     }
     // ---- movement --------------------------------------------------------------------------------
-    private movePath(): ReturnType<IDecisionContext["pathHelper"]["getMovePath"]> | undefined {
+    private movePath(): IReadonlyMovePath | undefined {
         if (!this.unit.canMove()) {
             return undefined;
         }
         if (!this.movePathCache) {
-            this.movePathCache = this.context.pathHelper.getMovePath(
+            this.movePathCache = decisionPathSource(this.context).getMovePath(
                 this.unit.getBaseCell(),
-                this.context.grid.getMatrix(),
+                this.context.matrix,
                 this.unit.getSteps(),
                 this.context.grid.getAggrMatrixByTeam(this.enemyTeam),
                 this.unit.canFly(),
@@ -554,7 +554,7 @@ class CandidateGenerator {
                 ))
         );
     }
-    private moveAction(route: IWeightedRoute): GameAction {
+    private moveAction(route: IReadonlyWeightedRoute): GameAction {
         return {
             type: "move_unit",
             unitId: this.unit.getId(),
@@ -571,7 +571,7 @@ class CandidateGenerator {
             return;
         }
         const base = this.unit.getBaseCell();
-        const routes: IWeightedRoute[] = [];
+        const routes: IReadonlyWeightedRoute[] = [];
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];
             if (!route?.route.length) {
@@ -620,7 +620,7 @@ class CandidateGenerator {
             }
             if (kept.length < routes.length) this.truncated.push("move");
         }
-        const candidateOf = (route: IWeightedRoute): IEnumeratedCandidate => ({
+        const candidateOf = (route: IReadonlyWeightedRoute): IEnumeratedCandidate => ({
             kind: "move",
             actions: [this.moveAction(route)],
             targetCell: { x: route.cell.x, y: route.cell.y },
@@ -700,7 +700,7 @@ class CandidateGenerator {
         interface IMeleePair {
             target: Unit;
             cell: XY;
-            route?: IWeightedRoute;
+            route?: IReadonlyWeightedRoute;
             effective: number;
             kill: 0 | 1;
         }
@@ -774,11 +774,11 @@ class CandidateGenerator {
      */
     private mountainMeleeStrike(
         targetCells: readonly XY[],
-    ): { attackFrom: XY; targetCell: XY; route?: IWeightedRoute } | undefined {
+    ): { attackFrom: XY; targetCell: XY; route?: IReadonlyWeightedRoute } | undefined {
         interface IStrike {
             attackFrom: XY;
             targetCell: XY;
-            route?: IWeightedRoute;
+            route?: IReadonlyWeightedRoute;
             weight: number;
         }
 
@@ -792,7 +792,7 @@ class CandidateGenerator {
             }
             return undefined;
         };
-        const routeSignature = (route?: IWeightedRoute): string =>
+        const routeSignature = (route?: IReadonlyWeightedRoute): string =>
             route
                 ? `${route.route.map((cell) => `${cell.x},${cell.y}`).join(";")}|${Number(route.hasLavaCell)}|${Number(route.hasWaterCell)}`
                 : "";
@@ -806,7 +806,7 @@ class CandidateGenerator {
         };
 
         const strikes: IStrike[] = [];
-        const consider = (attackFrom: XY, weight: number, route?: IWeightedRoute): void => {
+        const consider = (attackFrom: XY, weight: number, route?: IReadonlyWeightedRoute): void => {
             if (!Number.isFinite(weight) || !this.footprintOk(attackFrom)) {
                 return;
             }
@@ -996,7 +996,7 @@ class CandidateGenerator {
         };
         const movePath = this.movePath();
         if (!movePath) return;
-        let route: IWeightedRoute | undefined;
+        let route: IReadonlyWeightedRoute | undefined;
         for (const routeList of movePath.knownPaths.values()) {
             const candidateRoute = routeList[0];
             if (!candidateRoute?.route.length || candidateRoute.hasLavaCell || candidateRoute.hasWaterCell) continue;
@@ -1026,7 +1026,7 @@ class CandidateGenerator {
             !target.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
             !RANGE_ATTACK_CELL_SIDES.includes(shot.aimSide as RangeAttackCellSide) ||
             !isRangeAttackSideObservable(
-                this.context.grid.getMatrix(),
+                this.context.matrix,
                 shot.aimCell,
                 shot.aimSide as RangeAttackCellSide,
                 this.unit.getTeam(),
@@ -1231,7 +1231,7 @@ class CandidateGenerator {
             return;
         }
         const { grid, unitsHolder } = this.context;
-        const matrix = grid.getMatrix();
+        const matrix = this.context.matrix;
         const gs = grid.getSettings();
         const allUnits = unitsHolder.getAllUnits();
         const fromTeam = this.unit.getTeam();
@@ -1396,7 +1396,7 @@ class CandidateGenerator {
         }
         interface IMoveShot {
             shot: IShot;
-            route: IWeightedRoute;
+            route: IReadonlyWeightedRoute;
             value: number;
             kill: 0 | 1;
             shotFeatures: IShotCandidateFeatures;
@@ -1690,7 +1690,7 @@ class CandidateGenerator {
             return;
         }
         const { grid, unitsHolder } = this.context;
-        const matrix = grid.getMatrix();
+        const matrix = this.context.matrix;
         const gs = grid.getSettings();
         const team = this.unit.getTeam();
         const livingAllies = [this.unit, ...this.allies];

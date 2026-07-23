@@ -22,11 +22,11 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
 
 export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
@@ -102,8 +102,8 @@ export class StrategyV0_1 implements IAIStrategy {
         return placements;
     }
     public decideTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        const { grid, matrix, unitsHolder, pathHelper } = context;
-        const aiAction = findTarget(unit, grid, matrix, unitsHolder, pathHelper);
+        const { grid, matrix, unitsHolder } = context;
+        const aiAction = findTarget(unit, grid, matrix, unitsHolder, decisionPathSource(context));
         if (!aiAction) {
             return this.fallbackTurn(unit, context);
         }
@@ -188,7 +188,7 @@ export class StrategyV0_1 implements IAIStrategy {
                 attackerId: unit.getId(),
                 targetId,
                 attackFrom: { x: attackFrom.x, y: attackFrom.y },
-                path: route?.route,
+                path: route?.route.map((cell) => ({ x: cell.x, y: cell.y })),
                 hasLavaCell: route?.hasLavaCell,
                 hasWaterCell: route?.hasWaterCell,
             });
@@ -455,11 +455,16 @@ export class StrategyV0_1 implements IAIStrategy {
             });
         return candidates[0]?.getId() ?? currentTargetId;
     }
-    protected routeForCell(aiAction: IAIAction, cell: XY): IWeightedRoute | undefined {
+    protected routeForCell(aiAction: IAIAction, cell: XY): IReadonlyWeightedRoute | undefined {
         return aiAction.currentActiveKnownPaths().get(cellKey(cell))?.[0];
     }
     /** Keep MOVE proposals inside the same path, step-budget, continuity, and landing gates as the engine. */
-    protected isLegalMoveRoute(unit: Unit, context: IDecisionContext, targetCell: XY, route: IWeightedRoute): boolean {
+    protected isLegalMoveRoute(
+        unit: Unit,
+        context: IDecisionContext,
+        targetCell: XY,
+        route: IReadonlyWeightedRoute,
+    ): boolean {
         if (!canUnitLandAt(unit, context.grid, targetCell)) {
             return false;
         }
@@ -500,13 +505,13 @@ export class StrategyV0_1 implements IAIStrategy {
      * the live server's fallback. If the unit can't move, pass the turn.
      */
     protected fallbackTurn(unit: Unit, context: IDecisionContext): GameAction[] {
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const endTurn: GameAction = { type: "end_turn", unitId: unit.getId(), reason: "manual" };
         if (!unit.canMove()) {
             return [endTurn];
         }
         const enemyTeam = otherTeam(unit.getTeam());
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -521,7 +526,7 @@ export class StrategyV0_1 implements IAIStrategy {
         }
 
         const base = unit.getBaseCell();
-        let bestRoute: IWeightedRoute | undefined;
+        let bestRoute: IReadonlyWeightedRoute | undefined;
         let bestScore = Infinity;
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];

@@ -11,10 +11,10 @@
 
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { auraRelevanceWeight, setPreferAttackOverMining } from "../ai";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { otherTeam } from "./v0_1";
@@ -230,8 +230,8 @@ export class StrategyV0_6 extends StrategyV0_5 {
         // Enemy melee reach next turn = its move range + one step onto an adjacent cell. Staying strictly beyond
         // it keeps the shooter safe for a turn while it closes to firing range.
         const maxEnemyReach = Math.max(...enemies.map((e) => e.getSteps())) + 1;
-        const { grid, matrix, pathHelper } = context;
-        const movePath = pathHelper.getMovePath(
+        const { grid, matrix } = context;
+        const movePath = decisionPathSource(context).getMovePath(
             base,
             matrix,
             unit.getSteps(),
@@ -246,7 +246,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
         // Kite target = the reachable cell CLOSEST to the enemy that is still outside melee reach (the "safe
         // frontier"). Advance as far as we safely can so the enemy walks into our shot range next turn, instead
         // of marching into melee (base's advance) OR sitting still out of range (the old crude hold).
-        let best: IWeightedRoute | undefined;
+        let best: IReadonlyWeightedRoute | undefined;
         let bestDist = Infinity;
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];

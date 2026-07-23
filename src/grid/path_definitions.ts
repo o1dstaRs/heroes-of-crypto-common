@@ -25,3 +25,17 @@ export interface IWeightedRoute {
     hasLavaCell: boolean;
     hasWaterCell: boolean;
 }
+
+/** Deep-readonly view used when a path result is shared inside one synchronous decision. */
+export interface IReadonlyWeightedRoute extends Readonly<Omit<IWeightedRoute, "cell" | "route">> {
+    readonly cell: Readonly<XY>;
+    readonly route: readonly Readonly<XY>[];
+}
+
+export type IReadonlyKnownPaths = ReadonlyMap<number, readonly IReadonlyWeightedRoute[]>;
+
+export interface IReadonlyMovePath {
+    readonly cells: readonly Readonly<XY>[];
+    readonly hashes: ReadonlySet<number>;
+    readonly knownPaths: IReadonlyKnownPaths;
+}

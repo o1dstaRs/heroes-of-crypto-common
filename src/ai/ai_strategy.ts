@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../engine/actions";
+import type { DecisionPathCatalog } from "./decision_path_catalog";
 import type { PlacementPolicyVariant } from "./setup/setup_ship";
 import type { FightProperties } from "../fights/fight_properties";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
@@ -261,6 +262,8 @@ export interface IDecisionContext {
     matrix: number[][];
     unitsHolder: UnitsHolder;
     pathHelper: PathHelper;
+    /** @internal Shared read-only reachability for this synchronous decision only. */
+    readonly decisionPathCatalog?: DecisionPathCatalog;
     /**
      * Optional: lets a strategy ask whether a unit can actually LAND a ranged shot right now (not just
      * whether it has ammo) — i.e. it isn't boxed in by melee and isn't range-suppressed — and to

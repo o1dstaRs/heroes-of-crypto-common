@@ -37,6 +37,7 @@ import {
     V08S_URGENT_FINISH_START_LAP,
     V08_TARGET_PRESSURE_START_LAP,
 } from "../ai/versions/v0_8s_finish";
+import { createDecisionPathCatalog, DecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -1210,7 +1211,12 @@ export class SearchDriver {
      * act-vs-wait by lap rollout (oracle mode), or log the Q2 wait-horizon ablation and return the
      * incumbent unchanged (ablation mode).
      */
-    public chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[] {
+    public chooseDecision(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext?: IDecisionContext,
+    ): GameAction[] {
         if (!this.appliesTo(version)) {
             return incumbent;
         }
@@ -1359,13 +1365,32 @@ export class SearchDriver {
                 // Gate-1 never enumerates: the candidate pair is {incumbent, wait} by construction.
                 return this.oracle(unit, incumbent, seedBase, t0);
             }
+            // The live root may share its one-decision matrix/path facade with enumeration. Strict identity
+            // checks prevent an unrelated caller context from entering search; rollout contexts below continue
+            // to use the original dependencies after every apply/restore edge.
+            const sharedRootContext =
+                rootDecisionContext?.grid === this.deps.grid &&
+                rootDecisionContext.unitsHolder === this.deps.unitsHolder &&
+                rootDecisionContext.attackHandler === this.deps.attackHandler &&
+                rootDecisionContext.fightProperties === this.deps.fightProperties &&
+                rootDecisionContext.decisionOrigin === "root" &&
+                rootDecisionContext.decisionPathCatalog instanceof DecisionPathCatalog &&
+                rootDecisionContext.decisionPathCatalog.claimRootShare(
+                    this.deps.pathHelper,
+                    unit,
+                    rootDecisionContext.matrix,
+                )
+                    ? rootDecisionContext
+                    : undefined;
             const context: IDecisionContext = {
                 grid: this.deps.grid,
-                matrix: this.deps.grid.getMatrix(),
+                matrix: sharedRootContext?.matrix ?? this.deps.grid.getMatrix(),
                 unitsHolder: this.deps.unitsHolder,
                 pathHelper: this.deps.pathHelper,
+                decisionPathCatalog: sharedRootContext?.decisionPathCatalog,
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
+                decisionOrigin: "root",
             };
             const preserveBaselineAttackTargetCoverage =
                 prioritizeV08STargetPressure ||
@@ -3106,11 +3131,13 @@ export class SearchDriver {
         const id = unit.getId();
         let decided: GameAction[];
         try {
+            const matrix = this.deps.grid.getMatrix();
             decided = strat.decideTurn(unit, {
                 grid: this.deps.grid,
-                matrix: this.deps.grid.getMatrix(),
+                matrix,
                 unitsHolder: this.deps.unitsHolder,
                 pathHelper: this.deps.pathHelper,
+                decisionPathCatalog: createDecisionPathCatalog(this.deps.grid, this.deps.pathHelper, unit, matrix),
                 attackHandler: this.deps.attackHandler,
                 fightProperties: this.deps.fightProperties,
                 decisionOrigin: "rollout",

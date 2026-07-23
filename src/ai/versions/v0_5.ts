@@ -12,7 +12,6 @@
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
@@ -32,6 +31,7 @@ import {
     teamRangedFirepower,
 } from "../ai";
 import type { IDecisionContext, IAIStrategy, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam, STRATEGY_V0_1 } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
@@ -206,7 +206,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (decision.some((a) => COMBAT_ACTIONS.has(a.type) && a.type !== "melee_attack")) {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const meleeAtk = decision.find((a) => a.type === "melee_attack");
         if (meleeAtk?.type === "melee_attack") {
             const tgt = unitsHolder.getAllUnits().get(meleeAtk.targetId);
@@ -223,7 +223,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!enemies.length) {
             return decision;
         }
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -236,7 +236,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         const base = unit.getBaseCell();
-        let best: IWeightedRoute | undefined;
+        let best: IReadonlyWeightedRoute | undefined;
         // No-Melee wants max safety (farthest from enemies); a shooter wants the CHEAPEST disengage (least move,
         // to keep shot damage up and stay in the fight) — pick by move cost then distance.
         let bestScore = noMelee ? -Infinity : Infinity;
@@ -425,7 +425,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (unit.getAttackType() === RANGE || !unit.canMove() || (forcedTarget && !forcedTarget.isDead())) {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const hits = mountainHitsLeft(grid);
         if (hits <= 0) {
             return decision; // not a block map / already cleared
@@ -434,7 +434,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!decision.some((a) => a.type === "move_unit") || decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
             return decision;
         }
-        const strike = findMountainMeleeStrike(unit, grid, matrix, pathHelper);
+        const strike = findMountainMeleeStrike(unit, grid, matrix, decisionPathSource(context));
         if (!strike) {
             return decision; // can't reach the block this turn
         }
@@ -532,7 +532,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack" || unit.getTarget() || !unit.canMove()) {
             return decision;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (!enemies.length) {
@@ -595,7 +595,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             }
             return [...affected.values()];
         };
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -607,7 +607,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const bc = unit.getBaseCell();
         const v4from = strike.attackFrom ?? bc;
         const v4target = strike.targetId;
-        const stands: { cell: XY; route?: IWeightedRoute }[] = [{ cell: bc }];
+        const stands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: bc }];
         for (const routes of movePath.knownPaths.values()) {
             const r = routes[0];
             if (r?.route.length && canUnitLandAt(unit, grid, r.cell)) {
@@ -616,7 +616,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         }
         // Enumerate candidates: spin is target-independent (one per cell); directional pairs each stand cell
         // with every enemy adjacent to its footprint (the aim through which the line/arc resolves).
-        type Cand = { cell: XY; route?: IWeightedRoute; target: Unit; hitSet: Unit[] };
+        type Cand = { cell: XY; route?: IReadonlyWeightedRoute; target: Unit; hitSet: Unit[] };
         const cands: Cand[] = [];
         for (const s of stands) {
             if (spin) {
@@ -779,7 +779,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!meleeAuras.length || decision.some((a) => COMBAT_ACTIONS.has(a.type))) {
             return decision; // not a melee-aura emitter, or it's striking/casting this turn
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const team = unit.getTeam();
         const enemyTeam = otherTeam(team);
         const meleeAllies = unitsHolder
@@ -808,12 +808,12 @@ export class StrategyV0_5 extends StrategyV0_4 {
             );
         };
         const base = unit.getBaseCell();
-        let best: { cell: XY; route?: IWeightedRoute; cover: number; dist: number } = {
+        let best: { cell: XY; route?: IReadonlyWeightedRoute; cover: number; dist: number } = {
             cell: base,
             cover: cover(base),
             dist: getDistance(base, centroid),
         };
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             base,
             matrix,
             unit.getSteps(),
@@ -1003,7 +1003,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!strike || strike.type !== "melee_attack") {
             return decision; // only converts a diving MELEE strike (a flyer shooting from range is fine)
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const target = unitsHolder.getAllUnits().get(strike.targetId);
         if (!target) {
             return decision;
@@ -1023,7 +1023,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         const enemyTeam = otherTeam(unit.getTeam());
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             base,
             matrix,
             unit.getSteps(),
@@ -1165,7 +1165,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             wStandSupport,
             wTargetWounded,
         ] = this.w;
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const base = unit.getBaseCell();
         const myCells = unit.getCells();
@@ -1200,7 +1200,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return f.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)));
         };
 
-        type Cand = { target: Unit; cell: XY; route?: IWeightedRoute };
+        type Cand = { target: Unit; cell: XY; route?: IReadonlyWeightedRoute };
         const cands: Cand[] = [];
         // ANCHOR: v0.4's own (target, stand cell) is always a candidate, so the meleeIncumbent weight can
         // make it win (default behaviour). Without this, a tie at 0 could deviate from v0.4 even at default.
@@ -1216,7 +1216,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         }
         // Move-and-strike: reachable cells whose footprint sits adjacent to an enemy (skip if can't move).
         if (unit.canMove()) {
-            const movePath = pathHelper.getMovePath(
+            const movePath = decisionPathSource(context).getMovePath(
                 base,
                 matrix,
                 unit.getSteps(),
@@ -1434,7 +1434,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision; // move is part of a strike/cast — leave the (target-constrained) stand cell alone
         }
         const [, , , , , , wAdvance, wCohesion, wHazard, wIncumbent, wThreat, wAggrZone, wShoot, wAura] = this.w;
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (!enemies.length) {
@@ -1464,7 +1464,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // the advance (don't over-extend into a reactable position). wAdvanceFM modulates advance by exposure.
         const fm = this.fmExposure(unit, context);
         const wAdvanceFM = this.w[24] ?? 0;
-        const score = (cell: XY, route: IWeightedRoute): number => {
+        const score = (cell: XY, route: IReadonlyWeightedRoute): number => {
             const advance = (baseEnemyDist - minEnemyDist(cell)) / steps; // + => closer to the enemy
             const cohesion = (baseCentroidDist - getDistance(cell, centroid)) / steps; // + => toward allies
             const hazard = route.hasLavaCell || route.hasWaterCell ? 1 : 0;
@@ -1488,7 +1488,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             );
         };
 
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             base,
             matrix,
             unit.getSteps(),
@@ -1512,7 +1512,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     ))
             );
         };
-        let best: { cell: XY; route: IWeightedRoute } | undefined;
+        let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
         let bestScore = -Infinity;
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];

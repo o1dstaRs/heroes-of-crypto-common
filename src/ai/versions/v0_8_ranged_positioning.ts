@@ -18,7 +18,6 @@ import {
     getRangeAttackSideCenter,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
@@ -31,6 +30,7 @@ import type {
     V08SupportedPrepinEgressFunnelStage,
     V08SupportedRangedEscapeFunnelStage,
 } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
 import {
@@ -74,7 +74,7 @@ interface IProtection {
 }
 
 interface IRouteView {
-    readonly route: IWeightedRoute;
+    readonly route: IReadonlyWeightedRoute;
     readonly footprint: XY[];
     readonly position: XY;
     readonly protection: IProtection;
@@ -111,7 +111,7 @@ const cellDistance = (left: readonly XY[], right: readonly XY[]): number => {
     return best;
 };
 
-const routeCost = (route: IWeightedRoute): number => route.weight ?? route.route.length;
+const routeCost = (route: IReadonlyWeightedRoute): number => route.weight ?? route.route.length;
 
 const isFrontline = (unit: Unit): boolean => {
     const attackType = unit.getAttackType();
@@ -174,10 +174,10 @@ function protectionAt(destination: readonly XY[], enemies: readonly Unit[], fron
     };
 }
 
-function reachableRoutes(unit: Unit, context: IDecisionContext): IWeightedRoute[] {
+function reachableRoutes(unit: Unit, context: IDecisionContext): IReadonlyWeightedRoute[] {
     const enemyTeam = otherTeam(unit.getTeam());
     const base = unit.getBaseCell();
-    const movePath = context.pathHelper.getMovePath(
+    const movePath = decisionPathSource(context).getMovePath(
         base,
         context.matrix,
         unit.getSteps(),
@@ -186,7 +186,7 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IWeightedRoute[
         unit.isSmallSize(),
         unit.canTraverseLava(),
     );
-    const routes: IWeightedRoute[] = [];
+    const routes: IReadonlyWeightedRoute[] = [];
     for (const routeList of movePath.knownPaths.values()) {
         const route = routeList[0];
         if (
@@ -215,7 +215,7 @@ function footprintForAnchor(unit: Unit, anchor: XY): XY[] {
     ];
 }
 
-function moveAction(unit: Unit, route: IWeightedRoute, footprint: XY[]): GameAction {
+function moveAction(unit: Unit, route: IReadonlyWeightedRoute, footprint: XY[]): GameAction {
     return {
         type: "move_unit",
         unitId: unit.getId(),
@@ -229,7 +229,7 @@ function moveAction(unit: Unit, route: IWeightedRoute, footprint: XY[]): GameAct
 function routeView(
     unit: Unit,
     context: IDecisionContext,
-    route: IWeightedRoute,
+    route: IReadonlyWeightedRoute,
     enemies: readonly Unit[],
     frontliners: readonly Unit[],
 ): IRouteView | undefined {
@@ -474,7 +474,7 @@ function supportedPrepinEgress(
     const rangedSuperior = rangedOutput(context.unitsHolder.getAllAllies(unit.getTeam())) > rangedOutput(enemies);
 
     const proposals: Array<{
-        route: IWeightedRoute;
+        route: IReadonlyWeightedRoute;
         footprint: XY[];
         divisor: number;
         exposure: number;

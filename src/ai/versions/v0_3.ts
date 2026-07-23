@@ -12,12 +12,12 @@
 import type { GameAction } from "../../engine/actions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { getDistance, type XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam } from "./v0_1";
 import { StrategyV0_2 } from "./v0_2";
 
@@ -111,7 +111,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
         if (!move || move.type !== "move_unit") {
             return undefined;
         }
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const allies = unitsHolder
             .getAllAllies(unit.getTeam())
             .filter((a) => !a.isDead() && a.getId() !== unit.getId());
@@ -127,7 +127,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             return undefined; // already with the pack
         }
         const enemyTeam = otherTeam(unit.getTeam());
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             base,
             matrix,
             unit.getSteps(),
@@ -137,7 +137,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.canTraverseLava(),
         );
         let bestCell = base;
-        let bestRoute: IWeightedRoute | undefined;
+        let bestRoute: IReadonlyWeightedRoute | undefined;
         let bestDist = getDistance(base, centroid);
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];
@@ -192,13 +192,13 @@ export class StrategyV0_3 extends StrategyV0_2 {
      * else end the turn — rather than throwing the shooter into melee. Undefined ⇒ let v0.2 decide.
      */
     private rangedRetreat(unit: Unit, context: IDecisionContext): GameAction[] | undefined {
-        const { grid, matrix, unitsHolder, pathHelper } = context;
+        const { grid, matrix, unitsHolder } = context;
         const enemyTeam = otherTeam(unit.getTeam());
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((e) => !e.isDead());
         if (!enemies.length) {
             return undefined;
         }
-        const movePath = pathHelper.getMovePath(
+        const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
             unit.getSteps(),
@@ -218,7 +218,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
 
         const base = unit.getBaseCell();
         let bestCell = base;
-        let bestRoute: IWeightedRoute | undefined;
+        let bestRoute: IReadonlyWeightedRoute | undefined;
         let bestScore = safety(base);
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];
