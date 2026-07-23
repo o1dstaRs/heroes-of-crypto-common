@@ -11,9 +11,9 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -108,6 +108,12 @@ export interface IV08RangedPositioningABOptions {
     supportedBandAdvanceDominanceOverlay?: boolean;
     /** Matched dominance selector-off control: both catalogs and comparisons run, but v0.8 selects shipped. */
     supportedBandAdvanceDominanceOverlayControl?: boolean;
+    /** Strict wins only when it is safely screened and closer than an unscreened, otherwise-equal shipped move. */
+    supportedBandScreenedCloserOverlay?: boolean;
+    /** Matched screened-closer selector-off control: both catalogs/comparisons run, but v0.8 selects shipped. */
+    supportedBandScreenedCloserOverlayControl?: boolean;
+    /** Immutable preregistration receipt hashed before either screened-closer child is launched. */
+    prelaunchReceipt?: string;
     /** Live-root post-catalog vetoes over shipped legacy; rollouts and v0.8s remain exact incumbent controls. */
     protectedAdvanceGuardrails?: boolean;
     /** Selects both guardrails, an isolated reason, or the exact catalog-only control. */
@@ -130,8 +136,14 @@ export interface IV08RangedPositioningABSourceIdentity {
     dirty: boolean | null;
 }
 
+export interface IV08RangedPositioningABPrelaunchReceipt {
+    path: string;
+    sha256: string;
+    mtimeMs: number;
+}
+
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -174,6 +186,8 @@ export interface IV08RangedPositioningABManifest {
         supportedBandAdvanceOverlayControl: boolean;
         supportedBandAdvanceDominanceOverlay: boolean;
         supportedBandAdvanceDominanceOverlayControl: boolean;
+        supportedBandScreenedCloserOverlay: boolean;
+        supportedBandScreenedCloserOverlayControl: boolean;
         protectedAdvanceGuardrails: boolean;
         protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode;
         diag: boolean;
@@ -181,6 +195,7 @@ export interface IV08RangedPositioningABManifest {
         controlVersion: typeof V08_A13_SOURCE_VERSION;
     };
     behaviorEnvironment: Readonly<Record<string, string>>;
+    prelaunchReceipt?: IV08RangedPositioningABPrelaunchReceipt;
     artifacts: {
         summary: string;
         searchAudit?: string;
@@ -233,6 +248,8 @@ function validateBehaviorArmGeometry(
     supportedBandAdvanceOverlayControl: boolean,
     supportedBandAdvanceDominanceOverlay: boolean,
     supportedBandAdvanceDominanceOverlayControl: boolean,
+    supportedBandScreenedCloserOverlay: boolean,
+    supportedBandScreenedCloserOverlayControl: boolean,
     protectedAdvanceGuardrails: boolean,
 ): void {
     const enabledSpecialArms = [
@@ -249,6 +266,8 @@ function validateBehaviorArmGeometry(
         supportedBandAdvanceOverlayControl,
         supportedBandAdvanceDominanceOverlay,
         supportedBandAdvanceDominanceOverlayControl,
+        supportedBandScreenedCloserOverlay,
+        supportedBandScreenedCloserOverlayControl,
         protectedAdvanceGuardrails,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
@@ -257,7 +276,8 @@ function validateBehaviorArmGeometry(
                 "supportedRangedDelta, responseNeutralAdvance, supportedPrepinEgress, supportedBandAdvance, and " +
                 "supportedBandAdvanceVsLegacy, supportedBandAdvanceOverlayVsLegacy, " +
                 "supportedBandAdvanceOverlayControl, supportedBandAdvanceDominanceOverlay, " +
-                "supportedBandAdvanceDominanceOverlayControl, and protectedAdvanceGuardrails " +
+                "supportedBandAdvanceDominanceOverlayControl, supportedBandScreenedCloserOverlay, " +
+                "supportedBandScreenedCloserOverlayControl, and protectedAdvanceGuardrails " +
                 "are mutually exclusive",
         );
     }
@@ -299,6 +319,12 @@ function validateBehaviorArmGeometry(
     }
     if (supportedBandAdvanceDominanceOverlayControl && (mode !== "both" || moveShots !== 0)) {
         throw new Error("supportedBandAdvanceDominanceOverlayControl requires mode=both and moveShots=0");
+    }
+    if (supportedBandScreenedCloserOverlay && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandScreenedCloserOverlay requires mode=both and moveShots=0");
+    }
+    if (supportedBandScreenedCloserOverlayControl && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandScreenedCloserOverlayControl requires mode=both and moveShots=0");
     }
     if (protectedAdvanceGuardrails && (mode !== "both" || moveShots !== 0)) {
         throw new Error("protectedAdvanceGuardrails requires mode=both and moveShots=0");
@@ -475,7 +501,9 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         !options.supportedBandAdvanceOverlayVsLegacy &&
         !options.supportedBandAdvanceOverlayControl &&
         !options.supportedBandAdvanceDominanceOverlay &&
-        !options.supportedBandAdvanceDominanceOverlayControl
+        !options.supportedBandAdvanceDominanceOverlayControl &&
+        !options.supportedBandScreenedCloserOverlay &&
+        !options.supportedBandScreenedCloserOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -518,6 +546,18 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         throw new Error("supportedBandAdvanceDominanceOverlayControl must be a boolean");
     }
     if (
+        options.supportedBandScreenedCloserOverlay !== undefined &&
+        typeof options.supportedBandScreenedCloserOverlay !== "boolean"
+    ) {
+        throw new Error("supportedBandScreenedCloserOverlay must be a boolean");
+    }
+    if (
+        options.supportedBandScreenedCloserOverlayControl !== undefined &&
+        typeof options.supportedBandScreenedCloserOverlayControl !== "boolean"
+    ) {
+        throw new Error("supportedBandScreenedCloserOverlayControl must be a boolean");
+    }
+    if (
         [
             options.supportedBandAdvance,
             options.supportedBandAdvanceCatalogOnly,
@@ -526,12 +566,15 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
             options.supportedBandAdvanceOverlayControl,
             options.supportedBandAdvanceDominanceOverlay,
             options.supportedBandAdvanceDominanceOverlayControl,
+            options.supportedBandScreenedCloserOverlay,
+            options.supportedBandScreenedCloserOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
                 "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
-                "supportedBandAdvanceDominanceOverlay, and supportedBandAdvanceDominanceOverlayControl " +
+                "supportedBandAdvanceDominanceOverlay, supportedBandAdvanceDominanceOverlayControl, " +
+                "supportedBandScreenedCloserOverlay, and supportedBandScreenedCloserOverlayControl " +
                 "are mutually exclusive",
         );
     }
@@ -549,6 +592,24 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     }
     if (options.supportedBandAdvanceDominanceOverlayControl && !options.supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceDominanceOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandScreenedCloserOverlay && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandScreenedCloserOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (options.supportedBandScreenedCloserOverlayControl && !options.supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    const screenedCloserArm =
+        (options.supportedBandScreenedCloserOverlay ?? false) ||
+        (options.supportedBandScreenedCloserOverlayControl ?? false);
+    if (screenedCloserArm && !options.prelaunchReceipt) {
+        throw new Error("screened-closer overlays require --prelaunch-receipt");
+    }
+    if (options.prelaunchReceipt !== undefined && !isAbsolute(options.prelaunchReceipt)) {
+        throw new Error("prelaunchReceipt must be an absolute path");
+    }
+    if (!screenedCloserArm && options.prelaunchReceipt !== undefined) {
+        throw new Error("prelaunchReceipt is only valid for screened-closer overlays");
     }
     if (options.protectedAdvanceGuardrails !== undefined && typeof options.protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -576,6 +637,8 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.supportedBandAdvanceOverlayControl ?? false,
         options.supportedBandAdvanceDominanceOverlay ?? false,
         options.supportedBandAdvanceDominanceOverlayControl ?? false,
+        options.supportedBandScreenedCloserOverlay ?? false,
+        options.supportedBandScreenedCloserOverlayControl ?? false,
         options.protectedAdvanceGuardrails ?? false,
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
@@ -675,14 +738,47 @@ export function discoverV08RangedPositioningABSourceIdentity(
     };
 }
 
+export function readV08RangedPositioningABPrelaunchReceipt(path: string): IV08RangedPositioningABPrelaunchReceipt {
+    if (!isAbsolute(path)) throw new Error("prelaunchReceipt must be an absolute path");
+    const before = statSync(path);
+    if (!before.isFile()) throw new Error("prelaunchReceipt must identify a regular file");
+    if ((before.mode & 0o222) !== 0) throw new Error("prelaunchReceipt must be read-only");
+    const bytes = readFileSync(path);
+    const after = statSync(path);
+    if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+        throw new Error("prelaunchReceipt changed while it was being hashed");
+    }
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(bytes.toString("utf8"));
+    } catch {
+        throw new Error("prelaunchReceipt must contain valid JSON");
+    }
+    if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        (parsed as { schema?: unknown }).schema !== "hoc.supported_band_screened_closer_prelaunch_receipt.v1"
+    ) {
+        throw new Error("prelaunchReceipt has an incompatible schema");
+    }
+    return {
+        path,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        mtimeMs: before.mtimeMs,
+    };
+}
+
 export function buildV08RangedPositioningABManifest(
     invocation: IV08RangedPositioningABInvocation,
     options: IV08RangedPositioningABOptions,
     source: IV08RangedPositioningABSourceIdentity,
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
+    const prelaunchReceipt = options.prelaunchReceipt
+        ? readV08RangedPositioningABPrelaunchReceipt(options.prelaunchReceipt)
+        : undefined;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -725,6 +821,8 @@ export function buildV08RangedPositioningABManifest(
             supportedBandAdvanceOverlayControl: options.supportedBandAdvanceOverlayControl ?? false,
             supportedBandAdvanceDominanceOverlay: options.supportedBandAdvanceDominanceOverlay ?? false,
             supportedBandAdvanceDominanceOverlayControl: options.supportedBandAdvanceDominanceOverlayControl ?? false,
+            supportedBandScreenedCloserOverlay: options.supportedBandScreenedCloserOverlay ?? false,
+            supportedBandScreenedCloserOverlayControl: options.supportedBandScreenedCloserOverlayControl ?? false,
             protectedAdvanceGuardrails: options.protectedAdvanceGuardrails ?? false,
             protectedAdvanceGuardrailsMode: options.protectedAdvanceGuardrailsMode ?? "both",
             diag: options.diag ?? false,
@@ -732,6 +830,7 @@ export function buildV08RangedPositioningABManifest(
             controlVersion: V08_A13_SOURCE_VERSION,
         },
         behaviorEnvironment: extractV08RangedPositioningBehaviorEnvironment(invocation.environment),
+        ...(prelaunchReceipt ? { prelaunchReceipt } : {}),
         artifacts: {
             summary: `${invocation.outBase}.summary.json`,
             ...(invocation.searchAuditPath ? { searchAudit: invocation.searchAuditPath } : {}),
@@ -779,6 +878,8 @@ export function buildV08RangedPositioningABEnvironment(
     supportedBandAdvanceOverlayControl = false,
     supportedBandAdvanceDominanceOverlay = false,
     supportedBandAdvanceDominanceOverlayControl = false,
+    supportedBandScreenedCloserOverlay = false,
+    supportedBandScreenedCloserOverlayControl = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -869,7 +970,9 @@ export function buildV08RangedPositioningABEnvironment(
         !supportedBandAdvanceOverlayVsLegacy &&
         !supportedBandAdvanceOverlayControl &&
         !supportedBandAdvanceDominanceOverlay &&
-        !supportedBandAdvanceDominanceOverlayControl
+        !supportedBandAdvanceDominanceOverlayControl &&
+        !supportedBandScreenedCloserOverlay &&
+        !supportedBandScreenedCloserOverlayControl
     ) {
         throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
     }
@@ -888,6 +991,12 @@ export function buildV08RangedPositioningABEnvironment(
     if (typeof supportedBandAdvanceDominanceOverlayControl !== "boolean") {
         throw new Error("supportedBandAdvanceDominanceOverlayControl must be a boolean");
     }
+    if (typeof supportedBandScreenedCloserOverlay !== "boolean") {
+        throw new Error("supportedBandScreenedCloserOverlay must be a boolean");
+    }
+    if (typeof supportedBandScreenedCloserOverlayControl !== "boolean") {
+        throw new Error("supportedBandScreenedCloserOverlayControl must be a boolean");
+    }
     if (supportedBandAdvanceVsLegacy && (supportedBandAdvance || supportedBandAdvanceCatalogOnly)) {
         throw new Error(
             "supportedBandAdvanceVsLegacy, supportedBandAdvance, and supportedBandAdvanceCatalogOnly are mutually exclusive",
@@ -902,12 +1011,15 @@ export function buildV08RangedPositioningABEnvironment(
             supportedBandAdvanceOverlayControl,
             supportedBandAdvanceDominanceOverlay,
             supportedBandAdvanceDominanceOverlayControl,
+            supportedBandScreenedCloserOverlay,
+            supportedBandScreenedCloserOverlayControl,
         ].filter(Boolean).length > 1
     ) {
         throw new Error(
             "supportedBandAdvance, supportedBandAdvanceCatalogOnly, supportedBandAdvanceVsLegacy, " +
                 "supportedBandAdvanceOverlayVsLegacy, supportedBandAdvanceOverlayControl, " +
-                "supportedBandAdvanceDominanceOverlay, and supportedBandAdvanceDominanceOverlayControl " +
+                "supportedBandAdvanceDominanceOverlay, supportedBandAdvanceDominanceOverlayControl, " +
+                "supportedBandScreenedCloserOverlay, and supportedBandScreenedCloserOverlayControl " +
                 "are mutually exclusive",
         );
     }
@@ -925,6 +1037,12 @@ export function buildV08RangedPositioningABEnvironment(
     }
     if (supportedBandAdvanceDominanceOverlayControl && !supportedBandAdvanceLiveOnly) {
         throw new Error("supportedBandAdvanceDominanceOverlayControl requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandScreenedCloserOverlay && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandScreenedCloserOverlay requires supportedBandAdvanceLiveOnly");
+    }
+    if (supportedBandScreenedCloserOverlayControl && !supportedBandAdvanceLiveOnly) {
+        throw new Error("supportedBandScreenedCloserOverlayControl requires supportedBandAdvanceLiveOnly");
     }
     if (typeof protectedAdvanceGuardrails !== "boolean") {
         throw new Error("protectedAdvanceGuardrails must be a boolean");
@@ -951,6 +1069,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceOverlayControl,
         supportedBandAdvanceDominanceOverlay,
         supportedBandAdvanceDominanceOverlayControl,
+        supportedBandScreenedCloserOverlay,
+        supportedBandScreenedCloserOverlayControl,
         protectedAdvanceGuardrails,
     );
 
@@ -1010,8 +1130,13 @@ export function buildV08RangedPositioningABEnvironment(
     const supportedBandOverlayDuel = supportedBandAdvanceOverlayVsLegacy || supportedBandAdvanceOverlayControl;
     const supportedBandDominanceOverlayDuel =
         supportedBandAdvanceDominanceOverlay || supportedBandAdvanceDominanceOverlayControl;
+    const supportedBandScreenedCloserOverlayDuel =
+        supportedBandScreenedCloserOverlay || supportedBandScreenedCloserOverlayControl;
     const supportedBandLegacyDuel =
-        supportedBandAdvanceVsLegacy || supportedBandOverlayDuel || supportedBandDominanceOverlayDuel;
+        supportedBandAdvanceVsLegacy ||
+        supportedBandOverlayDuel ||
+        supportedBandDominanceOverlayDuel ||
+        supportedBandScreenedCloserOverlayDuel;
     environment.V08_SUPPORTED_BAND_ADVANCE = supportedBandExperiment ? "1" : "0";
     environment.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS =
         supportedBandExperiment || supportedBandLegacyDuel ? V08_A13_PRODUCTION_VERSION : "";
@@ -1022,6 +1147,12 @@ export function buildV08RangedPositioningABEnvironment(
     environment.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS =
         supportedBandAdvanceDominanceOverlayControl ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS = supportedBandDominanceOverlayDuel
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
+    environment.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS = supportedBandScreenedCloserOverlayControl
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
+    environment.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS = supportedBandScreenedCloserOverlayDuel
         ? V08_A13_PRODUCTION_VERSION
         : "";
     environment.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS = supportedBandAdvanceOverlayControl
@@ -1055,6 +1186,8 @@ export function buildV08RangedPositioningABEnvironment(
         supportedBandAdvanceOverlayControl ||
         supportedBandAdvanceDominanceOverlay ||
         supportedBandAdvanceDominanceOverlayControl ||
+        supportedBandScreenedCloserOverlay ||
+        supportedBandScreenedCloserOverlayControl ||
         protectedAdvanceGuardrails
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
@@ -1099,6 +1232,8 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedBandAdvanceOverlayControl ?? false,
         options.supportedBandAdvanceDominanceOverlay ?? false,
         options.supportedBandAdvanceDominanceOverlayControl ?? false,
+        options.supportedBandScreenedCloserOverlay ?? false,
+        options.supportedBandScreenedCloserOverlayControl ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -1200,6 +1335,8 @@ export async function runV08RangedPositioningAB(
     const supportedBandAdvanceOverlayControl = options.supportedBandAdvanceOverlayControl ?? false;
     const supportedBandAdvanceDominanceOverlay = options.supportedBandAdvanceDominanceOverlay ?? false;
     const supportedBandAdvanceDominanceOverlayControl = options.supportedBandAdvanceDominanceOverlayControl ?? false;
+    const supportedBandScreenedCloserOverlay = options.supportedBandScreenedCloserOverlay ?? false;
+    const supportedBandScreenedCloserOverlayControl = options.supportedBandScreenedCloserOverlayControl ?? false;
     const protectedAdvanceGuardrails = options.protectedAdvanceGuardrails ?? false;
     const protectedAdvanceGuardrailsMode = options.protectedAdvanceGuardrailsMode ?? "both";
     for (const invocation of invocations) {
@@ -1228,14 +1365,17 @@ export async function runV08RangedPositioningAB(
                 `supportedBandOverlayControl=${supportedBandAdvanceOverlayControl} ` +
                 `supportedBandDominanceOverlay=${supportedBandAdvanceDominanceOverlay} ` +
                 `supportedBandDominanceOverlayControl=${supportedBandAdvanceDominanceOverlayControl} ` +
+                `supportedBandScreenedCloserOverlay=${supportedBandScreenedCloserOverlay} ` +
+                `supportedBandScreenedCloserOverlayControl=${supportedBandScreenedCloserOverlayControl} ` +
                 `protectedAdvanceGuardrails=${protectedAdvanceGuardrails} ` +
                 `protectedAdvanceGuardrailsMode=${protectedAdvanceGuardrailsMode} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
+        // Freeze source and preregistration receipt bytes before the child can produce any outcome artifact.
+        const manifest = buildV08RangedPositioningABManifest(invocation, options, sourceIdentity);
         await prepareInvocation(invocation);
         const code = await runChild(invocation);
         if (code !== 0) throw new Error(`ranged-positioning A/B ${invocation.cohort} exited with code ${code}`);
-        const manifest = buildV08RangedPositioningABManifest(invocation, options, sourceIdentity);
         writeManifest(`${invocation.outBase}.experiment.json`, manifest);
     }
     return invocations;
@@ -1278,6 +1418,9 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-band-overlay-control": { type: "boolean", default: false },
             "supported-band-dominance-overlay": { type: "boolean", default: false },
             "supported-band-dominance-overlay-control": { type: "boolean", default: false },
+            "supported-band-screened-closer-overlay": { type: "boolean", default: false },
+            "supported-band-screened-closer-overlay-control": { type: "boolean", default: false },
+            "prelaunch-receipt": { type: "string" },
             "protected-advance-guardrails": { type: "boolean", default: false },
             "protected-advance-guardrails-mode": { type: "string", default: "both" },
             diag: { type: "boolean", default: false },
@@ -1337,6 +1480,9 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedBandAdvanceOverlayControl: values["supported-band-overlay-control"]!,
         supportedBandAdvanceDominanceOverlay: values["supported-band-dominance-overlay"]!,
         supportedBandAdvanceDominanceOverlayControl: values["supported-band-dominance-overlay-control"]!,
+        supportedBandScreenedCloserOverlay: values["supported-band-screened-closer-overlay"]!,
+        supportedBandScreenedCloserOverlayControl: values["supported-band-screened-closer-overlay-control"]!,
+        prelaunchReceipt: values["prelaunch-receipt"],
         protectedAdvanceGuardrails: values["protected-advance-guardrails"]!,
         protectedAdvanceGuardrailsMode,
         diag: values.diag!,
@@ -1360,7 +1506,9 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
                 "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy|" +
                 "--supported-band-overlay-vs-legacy|--supported-band-overlay-control|" +
-                "--supported-band-dominance-overlay|--supported-band-dominance-overlay-control] " +
+                "--supported-band-dominance-overlay|--supported-band-dominance-overlay-control|" +
+                "--supported-band-screened-closer-overlay|--supported-band-screened-closer-overlay-control] " +
+                "[--prelaunch-receipt /absolute/path/to/receipt.json] " +
                 "[--supported-band-live-only] " +
                 "[--protected-advance-guardrails] " +
                 "[--protected-advance-guardrails-mode both|catalog_only|partial_band|ranged_superior_hold] " +

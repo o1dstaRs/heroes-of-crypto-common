@@ -9,7 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -61,6 +62,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     supportedBandAdvanceOverlayControl: false,
     supportedBandAdvanceDominanceOverlay: false,
     supportedBandAdvanceDominanceOverlayControl: false,
+    supportedBandScreenedCloserOverlay: false,
+    supportedBandScreenedCloserOverlayControl: false,
     protectedAdvanceGuardrails: false,
     protectedAdvanceGuardrailsMode: "both",
     diag: false,
@@ -69,6 +72,19 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
 const argValue = (args: readonly string[], flag: string): string | undefined => {
     const index = args.indexOf(flag);
     return index < 0 ? undefined : args[index + 1];
+};
+
+const createScreenedCloserReceipt = (
+    contents = `${JSON.stringify({
+        schema: "hoc.supported_band_screened_closer_prelaunch_receipt.v1",
+        hypothesis: "Prefer an otherwise-equal closer native-screened route.",
+    })}\n`,
+): { path: string; contents: string } => {
+    const directory = mkdtempSync(join(tmpdir(), "hoc-screened-closer-receipt-"));
+    const path = join(directory, "prelaunch-receipt.json");
+    writeFileSync(path, contents);
+    chmodSync(path, 0o444);
+    return { path, contents };
 };
 
 describe("v0.8 ranged-positioning mirrored A/B runner", () => {
@@ -132,6 +148,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
@@ -233,6 +251,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             supportedBandAdvanceOverlayControl: false,
             supportedBandAdvanceDominanceOverlay: false,
             supportedBandAdvanceDominanceOverlayControl: false,
+            supportedBandScreenedCloserOverlay: false,
+            supportedBandScreenedCloserOverlayControl: false,
+            prelaunchReceipt: undefined,
             protectedAdvanceGuardrails: false,
             protectedAdvanceGuardrailsMode: "both",
             diag: true,
@@ -261,6 +282,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceOverlayControl).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceDominanceOverlay).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceDominanceOverlayControl).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandScreenedCloserOverlay).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandScreenedCloserOverlayControl).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).prelaunchReceipt).toBeUndefined();
         expect(parseV08RangedPositioningABOptions([]).protectedAdvanceGuardrails).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).protectedAdvanceGuardrailsMode).toBe("both");
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
@@ -286,6 +310,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(String(log.mock.calls[0]?.[0])).toContain("supported-band-overlay-control");
             expect(String(log.mock.calls[0]?.[0])).toContain("supported-band-dominance-overlay");
             expect(String(log.mock.calls[0]?.[0])).toContain("supported-band-dominance-overlay-control");
+            expect(String(log.mock.calls[0]?.[0])).toContain("supported-band-screened-closer-overlay");
+            expect(String(log.mock.calls[0]?.[0])).toContain("prelaunch-receipt");
         } finally {
             log.mockRestore();
         }
@@ -532,7 +558,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 paretoNoMeleeFocus: true,
                 paretoNoMeleeFocusScope: "any_board",
@@ -601,7 +627,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             geometry: {
                 cohort: "mixed_cyclops_tsar",
                 amountMode: "expBudget",
@@ -687,7 +713,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
@@ -780,7 +806,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedRangedDelta: true,
                 supportedRangedDeltaCatalogOnly: false,
@@ -931,7 +957,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedPrepinEgress: true,
                 supportedPrepinEgressCatalogOnly: false,
@@ -1042,7 +1068,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvance: true,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1141,7 +1167,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         const manifest = buildV08RangedPositioningABManifest(invocation, duel, source);
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvance: false,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1222,7 +1248,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         const manifest = buildV08RangedPositioningABManifest(invocation, overlay, source);
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvance: false,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1337,7 +1363,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const treatmentManifest = buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source);
         const controlManifest = buildV08RangedPositioningABManifest(controlInvocation, control, source);
         expect(controlManifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvanceLiveOnly: true,
                 supportedBandAdvanceVsLegacy: false,
@@ -1457,7 +1483,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const treatmentManifest = buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source);
         const controlManifest = buildV08RangedPositioningABManifest(controlInvocation, control, source);
         expect(treatmentManifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvanceDominanceOverlay: true,
                 supportedBandAdvanceDominanceOverlayControl: false,
@@ -1474,7 +1500,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             },
         });
         expect(controlManifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 supportedBandAdvanceDominanceOverlay: false,
                 supportedBandAdvanceDominanceOverlayControl: true,
@@ -1564,6 +1590,201 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("mutually exclusive");
     });
 
+    it("seals screened-closer treatment/control to one selector key and an immutable receipt", () => {
+        const receipt = createScreenedCloserReceipt();
+        const treatment: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "both",
+            supportedBandAdvanceLiveOnly: true,
+            supportedBandScreenedCloserOverlay: true,
+            prelaunchReceipt: receipt.path,
+            diag: true,
+        };
+        const control: IV08RangedPositioningABOptions = {
+            ...treatment,
+            supportedBandScreenedCloserOverlay: false,
+            supportedBandScreenedCloserOverlayControl: true,
+        };
+        const hostileEnvironment = {
+            PATH: "/bin",
+            V08_SUPPORTED_BAND_ADVANCE: "1",
+            V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "hostile",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "v0.7",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "hostile",
+        };
+        const [treatmentInvocation] = buildV08RangedPositioningABInvocations(treatment, hostileEnvironment);
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, hostileEnvironment);
+        const expectedCommonEnvironment = {
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "both",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE: "0",
+            V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "v0.8",
+        };
+        expect(treatmentInvocation.environment).toMatchObject({
+            ...expectedCommonEnvironment,
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "",
+        });
+        expect(controlInvocation.environment).toMatchObject({
+            ...expectedCommonEnvironment,
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "v0.8",
+        });
+        const changedEnvironmentKeys = [
+            ...new Set([
+                ...Object.keys(treatmentInvocation.environment),
+                ...Object.keys(controlInvocation.environment),
+            ]),
+        ]
+            .filter((key) => treatmentInvocation.environment[key] !== controlInvocation.environment[key])
+            .sort();
+        expect(changedEnvironmentKeys).toEqual(["V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS"]);
+
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
+        const treatmentManifest = buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source);
+        const controlManifest = buildV08RangedPositioningABManifest(controlInvocation, control, source);
+        const receiptSha256 = createHash("sha256").update(receipt.contents).digest("hex");
+        expect(treatmentManifest).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
+            arm: {
+                supportedBandAdvanceLiveOnly: true,
+                supportedBandScreenedCloserOverlay: true,
+                supportedBandScreenedCloserOverlayControl: false,
+            },
+            behaviorEnvironment: {
+                V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "",
+                V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "v0.8",
+            },
+            prelaunchReceipt: {
+                path: receipt.path,
+                sha256: receiptSha256,
+            },
+        });
+        expect(controlManifest).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
+            arm: {
+                supportedBandAdvanceLiveOnly: true,
+                supportedBandScreenedCloserOverlay: false,
+                supportedBandScreenedCloserOverlayControl: true,
+            },
+            behaviorEnvironment: {
+                V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "v0.8",
+                V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "v0.8",
+            },
+            prelaunchReceipt: {
+                path: receipt.path,
+                sha256: receiptSha256,
+            },
+        });
+        expect(treatmentManifest.prelaunchReceipt?.mtimeMs).toBeGreaterThan(0);
+        expect(controlManifest.prelaunchReceipt).toEqual(treatmentManifest.prelaunchReceipt);
+        expect(controlManifest.fingerprintSha256).not.toBe(treatmentManifest.fingerprintSha256);
+
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-live-only",
+                "--supported-band-screened-closer-overlay",
+                "--prelaunch-receipt",
+                receipt.path,
+            ]),
+        ).toMatchObject({
+            supportedBandScreenedCloserOverlay: true,
+            supportedBandScreenedCloserOverlayControl: false,
+            prelaunchReceipt: receipt.path,
+        });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-live-only",
+                "--supported-band-screened-closer-overlay-control",
+                "--prelaunch-receipt",
+                receipt.path,
+            ]),
+        ).toMatchObject({
+            supportedBandScreenedCloserOverlay: false,
+            supportedBandScreenedCloserOverlayControl: true,
+            prelaunchReceipt: receipt.path,
+        });
+
+        for (const arm of [treatment, control]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...arm, prelaunchReceipt: undefined })).toThrow(
+                "require --prelaunch-receipt",
+            );
+            expect(() =>
+                buildV08RangedPositioningABInvocations({ ...arm, supportedBandAdvanceLiveOnly: false }),
+            ).toThrow("requires supportedBandAdvanceLiveOnly");
+            expect(() => buildV08RangedPositioningABInvocations({ ...arm, moveShots: 1 })).toThrow("moveShots=0");
+        }
+        expect(() =>
+            buildV08RangedPositioningABInvocations({
+                ...BASE_OPTIONS,
+                prelaunchReceipt: receipt.path,
+            }),
+        ).toThrow("only valid for screened-closer overlays");
+        expect(() =>
+            parseV08RangedPositioningABOptions([
+                "--supported-band-screened-closer-overlay",
+                "--supported-band-live-only",
+                "--prelaunch-receipt",
+                "relative-receipt.json",
+            ]),
+        ).toThrow("absolute path");
+        for (const conflictingArm of [
+            { supportedBandAdvance: true },
+            { supportedBandAdvanceCatalogOnly: true },
+            { supportedBandAdvanceVsLegacy: true },
+            { supportedBandAdvanceOverlayVsLegacy: true },
+            { supportedBandAdvanceOverlayControl: true },
+            { supportedBandAdvanceDominanceOverlay: true },
+            { supportedBandAdvanceDominanceOverlayControl: true },
+            { supportedBandScreenedCloserOverlayControl: true },
+            { protectedAdvanceGuardrails: true },
+        ]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...treatment, ...conflictingArm })).toThrow(
+                "mutually exclusive",
+            );
+        }
+
+        const missingOptions = { ...treatment, prelaunchReceipt: join(tmpdir(), "missing-screened-receipt.json") };
+        const [missingInvocation] = buildV08RangedPositioningABInvocations(missingOptions, { PATH: "/bin" });
+        expect(() => buildV08RangedPositioningABManifest(missingInvocation, missingOptions, source)).toThrow();
+
+        const writableReceipt = createScreenedCloserReceipt();
+        chmodSync(writableReceipt.path, 0o644);
+        const writableOptions = { ...treatment, prelaunchReceipt: writableReceipt.path };
+        const [writableInvocation] = buildV08RangedPositioningABInvocations(writableOptions, { PATH: "/bin" });
+        expect(() => buildV08RangedPositioningABManifest(writableInvocation, writableOptions, source)).toThrow(
+            "read-only",
+        );
+
+        const wrongSchemaReceipt = createScreenedCloserReceipt('{"schema":"wrong"}\n');
+        const wrongSchemaOptions = { ...treatment, prelaunchReceipt: wrongSchemaReceipt.path };
+        const [wrongSchemaInvocation] = buildV08RangedPositioningABInvocations(wrongSchemaOptions, { PATH: "/bin" });
+        expect(() => buildV08RangedPositioningABManifest(wrongSchemaInvocation, wrongSchemaOptions, source)).toThrow(
+            "incompatible schema",
+        );
+    });
+
     it("isolates live-root protected-advance guardrails over one shipped legacy catalog", () => {
         const guardrails: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -1603,7 +1824,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         });
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(invocation, guardrails, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             arm: {
                 protectedAdvanceGuardrails: true,
                 protectedAdvanceGuardrailsMode: "both",
@@ -1675,7 +1896,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(catalogInvocation.args, "--vA")).toBe("v0.8");
             expect(argValue(catalogInvocation.args, "--vB")).toBe("v0.8s");
             expect(buildV08RangedPositioningABManifest(catalogInvocation, catalogControl, source)).toMatchObject({
-                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
                 geometry: { pairedSideSwap: true, symmetricRosters: true },
                 arm: { protectedAdvanceGuardrails: true, protectedAdvanceGuardrailsMode: "catalog_only" },
             });
@@ -1758,7 +1979,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v16",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v17",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -1801,6 +2022,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 supportedBandAdvanceOverlayControl: false,
                 supportedBandAdvanceDominanceOverlay: false,
                 supportedBandAdvanceDominanceOverlayControl: false,
+                supportedBandScreenedCloserOverlay: false,
+                supportedBandScreenedCloserOverlayControl: false,
                 protectedAdvanceGuardrails: false,
                 protectedAdvanceGuardrailsMode: "both",
                 diag: true,
@@ -1835,6 +2058,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "",
+            V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
@@ -1914,6 +2139,40 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         expect(readFileSync(expected.searchAuditPath!, "utf8")).toBe("fresh-child-output\n");
         expect(declaredAudit).toBe(expected.searchAuditPath);
+    });
+
+    it("binds screened-closer receipt bytes before the child can mutate external state", async () => {
+        const receipt = createScreenedCloserReceipt();
+        const originalSha256 = createHash("sha256").update(receipt.contents).digest("hex");
+        const options: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            out: mkdtempSync(join(tmpdir(), "hoc-screened-closer-runner-")),
+            supportedBandAdvanceLiveOnly: true,
+            supportedBandScreenedCloserOverlay: true,
+            prelaunchReceipt: receipt.path,
+        };
+        let writtenSha256: string | undefined;
+        await runV08RangedPositioningAB(options, {
+            discoverSourceIdentity: () => ({ head: null, tree: null, dirty: false }),
+            runChild: async () => {
+                chmodSync(receipt.path, 0o644);
+                writeFileSync(
+                    receipt.path,
+                    `${JSON.stringify({
+                        schema: "hoc.supported_band_screened_closer_prelaunch_receipt.v1",
+                        hypothesis: "post-launch mutation",
+                    })}\n`,
+                );
+                chmodSync(receipt.path, 0o444);
+                return 0;
+            },
+            writeManifest: (_path, manifest) => {
+                writtenSha256 = manifest.prelaunchReceipt?.sha256;
+            },
+        });
+        expect(writtenSha256).toBe(originalSha256);
+        expect(createHash("sha256").update(readFileSync(receipt.path)).digest("hex")).not.toBe(originalSha256);
     });
 
     it("runs cohort children sequentially and fails closed on a nonzero child", async () => {

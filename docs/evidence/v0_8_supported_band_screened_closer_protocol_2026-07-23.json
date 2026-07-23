@@ -1,0 +1,287 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-screened-closer-protocol/v1",
+    "recordedAt": "2026-07-23T18:56:00Z",
+    "status": "preregistered-before-outcomes",
+    "purpose": "Test whether v0.8 should replace a shipped full-damage, zero-reach ranged advance only when the strict route is both natively screened from the aimed target and strictly closer to that target.",
+    "priorEvidencePolicy": {
+        "failedCandidate": "docs/evidence/v0_8_supported_band_dominance_pilot_2026-07-23.json",
+        "use": "The failed pilot and prior broad-overlay route subsets are hypothesis-generation evidence only.",
+        "pooling": false,
+        "freshSeedMasterRequired": true
+    },
+    "sourceRequirement": {
+        "candidate": "The clean pushed commit containing this protocol and the screened-closer implementation.",
+        "dirty": false,
+        "manifestHeadAndTreeRequired": true,
+        "analyzerHashRequiredBeforePilot": true,
+        "configurationChangesAfterOutcomeOpenCreateNewCandidate": true
+    },
+    "selector": {
+        "name": "screened_closer",
+        "catalogOrder": ["shipped", "strict"],
+        "incumbent": "shipped",
+        "strictProposalRequired": true,
+        "allConditionsRequired": [
+            "Both decisions are distinct move_unit plus ordinary range_attack decisions.",
+            "Both decisions preserve the same declared target and visible aim edge, and both source-pinned retainedSignatureAfter booleans are true.",
+            "Both primary target divisors after movement equal 1.",
+            "Both reachable-threat counts after movement equal 0.",
+            "Strict and shipped targetDistanceBefore values are equal, finite, nonnegative integers.",
+            "Strict targetDistanceAfter is strictly less than shipped targetDistanceAfter and both are strictly less than targetDistanceBefore.",
+            "A living native-melee ally screens the strict destination from the aimed target.",
+            "No living native-melee ally screens the shipped destination from the aimed target.",
+            "The strict and shipped destination footprints differ."
+        ],
+        "targetDistanceDefinition": "Minimum pairwise Chebyshev distance between the complete shooter destination footprint and complete target footprint.",
+        "screenDefinition": "The guard is a living same-team native MELEE or MELEE_MAGIC unit, is strictly closer to the aimed target than the shooter destination, is within three Chebyshev cells of the shooter destination, and satisfies guardToTarget + shooterToGuard <= shooterToTarget + 1.",
+        "fallback": "Return the exact shipped decision object and publish shipped branch events whenever any condition is absent, equal, malformed, or inconsistent.",
+        "malformedMetadata": "Malformed or structurally inconsistent metadata fails closed to shipped and fails integrity. A legitimate shipped shot-only decision with no move metadata, or well-formed metadata that merely fails a qualification predicate, is valid filtered telemetry and does not fail integrity.",
+        "validitySemantics": {
+            "strict": "A comparison is emitted only from a strict proposal, so strict move+shot, 1x improvement, zero threats, closer-than-current, native screen+guard, retained signature, and safe geometry are producer invariants; violating one is an integrity failure.",
+            "shipped": "A structurally valid shot-only fallback or moved decision that is partial, threatened, non-closing, signature-changing, screened, or otherwise ineligible is valid filtered telemetry.",
+            "relative": "Strict-closer-than-shipped, shipped-unscreened, and distinct-route tests are qualification predicates; failing one filters without an integrity failure."
+        },
+        "oldDominanceReasons": "no_shipped_advance, lower_divisor, and lower_reachable_threats are not enabled by this candidate.",
+        "treatment": "v0.8 selects a screened_closer strict proposal; v0.8s remains shipped.",
+        "control": "At every matched pre-divergence root, v0.8 computes identical shipped-first and strict-second catalogs, objective comparison telemetry, and RNG tails but returns shipped. Later roots may differ after a treatment action changes the trajectory; v0.8s remains shipped.",
+        "soleBehaviorDifference": "V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS contains v0.8 only in control.",
+        "defaultEnabled": false
+    },
+    "geometry": {
+        "cohort": "hybrid",
+        "amountMode": "expBudget",
+        "mode": "both",
+        "livetwin": true,
+        "pairedSideSwap": true,
+        "symmetricRosters": true,
+        "moveShots": 0,
+        "decisionOrigin": "root",
+        "diagnostics": true,
+        "researchUnbounded": true,
+        "m4WorkersPerArm": 6,
+        "m4ConcurrentArms": 2,
+        "remoteHost": "agent-zinc",
+        "remotePhysicalCores": 24,
+        "remoteWorkersPerArm": 12,
+        "remoteConcurrentArms": 2,
+        "remoteShardsRunSequentially": true
+    },
+    "seedAllocation": {
+        "masterHex": "0x5C8E3E21",
+        "masterUnsigned": 1552825889,
+        "pairStrideHex": "0x9e3779b1",
+        "pairStrideUnsigned": 2654435761,
+        "formula": "pairSeed(i) = (masterUnsigned + i * pairStrideUnsigned) mod 2^32",
+        "lanes": {
+            "pilot": {
+                "baseSeed": 1552825889,
+                "pairIndices": [0, 999],
+                "pairSeedClusters": 1000,
+                "gamesPerArm": 2000
+            },
+            "scout": {
+                "baseSeed": 1698797961,
+                "pairIndices": [1000, 4999],
+                "pairSeedClusters": 4000,
+                "gamesPerArm": 8000
+            },
+            "confirmation": {
+                "baseSeed": 2282686249,
+                "pairIndices": [5000, 14999],
+                "pairSeedClusters": 10000,
+                "gamesPerArm": 20000
+            },
+            "remotePrimary": {
+                "gamesPerArm": 40000,
+                "pairSeedClusters": 20000,
+                "shards": [
+                    {
+                        "baseSeed": 3742406969,
+                        "pairIndices": [15000, 19999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 177300033,
+                        "pairIndices": [20000, 24999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 907160393,
+                        "pairIndices": [25000, 29999],
+                        "gamesPerArm": 10000
+                    },
+                    {
+                        "baseSeed": 1637020753,
+                        "pairIndices": [30000, 34999],
+                        "gamesPerArm": 10000
+                    }
+                ]
+            }
+        },
+        "disjointnessProof": {
+            "status": "conservative-campaign-history-assumption",
+            "method": "The odd stride is invertible modulo 2^32. Each listed prior A/B lane base was converted to this master's pair-index cycle and assigned a deliberately dominating 1000000-cluster forward span before comparison with reserved new indices 0 through 34999.",
+            "reservedNewPairIndices": [0, 34999],
+            "dominatingPriorPairIndicesPerListedBase": [0, 999999],
+            "dominatingPriorSpanBasis": "Campaign-history assumption: no known listed prior campaign allocated one million pair-seed clusters from a single base. This also covers the earlier requested one-million-game study, which is at most 500000 paired clusters. There is no hashed exhaustive historical lane registry, so this is deliberately not described as a complete machine-verifiable proof.",
+            "nearestPriorLaneDistancePairSteps": 24457374,
+            "minimumConservativeSeparationPairSteps": 23422376,
+            "overlaps": 0,
+            "includesFailedDominanceLanes": true,
+            "priorBasesChecked": [
+                8241200, 92373000, 92374500, 92376000, 92377500, 10134723, 10144723, 10154723, 10164723, 10174723,
+                3561465089, 3707437161, 4145353377, 215316261, 580246441, 945176621, 1310106801, 2703034961, 2849007033,
+                3432895321, 597648745, 1327509105, 2057369465, 2787229825, 3517090185
+            ]
+        }
+    },
+    "statistics": {
+        "causalContrast": "Treatment minus matched screened-closer selector-off control.",
+        "cluster": "Independent pair-seed cluster containing both physical-seat swaps.",
+        "confidenceInterval": "Two-sided 95% Student-t interval over pair-seed cluster means.",
+        "physicalSeats": ["candidate-green", "candidate-red"],
+        "exposureCounting": {
+            "sourceArm": "Treatment only; control neutral telemetry is never pooled or double-counted. Objective fields must match after normalization only at causally matched pre-divergence roots.",
+            "strictEligible": "All treatment neutral screened-closer comparison events emitted before a13 retention.",
+            "screenedCloserProposals": "Treatment neutral comparisons with dominant=true before the selector-off control is applied.",
+            "retainedActualDifferences": "Treatment screened_closer decisions that survive a13 and differ executably from shipped.",
+            "retainedActualDifferenceGames": "Unique treatment game records containing at least one retained executable screened_closer difference."
+        },
+        "m4PhasesAreScreeningOnly": true,
+        "crossPhasePoolingForbidden": true
+    },
+    "gates": {
+        "pilot": {
+            "exposure": {
+                "strictEligibleMinimum": 40,
+                "screenedCloserProposalsMinimum": 8,
+                "retainedActualDifferencesMinimum": 6,
+                "retainedActualDifferenceGamesMinimum": 5,
+                "retainedActualDifferencesPerSeatMinimum": 2,
+                "underexposureDisposition": "not-testable-stop"
+            },
+            "scoreDeltaPointPpMinimum": -0.5,
+            "eachSeatDeltaPointPpMinimum": -1,
+            "armageddonDeltaPointPpMaximum": 0.1,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0.02
+        },
+        "scout": {
+            "exposure": {
+                "strictEligibleMinimum": 160,
+                "screenedCloserProposalsMinimum": 30,
+                "retainedActualDifferencesMinimum": 24,
+                "retainedActualDifferenceGamesMinimum": 20,
+                "retainedActualDifferencesPerSeatMinimum": 6
+            },
+            "scoreDeltaPointPpMinimum": 0,
+            "scoreDeltaLower95PpMinimum": -0.15,
+            "eachSeatDeltaPointPpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.1,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.03
+        },
+        "confirmation": {
+            "exposure": {
+                "strictEligibleMinimum": 400,
+                "screenedCloserProposalsMinimum": 100,
+                "retainedActualDifferencesMinimum": 80,
+                "retainedActualDifferenceGamesMinimum": 65,
+                "retainedActualDifferencesPerSeatMinimum": 20
+            },
+            "scoreDeltaPointPpMinimum": 0.01,
+            "scoreDeltaLower95PpMinimum": -0.05,
+            "directTreatmentScorePercentMinimum": 50,
+            "directTreatmentScoreLower95PercentMinimum": 49.9,
+            "eachSeatDeltaPointPpMinimum": 0,
+            "eachSeatDeltaLower95PpMinimum": -0.1,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.05,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.02
+        },
+        "remotePrimary": {
+            "exposure": {
+                "strictEligibleMinimum": 800,
+                "screenedCloserProposalsMinimum": 200,
+                "retainedActualDifferencesMinimum": 160,
+                "retainedActualDifferenceGamesMinimum": 130,
+                "retainedActualDifferencesPerSeatMinimum": 40
+            },
+            "scoreDeltaPointPpMinimum": 0.01,
+            "scoreDeltaLower95PpStrictlyGreaterThan": 0,
+            "directTreatmentScorePercentMinimum": 50,
+            "directTreatmentScoreLower95PercentMinimum": 49.95,
+            "eachSeatDeltaPointPpMinimum": 0,
+            "eachSeatDeltaLower95PpMinimum": -0.05,
+            "armageddonDeltaPointPpMaximum": 0,
+            "armageddonDeltaUpper95PpMaximum": 0.025,
+            "treatmentOnlyArmageddonInActualDifferenceGamesMaximum": 0,
+            "meanLapDeltaPointMaximum": 0,
+            "meanLapDeltaUpper95Maximum": 0.01,
+            "nonnegativeScoreShardMinimum": 3,
+            "shardCount": 4,
+            "perShardScoreDeltaPointPpMinimum": -0.05,
+            "perShardArmageddonDeltaPointPpMaximum": 0.05,
+            "perShardMeanLapDeltaPointMaximum": 0.02
+        }
+    },
+    "telemetryRequirements": {
+        "neutralComparisonInBothArms": ["strictEligible", "screenedCloserQualified", "filtered", "invalid", "selected"],
+        "perComparison": [
+            "strict and shipped executable action summaries",
+            "same declared target and visible aim edge",
+            "source-pinned retained-signature booleans computed from exact first-hit, affected-unit, and divisor arrays",
+            "strict divisorAfter, reachableThreatsAfter, target distances, screen, guard, and signature proof fields",
+            "shipped divisor, threat, distance, screen, guard, and signature proof fields are nullable exactly for a structurally valid shot-only fallback; otherwise they are typed and internally consistent",
+            "deterministic strict screeningGuardId; a moved shipped decision has internally consistent targetScreenedAfter and screeningGuardId, with null shipped guard required for dominant or selected screened_closer proposals",
+            "physical seat, actor, target, lap, retained, selected, and reason"
+        ],
+        "selectedStrictEvents": "Treatment only when screened_closer is true and selector is enabled.",
+        "actualDifferenceDefinition": "Strict and shipped completed decision summaries differ; identical actions never count as causal exposure."
+    },
+    "integrityGates": [
+        "Frozen clean pushed source head/tree and recomputed manifest fingerprints.",
+        "Complete unique game IDs and exact pair-seed formula.",
+        "Treatment/control geometry identical and only the screened-closer selector-off key differs.",
+        "Shipped-first then strict catalog order with the exact same cached route catalog and equal RNG tails.",
+        "Control selects zero strict decisions; at causally matched pre-divergence roots, objective catalog/comparison/RNG fields match after normalizing selected, retained, and the control environment.",
+        "Every selected decision satisfies every serialized screened-closer condition and has a different endpoint.",
+        "Pinned source plus focused tests prove the retained-signature and target-screen computations; artifacts serialize their fail-closed booleans rather than the full board state.",
+        "The declared action target and visible aim edge match across strict and shipped, and both retained-signature booleans are true.",
+        "Malformed, nonfinite, negative, or structurally inconsistent metadata fails closed and fails integrity; legitimate absent shipped move metadata and well-formed ineligible values are filtered without an integrity failure.",
+        "Exact shipped decision object and branch telemetry are preserved on every filter.",
+        "Every outcome, lap, or Armageddon difference has a retained screened-closer causal decision.",
+        "No-proposal games have identical core records; normalized records differ only by neutral diagnostics.",
+        "Zero rejected actions, stuck endings, turn caps, or other non-elimination endings."
+    ],
+    "phaseOrderAndNoPeek": {
+        "duringPhase": "Inspect process liveness and exact record counts only. Do not open logs, records, summaries, result lines, or one-arm statistics until both arms finish.",
+        "remoteBarrier": "For remotePrimary, all four treatment and all four control shards must exit successfully with exact counts before any of the eight logs, records, summaries, manifests, or outcome statistics are opened.",
+        "prePeekFailure": "Discard both arms and restart both on the same lane.",
+        "postPeekFailure": "The lane is burned.",
+        "prelaunchReceipt": "Before every phase, create a read-only JSON receipt outside all output directories containing candidate head/tree, protocol SHA-256, analyzer SHA-256 and self-test result, exact commands using --prelaunch-receipt with that receipt path, geometry, seed lane, output directories, and creation time. Compute its SHA-256 and publish that exact digest in the user-visible transcript before any phase artifact is created. The runner must hash the receipt bytes into every experiment manifest/fingerprint; the analyzer must verify that binding and require manifest/records/summary filesystem creation or modification times later than the receipt.",
+        "priorReceipt": "Every phase after pilot additionally requires the immediately preceding passing report and its SHA-256, published before the next prelaunch receipt and artifacts are created.",
+        "analyzerMutation": "Any analyzer byte change after prelaunch-receipt publication invalidates the phase. Before any outcome peek, discard all phase arms and restart with a newly published receipt; after any outcome peek, stop and create a new candidate and seed master.",
+        "gateFailure": "Stop the candidate. Do not launch the next phase.",
+        "underexposure": "Stop as underexposed; never relax the screen or distance rule and never extend adaptively.",
+        "codeConfigThresholdChange": "Creates a new candidate with a new seed master and preregistration.",
+        "forbidden": [
+            "optional stopping",
+            "cross-phase pooling",
+            "seed cherry-picking",
+            "post-hoc subgroup rescue",
+            "launching remote before confirmation passes"
+        ]
+    },
+    "promotionMeaning": {
+        "pilotScoutConfirmation": "Screening only.",
+        "remotePrimary": "Positive causal research qualification only.",
+        "defaultReadiness": "Not authorized without a separately preregistered bounded operational phase.",
+        "globalNearZeroArmageddonClaim": "Not tested by this feature-specific protocol.",
+        "projectileEndpointClaim": "Out of scope; renderer endpoint correctness requires separate client integration evidence."
+    }
+}

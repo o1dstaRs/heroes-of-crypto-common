@@ -11,10 +11,20 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../../src/ai";
+import {
+    getEnemiesCellsWithinMovementRange,
+    type IAIPolicyEvent,
+    type IDecisionContext,
+    type IV08SupportedBandAdvanceDetails,
+    type IV08SupportedBandDuelDecisionSummary,
+} from "../../src/ai";
 import { V08_DOMINANT_FINISH_START_LAP, V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
+import {
+    compareV08SupportedBandScreenedCloser,
+    type IV08ProtectedAdvanceCatalogMetadata,
+} from "../../src/ai/versions/v0_8_ranged_positioning";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -353,6 +363,7 @@ function setupSupportedBandAdvance(
         guardRanged?: boolean;
         includeGuard?: boolean;
         shotDistance?: number;
+        shooterSpeed?: number;
         shooterAbilities?: string[];
         targetCanCounter?: boolean;
         targetRanged?: boolean;
@@ -375,7 +386,7 @@ function setupSupportedBandAdvance(
         team: LOWER,
         name: "Band archer",
         attackType: RANGE,
-        speed: 1,
+        speed: options.shooterSpeed ?? 1,
         rangeShots: 8,
         shotDistance: options.shotDistance ?? 5,
         damageMin: 10,
@@ -479,6 +490,79 @@ function setupSupportedBandAdvance(
     return { shooter, target, guard, context, destination };
 }
 
+function setupScreenedCloserDuel(sameRoute = false): {
+    shooter: Unit;
+    target: Unit;
+    guard: Unit;
+    context: IDecisionContext;
+    strictDestination: XY;
+    shippedDestination: XY;
+    getCatalogCalls: () => number;
+} {
+    const setup = setupSupportedBandAdvance({
+        guardCell: { x: 1, y: 4 },
+        shooterSpeed: 3,
+        shotDistance: 6.3,
+        targetCell: { x: 5, y: 0 },
+    });
+    if (!setup.guard) throw new Error("screened-closer fixture requires a native guard");
+    const strictDestination = { x: 2, y: 5 };
+    const shippedDestination = sameRoute ? strictDestination : { x: 5, y: 6 };
+    const strictRoute = {
+        cell: strictDestination,
+        route: [{ x: 4, y: 6 }, { x: 3, y: 5 }, strictDestination],
+        weight: 2,
+        firstAggrMet: false,
+        hasLavaCell: false,
+        hasWaterCell: false,
+    };
+    const shippedRoute = sameRoute
+        ? strictRoute
+        : {
+              cell: shippedDestination,
+              route: [shippedDestination],
+              weight: 1,
+              firstAggrMet: false,
+              hasLavaCell: false,
+              hasWaterCell: false,
+          };
+    const routes = sameRoute ? [strictRoute] : [shippedRoute, strictRoute];
+    const movePath = {
+        cells: routes.map(({ cell }) => cell),
+        hashes: new Set(routes.map(({ cell }) => (cell.x << 4) | cell.y)),
+        knownPaths: new Map(routes.map((route) => [(route.cell.x << 4) | route.cell.y, [route]])),
+    };
+    let catalogCalls = 0;
+    setup.context.pathHelper = {
+        getMovePath: () => {
+            catalogCalls += 1;
+            getRandomInt(0, 1_000_000);
+            return movePath;
+        },
+    } as unknown as PathHelper;
+    setup.context.decisionOrigin = "root";
+    return {
+        shooter: setup.shooter,
+        target: setup.target,
+        guard: setup.guard,
+        context: setup.context,
+        strictDestination,
+        shippedDestination,
+        getCatalogCalls: () => catalogCalls,
+    };
+}
+
+function enableScreenedCloserOverlay(): void {
+    process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+    process.env.V08_RANGED_POSITION_MODE = "both";
+    process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+    process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+    process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS = "v0.8";
+}
+
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
@@ -499,6 +583,8 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY;
     delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_MODE;
@@ -852,7 +938,7 @@ describe("v0.8 protected ranged positioning", () => {
     it("strictly closes one damage band at a root only behind an exact native melee screen", () => {
         process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
         process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
-        const { shooter, target, context, destination } = setupSupportedBandAdvance();
+        const { shooter, target, guard, context, destination } = setupSupportedBandAdvance();
         context.decisionOrigin = "root";
         const policyEvents: IAIPolicyEvent[] = [];
         context.policyEventObserver = (event) => policyEvents.push(event);
@@ -896,6 +982,9 @@ describe("v0.8 protected ranged positioning", () => {
             minEnemyDistanceAfter: 5,
             rangedSuperior: false,
             finishActive: false,
+            targetScreenedAfter: true,
+            screeningGuardId: guard?.getId() ?? null,
+            retainedSignatureAfter: true,
         });
     });
 
@@ -1459,6 +1548,318 @@ describe("v0.8 protected ranged positioning", () => {
         expect(treatment.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_duel_difference");
         expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
         expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+    });
+
+    it("selects only the native-screened closer route with matched control catalogs and RNG tails", () => {
+        enableScreenedCloserOverlay();
+        const run = (arm: "treatment" | "control" | "shipped") => {
+            if (arm === "control") {
+                process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS = "v0.8";
+            } else {
+                delete process.env.V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS;
+            }
+            const fixture = setupScreenedCloserDuel();
+            const events: IAIPolicyEvent[] = [];
+            fixture.context.policyEventObserver = (event) => events.push(event);
+            setDeterministicRandomSource(makeRng(0x5c4eeaed));
+            const actions = (arm === "shipped" ? new StrategyV0_8S() : new StrategyV0_8()).decideTurn(
+                fixture.shooter,
+                fixture.context,
+            );
+            return {
+                actions,
+                events,
+                fixture,
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const treatment = run("treatment");
+        const control = run("control");
+        const shipped = run("shipped");
+        expect(treatment.actions.find(({ type }) => type === "move_unit")?.targetCells?.[0]).toEqual(
+            treatment.fixture.strictDestination,
+        );
+        expect(control.actions.find(({ type }) => type === "move_unit")?.targetCells?.[0]).toEqual(
+            control.fixture.shippedDestination,
+        );
+        expect(shipped.actions.find(({ type }) => type === "move_unit")?.targetCells?.[0]).toEqual(
+            shipped.fixture.shippedDestination,
+        );
+        expect(treatment.fixture.getCatalogCalls()).toBe(2);
+        expect(control.fixture.getCatalogCalls()).toBe(2);
+        expect(shipped.fixture.getCatalogCalls()).toBe(2);
+        expect(treatment.tail).toEqual(control.tail);
+        expect(treatment.tail).toEqual(shipped.tail);
+
+        const treatmentComparison = treatment.events.find(
+            ({ kind }) => kind === "v0.8_supported_band_screened_closer_comparison",
+        );
+        const controlComparison = control.events.find(
+            ({ kind }) => kind === "v0.8_supported_band_screened_closer_comparison",
+        );
+        expect(treatmentComparison?.kind).toBe("v0.8_supported_band_screened_closer_comparison");
+        expect(controlComparison?.kind).toBe("v0.8_supported_band_screened_closer_comparison");
+        if (
+            treatmentComparison?.kind !== "v0.8_supported_band_screened_closer_comparison" ||
+            controlComparison?.kind !== "v0.8_supported_band_screened_closer_comparison"
+        ) {
+            throw new Error("missing matched screened-closer comparison");
+        }
+        expect(treatmentComparison.details).toMatchObject({
+            selected: true,
+            dominant: true,
+            metadataValid: true,
+            reason: "screened_closer",
+            strictDivisorAfter: 1,
+            strictReachableThreatsAfter: 0,
+            strictTargetDistanceBefore: 7,
+            strictTargetDistanceAfter: 5,
+            strictTargetScreenedAfter: true,
+            strictScreeningGuardId: treatment.fixture.guard.getId(),
+            strictRetainedSignatureAfter: true,
+            shippedDivisorAfter: 1,
+            shippedReachableThreatsAfter: 0,
+            shippedTargetDistanceBefore: 7,
+            shippedTargetDistanceAfter: 6,
+            shippedTargetScreenedAfter: false,
+            shippedScreeningGuardId: null,
+            shippedRetainedSignatureAfter: true,
+        });
+        expect(controlComparison.details).toMatchObject({
+            selected: false,
+            dominant: true,
+            metadataValid: true,
+            reason: "screened_closer",
+        });
+        expect(
+            treatment.events
+                .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+                .map(({ stage }) => stage)
+                .filter((stage) => stage?.startsWith("screened_closer_")),
+        ).toEqual(["screened_closer_eligible", "screened_closer_dominant"]);
+        expect(
+            control.events
+                .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+                .map(({ stage }) => stage)
+                .filter((stage) => stage?.startsWith("screened_closer_")),
+        ).toEqual(["screened_closer_eligible", "screened_closer_dominant"]);
+        expect(treatment.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_duel_difference");
+        expect(control.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        expect(shipped.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_screened_closer_comparison");
+    });
+
+    it("filters a same-route screened-closer comparison without manufacturing a decision difference", () => {
+        enableScreenedCloserOverlay();
+        const fixture = setupScreenedCloserDuel(true);
+        const events: IAIPolicyEvent[] = [];
+        fixture.context.policyEventObserver = (event) => events.push(event);
+        const actions = new StrategyV0_8().decideTurn(fixture.shooter, fixture.context);
+        const comparison = events.find(({ kind }) => kind === "v0.8_supported_band_screened_closer_comparison");
+
+        expect(actions.find(({ type }) => type === "move_unit")?.targetCells?.[0]).toEqual(fixture.shippedDestination);
+        expect(comparison?.kind).toBe("v0.8_supported_band_screened_closer_comparison");
+        if (comparison?.kind !== "v0.8_supported_band_screened_closer_comparison") {
+            throw new Error("missing same-route screened-closer comparison");
+        }
+        expect(comparison.details).toMatchObject({
+            selected: false,
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strictTargetScreenedAfter: true,
+            shippedTargetScreenedAfter: true,
+        });
+        expect(comparison.details.strict).toEqual(comparison.details.shipped);
+        expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        expect(
+            events
+                .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+                .map(({ stage }) => stage)
+                .filter((stage) => stage?.startsWith("screened_closer_")),
+        ).toEqual(["screened_closer_eligible", "screened_closer_filtered"]);
+    });
+
+    it("separates valid screened-closer filters from malformed catalog integrity failures", () => {
+        const strictDetails: IV08SupportedBandAdvanceDetails = {
+            fromCell: { x: 5, y: 7 },
+            toCell: { x: 5, y: 4 },
+            targetId: "target",
+            targetCreatureName: "Target",
+            exposureBefore: 0,
+            exposureAfter: 0,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 3,
+            minEnemyDistanceBefore: 6,
+            minEnemyDistanceAfter: 3,
+            rangedSuperior: false,
+            finishActive: false,
+            targetScreenedAfter: true,
+            screeningGuardId: "guard",
+            retainedSignatureAfter: true,
+        };
+        const summary = (destination: XY, path: XY[]): IV08SupportedBandDuelDecisionSummary => ({
+            actionTypes: ["move_unit", "range_attack"],
+            movePath: path,
+            moveTargetCells: [destination],
+            moveHasLavaCell: false,
+            moveHasWaterCell: false,
+            rangeTargetId: "target",
+            rangeAimCell: { x: 5, y: 1 },
+            rangeAimSide: 0,
+        });
+        const strictSummary = summary(strictDetails.toCell, [
+            { x: 5, y: 6 },
+            { x: 5, y: 5 },
+            { x: 5, y: 4 },
+        ]);
+        const shippedSummary = summary({ x: 9, y: 2 }, [
+            { x: 6, y: 6 },
+            { x: 7, y: 5 },
+            { x: 8, y: 4 },
+            { x: 9, y: 3 },
+            { x: 9, y: 2 },
+        ]);
+        const shippedMetadata: IV08ProtectedAdvanceCatalogMetadata = {
+            fromCell: { ...strictDetails.fromCell },
+            toCell: { x: 9, y: 2 },
+            targetId: strictDetails.targetId,
+            targetCreatureName: strictDetails.targetCreatureName,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            ownRangedOutput: 80,
+            enemyRangedOutput: 20,
+            finishActive: false,
+            reachableThreatsAfter: 0,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 4,
+            targetScreenedAfter: false,
+            screeningGuardId: null,
+            retainedSignatureAfter: true,
+        };
+        expect(
+            compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, shippedMetadata, shippedSummary),
+        ).toMatchObject({ dominant: true, metadataValid: true, reason: "screened_closer" });
+        const shotOnlySummary: IV08SupportedBandDuelDecisionSummary = {
+            actionTypes: ["range_attack"],
+            movePath: null,
+            moveTargetCells: null,
+            moveHasLavaCell: null,
+            moveHasWaterCell: null,
+            rangeTargetId: "target",
+            rangeAimCell: { x: 5, y: 1 },
+            rangeAimSide: 0,
+        };
+        const validFilters: Array<
+            readonly [
+                IV08SupportedBandAdvanceDetails,
+                IV08ProtectedAdvanceCatalogMetadata | undefined,
+                IV08SupportedBandDuelDecisionSummary,
+            ]
+        > = [
+            [strictDetails, undefined, shotOnlySummary],
+            [strictDetails, { ...shippedMetadata, retainedSignatureAfter: false }, shippedSummary],
+            [
+                strictDetails,
+                {
+                    ...shippedMetadata,
+                    targetDistanceAfter: shippedMetadata.targetDistanceBefore,
+                },
+                shippedSummary,
+            ],
+            [strictDetails, { ...shippedMetadata, reachableThreatsAfter: 1 }, shippedSummary],
+            [
+                strictDetails,
+                {
+                    ...shippedMetadata,
+                    targetScreenedAfter: true,
+                    screeningGuardId: "shipped-guard",
+                },
+                shippedSummary,
+            ],
+            [
+                strictDetails,
+                {
+                    ...shippedMetadata,
+                    toCell: { ...strictDetails.toCell },
+                    targetDistanceAfter: strictDetails.targetDistanceAfter,
+                },
+                strictSummary,
+            ],
+            [
+                { ...strictDetails, divisorBefore: 4 },
+                { ...shippedMetadata, divisorBefore: 4, divisorAfter: 2 },
+                shippedSummary,
+            ],
+        ];
+        for (const [details, metadata, decision] of validFilters) {
+            expect(compareV08SupportedBandScreenedCloser(details, strictSummary, metadata, decision)).toMatchObject({
+                dominant: false,
+                metadataValid: true,
+                reason: "filtered",
+            });
+        }
+        for (const malformed of [
+            { ...shippedMetadata, divisorAfter: shippedMetadata.divisorBefore },
+            { ...shippedMetadata, targetScreenedAfter: false, screeningGuardId: "impossible-guard" },
+            { ...shippedMetadata, targetDistanceBefore: shippedMetadata.targetDistanceBefore + 1 },
+            { ...shippedMetadata, fromCell: { x: 16, y: 7 } },
+        ]) {
+            expect(
+                compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, malformed, shippedSummary),
+            ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        }
+        expect(
+            compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, undefined, shippedSummary),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                {
+                    ...strictSummary,
+                    movePath: [...strictSummary.movePath!, { x: Number.POSITIVE_INFINITY, y: 4 }],
+                    rangeAimSide: 7,
+                },
+                shippedMetadata,
+                shippedSummary,
+            ),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+    });
+
+    it("executes the screened-closer move and retained shot through the authoritative action engine", () => {
+        enableScreenedCloserOverlay();
+        const { shooter, target, context, strictDestination } = setupScreenedCloserDuel();
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
+        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        shooter.refreshPossibleAttackTypes(
+            context.attackHandler!.canLandRangeAttack(
+                shooter,
+                context.grid.getEnemyAggrMatrixByUnitId(shooter.getId()),
+            ),
+        );
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+        const hpBefore = target.getCumulativeHp();
+        const results = actions.map((action) => engine.apply(action));
+
+        expect(actions.map(({ type }) => type)).toEqual(["move_unit", "range_attack"]);
+        expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [strictDestination] });
+        expect(results.every(({ completed }) => completed)).toBe(true);
+        expect(target.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("does not duplicate pinned retreat after duel branch selection", () => {

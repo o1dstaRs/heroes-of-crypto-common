@@ -31,12 +31,14 @@ export type {
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
     IV08SupportedBandDominanceComparisonDetails,
+    IV08SupportedBandScreenedCloserComparisonDetails,
     IV08SupportedBandDuelDecisionSummary,
     IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandDominanceReason,
+    V08SupportedBandScreenedCloserReason,
     V08SupportedBandDuelDifference,
 } from "./ai_strategy";
 

@@ -16,7 +16,7 @@ import {
     getPositionForCell,
     getPositionForCells,
     getRangeAttackSideCenter,
-    type RangeAttackCellSide,
+    RangeAttackCellSide,
 } from "../../grid/grid_math";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
@@ -24,11 +24,14 @@ import { canUnitLandAt } from "../ai";
 import type {
     IAIPolicyEvent,
     IDecisionContext,
+    IV08SupportedBandAdvanceDetails,
     IV08SupportedBandDominanceComparisonDetails,
+    IV08SupportedBandScreenedCloserComparisonDetails,
     IV08SupportedBandDuelDecisionSummary,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandDominanceReason,
+    V08SupportedBandScreenedCloserReason,
     V08SupportedBandDuelDifference,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
@@ -64,6 +67,9 @@ const SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_
 const SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS_ENV =
     "V08_SUPPORTED_BAND_ADVANCE_DOMINANCE_OVERLAY_CONTROL_VERSIONS";
+const SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS_ENV = "V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS";
+const SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS_ENV =
+    "V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS";
 const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
 const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
 const PROTECTED_ADVANCE_GUARDRAILS_MODE_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_MODE";
@@ -92,7 +98,7 @@ interface IRouteView {
     readonly futureDivisor: number;
 }
 
-interface IProtectedAdvanceMetadata {
+export interface IV08ProtectedAdvanceCatalogMetadata {
     readonly fromCell: XY;
     readonly toCell: XY;
     readonly targetId: string;
@@ -103,11 +109,16 @@ interface IProtectedAdvanceMetadata {
     readonly enemyRangedOutput: number;
     readonly finishActive: boolean;
     readonly reachableThreatsAfter: number;
+    readonly targetDistanceBefore: number;
+    readonly targetDistanceAfter: number;
+    readonly targetScreenedAfter: boolean;
+    readonly screeningGuardId: string | null;
+    readonly retainedSignatureAfter: boolean;
 }
 
 interface IProtectedAdvanceCatalog {
     readonly decision: GameAction[];
-    readonly metadata?: IProtectedAdvanceMetadata;
+    readonly metadata?: IV08ProtectedAdvanceCatalogMetadata;
 }
 
 const cellDistance = (left: readonly XY[], right: readonly XY[]): number => {
@@ -773,11 +784,13 @@ function supportedBandAdvance(
     let best: IRouteView | undefined;
     let bestDivisor = currentDivisor;
     let bestTargetDistance = currentTargetDistance;
+    let bestScreeningGuardId: string | null = null;
     for (const route of routes) {
         const view = routeView(unit, context, route, enemies, guards);
         if (!view || view.protection.reachableThreats !== 0) continue;
         hasZeroExposureRoute = true;
-        if (!guards.some((guard) => allyScreensThreat(view.footprint, guard, target))) continue;
+        const screeningGuard = guards.find((guard) => allyScreensThreat(view.footprint, guard, target));
+        if (!screeningGuard) continue;
         hasTargetScreenedRoute = true;
         const targetDistance = cellDistance(view.footprint, target.getCells());
         if (targetDistance >= currentTargetDistance) continue;
@@ -813,6 +826,7 @@ function supportedBandAdvance(
             best = view;
             bestDivisor = divisor;
             bestTargetDistance = targetDistance;
+            bestScreeningGuardId = screeningGuard.getId();
         }
     }
     if (hasZeroExposureRoute) emitFunnel("zero_exposure_route");
@@ -843,6 +857,9 @@ function supportedBandAdvance(
             minEnemyDistanceAfter: best.minEnemyDistance,
             rangedSuperior,
             finishActive,
+            targetScreenedAfter: bestScreeningGuardId !== null,
+            screeningGuardId: bestScreeningGuardId,
+            retainedSignatureAfter: true,
         },
     });
     return [moveAction(unit, best.route, best.footprint), shot];
@@ -944,6 +961,7 @@ function protectedAdvanceShotCatalog(
     const frontliners = context.unitsHolder
         .getAllAllies(unit.getTeam())
         .filter((ally) => !ally.isDead() && ally.getId() !== unit.getId() && isFrontline(ally));
+    const nativeGuards = nativeMeleeGuards(unit, context);
     const settings = context.grid.getSettings();
     const currentOrigin = unit.getPosition();
     const currentTargetPosition = getRangeAttackSideCenter(
@@ -968,6 +986,7 @@ function protectedAdvanceShotCatalog(
     if (currentDivisor <= 1) {
         return { decision };
     }
+    const currentTargetDistance = cellDistance(unit.getCells(), target.getCells());
 
     let currentResponseDivisor: number | undefined;
     if (targetCanCounter) {
@@ -1000,6 +1019,8 @@ function protectedAdvanceShotCatalog(
 
     let best: IRouteView | undefined;
     let bestDivisor = currentDivisor;
+    let bestTargetDistance = currentTargetDistance;
+    let bestRetainedSignatureAfter = false;
     for (const route of reachableRoutes(unit, context)) {
         const view = routeView(unit, context, route, enemies, frontliners);
         if (!view) {
@@ -1036,6 +1057,8 @@ function protectedAdvanceShotCatalog(
         if (divisor >= currentDivisor) {
             continue;
         }
+        const targetDistance = cellDistance(view.footprint, target.getCells());
+        const retainedSignatureAfter = hasSameNonRegressingRangeSignature(currentEvaluation, evaluation);
         if (targetCanCounter) {
             // Trace the future counter-shot through the unchanged board to the empty destination. Any existing
             // unit or mountain on that ray makes the hypothetical ambiguous, so fail closed. If the ray is
@@ -1061,6 +1084,8 @@ function protectedAdvanceShotCatalog(
         if (!best || preferAdvance(view, divisor, best, bestDivisor)) {
             best = view;
             bestDivisor = divisor;
+            bestTargetDistance = targetDistance;
+            bestRetainedSignatureAfter = retainedSignatureAfter;
         }
     }
     if (!best) {
@@ -1075,6 +1100,7 @@ function protectedAdvanceShotCatalog(
             lap: context.fightProperties?.getCurrentLap() ?? 0,
         });
     }
+    const screeningGuard = nativeGuards.find((guard) => allyScreensThreat(best.footprint, guard, target));
     return {
         decision: [moveAction(unit, best.route, best.footprint), ...decision],
         metadata: {
@@ -1088,6 +1114,11 @@ function protectedAdvanceShotCatalog(
             enemyRangedOutput,
             finishActive,
             reachableThreatsAfter: best.protection.reachableThreats,
+            targetDistanceBefore: currentTargetDistance,
+            targetDistanceAfter: bestTargetDistance,
+            targetScreenedAfter: screeningGuard !== undefined,
+            screeningGuardId: screeningGuard?.getId() ?? null,
+            retainedSignatureAfter: bestRetainedSignatureAfter,
         },
     };
 }
@@ -1170,6 +1201,26 @@ interface ISupportedBandDominanceComparison {
     shippedReachableThreatsAfter: number | null;
 }
 
+interface ISupportedBandScreenedCloserComparison {
+    dominant: boolean;
+    metadataValid: boolean;
+    reason: V08SupportedBandScreenedCloserReason;
+    strictDivisorAfter: number | null;
+    strictReachableThreatsAfter: number | null;
+    strictTargetDistanceBefore: number | null;
+    strictTargetDistanceAfter: number | null;
+    strictTargetScreenedAfter: boolean | null;
+    strictScreeningGuardId: string | null;
+    strictRetainedSignatureAfter: boolean | null;
+    shippedDivisorAfter: number | null;
+    shippedReachableThreatsAfter: number | null;
+    shippedTargetDistanceBefore: number | null;
+    shippedTargetDistanceAfter: number | null;
+    shippedTargetScreenedAfter: boolean | null;
+    shippedScreeningGuardId: string | null;
+    shippedRetainedSignatureAfter: boolean | null;
+}
+
 const finiteNonnegativeCount = (value: unknown): number | null => {
     return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 };
@@ -1178,6 +1229,29 @@ const finitePositivePowerOfTwo = (value: unknown): number | null =>
     typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && Number.isInteger(Math.log2(value))
         ? value
         : null;
+
+const finiteBoolean = (value: unknown): boolean | null => (typeof value === "boolean" ? value : null);
+
+const nonemptyString = (value: unknown): string | null =>
+    typeof value === "string" && value.length > 0 ? value : null;
+
+const isSafeGridCell = (value: unknown): value is XY => {
+    if (typeof value !== "object" || value === null) return false;
+    const cell = value as Partial<XY>;
+    return (
+        Number.isSafeInteger(cell.x) &&
+        Number.isSafeInteger(cell.y) &&
+        cell.x! >= 0 &&
+        cell.x! < 16 &&
+        cell.y! >= 0 &&
+        cell.y! < 16
+    );
+};
+
+const sameCell = (left: XY, right: XY): boolean => left.x === right.x && left.y === right.y;
+
+const adjacentCell = (left: XY, right: XY): boolean =>
+    Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y)) === 1;
 
 const isMoveShotSummary = (summary: IV08SupportedBandDuelDecisionSummary): boolean =>
     summary.actionTypes.length === 2 &&
@@ -1200,6 +1274,15 @@ const isShotOnlySummary = (summary: IV08SupportedBandDuelDecisionSummary): boole
     summary.rangeAimCell !== null &&
     summary.rangeAimSide !== null;
 
+const isValidatedShotOnlySummary = (summary: IV08SupportedBandDuelDecisionSummary): boolean =>
+    isShotOnlySummary(summary) &&
+    summary.moveHasLavaCell === null &&
+    summary.moveHasWaterCell === null &&
+    isSafeGridCell(summary.rangeAimCell) &&
+    Number.isSafeInteger(summary.rangeAimSide) &&
+    summary.rangeAimSide! >= RangeAttackCellSide.LEFT &&
+    summary.rangeAimSide! <= RangeAttackCellSide.UP;
+
 const hasSameRangeAim = (
     strict: IV08SupportedBandDuelDecisionSummary,
     shipped: IV08SupportedBandDuelDecisionSummary,
@@ -1211,11 +1294,44 @@ const hasSameRangeAim = (
     strict.rangeAimCell.x === shipped.rangeAimCell.x &&
     strict.rangeAimCell.y === shipped.rangeAimCell.y;
 
+const summaryMovesTo = (summary: IV08SupportedBandDuelDecisionSummary, destination: XY): boolean =>
+    summary.moveTargetCells?.some((cell) => cell.x === destination.x && cell.y === destination.y) ?? false;
+
+const isValidatedMoveShotSummary = (
+    summary: IV08SupportedBandDuelDecisionSummary,
+    fromCell: XY,
+    toCell: XY,
+): boolean => {
+    if (
+        !isMoveShotSummary(summary) ||
+        !isSafeGridCell(fromCell) ||
+        !isSafeGridCell(toCell) ||
+        summary.moveHasLavaCell !== false ||
+        summary.moveHasWaterCell !== false ||
+        !summary.movePath?.every(isSafeGridCell) ||
+        !summary.moveTargetCells?.every(isSafeGridCell) ||
+        !isSafeGridCell(summary.rangeAimCell) ||
+        !Number.isSafeInteger(summary.rangeAimSide) ||
+        summary.rangeAimSide! < RangeAttackCellSide.LEFT ||
+        summary.rangeAimSide! > RangeAttackCellSide.UP ||
+        !summaryMovesTo(summary, toCell) ||
+        !sameCell(summary.movePath[summary.movePath.length - 1]!, toCell)
+    ) {
+        return false;
+    }
+    let prior = fromCell;
+    for (const cell of summary.movePath) {
+        if (!adjacentCell(prior, cell)) return false;
+        prior = cell;
+    }
+    return true;
+};
+
 /** Apply the preregistered dominance rules in order and fail closed on malformed catalog metadata. */
 function compareSupportedBandDominance(
     strictProposal: Extract<IAIPolicyEvent, { kind: "v0.8_supported_band_advance" }>,
     strictSummary: IV08SupportedBandDuelDecisionSummary,
-    shippedMetadata: IProtectedAdvanceMetadata | undefined,
+    shippedMetadata: IV08ProtectedAdvanceCatalogMetadata | undefined,
     shippedSummary: IV08SupportedBandDuelDecisionSummary,
 ): ISupportedBandDominanceComparison {
     const strictDivisorBefore = finitePositivePowerOfTwo(strictProposal.details.divisorBefore);
@@ -1290,6 +1406,129 @@ function compareSupportedBandDominance(
         strictReachableThreatsAfter,
         shippedDivisorAfter,
         shippedReachableThreatsAfter,
+    };
+}
+
+/**
+ * Compare the separately sealed screened-closer candidate. Structural validity is intentionally separate from
+ * qualification: ordinary shipped fallbacks and well-formed, non-qualifying advances are valid filtered controls.
+ * The selector changes the executable root only when both routes are full-damage and unreachable, strict alone has
+ * a native-melee target screen, shipped really closes, both signatures are retained, and strict is strictly closer.
+ */
+export function compareV08SupportedBandScreenedCloser(
+    strictDetails: IV08SupportedBandAdvanceDetails,
+    strictSummary: IV08SupportedBandDuelDecisionSummary,
+    shippedMetadata: IV08ProtectedAdvanceCatalogMetadata | undefined,
+    shippedSummary: IV08SupportedBandDuelDecisionSummary,
+): ISupportedBandScreenedCloserComparison {
+    const strictDivisorBefore = finitePositivePowerOfTwo(strictDetails.divisorBefore);
+    const strictDivisorAfter = finitePositivePowerOfTwo(strictDetails.divisorAfter);
+    const strictReachableThreatsBefore = finiteNonnegativeCount(strictDetails.exposureBefore);
+    const strictReachableThreatsAfter = finiteNonnegativeCount(strictDetails.exposureAfter);
+    const strictTargetDistanceBefore = finiteNonnegativeCount(strictDetails.targetDistanceBefore);
+    const strictTargetDistanceAfter = finiteNonnegativeCount(strictDetails.targetDistanceAfter);
+    const strictTargetScreenedAfter = finiteBoolean(strictDetails.targetScreenedAfter);
+    const strictScreeningGuardId = nonemptyString(strictDetails.screeningGuardId);
+    const strictRetainedSignatureAfter = finiteBoolean(strictDetails.retainedSignatureAfter);
+    const shippedDivisorBefore =
+        shippedMetadata === undefined ? null : finitePositivePowerOfTwo(shippedMetadata.divisorBefore);
+    const shippedDivisorAfter =
+        shippedMetadata === undefined ? null : finitePositivePowerOfTwo(shippedMetadata.divisorAfter);
+    const shippedReachableThreatsAfter =
+        shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.reachableThreatsAfter);
+    const shippedTargetDistanceBefore =
+        shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.targetDistanceBefore);
+    const shippedTargetDistanceAfter =
+        shippedMetadata === undefined ? null : finiteNonnegativeCount(shippedMetadata.targetDistanceAfter);
+    const shippedTargetScreenedAfter =
+        shippedMetadata === undefined ? null : finiteBoolean(shippedMetadata.targetScreenedAfter);
+    const shippedScreeningGuardId =
+        shippedMetadata === undefined ? null : nonemptyString(shippedMetadata.screeningGuardId);
+    const shippedRetainedSignatureAfter =
+        shippedMetadata === undefined ? null : finiteBoolean(shippedMetadata.retainedSignatureAfter);
+    const strictScreenMetadataValid = strictTargetScreenedAfter === true && strictScreeningGuardId !== null;
+    const shippedScreenMetadataStructurallyValid =
+        shippedMetadata !== undefined &&
+        shippedTargetScreenedAfter !== null &&
+        ((shippedTargetScreenedAfter === true && shippedScreeningGuardId !== null) ||
+            (shippedTargetScreenedAfter === false && shippedMetadata.screeningGuardId === null));
+    const targetIdentityValid =
+        nonemptyString(strictDetails.targetId) !== null &&
+        nonemptyString(strictDetails.targetCreatureName) !== null &&
+        strictSummary.rangeTargetId === strictDetails.targetId &&
+        shippedSummary.rangeTargetId === strictDetails.targetId &&
+        hasSameRangeAim(strictSummary, shippedSummary) &&
+        (shippedMetadata === undefined ||
+            (shippedMetadata.targetId === strictDetails.targetId &&
+                shippedMetadata.targetCreatureName === strictDetails.targetCreatureName));
+    const strictMetadataValid =
+        strictDivisorBefore !== null &&
+        strictDivisorAfter === 1 &&
+        strictDivisorBefore > strictDivisorAfter &&
+        strictReachableThreatsBefore !== null &&
+        strictReachableThreatsAfter === 0 &&
+        strictTargetDistanceBefore !== null &&
+        strictTargetDistanceAfter !== null &&
+        strictTargetDistanceAfter < strictTargetDistanceBefore &&
+        strictScreenMetadataValid &&
+        strictRetainedSignatureAfter === true &&
+        isValidatedMoveShotSummary(strictSummary, strictDetails.fromCell, strictDetails.toCell);
+    const shippedMetadataValid =
+        shippedMetadata === undefined
+            ? isValidatedShotOnlySummary(shippedSummary)
+            : shippedDivisorBefore !== null &&
+              shippedDivisorAfter !== null &&
+              shippedDivisorBefore === strictDivisorBefore &&
+              shippedDivisorAfter < shippedDivisorBefore &&
+              shippedReachableThreatsAfter !== null &&
+              shippedTargetDistanceBefore === strictTargetDistanceBefore &&
+              shippedTargetDistanceAfter !== null &&
+              shippedScreenMetadataStructurallyValid &&
+              shippedRetainedSignatureAfter !== null &&
+              typeof shippedMetadata.ownRangedOutput === "number" &&
+              Number.isFinite(shippedMetadata.ownRangedOutput) &&
+              shippedMetadata.ownRangedOutput >= 0 &&
+              typeof shippedMetadata.enemyRangedOutput === "number" &&
+              Number.isFinite(shippedMetadata.enemyRangedOutput) &&
+              shippedMetadata.enemyRangedOutput >= 0 &&
+              typeof shippedMetadata.finishActive === "boolean" &&
+              isValidatedMoveShotSummary(shippedSummary, shippedMetadata.fromCell, shippedMetadata.toCell) &&
+              sameCell(shippedMetadata.fromCell, strictDetails.fromCell);
+    const metadataValid = strictMetadataValid && shippedMetadataValid && targetIdentityValid;
+    const dominant =
+        metadataValid &&
+        shippedMetadata !== undefined &&
+        strictDivisorAfter === 1 &&
+        shippedDivisorAfter === 1 &&
+        strictReachableThreatsAfter === 0 &&
+        shippedReachableThreatsAfter === 0 &&
+        strictTargetScreenedAfter === true &&
+        shippedTargetScreenedAfter === false &&
+        strictRetainedSignatureAfter === true &&
+        shippedRetainedSignatureAfter === true &&
+        shippedTargetDistanceBefore !== null &&
+        shippedTargetDistanceAfter !== null &&
+        shippedTargetDistanceAfter < shippedTargetDistanceBefore &&
+        strictTargetDistanceAfter! < shippedTargetDistanceAfter! &&
+        !sameSupportedBandDuelDecision(strictSummary, shippedSummary);
+    return {
+        dominant,
+        metadataValid,
+        reason: dominant ? "screened_closer" : "filtered",
+        strictDivisorAfter,
+        strictReachableThreatsAfter,
+        strictTargetDistanceBefore,
+        strictTargetDistanceAfter,
+        strictTargetScreenedAfter,
+        strictScreeningGuardId,
+        strictRetainedSignatureAfter,
+        shippedDivisorAfter,
+        shippedReachableThreatsAfter,
+        shippedTargetDistanceBefore,
+        shippedTargetDistanceAfter,
+        shippedTargetScreenedAfter,
+        shippedScreeningGuardId,
+        shippedRetainedSignatureAfter,
     };
 }
 
@@ -1386,7 +1625,9 @@ function protectedAdvanceShotWithGuardrails(
  * dominance overlay selects one only when its divisor/exposure metadata objectively improves shipped; equal-quality
  * alternate paths preserve shipped. Each matched selector-off control still computes both catalogs but always
  * selects legacy. Branch events are buffered and only the selected policy's events are published, while neutral
- * dominance funnel stages expose eligible/dominant/filtered comparison counts in both matched arms.
+ * comparison funnel stages expose eligible/dominant/filtered counts in both matched arms. The independently
+ * sealed screened-closer overlay changes a root only for a strict native-screened route that is objectively closer
+ * than an unscreened shipped route at equal full damage and zero reach.
  */
 function supportedBandAdvanceVsLegacy(
     unit: Unit,
@@ -1431,6 +1672,18 @@ function supportedBandAdvanceVsLegacy(
             .map((value) => value.trim())
             .filter(Boolean),
     );
+    const screenedCloserOverlayVersions = new Set(
+        (process.env[SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const screenedCloserOverlayControlVersions = new Set(
+        (process.env[SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
     const selectsStrict = strictVersions.has(strategyVersion);
     const selectsLegacy = legacyVersions.has(strategyVersion);
     if (!selectsStrict && !selectsLegacy) return decision;
@@ -1459,18 +1712,33 @@ function supportedBandAdvanceVsLegacy(
     const selectsDominanceOverlay = selectsStrict && dominanceOverlayVersions.has(strategyVersion);
     const selectsDominanceOverlayControl =
         selectsDominanceOverlay && dominanceOverlayControlVersions.has(strategyVersion);
+    const selectsScreenedCloserOverlay = selectsStrict && screenedCloserOverlayVersions.has(strategyVersion);
+    const selectsScreenedCloserOverlayControl =
+        selectsScreenedCloserOverlay && screenedCloserOverlayControlVersions.has(strategyVersion);
     const strictSummary = supportedBandDuelDecisionSummary(strictDecision);
     const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
     const dominanceComparison =
         selectsDominanceOverlay && strictProposal
             ? compareSupportedBandDominance(strictProposal, strictSummary, legacyCatalog.metadata, shippedSummary)
             : undefined;
+    const screenedCloserComparison =
+        selectsScreenedCloserOverlay && strictProposal
+            ? compareV08SupportedBandScreenedCloser(
+                  strictProposal.details,
+                  strictSummary,
+                  legacyCatalog.metadata,
+                  shippedSummary,
+              )
+            : undefined;
     const strictDominatesShipped = dominanceComparison?.dominant ?? false;
+    const strictIsScreenedCloser = screenedCloserComparison?.dominant ?? false;
     const choosesStrict =
         selectsStrict &&
-        (selectsDominanceOverlay
-            ? !selectsDominanceOverlayControl && strictDominatesShipped
-            : !selectsStrictOverlay || (!selectsOverlayControl && strictProposal !== undefined));
+        (selectsScreenedCloserOverlay
+            ? !selectsScreenedCloserOverlayControl && strictIsScreenedCloser
+            : selectsDominanceOverlay
+              ? !selectsDominanceOverlayControl && strictDominatesShipped
+              : !selectsStrictOverlay || (!selectsOverlayControl && strictProposal !== undefined));
     const selectedDecision = choosesStrict ? strictDecision : legacyDecision;
     const selectedEvents = choosesStrict ? strictEvents : legacyEvents;
     for (const event of selectedEvents) context.policyEventObserver?.(event);
@@ -1500,6 +1768,53 @@ function supportedBandAdvanceVsLegacy(
         for (const stage of [
             "dominance_eligible",
             strictDominatesShipped ? "dominance_dominant" : "dominance_filtered",
+        ] as const) {
+            context.policyEventObserver?.({
+                kind: "v0.8_supported_band_advance_funnel",
+                unitId: unit.getId(),
+                creatureName: unit.getName(),
+                team: unit.getTeam(),
+                lap: context.fightProperties?.getCurrentLap() ?? 0,
+                stage,
+            });
+        }
+    }
+    if (strictProposal && screenedCloserComparison) {
+        const screenedCloserDetails: IV08SupportedBandScreenedCloserComparisonDetails = {
+            selected: choosesStrict,
+            dominant: screenedCloserComparison.dominant,
+            metadataValid: screenedCloserComparison.metadataValid,
+            reason: screenedCloserComparison.reason,
+            targetId: strictProposal.details.targetId,
+            targetCreatureName: strictProposal.details.targetCreatureName,
+            strict: strictSummary,
+            shipped: shippedSummary,
+            strictDivisorAfter: screenedCloserComparison.strictDivisorAfter,
+            strictReachableThreatsAfter: screenedCloserComparison.strictReachableThreatsAfter,
+            strictTargetDistanceBefore: screenedCloserComparison.strictTargetDistanceBefore,
+            strictTargetDistanceAfter: screenedCloserComparison.strictTargetDistanceAfter,
+            strictTargetScreenedAfter: screenedCloserComparison.strictTargetScreenedAfter,
+            strictScreeningGuardId: screenedCloserComparison.strictScreeningGuardId,
+            strictRetainedSignatureAfter: screenedCloserComparison.strictRetainedSignatureAfter,
+            shippedDivisorAfter: screenedCloserComparison.shippedDivisorAfter,
+            shippedReachableThreatsAfter: screenedCloserComparison.shippedReachableThreatsAfter,
+            shippedTargetDistanceBefore: screenedCloserComparison.shippedTargetDistanceBefore,
+            shippedTargetDistanceAfter: screenedCloserComparison.shippedTargetDistanceAfter,
+            shippedTargetScreenedAfter: screenedCloserComparison.shippedTargetScreenedAfter,
+            shippedScreeningGuardId: screenedCloserComparison.shippedScreeningGuardId,
+            shippedRetainedSignatureAfter: screenedCloserComparison.shippedRetainedSignatureAfter,
+        };
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_band_screened_closer_comparison",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: context.fightProperties?.getCurrentLap() ?? 0,
+            details: screenedCloserDetails,
+        });
+        for (const stage of [
+            "screened_closer_eligible",
+            strictIsScreenedCloser ? "screened_closer_dominant" : "screened_closer_filtered",
         ] as const) {
             context.policyEventObserver?.({
                 kind: "v0.8_supported_band_advance_funnel",

@@ -179,6 +179,8 @@ export function buildV08A13SearchEnvironment(
         V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS: "",
         V08_SUPPORTED_BAND_ADVANCE_OVERLAY_VERSIONS: "",
         V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
+        V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_CONTROL_VERSIONS: "",
+        V08_SUPPORTED_BAND_SCREENED_CLOSER_OVERLAY_VERSIONS: "",
         // Research-only strategy delta. Ordinary a13 construction records the global gate and selector as off;
         // paired runners may override both in their isolated child environment.
         V08_SUPPORTED_PREPIN_EGRESS: "0",

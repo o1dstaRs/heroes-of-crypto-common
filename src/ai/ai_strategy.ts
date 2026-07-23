@@ -67,6 +67,7 @@ export type AIPolicyEventKind =
     | "v0.8_supported_band_advance"
     | "v0.8_supported_band_advance_funnel"
     | "v0.8_supported_band_dominance_comparison"
+    | "v0.8_supported_band_screened_closer_comparison"
     | "v0.8_supported_band_duel_difference";
 
 export const V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES = [
@@ -134,6 +135,12 @@ export const V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES = [
     "dominance_dominant",
     /** Neutral matched-arm comparison: shipped is equal or better and therefore remains selected. */
     "dominance_filtered",
+    /** Neutral matched-arm comparison: strict proposed and shipped emitted a structurally consistent outcome. */
+    "screened_closer_eligible",
+    /** Neutral matched-arm comparison: strict is safely screened and objectively closer than shipped. */
+    "screened_closer_dominant",
+    /** Neutral matched-arm comparison: the screened-closer proof did not qualify or failed closed. */
+    "screened_closer_filtered",
 ] as const;
 
 export type V08SupportedBandAdvanceFunnelStage = (typeof V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES)[number];
@@ -192,6 +199,12 @@ export interface IV08SupportedPrepinEgressDetails {
 export interface IV08SupportedBandAdvanceDetails extends IV08SupportedPrepinEgressDetails {
     /** Whether v0.8's dominant or urgent anti-Armageddon finish sprint released the ranged-superiority hold. */
     finishActive: boolean;
+    /** Whether a native-melee ally screens the selected destination from the aimed target. */
+    targetScreenedAfter: boolean;
+    /** Stable identity of the native-melee target screen used by the selected route. */
+    screeningGuardId: string | null;
+    /** Whether the selected move preserves the incumbent shot's complete non-regressing hit signature. */
+    retainedSignatureAfter: boolean;
 }
 
 export type V08SupportedBandDuelDifference =
@@ -237,6 +250,37 @@ export interface IV08SupportedBandDominanceComparisonDetails {
     strictReachableThreatsAfter: number | null;
     shippedDivisorAfter: number | null;
     shippedReachableThreatsAfter: number | null;
+}
+
+export type V08SupportedBandScreenedCloserReason = "screened_closer" | "filtered";
+
+/** Neutral strict-vs-shipped proof for the separately sealed screened-closer overlay. */
+export interface IV08SupportedBandScreenedCloserComparisonDetails {
+    /** Whether the arm selected strict; false in the matched selector-off control. */
+    selected: boolean;
+    /** Objective comparison result before the matched control selector is applied. */
+    dominant: boolean;
+    /** False only for malformed or inconsistent geometry/metadata; a valid shipped shot-only fallback is true. */
+    metadataValid: boolean;
+    reason: V08SupportedBandScreenedCloserReason;
+    targetId: string;
+    targetCreatureName: string;
+    strict: IV08SupportedBandDuelDecisionSummary;
+    shipped: IV08SupportedBandDuelDecisionSummary;
+    strictDivisorAfter: number | null;
+    strictReachableThreatsAfter: number | null;
+    strictTargetDistanceBefore: number | null;
+    strictTargetDistanceAfter: number | null;
+    strictTargetScreenedAfter: boolean | null;
+    strictScreeningGuardId: string | null;
+    strictRetainedSignatureAfter: boolean | null;
+    shippedDivisorAfter: number | null;
+    shippedReachableThreatsAfter: number | null;
+    shippedTargetDistanceBefore: number | null;
+    shippedTargetDistanceAfter: number | null;
+    shippedTargetScreenedAfter: boolean | null;
+    shippedScreeningGuardId: string | null;
+    shippedRetainedSignatureAfter: boolean | null;
 }
 
 export type V08ProtectedAdvanceGuardrailReason = "ranged_superior_hold" | "partial_band";
@@ -296,6 +340,11 @@ export type IAIPolicyEvent =
           stage?: never;
       })
     | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_band_screened_closer_comparison";
+          details: IV08SupportedBandScreenedCloserComparisonDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
           kind: "v0.8_supported_prepin_egress";
           details: IV08SupportedPrepinEgressDetails;
           stage?: never;
@@ -313,6 +362,7 @@ export type IAIPolicyEvent =
               | "v0.8_supported_band_advance"
               | "v0.8_supported_band_advance_funnel"
               | "v0.8_supported_band_dominance_comparison"
+              | "v0.8_supported_band_screened_closer_comparison"
               | "v0.8_supported_band_duel_difference"
               | "v0.8_protected_advance_guardrail"
               | "v0.8_supported_prepin_egress"

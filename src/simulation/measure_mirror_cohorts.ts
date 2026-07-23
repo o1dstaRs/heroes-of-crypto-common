@@ -40,6 +40,7 @@ import {
     type IV08ProtectedAdvanceGuardrailDetails,
     type IV08SupportedBandAdvanceDetails,
     type IV08SupportedBandDominanceComparisonDetails,
+    type IV08SupportedBandScreenedCloserComparisonDetails,
     type IV08SupportedBandDuelDecisionSummary,
     type IV08SupportedBandDuelDetails,
     type IV08SupportedPrepinEgressDetails,
@@ -47,6 +48,7 @@ import {
     type V08ProtectedAdvanceGuardrailReason,
     type V08SupportedBandAdvanceFunnelStage,
     type V08SupportedBandDominanceReason,
+    type V08SupportedBandScreenedCloserReason,
     type V08SupportedBandDuelDifference,
     type V08SupportedPrepinEgressFunnelStage,
     type V08SupportedRangedEscapeFunnelStage,
@@ -188,6 +190,18 @@ export interface IMirrorSideDiag {
     supportedBandDominanceInvalidComparisons: number;
     /** Eligible comparisons split by the first satisfied preregistered dominance rule. */
     supportedBandDominanceComparisonsByReason: Record<V08SupportedBandDominanceReason, number>;
+    /** Strict proposals eligible for the independently sealed screened-closer comparison. */
+    supportedBandScreenedCloserEligibleComparisons: number;
+    /** Eligible comparisons whose strict route satisfies the complete screened-closer proof. */
+    supportedBandScreenedCloserDominantComparisons: number;
+    /** Eligible comparisons retained on shipped because the proof failed closed. */
+    supportedBandScreenedCloserFilteredComparisons: number;
+    /** Proven comparisons whose treatment selector chose strict. */
+    supportedBandScreenedCloserSelectedComparisons: number;
+    /** Comparisons rejected for malformed/inconsistent metadata; valid shipped shot-only fallbacks are excluded. */
+    supportedBandScreenedCloserInvalidComparisons: number;
+    /** Screened-closer comparisons split by objective result. */
+    supportedBandScreenedCloserComparisonsByReason: Record<V08SupportedBandScreenedCloserReason, number>;
     /** Strict-vs-shipped root decision differences retained after a13 arbitration. */
     supportedBandDuelDifferenceSelections: number;
     /** Pre-search strict-vs-shipped root decision differences. */
@@ -264,6 +278,16 @@ const newSupportedBandDominanceReasonCounts = (): Record<V08SupportedBandDominan
     filtered: 0,
 });
 
+const SUPPORTED_BAND_SCREENED_CLOSER_REASONS: readonly V08SupportedBandScreenedCloserReason[] = [
+    "screened_closer",
+    "filtered",
+];
+
+const newSupportedBandScreenedCloserReasonCounts = (): Record<V08SupportedBandScreenedCloserReason, number> => ({
+    screened_closer: 0,
+    filtered: 0,
+});
+
 const PROTECTED_ADVANCE_GUARDRAIL_REASONS: readonly V08ProtectedAdvanceGuardrailReason[] = [
     "ranged_superior_hold",
     "partial_band",
@@ -290,6 +314,8 @@ export interface IMirrorGameRecord {
     supportedBandAdvanceEvents?: IMirrorSupportedBandAdvanceEvent[];
     /** Neutral dominance comparisons; retained marks the comparison attached to the search-selected incumbent. */
     supportedBandDominanceComparisonEvents?: IMirrorSupportedBandDominanceComparisonEvent[];
+    /** Neutral screened-closer comparisons; retained marks the comparison attached to the selected incumbent. */
+    supportedBandScreenedCloserComparisonEvents?: IMirrorSupportedBandScreenedCloserComparisonEvent[];
     /** Strict-vs-shipped decision differences; retained marks the incumbent that survived search. */
     supportedBandDuelDifferenceEvents?: IMirrorSupportedBandDuelDifferenceEvent[];
     /** Root veto proposals; retained marks the one surviving search. Omitted when none to keep JSONL compact. */
@@ -317,6 +343,14 @@ export interface IMirrorSupportedBandAdvanceEvent extends IV08SupportedBandAdvan
 }
 
 export interface IMirrorSupportedBandDominanceComparisonEvent extends IV08SupportedBandDominanceComparisonDetails {
+    side: "green" | "red";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    retained: boolean;
+}
+
+export interface IMirrorSupportedBandScreenedCloserComparisonEvent extends IV08SupportedBandScreenedCloserComparisonDetails {
     side: "green" | "red";
     unitId: string;
     creatureName: string;
@@ -450,6 +484,12 @@ function newSideDiag(version: string): IMirrorSideDiag {
         supportedBandDominanceSelectedComparisons: 0,
         supportedBandDominanceInvalidComparisons: 0,
         supportedBandDominanceComparisonsByReason: newSupportedBandDominanceReasonCounts(),
+        supportedBandScreenedCloserEligibleComparisons: 0,
+        supportedBandScreenedCloserDominantComparisons: 0,
+        supportedBandScreenedCloserFilteredComparisons: 0,
+        supportedBandScreenedCloserSelectedComparisons: 0,
+        supportedBandScreenedCloserInvalidComparisons: 0,
+        supportedBandScreenedCloserComparisonsByReason: newSupportedBandScreenedCloserReasonCounts(),
         supportedBandDuelDifferenceSelections: 0,
         supportedBandDuelDifferenceProposals: 0,
         supportedBandDuelDifferenceSelectionsByDifference: newSupportedBandDuelDifferenceCounts(),
@@ -498,6 +538,11 @@ export function playMirrorGame(
     const bandAdvanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandAdvanceEvent>();
     const supportedBandDominanceComparisonEvents: IMirrorSupportedBandDominanceComparisonEvent[] = [];
     const bandDominanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandDominanceComparisonEvent>();
+    const supportedBandScreenedCloserComparisonEvents: IMirrorSupportedBandScreenedCloserComparisonEvent[] = [];
+    const bandScreenedCloserRecordByEvent = new WeakMap<
+        IAIPolicyEvent,
+        IMirrorSupportedBandScreenedCloserComparisonEvent
+    >();
     const supportedBandDuelDifferenceEvents: IMirrorSupportedBandDuelDifferenceEvent[] = [];
     const bandDuelDifferenceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandDuelDifferenceEvent>();
     const protectedAdvanceGuardrailEvents: IMirrorProtectedAdvanceGuardrailEvent[] = [];
@@ -553,6 +598,9 @@ export function playMirrorGame(
                   if (proposal) proposal.retained = true;
               } else if (event.kind === "v0.8_supported_band_dominance_comparison") {
                   const proposal = bandDominanceRecordByEvent.get(event);
+                  if (proposal) proposal.retained = true;
+              } else if (event.kind === "v0.8_supported_band_screened_closer_comparison") {
+                  const proposal = bandScreenedCloserRecordByEvent.get(event);
                   if (proposal) proposal.retained = true;
               } else if (event.kind === "v0.8_supported_band_duel_difference") {
                   side.supportedBandDuelDifferenceSelections += 1;
@@ -626,6 +674,25 @@ export function playMirrorGame(
                   };
                   supportedBandDominanceComparisonEvents.push(proposal);
                   bandDominanceRecordByEvent.set(event, proposal);
+              } else if (event.kind === "v0.8_supported_band_screened_closer_comparison") {
+                  side.supportedBandScreenedCloserEligibleComparisons += 1;
+                  if (event.details.dominant) side.supportedBandScreenedCloserDominantComparisons += 1;
+                  else side.supportedBandScreenedCloserFilteredComparisons += 1;
+                  if (event.details.selected) side.supportedBandScreenedCloserSelectedComparisons += 1;
+                  if (!event.details.metadataValid) side.supportedBandScreenedCloserInvalidComparisons += 1;
+                  side.supportedBandScreenedCloserComparisonsByReason[event.details.reason] += 1;
+                  const proposal: IMirrorSupportedBandScreenedCloserComparisonEvent = {
+                      ...event.details,
+                      strict: detachSupportedBandDuelDecision(event.details.strict),
+                      shipped: detachSupportedBandDuelDecision(event.details.shipped),
+                      side: event.team === GREEN_TEAM ? "green" : "red",
+                      unitId: event.unitId,
+                      creatureName: event.creatureName,
+                      lap: event.lap,
+                      retained: false,
+                  };
+                  supportedBandScreenedCloserComparisonEvents.push(proposal);
+                  bandScreenedCloserRecordByEvent.set(event, proposal);
               } else if (event.kind === "v0.8_supported_band_duel_difference") {
                   side.supportedBandDuelDifferenceProposals += 1;
                   side.supportedBandDuelDifferenceProposalsByDifference[event.details.difference] += 1;
@@ -768,6 +835,7 @@ export function playMirrorGame(
         ...(supportedRangedEscapeEvents.length ? { supportedRangedEscapeEvents } : {}),
         ...(supportedBandAdvanceEvents.length ? { supportedBandAdvanceEvents } : {}),
         ...(supportedBandDominanceComparisonEvents.length ? { supportedBandDominanceComparisonEvents } : {}),
+        ...(supportedBandScreenedCloserComparisonEvents.length ? { supportedBandScreenedCloserComparisonEvents } : {}),
         ...(supportedBandDuelDifferenceEvents.length ? { supportedBandDuelDifferenceEvents } : {}),
         ...(protectedAdvanceGuardrailEvents.length ? { protectedAdvanceGuardrailEvents } : {}),
         ...(supportedPrepinEgressEvents.length ? { supportedPrepinEgressEvents } : {}),
@@ -869,6 +937,12 @@ interface IVersionAggregate {
     supportedBandDominanceSelectedComparisons: number;
     supportedBandDominanceInvalidComparisons: number;
     supportedBandDominanceComparisonsByReason: Record<V08SupportedBandDominanceReason, number>;
+    supportedBandScreenedCloserEligibleComparisons: number;
+    supportedBandScreenedCloserDominantComparisons: number;
+    supportedBandScreenedCloserFilteredComparisons: number;
+    supportedBandScreenedCloserSelectedComparisons: number;
+    supportedBandScreenedCloserInvalidComparisons: number;
+    supportedBandScreenedCloserComparisonsByReason: Record<V08SupportedBandScreenedCloserReason, number>;
     supportedBandDuelDifferenceSelections: number;
     supportedBandDuelDifferenceProposals: number;
     supportedBandDuelDifferenceSelectionsByDifference: Record<V08SupportedBandDuelDifference, number>;
@@ -922,6 +996,12 @@ export function aggregateMirrorDiag(
                 supportedBandDominanceSelectedComparisons: 0,
                 supportedBandDominanceInvalidComparisons: 0,
                 supportedBandDominanceComparisonsByReason: newSupportedBandDominanceReasonCounts(),
+                supportedBandScreenedCloserEligibleComparisons: 0,
+                supportedBandScreenedCloserDominantComparisons: 0,
+                supportedBandScreenedCloserFilteredComparisons: 0,
+                supportedBandScreenedCloserSelectedComparisons: 0,
+                supportedBandScreenedCloserInvalidComparisons: 0,
+                supportedBandScreenedCloserComparisonsByReason: newSupportedBandScreenedCloserReasonCounts(),
                 supportedBandDuelDifferenceSelections: 0,
                 supportedBandDuelDifferenceProposals: 0,
                 supportedBandDuelDifferenceSelectionsByDifference: newSupportedBandDuelDifferenceCounts(),
@@ -980,6 +1060,19 @@ export function aggregateMirrorDiag(
             for (const reason of SUPPORTED_BAND_DOMINANCE_REASONS) {
                 a.supportedBandDominanceComparisonsByReason[reason] +=
                     side.supportedBandDominanceComparisonsByReason?.[reason] ?? 0;
+            }
+            a.supportedBandScreenedCloserEligibleComparisons +=
+                side.supportedBandScreenedCloserEligibleComparisons ?? 0;
+            a.supportedBandScreenedCloserDominantComparisons +=
+                side.supportedBandScreenedCloserDominantComparisons ?? 0;
+            a.supportedBandScreenedCloserFilteredComparisons +=
+                side.supportedBandScreenedCloserFilteredComparisons ?? 0;
+            a.supportedBandScreenedCloserSelectedComparisons +=
+                side.supportedBandScreenedCloserSelectedComparisons ?? 0;
+            a.supportedBandScreenedCloserInvalidComparisons += side.supportedBandScreenedCloserInvalidComparisons ?? 0;
+            for (const reason of SUPPORTED_BAND_SCREENED_CLOSER_REASONS) {
+                a.supportedBandScreenedCloserComparisonsByReason[reason] +=
+                    side.supportedBandScreenedCloserComparisonsByReason?.[reason] ?? 0;
             }
             a.supportedBandDuelDifferenceSelections += side.supportedBandDuelDifferenceSelections ?? 0;
             a.supportedBandDuelDifferenceProposals += side.supportedBandDuelDifferenceProposals ?? 0;
@@ -1095,6 +1188,28 @@ export function aggregateMirrorDiag(
                 SUPPORTED_BAND_DOMINANCE_REASONS.map((reason) => [
                     reason,
                     a.supportedBandDominanceComparisonsByReason[reason] / Math.max(1, a.games),
+                ]),
+            ),
+            supportedBandScreenedCloserEligibleComparisons: a.supportedBandScreenedCloserEligibleComparisons,
+            supportedBandScreenedCloserEligibleComparisonsPerGame:
+                a.supportedBandScreenedCloserEligibleComparisons / Math.max(1, a.games),
+            supportedBandScreenedCloserDominantComparisons: a.supportedBandScreenedCloserDominantComparisons,
+            supportedBandScreenedCloserDominantComparisonsPerGame:
+                a.supportedBandScreenedCloserDominantComparisons / Math.max(1, a.games),
+            supportedBandScreenedCloserFilteredComparisons: a.supportedBandScreenedCloserFilteredComparisons,
+            supportedBandScreenedCloserFilteredComparisonsPerGame:
+                a.supportedBandScreenedCloserFilteredComparisons / Math.max(1, a.games),
+            supportedBandScreenedCloserSelectedComparisons: a.supportedBandScreenedCloserSelectedComparisons,
+            supportedBandScreenedCloserSelectedComparisonsPerGame:
+                a.supportedBandScreenedCloserSelectedComparisons / Math.max(1, a.games),
+            supportedBandScreenedCloserInvalidComparisons: a.supportedBandScreenedCloserInvalidComparisons,
+            supportedBandScreenedCloserInvalidComparisonsPerGame:
+                a.supportedBandScreenedCloserInvalidComparisons / Math.max(1, a.games),
+            supportedBandScreenedCloserComparisonsByReason: a.supportedBandScreenedCloserComparisonsByReason,
+            supportedBandScreenedCloserComparisonsByReasonPerGame: Object.fromEntries(
+                SUPPORTED_BAND_SCREENED_CLOSER_REASONS.map((reason) => [
+                    reason,
+                    a.supportedBandScreenedCloserComparisonsByReason[reason] / Math.max(1, a.games),
                 ]),
             ),
             supportedBandDuelDifferenceSelections: a.supportedBandDuelDifferenceSelections,

@@ -17,6 +17,7 @@ import type {
     IV08SupportedBandAdvanceDetails,
     IV08SupportedBandDominanceComparisonDetails,
     IV08SupportedBandDuelDetails,
+    IV08SupportedBandScreenedCloserComparisonDetails,
     IV08SupportedPrepinEgressDetails,
     IV08SupportedRangedEscapeDetails,
 } from "../../src/ai";
@@ -918,6 +919,179 @@ describe("measure_mirror_cohorts", () => {
                 lower_reachable_threats: 1,
                 filtered: 1,
             },
+        });
+    });
+
+    test("tracks screened-closer comparisons, integrity filters, retention, and side swaps", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const sourceDetails: IV08SupportedBandScreenedCloserComparisonDetails[] = [];
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            const controlTeam = candidateTeam === GREEN_TEAM ? RED_TEAM : GREEN_TEAM;
+            const emitPair = (team: typeof GREEN_TEAM | typeof RED_TEAM, selectStrict: boolean): void => {
+                const dominantDetails: IV08SupportedBandScreenedCloserComparisonDetails = {
+                    selected: selectStrict,
+                    dominant: true,
+                    metadataValid: true,
+                    reason: "screened_closer",
+                    targetId: "screened-target",
+                    targetCreatureName: "Screened target",
+                    strict: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 2, y: 1 }],
+                        moveTargetCells: [{ x: 2, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                    shipped: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 1, y: 1 }],
+                        moveTargetCells: [{ x: 1, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                    strictDivisorAfter: 1,
+                    strictReachableThreatsAfter: 0,
+                    strictTargetDistanceBefore: 6,
+                    strictTargetDistanceAfter: 3,
+                    strictTargetScreenedAfter: true,
+                    strictScreeningGuardId: "native-guard",
+                    strictRetainedSignatureAfter: true,
+                    shippedDivisorAfter: 1,
+                    shippedReachableThreatsAfter: 0,
+                    shippedTargetDistanceBefore: 6,
+                    shippedTargetDistanceAfter: 4,
+                    shippedTargetScreenedAfter: false,
+                    shippedScreeningGuardId: null,
+                    shippedRetainedSignatureAfter: true,
+                };
+                const invalidDetails: IV08SupportedBandScreenedCloserComparisonDetails = {
+                    ...dominantDetails,
+                    selected: false,
+                    dominant: false,
+                    metadataValid: false,
+                    reason: "filtered",
+                    strict: {
+                        ...dominantDetails.strict,
+                        actionTypes: [...dominantDetails.strict.actionTypes],
+                        movePath: dominantDetails.strict.movePath?.map((cell) => ({ ...cell })) ?? null,
+                        moveTargetCells: dominantDetails.strict.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
+                        rangeAimCell: dominantDetails.strict.rangeAimCell
+                            ? { ...dominantDetails.strict.rangeAimCell }
+                            : null,
+                    },
+                    shipped: {
+                        ...dominantDetails.shipped,
+                        actionTypes: [...dominantDetails.shipped.actionTypes],
+                        movePath: dominantDetails.shipped.movePath?.map((cell) => ({ ...cell })) ?? null,
+                        moveTargetCells: dominantDetails.shipped.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
+                        rangeAimCell: dominantDetails.shipped.rangeAimCell
+                            ? { ...dominantDetails.shipped.rangeAimCell }
+                            : null,
+                    },
+                    shippedRetainedSignatureAfter: null,
+                };
+                const retained: IAIPolicyEvent = {
+                    kind: "v0.8_supported_band_screened_closer_comparison",
+                    unitId: `screened-retained-${team}`,
+                    creatureName: "Arbalester",
+                    team,
+                    lap: 3,
+                    details: dominantDetails,
+                };
+                const replaced: IAIPolicyEvent = {
+                    kind: "v0.8_supported_band_screened_closer_comparison",
+                    unitId: `screened-replaced-${team}`,
+                    creatureName: "Elf",
+                    team,
+                    lap: 4,
+                    details: invalidDetails,
+                };
+                sourceDetails.push(dominantDetails, invalidDetails);
+                config.policyProposalObserver?.(retained);
+                config.policyProposalObserver?.(replaced);
+                config.policyEventObserver?.(retained);
+            };
+            emitPair(candidateTeam, true);
+            emitPair(controlTeam, false);
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        records.forEach((record, game) => {
+            const candidate = record.diag!.green.version === "v0.8" ? record.diag!.green : record.diag!.red;
+            const control = record.diag!.green.version === "v0.8s" ? record.diag!.green : record.diag!.red;
+            expect(candidate).toMatchObject({
+                supportedBandScreenedCloserEligibleComparisons: 2,
+                supportedBandScreenedCloserDominantComparisons: 1,
+                supportedBandScreenedCloserFilteredComparisons: 1,
+                supportedBandScreenedCloserSelectedComparisons: 1,
+                supportedBandScreenedCloserInvalidComparisons: 1,
+                supportedBandScreenedCloserComparisonsByReason: { screened_closer: 1, filtered: 1 },
+            });
+            expect(control).toMatchObject({
+                supportedBandScreenedCloserEligibleComparisons: 2,
+                supportedBandScreenedCloserDominantComparisons: 1,
+                supportedBandScreenedCloserFilteredComparisons: 1,
+                supportedBandScreenedCloserSelectedComparisons: 0,
+                supportedBandScreenedCloserInvalidComparisons: 1,
+                supportedBandScreenedCloserComparisonsByReason: { screened_closer: 1, filtered: 1 },
+            });
+            expect(record.supportedBandScreenedCloserComparisonEvents?.map(({ retained }) => retained)).toEqual([
+                true,
+                false,
+                true,
+                false,
+            ]);
+            expect(record.supportedBandScreenedCloserComparisonEvents?.[0]).toMatchObject({
+                ...sourceDetails[game * 4],
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                retained: true,
+            });
+            expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.strict).not.toBe(
+                sourceDetails[game * 4]!.strict,
+            );
+            expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.shipped.movePath).not.toBe(
+                sourceDetails[game * 4]!.shipped.movePath,
+            );
+        });
+        expect(records[0].supportedBandScreenedCloserComparisonEvents?.[0]?.side).toBe("green");
+        expect(records[1].supportedBandScreenedCloserComparisonEvents?.[0]?.side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedBandScreenedCloserEligibleComparisons: number;
+                    supportedBandScreenedCloserEligibleComparisonsPerGame: number;
+                    supportedBandScreenedCloserDominantComparisons: number;
+                    supportedBandScreenedCloserFilteredComparisons: number;
+                    supportedBandScreenedCloserSelectedComparisons: number;
+                    supportedBandScreenedCloserInvalidComparisons: number;
+                    supportedBandScreenedCloserComparisonsByReason: Record<string, number>;
+                    supportedBandScreenedCloserComparisonsByReasonPerGame: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedBandScreenedCloserEligibleComparisons: 4,
+            supportedBandScreenedCloserEligibleComparisonsPerGame: 2,
+            supportedBandScreenedCloserDominantComparisons: 2,
+            supportedBandScreenedCloserFilteredComparisons: 2,
+            supportedBandScreenedCloserSelectedComparisons: 2,
+            supportedBandScreenedCloserInvalidComparisons: 2,
+            supportedBandScreenedCloserComparisonsByReason: { screened_closer: 2, filtered: 2 },
+            supportedBandScreenedCloserComparisonsByReasonPerGame: { screened_closer: 1, filtered: 1 },
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedBandScreenedCloserEligibleComparisons: 4,
+            supportedBandScreenedCloserEligibleComparisonsPerGame: 2,
+            supportedBandScreenedCloserDominantComparisons: 2,
+            supportedBandScreenedCloserFilteredComparisons: 2,
+            supportedBandScreenedCloserSelectedComparisons: 0,
+            supportedBandScreenedCloserInvalidComparisons: 2,
+            supportedBandScreenedCloserComparisonsByReason: { screened_closer: 2, filtered: 2 },
+            supportedBandScreenedCloserComparisonsByReasonPerGame: { screened_closer: 1, filtered: 1 },
         });
     });
 
