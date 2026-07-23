@@ -57,6 +57,34 @@ export interface IMixedSupportedParetoNoMeleeFocusContext {
     readonly support: IMixedSupportedParetoNoMeleeFocusSupport;
 }
 
+export const MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES = [
+    "mixed_board",
+    "exact_native_actor_identity",
+    "stationary_lap_candidate_shape",
+    "original_native_guard_presence",
+    "original_native_tsar_no_melee_target",
+    "reachable_threat_presence",
+    "all_reachable_threats_screened",
+    "catalog_expansion",
+    "exact_pareto_proposal",
+    "valid_override",
+] as const;
+
+export type MixedSupportedParetoNoMeleeFocusFunnelStage =
+    (typeof MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES)[number];
+
+export interface IMixedSupportedParetoNoMeleeFocusFunnelProbe {
+    /** Ordered cumulative eligibility stages passed by this decision. */
+    readonly passedStages: readonly MixedSupportedParetoNoMeleeFocusFunnelStage[];
+    /** First failed eligibility stage; downstream catalog/selection stages are recorded by SearchDriver. */
+    readonly failedStage: MixedSupportedParetoNoMeleeFocusFunnelStage | null;
+    readonly guardCount: number;
+    readonly noMeleeTargetCount: number;
+    readonly reachableThreats: number;
+    readonly screenedThreats: number;
+    readonly context?: IMixedSupportedParetoNoMeleeFocusContext;
+}
+
 interface IStationaryShot {
     readonly candidate: IEnumeratedCandidate;
     readonly index: number;
@@ -159,19 +187,30 @@ function mixedSupportedGuardScreensThreat(actor: Unit, guard: Unit, threat: Unit
     return guardToThreat < actorToThreat && actorToGuard <= 3 && guardToThreat + actorToGuard <= actorToThreat + 1;
 }
 
-/**
- * Eligibility shared by catalog generation and selection for the conservative mixed-board arm.
- * It admits only the fixed native Cyclops/Large-Caliber and Tsar-Cannon/Through-Shot identities, rejects
- * structurally pure-ranged boards, and requires every enemy inside an optimistic one-activation melee horizon
- * to be screened by a living original native melee ally. The target is equally narrow: a living original native
- * Tsar Cannon whose captured, owned, and currently active card is No Melee.
- */
-export function mixedSupportedParetoNoMeleeFocusContext(
+interface IMixedSupportedParetoNoMeleeFocusInspection {
+    readonly mixedBoard: boolean;
+    readonly actorAbility?: PureRangedParetoFocusActorAbility;
+    readonly noMeleeTargetIds: readonly string[];
+    readonly guardCount: number;
+    readonly reachableThreats: number;
+    readonly screenedThreats: number;
+    readonly context?: IMixedSupportedParetoNoMeleeFocusContext;
+}
+
+function inspectMixedSupportedParetoNoMeleeFocus(
     actor: Unit,
     unitsHolder: UnitsHolder,
     originalState: PureRangedTerminalState | null,
-): IMixedSupportedParetoNoMeleeFocusContext | undefined {
-    if (originalState?.eligible !== false) return undefined;
+): IMixedSupportedParetoNoMeleeFocusInspection {
+    const empty = {
+        noMeleeTargetIds: [],
+        guardCount: 0,
+        reachableThreats: 0,
+        screenedThreats: 0,
+    } as const;
+    if (originalState?.eligible !== false) {
+        return { ...empty, mixedBoard: false };
+    }
     const actorAbility = anyBoardParetoNoMeleeFocusActorAbility(actor, originalState);
     if (
         !actorAbility ||
@@ -179,7 +218,7 @@ export function mixedSupportedParetoNoMeleeFocusContext(
         (actor.getName() === "Tsar Cannon" && actorAbility !== "through_shot") ||
         (actor.getName() !== "Cyclops" && actor.getName() !== "Tsar Cannon")
     ) {
-        return undefined;
+        return { ...empty, mixedBoard: true };
     }
 
     const units = unitsHolder.getAllUnits();
@@ -208,7 +247,15 @@ export function mixedSupportedParetoNoMeleeFocusContext(
             noMeleeTargetIds.push(unit.getId());
         }
     }
-    if (!guards.length || !noMeleeTargetIds.length) return undefined;
+    const base = {
+        mixedBoard: true,
+        actorAbility,
+        noMeleeTargetIds,
+        guardCount: guards.length,
+        reachableThreats: 0,
+        screenedThreats: 0,
+    } as const;
+    if (!guards.length || !noMeleeTargetIds.length) return base;
 
     const reachableThreats = [...units.values()].filter(
         (unit) =>
@@ -217,21 +264,44 @@ export function mixedSupportedParetoNoMeleeFocusContext(
             !unit.hasAbilityActive("No Melee") &&
             cellDistance(actor.getCells(), unit.getCells()) <= Math.ceil(Math.max(0, unit.getSteps())) + 1,
     );
-    if (!reachableThreats.length) return undefined;
+    if (!reachableThreats.length) return base;
     const screenedThreats = reachableThreats.filter((threat) =>
         guards.some((guard) => mixedSupportedGuardScreensThreat(actor, guard, threat)),
     ).length;
-    if (screenedThreats !== reachableThreats.length) return undefined;
-
-    return {
-        actorAbility,
-        noMeleeTargetIds,
-        support: {
-            guardCount: guards.length,
+    const support = {
+        guardCount: guards.length,
+        reachableThreats: reachableThreats.length,
+        screenedThreats,
+    };
+    if (screenedThreats !== reachableThreats.length) {
+        return {
+            ...base,
             reachableThreats: reachableThreats.length,
             screenedThreats,
-        },
+        };
+    }
+
+    return {
+        ...base,
+        reachableThreats: reachableThreats.length,
+        screenedThreats,
+        context: { actorAbility, noMeleeTargetIds, support },
     };
+}
+
+/**
+ * Eligibility shared by catalog generation and selection for the conservative mixed-board arm.
+ * It admits only the fixed native Cyclops/Large-Caliber and Tsar-Cannon/Through-Shot identities, rejects
+ * structurally pure-ranged boards, and requires every enemy inside an optimistic one-activation melee horizon
+ * to be screened by a living original native melee ally. The target is equally narrow: a living original native
+ * Tsar Cannon whose captured, owned, and currently active card is No Melee.
+ */
+export function mixedSupportedParetoNoMeleeFocusContext(
+    actor: Unit,
+    unitsHolder: UnitsHolder,
+    originalState: PureRangedTerminalState | null,
+): IMixedSupportedParetoNoMeleeFocusContext | undefined {
+    return inspectMixedSupportedParetoNoMeleeFocus(actor, unitsHolder, originalState).context;
 }
 
 export function pureRangedParetoNoMeleeFocusLapEligible(currentLap: number): boolean {
@@ -251,6 +321,56 @@ export function isParetoNoMeleeFocusStationaryIncumbent(actor: Unit, actions: re
             (selector) => selector.unitId === actor.getId() && selector.attackType === RANGE && actions[0] === selector,
         )
     );
+}
+
+/**
+ * Read-only first-failure probe for the mixed-supported eligibility prefix. It deliberately performs no
+ * enumeration, path finding, engine probing, or random draws; SearchDriver records the final three stages where
+ * those existing operations already happen.
+ */
+export function probeMixedSupportedParetoNoMeleeFocusFunnel(
+    actor: Unit,
+    unitsHolder: UnitsHolder,
+    originalState: PureRangedTerminalState | null,
+    currentLap: number,
+    incumbent: readonly GameAction[],
+): IMixedSupportedParetoNoMeleeFocusFunnelProbe {
+    const inspection = inspectMixedSupportedParetoNoMeleeFocus(actor, unitsHolder, originalState);
+    const passedStages: MixedSupportedParetoNoMeleeFocusFunnelStage[] = [];
+    const result = (
+        failedStage: MixedSupportedParetoNoMeleeFocusFunnelStage | null,
+    ): IMixedSupportedParetoNoMeleeFocusFunnelProbe => ({
+        passedStages,
+        failedStage,
+        guardCount: inspection.guardCount,
+        noMeleeTargetCount: inspection.noMeleeTargetIds.length,
+        reachableThreats: inspection.reachableThreats,
+        screenedThreats: inspection.screenedThreats,
+        ...(inspection.context ? { context: inspection.context } : {}),
+    });
+
+    if (!inspection.mixedBoard) return result("mixed_board");
+    passedStages.push("mixed_board");
+    if (!inspection.actorAbility) return result("exact_native_actor_identity");
+    passedStages.push("exact_native_actor_identity");
+    if (
+        !pureRangedParetoNoMeleeFocusLapEligible(currentLap) ||
+        !isParetoNoMeleeFocusStationaryIncumbent(actor, incumbent)
+    ) {
+        return result("stationary_lap_candidate_shape");
+    }
+    passedStages.push("stationary_lap_candidate_shape");
+    if (inspection.guardCount === 0) return result("original_native_guard_presence");
+    passedStages.push("original_native_guard_presence");
+    if (inspection.noMeleeTargetIds.length === 0) return result("original_native_tsar_no_melee_target");
+    passedStages.push("original_native_tsar_no_melee_target");
+    if (inspection.reachableThreats === 0) return result("reachable_threat_presence");
+    passedStages.push("reachable_threat_presence");
+    if (inspection.screenedThreats !== inspection.reachableThreats) {
+        return result("all_reachable_threats_screened");
+    }
+    passedStages.push("all_reachable_threats_screened");
+    return result(null);
 }
 
 const finiteNonnegative = (value: number): boolean => Number.isFinite(value) && value >= 0;
