@@ -32,7 +32,11 @@ import type {
 } from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
-import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
+import {
+    isV08DirectCombatDecision,
+    V08_DOMINANT_FINISH_START_LAP,
+    v08DominantFinishState,
+} from "./v0_8_dominant_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -1110,9 +1114,11 @@ function protectedAdvanceGuardrailsMode(
 /**
  * Live-root post-catalog guardrails for the shipped protected advance. The incumbent catalog is built exactly
  * once before version selection, preserving its incoming and outgoing seeded path stream. A pre-finish shooter
- * holds when its ranged army is stronger (including against zero enemy ranged output), and a pre-finish close
- * must reach full damage. Dominant/urgent finish pressure releases both vetoes. Every other proposal, including
- * a zero-reach full-damage close without a native melee screen, remains the exact incumbent decision.
+ * holds before the five-lap finishing runway when its ranged army is stronger (including against zero enemy
+ * ranged output), and a pre-finish close must reach full damage. The ranged-superiority veto always releases at
+ * the dominant-finish start lap, even without a two-to-one material lead; active dominant/urgent finish pressure
+ * releases both vetoes. Every other proposal, including a zero-reach full-damage close without a native melee
+ * screen, remains the exact incumbent decision.
  */
 function protectedAdvanceShotWithGuardrails(
     unit: Unit,
@@ -1138,8 +1144,9 @@ function protectedAdvanceShotWithGuardrails(
     let reason: V08ProtectedAdvanceGuardrailReason | undefined;
     if (metadata && !metadata.finishActive) {
         const rangedSuperiorHold = metadata.ownRangedOutput > metadata.enemyRangedOutput;
+        const beforeFinishingRunway = (context.fightProperties?.getCurrentLap() ?? 0) < V08_DOMINANT_FINISH_START_LAP;
         const partialBand = !Number.isFinite(metadata.divisorAfter) || metadata.divisorAfter !== 1;
-        if ((mode === "both" || mode === "ranged_superior_hold") && rangedSuperiorHold) {
+        if ((mode === "both" || mode === "ranged_superior_hold") && rangedSuperiorHold && beforeFinishingRunway) {
             reason = "ranged_superior_hold";
         } else if ((mode === "both" || mode === "partial_band") && partialBand) {
             reason = "partial_band";
