@@ -1,0 +1,212 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-overlay-evidence/v1",
+    "recordedAt": "2026-07-23T17:37:08Z",
+    "status": "valid-unqualified",
+    "deploymentDecision": "do-not-enable-or-run-remote-qualification",
+    "source": {
+        "commit": "4dcef3e56bb0abab5fc74a4c72ba10a2f4b43dc7",
+        "tree": "6118b0764f9ba4a97d77d1e3219994dc15466fac",
+        "dirty": false
+    },
+    "candidate": {
+        "description": "At explicit live roots, build shipped protected-advance first and strict supported-band second. Select strict whenever it emits a real supported-band proposal; otherwise preserve shipped.",
+        "matchedControl": "Build both catalogs in the same order and always publish shipped.",
+        "soleBehaviorEnvironmentDifference": "V08_SUPPORTED_BAND_ADVANCE_OVERLAY_CONTROL_VERSIONS",
+        "defaultEnabled": false
+    },
+    "protocol": {
+        "cohort": "hybrid",
+        "mode": "both",
+        "amountMode": "expBudget",
+        "livetwin": true,
+        "pairedSideSwap": true,
+        "symmetricRosters": true,
+        "moveShots": 0,
+        "researchUnbounded": true,
+        "decisionOrigin": "root",
+        "scout": {
+            "gamesPerArm": 2000,
+            "pairSeedClusters": 1000,
+            "baseSeed": 3561465089
+        },
+        "confirmation": {
+            "gamesPerArm": 6000,
+            "pairSeedClusters": 3000,
+            "baseSeed": 3707437161,
+            "requiredGates": {
+                "scoreDeltaPointPpMinimum": 0.1,
+                "scoreDeltaLower95PpMinimum": -0.25,
+                "eachPhysicalSeatDeltaPpMinimum": -0.25,
+                "armageddonDeltaPointPpMaximum": 0,
+                "armageddonDeltaUpper95PpMaximum": 0.25,
+                "meanLapDeltaPointMaximum": 0,
+                "meanLapDeltaUpper95Maximum": 0.05,
+                "retainedActualDifferencesMinimum": 60,
+                "retainedActualDifferencesPerSeatMinimum": 10,
+                "integrityAndSemanticsRequired": true
+            }
+        },
+        "confidenceMethod": "Two-sided 95% Student-t interval over independent side-swap pair-seed cluster means.",
+        "stopRule": "Do not launch the remote panel unless every confirmation gate passes."
+    },
+    "scout": {
+        "verdict": "pass-screening",
+        "treatment": {
+            "wins": 981,
+            "losses": 982,
+            "draws": 37,
+            "scorePercent": 49.975,
+            "armageddons": 45,
+            "averageLaps": 6.406,
+            "rejectedActions": 0
+        },
+        "control": {
+            "wins": 982,
+            "losses": 982,
+            "draws": 36,
+            "scorePercent": 50,
+            "armageddons": 44,
+            "averageLaps": 6.403,
+            "rejectedActions": 0
+        },
+        "pairedTreatmentMinusControl": {
+            "scorePointPp": -0.025,
+            "scoreLower95Pp": -0.2271,
+            "scoreUpper95Pp": 0.1771,
+            "greenSeatPointPp": -0.1,
+            "redSeatPointPp": 0.05,
+            "armageddonPointPp": 0.05,
+            "armageddonLower95Pp": -0.1198,
+            "armageddonUpper95Pp": 0.2198,
+            "meanLaps": 0.003,
+            "meanLapsLower95": -0.00393,
+            "meanLapsUpper95": 0.00993
+        },
+        "telemetry": {
+            "strictProposals": 57,
+            "strictRetained": 55,
+            "actualDifferenceProposals": 27,
+            "actualDifferenceRetained": 25,
+            "retainedGreen": 9,
+            "retainedRed": 16,
+            "differenceTypes": {
+                "different_advance": 27,
+                "strict_hold_shipped_advance": 0,
+                "strict_advance_shipped_hold": 0,
+                "other": 0
+            }
+        },
+        "integrity": {
+            "allGamesEndedByElimination": true,
+            "zeroChangesOutsideProposalGames": true,
+            "semanticFailures": 0,
+            "rejectedActions": 0
+        },
+        "artifactsSha256": {
+            "treatmentExperiment": "0962c4f8c6d37b3c4000c7f78063f885eb4cc6a0ef96325bc50b18707d2294aa",
+            "treatmentRecords": "9ce7e81077c61b98006cfac858d79b157a7a02fd2c6db82a52fbbe0589aaecff",
+            "treatmentSummary": "ea06d05840449f18a9de38648c21ab01acd97a341d6c37b7fa47bc036b4adeed",
+            "controlExperiment": "b75197983be4a505da4020e9ad81715c5d6d2b8f83246c84799cfc026f24b627",
+            "controlRecords": "67d47b586dd6f3b4a2d2feb14c413519090472f0641469bfe6f1013152d2c127",
+            "controlSummary": "ca21dcecbd30ca54d7a158d7beb350b7b727ed97184a3ed6142e75d59779cd5f",
+            "pathIndependentComposite": "b1860ed1e82ee9e30755298fa76e51a17afe1f42a74d185f715753699a91a579"
+        }
+    },
+    "confirmation": {
+        "verdict": "fail-score-point-gate",
+        "treatment": {
+            "wins": 2977,
+            "losses": 2982,
+            "draws": 41,
+            "scorePercent": 49.958333333333336,
+            "armageddons": 114,
+            "averageLaps": 6.318333333333333,
+            "rejectedActions": 0
+        },
+        "control": {
+            "wins": 2979,
+            "losses": 2979,
+            "draws": 42,
+            "scorePercent": 50,
+            "armageddons": 114,
+            "averageLaps": 6.319,
+            "rejectedActions": 0
+        },
+        "pairedTreatmentMinusControl": {
+            "scorePointPp": -0.04166666666666667,
+            "scoreLower95Pp": -0.13553447505424677,
+            "scoreUpper95Pp": 0.05220114172091344,
+            "greenSeatPointPp": -0.06666666666666667,
+            "redSeatPointPp": -0.016666666666666666,
+            "armageddonPointPp": 0,
+            "armageddonUpper95Pp": 0.04622315058244247,
+            "meanLaps": -0.0006666666666666666,
+            "meanLapsUpper95": 0.0030884439753638367
+        },
+        "gateResults": {
+            "scoreDeltaPoint": false,
+            "scoreDeltaLower95": true,
+            "greenSeatDeltaPoint": true,
+            "redSeatDeltaPoint": true,
+            "armageddonDeltaPoint": true,
+            "armageddonDeltaUpper95": true,
+            "meanLapDeltaPoint": true,
+            "meanLapDeltaUpper95": true,
+            "retainedDifferenceExposure": true,
+            "integrityAndSemantics": true
+        },
+        "telemetry": {
+            "strictProposals": 212,
+            "strictRetained": 182,
+            "actualDifferenceProposals": 78,
+            "actualDifferenceRetained": 68,
+            "retainedGreen": 34,
+            "retainedRed": 34,
+            "differenceTypes": {
+                "different_advance": 78,
+                "strict_hold_shipped_advance": 0,
+                "strict_advance_shipped_hold": 0,
+                "other": 0
+            },
+            "creatureProposals": {
+                "Beholder": 143,
+                "Medusa": 69
+            }
+        },
+        "attribution": {
+            "candidateScorePoints": -2.5,
+            "candidateLossToWin": 3,
+            "candidateWinToLoss": 5,
+            "candidateDrawToLoss": 1,
+            "coreDifferenceGames": 37,
+            "outcomeDifferenceGames": 9,
+            "lapDifferenceGames": 34,
+            "armageddonDifferenceGames": 2,
+            "netLaps": -4,
+            "treatmentOnlyArmageddon": 1,
+            "controlOnlyArmageddon": 1
+        },
+        "integrity": {
+            "gamesPerArm": 6000,
+            "pairSeedClusters": 3000,
+            "allGamesEndedByElimination": true,
+            "semanticFailures": 0,
+            "rejectedActions": 0
+        },
+        "artifactsSha256": {
+            "treatmentExperiment": "2ddbd480a7d490f4950994f40924817ea92398d84e0fb600bec489db4edd53e7",
+            "treatmentRecords": "52b416c9ed24790b71ba5b41e81cc8d455fc3e06af17e9c0297af8c3e31e4183",
+            "treatmentSummary": "cb8fb99bd468862b0cbd7cdd432645ee7712bc1abf3580ba94b17f4c9289571d",
+            "controlExperiment": "a89211abd19667f1eff751fd601124555f58516cba7142f3a3d016ea65c44603",
+            "controlRecords": "af2e17ff6bb7374e4fe9655100fc48b335c3e39897f5c505ec47a6b3c3ef2146",
+            "controlSummary": "beb6cf39f61990df226b78d67cfc81e097f7ba3ce635b26cb9117b7dc3048268",
+            "pathIndependentComposite": "1e74629f86692e9b025a649e5267fafaf5481660b0facf31f313101ce2988a97"
+        }
+    },
+    "analyzer": {
+        "pathAtAudit": "/tmp/hoc-overlay-paired-analysis-v1.mjs",
+        "sha256": "156da6672ec001d803111648454e3ffad73a3b7776494e43885e6d6c2ff034bc",
+        "readOnly": true
+    },
+    "conclusion": "The broad overlay was safe and semantically valid but did not improve score. Preserve shipped behavior. Any successor must be a new candidate with fresh seeds and must retain shipped unless the strict route clears a preregistered objective or value margin."
+}
