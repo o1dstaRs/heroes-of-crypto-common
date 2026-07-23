@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getAuraCellKeys } from "../../src/effects/effect_helper";
+import { getAuraCellKeys, getAuraCellKeysView } from "../../src/effects/effect_helper";
 import { getCellsAroundCell } from "../../src/grid/grid_math";
 import { GridSettings } from "../../src/grid/grid_settings";
 import type { XY } from "../../src/utils/math";
@@ -62,9 +62,9 @@ describe("aura geometry compatibility oracle", () => {
             for (let y = 0; y < testGridSettings.getGridSize(); y++) {
                 for (const range of [-3, -1, -0, 0, 0.25, 1, 1.5, 2, 3, 4]) {
                     const cell = { x, y };
-                    expect(getAuraCellKeys(testGridSettings, cell, range)).toEqual(
-                        legacyGetAuraCellKeys(testGridSettings, cell, range),
-                    );
+                    const expected = legacyGetAuraCellKeys(testGridSettings, cell, range);
+                    expect(getAuraCellKeys(testGridSettings, cell, range)).toEqual(expected);
+                    expect(getAuraCellKeysView(testGridSettings, cell, range)).toEqual(expected);
                 }
             }
         }
@@ -110,5 +110,46 @@ describe("aura geometry compatibility oracle", () => {
         expect(second).toEqual(expected);
         expect(second).not.toBe(first);
         expect(source).toEqual(sourceBefore);
+    });
+
+    it("exposes one immutable production view without leaking it through the public mutable result", () => {
+        const source = { x: 5, y: 6 };
+        const firstView = getAuraCellKeysView(testGridSettings, source, 3);
+        const secondView = getAuraCellKeysView(testGridSettings, source, 3);
+        const mutableResult = getAuraCellKeys(testGridSettings, source, 3);
+
+        expect(firstView).toBe(secondView);
+        expect(Object.isFrozen(firstView)).toBe(true);
+        expect(firstView).toEqual(legacyGetAuraCellKeys(testGridSettings, source, 3));
+        expect(mutableResult).toEqual(firstView);
+        expect(mutableResult).not.toBe(firstView);
+    });
+
+    it("separates cache entries by grid identity, source cell, and range", () => {
+        const firstGrid = new GridSettings(7, 700, 0, 700, -700, 0, 0);
+        const secondGrid = new GridSettings(7, 1400, 0, 1400, -1400, 0, 0);
+        const first = getAuraCellKeysView(firstGrid, { x: 2, y: 3 }, 1);
+
+        expect(getAuraCellKeysView(firstGrid, { x: 2, y: 3 }, 1)).toBe(first);
+        expect(getAuraCellKeysView(firstGrid, { x: 2, y: 4 }, 1)).not.toBe(first);
+        expect(getAuraCellKeysView(firstGrid, { x: 2, y: 3 }, 2)).not.toBe(first);
+        expect(getAuraCellKeysView(secondGrid, { x: 2, y: 3 }, 1)).not.toBe(first);
+    });
+
+    it("fails closed instead of aliasing cache keys for malformed or precision-unsafe grid sizes", () => {
+        for (const [gridSize, firstCell, secondCell] of [
+            [Number.NaN, { x: 1, y: 1 }, { x: 1, y: 2 }],
+            [Number.POSITIVE_INFINITY, { x: 1, y: 1 }, { x: 1, y: 2 }],
+            [Number.MAX_SAFE_INTEGER, { x: 2, y: 1 }, { x: 2, y: 2 }],
+        ] as const) {
+            const grid = new GridSettings(gridSize, 700, 0, 700, -700, 0, 0);
+            const first = getAuraCellKeysView(grid, firstCell, 0);
+            const second = getAuraCellKeysView(grid, secondCell, 0);
+
+            expect(first).toEqual(legacyGetAuraCellKeys(grid, firstCell, 0));
+            expect(second).toEqual(legacyGetAuraCellKeys(grid, secondCell, 0));
+            expect(second).not.toBe(first);
+            expect(getAuraCellKeys(grid, secondCell, 0)).toEqual(second);
+        }
     });
 });

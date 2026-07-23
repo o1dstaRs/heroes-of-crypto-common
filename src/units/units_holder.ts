@@ -22,7 +22,7 @@ import {
 } from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
-import { AppliedAuraEffectProperties } from "../effects/effect_properties";
+import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
 import type { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
@@ -35,17 +35,23 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { UnitProperties } from "./unit_properties";
 
+type AuraRefreshFingerprintValue = boolean | number | string | undefined;
+
 export class UnitsHolder {
     private readonly grid: Grid;
     private readonly allUnits: Map<string, Unit> = new Map();
     private readonly gridSettings: GridSettings;
     private teamsAuraEffects: Map<TeamType, Map<number, AppliedAuraEffectProperties[]>>;
     private distancesToClosestEnemies: Map<string, number> = new Map();
+    private auraRefreshFingerprint: AuraRefreshFingerprintValue[] | undefined;
+    private auraRefreshKnownEmpty: boolean;
     public constructor(grid: Grid) {
         this.grid = grid;
         this.gridSettings = grid.getSettings();
         this.teamsAuraEffects = new Map();
         this.distancesToClosestEnemies = new Map();
+        this.auraRefreshFingerprint = undefined;
+        this.auraRefreshKnownEmpty = false;
     }
     public getAllUnitsIterator(): IterableIterator<Unit> {
         return this.allUnits.values();
@@ -819,7 +825,7 @@ export class UnitsHolder {
         // (used authoritatively by the ranked server) only ever called the stack-power refresh, so
         // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
-        this.refreshAuraEffectsForAllUnits();
+        this.refreshAuraEffectsIfNeeded();
         this.refreshAngelicHostForAllUnits();
         this.refreshWaterShieldForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
@@ -934,7 +940,234 @@ export class UnitsHolder {
 
         return auraAttackMod;
     }
+    private appendAppliedAuraState(
+        target: AuraRefreshFingerprintValue[],
+        channel: string,
+        names: readonly string[],
+        laps: readonly number[],
+        descriptions: readonly string[],
+        powers: readonly number[],
+    ): boolean {
+        target.push(channel, names.length, laps.length, descriptions.length, powers.length);
+
+        const aligned =
+            names.length === laps.length && names.length === descriptions.length && names.length === powers.length;
+        if (!aligned) {
+            target.push("malformed");
+            for (const values of [names, laps, descriptions, powers]) {
+                target.push(values.length);
+                for (const value of values) {
+                    target.push(value);
+                }
+            }
+            return false;
+        }
+
+        for (let i = 0; i < names.length; i++) {
+            target.push(i, names[i], laps[i], descriptions[i], powers[i]);
+        }
+        return true;
+    }
+    private appendAuraDefinition(target: AuraRefreshFingerprintValue[], properties: AuraEffectProperties): boolean {
+        const keys = Object.keys(properties).sort();
+        if (
+            keys.length !== 6 ||
+            keys[0] !== "desc" ||
+            keys[1] !== "is_buff" ||
+            keys[2] !== "name" ||
+            keys[3] !== "power" ||
+            keys[4] !== "power_type" ||
+            keys[5] !== "range" ||
+            typeof properties.name !== "string" ||
+            typeof properties.desc !== "string" ||
+            typeof properties.range !== "number" ||
+            typeof properties.power !== "number" ||
+            typeof properties.is_buff !== "boolean" ||
+            typeof properties.power_type !== "number"
+        ) {
+            return false;
+        }
+
+        target.push(
+            properties.name,
+            properties.desc,
+            properties.range,
+            properties.power,
+            properties.is_buff,
+            properties.power_type,
+        );
+        return true;
+    }
+    private captureAuraRefreshFingerprint(): AuraRefreshFingerprintValue[] | undefined {
+        const fingerprint: AuraRefreshFingerprintValue[] = [];
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+
+        for (const unit of this.getAllUnitsIterator()) {
+            const baseCell = unit.getBaseCell();
+            const cells = unit.getCells();
+            const auraEffects = unit.getAuraEffects();
+            const madeOfFire = unit.getBuff("Made of Fire");
+
+            fingerprint.push(
+                "unit",
+                unit.getId(),
+                unit.getTeam(),
+                baseCell.x,
+                baseCell.y,
+                cells.length,
+                unit.getAttackType(),
+                unit.canFly(),
+                unit.getLuck(),
+                unit.hasEffectActive("Break"),
+                unit.hasAuraEffect("Disguise"),
+                unit.hasAbilityActive("Disguise Aura"),
+                madeOfFire?.getPower(),
+                auraEffects.length,
+            );
+            for (const cell of cells) {
+                fingerprint.push(cell.x, cell.y);
+            }
+
+            if (auraEffects.length) {
+                fingerprint.push(
+                    unit.getStackPower(),
+                    fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+                    fightProperties.getAdditionalAuraRangePerTeam(unit.getTeam()),
+                );
+            }
+            for (const auraEffect of auraEffects) {
+                const defaultProperties = auraEffect.defaultProperties;
+                const currentProperties = auraEffect.getProperties();
+                if (
+                    !this.appendAuraDefinition(fingerprint, defaultProperties) ||
+                    !this.appendAuraDefinition(fingerprint, currentProperties)
+                ) {
+                    return undefined;
+                }
+            }
+
+            const properties = unit.getUnitProperties();
+            if (
+                !this.appendAppliedAuraState(
+                    fingerprint,
+                    "buff-properties",
+                    properties.applied_buffs,
+                    properties.applied_buffs_laps,
+                    properties.applied_buffs_descriptions,
+                    properties.applied_buffs_powers,
+                ) ||
+                !this.appendAppliedAuraState(
+                    fingerprint,
+                    "debuff-properties",
+                    properties.applied_debuffs,
+                    properties.applied_debuffs_laps,
+                    properties.applied_debuffs_descriptions,
+                    properties.applied_debuffs_powers,
+                )
+            ) {
+                return undefined;
+            }
+
+            for (const [channel, spells] of [
+                ["buff-objects", unit.getBuffs()],
+                ["debuff-objects", unit.getDebuffs()],
+            ] as const) {
+                fingerprint.push(channel, spells.length);
+                for (let i = 0; i < spells.length; i++) {
+                    const spell = spells[i];
+                    const name = spell.getName();
+                    if (
+                        spell.getLaps() === Number.MAX_SAFE_INTEGER ||
+                        name.endsWith(" Aura") ||
+                        name === "Made of Fire"
+                    ) {
+                        fingerprint.push(
+                            i,
+                            name,
+                            spell.getPower(),
+                            spell.getLaps(),
+                            spell.getFirstSpellProperty(),
+                            spell.getSecondSpellProperty(),
+                        );
+                    }
+                }
+            }
+        }
+
+        return fingerprint;
+    }
+    private auraRefreshFingerprintMatches(candidate: readonly AuraRefreshFingerprintValue[]): boolean {
+        const current = this.auraRefreshFingerprint;
+        if (!current || current.length !== candidate.length) {
+            return false;
+        }
+
+        for (let i = 0; i < current.length; i++) {
+            if (!Object.is(current[i], candidate[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+    private isAuraStateProvablyEmpty(): boolean {
+        for (const unit of this.getAllUnitsIterator()) {
+            const properties = unit.getUnitProperties();
+            if (properties.aura_effects.length || unit.getAuraEffects().length) {
+                return false;
+            }
+
+            for (const [names, laps, descriptions, powers] of [
+                [
+                    properties.applied_buffs,
+                    properties.applied_buffs_laps,
+                    properties.applied_buffs_descriptions,
+                    properties.applied_buffs_powers,
+                ],
+                [
+                    properties.applied_debuffs,
+                    properties.applied_debuffs_laps,
+                    properties.applied_debuffs_descriptions,
+                    properties.applied_debuffs_powers,
+                ],
+            ] as const) {
+                if (
+                    names.length !== laps.length ||
+                    names.length !== descriptions.length ||
+                    names.length !== powers.length ||
+                    laps.includes(Number.MAX_SAFE_INTEGER)
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+    public refreshAuraEffectsIfNeeded(): boolean {
+        const auraStateEmpty = this.isAuraStateProvablyEmpty();
+        if (auraStateEmpty) {
+            if (this.auraRefreshKnownEmpty) {
+                return false;
+            }
+            this.refreshAuraEffectsForAllUnits();
+            return true;
+        }
+
+        const before = this.captureAuraRefreshFingerprint();
+        if (before && this.auraRefreshFingerprintMatches(before)) {
+            return false;
+        }
+
+        this.refreshAuraEffectsForAllUnits();
+        this.auraRefreshFingerprint = this.captureAuraRefreshFingerprint();
+        return true;
+    }
     public refreshAuraEffectsForAllUnits(): void {
+        // Explicit calls remain a forced full-refresh compatibility oracle. The conditional production entry point
+        // installs a fresh post-refresh fingerprint after this method returns successfully.
+        this.auraRefreshFingerprint = undefined;
+        this.auraRefreshKnownEmpty = false;
+
         // setup the initial empty maps
         this.teamsAuraEffects = new Map();
         for (let i = 0; i < (Object.keys(PBTypes.TeamVals).length - 2) >> 1; i++) {
@@ -979,7 +1212,7 @@ export class UnitsHolder {
                         continue;
                     }
 
-                    const affectedCellKeys = EffectHelper.getAuraCellKeys(this.gridSettings, c, auraRange);
+                    const affectedCellKeys = EffectHelper.getAuraCellKeysView(this.gridSettings, c, auraRange);
                     for (const ack of affectedCellKeys) {
                         if (!teamAuraEffects.has(ack)) {
                             teamAuraEffects.set(ack, []);
@@ -1077,6 +1310,7 @@ export class UnitsHolder {
                 }
             }
         }
+        this.auraRefreshKnownEmpty = this.isAuraStateProvablyEmpty();
     }
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);

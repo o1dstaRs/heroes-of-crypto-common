@@ -180,7 +180,12 @@ const FIGHT_FIELDS = [
 ] as const;
 
 /** The mutable UnitsHolder caches (derived, but snapshotted so restore is byte-for-byte). */
-const HOLDER_FIELDS = ["teamsAuraEffects", "distancesToClosestEnemies"] as const;
+const HOLDER_FIELDS = [
+    "teamsAuraEffects",
+    "distancesToClosestEnemies",
+    "auraRefreshFingerprint",
+    "auraRefreshKnownEmpty",
+] as const;
 
 const HOLDER_SHARED_FIELDS = ["grid", "allUnits", "gridSettings"] as const;
 

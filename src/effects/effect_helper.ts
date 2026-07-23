@@ -20,6 +20,8 @@ import { getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
+const auraCellKeysPerGrid = new WeakMap<GridSettings, Map<number, Map<number, ReadonlyArray<number>>>>();
+
 export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectProperties): boolean {
     if (auraEffectProperties.power_type === AbilityPowerType.DISABLE_FLY_MOVEMENT) {
         return unit.canFly();
@@ -65,7 +67,7 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
     return false;
 }
 
-export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: number): number[] {
+function calculateAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: number): number[] {
     const ret: number[] = [];
     let cellsPool: XY[] = [cell];
     const cellsCheckedAura: number[] = [];
@@ -105,6 +107,61 @@ export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange:
     }
 
     return ret;
+}
+
+/**
+ * Returns a shared, immutable view for production aura traversal.
+ *
+ * Aura geometry depends only on the immutable GridSettings instance, an in-bounds integer source cell, and an
+ * integer range. The fallback deliberately recalculates malformed/custom inputs so getAuraCellKeys keeps its
+ * historical behavior for callers outside the fight engine.
+ */
+export function getAuraCellKeysView(gridSettings: GridSettings, cell: XY, auraRange: number): ReadonlyArray<number> {
+    const gridSize = gridSettings.getGridSize();
+    if (
+        !Number.isSafeInteger(gridSize) ||
+        gridSize <= 0 ||
+        !Number.isSafeInteger(cell.x) ||
+        !Number.isSafeInteger(cell.y) ||
+        !Number.isSafeInteger(auraRange) ||
+        cell.x < 0 ||
+        cell.y < 0 ||
+        cell.x >= gridSize ||
+        cell.y >= gridSize ||
+        auraRange < 0
+    ) {
+        return calculateAuraCellKeys(gridSettings, cell, auraRange);
+    }
+
+    const cellKey = cell.x * gridSize + cell.y;
+    if (!Number.isSafeInteger(cellKey)) {
+        return calculateAuraCellKeys(gridSettings, cell, auraRange);
+    }
+
+    let rangesPerCell = auraCellKeysPerGrid.get(gridSettings);
+    if (!rangesPerCell) {
+        rangesPerCell = new Map();
+        auraCellKeysPerGrid.set(gridSettings, rangesPerCell);
+    }
+
+    let keysPerRange = rangesPerCell.get(cellKey);
+    if (!keysPerRange) {
+        keysPerRange = new Map();
+        rangesPerCell.set(cellKey, keysPerRange);
+    }
+
+    const cached = keysPerRange.get(auraRange);
+    if (cached) {
+        return cached;
+    }
+
+    const calculated = Object.freeze(calculateAuraCellKeys(gridSettings, cell, auraRange));
+    keysPerRange.set(auraRange, calculated);
+    return calculated;
+}
+
+export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: number): number[] {
+    return Array.from(getAuraCellKeysView(gridSettings, cell, auraRange));
 }
 
 export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: number): XY[] {
