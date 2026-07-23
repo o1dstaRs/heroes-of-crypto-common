@@ -141,7 +141,8 @@ export namespace PBTypes {
         ARACHNA_QUEEN = 44,
         ARACHNA_SPIDER = 45,
         MERMAID = 46,
-        DRYAD = 47
+        DRYAD = 47,
+        BLACKSMITH = 48
     }
     export class StringList extends pb_1.Message {
         #one_of_decls: number[][] = [];

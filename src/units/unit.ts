@@ -13,6 +13,7 @@ import Denque from "denque";
 import { Ability } from "../abilities/ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
@@ -65,6 +66,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
+    "Blacksmith Tools": new Set(["Craft"]),
 };
 
 function isSpellOwnedBySpellbook(entry: string, abilityName: string): boolean {
@@ -277,7 +279,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         effectFactory: EffectFactory,
         summoned: boolean,
     ) {
-        this.unitProperties = unitProperties;
+        // Deep-copy so this unit OWNS its properties (nested arrays included). Client factories stamp
+        // same-type stacks by shallow-spreading a shared template (Unit.createUnit({ ...template, id, team }))
+        // and stack-splits reuse the source unit's live props — both alias the nested `abilities` /
+        // `abilities_descriptions` / ... arrays. Without this clone, grantAbility() pushing to one unit's
+        // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
+        this.unitProperties = structuredClone(unitProperties);
         this.initialUnitProperties = structuredClone(unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
@@ -568,6 +575,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .replace("{}", Number(chance.toFixed(2)).toString())
                 .replace("{}", Number(reduction.toFixed(2)).toString());
         }
+        if (ability.getName() === "Blacksmith Tools") {
+            // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
+            const { stun, nothing, double, frozen } = getCraftChances(this.getLuck());
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace("{}", double.toString())
+                .replace("{}", frozen.toString())
+                .replace("{}", stun.toString())
+                .replace("{}", nothing.toString());
+        }
         return ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString());
     }
     public getTarget(): string {
@@ -654,7 +672,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public isSkippingThisTurn(): boolean {
         const effects = this.getEffects();
         for (const e of effects) {
-            if (e.getName() === "Stun" || e.getName() === "Blindness") {
+            if (e.getName() === "Stun" || e.getName() === "Blindness" || e.getName() === "Freeze") {
                 return true;
             }
         }
@@ -1997,7 +2015,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public canRespond(attackType: AttackType): boolean {
         for (const e of this.effects) {
-            if (e.getName() === "Stun" || e.getName() === "Blindness") {
+            if (e.getName() === "Stun" || e.getName() === "Blindness" || e.getName() === "Freeze") {
                 return false;
             }
         }

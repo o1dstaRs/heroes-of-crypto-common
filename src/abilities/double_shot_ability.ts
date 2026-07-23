@@ -52,7 +52,8 @@ export function processDoubleShotAbility(
     isAOE: boolean,
 ): IDoubleShotResult {
     const animationData: IAnimationData[] = [];
-    const doubleShotAbility = fromUnit.getAbility("Double Shot");
+    // Crafted Double Shot (granted by the Blacksmith's Craft) behaves identically to Double Shot.
+    const doubleShotAbility = fromUnit.getAbility("Double Shot") ?? fromUnit.getAbility("Crafted Double Shot");
     const unitIdsDied: string[] = [];
 
     let damageFromAttack = 0;

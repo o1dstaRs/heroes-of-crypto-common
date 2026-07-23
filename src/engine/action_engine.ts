@@ -11,6 +11,7 @@
 
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
+import { processCraftAbility } from "../abilities/craft_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
@@ -809,6 +810,9 @@ export class GameActionEngine {
         if (!target && this.isMassSpell(spell)) {
             return this.massCastSpell(action, caster, spell);
         }
+        if (!target && spell.getSpellTargetType() === SpellTargetType.ALLIES_AREA) {
+            return this.craftCast(action, caster, spell);
+        }
 
         const result = this.context.attackHandler.handleMagicAttack(
             this.context.grid.getMatrix(),
@@ -839,6 +843,37 @@ export class GameActionEngine {
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Blacksmith's Craft: a 2x2 area cast on allies. The clicked cell is the bottom-left of the block; every
+     * ally occupying one of the four cells rolls an independent crafting outcome (see processCraftAbility).
+     */
+    private craftCast(
+        action: Extract<GameAction, { type: "cast_spell" }>,
+        caster: Unit,
+        spell: Spell,
+    ): IGameActionResult {
+        if (!action.targetCell) {
+            return this.reject("spell_not_available");
+        }
+        const c = action.targetCell;
+        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const allies = affected.filter((u) => u.getTeam() === caster.getTeam());
+        processCraftAbility(caster, allies, this.context.sceneLog);
+        caster.useSpell(spell.getName());
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetCell: c,
+                unitIdsDied: [],
+                animations: [],
+            },
+        ];
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }

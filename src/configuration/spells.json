@@ -679,6 +679,26 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Craft": {
+            "name": "Craft",
+            "level": 1,
+            "desc": [
+                "Craft allies in a 2x2 area: each may gain a second attack, a frozen weapon, be stunned, or nothing.",
+                "Requires stack power 4."
+            ],
+            "target": "ALLIES_AREA",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 4,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Made of Fire": {
             "name": "Made of Fire",
             "level": 0,
