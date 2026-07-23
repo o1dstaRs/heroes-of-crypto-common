@@ -1,0 +1,226 @@
+{
+    "schemaVersion": 1,
+    "title": "A13 Workstream 3 static aura geometry and unchanged-state refresh evidence",
+    "recordedDate": "2026-07-22",
+    "status": "local qualified candidate; not pushed, pinned, deployed, or release-approved",
+    "scope": {
+        "productionDelta": [
+            "src/effects/effect_helper.ts",
+            "src/simulation/battle_snapshot.ts",
+            "src/units/units_holder.ts"
+        ],
+        "mechanism": [
+            "Cache immutable ordered aura cell-key views by immutable GridSettings identity, safe source cell, and integer range.",
+            "Fingerprint every value that can change the legacy full refresh and skip only an exact unchanged state.",
+            "Keep refreshAuraEffectsForAllUnits as the forced full-refresh oracle and fail closed for malformed state.",
+            "Snapshot and restore the dynamic fingerprint and known-empty marker with the derived aura map."
+        ],
+        "nonGoals": [
+            "No per-emitter or per-recipient partial rebuild in this slice.",
+            "No change to aura order, strongest-duplicate tie handling, off-grid behavior, or application rules.",
+            "No claimed release-level end-to-end wall-clock result."
+        ]
+    },
+    "source": {
+        "baselineOverlayCommit": "355275ae69dbd679667a747aafe00e71a650bb8e",
+        "baselineConstruction": "Copy the exact candidate source tree, then replace only the three productionDelta files with git show 355275a:<path>.",
+        "baselineSrcTreeManifestSha256": "df09407517a74cebfd8177571aed8bf1cc67b6568570ac7cd3351b00bf546b48",
+        "candidateSrcTreeManifestSha256": "9b2b76ad9d7d8eb8676b38c07f10cd67aaa881a1b0898cbd2276c0c7f233becd",
+        "combatHelperSha256BothRoots": "d4728f1de9c1ee4af9ed8395e9307efbcd277cd0e063a632a5f71580b9e3c875",
+        "runner": {
+            "path": "docs/evidence/tools/a13_aura_pair_microbench.ts",
+            "sha256": "1ff7f4b5371bc5ab485f6a923ccd902370a82fc3d6a92c03ee19bc8be01145be"
+        },
+        "files": {
+            "baseline": {
+                "src/effects/effect_helper.ts": "ac8c020e9dcd71a8d7f3248cd70eae257b62a60dd80f1fbe0ee7b1e61631014e",
+                "src/simulation/battle_snapshot.ts": "a28828f17baf1578573342448e52c74d34646856f58803f1fdd55e680a084da4",
+                "src/units/units_holder.ts": "e4382011eec6fca1ceda70395ca24a35b5b28ea0cc82d390319499a29cd6b2a0"
+            },
+            "candidate": {
+                "src/effects/effect_helper.ts": "c97f2702915226bbad30241f4e1d846934cc12a81991799d649012933bd97bcc",
+                "src/simulation/battle_snapshot.ts": "c8483f80c687fc0cff05496c4de8c8fc1b8401fcffa03a4c5ce1ba8ccb323b24",
+                "src/units/units_holder.ts": "465ae6e02b03b9fd1783d205d685f82e68084e61bda220faa1382b4decf83fc0"
+            }
+        },
+        "sealedDelta": {
+            "changed": [
+                "src/effects/effect_helper.ts",
+                "src/simulation/battle_snapshot.ts",
+                "src/units/units_holder.ts"
+            ],
+            "added": [],
+            "deleted": [],
+            "passed": true
+        }
+    },
+    "semanticOracle": {
+        "workloadSha256": "eb4e4718352ac2885c632586359c780796c0f0f74b6f55297a5031f4b1602c8f",
+        "fixtureUnits": 12,
+        "timedEvents": 26,
+        "dirtyEvents": 13,
+        "noOpEvents": 13,
+        "liveAndRestoreBoundaries": 30,
+        "postTimingMalformedBoundaries": 10,
+        "mismatches": 0,
+        "liveTraceSha256": "f0aefa03b43a74889154d2f045eaaa3ce991a49340fdd48c69890cc42fc18c7c",
+        "malformedTraceSha256": "c17e4ef223a5c6f4e6b3926fe5cb4d07ec4ba10ebc93ad04e484c84bcab94fad",
+        "combinedTraceSha256": "f3eed1f474d0f27f5a784b71306b8670ee2d2a2567f655e8c9a31e0afa5d8cc1",
+        "timedStableStateChecksumsEqual": true
+    },
+    "microbenchmark": {
+        "host": {
+            "cpu": "Apple M4 Max",
+            "architecture": "arm64",
+            "logicalCpus": 16,
+            "bun": "1.3.14"
+        },
+        "protocol": {
+            "blocks": 31,
+            "order": "alternating AB/BA",
+            "settlingBlocks": 2,
+            "targetMsPerSlowerArm": 150,
+            "warmupMsPerArm": 750,
+            "callsPerBlock": 832,
+            "bootstrapSamples": 10000,
+            "bootstrapSeed": "0xa13ab005",
+            "timingScope": "Aura refresh entry only; event mutation and state hashing excluded.",
+            "note": "Paired statistical gates qualify this local microbenchmark. Release-level wall-clock claims require a separate idle, thermal, and power-controlled run."
+        },
+        "candidateRefreshDecisions": {
+            "rebuilds": 12896,
+            "noOps": 12896
+        },
+        "baselineNsPerCall": {
+            "median": 113219.83413461539,
+            "p95": 129541.98677884616,
+            "p99": 133696.921875
+        },
+        "candidateNsPerCall": {
+            "median": 71114.94350961539,
+            "p95": 73128.59014423077,
+            "p99": 73899.03605769231
+        },
+        "medianReduction": 0.37188617124220835,
+        "medianReductionBootstrap95": {
+            "lower": 0.3660893131752847,
+            "median": 0.37188617124220835,
+            "upper": 0.3810417642430931
+        },
+        "p95RatioBootstrap95": {
+            "lower": 0.5435528112481806,
+            "median": 0.5704639699856743,
+            "upper": 0.6095055896222934
+        },
+        "p99RatioBootstrap95": {
+            "lower": 0.5438328289140696,
+            "median": 0.5527355082025318,
+            "upper": 0.6001211920954387
+        },
+        "blockNsPerCall": {
+            "baseline": [
+                121856.37019230769, 120651.25, 114855.58173076923, 109947.53004807692, 110920.12740384616,
+                112235.11298076923, 112558.77764423077, 114765.60336538461, 129541.98677884616, 119291.40024038461,
+                109551.12860576923, 112445.39783653847, 117727.08653846153, 114775.15745192308, 112470.99879807692,
+                110623.34495192308, 109885.36418269231, 112519.87379807692, 113219.83413461539, 115116.05048076923,
+                113683.69591346153, 111494.38701923077, 111512.87019230769, 112684.50240384616, 125945.11538461539,
+                133696.921875, 115006.37379807692, 111142.07572115384, 111998.59134615384, 113651.08774038461,
+                115111.640625
+            ],
+            "candidate": [
+                72708.77524038461, 71020.88581730769, 71327.55048076923, 69772.70552884616, 69717.18990384616,
+                69522.53485576923, 71965.87379807692, 71885.08052884616, 73899.03605769231, 71114.94350961539,
+                70347.24759615384, 70136.15985576923, 73128.59014423077, 71035.11538461539, 71524.08293269231,
+                69995.12620192308, 70878.09014423077, 72671.33774038461, 72182.90144230769, 71191.54326923077,
+                71487.92307692308, 69671.36177884616, 70829.28846153847, 70168.57572115384, 71259.828125,
+                71672.78725961539, 71843.99278846153, 69719.15384615384, 70213.83774038461, 70540.89903846153,
+                73108.37139423077
+            ]
+        },
+        "gates": {
+            "medianReductionAtLeast30Percent": true,
+            "medianReductionLower95AtLeast25Percent": true,
+            "p95RatioUpper95AtMost1Point05": true,
+            "p99RatioUpper95AtMost1Point05": true,
+            "allPassed": true
+        },
+        "rawReport": {
+            "retained": false,
+            "ephemeralPath": "/tmp/a13-aura-final.AXSulF/a13-aura-pair.final.json",
+            "sha256": "4442d4169c60554485d3cb685812a8bd3c7a70fd59efc39284bfbc27955a1729",
+            "measuredRunnerSha256": "ea6f3df05f3fafe372631c827ac1e6fba8bde8e0aae6b6539d8bf011c851d637"
+        },
+        "splitPathDiagnostic": {
+            "status": "directional under a concurrently loaded host; the aggregate still passed every gate",
+            "runnerSha256": "1ff7f4b5371bc5ab485f6a923ccd902370a82fc3d6a92c03ee19bc8be01145be",
+            "rawReportSha256": "d6f3c8ed142db45729abb013606f8b5233ef6bc6f4f93af3bb1228ee71270dab",
+            "aggregateMedianReduction": 0.403424270679519,
+            "aggregateMedianReductionBootstrap95": {
+                "lower": 0.3946798993998146,
+                "median": 0.40297206779198746,
+                "upper": 0.4124152710718163
+            },
+            "dirtyRefresh": {
+                "baselineMedianNs": 141925.9090909091,
+                "candidateMedianNs": 156728.15151515152,
+                "candidateToBaselineRatio": 1.1042955618114874,
+                "tradeoff": "An invalidated call is about 10.43% slower because it fingerprints before and after the forced rebuild."
+            },
+            "noOpRefresh": {
+                "baselineMedianNs": 141149.67365967366,
+                "candidateMedianNs": 11207.601398601399,
+                "candidateToBaselineRatio": 0.07940224803936902,
+                "benefit": "An unchanged call is about 92.06% cheaper."
+            },
+            "medianModelBreakEvenNoOpFraction": 0.10176235946708219,
+            "interpretation": "The simple median model breaks even near a 10.18% no-op rate. The sealed qualification workload is intentionally 50% dirty and 50% no-op; always-dirty workloads regress and are not the target."
+        },
+        "replication": {
+            "postFixAggregateMedianReductionRange": [0.37188617124220835, 0.403424270679519],
+            "headlineUsesConservativeMinimum": true
+        }
+    },
+    "validation": {
+        "deepDifferential": {
+            "command": "A13_AURA_ORACLE_DEEP=1 bun test test/units/aura_refresh_invalidation.test.ts",
+            "result": "7 passed, 0 failed, 12,499 assertions; 64 seeds x 192 mixed events plus hand-authored boundaries"
+        },
+        "focusedEngineAndAbilitySuites": {
+            "result": "167 passed, 0 failed, 6,099 assertions"
+        },
+        "typescript": {
+            "command": "bunx tsc -p tsconfig.build.json --noEmit",
+            "result": "passed"
+        },
+        "formatAndLint": {
+            "result": "owned source ESLint, owned-file Prettier, and git diff --check passed"
+        },
+        "fullCommon": {
+            "result": "1,831 passed and 6 unrelated AI/search WIP failures across 1,837 tests; all six reproduced identically from a clean HEAD archive"
+        },
+        "client": {
+            "result": "common dist rebuilt directly; client TypeScript passed; 209 core tests passed with 0 failures"
+        },
+        "server": {
+            "result": "Existing pinned server passed TypeScript and 229 API tests with 0 failures, but it resolves common SHA 473373c2c4910fa8879c490273ab9a92e36ffe2c. Workstream 3 requires a post-push pin bump and repeat validation."
+        }
+    },
+    "compatibilityWaivers": [
+        "A skipped refresh preserves aura-map, applied-effect, and current AuraEffect object identities where a forced refresh reallocates them. No common, client, or server consumer was found retaining these references across refreshes.",
+        "Injected subclasses, proxies, monkeypatched methods, or throwing getters may fail during fingerprint capture earlier than the legacy refresh and can expose different partial mutation on exception. Native production objects and supported public native mutations are covered.",
+        "Static geometry caching assumes a GridSettings instance remains immutable, matching its readonly API and snapshot classification. Runtime casts that mutate a cached instance are unsupported."
+    ],
+    "reproduction": {
+        "runnerCommand": "bun docs/evidence/tools/a13_aura_pair_microbench.ts --baseline-root <baseline> --candidate-root <candidate> --out <new-output.json>",
+        "runnerRefuses": [
+            "unexpected source deltas",
+            "identical roots without the explicit smoke override",
+            "source, helper, or runner mutation during execution",
+            "semantic mismatch",
+            "timed checksum mismatch",
+            "missing candidate production entry",
+            "failed performance gates",
+            "overwriting an existing output"
+        ]
+    }
+}
