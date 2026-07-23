@@ -175,8 +175,9 @@ import {
  * redirect. SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE defaults to `pure_ranged`; `any_board` widens catalog
  * collection to mixed boards but requires exact Pareto, native/current actor and target cards, original stacks,
  * and production v0.8 selection. `mixed_supported` is the narrower fixed-cohort arm: it structurally excludes
- * pure boards, admits only native Cyclops/Large-Caliber or Tsar-Cannon/Through-Shot actors, requires every
- * reachable melee threat to be screened by an original native melee ally, and targets native Tsar Cannons only.
+ * pure boards, admits only native Cyclops/Large-Caliber or Tsar-Cannon/Through-Shot actors, requires a nearby
+ * original native melee ally and every reachable melee threat to be screened by one, and targets native Tsar
+ * Cannons only. An empty reachable-threat set is safe only while that nearby native guard remains.
  * Each mixed-supported proposal emits a sparse v13 audit row even when SEARCH_AUDIT_TURNS is disabled.
  * SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS=1 is an independent default-off, version-scoped scheduler for ordinary
  * original shooters on those all-ranged boards. During laps 1..11 it locks an inherited stationary shot already

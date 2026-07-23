@@ -143,6 +143,7 @@ function mixedSupportedFixture(
     actorName = "Cyclops",
     actorAbilities: readonly string[] = ["Large Caliber"],
     noMeleeName = "Tsar Cannon",
+    guardCell: Readonly<{ x: number; y: number }> = { x: 3, y: 7 },
 ): IMixedSupportedFixture {
     const context = createCombatTestContext();
     const actor = createTestUnit({
@@ -173,7 +174,7 @@ function mixedSupportedFixture(
         abilities: ["No Melee"],
     });
     placeUnit(context.grid, context.unitsHolder, actor, { x: 2, y: 7 });
-    placeUnit(context.grid, context.unitsHolder, guard, { x: 3, y: 7 });
+    placeUnit(context.grid, context.unitsHolder, guard, guardCell);
     placeUnit(context.grid, context.unitsHolder, threat, { x: 5, y: 7 });
     placeUnit(context.grid, context.unitsHolder, primary, { x: 8, y: 3 });
     placeUnit(context.grid, context.unitsHolder, noMelee, { x: 9, y: 7 });
@@ -557,6 +558,80 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
         ).toBe("through_shot");
     });
 
+    it("treats an empty threat set as fully screened only with close original native support", () => {
+        const zeroThreat = mixedSupportedFixture();
+        zeroThreat.threat.grantStolenAbility("No Melee");
+        expect(
+            mixedSupportedParetoNoMeleeFocusContext(zeroThreat.actor, zeroThreat.unitsHolder, zeroThreat.state),
+        ).toMatchObject({
+            actorAbility: "large_caliber",
+            noMeleeTargetIds: [zeroThreat.noMelee.getId()],
+            support: { guardCount: 1, reachableThreats: 0, screenedThreats: 0 },
+        });
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                zeroThreat.actor,
+                zeroThreat.unitsHolder,
+                [zeroThreat.incumbent, zeroThreat.focus],
+                zeroThreat.state,
+                3,
+                1,
+                "mixed_supported",
+            )[0],
+        ).toMatchObject({
+            candidate: zeroThreat.focus,
+            noMeleeTargetId: zeroThreat.noMelee.getId(),
+            support: { guardCount: 1, reachableThreats: 0, screenedThreats: 0 },
+        });
+        expect(
+            probeMixedSupportedParetoNoMeleeFocusFunnel(
+                zeroThreat.actor,
+                zeroThreat.unitsHolder,
+                zeroThreat.state,
+                3,
+                zeroThreat.incumbent.actions,
+            ),
+        ).toMatchObject({
+            passedStages: MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES.slice(0, 7),
+            failedStage: null,
+            guardCount: 1,
+            reachableThreats: 0,
+            screenedThreats: 0,
+        });
+
+        const distantGuard = mixedSupportedFixture("Cyclops", ["Large Caliber"], "Tsar Cannon", { x: 2, y: 12 });
+        distantGuard.threat.grantStolenAbility("No Melee");
+        expect(
+            mixedSupportedParetoNoMeleeFocusContext(distantGuard.actor, distantGuard.unitsHolder, distantGuard.state),
+        ).toBeUndefined();
+        expect(
+            rankPureRangedParetoNoMeleeFocusCandidates(
+                distantGuard.actor,
+                distantGuard.unitsHolder,
+                [distantGuard.incumbent, distantGuard.focus],
+                distantGuard.state,
+                3,
+                1,
+                "mixed_supported",
+            ),
+        ).toEqual([]);
+        expect(
+            probeMixedSupportedParetoNoMeleeFocusFunnel(
+                distantGuard.actor,
+                distantGuard.unitsHolder,
+                distantGuard.state,
+                3,
+                distantGuard.incumbent.actions,
+            ),
+        ).toMatchObject({
+            passedStages: MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES.slice(0, 3),
+            failedStage: "original_native_guard_presence",
+            guardCount: 0,
+            reachableThreats: 0,
+            screenedThreats: 0,
+        });
+    });
+
     it("reports the deterministic mixed-supported eligibility prefix and exact first failure", () => {
         const eligible = mixedSupportedFixture();
         const complete = probeMixedSupportedParetoNoMeleeFocusFunnel(
@@ -617,10 +692,6 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
             "original_native_tsar_no_melee_target",
             4,
         );
-
-        const noReachableThreat = mixedSupportedFixture();
-        noReachableThreat.threat.grantStolenAbility("No Melee");
-        expectFailure(noReachableThreat, "reachable_threat_presence", 5);
 
         const unscreened = mixedSupportedFixture();
         const extraThreat = createTestUnit({

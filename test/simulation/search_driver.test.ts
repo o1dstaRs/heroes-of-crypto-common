@@ -1950,7 +1950,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             scope: "mixed_supported",
             status: "valid_override",
             actor: { name: "Cyclops", ability: "large_caliber" },
-            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+            support: { guardCount: 1, reachableThreats: 1, screenedThreats: 1 },
             incumbent: { targetId: primary.getId(), targetName: "Squire" },
             proposal: { targetId: noMelee.getId(), targetName: "Tsar Cannon" },
         });
@@ -1966,6 +1966,44 @@ describe("search driver — gating, hygiene, determinism", () => {
             mixedSupportedParetoNoMeleeFocusFunnel: {
                 countingDomain: "production_v0.8_selector_decisions",
                 stages: MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES,
+                opportunities: 1,
+                cumulative: uniformMixedSupportedFunnelCounts(1),
+                failures: uniformMixedSupportedFunnelCounts(0),
+            },
+        });
+        expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("takes a valid mixed-supported override with close native support and no reachable threats", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-zero-threat-")), "search.jsonl");
+        setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_325, "v0.8", undefined, mixedSupportedParetoRoster());
+        const { actor, primary, noMelee } = positionMixedSupportedParetoFixture(h);
+        primary.grantStolenAbility("No Melee");
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const incumbent = plainAim(actor, primary);
+        const chosen = driver.chooseDecision(actor, "v0.8", incumbent);
+        expect(chosen).not.toBe(incumbent);
+        expect(chosen.find((action) => action.type === "range_attack")?.targetId).toBe(noMelee.getId());
+
+        driver.onMatchEnd("draw", "turn_cap");
+        const rows = readFileSync(audit, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as Record<string, unknown>);
+        expect(rows.find((row) => row.t === "pareto_focus")).toMatchObject({
+            schema: "hoc.search.pareto_focus.v13",
+            status: "valid_override",
+            support: { guardCount: 1, reachableThreats: 0, screenedThreats: 0 },
+            incumbent: { targetId: primary.getId() },
+            proposal: { targetId: noMelee.getId() },
+        });
+        expect(rows.find((row) => row.t === "game")).toMatchObject({
+            pureRangedParetoNoMeleeFocusProposals: 1,
+            pureRangedParetoNoMeleeFocusValidOverrides: 1,
+            mixedSupportedParetoNoMeleeFocusFunnel: {
                 opportunities: 1,
                 cumulative: uniformMixedSupportedFunnelCounts(1),
                 failures: uniformMixedSupportedFunnelCounts(0),
@@ -2007,7 +2045,7 @@ describe("search driver — gating, hygiene, determinism", () => {
                 stationary_lap_candidate_shape: 1,
                 original_native_guard_presence: 1,
                 original_native_tsar_no_melee_target: 1,
-                reachable_threat_presence: 1,
+                reachable_threat_assessment: 1,
                 all_reachable_threats_screened: 1,
                 catalog_expansion: 0,
                 exact_pareto_proposal: 0,
@@ -2019,7 +2057,7 @@ describe("search driver — gating, hygiene, determinism", () => {
                 stationary_lap_candidate_shape: 1,
                 original_native_guard_presence: 0,
                 original_native_tsar_no_melee_target: 0,
-                reachable_threat_presence: 0,
+                reachable_threat_assessment: 0,
                 all_reachable_threats_screened: 0,
                 catalog_expansion: 1,
                 exact_pareto_proposal: 0,
@@ -2114,7 +2152,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             schema: "hoc.search.pareto_focus.v13",
             status: "rejected_probe",
             lap: 1,
-            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+            support: { guardCount: 1, reachableThreats: 1, screenedThreats: 1 },
         });
         expect(rejected.game).toMatchObject({
             mixedSupportedParetoNoMeleeFocusFunnel: {
@@ -2132,7 +2170,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             schema: "hoc.search.pareto_focus.v13",
             status: "deadline_fallback",
             lap: 1,
-            support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+            support: { guardCount: 1, reachableThreats: 1, screenedThreats: 1 },
         });
         expect(deadline.game).toMatchObject({
             mixedSupportedParetoNoMeleeFocusFunnel: {
