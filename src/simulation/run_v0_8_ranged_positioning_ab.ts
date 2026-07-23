@@ -119,7 +119,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v11";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v12";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -550,7 +550,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v11" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v12" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -1076,7 +1076,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
     if (args.includes("--help") || args.includes("-h")) {
         console.log(
             "Usage: bun src/simulation/run_v0_8_ranged_positioning_ab.ts " +
-                "[--cohorts hybrid,ranged_max_sniper3] [--games 1000] [--seed 872511] " +
+                `[--cohorts <csv:${MIRROR_COHORTS.join("|")}>] [--games 1000] [--seed 872511] ` +
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +

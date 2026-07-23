@@ -18,11 +18,14 @@ import type {
     IV08SupportedPrepinEgressDetails,
 } from "../../src/ai";
 import { V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES } from "../../src/ai/ai_strategy";
+import { setupForArchetype } from "../../src/simulation/archetype_payoff";
 import {
     aggregateMirrorDiag,
     buildMirrorRoster,
+    MIRROR_COHORTS,
     mirrorGameSeed,
     mirrorWorkerGameIndex,
+    MIXED_CYCLOPS_TSAR_ROSTER_NAMES,
     playMirrorGame,
     PURE_RANGED_ROSTER_NAMES,
     summarizeMirrorRecords,
@@ -213,6 +216,59 @@ describe("measure_mirror_cohorts", () => {
         expect(table.map((u) => u.amount)).toEqual([50, 50, 30, 30, 15, 8]);
         // expBudget differs from the level table for at least one stack (live ceil(1000/exp) rule).
         expect(exp.map((u) => u.amount)).not.toEqual(table.map((u) => u.amount));
+    });
+
+    test("mixed_cyclops_tsar is a fixed mixed screen with native Large Caliber and Through Shot actors", () => {
+        const exp = buildMirrorRoster("mixed_cyclops_tsar", 1, "expBudget");
+        const table = buildMirrorRoster("mixed_cyclops_tsar", 999, "levelTable");
+
+        expect(MIRROR_COHORTS).toContain("mixed_cyclops_tsar");
+        expect(exp.map((unit) => unit.creatureName)).toEqual(
+            MIXED_CYCLOPS_TSAR_ROSTER_NAMES.map((unit) => unit.creatureName),
+        );
+        expect(exp.map((unit) => unit.level)).toEqual([1, 1, 2, 2, 3, 4]);
+        expect(table.map((unit) => unit.creatureName)).toEqual(exp.map((unit) => unit.creatureName));
+        expect(table.map((unit) => unit.amount)).toEqual([50, 50, 30, 30, 15, 8]);
+        expect(exp.map((unit) => unit.amount)).not.toEqual(table.map((unit) => unit.amount));
+        expect(exp.map((unit) => unit.creatureName)).not.toEqual(
+            PURE_RANGED_ROSTER_NAMES.map((unit) => unit.creatureName),
+        );
+        expect(exp.map((unit) => unit.creatureName)).toEqual([
+            "Squire",
+            "Arbalester",
+            "Pikeman",
+            "Elf",
+            "Cyclops",
+            "Tsar Cannon",
+        ]);
+    });
+
+    test("mixed_cyclops_tsar preserves symmetric paired side swaps and the ordinary LiveTwin setup", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, cohort: "mixed_cyclops_tsar" };
+        const configs: IMatchConfig[] = [];
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            configs.push(config);
+            return fakeResult(config, "draw");
+        };
+
+        const first = playMirrorGame(cfg, 0, { matchRunner });
+        const second = playMirrorGame(cfg, 1, { matchRunner });
+        const signature = (roster: IMatchConfig["roster"]): string[] =>
+            roster.map((unit) => `L${unit.level}:${unit.creatureName}x${unit.amount}`);
+        const expectedSetup = setupForArchetype("melee_coevo");
+
+        expect(first.seed).toBe(second.seed);
+        expect(configs[0].greenVersion).toBe("v0.7");
+        expect(configs[0].redVersion).toBe("v0.6");
+        expect(configs[1].greenVersion).toBe("v0.6");
+        expect(configs[1].redVersion).toBe("v0.7");
+        expect(signature(configs[0].roster)).toEqual(signature(configs[0].redRoster!));
+        expect(signature(configs[1].roster)).toEqual(signature(configs[0].roster));
+        expect(configs[0].roster).not.toBe(configs[0].redRoster);
+        expect(configs[0].greenPerk).toBe(expectedSetup.perk);
+        expect(configs[0].redPerk).toBe(expectedSetup.perk);
+        expect(configs[0].greenAugments).toEqual(expectedSetup.augments);
+        expect(configs[0].redAugments).toEqual(expectedSetup.augments);
     });
 
     test("diagnostics aggregate only completed adjacent same-unit same-side same-lap move-shots by version", () => {
