@@ -1,0 +1,60 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-aggregation-incident/v1",
+    "recordedAt": "2026-07-23T13:04:26.000Z",
+    "campaign": {
+        "id": "a13-stat-rounding-4d8d94a-20260723-v2",
+        "status": "invalidated-before-aggregate-output",
+        "protocolCommit": "4c8b0fcd9363874396e8bcdf9336fc905b73002c",
+        "authorizationCommit": "453b142517195ee068ea9510ffef47bb70e00359",
+        "closedLedgerCommit": "30ef1c441c33cf870e482d5a5b282fa6ada51e8d",
+        "zeroRetryHonored": true
+    },
+    "evidence": {
+        "formalOutputRoot": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2",
+        "aggregateExists": false,
+        "allProducerStagesAccepted": true,
+        "acceptedProducerStageCount": 13,
+        "noShadowAttemptsAttestation": true,
+        "ledger": {
+            "path": "docs/evidence/a13_stat_rounding_attempt_ledger_2026-07-23.jsonl",
+            "bytes": 197208,
+            "sha256": "94926abe0565b3151e120ca14c22fd9429927a6c26f7cbb8f040136357d72680",
+            "recordCount": 29,
+            "closureRecordSha256": "9a5237cccc06ba16e1aa9f658fb3f5ca358fe78ae42a09d8ab470c54a200f2b4"
+        },
+        "producerProtocol": {
+            "path": "docs/evidence/a13_stat_rounding_replication_protocol_2026-07-23.json",
+            "bytes": 21370,
+            "sha256": "96eaf0ab6753955a853a9f3f3ed91ca4435f92b0166f5c2781a87a8efb181a65"
+        },
+        "microArtifact": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2/micro.json",
+            "bytes": 364779,
+            "sha256": "cd97a2496379eaa7ced8f1cb46fdcaba900f8febd5d9837c3aeb7ada1bcd3401"
+        }
+    },
+    "failure": {
+        "stage": "aggregation",
+        "runner": {
+            "path": "docs/evidence/tools/a13_stat_rounding_replication.ts",
+            "bytes": 207847,
+            "sha256": "e637a848f57785f0f87e7955cb4fac6e8572dddd0b34ff181c85913f0d121f84"
+        },
+        "assertion": "micro actualTrace bootstrap",
+        "field": "ratioOfTotalsBootstrap95.lower95",
+        "producerStored": 0.32440328365332727,
+        "replicationRecomputed": 0.3244032836533272,
+        "absoluteDifference": 5.551115123125783e-17,
+        "ulpDistance": 1,
+        "producerInterpolation": "lower * (1 - fraction) + upper * fraction",
+        "replicationInterpolation": "lower + (upper - lower) * fraction",
+        "rootCause": "The producer and independent verifier used algebraically equivalent quantile interpolation expressions whose IEEE-754 evaluation differs by one ULP for this observed lower bound.",
+        "scope": "The aggregate stopped at the exact micro prerequisite assertion before constructing or writing any macro-performance aggregate."
+    },
+    "decision": {
+        "v2PerformanceVerdict": "invalid",
+        "campaignWillNotBeRetried": true,
+        "macroPerformanceValuesInspectedBeforeRemediationFreeze": false,
+        "remediationConstraint": "Commit and independently audit a micro-only deterministic interpolation correction without changing macro estimators, schedules, gates, candidate bytes, or the already sealed v2 producer artifacts before executing one new aggregation attempt."
+    }
+}
