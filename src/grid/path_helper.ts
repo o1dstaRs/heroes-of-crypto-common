@@ -1281,6 +1281,7 @@ export class PathHelper {
             return aggrValue;
         };
 
+        const indexedNeighbors: XY[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
         while (queue.length) {
             const curWeightedRoute = queue.shift();
             if (!curWeightedRoute) {
@@ -1290,7 +1291,54 @@ export class PathHelper {
             const cur = curWeightedRoute.cell;
 
             const key = (cur.x << 4) | cur.y;
-            for (const n of this.getNeighborCells(cur, visited, isSmallUnit)) {
+            let neighbors: XY[];
+            if (indexedNeighbors) {
+                indexedNeighbors.length = 0;
+                const canGoLeft = cur.x > (isSmallUnit ? 0 : 1);
+                const canGoRight = cur.x < 15;
+                const canGoDown = cur.y > (isSmallUnit ? 0 : 1);
+                const canGoUp = cur.y < 15;
+                if (canGoLeft) {
+                    const x = cur.x - 1;
+                    if (!visited.has((x << 4) | cur.y)) indexedNeighbors.push({ x, y: cur.y });
+                }
+                if (canGoUp) {
+                    const y = cur.y + 1;
+                    if (!visited.has((cur.x << 4) | y)) indexedNeighbors.push({ x: cur.x, y });
+                }
+                if (canGoDown) {
+                    const y = cur.y - 1;
+                    if (!visited.has((cur.x << 4) | y)) indexedNeighbors.push({ x: cur.x, y });
+                }
+                if (canGoRight) {
+                    const x = cur.x + 1;
+                    if (!visited.has((x << 4) | cur.y)) indexedNeighbors.push({ x, y: cur.y });
+                }
+                if (canGoLeft && canGoDown) {
+                    const x = cur.x - 1;
+                    const y = cur.y - 1;
+                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                }
+                if (canGoLeft && canGoUp) {
+                    const x = cur.x - 1;
+                    const y = cur.y + 1;
+                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                }
+                if (canGoRight && canGoDown) {
+                    const x = cur.x + 1;
+                    const y = cur.y - 1;
+                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                }
+                if (canGoRight && canGoUp) {
+                    const x = cur.x + 1;
+                    const y = cur.y + 1;
+                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                }
+                neighbors = indexedNeighbors;
+            } else {
+                neighbors = this.getNeighborCells(cur, visited, isSmallUnit);
+            }
+            for (const n of neighbors) {
                 const keyNeighbor = (n.x << 4) | n.y;
                 // A legal large-unit anchor is the upper-right cell of its 2x2 footprint, so x/y must both
                 // stay at least 1. Keep malformed state (for example, a size-unsafe position swap) from
