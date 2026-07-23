@@ -223,7 +223,7 @@ export class LookaheadDriver {
             return false;
         }
         return (
-            fp.getTeamUnitsAlive(team) > 1 &&
+            fp.hasUnactedTeammate(team, unit.getId(), this.deps.unitsHolder.getAllUnits()) &&
             !fp.hourglassIncludes(unit.getId()) &&
             !fp.hasAlreadyMadeTurn(unit.getId()) &&
             !fp.hasAlreadyHourglass(unit.getId())

@@ -813,6 +813,9 @@ export class GameActionEngine {
         if (!target && spell.getSpellTargetType() === SpellTargetType.ALLIES_AREA) {
             return this.craftCast(action, caster, spell);
         }
+        if (target && (spell.getName() === "Enchant Armor" || spell.getName() === "Enchant Weapon")) {
+            return this.enchantCast(caster, target, spell);
+        }
 
         const result = this.context.attackHandler.handleMagicAttack(
             this.context.grid.getMatrix(),
@@ -870,6 +873,38 @@ export class GameActionEngine {
                 casterId: caster.getId(),
                 spellName: spell.getName(),
                 targetCell: c,
+                unitIdsDied: [],
+                animations: [],
+            },
+        ];
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Blacksmith's Enchant Armor / Enchant Weapon: a single-target ally buff with a 50% chance per cast to add
+     * +1 flat armor / attack. The bonus STACKS — the running total lives in the buff's first spell property, so
+     * re-casting reads the current total, deletes the old buff, and re-applies it at +1 (see adjustBaseStats,
+     * which folds that property into armor_mod / attack_mod, and the card's Buffs section, which shows "+N").
+     */
+    private enchantCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const isArmor = spell.getName() === "Enchant Armor";
+        const buffName = spell.getName();
+        if (getRandomInt(0, 100) < 50) {
+            const next = (target.getBuff(buffName)?.getFirstSpellProperty() ?? 0) + 1;
+            target.deleteBuff(buffName); // idempotent when absent; re-applied below carrying the new total
+            target.applyBuff(spell, next);
+            this.context.sceneLog.updateLog(`${target.getName()} enchanted: +${next} ${isArmor ? "armor" : "attack"}`);
+        } else {
+            this.context.sceneLog.updateLog(`${target.getName()}'s ${isArmor ? "armor" : "weapon"} enchant failed`);
+        }
+        caster.useSpell(spell.getName());
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetId: target.getId(),
+                targetCell: target.getBaseCell(),
                 unitIdsDied: [],
                 animations: [],
             },
@@ -1358,13 +1393,16 @@ export class GameActionEngine {
         return unit;
     }
     private canWaitOnHourglass(unit: Unit): boolean {
-        const teamUnitsAlive = this.context.fightProperties.getTeamUnitsAlive(unit.getTeam());
         if (unit.getTeam() !== PBTypes.TeamVals.LOWER && unit.getTeam() !== PBTypes.TeamVals.UPPER) {
             return false;
         }
 
         return (
-            teamUnitsAlive > 1 &&
+            this.context.fightProperties.hasUnactedTeammate(
+                unit.getTeam(),
+                unit.getId(),
+                this.context.unitsHolder.getAllUnits(),
+            ) &&
             !this.context.fightProperties.hourglassIncludes(unit.getId()) &&
             !this.context.fightProperties.hasAlreadyMadeTurn(unit.getId()) &&
             !this.context.fightProperties.hasAlreadyHourglass(unit.getId())

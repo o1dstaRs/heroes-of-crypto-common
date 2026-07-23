@@ -19,7 +19,12 @@ import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumerate
 import { isV08StrongerRangedPostureWait } from "../../src/ai/versions/v0_8";
 import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { V08S_URGENT_FINISH_START_LAP, V08_TARGET_PRESSURE_START_LAP } from "../../src/ai/versions/v0_8s_finish";
-import { WAIT_FEATURE_NAMES, WAIT_FEATURE_NAMES_V2_RAW, waitScorerInSupport } from "../../src/ai/versions/wait_scorer";
+import {
+    canWaitOnHourglassMirror,
+    WAIT_FEATURE_NAMES,
+    WAIT_FEATURE_NAMES_V2_RAW,
+    waitScorerInSupport,
+} from "../../src/ai/versions/wait_scorer";
 import type { GameAction } from "../../src/engine/actions";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameEvent } from "../../src/engine/events";
@@ -3908,12 +3913,8 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
                 break;
             }
             const fp = h.fightProperties;
-            const id = unit.getId();
             const eligible =
-                fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
-                !fp.hourglassIncludes(id) &&
-                !fp.hasAlreadyMadeTurn(id) &&
-                !fp.hasAlreadyHourglass(id) &&
+                canWaitOnHourglassMirror(unit, fp, h.unitsHolder.getAllUnits()) &&
                 waitScorerInSupport(unit, h.unitsHolder);
             const incumbent = h.decideActive();
             if (eligible && incumbent.length > 0 && !incumbent.some((a) => a.type === "wait_turn")) {
@@ -3950,13 +3951,23 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
     });
 
     it("scorer stays scoped to v0.6s by default: plain v0.6 decides identically even when armed", () => {
-        setEnv({});
-        const a = buildBattle(3103, "v0.6");
-        findEligibleActPoint(a);
-        const offDecision = JSON.stringify(a.decideActive());
+        let fixture: { seed: number; battle: Harness } | undefined;
+        for (let seed = 1; seed <= 64 && !fixture; seed += 1) {
+            setEnv({});
+            const battle = buildBattle(seed, "v0.6");
+            try {
+                findEligibleActPoint(battle);
+                fixture = { seed, battle };
+            } catch {
+                // This roster has no supported same-team defer point inside the bounded window.
+            }
+        }
+        expect(fixture).toBeDefined();
+        if (!fixture) throw new Error("no supported plain-v0.6 wait-scorer fixture found");
+        const offDecision = JSON.stringify(fixture.battle.decideActive());
 
         setEnv({});
-        const b = buildBattle(3103, "v0.6");
+        const b = buildBattle(fixture.seed, "v0.6");
         findEligibleActPoint(b);
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(9) });
         expect(JSON.stringify(b.decideActive())).toBe(offDecision);

@@ -470,7 +470,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         const fp = context.fightProperties;
         return (
             !!fp &&
-            fp.getTeamUnitsAlive(unit.getTeam()) > 1 &&
+            fp.hasUnactedTeammate(unit.getTeam(), unit.getId(), context.unitsHolder.getAllUnits()) &&
             !unit.isOnHourglass() &&
             !fp.hourglassIncludes(unit.getId()) &&
             !fp.hasAlreadyHourglass(unit.getId()) &&
@@ -838,7 +838,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         }
         // Respect the engine's hourglass rules so the proposal is never rejected (which would waste the turn).
         return (
-            fp.getTeamUnitsAlive(fromTeam) > 1 &&
+            fp.hasUnactedTeammate(fromTeam, unit.getId(), unitsHolder.getAllUnits()) &&
             !unit.isOnHourglass() &&
             !fp.hourglassIncludes(unit.getId()) &&
             !fp.hasAlreadyHourglass(unit.getId()) &&

@@ -66,7 +66,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
-    "Blacksmith Tools": new Set(["Craft"]),
+    "Blacksmith Tools": new Set(["Craft", "Enchant Armor", "Enchant Weapon"]),
 };
 
 function isSpellOwnedBySpellbook(entry: string, abilityName: string): boolean {
@@ -2648,6 +2648,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
+        // Enchant Armor (Blacksmith): a stacking flat +N armor buff. The accumulated bonus lives in the buff's
+        // first spell property (set in enchantCast), so a unit enchanted N times carries +N here and on its card.
+        const enchantArmorBuff = this.getBuff("Enchant Armor");
+        if (enchantArmorBuff) {
+            this.unitProperties.armor_mod = Number(
+                (this.unitProperties.armor_mod + (enchantArmorBuff.getFirstSpellProperty() ?? 0)).toFixed(2),
+            );
+        }
+
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
 
         const leatherArmorAbility = this.getAbility("Leather Armor");
@@ -2916,6 +2925,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (angelicHostBuff) {
             this.unitProperties.attack_mod = Number(
                 (this.unitProperties.attack_mod + angelicHostBuff.getPower()).toFixed(2),
+            );
+        }
+
+        // Enchant Weapon (Blacksmith): a stacking flat +N attack buff; accumulated bonus in the buff's first
+        // spell property (set in enchantCast). getAttack() = base_attack + attack_mod, so this lands as flat +N.
+        const enchantWeaponBuff = this.getBuff("Enchant Weapon");
+        if (enchantWeaponBuff) {
+            this.unitProperties.attack_mod = Number(
+                (this.unitProperties.attack_mod + (enchantWeaponBuff.getFirstSpellProperty() ?? 0)).toFixed(2),
             );
         }
         this.unitProperties.base_attack = Number((this.unitProperties.base_attack * baseAttackMultiplier).toFixed(2));

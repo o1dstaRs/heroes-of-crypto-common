@@ -210,10 +210,10 @@ describe("wait scorer — features", () => {
     });
 
     it("canWaitOnHourglassMirror matches the oracle's eligibility predicate", () => {
-        const { actor } = buildBoard();
-        expect(canWaitOnHourglassMirror(actor, fp())).toBe(true);
+        const { actor, context } = buildBoard();
+        expect(canWaitOnHourglassMirror(actor, fp(), context.unitsHolder.getAllUnits())).toBe(true);
         fp().addAlreadyMadeTurn(LOWER, actor.getId());
-        expect(canWaitOnHourglassMirror(actor, fp())).toBe(false);
+        expect(canWaitOnHourglassMirror(actor, fp(), context.unitsHolder.getAllUnits())).toBe(false);
     });
 });
 
@@ -323,7 +323,7 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
     it("training-support guard: a RANGE actor keeps the exact incumbent even at z > 0", () => {
         const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
-        expect(canWaitOnHourglassMirror(ranged.actor, fp())).toBe(true);
+        expect(canWaitOnHourglassMirror(ranged.actor, fp(), ranged.context.unitsHolder.getAllUnits())).toBe(true);
         expect(applyWaitScorer(ranged.actor, ranged.context, ranged.charge, "v0.6s")).toBe(ranged.charge);
         // V07_WAIT_GUARD=off reproduces the unguarded pre-fix scorer (the ranged-collapse configuration)
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5), V07_WAIT_GUARD: "off" });

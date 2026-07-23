@@ -19,7 +19,19 @@
             "exp": 9.5,
             "size": 1,
             "level": 1,
-            "spells": ["System:Craft"],
+            "spells": [
+                "System:Craft",
+                "System:Enchant Armor",
+                "System:Enchant Armor",
+                "System:Enchant Armor",
+                "System:Enchant Armor",
+                "System:Enchant Armor",
+                "System:Enchant Weapon",
+                "System:Enchant Weapon",
+                "System:Enchant Weapon",
+                "System:Enchant Weapon",
+                "System:Enchant Weapon"
+            ],
             "abilities": ["Blacksmith Tools"]
         },
         "Squire": {
