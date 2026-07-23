@@ -14,7 +14,9 @@ import { describe, expect, it } from "bun:test";
 import type { IEnumeratedCandidate } from "../../src/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES,
     mixedSupportedParetoNoMeleeFocusContext,
+    probeMixedSupportedParetoNoMeleeFocusFunnel,
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     rankPureRangedParetoNoMeleeFocusCandidates,
 } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
@@ -553,6 +555,82 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
                 "mixed_supported",
             )[0]?.actorAbility,
         ).toBe("through_shot");
+    });
+
+    it("reports the deterministic mixed-supported eligibility prefix and exact first failure", () => {
+        const eligible = mixedSupportedFixture();
+        const complete = probeMixedSupportedParetoNoMeleeFocusFunnel(
+            eligible.actor,
+            eligible.unitsHolder,
+            eligible.state,
+            3,
+            eligible.incumbent.actions,
+        );
+        expect(complete).toMatchObject({
+            passedStages: MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES.slice(0, 7),
+            failedStage: null,
+            guardCount: 1,
+            noMeleeTargetCount: 1,
+            reachableThreats: 1,
+            screenedThreats: 1,
+            context: mixedSupportedParetoNoMeleeFocusContext(eligible.actor, eligible.unitsHolder, eligible.state),
+        });
+
+        const expectFailure = (
+            fixture: IMixedSupportedFixture,
+            failedStage: (typeof MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES)[number],
+            passedCount: number,
+            state = fixture.state,
+            incumbent = fixture.incumbent.actions,
+        ): void => {
+            const probe = probeMixedSupportedParetoNoMeleeFocusFunnel(
+                fixture.actor,
+                fixture.unitsHolder,
+                state,
+                3,
+                incumbent,
+            );
+            expect(probe.failedStage).toBe(failedStage);
+            expect(probe.passedStages).toEqual(
+                MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES.slice(0, passedCount),
+            );
+        };
+
+        const pureBoard = mixedSupportedFixture();
+        expectFailure(pureBoard, "mixed_board", 0, { ...pureBoard.state, eligible: true });
+
+        expectFailure(mixedSupportedFixture("Arbalester", ["Large Caliber"]), "exact_native_actor_identity", 1);
+
+        const wrongShape = mixedSupportedFixture();
+        expectFailure(wrongShape, "stationary_lap_candidate_shape", 2, wrongShape.state, [
+            { type: "wait_turn", unitId: wrongShape.actor.getId() },
+        ]);
+
+        const noOriginalGuard = mixedSupportedFixture();
+        expectFailure(noOriginalGuard, "original_native_guard_presence", 3, {
+            ...noOriginalGuard.state,
+            originalUnits: noOriginalGuard.state.originalUnits.filter(({ id }) => id !== noOriginalGuard.guard.getId()),
+        });
+
+        expectFailure(
+            mixedSupportedFixture("Cyclops", ["Large Caliber"], "Arbalester"),
+            "original_native_tsar_no_melee_target",
+            4,
+        );
+
+        const noReachableThreat = mixedSupportedFixture();
+        noReachableThreat.threat.grantStolenAbility("No Melee");
+        expectFailure(noReachableThreat, "reachable_threat_presence", 5);
+
+        const unscreened = mixedSupportedFixture();
+        const extraThreat = createTestUnit({
+            team: UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+            name: "Flanking threat",
+            speed: 2,
+        });
+        placeUnit(unscreened.grid, unscreened.unitsHolder, extraThreat, { x: 2, y: 10 });
+        expectFailure(unscreened, "all_reachable_threats_screened", 6);
     });
 
     it("structurally excludes pure boards, wrong name/card maps, and non-native Tsar targets", () => {

@@ -73,11 +73,14 @@ import {
     anyBoardParetoNoMeleeFocusActorAbility,
     DEFAULT_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE,
     isParetoNoMeleeFocusStationaryIncumbent,
+    MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES,
     mixedSupportedParetoNoMeleeFocusContext,
+    probeMixedSupportedParetoNoMeleeFocusFunnel,
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     pureRangedParetoNoMeleeFocusLapEligible,
     pureRangedParetoNoMeleeFocusActorAbility,
     rankPureRangedParetoNoMeleeFocusCandidates,
+    type MixedSupportedParetoNoMeleeFocusFunnelStage,
     type PureRangedParetoNoMeleeFocusScope,
 } from "./pure_ranged_pareto_no_melee_focus";
 import { rankPureRangedNoMeleePressureCandidates } from "./pure_ranged_no_melee_pressure";
@@ -512,6 +515,10 @@ interface ISearchCounters {
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: Record<string, number>;
     pureRangedParetoNoMeleeFocusProposalsByActorName: Record<string, number>;
     pureRangedParetoNoMeleeFocusOverridesByActorName: Record<string, number>;
+    /** In-scope production-selector decisions offered to the mixed-supported funnel. */
+    mixedSupportedParetoNoMeleeFocusFunnelOpportunities: number;
+    /** Production-selector decisions that cumulatively reached each mixed-supported funnel stage. */
+    mixedSupportedParetoNoMeleeFocusFunnelCumulative: Record<MixedSupportedParetoNoMeleeFocusFunnelStage, number>;
     /** JIT turns whose inherited stationary shot proposes a lock on an armed original No Melee barrier. */
     pureRangedJitNoMeleeFocusIncumbentLockProposals: number;
     /** Proposed incumbent locks accepted by the authoritative engine probe. */
@@ -595,6 +602,14 @@ interface ISearchCounters {
     q2oDeltaCount: number;
 }
 
+const emptyMixedSupportedParetoNoMeleeFocusFunnel = (): Record<MixedSupportedParetoNoMeleeFocusFunnelStage, number> => {
+    const counts = {} as Record<MixedSupportedParetoNoMeleeFocusFunnelStage, number>;
+    for (const stage of MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES) {
+        counts[stage] = 0;
+    }
+    return counts;
+};
+
 const emptyCounters = (): ISearchCounters => ({
     decisions: 0,
     searched: 0,
@@ -636,6 +651,8 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedParetoNoMeleeFocusOverridesByActorAbility: {},
     pureRangedParetoNoMeleeFocusProposalsByActorName: {},
     pureRangedParetoNoMeleeFocusOverridesByActorName: {},
+    mixedSupportedParetoNoMeleeFocusFunnelOpportunities: 0,
+    mixedSupportedParetoNoMeleeFocusFunnelCumulative: emptyMixedSupportedParetoNoMeleeFocusFunnel(),
     pureRangedJitNoMeleeFocusIncumbentLockProposals: 0,
     pureRangedJitNoMeleeFocusIncumbentLocks: 0,
     pureRangedJitNoMeleeFocusRejectedLockProbes: 0,
@@ -1212,6 +1229,11 @@ export class SearchDriver {
             this.pureRangedParetoNoMeleeFocus &&
             this.pureRangedParetoNoMeleeFocusVersions.has(version) &&
             (this.pureRangedParetoNoMeleeFocusScope === "pure_ranged" || version === PARETO_ANY_BOARD_SELECTOR_VERSION);
+        const mixedSupportedParetoNoMeleeFocusFunnelSeat =
+            pureRangedParetoNoMeleeFocusSeat &&
+            this.pureRangedParetoNoMeleeFocusScope === "mixed_supported" &&
+            !this.observeOnly &&
+            !this.circuitOpen;
         const pureRangedJitNoMeleeFocusSeat =
             this.pureRangedJitNoMeleeFocus && this.pureRangedJitNoMeleeFocusVersions.has(version);
         // A wait is an initiative action, not a skipped turn: it normally reactivates the unit later in the same
@@ -1261,9 +1283,26 @@ export class SearchDriver {
             pureRangedDeadlineFinisherSeat &&
             this.pureRangedTerminalState?.eligible === true &&
             unit.hasAbilityActive("Endless Quiver");
+        const mixedSupportedParetoFunnelProbe = mixedSupportedParetoNoMeleeFocusFunnelSeat
+            ? probeMixedSupportedParetoNoMeleeFocusFunnel(
+                  unit,
+                  this.deps.unitsHolder,
+                  this.pureRangedTerminalState,
+                  currentLap,
+                  incumbent,
+              )
+            : undefined;
+        if (mixedSupportedParetoFunnelProbe) {
+            this.counters.mixedSupportedParetoNoMeleeFocusFunnelOpportunities += 1;
+            for (const stage of mixedSupportedParetoFunnelProbe.passedStages) {
+                this.counters.mixedSupportedParetoNoMeleeFocusFunnelCumulative[stage] += 1;
+            }
+        }
         const mixedSupportedParetoContext =
             this.pureRangedParetoNoMeleeFocus && this.pureRangedParetoNoMeleeFocusScope === "mixed_supported"
-                ? mixedSupportedParetoNoMeleeFocusContext(unit, this.deps.unitsHolder, this.pureRangedTerminalState)
+                ? mixedSupportedParetoFunnelProbe
+                    ? mixedSupportedParetoFunnelProbe.context
+                    : mixedSupportedParetoNoMeleeFocusContext(unit, this.deps.unitsHolder, this.pureRangedTerminalState)
                 : undefined;
         const incumbentRangedTargetId = incumbent.find((action) => action.type === "range_attack")?.targetId;
         // Catalog expansion is global rather than version-scoped: both experiment seats enumerate the exact same
@@ -1364,6 +1403,11 @@ export class SearchDriver {
             const candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
                 keepCandidate,
             );
+            if (mixedSupportedParetoFunnelProbe?.failedStage === null) {
+                if (pureRangedParetoNoMeleeFocusCatalogBoard) {
+                    this.counters.mixedSupportedParetoNoMeleeFocusFunnelCumulative.catalog_expansion += 1;
+                }
+            }
             // The normal capped catalog remains untouched if a terminal intervention finds no engine-valid shot.
             // Private target-coverage re-enumeration prevents the No Melee target from disappearing behind the
             // generic shot cap, but none of its extra candidates can leak into the fallback search.
@@ -1374,6 +1418,21 @@ export class SearchDriver {
                           preserveAttackTargetCoverage: true,
                       }).candidates.filter(keepCandidate)
                     : candidates;
+            const mixedSupportedParetoFocusCandidates =
+                mixedSupportedParetoFunnelProbe?.failedStage === null && pureRangedParetoNoMeleeFocusCatalogBoard
+                    ? rankPureRangedParetoNoMeleeFocusCandidates(
+                          unit,
+                          this.deps.unitsHolder,
+                          candidates,
+                          this.pureRangedTerminalState,
+                          currentLap,
+                          this.pureRangedParetoNoMeleeFocusDamageFloor,
+                          this.pureRangedParetoNoMeleeFocusScope,
+                      )
+                    : undefined;
+            if (mixedSupportedParetoFocusCandidates?.length) {
+                this.counters.mixedSupportedParetoNoMeleeFocusFunnelCumulative.exact_pareto_proposal += 1;
+            }
             if (
                 pureRangedJitNoMeleeFocusSeat &&
                 pureRangedJitNoMeleeFocusCatalogBoard &&
@@ -1545,15 +1604,17 @@ export class SearchDriver {
                 !this.circuitOpen &&
                 !this.observeOnly
             ) {
-                const focusCandidates = rankPureRangedParetoNoMeleeFocusCandidates(
-                    unit,
-                    this.deps.unitsHolder,
-                    candidates,
-                    this.pureRangedTerminalState,
-                    currentLap,
-                    this.pureRangedParetoNoMeleeFocusDamageFloor,
-                    this.pureRangedParetoNoMeleeFocusScope,
-                );
+                const focusCandidates =
+                    mixedSupportedParetoFocusCandidates ??
+                    rankPureRangedParetoNoMeleeFocusCandidates(
+                        unit,
+                        this.deps.unitsHolder,
+                        candidates,
+                        this.pureRangedTerminalState,
+                        currentLap,
+                        this.pureRangedParetoNoMeleeFocusDamageFloor,
+                        this.pureRangedParetoNoMeleeFocusScope,
+                    );
                 const proposalDecisionOrdinal = this.counters.decisions;
                 if (focusCandidates.length) {
                     const proposal = focusCandidates[0];
@@ -1646,6 +1707,9 @@ export class SearchDriver {
                 if (focusCandidate && focus) {
                     this.counters.decisions += 1;
                     this.counters.pureRangedParetoNoMeleeFocusValidOverrides += 1;
+                    if (mixedSupportedParetoFocusCandidates) {
+                        this.counters.mixedSupportedParetoNoMeleeFocusFunnelCumulative.valid_override += 1;
+                    }
                     this.counters.pureRangedParetoNoMeleeFocusExpectedDamage += focus.expectedNoMeleeDamage;
                     if (focus.minimumDamageRatio < 1) {
                         this.counters.pureRangedParetoNoMeleeFocusRelaxedOnlyValidOverrides += 1;
@@ -1832,6 +1896,13 @@ export class SearchDriver {
             return;
         }
         const c = this.counters;
+        const mixedSupportedParetoNoMeleeFocusFunnelFailures = emptyMixedSupportedParetoNoMeleeFocusFunnel();
+        let mixedSupportedParetoPreviousStage = c.mixedSupportedParetoNoMeleeFocusFunnelOpportunities;
+        for (const stage of MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES) {
+            const cumulative = c.mixedSupportedParetoNoMeleeFocusFunnelCumulative[stage];
+            mixedSupportedParetoNoMeleeFocusFunnelFailures[stage] = mixedSupportedParetoPreviousStage - cumulative;
+            mixedSupportedParetoPreviousStage = cumulative;
+        }
         const summary = {
             t: "game",
             mode: this.mode,
@@ -1890,6 +1961,17 @@ export class SearchDriver {
             pureRangedParetoNoMeleeFocusDamageFloor: this.pureRangedParetoNoMeleeFocusDamageFloor,
             ...(this.pureRangedParetoNoMeleeFocusScope !== "pure_ranged"
                 ? { pureRangedParetoNoMeleeFocusScope: this.pureRangedParetoNoMeleeFocusScope }
+                : {}),
+            ...(this.pureRangedParetoNoMeleeFocusScope === "mixed_supported"
+                ? {
+                      mixedSupportedParetoNoMeleeFocusFunnel: {
+                          countingDomain: "production_v0.8_selector_decisions",
+                          stages: [...MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES],
+                          opportunities: c.mixedSupportedParetoNoMeleeFocusFunnelOpportunities,
+                          cumulative: c.mixedSupportedParetoNoMeleeFocusFunnelCumulative,
+                          failures: mixedSupportedParetoNoMeleeFocusFunnelFailures,
+                      },
+                  }
                 : {}),
             pureRangedParetoNoMeleeFocusProposals: c.pureRangedParetoNoMeleeFocusProposals,
             pureRangedParetoNoMeleeFocusValidOverrides: c.pureRangedParetoNoMeleeFocusValidOverrides,

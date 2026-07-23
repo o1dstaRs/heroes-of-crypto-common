@@ -52,6 +52,7 @@ import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { ilActionSignature, parseIlGameRow, parseIlRow } from "../../src/simulation/il_dataset";
 import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
+import { MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
 import { classifyActions, SearchDriver } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
@@ -1696,6 +1697,8 @@ describe("search driver — gating, hygiene, determinism", () => {
         // The selector remains candidate-only even if a hand-written environment includes both version names.
         SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS: "v0.8,v0.8s",
     } as const;
+    const uniformMixedSupportedFunnelCounts = (value: number): Record<string, number> =>
+        Object.fromEntries(MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES.map((stage) => [stage, value]));
 
     it("wires the 0.95 floor through SearchDriver while the scoped control remains exact", () => {
         const exactAudit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-exact-floor-")), "search.jsonl");
@@ -1797,6 +1800,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(summary.pureRangedParetoNoMeleeFocusExpectedDamage as number).toBeGreaterThan(0);
         expect(summary.pureRangedParetoNoMeleeFocusMinimumDamageRatio as number).toBeGreaterThan(1);
         expect(summary).not.toHaveProperty("pureRangedParetoNoMeleeFocusScope");
+        expect(summary).not.toHaveProperty("mixedSupportedParetoNoMeleeFocusFunnel");
 
         expectEngineAcceptsProductiveDecision(h, chosen);
     });
@@ -1881,6 +1885,7 @@ describe("search driver — gating, hygiene, determinism", () => {
             pureRangedParetoNoMeleeFocusValidOverrides: 1,
             pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
         });
+        expect(summary).not.toHaveProperty("mixedSupportedParetoNoMeleeFocusFunnel");
         expectEngineAcceptsProductiveDecision(h, chosen);
     });
 
@@ -1958,8 +1963,98 @@ describe("search driver — gating, hygiene, determinism", () => {
             pureRangedParetoNoMeleeFocusProposals: 1,
             pureRangedParetoNoMeleeFocusValidOverrides: 1,
             pureRangedParetoNoMeleeFocusBelowFloorViolations: 0,
+            mixedSupportedParetoNoMeleeFocusFunnel: {
+                countingDomain: "production_v0.8_selector_decisions",
+                stages: MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES,
+                opportunities: 1,
+                cumulative: uniformMixedSupportedFunnelCounts(1),
+                failures: uniformMixedSupportedFunnelCounts(0),
+            },
         });
         expectEngineAcceptsProductiveDecision(h, chosen);
+    });
+
+    it("telescopes mixed-supported first failures without counting the control seat", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-funnel-")), "search.jsonl");
+        setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_323, "v0.8", undefined, mixedSupportedParetoRoster());
+        const { actor, primary, noMelee } = positionMixedSupportedParetoFixture(h);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        const controlIncumbent = plainAim(actor, primary);
+        expect(driver.chooseDecision(actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        const nonShotIncumbent: GameAction[] = [{ type: "wait_turn", unitId: actor.getId() }];
+        driver.chooseDecision(actor, "v0.8", nonShotIncumbent);
+        const alreadyFocusedIncumbent = plainAim(actor, noMelee);
+        driver.chooseDecision(actor, "v0.8", alreadyFocusedIncumbent);
+
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as {
+            mixedSupportedParetoNoMeleeFocusFunnel: {
+                opportunities: number;
+                cumulative: Record<string, number>;
+                failures: Record<string, number>;
+            };
+        };
+        expect(summary.mixedSupportedParetoNoMeleeFocusFunnel).toEqual({
+            countingDomain: "production_v0.8_selector_decisions",
+            stages: [...MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES],
+            opportunities: 2,
+            cumulative: {
+                mixed_board: 2,
+                exact_native_actor_identity: 2,
+                stationary_lap_candidate_shape: 1,
+                original_native_guard_presence: 1,
+                original_native_tsar_no_melee_target: 1,
+                reachable_threat_presence: 1,
+                all_reachable_threats_screened: 1,
+                catalog_expansion: 0,
+                exact_pareto_proposal: 0,
+                valid_override: 0,
+            },
+            failures: {
+                mixed_board: 0,
+                exact_native_actor_identity: 0,
+                stationary_lap_candidate_shape: 1,
+                original_native_guard_presence: 0,
+                original_native_tsar_no_melee_target: 0,
+                reachable_threat_presence: 0,
+                all_reachable_threats_screened: 0,
+                catalog_expansion: 1,
+                exact_pareto_proposal: 0,
+                valid_override: 0,
+            },
+        });
+    });
+
+    it("attributes a target-covered catalog with no exact-Pareto redirect to the proposal stage", () => {
+        const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-no-proposal-")), "search.jsonl");
+        setEnv({ ...mixedSupportedParetoEnvironment, SEARCH_AUDIT: audit });
+        const h = buildBattle(10_324, "v0.8", undefined, mixedSupportedParetoRoster());
+        const { actor, primary } = positionMixedSupportedParetoFixture(h);
+        primary.applyDamage(primary.getCumulativeHp() - 1, 0, new SceneLogMock(), false);
+        const driver = h.makeDriver();
+        driver.onFightReady();
+
+        driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
+        driver.onMatchEnd("draw", "turn_cap");
+        const summary = JSON.parse(readFileSync(audit, "utf8").trim()) as Record<string, unknown>;
+        expect(summary).toMatchObject({
+            pureRangedParetoNoMeleeFocusProposals: 0,
+            mixedSupportedParetoNoMeleeFocusFunnel: {
+                opportunities: 1,
+                cumulative: {
+                    catalog_expansion: 1,
+                    exact_pareto_proposal: 0,
+                    valid_override: 0,
+                },
+                failures: {
+                    exact_pareto_proposal: 1,
+                    valid_override: 0,
+                },
+            },
+        });
     });
 
     it("gives mixed-supported candidate and control seats identical target-covered catalogs", () => {
@@ -1983,7 +2078,9 @@ describe("search driver — gating, hygiene, determinism", () => {
     });
 
     it("audits mixed-supported rejected probes and deadline fallbacks without per-turn audit mode", () => {
-        const auditStatus = (deadline: boolean): Record<string, unknown> => {
+        const auditStatus = (
+            deadline: boolean,
+        ): { proposal: Record<string, unknown>; game: Record<string, unknown> } => {
             const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-mixed-status-")), "search.jsonl");
             setEnv({
                 ...mixedSupportedParetoEnvironment,
@@ -2002,24 +2099,50 @@ describe("search driver — gating, hygiene, determinism", () => {
             }
             driver.chooseDecision(actor, "v0.8", plainAim(actor, primary));
             driver.onMatchEnd("draw", "turn_cap");
-            return readFileSync(audit, "utf8")
+            const rows = readFileSync(audit, "utf8")
                 .trim()
                 .split("\n")
-                .map((line) => JSON.parse(line) as Record<string, unknown>)
-                .find((row) => row.t === "pareto_focus")!;
+                .map((line) => JSON.parse(line) as Record<string, unknown>);
+            return {
+                proposal: rows.find((row) => row.t === "pareto_focus")!,
+                game: rows.find((row) => row.t === "game")!,
+            };
         };
 
-        expect(auditStatus(false)).toMatchObject({
+        const rejected = auditStatus(false);
+        expect(rejected.proposal).toMatchObject({
             schema: "hoc.search.pareto_focus.v13",
             status: "rejected_probe",
             lap: 1,
             support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
         });
-        expect(auditStatus(true)).toMatchObject({
+        expect(rejected.game).toMatchObject({
+            mixedSupportedParetoNoMeleeFocusFunnel: {
+                opportunities: 1,
+                cumulative: {
+                    exact_pareto_proposal: 1,
+                    valid_override: 0,
+                },
+                failures: { valid_override: 1 },
+            },
+        });
+
+        const deadline = auditStatus(true);
+        expect(deadline.proposal).toMatchObject({
             schema: "hoc.search.pareto_focus.v13",
             status: "deadline_fallback",
             lap: 1,
             support: { guardCount: 2, reachableThreats: 1, screenedThreats: 1 },
+        });
+        expect(deadline.game).toMatchObject({
+            mixedSupportedParetoNoMeleeFocusFunnel: {
+                opportunities: 1,
+                cumulative: {
+                    exact_pareto_proposal: 1,
+                    valid_override: 0,
+                },
+                failures: { valid_override: 1 },
+            },
         });
     });
 
