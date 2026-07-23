@@ -35,13 +35,16 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES,
     V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES,
+    V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES,
     type IAIPolicyEvent,
     type IV08ProtectedAdvanceGuardrailDetails,
     type IV08SupportedBandAdvanceDetails,
     type IV08SupportedPrepinEgressDetails,
+    type IV08SupportedRangedEscapeDetails,
     type V08ProtectedAdvanceGuardrailReason,
     type V08SupportedBandAdvanceFunnelStage,
     type V08SupportedPrepinEgressFunnelStage,
+    type V08SupportedRangedEscapeFunnelStage,
 } from "../ai/ai_strategy";
 import {
     canWaitOnHourglassMirror,
@@ -156,6 +159,8 @@ export interface IMirrorSideDiag {
     supportedRangedEscapes: number;
     /** Pre-search weak-melee escape proposals, including ones later replaced by a13. */
     supportedRangedEscapeProposals: number;
+    /** Live-root catalog counts at each weak-melee supported-delta eligibility stage. */
+    supportedRangedEscapeFunnel: Record<V08SupportedRangedEscapeFunnelStage, number>;
     /** Delta-only protected advances whose ordinary counter-shot was proven response-neutral. */
     responseNeutralAdvances: number;
     /** Pre-search response-neutral advance proposals, including ones later replaced by a13. */
@@ -194,6 +199,12 @@ const newSupportedPrepinEgressFunnel = (): Record<V08SupportedPrepinEgressFunnel
         number
     >;
 
+const newSupportedRangedEscapeFunnel = (): Record<V08SupportedRangedEscapeFunnelStage, number> =>
+    Object.fromEntries(V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES.map((stage) => [stage, 0])) as Record<
+        V08SupportedRangedEscapeFunnelStage,
+        number
+    >;
+
 const newSupportedBandAdvanceFunnel = (): Record<V08SupportedBandAdvanceFunnelStage, number> =>
     Object.fromEntries(V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map((stage) => [stage, 0])) as Record<
         V08SupportedBandAdvanceFunnelStage,
@@ -228,6 +239,16 @@ export interface IMirrorGameRecord {
     protectedAdvanceGuardrailEvents?: IMirrorProtectedAdvanceGuardrailEvent[];
     /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
     supportedPrepinEgressEvents?: IMirrorSupportedPrepinEgressEvent[];
+    /** Root weak-melee escape proposals; retained marks the one surviving search. */
+    supportedRangedEscapeEvents?: IMirrorSupportedRangedEscapeEvent[];
+}
+
+export interface IMirrorSupportedRangedEscapeEvent extends IV08SupportedRangedEscapeDetails {
+    side: "green" | "red";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    retained: boolean;
 }
 
 export interface IMirrorSupportedBandAdvanceEvent extends IV08SupportedBandAdvanceDetails {
@@ -334,6 +355,7 @@ function newSideDiag(version: string): IMirrorSideDiag {
         moveShotRangeDamage: 0,
         supportedRangedEscapes: 0,
         supportedRangedEscapeProposals: 0,
+        supportedRangedEscapeFunnel: newSupportedRangedEscapeFunnel(),
         responseNeutralAdvances: 0,
         responseNeutralAdvanceProposals: 0,
         supportedBandAdvanceSelections: 0,
@@ -377,6 +399,8 @@ export function playMirrorGame(
     const redVersion = aIsGreen ? cfg.vB : cfg.vA;
 
     const diag = cfg.diag ? { green: newSideDiag(greenVersion), red: newSideDiag(redVersion) } : undefined;
+    const supportedRangedEscapeEvents: IMirrorSupportedRangedEscapeEvent[] = [];
+    const rangedEscapeRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedRangedEscapeEvent>();
     const supportedBandAdvanceEvents: IMirrorSupportedBandAdvanceEvent[] = [];
     const bandAdvanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandAdvanceEvent>();
     const protectedAdvanceGuardrailEvents: IMirrorProtectedAdvanceGuardrailEvent[] = [];
@@ -422,6 +446,8 @@ export function playMirrorGame(
               const side = event.team === GREEN_TEAM ? diag.green : diag.red;
               if (event.kind === "v0.8_supported_ranged_escape") {
                   side.supportedRangedEscapes += 1;
+                  const proposal = rangedEscapeRecordByEvent.get(event);
+                  if (proposal) proposal.retained = true;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvances += 1;
               } else if (event.kind === "v0.8_supported_band_advance") {
@@ -445,6 +471,21 @@ export function playMirrorGame(
               const side = event.team === GREEN_TEAM ? diag.green : diag.red;
               if (event.kind === "v0.8_supported_ranged_escape") {
                   side.supportedRangedEscapeProposals += 1;
+                  const proposal: IMirrorSupportedRangedEscapeEvent = {
+                      ...event.details,
+                      fromCell: { ...event.details.fromCell },
+                      toCell: { ...event.details.toCell },
+                      incumbentAttackFromCell: { ...event.details.incumbentAttackFromCell },
+                      side: event.team === GREEN_TEAM ? "green" : "red",
+                      unitId: event.unitId,
+                      creatureName: event.creatureName,
+                      lap: event.lap,
+                      retained: false,
+                  };
+                  supportedRangedEscapeEvents.push(proposal);
+                  rangedEscapeRecordByEvent.set(event, proposal);
+              } else if (event.kind === "v0.8_supported_ranged_escape_funnel" && event.stage) {
+                  side.supportedRangedEscapeFunnel[event.stage] += 1;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvanceProposals += 1;
               } else if (event.kind === "v0.8_supported_band_advance") {
@@ -585,6 +626,7 @@ export function playMirrorGame(
         rejectedRed: result.rejectedRed ?? 0,
         ...(game === 0 ? { rosterSig: roster.map((u) => `L${u.level}:${u.creatureName}x${u.amount}`).join("|") } : {}),
         ...(diag ? { diag } : {}),
+        ...(supportedRangedEscapeEvents.length ? { supportedRangedEscapeEvents } : {}),
         ...(supportedBandAdvanceEvents.length ? { supportedBandAdvanceEvents } : {}),
         ...(protectedAdvanceGuardrailEvents.length ? { protectedAdvanceGuardrailEvents } : {}),
         ...(supportedPrepinEgressEvents.length ? { supportedPrepinEgressEvents } : {}),
@@ -674,6 +716,7 @@ interface IVersionAggregate {
     moveShotRangeDamage: number;
     supportedRangedEscapes: number;
     supportedRangedEscapeProposals: number;
+    supportedRangedEscapeFunnel: Record<V08SupportedRangedEscapeFunnelStage, number>;
     responseNeutralAdvances: number;
     responseNeutralAdvanceProposals: number;
     supportedBandAdvanceSelections: number;
@@ -716,6 +759,7 @@ export function aggregateMirrorDiag(
                 moveShotRangeDamage: 0,
                 supportedRangedEscapes: 0,
                 supportedRangedEscapeProposals: 0,
+                supportedRangedEscapeFunnel: newSupportedRangedEscapeFunnel(),
                 responseNeutralAdvances: 0,
                 responseNeutralAdvanceProposals: 0,
                 supportedBandAdvanceSelections: 0,
@@ -757,6 +801,9 @@ export function aggregateMirrorDiag(
             a.moveShotRangeDamage += side.moveShotRangeDamage ?? 0;
             a.supportedRangedEscapes += side.supportedRangedEscapes ?? 0;
             a.supportedRangedEscapeProposals += side.supportedRangedEscapeProposals ?? 0;
+            for (const stage of V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES) {
+                a.supportedRangedEscapeFunnel[stage] += side.supportedRangedEscapeFunnel?.[stage] ?? 0;
+            }
             a.responseNeutralAdvances += side.responseNeutralAdvances ?? 0;
             a.responseNeutralAdvanceProposals += side.responseNeutralAdvanceProposals ?? 0;
             a.supportedBandAdvanceSelections += side.supportedBandAdvanceSelections ?? 0;
@@ -828,6 +875,13 @@ export function aggregateMirrorDiag(
             supportedRangedEscapesPerGame: a.supportedRangedEscapes / Math.max(1, a.games),
             supportedRangedEscapeProposals: a.supportedRangedEscapeProposals,
             supportedRangedEscapeProposalsPerGame: a.supportedRangedEscapeProposals / Math.max(1, a.games),
+            supportedRangedEscapeFunnel: a.supportedRangedEscapeFunnel,
+            supportedRangedEscapeFunnelPerGame: Object.fromEntries(
+                V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES.map((stage) => [
+                    stage,
+                    a.supportedRangedEscapeFunnel[stage] / Math.max(1, a.games),
+                ]),
+            ),
             responseNeutralAdvances: a.responseNeutralAdvances,
             responseNeutralAdvancesPerGame: a.responseNeutralAdvances / Math.max(1, a.games),
             responseNeutralAdvanceProposals: a.responseNeutralAdvanceProposals,

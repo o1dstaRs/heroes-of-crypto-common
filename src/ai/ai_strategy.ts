@@ -58,12 +58,42 @@ export interface IPlacementContext {
 
 export type AIPolicyEventKind =
     | "v0.8_supported_ranged_escape"
+    | "v0.8_supported_ranged_escape_funnel"
     | "v0.8_response_neutral_advance"
     | "v0.8_protected_advance_guardrail"
     | "v0.8_supported_prepin_egress"
     | "v0.8_supported_prepin_egress_funnel"
     | "v0.8_supported_band_advance"
     | "v0.8_supported_band_advance_funnel";
+
+export const V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES = [
+    "melee_incumbent",
+    "attack_context",
+    "current_ranged_mode",
+    "ammo",
+    "mobile",
+    "ordinary_shooter",
+    "range_unsuppressed",
+    "currently_pinned",
+    "no_nonmelee_commitment",
+    "finish_override_clear",
+    "armageddon_buffer_clear",
+    "target_found",
+    "damage_supported",
+    "nonsecure_melee",
+    "live_enemies",
+    "frontline_present",
+    "reachable_route",
+    "valid_route",
+    "legacy_retreat_route",
+    "target_screen_route",
+    "unscreened_reduced_route",
+    "exposure_nonincreasing_route",
+    "partial_delta_route",
+    "delta_only_best",
+] as const;
+
+export type V08SupportedRangedEscapeFunnelStage = (typeof V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES)[number];
 
 export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
     "ordinary_shot",
@@ -104,6 +134,32 @@ interface IAIPolicyEventBase {
     creatureName: string;
     team: TeamType;
     lap: number;
+}
+
+/** Detached geometry for one live weak-melee escape proposal. */
+export interface IV08SupportedRangedEscapeDetails {
+    fromCell: XY;
+    toCell: XY;
+    incumbentAttackFromCell: XY;
+    targetId: string;
+    targetCreatureName: string;
+    targetHp: number;
+    meleeHitChance: number;
+    expectedEffectiveMeleeDamage: number;
+    reachableThreatsBefore: number;
+    screenedThreatsBefore: number;
+    unscreenedThreatsBefore: number;
+    reachableThreatsAfter: number;
+    screenedThreatsAfter: number;
+    unscreenedThreatsAfter: number;
+    targetDistanceBefore: number;
+    targetDistanceAfter: number;
+    minEnemyDistanceBefore: number;
+    minEnemyDistanceAfter: number;
+    nearestFrontlineDistanceAfter: number;
+    screeningFrontlinerId: string;
+    screeningFrontlinerCreatureName: string;
+    routeCost: number;
 }
 
 /** Detached geometry for one live supported pre-pin proposal. */
@@ -151,6 +207,16 @@ export interface IV08ProtectedAdvanceGuardrailDetails {
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export type IAIPolicyEvent =
     | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_ranged_escape";
+          details: IV08SupportedRangedEscapeDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_ranged_escape_funnel";
+          stage: V08SupportedRangedEscapeFunnelStage;
+          details?: never;
+      })
+    | (IAIPolicyEventBase & {
           kind: "v0.8_protected_advance_guardrail";
           details: IV08ProtectedAdvanceGuardrailDetails;
           stage?: never;
@@ -178,6 +244,8 @@ export type IAIPolicyEvent =
     | (IAIPolicyEventBase & {
           kind: Exclude<
               AIPolicyEventKind,
+              | "v0.8_supported_ranged_escape"
+              | "v0.8_supported_ranged_escape_funnel"
               | "v0.8_supported_band_advance"
               | "v0.8_supported_band_advance_funnel"
               | "v0.8_protected_advance_guardrail"

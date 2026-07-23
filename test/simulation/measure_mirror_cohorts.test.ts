@@ -16,8 +16,12 @@ import type {
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
     IV08SupportedPrepinEgressDetails,
+    IV08SupportedRangedEscapeDetails,
 } from "../../src/ai";
-import { V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES } from "../../src/ai/ai_strategy";
+import {
+    V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES,
+    V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES,
+} from "../../src/ai/ai_strategy";
 import { setupForArchetype } from "../../src/simulation/archetype_payoff";
 import {
     aggregateMirrorDiag,
@@ -51,6 +55,31 @@ const BASE_CFG: IMirrorRunConfig = {
     livetwin: true,
     diag: false,
     zeroScorer: false,
+};
+
+const RANGED_ESCAPE_DETAILS: IV08SupportedRangedEscapeDetails = {
+    fromCell: { x: 1, y: 2 },
+    toCell: { x: 2, y: 2 },
+    incumbentAttackFromCell: { x: 1, y: 2 },
+    targetId: "pinned-target",
+    targetCreatureName: "Pinned target",
+    targetHp: 40,
+    meleeHitChance: 0.8,
+    expectedEffectiveMeleeDamage: 12,
+    reachableThreatsBefore: 2,
+    screenedThreatsBefore: 1,
+    unscreenedThreatsBefore: 1,
+    reachableThreatsAfter: 2,
+    screenedThreatsAfter: 2,
+    unscreenedThreatsAfter: 0,
+    targetDistanceBefore: 1,
+    targetDistanceAfter: 2,
+    minEnemyDistanceBefore: 1,
+    minEnemyDistanceAfter: 2,
+    nearestFrontlineDistanceAfter: 1,
+    screeningFrontlinerId: "screen",
+    screeningFrontlinerCreatureName: "Squire",
+    routeCost: 1,
 };
 
 const PREPIN_DETAILS: IV08SupportedPrepinEgressDetails = {
@@ -305,6 +334,7 @@ describe("measure_mirror_cohorts", () => {
                 creatureName: "Arbalester",
                 team: RED_TEAM,
                 lap: 4,
+                details: RANGED_ESCAPE_DETAILS,
             });
             config.policyEventObserver?.({
                 kind: "v0.8_response_neutral_advance",
@@ -319,6 +349,7 @@ describe("measure_mirror_cohorts", () => {
                 creatureName: "Arbalester",
                 team: RED_TEAM,
                 lap: 4,
+                details: RANGED_ESCAPE_DETAILS,
             });
             return fakeResult(config, "draw", actions);
         };
@@ -357,6 +388,7 @@ describe("measure_mirror_cohorts", () => {
         delete historicalSide.protectedAdvanceGuardrailVetoesByReason;
         delete historicalSide.protectedAdvanceGuardrailProposals;
         delete historicalSide.protectedAdvanceGuardrailProposalsByReason;
+        delete historicalSide.supportedRangedEscapeFunnel;
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -411,6 +443,138 @@ describe("measure_mirror_cohorts", () => {
                 supportedPrepinEgressProposals: 0,
             });
         }
+    });
+
+    test("tracks the supported ranged escape funnel and detached retained proposals across side swaps", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const partialStages = V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES.slice(0, 5);
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const treatmentTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            for (const stage of V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES) {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_ranged_escape_funnel",
+                    unitId: `full-${stage}`,
+                    creatureName: "Arbalester",
+                    team: treatmentTeam,
+                    lap: 2,
+                    stage,
+                });
+            }
+            for (const stage of partialStages) {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_ranged_escape_funnel",
+                    unitId: `partial-${stage}`,
+                    creatureName: "Arbalester",
+                    team: treatmentTeam,
+                    lap: 2,
+                    stage,
+                });
+            }
+
+            const retainedDetails: IV08SupportedRangedEscapeDetails = {
+                ...RANGED_ESCAPE_DETAILS,
+                fromCell: { ...RANGED_ESCAPE_DETAILS.fromCell },
+                toCell: { ...RANGED_ESCAPE_DETAILS.toCell },
+                incumbentAttackFromCell: { ...RANGED_ESCAPE_DETAILS.incumbentAttackFromCell },
+            };
+            const retainedProposal: IAIPolicyEvent = {
+                kind: "v0.8_supported_ranged_escape",
+                unitId: "escape-retained",
+                creatureName: "Arbalester",
+                team: treatmentTeam,
+                lap: 2,
+                details: retainedDetails,
+            };
+            const replacedProposal: IAIPolicyEvent = {
+                kind: "v0.8_supported_ranged_escape",
+                unitId: "escape-replaced",
+                creatureName: "Elf",
+                team: treatmentTeam,
+                lap: 2,
+                details: {
+                    ...RANGED_ESCAPE_DETAILS,
+                    fromCell: { x: 3, y: 4 },
+                    toCell: { x: 4, y: 4 },
+                    incumbentAttackFromCell: { x: 3, y: 4 },
+                    routeCost: 2,
+                },
+            };
+            config.policyProposalObserver?.(retainedProposal);
+            config.policyProposalObserver?.(replacedProposal);
+            config.policyEventObserver?.(retainedProposal);
+
+            // Mirror records own detached coordinates; later strategy-side mutation cannot rewrite JSONL evidence.
+            retainedDetails.fromCell.x = 99;
+            retainedDetails.toCell.x = 99;
+            retainedDetails.incumbentAttackFromCell.x = 99;
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        for (const record of records) {
+            const treatment = record.diag!.green.version === "v0.8" ? record.diag!.green : record.diag!.red;
+            const control = record.diag!.green.version === "v0.8s" ? record.diag!.green : record.diag!.red;
+            expect(treatment.supportedRangedEscapeProposals).toBe(2);
+            expect(treatment.supportedRangedEscapes).toBe(1);
+            expect(treatment.supportedRangedEscapeFunnel.melee_incumbent).toBe(2);
+            expect(treatment.supportedRangedEscapeFunnel.armageddon_buffer_clear).toBe(1);
+            expect(control.supportedRangedEscapeProposals).toBe(0);
+            expect(control.supportedRangedEscapes).toBe(0);
+            expect(Object.values(control.supportedRangedEscapeFunnel).every((count) => count === 0)).toBe(true);
+            expect(record.supportedRangedEscapeEvents?.map(({ retained }) => retained)).toEqual([true, false]);
+            expect(record.supportedRangedEscapeEvents?.[0]).toMatchObject({
+                ...RANGED_ESCAPE_DETAILS,
+                fromCell: RANGED_ESCAPE_DETAILS.fromCell,
+                toCell: RANGED_ESCAPE_DETAILS.toCell,
+                incumbentAttackFromCell: RANGED_ESCAPE_DETAILS.incumbentAttackFromCell,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: "escape-retained",
+                creatureName: "Arbalester",
+                lap: 2,
+                retained: true,
+            });
+        }
+        expect(records[0].supportedRangedEscapeEvents?.[0].side).toBe("green");
+        expect(records[1].supportedRangedEscapeEvents?.[0].side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedRangedEscapes: number;
+                    supportedRangedEscapesPerGame: number;
+                    supportedRangedEscapeProposals: number;
+                    supportedRangedEscapeProposalsPerGame: number;
+                    supportedRangedEscapeFunnel: Record<string, number>;
+                    supportedRangedEscapeFunnelPerGame: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedRangedEscapes: 2,
+            supportedRangedEscapesPerGame: 1,
+            supportedRangedEscapeProposals: 4,
+            supportedRangedEscapeProposalsPerGame: 2,
+            supportedRangedEscapeFunnel: {
+                melee_incumbent: 4,
+                current_ranged_mode: 4,
+                armageddon_buffer_clear: 2,
+                delta_only_best: 2,
+            },
+            supportedRangedEscapeFunnelPerGame: {
+                melee_incumbent: 2,
+                current_ranged_mode: 2,
+                armageddon_buffer_clear: 1,
+                delta_only_best: 1,
+            },
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedRangedEscapes: 0,
+            supportedRangedEscapeProposals: 0,
+        });
+        expect(
+            Object.values(aggregate.versions["v0.8s"].supportedRangedEscapeFunnel).every((count) => count === 0),
+        ).toBe(true);
     });
 
     test("tracks the supported band catalog and exact retained treatment proposal across side swaps", () => {

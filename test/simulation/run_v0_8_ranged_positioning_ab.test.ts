@@ -47,6 +47,8 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     jitNoMeleeFocus: false,
     jitNoMeleeFocusCatalogOnly: false,
     supportedRangedDelta: false,
+    supportedRangedDeltaCatalogOnly: false,
+    supportedRangedDeltaLiveOnly: false,
     responseNeutralAdvance: false,
     supportedPrepinEgress: false,
     supportedPrepinEgressCatalogOnly: false,
@@ -123,6 +125,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
+            V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
@@ -207,6 +211,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             jitNoMeleeFocus: false,
             jitNoMeleeFocusCatalogOnly: false,
             supportedRangedDelta: false,
+            supportedRangedDeltaCatalogOnly: false,
+            supportedRangedDeltaLiveOnly: false,
             responseNeutralAdvance: false,
             supportedPrepinEgress: false,
             supportedPrepinEgressCatalogOnly: false,
@@ -229,6 +235,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).jitNoMeleeFocus).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).jitNoMeleeFocusCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedRangedDelta).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedRangedDeltaCatalogOnly).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedRangedDeltaLiveOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).responseNeutralAdvance).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgress).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgressCatalogOnly).toBe(false);
@@ -505,7 +513,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 paretoNoMeleeFocus: true,
                 paretoNoMeleeFocusScope: "any_board",
@@ -574,7 +582,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             geometry: {
                 cohort: "mixed_cyclops_tsar",
                 amountMode: "expBudget",
@@ -660,7 +668,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
@@ -709,42 +717,109 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("mutually exclusive");
     });
 
-    it("compares supported ranged escape against the same shipped positioning baseline", () => {
-        const options: IV08RangedPositioningABOptions = {
+    it("isolates live-root supported ranged escape with a catalog-identical selector-off control", () => {
+        const treatment: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
             cohorts: ["hybrid"],
             mode: "retreat",
             supportedRangedDelta: true,
+            supportedRangedDeltaLiveOnly: true,
+            diag: true,
         };
-        const [invocation] = buildV08RangedPositioningABInvocations(options, { PATH: "/bin" });
-        expect(invocation.environment).toMatchObject({
+        const control: IV08RangedPositioningABOptions = {
+            ...treatment,
+            supportedRangedDelta: false,
+            supportedRangedDeltaCatalogOnly: true,
+        };
+        const [treatmentInvocation] = buildV08RangedPositioningABInvocations(treatment, { PATH: "/bin" });
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, { PATH: "/bin" });
+        expect(treatmentInvocation.environment).toMatchObject({
             SEARCH_VERSIONS: "v0.8,v0.8s",
             V08_RANGED_POSITION_MODE: "retreat",
             V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "1",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "v0.8",
         });
-        const manifest = buildV08RangedPositioningABManifest(invocation, options, {
+        expect(controlInvocation.environment).toMatchObject({
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "1",
+            V08_SUPPORTED_RANGED_DELTA_VERSIONS: "supported-ranged-delta-catalog-only-control",
+        });
+        const differingEnvironmentKeys = [
+            ...new Set([
+                ...Object.keys(treatmentInvocation.environment),
+                ...Object.keys(controlInvocation.environment),
+            ]),
+        ].filter((key) => treatmentInvocation.environment[key] !== controlInvocation.environment[key]);
+        expect(differingEnvironmentKeys).toEqual(["V08_SUPPORTED_RANGED_DELTA_VERSIONS"]);
+
+        const source = {
             head: "a".repeat(40),
             tree: "b".repeat(40),
             dirty: false,
+        } as const;
+        expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
+            arm: {
+                supportedRangedDelta: true,
+                supportedRangedDeltaCatalogOnly: false,
+                supportedRangedDeltaLiveOnly: true,
+            },
         });
-        expect(manifest.arm.supportedRangedDelta).toBe(true);
+        expect(buildV08RangedPositioningABManifest(controlInvocation, control, source)).toMatchObject({
+            arm: {
+                supportedRangedDelta: false,
+                supportedRangedDeltaCatalogOnly: true,
+                supportedRangedDeltaLiveOnly: true,
+            },
+        });
         expect(
-            parseV08RangedPositioningABOptions(["--cohorts", "hybrid", "--mode", "retreat", "--supported-ranged-delta"])
-                .supportedRangedDelta,
-        ).toBe(true);
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "advance" })).toThrow(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "retreat",
+                "--supported-ranged-delta",
+                "--supported-ranged-delta-live-only",
+            ]),
+        ).toMatchObject({ supportedRangedDelta: true, supportedRangedDeltaLiveOnly: true });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "retreat",
+                "--supported-ranged-delta-catalog-only",
+                "--supported-ranged-delta-live-only",
+            ]),
+        ).toMatchObject({ supportedRangedDeltaCatalogOnly: true, supportedRangedDeltaLiveOnly: true });
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "advance" })).toThrow(
             "mode=retreat|both",
         );
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "off" })).toThrow("mode=retreat|both");
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, moveShots: 1 })).toThrow("moveShots=0");
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, deadlineFinisher: true })).toThrow(
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "off" })).toThrow(
+            "mode=retreat|both",
+        );
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...treatment, supportedRangedDeltaCatalogOnly: true }),
+        ).toThrow("mutually exclusive");
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, deadlineFinisher: true })).toThrow(
             "mutually exclusive",
         );
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, noMeleeTerminalPressure: true })).toThrow(
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, noMeleeTerminalPressure: true })).toThrow(
             "mutually exclusive",
         );
-        expect(() => buildV08RangedPositioningABInvocations({ ...options, mode: "both" })).not.toThrow();
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode: "both" })).not.toThrow();
+        expect(() =>
+            buildV08RangedPositioningABInvocations({
+                ...BASE_OPTIONS,
+                cohorts: ["hybrid"],
+                mode: "retreat",
+                supportedRangedDeltaLiveOnly: true,
+            }),
+        ).toThrow("requires a supported ranged");
         expect(() =>
             buildV08RangedPositioningABEnvironment("off", "operational_bounded", {}, 0, false, false, true),
         ).toThrow("mode=retreat|both");
@@ -837,7 +912,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 supportedPrepinEgress: true,
                 supportedPrepinEgressCatalogOnly: false,
@@ -948,7 +1023,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 supportedBandAdvance: true,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1045,7 +1120,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         const manifest = buildV08RangedPositioningABManifest(invocation, duel, source);
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 supportedBandAdvance: false,
                 supportedBandAdvanceCatalogOnly: false,
@@ -1130,7 +1205,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         });
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(invocation, guardrails, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             arm: {
                 protectedAdvanceGuardrails: true,
                 protectedAdvanceGuardrailsMode: "both",
@@ -1202,7 +1277,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(catalogInvocation.args, "--vA")).toBe("v0.8");
             expect(argValue(catalogInvocation.args, "--vB")).toBe("v0.8s");
             expect(buildV08RangedPositioningABManifest(catalogInvocation, catalogControl, source)).toMatchObject({
-                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+                schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
                 geometry: { pairedSideSwap: true, symmetricRosters: true },
                 arm: { protectedAdvanceGuardrails: true, protectedAdvanceGuardrailsMode: "catalog_only" },
             });
@@ -1283,7 +1358,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -1312,6 +1387,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 jitNoMeleeFocusActivationBuffer: 1,
                 jitNoMeleeFocusDamageFloor: 0.8,
                 supportedRangedDelta: false,
+                supportedRangedDeltaCatalogOnly: false,
+                supportedRangedDeltaLiveOnly: false,
                 responseNeutralAdvance: false,
                 supportedPrepinEgress: false,
                 supportedPrepinEgressCatalogOnly: false,
@@ -1351,6 +1428,8 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
+            V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: "0",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
