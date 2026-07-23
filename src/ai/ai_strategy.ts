@@ -65,7 +65,8 @@ export type AIPolicyEventKind =
     | "v0.8_supported_prepin_egress"
     | "v0.8_supported_prepin_egress_funnel"
     | "v0.8_supported_band_advance"
-    | "v0.8_supported_band_advance_funnel";
+    | "v0.8_supported_band_advance_funnel"
+    | "v0.8_supported_band_duel_difference";
 
 export const V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES = [
     "melee_incumbent",
@@ -186,6 +187,28 @@ export interface IV08SupportedBandAdvanceDetails extends IV08SupportedPrepinEgre
     finishActive: boolean;
 }
 
+export type V08SupportedBandDuelDifference =
+    "strict_hold_shipped_advance" | "strict_advance_shipped_hold" | "different_advance" | "other";
+
+/** Detached executable fields used to compare one strict-vs-shipped supported-band decision. */
+export interface IV08SupportedBandDuelDecisionSummary {
+    actionTypes: GameAction["type"][];
+    movePath: XY[] | null;
+    moveTargetCells: XY[] | null;
+    moveHasLavaCell: boolean | null;
+    moveHasWaterCell: boolean | null;
+    rangeTargetId: string | null;
+    rangeAimCell: XY | null;
+    rangeAimSide: number | null;
+}
+
+/** Exact root decision difference produced by the strict-vs-shipped supported-band duel. */
+export interface IV08SupportedBandDuelDetails {
+    difference: V08SupportedBandDuelDifference;
+    strict: IV08SupportedBandDuelDecisionSummary;
+    shipped: IV08SupportedBandDuelDecisionSummary;
+}
+
 export type V08ProtectedAdvanceGuardrailReason = "ranged_superior_hold" | "partial_band";
 export type V08ProtectedAdvanceGuardrailMode = "both" | "catalog_only" | V08ProtectedAdvanceGuardrailReason;
 
@@ -233,6 +256,11 @@ export type IAIPolicyEvent =
           details?: never;
       })
     | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_band_duel_difference";
+          details: IV08SupportedBandDuelDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
           kind: "v0.8_supported_prepin_egress";
           details: IV08SupportedPrepinEgressDetails;
           stage?: never;
@@ -249,6 +277,7 @@ export type IAIPolicyEvent =
               | "v0.8_supported_ranged_escape_funnel"
               | "v0.8_supported_band_advance"
               | "v0.8_supported_band_advance_funnel"
+              | "v0.8_supported_band_duel_difference"
               | "v0.8_protected_advance_guardrail"
               | "v0.8_supported_prepin_egress"
               | "v0.8_supported_prepin_egress_funnel"

@@ -30,9 +30,12 @@ export type {
     IPlacementContext,
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
+    IV08SupportedBandDuelDecisionSummary,
+    IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
+    V08SupportedBandDuelDifference,
 } from "./ai_strategy";
 
 // Browser-safe identity and immutable configuration for the promoted v0.8+a13

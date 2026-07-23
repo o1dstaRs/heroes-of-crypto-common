@@ -15,6 +15,7 @@ import type {
     IAIPolicyEvent,
     IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
+    IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
     IV08SupportedRangedEscapeDetails,
 } from "../../src/ai";
@@ -107,6 +108,30 @@ const BAND_ADVANCE_DETAILS: IV08SupportedBandAdvanceDetails = {
     minEnemyDistanceAfter: 3,
     rangedSuperior: false,
     finishActive: true,
+};
+
+const BAND_DUEL_DETAILS: IV08SupportedBandDuelDetails = {
+    difference: "strict_hold_shipped_advance",
+    strict: {
+        actionTypes: ["range_attack"],
+        movePath: null,
+        moveTargetCells: null,
+        moveHasLavaCell: null,
+        moveHasWaterCell: null,
+        rangeTargetId: "duel-target",
+        rangeAimCell: { x: 4, y: 5 },
+        rangeAimSide: 2,
+    },
+    shipped: {
+        actionTypes: ["move_unit", "range_attack"],
+        movePath: [{ x: 1, y: 1 }],
+        moveTargetCells: [{ x: 1, y: 1 }],
+        moveHasLavaCell: false,
+        moveHasWaterCell: false,
+        rangeTargetId: "duel-target",
+        rangeAimCell: { x: 4, y: 5 },
+        rangeAimSide: 2,
+    },
 };
 
 const PROTECTED_ADVANCE_GUARDRAIL_DETAILS: IV08ProtectedAdvanceGuardrailDetails = {
@@ -388,6 +413,10 @@ describe("measure_mirror_cohorts", () => {
         delete historicalSide.protectedAdvanceGuardrailVetoesByReason;
         delete historicalSide.protectedAdvanceGuardrailProposals;
         delete historicalSide.protectedAdvanceGuardrailProposalsByReason;
+        delete historicalSide.supportedBandDuelDifferenceSelections;
+        delete historicalSide.supportedBandDuelDifferenceProposals;
+        delete historicalSide.supportedBandDuelDifferenceSelectionsByDifference;
+        delete historicalSide.supportedBandDuelDifferenceProposalsByDifference;
         delete historicalSide.supportedRangedEscapeFunnel;
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
@@ -406,6 +435,8 @@ describe("measure_mirror_cohorts", () => {
                     responseNeutralAdvanceProposals: number;
                     supportedBandAdvanceSelections: number;
                     supportedBandAdvanceProposals: number;
+                    supportedBandDuelDifferenceSelections: number;
+                    supportedBandDuelDifferenceProposals: number;
                     protectedAdvanceGuardrailVetoes: number;
                     protectedAdvanceGuardrailVetoesByReason: Record<string, number>;
                     protectedAdvanceGuardrailProposals: number;
@@ -429,6 +460,8 @@ describe("measure_mirror_cohorts", () => {
                 responseNeutralAdvanceProposals: 1,
                 supportedBandAdvanceSelections: 0,
                 supportedBandAdvanceProposals: 0,
+                supportedBandDuelDifferenceSelections: 0,
+                supportedBandDuelDifferenceProposals: 0,
                 protectedAdvanceGuardrailVetoes: 0,
                 protectedAdvanceGuardrailVetoesByReason: {
                     ranged_superior_hold: 0,
@@ -671,6 +704,125 @@ describe("measure_mirror_cohorts", () => {
         expect(Object.values(aggregate.versions["v0.8s"].supportedBandAdvanceFunnelPerGame)).toEqual(
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 0),
         );
+    });
+
+    test("tracks strict-vs-shipped decision differences through search retention and side swaps", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            const retained: IAIPolicyEvent = {
+                kind: "v0.8_supported_band_duel_difference",
+                unitId: `duel-retained-${candidateTeam}`,
+                creatureName: "Arbalester",
+                team: candidateTeam,
+                lap: 3,
+                details: BAND_DUEL_DETAILS,
+            };
+            const replaced: IAIPolicyEvent = {
+                kind: "v0.8_supported_band_duel_difference",
+                unitId: `duel-replaced-${candidateTeam}`,
+                creatureName: "Elf",
+                team: candidateTeam,
+                lap: 4,
+                details: {
+                    difference: "different_advance",
+                    strict: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 2, y: 1 }],
+                        moveTargetCells: [{ x: 2, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                    shipped: {
+                        ...BAND_DUEL_DETAILS.shipped,
+                        actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
+                        movePath: [{ x: 1, y: 1 }],
+                        moveTargetCells: [{ x: 1, y: 1 }],
+                        rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
+                    },
+                },
+            };
+            config.policyProposalObserver?.(retained);
+            config.policyProposalObserver?.(replaced);
+            config.policyEventObserver?.(retained);
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        for (const record of records) {
+            const candidate = record.diag!.green.version === "v0.8" ? record.diag!.green : record.diag!.red;
+            const control = record.diag!.green.version === "v0.8s" ? record.diag!.green : record.diag!.red;
+            expect(candidate.supportedBandDuelDifferenceSelections).toBe(1);
+            expect(candidate.supportedBandDuelDifferenceProposals).toBe(2);
+            expect(candidate.supportedBandDuelDifferenceSelectionsByDifference).toEqual({
+                strict_hold_shipped_advance: 1,
+                strict_advance_shipped_hold: 0,
+                different_advance: 0,
+                other: 0,
+            });
+            expect(candidate.supportedBandDuelDifferenceProposalsByDifference).toEqual({
+                strict_hold_shipped_advance: 1,
+                strict_advance_shipped_hold: 0,
+                different_advance: 1,
+                other: 0,
+            });
+            expect(control.supportedBandDuelDifferenceSelections).toBe(0);
+            expect(control.supportedBandDuelDifferenceProposals).toBe(0);
+            expect(record.supportedBandDuelDifferenceEvents?.map(({ retained: selected }) => selected)).toEqual([
+                true,
+                false,
+            ]);
+            expect(record.supportedBandDuelDifferenceEvents?.[0]).toMatchObject({
+                ...BAND_DUEL_DETAILS,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: `duel-retained-${record.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM}`,
+                creatureName: "Arbalester",
+                lap: 3,
+                retained: true,
+            });
+            expect(record.supportedBandDuelDifferenceEvents?.[0]?.strict).not.toBe(BAND_DUEL_DETAILS.strict);
+            expect(record.supportedBandDuelDifferenceEvents?.[0]?.shipped.movePath).not.toBe(
+                BAND_DUEL_DETAILS.shipped.movePath,
+            );
+        }
+        expect(records[0].supportedBandDuelDifferenceEvents?.[0]?.side).toBe("green");
+        expect(records[1].supportedBandDuelDifferenceEvents?.[0]?.side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedBandDuelDifferenceSelections: number;
+                    supportedBandDuelDifferenceSelectionsPerGame: number;
+                    supportedBandDuelDifferenceSelectionsByDifference: Record<string, number>;
+                    supportedBandDuelDifferenceProposals: number;
+                    supportedBandDuelDifferenceProposalsPerGame: number;
+                    supportedBandDuelDifferenceProposalsByDifference: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedBandDuelDifferenceSelections: 2,
+            supportedBandDuelDifferenceSelectionsPerGame: 1,
+            supportedBandDuelDifferenceSelectionsByDifference: {
+                strict_hold_shipped_advance: 2,
+                strict_advance_shipped_hold: 0,
+                different_advance: 0,
+                other: 0,
+            },
+            supportedBandDuelDifferenceProposals: 4,
+            supportedBandDuelDifferenceProposalsPerGame: 2,
+            supportedBandDuelDifferenceProposalsByDifference: {
+                strict_hold_shipped_advance: 2,
+                strict_advance_shipped_hold: 0,
+                different_advance: 2,
+                other: 0,
+            },
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedBandDuelDifferenceSelections: 0,
+            supportedBandDuelDifferenceProposals: 0,
+        });
     });
 
     test("tracks protected-advance guardrail vetoes, reasons, and detached seed-forensic events", () => {

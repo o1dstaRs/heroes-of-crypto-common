@@ -39,10 +39,13 @@ import {
     type IAIPolicyEvent,
     type IV08ProtectedAdvanceGuardrailDetails,
     type IV08SupportedBandAdvanceDetails,
+    type IV08SupportedBandDuelDecisionSummary,
+    type IV08SupportedBandDuelDetails,
     type IV08SupportedPrepinEgressDetails,
     type IV08SupportedRangedEscapeDetails,
     type V08ProtectedAdvanceGuardrailReason,
     type V08SupportedBandAdvanceFunnelStage,
+    type V08SupportedBandDuelDifference,
     type V08SupportedPrepinEgressFunnelStage,
     type V08SupportedRangedEscapeFunnelStage,
 } from "../ai/ai_strategy";
@@ -171,6 +174,14 @@ export interface IMirrorSideDiag {
     supportedBandAdvanceProposals: number;
     /** Root-catalog counts at each supported damage-band stage, including selector-disabled catalog-only runs. */
     supportedBandAdvanceFunnel: Record<V08SupportedBandAdvanceFunnelStage, number>;
+    /** Strict-vs-shipped root decision differences retained after a13 arbitration. */
+    supportedBandDuelDifferenceSelections: number;
+    /** Pre-search strict-vs-shipped root decision differences. */
+    supportedBandDuelDifferenceProposals: number;
+    /** Retained strict-vs-shipped root decision differences split by action direction. */
+    supportedBandDuelDifferenceSelectionsByDifference: Record<V08SupportedBandDuelDifference, number>;
+    /** Proposed strict-vs-shipped root decision differences split by action direction. */
+    supportedBandDuelDifferenceProposalsByDifference: Record<V08SupportedBandDuelDifference, number>;
     /** Shipped protected advances converted back to the original ranged shot by a live-root guardrail. */
     protectedAdvanceGuardrailVetoes: number;
     /** Protected-advance vetoes split by the guardrail that fired. */
@@ -211,6 +222,20 @@ const newSupportedBandAdvanceFunnel = (): Record<V08SupportedBandAdvanceFunnelSt
         number
     >;
 
+const SUPPORTED_BAND_DUEL_DIFFERENCES: readonly V08SupportedBandDuelDifference[] = [
+    "strict_hold_shipped_advance",
+    "strict_advance_shipped_hold",
+    "different_advance",
+    "other",
+];
+
+const newSupportedBandDuelDifferenceCounts = (): Record<V08SupportedBandDuelDifference, number> => ({
+    strict_hold_shipped_advance: 0,
+    strict_advance_shipped_hold: 0,
+    different_advance: 0,
+    other: 0,
+});
+
 const PROTECTED_ADVANCE_GUARDRAIL_REASONS: readonly V08ProtectedAdvanceGuardrailReason[] = [
     "ranged_superior_hold",
     "partial_band",
@@ -235,6 +260,8 @@ export interface IMirrorGameRecord {
     diag?: { green: IMirrorSideDiag; red: IMirrorSideDiag };
     /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
     supportedBandAdvanceEvents?: IMirrorSupportedBandAdvanceEvent[];
+    /** Strict-vs-shipped decision differences; retained marks the incumbent that survived search. */
+    supportedBandDuelDifferenceEvents?: IMirrorSupportedBandDuelDifferenceEvent[];
     /** Root veto proposals; retained marks the one surviving search. Omitted when none to keep JSONL compact. */
     protectedAdvanceGuardrailEvents?: IMirrorProtectedAdvanceGuardrailEvent[];
     /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
@@ -252,6 +279,14 @@ export interface IMirrorSupportedRangedEscapeEvent extends IV08SupportedRangedEs
 }
 
 export interface IMirrorSupportedBandAdvanceEvent extends IV08SupportedBandAdvanceDetails {
+    side: "green" | "red";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    retained: boolean;
+}
+
+export interface IMirrorSupportedBandDuelDifferenceEvent extends IV08SupportedBandDuelDetails {
     side: "green" | "red";
     unitId: string;
     creatureName: string;
@@ -278,6 +313,16 @@ export interface IMirrorSupportedPrepinEgressEvent extends IV08SupportedPrepinEg
 export interface IMirrorDependencies {
     matchRunner?: (config: IMatchConfig) => IMatchResult;
 }
+
+const detachSupportedBandDuelDecision = (
+    decision: IV08SupportedBandDuelDecisionSummary,
+): IV08SupportedBandDuelDecisionSummary => ({
+    ...decision,
+    actionTypes: [...decision.actionTypes],
+    movePath: decision.movePath?.map((cell) => ({ ...cell })) ?? null,
+    moveTargetCells: decision.moveTargetCells?.map((cell) => ({ ...cell })) ?? null,
+    rangeAimCell: decision.rangeAimCell ? { ...decision.rangeAimCell } : null,
+});
 
 /** Pair seed rule shared with archetype_payoff: games 2k / 2k+1 replay the same seed with seats swapped. */
 export const mirrorGameSeed = (baseSeed: number, game: number): number =>
@@ -361,6 +406,10 @@ function newSideDiag(version: string): IMirrorSideDiag {
         supportedBandAdvanceSelections: 0,
         supportedBandAdvanceProposals: 0,
         supportedBandAdvanceFunnel: newSupportedBandAdvanceFunnel(),
+        supportedBandDuelDifferenceSelections: 0,
+        supportedBandDuelDifferenceProposals: 0,
+        supportedBandDuelDifferenceSelectionsByDifference: newSupportedBandDuelDifferenceCounts(),
+        supportedBandDuelDifferenceProposalsByDifference: newSupportedBandDuelDifferenceCounts(),
         protectedAdvanceGuardrailVetoes: 0,
         protectedAdvanceGuardrailVetoesByReason: newProtectedAdvanceGuardrailReasonCounts(),
         protectedAdvanceGuardrailProposals: 0,
@@ -403,6 +452,8 @@ export function playMirrorGame(
     const rangedEscapeRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedRangedEscapeEvent>();
     const supportedBandAdvanceEvents: IMirrorSupportedBandAdvanceEvent[] = [];
     const bandAdvanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandAdvanceEvent>();
+    const supportedBandDuelDifferenceEvents: IMirrorSupportedBandDuelDifferenceEvent[] = [];
+    const bandDuelDifferenceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandDuelDifferenceEvent>();
     const protectedAdvanceGuardrailEvents: IMirrorProtectedAdvanceGuardrailEvent[] = [];
     const guardrailRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorProtectedAdvanceGuardrailEvent>();
     const supportedPrepinEgressEvents: IMirrorSupportedPrepinEgressEvent[] = [];
@@ -454,6 +505,11 @@ export function playMirrorGame(
                   side.supportedBandAdvanceSelections += 1;
                   const proposal = bandAdvanceRecordByEvent.get(event);
                   if (proposal) proposal.retained = true;
+              } else if (event.kind === "v0.8_supported_band_duel_difference") {
+                  side.supportedBandDuelDifferenceSelections += 1;
+                  side.supportedBandDuelDifferenceSelectionsByDifference[event.details.difference] += 1;
+                  const proposal = bandDuelDifferenceRecordByEvent.get(event);
+                  if (proposal) proposal.retained = true;
               } else if (event.kind === "v0.8_protected_advance_guardrail") {
                   side.protectedAdvanceGuardrailVetoes += 1;
                   side.protectedAdvanceGuardrailVetoesByReason[event.details.reason] += 1;
@@ -502,6 +558,21 @@ export function playMirrorGame(
                   };
                   supportedBandAdvanceEvents.push(proposal);
                   bandAdvanceRecordByEvent.set(event, proposal);
+              } else if (event.kind === "v0.8_supported_band_duel_difference") {
+                  side.supportedBandDuelDifferenceProposals += 1;
+                  side.supportedBandDuelDifferenceProposalsByDifference[event.details.difference] += 1;
+                  const proposal: IMirrorSupportedBandDuelDifferenceEvent = {
+                      ...event.details,
+                      strict: detachSupportedBandDuelDecision(event.details.strict),
+                      shipped: detachSupportedBandDuelDecision(event.details.shipped),
+                      side: event.team === GREEN_TEAM ? "green" : "red",
+                      unitId: event.unitId,
+                      creatureName: event.creatureName,
+                      lap: event.lap,
+                      retained: false,
+                  };
+                  supportedBandDuelDifferenceEvents.push(proposal);
+                  bandDuelDifferenceRecordByEvent.set(event, proposal);
               } else if (event.kind === "v0.8_supported_band_advance_funnel" && event.stage) {
                   side.supportedBandAdvanceFunnel[event.stage] += 1;
               } else if (event.kind === "v0.8_protected_advance_guardrail") {
@@ -628,6 +699,7 @@ export function playMirrorGame(
         ...(diag ? { diag } : {}),
         ...(supportedRangedEscapeEvents.length ? { supportedRangedEscapeEvents } : {}),
         ...(supportedBandAdvanceEvents.length ? { supportedBandAdvanceEvents } : {}),
+        ...(supportedBandDuelDifferenceEvents.length ? { supportedBandDuelDifferenceEvents } : {}),
         ...(protectedAdvanceGuardrailEvents.length ? { protectedAdvanceGuardrailEvents } : {}),
         ...(supportedPrepinEgressEvents.length ? { supportedPrepinEgressEvents } : {}),
     };
@@ -722,6 +794,10 @@ interface IVersionAggregate {
     supportedBandAdvanceSelections: number;
     supportedBandAdvanceProposals: number;
     supportedBandAdvanceFunnel: Record<V08SupportedBandAdvanceFunnelStage, number>;
+    supportedBandDuelDifferenceSelections: number;
+    supportedBandDuelDifferenceProposals: number;
+    supportedBandDuelDifferenceSelectionsByDifference: Record<V08SupportedBandDuelDifference, number>;
+    supportedBandDuelDifferenceProposalsByDifference: Record<V08SupportedBandDuelDifference, number>;
     protectedAdvanceGuardrailVetoes: number;
     protectedAdvanceGuardrailVetoesByReason: Record<V08ProtectedAdvanceGuardrailReason, number>;
     protectedAdvanceGuardrailProposals: number;
@@ -765,6 +841,10 @@ export function aggregateMirrorDiag(
                 supportedBandAdvanceSelections: 0,
                 supportedBandAdvanceProposals: 0,
                 supportedBandAdvanceFunnel: newSupportedBandAdvanceFunnel(),
+                supportedBandDuelDifferenceSelections: 0,
+                supportedBandDuelDifferenceProposals: 0,
+                supportedBandDuelDifferenceSelectionsByDifference: newSupportedBandDuelDifferenceCounts(),
+                supportedBandDuelDifferenceProposalsByDifference: newSupportedBandDuelDifferenceCounts(),
                 protectedAdvanceGuardrailVetoes: 0,
                 protectedAdvanceGuardrailVetoesByReason: newProtectedAdvanceGuardrailReasonCounts(),
                 protectedAdvanceGuardrailProposals: 0,
@@ -810,6 +890,14 @@ export function aggregateMirrorDiag(
             a.supportedBandAdvanceProposals += side.supportedBandAdvanceProposals ?? 0;
             for (const stage of V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES) {
                 a.supportedBandAdvanceFunnel[stage] += side.supportedBandAdvanceFunnel?.[stage] ?? 0;
+            }
+            a.supportedBandDuelDifferenceSelections += side.supportedBandDuelDifferenceSelections ?? 0;
+            a.supportedBandDuelDifferenceProposals += side.supportedBandDuelDifferenceProposals ?? 0;
+            for (const difference of SUPPORTED_BAND_DUEL_DIFFERENCES) {
+                a.supportedBandDuelDifferenceSelectionsByDifference[difference] +=
+                    side.supportedBandDuelDifferenceSelectionsByDifference?.[difference] ?? 0;
+                a.supportedBandDuelDifferenceProposalsByDifference[difference] +=
+                    side.supportedBandDuelDifferenceProposalsByDifference?.[difference] ?? 0;
             }
             a.protectedAdvanceGuardrailVetoes += side.protectedAdvanceGuardrailVetoes ?? 0;
             for (const reason of PROTECTED_ADVANCE_GUARDRAIL_REASONS) {
@@ -895,6 +983,25 @@ export function aggregateMirrorDiag(
                 V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map((stage) => [
                     stage,
                     a.supportedBandAdvanceFunnel[stage] / Math.max(1, a.games),
+                ]),
+            ),
+            supportedBandDuelDifferenceSelections: a.supportedBandDuelDifferenceSelections,
+            supportedBandDuelDifferenceSelectionsPerGame:
+                a.supportedBandDuelDifferenceSelections / Math.max(1, a.games),
+            supportedBandDuelDifferenceSelectionsByDifference: a.supportedBandDuelDifferenceSelectionsByDifference,
+            supportedBandDuelDifferenceSelectionsByDifferencePerGame: Object.fromEntries(
+                SUPPORTED_BAND_DUEL_DIFFERENCES.map((difference) => [
+                    difference,
+                    a.supportedBandDuelDifferenceSelectionsByDifference[difference] / Math.max(1, a.games),
+                ]),
+            ),
+            supportedBandDuelDifferenceProposals: a.supportedBandDuelDifferenceProposals,
+            supportedBandDuelDifferenceProposalsPerGame: a.supportedBandDuelDifferenceProposals / Math.max(1, a.games),
+            supportedBandDuelDifferenceProposalsByDifference: a.supportedBandDuelDifferenceProposalsByDifference,
+            supportedBandDuelDifferenceProposalsByDifferencePerGame: Object.fromEntries(
+                SUPPORTED_BAND_DUEL_DIFFERENCES.map((difference) => [
+                    difference,
+                    a.supportedBandDuelDifferenceProposalsByDifference[difference] / Math.max(1, a.games),
                 ]),
             ),
             protectedAdvanceGuardrailVetoes: a.protectedAdvanceGuardrailVetoes,

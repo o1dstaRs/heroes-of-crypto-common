@@ -959,22 +959,63 @@ describe("v0.8 protected ranged positioning", () => {
         const run = (version: "v0.8" | "v0.8s", origin?: "root" | "rollout") => {
             const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
             context.decisionOrigin = origin;
-            return (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S())
-                .decideTurn(shooter, context)
-                .map((action) => action.type);
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            return {
+                actions: (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S())
+                    .decideTurn(shooter, context)
+                    .map((action) => action.type),
+                events,
+            };
         };
 
         // The strict seat holds its stronger ranged line against a melee-only army; shipped legacy safely closes.
-        expect(run("v0.8", "root")).toEqual(["range_attack"]);
-        expect(run("v0.8s", "root")).toEqual(["move_unit", "range_attack"]);
+        const strictRoot = run("v0.8", "root");
+        const shippedRoot = run("v0.8s", "root");
+        expect(strictRoot.actions).toEqual(["range_attack"]);
+        expect(shippedRoot.actions).toEqual(["move_unit", "range_attack"]);
+        const difference = strictRoot.events.find(({ kind }) => kind === "v0.8_supported_band_duel_difference");
+        expect(difference?.kind).toBe("v0.8_supported_band_duel_difference");
+        if (difference?.kind !== "v0.8_supported_band_duel_difference") {
+            throw new Error("missing strict-vs-shipped decision difference");
+        }
+        expect(difference.details).toMatchObject({
+            difference: "strict_hold_shipped_advance",
+            strict: {
+                actionTypes: ["range_attack"],
+                movePath: null,
+                moveTargetCells: null,
+            },
+            shipped: {
+                actionTypes: ["move_unit", "range_attack"],
+                movePath: [{ x: 5, y: 6 }],
+            },
+        });
+        expect(shippedRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
         // Hypothetical search continuations remain the shipped policy for both versions.
-        expect(run("v0.8", "rollout")).toEqual(["move_unit", "range_attack"]);
-        expect(run("v0.8s", "rollout")).toEqual(["move_unit", "range_attack"]);
-        expect(run("v0.8")).toEqual(["move_unit", "range_attack"]);
-        expect(run("v0.8s")).toEqual(["move_unit", "range_attack"]);
+        for (const nonRoot of [run("v0.8", "rollout"), run("v0.8s", "rollout"), run("v0.8"), run("v0.8s")]) {
+            expect(nonRoot.actions).toEqual(["move_unit", "range_attack"]);
+            expect(nonRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
+        }
         delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
-        expect(run("v0.8", "root")).toEqual(["move_unit", "range_attack"]);
-        expect(run("v0.8s", "root")).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8", "root").actions).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8s", "root").actions).toEqual(["move_unit", "range_attack"]);
+    });
+
+    it("does not report a strict-vs-shipped difference when both policies keep the same full-damage shot", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+
+        const { shooter, context } = setupSupportedBandAdvance({ shotDistance: 16 });
+        context.decisionOrigin = "root";
+        const events: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => events.push(event);
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual(["range_attack"]);
+        expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
     });
 
     it("computes both duel catalogs with equal RNG tails and publishes only the selected branch telemetry", () => {
@@ -1050,8 +1091,25 @@ describe("v0.8 protected ranged positioning", () => {
         expect(strict.tail).toEqual(legacy.tail);
         expect(strict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance");
         expect(strict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance_funnel");
+        const difference = strict.events.find(({ kind }) => kind === "v0.8_supported_band_duel_difference");
+        expect(difference?.kind).toBe("v0.8_supported_band_duel_difference");
+        if (difference?.kind !== "v0.8_supported_band_duel_difference") {
+            throw new Error("missing strict-vs-shipped different advance");
+        }
+        expect(difference.details).toMatchObject({
+            difference: "different_advance",
+            strict: {
+                actionTypes: ["move_unit", "range_attack"],
+                movePath: [{ x: 5, y: 6 }],
+            },
+            shipped: {
+                actionTypes: ["move_unit", "range_attack"],
+                movePath: [{ x: 4, y: 6 }],
+            },
+        });
         expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
         expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+        expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_duel_difference");
     });
 
     it("does not duplicate pinned retreat after duel branch selection", () => {

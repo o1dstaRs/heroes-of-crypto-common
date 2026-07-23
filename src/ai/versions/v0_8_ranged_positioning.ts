@@ -24,8 +24,10 @@ import { canUnitLandAt } from "../ai";
 import type {
     IAIPolicyEvent,
     IDecisionContext,
+    IV08SupportedBandDuelDecisionSummary,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
+    V08SupportedBandDuelDifference,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
     V08SupportedRangedEscapeFunnelStage,
@@ -1092,6 +1094,65 @@ function protectedAdvanceShot(
     return protectedAdvanceShotCatalog(unit, context, decision, responseNeutralAdvance).decision;
 }
 
+function supportedBandDuelDecisionSummary(decision: readonly GameAction[]): IV08SupportedBandDuelDecisionSummary {
+    const move = decision.find(
+        (action): action is Extract<GameAction, { type: "move_unit" }> => action.type === "move_unit",
+    );
+    const shot = decision.find(
+        (action): action is Extract<GameAction, { type: "range_attack" }> => action.type === "range_attack",
+    );
+    return {
+        actionTypes: decision.map((action) => action.type),
+        movePath: move ? move.path.map((cell) => ({ ...cell })) : null,
+        moveTargetCells: move?.targetCells ? move.targetCells.map((cell) => ({ ...cell })) : null,
+        moveHasLavaCell: move?.hasLavaCell ?? null,
+        moveHasWaterCell: move?.hasWaterCell ?? null,
+        rangeTargetId: shot?.targetId ?? null,
+        rangeAimCell: shot?.aimCell ? { ...shot.aimCell } : null,
+        rangeAimSide: shot?.aimSide ?? null,
+    };
+}
+
+const sameCells = (left: readonly XY[] | null, right: readonly XY[] | null): boolean =>
+    left === right ||
+    (left !== null &&
+        right !== null &&
+        left.length === right.length &&
+        left.every((cell, index) => cell.x === right[index]!.x && cell.y === right[index]!.y));
+
+function sameSupportedBandDuelDecision(
+    left: IV08SupportedBandDuelDecisionSummary,
+    right: IV08SupportedBandDuelDecisionSummary,
+): boolean {
+    return (
+        left.actionTypes.length === right.actionTypes.length &&
+        left.actionTypes.every((type, index) => type === right.actionTypes[index]) &&
+        sameCells(left.movePath, right.movePath) &&
+        sameCells(left.moveTargetCells, right.moveTargetCells) &&
+        left.moveHasLavaCell === right.moveHasLavaCell &&
+        left.moveHasWaterCell === right.moveHasWaterCell &&
+        left.rangeTargetId === right.rangeTargetId &&
+        ((left.rangeAimCell === null && right.rangeAimCell === null) ||
+            (left.rangeAimCell !== null &&
+                right.rangeAimCell !== null &&
+                left.rangeAimCell.x === right.rangeAimCell.x &&
+                left.rangeAimCell.y === right.rangeAimCell.y)) &&
+        left.rangeAimSide === right.rangeAimSide
+    );
+}
+
+function supportedBandDuelDifference(
+    strict: IV08SupportedBandDuelDecisionSummary,
+    shipped: IV08SupportedBandDuelDecisionSummary,
+): V08SupportedBandDuelDifference {
+    const strictMoves = strict.movePath !== null;
+    const shippedMoves = shipped.movePath !== null;
+    if (!strictMoves && shippedMoves) return "strict_hold_shipped_advance";
+    if (strictMoves && !shippedMoves) return "strict_advance_shipped_hold";
+    if (strictMoves && shippedMoves) return "different_advance";
+    return "other";
+}
+
 function protectedAdvanceGuardrailsMode(
     context: IDecisionContext,
     strategyVersion: string,
@@ -1222,6 +1283,24 @@ function supportedBandAdvanceVsLegacy(
     );
     const selectedEvents = selectsStrict ? strictEvents : legacyEvents;
     for (const event of selectedEvents) context.policyEventObserver?.(event);
+    if (selectsStrict && context.policyEventObserver) {
+        const strictSummary = supportedBandDuelDecisionSummary(strictDecision);
+        const shippedSummary = supportedBandDuelDecisionSummary(legacyDecision);
+        if (!sameSupportedBandDuelDecision(strictSummary, shippedSummary)) {
+            context.policyEventObserver({
+                kind: "v0.8_supported_band_duel_difference",
+                unitId: unit.getId(),
+                creatureName: unit.getName(),
+                team: unit.getTeam(),
+                lap: context.fightProperties?.getCurrentLap() ?? 0,
+                details: {
+                    difference: supportedBandDuelDifference(strictSummary, shippedSummary),
+                    strict: strictSummary,
+                    shipped: shippedSummary,
+                },
+            });
+        }
+    }
     return selectsStrict ? strictDecision : legacyDecision;
 }
 
