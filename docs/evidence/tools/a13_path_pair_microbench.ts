@@ -35,7 +35,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
-const SCHEMA = "heroes-of-crypto/a13-path-pair-microbench/v1" as const;
+const SCHEMA = "heroes-of-crypto/a13-path-pair-microbench/v2" as const;
 const RUNNER_PATH = fileURLToPath(import.meta.url);
 const GRID_SIZE = 16;
 const DEFAULT_SEED = 0xa13_2202;
@@ -802,6 +802,89 @@ function fallbackSemanticCases(seed: number): readonly ISemanticPathCase[] {
         edgeTags: ["ragged-aggr", "expected-exception"],
     });
 
+    for (const boundary of [
+        { id: "small-origin", currentCell: { x: 0, y: 0 }, isSmallUnit: true },
+        { id: "small-max", currentCell: { x: 15, y: 15 }, isSmallUnit: true },
+        { id: "large-min", currentCell: { x: 1, y: 1 }, isSmallUnit: false },
+        { id: "large-max", currentCell: { x: 15, y: 15 }, isSmallUnit: false },
+    ] as const) {
+        add({
+            id: `edge-fast-path-boundary-${boundary.id}`,
+            currentCell: boundary.currentCell,
+            isSmallUnit: boundary.isSmallUnit,
+            maxSteps: 2,
+            aggrBoard: Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1)),
+            edgeTags: ["fast-path-boundary", boundary.id],
+        });
+    }
+
+    const shortAggroRow = Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1));
+    shortAggroRow[3] = [1, 1];
+    add({
+        id: "edge-short-aggr-row-fallback",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: shortAggroRow,
+        edgeTags: ["ragged-aggr", "short-row", "fallback"],
+    });
+
+    const raggedLargeAggro = Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1));
+    delete raggedLargeAggro[3];
+    add({
+        id: "edge-ragged-large-aggr-exception",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: raggedLargeAggro,
+        isSmallUnit: false,
+        edgeTags: ["ragged-aggr", "large-footprint", "expected-exception"],
+    });
+
+    const malformedFlyingAggro = Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1));
+    delete malformedFlyingAggro[3];
+    add({
+        id: "edge-ragged-aggr-flying-no-read",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: malformedFlyingAggro,
+        canFly: true,
+        edgeTags: ["ragged-aggr", "flying", "no-aggr-read"],
+    });
+
+    const asymmetricAggro = Array.from({ length: GRID_SIZE }, (_, x) =>
+        Array.from({ length: GRID_SIZE }, (_, y) => 1 + ((x * 5 + y * 3) % 7)),
+    );
+    add({
+        id: "edge-dense-aggr-axis-order",
+        currentCell: { x: 7, y: 5 },
+        aggrBoard: asymmetricAggro,
+        isSmallUnit: false,
+        maxSteps: 6.3,
+        edgeTags: ["dense-aggr", "x-major", "large-footprint"],
+    });
+
+    const exceptionalAggro = Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1));
+    exceptionalAggro[3][4] = Number.NaN;
+    exceptionalAggro[4][5] = Number.POSITIVE_INFINITY;
+    exceptionalAggro[5][4] = Number.NEGATIVE_INFINITY;
+    exceptionalAggro[4][3] = -0;
+    exceptionalAggro[3][3] = 0;
+    add({
+        id: "edge-dense-aggr-special-floats",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: exceptionalAggro,
+        isSmallUnit: false,
+        maxSteps: 6.3,
+        edgeTags: ["dense-aggr", "special-floats", "large-footprint"],
+    });
+
+    const rejectedAggro = Array.from({ length: GRID_SIZE }, () => Array<number>(GRID_SIZE).fill(1));
+    rejectedAggro[3][4] = 9;
+    rejectedAggro[4][3] = 7;
+    add({
+        id: "edge-aggr-before-insufficient-budget",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: rejectedAggro,
+        maxSteps: 0.5,
+        edgeTags: ["dense-aggr", "insufficient-budget", "evaluation-order"],
+    });
+
     add({
         id: "edge-budget-nan",
         maxSteps: Number.NaN,
@@ -1098,14 +1181,12 @@ function verifySemanticCorpus(
     };
 }
 
-function verifySemantics(
-    baseline: IVariantRuntime,
-    candidate: IVariantRuntime,
+function combineSemanticResults(
+    timedLiveShaped: ReturnType<typeof verifySemanticCorpus>,
+    fallbackEdge: ReturnType<typeof verifySemanticCorpus>,
     timedLiveCases: readonly ISemanticPathCase[],
     fallbackEdgeCases: readonly ISemanticPathCase[],
 ): Record<string, unknown> & { passed: boolean } {
-    const timedLiveShaped = verifySemanticCorpus(baseline, candidate, timedLiveCases);
-    const fallbackEdge = verifySemanticCorpus(baseline, candidate, fallbackEdgeCases);
     const inputsBefore = digest({
         timedLiveShaped: (timedLiveShaped.inputs as { beforeSha256: string }).beforeSha256,
         fallbackEdge: (fallbackEdge.inputs as { beforeSha256: string }).beforeSha256,
@@ -1518,6 +1599,15 @@ function benchmarkResult(
     const candidateRun = pathRunner(candidate, makeHelper(candidate), workloads, benchmarkSeed);
     const warmupPairs = warmUp(baselineRun, candidateRun, cli.warmupMs);
     const calibration = calibrate(baselineRun, candidateRun, cli.targetMs);
+    // Calibration pilots are intentionally short. Two full-size, order-balanced settling blocks keep one arm from
+    // paying delayed tier-up or the first arm-sized collection in the recorded distribution.
+    const settling = runPairedBlocks({
+        baseline: baselineRun,
+        candidate: candidateRun,
+        blocks: 2,
+        iterations: calibration.iterations,
+        workloadCount: workloads.length,
+    });
     const paired = runPairedBlocks({
         baseline: baselineRun,
         candidate: candidateRun,
@@ -1533,7 +1623,10 @@ function benchmarkResult(
     const baselineChecksums = paired.baseline.map((sample) => sample.checksum);
     const candidateChecksums = paired.candidate.map((sample) => sample.checksum);
     const timedChecksumsEqual = baselineChecksums.every((checksum, index) => checksum === candidateChecksums[index]);
-    const checksumsEqual = timedChecksumsEqual && fullOutputPreflight.identical;
+    const settlingChecksumsEqual = settling.baseline.every(
+        (sample, index) => sample.checksum === settling.candidate[index]?.checksum,
+    );
+    const checksumsEqual = timedChecksumsEqual && settlingChecksumsEqual && fullOutputPreflight.identical;
     return {
         fullOutputPreflight,
         checksumOverhead,
@@ -1543,6 +1636,14 @@ function benchmarkResult(
             targetMsPerArm: cli.targetMs,
             ...calibration,
             callsPerArm: paired.callsPerArm,
+        },
+        settling: {
+            purpose: "two unrecorded full-size blocks absorb delayed tier-up and first arm-sized collection",
+            excludedFromStatistics: true,
+            executionOrders: settling.baseline.map((sample) => sample.order),
+            baseline: settling.baseline,
+            candidate: settling.candidate,
+            checksumsEqual: settlingChecksumsEqual,
         },
         executionOrders: paired.baseline.map((sample) => sample.order),
         baseline: baselineSummary,
@@ -1557,6 +1658,7 @@ function benchmarkResult(
         bootstrap,
         checksumsEqual,
         checksums: {
+            settlingPairsEqual: settlingChecksumsEqual,
             timedPairsEqual: timedChecksumsEqual,
             baseline: baselineChecksums,
             candidate: candidateChecksums,
@@ -1634,8 +1736,8 @@ function gateResult(options: {
             passed: options.runtimeIsolationExact,
         },
         {
-            id: "exact-semantic-preflight",
-            threshold: "all ordered bit-exact outputs/exceptions/RNG tails match",
+            id: "exact-semantic-equivalence",
+            threshold: "all ordered bit-exact outputs/exceptions/RNG tails match across both semantic phases",
             observed: options.semanticPassed,
             applicable: true,
             passed: options.semanticPassed,
@@ -1711,9 +1813,13 @@ async function main(): Promise<void> {
     const workloads = pathWorkloads(cli.seed, baseline.obstacleType);
     const workloadsBefore = workloadDigest(workloads);
     const timedLiveSemanticCases = timedSemanticCases(workloads);
+    const timedLiveShaped = verifySemanticCorpus(baseline, candidate, timedLiveSemanticCases);
+    const benchmark = timedLiveShaped.passed ? benchmarkResult(cli, baseline, candidate, workloads) : null;
+    // Malformed/custom inputs intentionally run after timing. Exercising them first broadens JIT type feedback for a
+    // throughput benchmark whose production corpus is the dense 16x16 board.
     const fallbackEdgeCases = fallbackSemanticCases(cli.seed);
-    const semantics = verifySemantics(baseline, candidate, timedLiveSemanticCases, fallbackEdgeCases);
-    const benchmark = semantics.passed ? benchmarkResult(cli, baseline, candidate, workloads) : null;
+    const fallbackEdge = verifySemanticCorpus(baseline, candidate, fallbackEdgeCases);
+    const semantics = combineSemanticResults(timedLiveShaped, fallbackEdge, timedLiveSemanticCases, fallbackEdgeCases);
     const workloadsAfter = workloadDigest(workloads);
     const baselineAfter = sourceSeal(cli.baselineRoot);
     const candidateAfter = sourceSeal(cli.candidateRoot);
@@ -1755,15 +1861,17 @@ async function main(): Promise<void> {
             enforce: cli.enforce,
             allowIdenticalSources: cli.allowIdenticalSources,
             pairing: "31 alternating AB/BA blocks by default; odd block count leaves one extra AB",
+            settling: "two full-size unrecorded blocks in AB then BA order after calibration",
         },
         methodology: {
             measuredCall: "full production PathHelper.getMovePath",
             sourceLoading:
                 "each arm dynamically imports its own path_helper.ts, grid_settings.ts, and utils/lib.ts from a distinct real source root",
             timingClock: "process.hrtime.bigint",
-            calibration: "one shared warmed iteration count targets 150ms per arm by default",
-            semanticPreflight:
-                "bit-exact ordered result graph including reference-alias topology, exceptions, independent-root deterministic RNG tails, and input immutability",
+            calibration:
+                "one shared warmed iteration count targets 150ms per arm by default, followed by two order-balanced full-size settling blocks",
+            semanticPhases:
+                "live-shaped bit-exact validation runs before timing; malformed/custom fallback validation runs afterward so edge-only type feedback cannot contaminate production throughput",
             bootstrap: "paired whole-block nonparametric resampling with deterministic seed",
             tailLabel:
                 "reported p95/p99 are quantiles of block-average getMovePath throughput; they are not individual-call latency tails",
