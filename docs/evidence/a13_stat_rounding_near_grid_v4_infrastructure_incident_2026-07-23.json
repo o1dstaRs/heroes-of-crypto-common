@@ -1,0 +1,64 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-v4-infrastructure-incident/v1",
+    "incidentId": "a13-stat-rounding-near-grid-v4-dependency-alias-topology-20260723",
+    "campaignId": "a13-stat-rounding-near-grid-77ee4616-20260723-v4",
+    "classification": "infrastructure-invalid-before-semantic-or-timing",
+    "failure": {
+        "stage": "semantic",
+        "phase": "pair-source-seal-before-variant-load-or-warmup",
+        "error": "ENOENT: no such file or directory, lstat '<baseline>/node_modules/denque'",
+        "exitCode": 1,
+        "semanticArtifactProduced": false,
+        "performanceDataProduced": false
+    },
+    "cause": {
+        "kind": "isolated-source-root-node-modules-alias-topology",
+        "summary": "Both extracted roots linked node_modules to the client workspace node_modules directory. That directory contains Bun's .bun store but not the denque or google-protobuf package aliases required by the common package. Those aliases exist in the common package's own node_modules directory.",
+        "incorrectTarget": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/node_modules",
+        "requiredTarget": "/Users/zolotukhin/Workplace/heroes-of-crypto-client/game/heroes-of-crypto-common/node_modules",
+        "incorrectTargetLinkSeal": {
+            "bytes": 64,
+            "sha256": "06a76db618800705827a28ee74f9e2adb1d14957e36d07c3abe0ed132e82e2db"
+        },
+        "affectedRoots": {
+            "baseline": "/private/tmp/hoc-stat-rounding-near-grid-qualification.CL0urh/baseline",
+            "candidate": "/private/tmp/hoc-stat-rounding-near-grid-qualification.CL0urh/candidate"
+        },
+        "missingAliasesAtIncorrectTarget": ["denque", "google-protobuf"]
+    },
+    "evidence": {
+        "ledger": {
+            "path": "docs/evidence/a13_stat_rounding_near_grid_attempt_ledger_2026-07-23.jsonl",
+            "bytes": 17477,
+            "sha256": "c9f9fb32d8e4cafb83e048fc128adfe8a7f5edbfc591f424323b68c936277953",
+            "terminalRecordSha256": "32ca43a98b406f6bb920fdfafda524e1e1bb0e33c69836760e4a0e0179c9a176"
+        },
+        "outputTree": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-qualification.CL0urh/formal-v4",
+            "codec": "sorted-json-object-array-with-directories/v1",
+            "entryCount": 6,
+            "fileBytes": 810,
+            "manifestSha256": "d5d811e36cbe31db2032f959fa70042e85da6d3d174cbe49dfa4cf7edc3400c2"
+        },
+        "logs": {
+            "stdout": {
+                "path": "/private/tmp/hoc-stat-rounding-near-grid-qualification.CL0urh/formal-v4/semantic.json.stdout.log",
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "stderr": {
+                "path": "/private/tmp/hoc-stat-rounding-near-grid-qualification.CL0urh/formal-v4/semantic.json.stderr.log",
+                "bytes": 810,
+                "sha256": "31d342ccc942cfccd8e69b2ba693744e6601717c6fe9ba7a261109841dfe9645"
+            }
+        }
+    },
+    "disposition": {
+        "v4PreservedAsHistorical": true,
+        "v4RetryAuthorized": false,
+        "v4SemanticEvidenceAccepted": false,
+        "v4TimingEvidenceAccepted": false,
+        "v4EvidencePooledIntoV5": false,
+        "remediation": "Prepare a fresh v5 zero-retry campaign from fresh archives, require package-local node_modules aliases, and validate source/dependency identity before creating any output."
+    }
+}
