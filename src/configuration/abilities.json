@@ -99,7 +99,10 @@
     "Blacksmith Tools": {
         "name": "Blacksmith Tools",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells:", "Craft"],
+        "desc": [
+            "Craft (2x2 allies, needs stack power 4). Each ally:",
+            "Double Attack {}%, Frozen weapon {}%, Stun {}%, nothing {}%."
+        ],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,

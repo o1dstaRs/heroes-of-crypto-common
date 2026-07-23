@@ -12,7 +12,7 @@
 import { EffectFactory } from "../effects/effect_factory";
 import * as HoCLib from "../utils/lib";
 import type { ISceneLog } from "../scene/scene_log_interface";
-import { Unit } from "../units/unit";
+import type { Unit } from "../units/unit";
 
 export type CraftOutcome = "stun" | "nothing" | "double" | "frozen";
 
@@ -21,6 +21,24 @@ export interface ICraftResult {
     outcome: CraftOutcome;
     /** The ability name granted (for "double"/"frozen"); undefined for "stun"/"nothing". */
     grantedAbility?: string;
+}
+
+export interface ICraftChances {
+    /** Percent chances (0-100); always sum to 100. */
+    stun: number;
+    nothing: number;
+    double: number;
+    frozen: number;
+}
+
+/**
+ * The luck-weighted Craft outcome percentages for a caster's luck. Luck shifts probability 1:1 from the bad
+ * Stun outcome to the good Frozen outcome (each clamped to 0-20); Nothing and Double stay at 40. Sums to 100.
+ * Single source of truth for both the rolls (processCraftAbility) and the ability/spell descriptions.
+ */
+export function getCraftChances(luck: number): ICraftChances {
+    const stun = Math.max(0, Math.min(20, 10 - luck));
+    return { stun, nothing: 40, double: 40, frozen: 20 - stun };
 }
 
 const effectFactory = new EffectFactory();
@@ -35,7 +53,7 @@ const effectFactory = new EffectFactory();
 export function processCraftAbility(caster: Unit, allies: Unit[], sceneLog: ISceneLog): ICraftResult[] {
     const results: ICraftResult[] = [];
     // Luck shifts probability 1:1 from the bad Stun outcome to the good Frozen outcome.
-    const stunChance = Math.max(0, Math.min(20, 10 - caster.getLuck()));
+    const stunChance = getCraftChances(caster.getLuck()).stun;
 
     for (const ally of allies) {
         if (ally.isDead()) {
@@ -55,9 +73,17 @@ export function processCraftAbility(caster: Unit, allies: Unit[], sceneLog: ISce
             results.push({ unitId: ally.getId(), outcome: "nothing" });
         } else if (roll < stunChance + 80) {
             const granted = isRanged ? "Crafted Double Shot" : "Crafted Double Punch";
-            ally.grantAbility(granted);
-            sceneLog.updateLog(`${ally.getName()} was crafted with ${granted}`);
-            results.push({ unitId: ally.getId(), outcome: "double", grantedAbility: granted });
+            const existing = isRanged ? "Double Shot" : "Double Punch";
+            // A unit that already gets this second attack can't gain a third (no triple attacks) — the
+            // craft simply does nothing rather than stacking another double.
+            if (ally.hasAbilityActive(existing) || ally.hasAbilityActive(granted)) {
+                sceneLog.updateLog(`${ally.getName()}'s craft found nothing to improve`);
+                results.push({ unitId: ally.getId(), outcome: "nothing" });
+            } else {
+                ally.grantAbility(granted);
+                sceneLog.updateLog(`${ally.getName()} was crafted with ${granted}`);
+                results.push({ unitId: ally.getId(), outcome: "double", grantedAbility: granted });
+            }
         } else {
             const granted = isRanged ? "Crafted Frozen Bow" : "Crafted Frozen Sword";
             ally.grantAbility(granted);

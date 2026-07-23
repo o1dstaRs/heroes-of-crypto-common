@@ -13,6 +13,7 @@ import Denque from "denque";
 import { Ability } from "../abilities/ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
@@ -568,6 +569,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return description
                 .replace("{}", Number(chance.toFixed(2)).toString())
                 .replace("{}", Number(reduction.toFixed(2)).toString());
+        }
+        if (ability.getName() === "Blacksmith Tools") {
+            // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
+            const { stun, nothing, double, frozen } = getCraftChances(this.getLuck());
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace("{}", double.toString())
+                .replace("{}", frozen.toString())
+                .replace("{}", stun.toString())
+                .replace("{}", nothing.toString());
         }
         return ability.getDesc().join("\n").replace(/\{\}/g, ability.getPower().toString());
     }
