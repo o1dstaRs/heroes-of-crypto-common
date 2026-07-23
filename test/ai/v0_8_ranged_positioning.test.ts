@@ -506,11 +506,12 @@ function setupScreenedCloserDuel(sameRoute = false): {
         targetCell: { x: 5, y: 0 },
     });
     if (!setup.guard) throw new Error("screened-closer fixture requires a native guard");
+    const origin = { ...setup.shooter.getBaseCell() };
     const strictDestination = { x: 2, y: 5 };
     const shippedDestination = sameRoute ? strictDestination : { x: 5, y: 6 };
     const strictRoute = {
         cell: strictDestination,
-        route: [{ x: 4, y: 6 }, { x: 3, y: 5 }, strictDestination],
+        route: [origin, { x: 4, y: 6 }, { x: 3, y: 5 }, strictDestination],
         weight: 2,
         firstAggrMet: false,
         hasLavaCell: false,
@@ -520,7 +521,7 @@ function setupScreenedCloserDuel(sameRoute = false): {
         ? strictRoute
         : {
               cell: shippedDestination,
-              route: [shippedDestination],
+              route: [origin, shippedDestination],
               weight: 1,
               firstAggrMet: false,
               hasLavaCell: false,
@@ -1618,7 +1619,14 @@ describe("v0.8 protected ranged positioning", () => {
             strictTargetScreenedAfter: true,
             strictScreeningGuardId: treatment.fixture.guard.getId(),
             strictRetainedSignatureAfter: true,
+            strictFromCell: treatment.fixture.shooter.getBaseCell(),
+            strictToCell: treatment.fixture.strictDestination,
+            strictDivisorBefore: 2,
+            strictReachableThreatsBefore: 0,
             shippedDivisorAfter: 1,
+            shippedDivisorBefore: 2,
+            shippedFromCell: treatment.fixture.shooter.getBaseCell(),
+            shippedToCell: treatment.fixture.shippedDestination,
             shippedReachableThreatsAfter: 0,
             shippedTargetDistanceBefore: 7,
             shippedTargetDistanceAfter: 6,
@@ -1750,6 +1758,155 @@ describe("v0.8 protected ranged positioning", () => {
         expect(
             compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, shippedMetadata, shippedSummary),
         ).toMatchObject({ dominant: false, metadataValid: true, reason: "filtered" });
+    });
+
+    it("normalizes one optional leading move origin and rejects malformed travelled paths", () => {
+        const strictDetails: IV08SupportedBandAdvanceDetails = {
+            fromCell: { x: 5, y: 7 },
+            toCell: { x: 5, y: 4 },
+            targetId: "target",
+            targetCreatureName: "Target",
+            exposureBefore: 0,
+            exposureAfter: 0,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 3,
+            minEnemyDistanceBefore: 6,
+            minEnemyDistanceAfter: 3,
+            rangedSuperior: false,
+            finishActive: false,
+            targetScreenedAfter: true,
+            screeningGuardId: "guard",
+            retainedSignatureAfter: true,
+        };
+        const summary = (
+            path: XY[],
+            destination = strictDetails.toCell,
+            targetCells: XY[] = [{ ...destination }],
+        ): IV08SupportedBandDuelDecisionSummary => ({
+            actionTypes: ["move_unit", "range_attack"],
+            movePath: path,
+            moveTargetCells: targetCells,
+            moveHasLavaCell: false,
+            moveHasWaterCell: false,
+            rangeTargetId: strictDetails.targetId,
+            rangeAimCell: { x: 5, y: 1 },
+            rangeAimSide: 0,
+        });
+        const shotOnlySummary: IV08SupportedBandDuelDecisionSummary = {
+            actionTypes: ["range_attack"],
+            movePath: null,
+            moveTargetCells: null,
+            moveHasLavaCell: null,
+            moveHasWaterCell: null,
+            rangeTargetId: strictDetails.targetId,
+            rangeAimCell: { x: 5, y: 1 },
+            rangeAimSide: 0,
+        };
+        const compare = (details: IV08SupportedBandAdvanceDetails, path: XY[], destination = details.toCell) =>
+            compareV08SupportedBandScreenedCloser(details, summary(path, destination), undefined, shotOnlySummary);
+
+        const canonical = compare(strictDetails, [
+            { ...strictDetails.fromCell },
+            { x: 5, y: 6 },
+            { x: 5, y: 5 },
+            { ...strictDetails.toCell },
+        ]);
+        expect(canonical).toMatchObject({
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+            strictFromCell: strictDetails.fromCell,
+            strictToCell: strictDetails.toCell,
+            shippedFromCell: null,
+            shippedToCell: null,
+            strictDivisorBefore: 2,
+            strictReachableThreatsBefore: 0,
+            shippedDivisorBefore: null,
+        });
+        expect(canonical.strictFromCell).not.toBe(strictDetails.fromCell);
+        expect(canonical.strictToCell).not.toBe(strictDetails.toCell);
+        expect(compare(strictDetails, [{ x: 5, y: 6 }, { x: 5, y: 5 }, { ...strictDetails.toCell }])).toMatchObject({
+            dominant: false,
+            metadataValid: true,
+            reason: "filtered",
+        });
+
+        const originOnlyDetails = { ...strictDetails, toCell: { ...strictDetails.fromCell } };
+        expect(compare(originOnlyDetails, [{ ...originOnlyDetails.fromCell }], originOnlyDetails.toCell)).toMatchObject(
+            { dominant: false, metadataValid: false, reason: "filtered" },
+        );
+        expect(
+            compare(strictDetails, [
+                { ...strictDetails.fromCell },
+                { ...strictDetails.fromCell },
+                { x: 5, y: 6 },
+                { x: 5, y: 5 },
+                { ...strictDetails.toCell },
+            ]),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        expect(
+            compare(strictDetails, [{ ...strictDetails.fromCell }, { x: 5, y: 5 }, { ...strictDetails.toCell }]),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+        expect(
+            compare({ ...strictDetails, divisorBefore: Number.NaN, exposureBefore: -1 }, [
+                { x: 5, y: 6 },
+                { x: 5, y: 5 },
+                { ...strictDetails.toCell },
+            ]),
+        ).toMatchObject({
+            dominant: false,
+            metadataValid: false,
+            strictDivisorBefore: null,
+            strictReachableThreatsBefore: null,
+        });
+
+        const canonicalPath = [
+            { ...strictDetails.fromCell },
+            { x: 5, y: 6 },
+            { x: 5, y: 5 },
+            { ...strictDetails.toCell },
+        ];
+        const duplicatedStrictFootprint = summary(canonicalPath, strictDetails.toCell, [
+            { ...strictDetails.toCell },
+            { ...strictDetails.toCell },
+        ]);
+        expect(
+            compareV08SupportedBandScreenedCloser(strictDetails, duplicatedStrictFootprint, undefined, shotOnlySummary),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
+
+        const shippedDestination = { x: 6, y: 5 };
+        const shippedMetadata: IV08ProtectedAdvanceCatalogMetadata = {
+            fromCell: { ...strictDetails.fromCell },
+            toCell: shippedDestination,
+            targetId: strictDetails.targetId,
+            targetCreatureName: strictDetails.targetCreatureName,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            ownRangedOutput: 40,
+            enemyRangedOutput: 80,
+            finishActive: false,
+            reachableThreatsAfter: 0,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 4,
+            targetScreenedAfter: false,
+            screeningGuardId: null,
+            retainedSignatureAfter: true,
+        };
+        const duplicatedShippedFootprint = summary(
+            [{ ...strictDetails.fromCell }, { x: 6, y: 6 }, shippedDestination],
+            shippedDestination,
+            [{ ...shippedDestination }, { ...shippedDestination }],
+        );
+        expect(
+            compareV08SupportedBandScreenedCloser(
+                strictDetails,
+                summary(canonicalPath),
+                shippedMetadata,
+                duplicatedShippedFootprint,
+            ),
+        ).toMatchObject({ dominant: false, metadataValid: false, reason: "filtered" });
     });
 
     it("separates valid screened-closer filters from malformed catalog integrity failures", () => {

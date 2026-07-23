@@ -939,24 +939,37 @@ describe("measure_mirror_cohorts", () => {
                     strict: {
                         ...BAND_DUEL_DETAILS.shipped,
                         actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
-                        movePath: [{ x: 2, y: 1 }],
+                        movePath: [
+                            { x: 1, y: 1 },
+                            { x: 2, y: 1 },
+                        ],
                         moveTargetCells: [{ x: 2, y: 1 }],
                         rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
                     },
                     shipped: {
                         ...BAND_DUEL_DETAILS.shipped,
                         actionTypes: [...BAND_DUEL_DETAILS.shipped.actionTypes],
-                        movePath: [{ x: 1, y: 1 }],
-                        moveTargetCells: [{ x: 1, y: 1 }],
+                        movePath: [
+                            { x: 1, y: 1 },
+                            { x: 1, y: 2 },
+                        ],
+                        moveTargetCells: [{ x: 1, y: 2 }],
                         rangeAimCell: { ...BAND_DUEL_DETAILS.shipped.rangeAimCell! },
                     },
+                    strictFromCell: { x: 1, y: 1 },
+                    strictToCell: { x: 2, y: 1 },
+                    shippedFromCell: { x: 1, y: 1 },
+                    shippedToCell: { x: 1, y: 2 },
+                    strictDivisorBefore: 2,
                     strictDivisorAfter: 1,
+                    strictReachableThreatsBefore: 0,
                     strictReachableThreatsAfter: 0,
                     strictTargetDistanceBefore: 6,
                     strictTargetDistanceAfter: 3,
                     strictTargetScreenedAfter: true,
                     strictScreeningGuardId: "native-guard",
                     strictRetainedSignatureAfter: true,
+                    shippedDivisorBefore: 2,
                     shippedDivisorAfter: 1,
                     shippedReachableThreatsAfter: 0,
                     shippedTargetDistanceBefore: 6,
@@ -1053,6 +1066,12 @@ describe("measure_mirror_cohorts", () => {
             );
             expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.shipped.movePath).not.toBe(
                 sourceDetails[game * 4]!.shipped.movePath,
+            );
+            expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.strictFromCell).not.toBe(
+                sourceDetails[game * 4]!.strictFromCell,
+            );
+            expect(record.supportedBandScreenedCloserComparisonEvents?.[0]?.shippedToCell).not.toBe(
+                sourceDetails[game * 4]!.shippedToCell,
             );
         });
         expect(records[0].supportedBandScreenedCloserComparisonEvents?.[0]?.side).toBe("green");

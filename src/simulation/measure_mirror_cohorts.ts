@@ -685,6 +685,11 @@ export function playMirrorGame(
                       ...event.details,
                       strict: detachSupportedBandDuelDecision(event.details.strict),
                       shipped: detachSupportedBandDuelDecision(event.details.shipped),
+                      strictFromCell: { ...event.details.strictFromCell },
+                      strictToCell: { ...event.details.strictToCell },
+                      shippedFromCell:
+                          event.details.shippedFromCell === null ? null : { ...event.details.shippedFromCell },
+                      shippedToCell: event.details.shippedToCell === null ? null : { ...event.details.shippedToCell },
                       side: event.team === GREEN_TEAM ? "green" : "red",
                       unitId: event.unitId,
                       creatureName: event.creatureName,

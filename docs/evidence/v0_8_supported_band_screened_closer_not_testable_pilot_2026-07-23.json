@@ -1,0 +1,129 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-screened-closer-not-testable-pilot/v1",
+    "recordedAt": "2026-07-23T20:29:23Z",
+    "status": "not-testable-stop",
+    "candidate": {
+        "head": "c28113bfadf9f2cbcbeeb8479eef91d6d503c26c",
+        "tree": "ec619120274de2e5f8e1ea78cdd1afe45051e49e",
+        "protocolSha256": "b9206674e5391a4c6c73fbf8b2b67d002473703a755bdd8fa20bf0aadea178fd",
+        "seedMasterUnsigned": 1552825889,
+        "pilotPairIndices": [0, 999]
+    },
+    "analyzerIncidentBeforeOutcomeAccess": {
+        "failedAnalyzerSha256": "f3e1d3d96f59f8299d7f0556a876921c8165cd318b7e3995be05c36c762f8437",
+        "failedAnalyzerSelfTests": "72/72",
+        "failure": "Array.map passed its index and source array to variadic path.resolve during prelaunch-receipt validation.",
+        "artifactBindingReached": false,
+        "outcomeAccessOccurred": false,
+        "originalPrelaunchReceiptSha256": "f578c98324dd28ae7151f3b06c4967f6d5d04f2cdb178e84b23c1f2cef709006",
+        "documentaryIncidentReceiptSha256": "fd548df674023ab9ee31fb9d8330210457c4407b1947325d3da679e5f3f3dc08",
+        "oldArmsDisposition": "Moved unread to a chmod-000 quarantine and forbidden as analyzer inputs.",
+        "repairUnifiedDiffSha256": "9becba00a21f375d03859c78d157306950d6c375c54f20c101da3229ff03331b",
+        "repairedAnalyzerSha256": "d64a690f4f3679136274c8669ce48483325ffefb74e9a3750a89a18ad8dc11de",
+        "repairedAnalyzerSelfTests": "73/73",
+        "disposition": "The protocol's analyzer-mutation rule required an identical same-lane rerun under a fresh receipt; no old result was reused."
+    },
+    "freshPilot": {
+        "prelaunchReceiptSha256": "71143bf6a93922c75c0461b652b6d1439b61ef4a947671c02fc9856f68298519",
+        "reportSha256": "9253f96d514a42667f387cd7a5d71ddd81b01b224df055a47f223b9361202227",
+        "gamesPerArm": 2000,
+        "pairSeedClusters": 1000,
+        "completionBarrier": {
+            "treatmentExitCode": 0,
+            "controlExitCode": 0,
+            "treatmentRecords": 2000,
+            "controlRecords": 2000
+        },
+        "sourceCleanAndPushed": true,
+        "receiptBeforeAllArtifacts": true,
+        "integrityPassed": false,
+        "integrityReasons": [
+            "treatment telemetry/semantic failure",
+            "control telemetry/semantic failure",
+            "treatment malformed comparison metadata",
+            "control malformed comparison metadata"
+        ],
+        "rawOutcomes": {
+            "treatment": {
+                "candidateScore": 0.5,
+                "winsA": 988,
+                "winsB": 988,
+                "draws": 24,
+                "averageLaps": 6.339,
+                "armageddonDecided": 50,
+                "rejectedActions": 0
+            },
+            "control": {
+                "candidateScore": 0.5,
+                "winsA": 988,
+                "winsB": 988,
+                "draws": 24,
+                "averageLaps": 6.339,
+                "armageddonDecided": 50,
+                "rejectedActions": 0
+            }
+        },
+        "telemetry": {
+            "treatmentEligibleComparisons": 83,
+            "controlEligibleComparisons": 83,
+            "treatmentInvalidComparisons": 83,
+            "controlInvalidComparisons": 83,
+            "treatmentSelectedComparisons": 0,
+            "controlSelectedComparisons": 0,
+            "treatmentRetainedActualDifferences": 0,
+            "controlRetainedActualDifferences": 0,
+            "failuresPerArm": {
+                "metadata_valid_flag_inconsistent": 83,
+                "invalid_metadata_fail_closed": 83
+            }
+        },
+        "gateDisposition": {
+            "passed": false,
+            "disposition": "not-testable-stop",
+            "scoutLaunched": false,
+            "reason": "Treatment never executed the candidate behavior because every canonical production route was falsely rejected by producer-side metadata validation."
+        }
+    },
+    "rootCause": {
+        "productionRouteContract": "PathHelper initializes route[0] to the moving unit's current/base cell and appends travelled neighbors.",
+        "producerBug": "isValidatedMoveShotSummary initialized prior=fromCell and then required route[0] to be adjacent. For canonical routes route[0] equals fromCell, so the zero-distance first comparison rejected every move+shot.",
+        "testGap": "Synthetic comparator fixtures omitted the leading origin cell.",
+        "analyzerDisposition": "Analyzer v2 correctly failed closed. It did not cause the invalid producer flag.",
+        "treatmentControlEquality": "Both arms were identical because dominant remained false and treatment always returned the shipped decision. Their zero outcome delta is non-informative."
+    },
+    "postOutcomeForensicsNotUsableForPromotion": {
+        "purpose": "Design and exposure diagnosis only; these values cannot qualify or promote the stopped candidate.",
+        "otherwiseStructurallyValidComparisons": 83,
+        "counterfactualScreenedCloserQualifiers": 14,
+        "counterfactualQualifierGames": 14,
+        "counterfactualQualifiersBySide": {
+            "green": 6,
+            "red": 8
+        },
+        "counterfactualRetainedQualifiers": 11,
+        "counterfactualRetainedQualifierGames": 11,
+        "counterfactualRetainedBySide": {
+            "green": 4,
+            "red": 7
+        },
+        "interpretation": "The geometry has enough opportunity exposure to justify a repaired new-candidate pilot, but no effect estimate exists because the behavior was never selected."
+    },
+    "requiredNextCandidate": {
+        "oldLaneBurned": true,
+        "oldOutcomesPoolable": false,
+        "freshSeedMasterUnsigned": 3675665451,
+        "freshSeedMasterHex": "0xDB16342B",
+        "requirements": [
+            "Normalize exactly one optional leading origin cell and require a nonempty adjacent travelled path ending at the declared destination.",
+            "Add canonical source-inclusive route regressions and malformed repeated-origin/nonadjacent regressions.",
+            "Serialize strict and shipped source/destination cells plus divisor-before proof fields so analyzer and producer validity can be recomputed equivalently.",
+            "Commit and push a new candidate and preregistration before generating fresh outcomes.",
+            "Freeze and publish a new analyzer and prelaunch receipt; never pool this stopped pilot."
+        ]
+    },
+    "limitations": [
+        "The 2.5% raw Armageddon-decided rate is a cohort baseline observation, not a feature effect; treatment executed no screened-closer decisions.",
+        "This feature-specific experiment does not establish the requested global near-zero Armageddon rate.",
+        "No bounded/default-readiness or renderer-projectile claim is made."
+    ]
+}

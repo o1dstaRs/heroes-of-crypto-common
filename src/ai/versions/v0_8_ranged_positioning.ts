@@ -1214,13 +1214,20 @@ interface ISupportedBandScreenedCloserComparison {
     dominant: boolean;
     metadataValid: boolean;
     reason: V08SupportedBandScreenedCloserReason;
+    strictFromCell: XY;
+    strictToCell: XY;
+    shippedFromCell: XY | null;
+    shippedToCell: XY | null;
+    strictDivisorBefore: number | null;
     strictDivisorAfter: number | null;
+    strictReachableThreatsBefore: number | null;
     strictReachableThreatsAfter: number | null;
     strictTargetDistanceBefore: number | null;
     strictTargetDistanceAfter: number | null;
     strictTargetScreenedAfter: boolean | null;
     strictScreeningGuardId: string | null;
     strictRetainedSignatureAfter: boolean | null;
+    shippedDivisorBefore: number | null;
     shippedDivisorAfter: number | null;
     shippedReachableThreatsAfter: number | null;
     shippedTargetDistanceBefore: number | null;
@@ -1306,6 +1313,11 @@ const hasSameRangeAim = (
 const summaryMovesTo = (summary: IV08SupportedBandDuelDecisionSummary, destination: XY): boolean =>
     summary.moveTargetCells?.some((cell) => cell.x === destination.x && cell.y === destination.y) ?? false;
 
+const hasUniqueCells = (cells: readonly XY[]): boolean =>
+    cells.every(
+        (cell, index) => cells.findIndex((candidate) => candidate.x === cell.x && candidate.y === cell.y) === index,
+    );
+
 const isValidatedMoveShotSummary = (
     summary: IV08SupportedBandDuelDecisionSummary,
     fromCell: XY,
@@ -1319,6 +1331,7 @@ const isValidatedMoveShotSummary = (
         summary.moveHasWaterCell !== false ||
         !summary.movePath?.every(isSafeGridCell) ||
         !summary.moveTargetCells?.every(isSafeGridCell) ||
+        !hasUniqueCells(summary.moveTargetCells) ||
         !isSafeGridCell(summary.rangeAimCell) ||
         !Number.isSafeInteger(summary.rangeAimSide) ||
         summary.rangeAimSide! < RangeAttackCellSide.LEFT ||
@@ -1328,8 +1341,10 @@ const isValidatedMoveShotSummary = (
     ) {
         return false;
     }
+    const travelledPath = sameCell(summary.movePath[0]!, fromCell) ? summary.movePath.slice(1) : summary.movePath;
+    if (!travelledPath.length) return false;
     let prior = fromCell;
-    for (const cell of summary.movePath) {
+    for (const cell of travelledPath) {
         if (!adjacentCell(prior, cell)) return false;
         prior = cell;
     }
@@ -1525,13 +1540,20 @@ export function compareV08SupportedBandScreenedCloser(
         dominant,
         metadataValid,
         reason: dominant ? "screened_closer" : "filtered",
+        strictFromCell: { ...strictDetails.fromCell },
+        strictToCell: { ...strictDetails.toCell },
+        shippedFromCell: shippedMetadata === undefined ? null : { ...shippedMetadata.fromCell },
+        shippedToCell: shippedMetadata === undefined ? null : { ...shippedMetadata.toCell },
+        strictDivisorBefore,
         strictDivisorAfter,
+        strictReachableThreatsBefore,
         strictReachableThreatsAfter,
         strictTargetDistanceBefore,
         strictTargetDistanceAfter,
         strictTargetScreenedAfter,
         strictScreeningGuardId,
         strictRetainedSignatureAfter,
+        shippedDivisorBefore,
         shippedDivisorAfter,
         shippedReachableThreatsAfter,
         shippedTargetDistanceBefore,
@@ -1799,13 +1821,24 @@ function supportedBandAdvanceVsLegacy(
             targetCreatureName: strictProposal.details.targetCreatureName,
             strict: strictSummary,
             shipped: shippedSummary,
+            strictFromCell: { ...screenedCloserComparison.strictFromCell },
+            strictToCell: { ...screenedCloserComparison.strictToCell },
+            shippedFromCell:
+                screenedCloserComparison.shippedFromCell === null
+                    ? null
+                    : { ...screenedCloserComparison.shippedFromCell },
+            shippedToCell:
+                screenedCloserComparison.shippedToCell === null ? null : { ...screenedCloserComparison.shippedToCell },
+            strictDivisorBefore: screenedCloserComparison.strictDivisorBefore,
             strictDivisorAfter: screenedCloserComparison.strictDivisorAfter,
+            strictReachableThreatsBefore: screenedCloserComparison.strictReachableThreatsBefore,
             strictReachableThreatsAfter: screenedCloserComparison.strictReachableThreatsAfter,
             strictTargetDistanceBefore: screenedCloserComparison.strictTargetDistanceBefore,
             strictTargetDistanceAfter: screenedCloserComparison.strictTargetDistanceAfter,
             strictTargetScreenedAfter: screenedCloserComparison.strictTargetScreenedAfter,
             strictScreeningGuardId: screenedCloserComparison.strictScreeningGuardId,
             strictRetainedSignatureAfter: screenedCloserComparison.strictRetainedSignatureAfter,
+            shippedDivisorBefore: screenedCloserComparison.shippedDivisorBefore,
             shippedDivisorAfter: screenedCloserComparison.shippedDivisorAfter,
             shippedReachableThreatsAfter: screenedCloserComparison.shippedReachableThreatsAfter,
             shippedTargetDistanceBefore: screenedCloserComparison.shippedTargetDistanceBefore,
