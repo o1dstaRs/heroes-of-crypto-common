@@ -326,7 +326,7 @@
     },
     "aggregationRunner": {
         "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-replication/v4",
-        "sha256": "e7728f12a5f6421c4a5011f536c49d42e00397946429ab60743468bf091c9ce0"
+        "sha256": "c160ce2f0013231d1fcb8ac77b41d0f2bc2c8652a8f7ef324ca8cb35dc924b66"
     },
     "microRunner": {
         "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-micro/v5",
@@ -355,7 +355,7 @@
         },
         "replication": {
             "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-replication/v4",
-            "sha256": "e7728f12a5f6421c4a5011f536c49d42e00397946429ab60743468bf091c9ce0"
+            "sha256": "c160ce2f0013231d1fcb8ac77b41d0f2bc2c8652a8f7ef324ca8cb35dc924b66"
         },
         "quantile": {
             "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-type7-quantile/v2",

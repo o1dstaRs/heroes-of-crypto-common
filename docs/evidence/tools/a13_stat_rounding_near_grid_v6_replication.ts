@@ -4409,6 +4409,7 @@ async function main(): Promise<void> {
     if (!cli) return;
     const runnerBefore = fileSeal(RUNNER_PATH);
     const quantileHelperBefore = fileSeal(QUANTILE_HELPER_PATH);
+    const sourceManifestHelperBefore = fileSeal(SOURCE_MANIFEST_HELPER_PATH);
     const incidentBefore = fileSeal(INCIDENT_PATH);
     const loadedProtocol = loadProtocol();
     validateAggregatorRuntimeBinding(aggregatorRuntimeBefore, loadedProtocol.value, "aggregator preflight");
@@ -4639,6 +4640,11 @@ async function main(): Promise<void> {
     assertEqual(runnerAfter, runnerBefore, "aggregation runner pre/post");
     const quantileHelperAfter = fileSeal(QUANTILE_HELPER_PATH);
     assertEqual(quantileHelperAfter, quantileHelperBefore, "shared quantile helper pre/post");
+    assertEqual(
+        fileSeal(SOURCE_MANIFEST_HELPER_PATH),
+        sourceManifestHelperBefore,
+        "shared source-manifest helper pre/post",
+    );
     assertEqual(fileSeal(INCIDENT_PATH), incidentBefore, "v5 infrastructure incident pre/post");
     assertEqual(fileSeal(PROTOCOL_PATH), loadedProtocol.seal, "protocol pre/post");
     assertEqual(fileSeal(semantic.file.path), semantic.file, "semantic corpus file pre/post");
