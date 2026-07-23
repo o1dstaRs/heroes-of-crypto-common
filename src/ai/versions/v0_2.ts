@@ -92,6 +92,13 @@ export function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): num
  */
 export class StrategyV0_2 extends StrategyV0_1 {
     public override readonly version: string = "v0.2";
+    /**
+     * Versioned behavior seam: historical native strategies keep their roster-order aim anchor even when a
+     * plain shot is intercepted. v0.8 opts into canonical first-hit targeting without rewriting v0.2-v0.7.
+     */
+    protected requireResolvedPrimaryRangeTarget(): boolean {
+        return false;
+    }
     /** Compatibility seam: historical versions retain the amount-blind proxy; newer versions may refine it. */
     protected rangedOutput(team: number, unitsHolder: UnitsHolder): number {
         return teamRangedFirepower(team, unitsHolder);
@@ -553,6 +560,19 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     // can put a Hidden neighbour first). Skip it so we pick a different, landable aim.
                     const primaryHit = evaluation.affectedUnits[0]?.[0];
                     if (evaluation.affectedUnits.length === 1 && primaryHit?.hasBuffActive("Hidden")) {
+                        continue;
+                    }
+                    // For versions opting into the correctness seam, plain shots stop on the first intersected
+                    // stack and must not label an intercepted shot as an attack on the screened rear unit. The
+                    // first-hit unit is enumerated through its own visible edges and produces the canonical
+                    // equivalent. Rear anchors stay legal for Through Shot and range AOE, where the exact
+                    // line/impact cell is intentional collateral geometry.
+                    if (
+                        this.requireResolvedPrimaryRangeTarget() &&
+                        !isThroughShot &&
+                        !isAOE &&
+                        primaryHit?.getId() !== enemy.getId()
+                    ) {
                         continue;
                     }
                     const scored = this.scoreShot(unit, evaluation, fromTeam, enemyTeam, context);

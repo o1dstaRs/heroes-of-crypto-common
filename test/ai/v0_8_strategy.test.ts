@@ -162,6 +162,7 @@ describe("v0.8 candidate policy", () => {
         expect(candidate.version).toBe("v0.8");
         expect(Object.getOwnPropertyNames(StrategyV0_8.prototype)).toEqual([
             "constructor",
+            "requireResolvedPrimaryRangeTarget",
             "rangedOutput",
             "applyMeleeDims",
             "placeArmy",
@@ -209,6 +210,49 @@ describe("v0.8 candidate policy", () => {
         expect(selectV08DirectCombatCandidate(candidates)?.actions).toBe(kill);
         expect(selectV08ProductiveCandidate(candidates)?.actions).toBe(kill);
         expect(selectV08ProductiveCandidate(candidates.slice(0, 2))?.actions).toBe(move);
+    });
+
+    it("targets the visible front stack instead of naming an occluded rear stack that it cannot hit", () => {
+        const combat = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "v0.8 screened-shot archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+        });
+        // Deliberately insert the rear stack first: equal-damage inherited scoring historically kept this
+        // roster-order target even though the trajectory resolved against the intervening front stack.
+        const rear = createTestUnit({ team: UPPER, name: "Rear stack", attackType: MELEE });
+        const front = createTestUnit({ team: UPPER, name: "Front stack", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, rear, { x: 10, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+        };
+
+        const frozenV07 = new StrategyV0_7().decideTurn(shooter, context);
+        const frozenShot = frozenV07.find(
+            (action): action is Extract<GameAction, { type: "range_attack" }> => action.type === "range_attack",
+        );
+        expect(frozenShot?.targetId).toBe(rear.getId());
+        expect(frozenShot?.aimCell).toEqual(rear.getBaseCell());
+
+        const decision = new StrategyV0_8().decideTurn(shooter, context);
+        const shot = decision.find(
+            (action): action is Extract<GameAction, { type: "range_attack" }> => action.type === "range_attack",
+        );
+        expect(shot).toBeDefined();
+        expect(shot!.targetId).toBe(front.getId());
+        expect(front.getCells()).toContainEqual(shot!.aimCell!);
+        expect(rear.getCells()).not.toContainEqual(shot!.aimCell!);
     });
 
     it("advances instead of mining BLOCK_CENTER when no immediate enemy attack exists", () => {

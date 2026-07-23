@@ -26,7 +26,12 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCells, getRangeAttackSideCenter } from "../../src/grid/grid_math";
+import {
+    getPositionForCells,
+    getRangeAttackSideCenter,
+    isRangeAttackSideObservable,
+    type RangeAttackCellSide,
+} from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -384,6 +389,159 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(shot.aimSide).toBeDefined();
         }
     });
+
+    it("shots: canonicalizes a screened rear aim to the visible edge and identity of the actual first hit", () => {
+        const c = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Screened-shot archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 5,
+        });
+        // Insert the rear unit first so roster iteration would deterministically advertise it first without
+        // first-hit canonicalization.
+        const rear = createTestUnit({ team: UPPER, name: "Screened rear", attackType: MELEE });
+        const front = createTestUnit({ team: UPPER, name: "Actual first hit", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, rear, { x: 10, y: 7 });
+        placeUnit(c.grid, c.unitsHolder, front, { x: 6, y: 7 });
+        shooter.refreshPossibleAttackTypes(true);
+        const context = ctxFor(c, true);
+
+        const enumerate = (): IEnumeratedCandidate[] =>
+            ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot");
+        const shots = enumerate();
+        expect(shots).toHaveLength(1);
+        expect(JSON.stringify(enumerate())).toBe(JSON.stringify(shots));
+
+        const candidate = shots[0];
+        const action = candidate.actions.find(
+            (entry): entry is Extract<GameAction, { type: "range_attack" }> => entry.type === "range_attack",
+        );
+        expect(action).toBeDefined();
+        expect(candidate.targetId).toBe(front.getId());
+        expect(action!.targetId).toBe(front.getId());
+        expect(front.getCells()).toContainEqual(action!.aimCell!);
+        expect(rear.getCells()).not.toContainEqual(action!.aimCell!);
+        expect(
+            isRangeAttackSideObservable(
+                c.grid.getMatrix(),
+                action!.aimCell!,
+                action!.aimSide as RangeAttackCellSide,
+                shooter.getTeam(),
+                false,
+            ),
+        ).toBe(true);
+
+        const to = getRangeAttackSideCenter(
+            testGridSettings,
+            action!.aimCell!,
+            action!.aimSide as RangeAttackCellSide,
+            shooter.getPosition(),
+        );
+        const evaluation = c.attackHandler.evaluateRangeAttack(
+            c.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            to,
+            false,
+            false,
+            false,
+        );
+        expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(candidate.targetId);
+        expect(candidate.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
+
+        const engine = startActionEngine(c, shooter, context);
+        expect(candidate.actions.every((entry) => engine.apply(entry).completed)).toBe(true);
+    });
+
+    for (const special of [
+        { ability: "Through Shot", through: true, aoe: false },
+        { ability: "Large Caliber", through: false, aoe: true },
+    ] as const) {
+        it(`shots: ${special.ability} retains an intentional rear aim while scoring the actual primary`, () => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: `${special.ability} shooter`,
+                attackType: RANGE,
+                rangeShots: 5,
+                shotDistance: 30,
+                amountAlive: 5,
+                abilities: [special.ability],
+            });
+            const rear = createTestUnit({ team: UPPER, name: "Intentional rear aim", attackType: MELEE });
+            const front = createTestUnit({ team: UPPER, name: "Special first hit", attackType: MELEE });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, rear, { x: 10, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, front, { x: 6, y: 7 });
+            shooter.refreshPossibleAttackTypes(true);
+            const context = ctxFor(c, true);
+
+            const rearAim = ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot").find(
+                (candidate) => {
+                    const action = candidate.actions.find((entry) => entry.type === "range_attack");
+                    return (
+                        action?.type === "range_attack" &&
+                        action.targetId === rear.getId() &&
+                        action.aimCell?.x === rear.getBaseCell().x &&
+                        action.aimCell.y === rear.getBaseCell().y
+                    );
+                },
+            );
+            expect(rearAim).toBeDefined();
+            expect(rearAim!.targetId).toBe(front.getId());
+            expect(rearAim!.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
+
+            const action = rearAim!.actions.find(
+                (entry): entry is Extract<GameAction, { type: "range_attack" }> => entry.type === "range_attack",
+            )!;
+            expect(
+                isRangeAttackSideObservable(
+                    c.grid.getMatrix(),
+                    action.aimCell!,
+                    action.aimSide as RangeAttackCellSide,
+                    shooter.getTeam(),
+                    special.through,
+                ),
+            ).toBe(true);
+            const to = getRangeAttackSideCenter(
+                testGridSettings,
+                action.aimCell!,
+                action.aimSide as RangeAttackCellSide,
+                shooter.getPosition(),
+            );
+            const evaluation = c.attackHandler.evaluateRangeAttack(
+                c.unitsHolder.getAllUnits(),
+                shooter,
+                shooter.getPosition(),
+                to,
+                special.through,
+                false,
+                special.aoe,
+            );
+            expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(rearAim!.targetId);
+            expect(evaluation.affectedUnits.flat().some((unit) => unit.getId() === rear.getId())).toBe(true);
+
+            const covered = ofKind(
+                enumerateCandidates(shooter, context, endTurn(shooter), {
+                    maxShotAims: 1,
+                    preserveAttackTargetCoverage: true,
+                }).candidates,
+                "shot",
+            );
+            expect(
+                covered.some((candidate) =>
+                    candidate.actions.some((entry) => entry.type === "range_attack" && entry.targetId === rear.getId()),
+                ),
+            ).toBe(true);
+
+            const engine = startActionEngine(c, shooter, context);
+            expect(rearAim!.actions.every((entry) => engine.apply(entry).completed)).toBe(true);
+        });
+    }
 
     it("shots: Cowardice rejects the stronger resolved primary, leaves a legal lower-HP target, and does not enrich the invalid incumbent", () => {
         const c = createCombatTestContext();
