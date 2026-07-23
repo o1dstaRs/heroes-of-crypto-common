@@ -111,6 +111,18 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Enchants": {
+        "name": "Enchants",
+        "type": "INFO",
+        "desc": ["Enchant an ally's Armor or Weapon (stack 1).", "Each cast: 50% chance to add +1 (stacks)."],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Shadow Touch": {
         "name": "Shadow Touch",
         "type": "ATTACK",

@@ -813,7 +813,7 @@ export class GameActionEngine {
         if (!target && spell.getSpellTargetType() === SpellTargetType.ALLIES_AREA) {
             return this.craftCast(action, caster, spell);
         }
-        if (target && (spell.getName() === "Enchant Armor" || spell.getName() === "Enchant Weapon")) {
+        if (target && (spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune")) {
             return this.enchantCast(caster, target, spell);
         }
 
@@ -881,13 +881,13 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Blacksmith's Enchant Armor / Enchant Weapon: a single-target ally buff with a 50% chance per cast to add
+     * Blacksmith's Armor Rune / Weapon Rune: a single-target ally buff with a 50% chance per cast to add
      * +1 flat armor / attack. The bonus STACKS — the running total lives in the buff's first spell property, so
      * re-casting reads the current total, deletes the old buff, and re-applies it at +1 (see adjustBaseStats,
      * which folds that property into armor_mod / attack_mod, and the card's Buffs section, which shows "+N").
      */
     private enchantCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
-        const isArmor = spell.getName() === "Enchant Armor";
+        const isArmor = spell.getName() === "Armor Rune";
         const buffName = spell.getName();
         if (getRandomInt(0, 100) < 50) {
             const next = (target.getBuff(buffName)?.getFirstSpellProperty() ?? 0) + 1;

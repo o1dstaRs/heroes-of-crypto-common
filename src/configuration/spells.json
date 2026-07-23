@@ -699,8 +699,8 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Enchant Armor": {
-            "name": "Enchant Armor",
+        "Armor Rune": {
+            "name": "Armor Rune",
             "level": 1,
             "desc": ["+{} armor", "50% chance per cast to add +1 armor (stacks). Requires stack power 1."],
             "target": "ANY_ALLY",
@@ -716,8 +716,8 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Enchant Weapon": {
-            "name": "Enchant Weapon",
+        "Weapon Rune": {
+            "name": "Weapon Rune",
             "level": 1,
             "desc": ["+{} attack", "50% chance per cast to add +1 attack (stacks). Requires stack power 1."],
             "target": "ANY_ALLY",

@@ -260,13 +260,18 @@ export function canCastSpell(
         }
 
         if (spell.isBuff()) {
+            // Blacksmith's runes (Armor Rune / Weapon Rune) STACK: re-casting on a unit that already carries the
+            // rune adds +1, so they must stay targetable (green) instead of being rejected as "already applied".
+            // A declared conflict with a DIFFERENT buff still blocks.
+            const stacks = spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune";
             const existingBuff = targetUnit.getBuff(spell.getName());
 
-            if (existingBuff && existingBuff.getLaps() > 0) {
+            if (!stacks && existingBuff && existingBuff.getLaps() > 0) {
                 return false;
             }
             for (const b of targetUnit.getBuffs()) {
-                if ((b.getName() === spell.getName() || willConclictWith.includes(b.getName())) && b.getLaps()) {
+                const blocksBySameName = !stacks && b.getName() === spell.getName();
+                if ((blocksBySameName || willConclictWith.includes(b.getName())) && b.getLaps()) {
                     return false;
                 }
             }

@@ -21,18 +21,18 @@
             "level": 1,
             "spells": [
                 "System:Craft",
-                "System:Enchant Armor",
-                "System:Enchant Armor",
-                "System:Enchant Armor",
-                "System:Enchant Armor",
-                "System:Enchant Armor",
-                "System:Enchant Weapon",
-                "System:Enchant Weapon",
-                "System:Enchant Weapon",
-                "System:Enchant Weapon",
-                "System:Enchant Weapon"
+                "System:Armor Rune",
+                "System:Armor Rune",
+                "System:Armor Rune",
+                "System:Armor Rune",
+                "System:Armor Rune",
+                "System:Weapon Rune",
+                "System:Weapon Rune",
+                "System:Weapon Rune",
+                "System:Weapon Rune",
+                "System:Weapon Rune"
             ],
-            "abilities": ["Blacksmith Tools"]
+            "abilities": ["Blacksmith Tools", "Enchants"]
         },
         "Squire": {
             "name": "Squire",
