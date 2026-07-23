@@ -56,6 +56,54 @@ interface IShotPlan {
     hitsEnemyRange: boolean;
 }
 
+export interface IVisibleEdgeScreenPressureShot {
+    /** Existing inherited native-shot score. This remains the normal ranking signal. */
+    baseScore: number;
+    /** Pure single-shot expected effective HP-damage proxy for the authoritative first stack hit. */
+    expectedDamage: number;
+    /** True when at least one rejected rear ray proved this primary is screening a dangerous backliner. */
+    screensDangerousBackline: boolean;
+}
+
+/**
+ * Experimental visible-edge screen-pressure tie-break.
+ *
+ * The normal native score remains primary. A canonical legal front shot may add exactly ten percent of the
+ * best positive native score only when its own pure single-shot damage proxy is at least ninety percent of the
+ * best canonical proxy. Keeping the bonus in native-score units makes the bound meaningful after learned
+ * scoring. A screened rear edge is evidence about the front target, never an emitted action target or aim.
+ * Equal adjusted scores fall back to the unmodified score and finally stable source order.
+ */
+export function selectVisibleEdgeScreenPressureShot<T extends IVisibleEdgeScreenPressureShot>(
+    shots: readonly T[],
+): T | undefined {
+    if (!shots.length) return undefined;
+    const maxExpectedDamage = Math.max(
+        0,
+        ...shots.map(({ expectedDamage }) => (Number.isFinite(expectedDamage) ? expectedDamage : 0)),
+    );
+    const maxPositiveBaseScore = Math.max(
+        0,
+        ...shots.map(({ baseScore }) => (Number.isFinite(baseScore) ? baseScore : 0)),
+    );
+    const damageFloor = maxExpectedDamage * 0.9;
+    const pressureBonus = maxPositiveBaseScore * 0.1;
+    let best = shots[0];
+    let bestAdjusted =
+        best.baseScore + (best.screensDangerousBackline && best.expectedDamage >= damageFloor ? pressureBonus : 0);
+    for (let index = 1; index < shots.length; index += 1) {
+        const candidate = shots[index];
+        const adjusted =
+            candidate.baseScore +
+            (candidate.screensDangerousBackline && candidate.expectedDamage >= damageFloor ? pressureBonus : 0);
+        if (adjusted > bestAdjusted || (adjusted === bestAdjusted && candidate.baseScore > best.baseScore)) {
+            best = candidate;
+            bestAdjusted = adjusted;
+        }
+    }
+    return best;
+}
+
 /** Σ remaining shots × max per-shot damage for a team's living range units (mirrors ai.ts firepower). */
 export function teamRangedFirepower(team: number, unitsHolder: UnitsHolder): number {
     let firepower = 0;
@@ -97,6 +145,10 @@ export class StrategyV0_2 extends StrategyV0_1 {
      * plain shot is intercepted. v0.8 opts into canonical first-hit targeting without rewriting v0.2-v0.7.
      */
     protected requireResolvedPrimaryRangeTarget(): boolean {
+        return false;
+    }
+    /** Default-off experiment seam. Only v0.8 may opt into screen-pressure ranking. */
+    protected visibleEdgeScreenPressureEnabled(): boolean {
         return false;
     }
     /** Compatibility seam: historical versions retain the amount-blind proxy; newer versions may refine it. */
@@ -537,8 +589,32 @@ export class StrategyV0_2 extends StrategyV0_1 {
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
         const isThroughShot = unit.hasAbilityActive("Through Shot");
         const from = unit.getPosition();
+        const screenPressureEnabled =
+            this.visibleEdgeScreenPressureEnabled() &&
+            this.requireResolvedPrimaryRangeTarget() &&
+            !isThroughShot &&
+            !isAOE &&
+            !unit.hasAbilityActive("Double Shot") &&
+            !unit.hasAbilityActive("Crafted Double Shot");
 
         let best: IShotPlan | undefined;
+        let canonicalShots:
+            | Array<
+                  IShotPlan & {
+                      baseScore: number;
+                      expectedDamage: number;
+                      screensDangerousBackline: boolean;
+                  }
+              >
+            | undefined;
+        let screeningPrimaryIds: Set<string> | undefined;
+        let forcedTargetId: string | undefined;
+        if (screenPressureEnabled) {
+            canonicalShots = [];
+            screeningPrimaryIds = new Set<string>();
+            const forcedTarget = allUnits.get(unit.getTarget());
+            forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+        }
         for (const enemy of enemies) {
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
@@ -573,6 +649,18 @@ export class StrategyV0_2 extends StrategyV0_1 {
                         !isAOE &&
                         primaryHit?.getId() !== enemy.getId()
                     ) {
+                        if (
+                            screenPressureEnabled &&
+                            !evaluation.attackObstacle &&
+                            primaryHit &&
+                            !primaryHit.isDead() &&
+                            primaryHit.getTeam() === enemyTeam &&
+                            !primaryHit.hasBuffActive("Hidden") &&
+                            !primaryHit.hasAbilityActive("Hidden") &&
+                            this.isDangerousScreenedBackline(enemy)
+                        ) {
+                            screeningPrimaryIds!.add(primaryHit.getId());
+                        }
                         continue;
                     }
                     const scored = this.scoreShot(unit, evaluation, fromTeam, enemyTeam, context);
@@ -582,7 +670,37 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     // Damage stays dominant; subclasses may add a per-target bias (e.g. Beholder
                     // spreading fresh debuffs onto the most valuable yet-to-act enemy).
                     const value = scored.value + this.shotTargetBonus(unit, enemy, scored.value, context);
-                    if (!best || value > best.score) {
+                    if (screenPressureEnabled) {
+                        const armCandidateIsLegal =
+                            primaryHit &&
+                            !primaryHit.isDead() &&
+                            primaryHit.getTeam() === enemyTeam &&
+                            !primaryHit.hasBuffActive("Hidden") &&
+                            !primaryHit.hasAbilityActive("Hidden") &&
+                            evaluation.affectedUnits.length === evaluation.rangeAttackDivisors.length &&
+                            (forcedTargetId === undefined || primaryHit.getId() === forcedTargetId) &&
+                            (!unit.hasDebuffActive("Cowardice") ||
+                                unit.getCumulativeHp() >= primaryHit.getCumulativeHp());
+                        if (armCandidateIsLegal) {
+                            canonicalShots!.push({
+                                aimCell: { x: cell.x, y: cell.y },
+                                aimSide: side,
+                                targetId: enemy.getId(),
+                                score: value,
+                                hitsEnemyRange: scored.hitsEnemyRange,
+                                baseScore: value,
+                                expectedDamage: this.expectedPlainPrimaryDamageProxy(
+                                    unit,
+                                    primaryHit,
+                                    evaluation,
+                                    context,
+                                ),
+                                screensDangerousBackline: false,
+                            });
+                        }
+                    } else if (!best || value > best.score) {
+                        // Preserve the historical disabled-path allocation profile: construct a plan only when
+                        // it becomes the new best, exactly as the pre-experiment native scorer did.
                         best = {
                             aimCell: { x: cell.x, y: cell.y },
                             aimSide: side,
@@ -594,7 +712,59 @@ export class StrategyV0_2 extends StrategyV0_1 {
                 }
             }
         }
+        if (screenPressureEnabled) {
+            for (const shot of canonicalShots!) {
+                shot.screensDangerousBackline = screeningPrimaryIds!.has(shot.targetId);
+            }
+            return selectVisibleEdgeScreenPressureShot(canonicalShots!);
+        }
         return best;
+    }
+    /** A live rear stack whose future ranged/caster output makes opening its screen strategically useful. */
+    private isDangerousScreenedBackline(unit: Unit): boolean {
+        const liveRanged = unit.isRangeCapable() && unit.getRangeShots() > 0;
+        const viableCaster =
+            unit.getCanCastSpells() &&
+            unit.getSpellsCount() > 0 &&
+            unit
+                .getSpells()
+                .some(
+                    (spell) =>
+                        spell.isRemaining() &&
+                        spell.getLapsTotal() > 0 &&
+                        spell.getMinimalCasterStackPower() <= unit.getStackPower(),
+                );
+        return (
+            !unit.isDead() &&
+            !unit.hasBuffActive("Hidden") &&
+            !unit.hasAbilityActive("Hidden") &&
+            (liveRanged || viableCaster)
+        );
+    }
+    /**
+     * Pure expected effective HP damage for ONE projectile onto a plain shot's authoritative first target.
+     * Double Shot and Crafted Double Shot are excluded from this first arm: their second-hit ability power and
+     * Dual Strike modifier are deliberately not approximated by this single-projectile safety floor.
+     */
+    private expectedPlainPrimaryDamageProxy(
+        unit: Unit,
+        primary: Unit,
+        evaluation: ReturnType<AttackHandler["evaluateRangeAttack"]>,
+        context: IDecisionContext,
+    ): number {
+        const groupIndex = evaluation.affectedUnits.findIndex((group) =>
+            group.some((candidate) => candidate.getId() === primary.getId()),
+        );
+        if (groupIndex < 0) return 0;
+        const divisor = evaluation.rangeAttackDivisors[groupIndex] ?? 1;
+        const attackerAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(unit.getTeam()) ?? 0;
+        const min = unit.calculateAttackDamageMin(unit.getAttack(), primary, true, attackerAbilityPower, divisor);
+        const max = unit.calculateAttackDamageMax(unit.getAttack(), primary, true, attackerAbilityPower, divisor);
+        const conditionalDamage = (min + max) / 2;
+        const defenderAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(primary.getTeam()) ?? 0;
+        const hitChance = 1 - Math.min(100, Math.max(0, unit.calculateMissChance(primary, defenderAbilityPower))) / 100;
+        const hp = primary.getCumulativeHp();
+        return hitChance * Math.min(conditionalDamage, hp);
     }
     /**
      * Per-shot bias on the chosen TARGET (the aimed enemy), added on top of raw effective damage.
