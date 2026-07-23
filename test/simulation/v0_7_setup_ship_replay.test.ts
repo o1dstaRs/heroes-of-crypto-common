@@ -27,7 +27,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // the affected seeded combat actions legitimately change. Two runs produced this byte-identical digest.
 // Re-pinned after enabling Dryad expanded the Nature L1 catalog and shifted the deterministic roster draws.
 // The full and focused suites independently produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "06d3b22c545e32993825c1d1e53172a16f4883bcc7deb2695dbe3f88507f1a02";
+// Re-pinned after Blacksmith expanded the Life L1 catalog and the hasUnactedTeammate wait gate changed
+// eligible seeded combat waits. Two isolated runs produced this digest with zero rejected actions.
+const EXPECTED_REPLAY_SHA256 = "904036cfb551468f5e163868597befeae309d47ca7925225dd7ad88ec48c7ea6";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

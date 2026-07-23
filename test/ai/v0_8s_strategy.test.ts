@@ -171,8 +171,10 @@ describe("v0.8 search measurement alias", () => {
             return createHash("sha256").update(JSON.stringify(result)).digest("hex");
         };
 
-        expect(digest("v0.7")).toBe("0a76410be0f38bee72cd4a882f56061c9a6013c0d1e1b66cffc167ea782ea88a");
-        expect(digest("v0.8")).toBe("0c2e35f661fe9bcd9f34bc2f41ebcd41a6a6af3512b5bc9fc90fbd56e5521c92");
+        // Re-pinned after the hasUnactedTeammate wait gate changed these seeded action traces. Two isolated
+        // runs produced the same hashes with no rejected actions or rejected waits for either version.
+        expect(digest("v0.7")).toBe("e9a602b75b4c4a3c29204b4de8503cec76c29f703196f327d9b53cbcb9ea8c53");
+        expect(digest("v0.8")).toBe("d3d0b790ba677cfa6fdae3f398e5312650ecb79052440d1cf341ceaef7b5476e");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

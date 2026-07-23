@@ -231,9 +231,9 @@ describe("B1 full-game league genome", () => {
         expect(wiredConfig?.greenAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(["lower", "both"]).toContain(wiredGate);
 
-        // Re-pinned after Arachna Queen expanded the L4 offer pool: 925 is the first current seed where
-        // collision reveals still leave the lower player with no legitimate opponent-creature knowledge.
-        const noVision = resolveLeaguePick(925, alternative, opponent, true);
+        // Re-pinned after Blacksmith expanded the Life L1 offer pool: seed 150 preserves the fixture's
+        // no-vision collision outcome without weakening the SEE_NONE or tight-placement assertions.
+        const noVision = resolveLeaguePick(150, alternative, opponent, true);
         expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
         expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");
