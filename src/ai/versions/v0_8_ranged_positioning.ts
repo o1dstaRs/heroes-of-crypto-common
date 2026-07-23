@@ -29,6 +29,7 @@ import type {
     V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
+    V08SupportedRangedEscapeFunnelStage,
 } from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
@@ -42,6 +43,9 @@ const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
 
+const SUPPORTED_RANGED_DELTA_VERSIONS_ENV = "V08_SUPPORTED_RANGED_DELTA_VERSIONS";
+const SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS";
+const SUPPORTED_RANGED_DELTA_LIVE_ONLY_ENV = "V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY";
 const SUPPORTED_PREPIN_EGRESS_ENABLED_ENV = "V08_SUPPORTED_PREPIN_EGRESS";
 const SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS";
 const SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS";
@@ -1241,29 +1245,66 @@ function pinnedRetreat(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
-    supportedDelta: boolean,
+    strategyVersion: string,
 ): GameAction[] {
+    const selectorVersions = (process.env[SUPPORTED_RANGED_DELTA_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const funnelVersions = (process.env[SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const liveOnly = process.env[SUPPORTED_RANGED_DELTA_LIVE_ONLY_ENV] === "1";
+    const selectorEnabled =
+        selectorVersions.includes(strategyVersion) && (!liveOnly || context.decisionOrigin === "root");
+    // Both the treatment and selector-off control build the same partial-screen catalog. Selection happens only
+    // after the complete legacy/treatment catalogs exist, so PathHelper consumes the same seeded stream.
+    const catalogEnabled = selectorVersions.length > 0 || funnelVersions.length > 0;
+    const funnelEnabled = context.decisionOrigin === "root" && funnelVersions.includes(strategyVersion);
+    const melee = decision.find((action) => action.type === "melee_attack");
+    const emitFunnel = (stage: V08SupportedRangedEscapeFunnelStage): void => {
+        if (!funnelEnabled || melee?.type !== "melee_attack") return;
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_ranged_escape_funnel",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: context.fightProperties?.getCurrentLap() ?? 0,
+            stage,
+        });
+    };
+    if (melee?.type === "melee_attack") emitFunnel("melee_incumbent");
+
     const attackHandler = context.attackHandler;
+    if (!attackHandler) return decision;
+    emitFunnel("attack_context");
+    if (unit.getAttackType() !== RANGE) return decision;
+    emitFunnel("current_ranged_mode");
+    if (unit.getRangeShots() <= 0) return decision;
+    emitFunnel("ammo");
+    if (!unit.canMove()) return decision;
+    emitFunnel("mobile");
+    if (unit.hasAbilityActive("Handyman")) return decision;
+    emitFunnel("ordinary_shooter");
+    if (unit.hasDebuffActive("Range Null Field Aura") || unit.hasDebuffActive("Rangebane")) return decision;
+    emitFunnel("range_unsuppressed");
     if (
-        !attackHandler ||
-        unit.getAttackType() !== RANGE ||
-        unit.getRangeShots() <= 0 ||
-        !unit.canMove() ||
-        unit.hasAbilityActive("Handyman") ||
-        unit.hasDebuffActive("Range Null Field Aura") ||
-        unit.hasDebuffActive("Rangebane") ||
         !attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
             unit.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
-        ) ||
-        decision.some((action) => TURN_CONSUMING_NON_MELEE.has(action.type))
+        )
     ) {
         return decision;
     }
+    emitFunnel("currently_pinned");
+    if (decision.some((action) => TURN_CONSUMING_NON_MELEE.has(action.type))) return decision;
+    emitFunnel("no_nonmelee_commitment");
 
-    const melee = decision.find((action) => action.type === "melee_attack");
     let weakMeleeTarget: Unit | undefined;
+    let weakMeleeEstimate: NonNullable<ReturnType<typeof estimatePrimaryMeleeDamage>> | undefined;
+    let incumbentAttackFromCell: XY | undefined;
     if (melee?.type === "melee_attack") {
         const currentLap = context.fightProperties?.getCurrentLap() ?? 0;
         // Ranged preservation is an early/mid-fight positioning concern. Once v0.8 has armed its commanding-lead
@@ -1274,71 +1315,147 @@ function pinnedRetreat(
         ) {
             return decision;
         }
+        emitFunnel("finish_override_clear");
         // With no later pre-wave activation left, retain real damage rather than manufacture Armageddon delay.
         if (currentLap >= NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 1) {
             return decision;
         }
+        emitFunnel("armageddon_buffer_clear");
         const target = context.unitsHolder.getAllUnits().get(melee.targetId);
         if (!target) {
             return decision;
         }
-        const estimate = estimatePrimaryMeleeDamage(
-            unit,
-            target,
-            context,
-            melee.attackFrom ?? unit.getBaseCell(),
-            decision,
-        );
+        emitFunnel("target_found");
+        incumbentAttackFromCell = melee.attackFrom ?? unit.getBaseCell();
+        const estimate = estimatePrimaryMeleeDamage(unit, target, context, incumbentAttackFromCell, decision);
         // Unsupported sequences fail closed; a truly secure stack kill is the one ranged melee worth preserving.
-        if (!estimate || estimate.secureKill) {
-            return decision;
-        }
+        if (!estimate) return decision;
+        emitFunnel("damage_supported");
+        if (estimate.secureKill) return decision;
+        emitFunnel("nonsecure_melee");
         weakMeleeTarget = target;
+        weakMeleeEstimate = estimate;
     }
 
     const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
     if (!enemies.length) {
         return decision;
     }
+    emitFunnel("live_enemies");
     const frontliners = context.unitsHolder
         .getAllAllies(unit.getTeam())
         .filter((ally) => !ally.isDead() && ally.getId() !== unit.getId() && isFrontline(ally));
+    if (frontliners.length) emitFunnel("frontline_present");
     const noMelee = unit.hasAbilityActive("No Melee");
     const currentProtection = protectionAt(unit.getCells(), enemies, frontliners);
     const currentUnscreened = currentProtection.reachableThreats - currentProtection.screenedThreats;
-    let best: IRouteView | undefined;
-    let bestUsesSupportedDelta = false;
-    for (const route of reachableRoutes(unit, context)) {
+    let legacyBest: IRouteView | undefined;
+    let treatmentBest: IRouteView | undefined;
+    let treatmentBestUsesSupportedDelta = false;
+    let hasValidRoute = false;
+    let hasLegacyRetreatRoute = false;
+    let hasTargetScreenRoute = false;
+    let hasUnscreenedReducedRoute = false;
+    let hasExposureNonincreasingRoute = false;
+    let hasPartialDeltaRoute = false;
+    const routes = reachableRoutes(unit, context);
+    if (routes.length) emitFunnel("reachable_route");
+    for (const route of routes) {
         const view = routeView(unit, context, route, enemies, frontliners);
         if (!view) {
             continue;
         }
+        hasValidRoute = true;
         const candidateUnscreened = view.protection.reachableThreats - view.protection.screenedThreats;
+        const legacyEligible = noMelee || view.protection.eligible;
+        if (legacyEligible) {
+            hasLegacyRetreatRoute = true;
+            if (!legacyBest || preferRetreat(view, legacyBest)) legacyBest = view;
+        }
+        // With the experiment unset, stop at the exact shipped catalog and comparator pass.
+        if (!catalogEnabled) continue;
+        const nonLegacyPartialRoute =
+            catalogEnabled && !noMelee && weakMeleeTarget !== undefined && !view.protection.eligible;
+        const targetScreened =
+            nonLegacyPartialRoute &&
+            frontliners.some((ally) => allyScreensThreat(view.footprint, ally, weakMeleeTarget!));
+        if (targetScreened) hasTargetScreenRoute = true;
+        const unscreenedReduced = targetScreened && candidateUnscreened < currentUnscreened;
+        if (unscreenedReduced) hasUnscreenedReducedRoute = true;
+        const exposureNonincreasing =
+            unscreenedReduced && view.protection.reachableThreats <= currentProtection.reachableThreats;
+        if (exposureNonincreasing) hasExposureNonincreasingRoute = true;
         const partialScreenImprovement =
-            supportedDelta &&
+            catalogEnabled &&
             !noMelee &&
             weakMeleeTarget !== undefined &&
             frontliners.some((ally) => allyScreensThreat(view.footprint, ally, weakMeleeTarget!)) &&
             candidateUnscreened < currentUnscreened &&
             view.protection.reachableThreats <= currentProtection.reachableThreats;
-        if (!noMelee && !view.protection.eligible && !partialScreenImprovement) {
+        if (!view.protection.eligible && partialScreenImprovement) hasPartialDeltaRoute = true;
+        if (!legacyEligible && !partialScreenImprovement) {
             continue;
         }
-        if (!best || preferRetreat(view, best)) {
-            best = view;
-            bestUsesSupportedDelta = !view.protection.eligible && partialScreenImprovement;
+        if (!treatmentBest || preferRetreat(view, treatmentBest)) {
+            treatmentBest = view;
+            treatmentBestUsesSupportedDelta = !view.protection.eligible && partialScreenImprovement;
         }
     }
+    if (hasValidRoute) emitFunnel("valid_route");
+    if (hasLegacyRetreatRoute) emitFunnel("legacy_retreat_route");
+    if (hasTargetScreenRoute) emitFunnel("target_screen_route");
+    if (hasUnscreenedReducedRoute) emitFunnel("unscreened_reduced_route");
+    if (hasExposureNonincreasingRoute) emitFunnel("exposure_nonincreasing_route");
+    if (hasPartialDeltaRoute) emitFunnel("partial_delta_route");
+    if (treatmentBestUsesSupportedDelta) emitFunnel("delta_only_best");
+
+    const best = selectorEnabled ? treatmentBest : legacyBest;
     if (!best) {
         return decision;
     }
-    if (bestUsesSupportedDelta) {
+    if (
+        selectorEnabled &&
+        treatmentBestUsesSupportedDelta &&
+        weakMeleeTarget &&
+        weakMeleeEstimate &&
+        incumbentAttackFromCell
+    ) {
+        const screeningFrontliner = [...frontliners]
+            .filter((ally) => allyScreensThreat(best.footprint, ally, weakMeleeTarget))
+            .sort((left, right) => (left.getId() < right.getId() ? -1 : left.getId() > right.getId() ? 1 : 0))[0];
+        const currentMinEnemyDistance = Math.min(
+            ...enemies.map((enemy) => cellDistance(unit.getCells(), enemy.getCells())),
+        );
         context.policyEventObserver?.({
             kind: "v0.8_supported_ranged_escape",
             unitId: unit.getId(),
             creatureName: unit.getName(),
             team: unit.getTeam(),
             lap: context.fightProperties?.getCurrentLap() ?? 0,
+            details: {
+                fromCell: { ...unit.getBaseCell() },
+                toCell: { ...best.route.cell },
+                incumbentAttackFromCell: { ...incumbentAttackFromCell },
+                targetId: weakMeleeTarget.getId(),
+                targetCreatureName: weakMeleeTarget.getName(),
+                targetHp: weakMeleeTarget.getCumulativeHp(),
+                meleeHitChance: weakMeleeEstimate.hitChance,
+                expectedEffectiveMeleeDamage: weakMeleeEstimate.expectedEffectiveDamage,
+                reachableThreatsBefore: currentProtection.reachableThreats,
+                screenedThreatsBefore: currentProtection.screenedThreats,
+                unscreenedThreatsBefore: currentUnscreened,
+                reachableThreatsAfter: best.protection.reachableThreats,
+                screenedThreatsAfter: best.protection.screenedThreats,
+                unscreenedThreatsAfter: best.protection.reachableThreats - best.protection.screenedThreats,
+                targetDistanceBefore: cellDistance(unit.getCells(), weakMeleeTarget.getCells()),
+                targetDistanceAfter: cellDistance(best.footprint, weakMeleeTarget.getCells()),
+                minEnemyDistanceBefore: currentMinEnemyDistance,
+                minEnemyDistanceAfter: best.minEnemyDistance,
+                nearestFrontlineDistanceAfter: best.nearestFrontlineDistance,
+                screeningFrontlinerId: screeningFrontliner?.getId() ?? "",
+                screeningFrontlinerCreatureName: screeningFrontliner?.getName() ?? "",
+                routeCost: routeCost(best.route),
+            },
         });
     }
     return [moveAction(unit, best.route, best.footprint)];
@@ -1359,11 +1476,6 @@ export function prioritizeV08RangedPositioning(
     if (!versions.includes(strategyVersion)) {
         return decision;
     }
-    const supportedDeltaVersions = (process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS ?? "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean);
-    const supportedDelta = supportedDeltaVersions.includes(strategyVersion);
     const responseNeutralAdvanceVersions = (process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS ?? "")
         .split(",")
         .map((value) => value.trim())
@@ -1407,7 +1519,7 @@ export function prioritizeV08RangedPositioning(
               : protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
           : decision;
     const retreated =
-        mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
+        mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, strategyVersion) : advanced;
     const bandAdvanced =
         bandAdvanceActiveHere && !bandAdvanceVsLegacy
             ? supportedBandAdvance(unit, context, retreated, strategyVersion)

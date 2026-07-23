@@ -481,6 +481,8 @@ function setupSupportedBandAdvance(
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
+    delete process.env.V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS;
+    delete process.env.V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY;
     delete process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS;
     delete process.env.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS;
@@ -2197,6 +2199,94 @@ describe("v0.8 protected ranged positioning", () => {
         const actions = new StrategyV0_8().decideTurn(armed.shooter, armed.context);
         expect(actions.map((action) => action.type)).toEqual(["move_unit"]);
         expect(policyEvents.map(({ kind }) => kind)).toEqual(["v0.8_supported_ranged_escape"]);
+        const proposal = policyEvents.find((event) => event.kind === "v0.8_supported_ranged_escape");
+        expect(proposal?.details).toMatchObject({
+            targetCreatureName: "Current pinner",
+            screeningFrontlinerCreatureName: "Bodyguard",
+            meleeHitChance: 1,
+        });
+        expect(proposal?.details.expectedEffectiveMeleeDamage).toBeGreaterThan(0);
+        expect(proposal?.details.unscreenedThreatsAfter).toBeLessThan(proposal?.details.unscreenedThreatsBefore ?? 0);
+        expect(proposal?.details.reachableThreatsAfter).toBeLessThanOrEqual(
+            proposal?.details.reachableThreatsBefore ?? 0,
+        );
+    });
+
+    it("catalogs the weak-melee funnel at live roots while the selector-off control retains melee", () => {
+        process.env.V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = "supported-ranged-delta-catalog-only-control";
+        const { shooter, context } = setupPartiallyScreenedPinnedShooter();
+        context.decisionOrigin = "root";
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toContain("melee_attack");
+        expect(
+            policyEvents
+                .filter((event) => event.kind === "v0.8_supported_ranged_escape_funnel")
+                .map((event) => event.stage),
+        ).toEqual([
+            "melee_incumbent",
+            "attack_context",
+            "current_ranged_mode",
+            "ammo",
+            "mobile",
+            "ordinary_shooter",
+            "range_unsuppressed",
+            "currently_pinned",
+            "no_nonmelee_commitment",
+            "finish_override_clear",
+            "armageddon_buffer_clear",
+            "target_found",
+            "damage_supported",
+            "nonsecure_melee",
+            "live_enemies",
+            "frontline_present",
+            "reachable_route",
+            "valid_route",
+            "target_screen_route",
+            "unscreened_reduced_route",
+            "exposure_nonincreasing_route",
+            "partial_delta_route",
+            "delta_only_best",
+        ]);
+        expect(policyEvents.map((event) => event.kind)).not.toContain("v0.8_supported_ranged_escape");
+    });
+
+    it("isolates supported-delta selection to live roots without changing the catalog RNG stream", () => {
+        const decide = (
+            selector: string,
+            origin: IDecisionContext["decisionOrigin"],
+        ): { actionTypes: string[]; events: IAIPolicyEvent[]; tail: number[] } => {
+            process.env.V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS = "v0.8";
+            process.env.V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY = "1";
+            process.env.V08_SUPPORTED_RANGED_DELTA_VERSIONS = selector;
+            const { shooter, context } = setupPartiallyScreenedPinnedShooter();
+            context.decisionOrigin = origin;
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            setDeterministicRandomSource(makeRng(0x61a8d37c));
+            const actionTypes = new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type);
+            const tail = [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)];
+            return { actionTypes, events, tail };
+        };
+
+        const treatment = decide("v0.8", "root");
+        const control = decide("supported-ranged-delta-catalog-only-control", "root");
+        expect(treatment.actionTypes).toEqual(["move_unit"]);
+        expect(control.actionTypes).toContain("melee_attack");
+        expect(treatment.tail).toEqual(control.tail);
+        expect(treatment.events.map((event) => event.kind)).toContain("v0.8_supported_ranged_escape");
+        expect(control.events.map((event) => event.kind)).not.toContain("v0.8_supported_ranged_escape");
+
+        const rolloutTreatment = decide("v0.8", "rollout");
+        const rolloutControl = decide("supported-ranged-delta-catalog-only-control", "rollout");
+        expect(rolloutTreatment.actionTypes).toEqual(rolloutControl.actionTypes);
+        expect(rolloutTreatment.actionTypes).toContain("melee_attack");
+        expect(rolloutTreatment.tail).toEqual(rolloutControl.tail);
+        expect(rolloutTreatment.events).toEqual([]);
+        expect(decide("v0.8", undefined).actionTypes).toContain("melee_attack");
     });
 
     it("applies the partial-screen escape through the authoritative action engine", () => {

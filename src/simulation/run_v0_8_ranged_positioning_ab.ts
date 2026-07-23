@@ -83,6 +83,10 @@ export interface IV08RangedPositioningABOptions {
     /** Enables the JIT arm's target-covered catalog for both seats while disabling its selector. */
     jitNoMeleeFocusCatalogOnly?: boolean;
     supportedRangedDelta?: boolean;
+    /** Computes the same weak-melee escape catalog while selecting the delta for neither strategy. */
+    supportedRangedDeltaCatalogOnly?: boolean;
+    /** Selects the supported delta only for live/root incumbents while rollouts retain shipped behavior. */
+    supportedRangedDeltaLiveOnly?: boolean;
     responseNeutralAdvance?: boolean;
     supportedPrepinEgress?: boolean;
     /** Computes the same pre-pin egress catalog for both seats while selecting it for neither seat. */
@@ -119,7 +123,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -148,6 +152,8 @@ export interface IV08RangedPositioningABManifest {
         jitNoMeleeFocusActivationBuffer: number;
         jitNoMeleeFocusDamageFloor: number;
         supportedRangedDelta: boolean;
+        supportedRangedDeltaCatalogOnly: boolean;
+        supportedRangedDeltaLiveOnly: boolean;
         responseNeutralAdvance: boolean;
         supportedPrepinEgress: boolean;
         supportedPrepinEgressCatalogOnly: boolean;
@@ -359,6 +365,28 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (options.supportedRangedDelta !== undefined && typeof options.supportedRangedDelta !== "boolean") {
         throw new Error("supportedRangedDelta must be a boolean");
     }
+    if (
+        options.supportedRangedDeltaCatalogOnly !== undefined &&
+        typeof options.supportedRangedDeltaCatalogOnly !== "boolean"
+    ) {
+        throw new Error("supportedRangedDeltaCatalogOnly must be a boolean");
+    }
+    if (options.supportedRangedDelta && options.supportedRangedDeltaCatalogOnly) {
+        throw new Error("supportedRangedDelta and supportedRangedDeltaCatalogOnly are mutually exclusive");
+    }
+    if (
+        options.supportedRangedDeltaLiveOnly !== undefined &&
+        typeof options.supportedRangedDeltaLiveOnly !== "boolean"
+    ) {
+        throw new Error("supportedRangedDeltaLiveOnly must be a boolean");
+    }
+    if (
+        options.supportedRangedDeltaLiveOnly &&
+        !options.supportedRangedDelta &&
+        !options.supportedRangedDeltaCatalogOnly
+    ) {
+        throw new Error("supportedRangedDeltaLiveOnly requires a supported ranged treatment or catalog control");
+    }
     if (options.responseNeutralAdvance !== undefined && typeof options.responseNeutralAdvance !== "boolean") {
         throw new Error("responseNeutralAdvance must be a boolean");
     }
@@ -447,7 +475,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.deadlineFinisher ?? false,
         (options.paretoNoMeleeFocus ?? false) || (options.paretoNoMeleeFocusCatalogOnly ?? false),
         (options.jitNoMeleeFocus ?? false) || (options.jitNoMeleeFocusCatalogOnly ?? false),
-        options.supportedRangedDelta ?? false,
+        (options.supportedRangedDelta ?? false) || (options.supportedRangedDeltaCatalogOnly ?? false),
         options.responseNeutralAdvance ?? false,
         (options.supportedPrepinEgress ?? false) || (options.supportedPrepinEgressCatalogOnly ?? false),
         (options.supportedBandAdvance ?? false) || (options.supportedBandAdvanceCatalogOnly ?? false),
@@ -558,7 +586,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v14" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -587,6 +615,8 @@ export function buildV08RangedPositioningABManifest(
             jitNoMeleeFocusActivationBuffer: PURE_RANGED_JIT_NO_MELEE_FOCUS_ACTIVATION_BUFFER,
             jitNoMeleeFocusDamageFloor: PURE_RANGED_JIT_NO_MELEE_FOCUS_DAMAGE_FLOOR,
             supportedRangedDelta: options.supportedRangedDelta ?? false,
+            supportedRangedDeltaCatalogOnly: options.supportedRangedDeltaCatalogOnly ?? false,
+            supportedRangedDeltaLiveOnly: options.supportedRangedDeltaLiveOnly ?? false,
             responseNeutralAdvance: options.responseNeutralAdvance ?? false,
             supportedPrepinEgress: options.supportedPrepinEgress ?? false,
             supportedPrepinEgressCatalogOnly: options.supportedPrepinEgressCatalogOnly ?? false,
@@ -643,6 +673,8 @@ export function buildV08RangedPositioningABEnvironment(
     protectedAdvanceGuardrails = false,
     protectedAdvanceGuardrailsMode: V08ProtectedAdvanceGuardrailMode = "both",
     paretoNoMeleeFocusScope: PureRangedParetoNoMeleeFocusScope = "pure_ranged",
+    supportedRangedDeltaCatalogOnly = false,
+    supportedRangedDeltaLiveOnly = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -689,6 +721,18 @@ export function buildV08RangedPositioningABEnvironment(
         throw new Error("jitNoMeleeFocus and jitNoMeleeFocusCatalogOnly are mutually exclusive");
     }
     if (typeof supportedRangedDelta !== "boolean") throw new Error("supportedRangedDelta must be a boolean");
+    if (typeof supportedRangedDeltaCatalogOnly !== "boolean") {
+        throw new Error("supportedRangedDeltaCatalogOnly must be a boolean");
+    }
+    if (supportedRangedDelta && supportedRangedDeltaCatalogOnly) {
+        throw new Error("supportedRangedDelta and supportedRangedDeltaCatalogOnly are mutually exclusive");
+    }
+    if (typeof supportedRangedDeltaLiveOnly !== "boolean") {
+        throw new Error("supportedRangedDeltaLiveOnly must be a boolean");
+    }
+    if (supportedRangedDeltaLiveOnly && !supportedRangedDelta && !supportedRangedDeltaCatalogOnly) {
+        throw new Error("supportedRangedDeltaLiveOnly requires a supported ranged treatment or catalog control");
+    }
     if (typeof responseNeutralAdvance !== "boolean") throw new Error("responseNeutralAdvance must be a boolean");
     if (typeof supportedPrepinEgress !== "boolean") throw new Error("supportedPrepinEgress must be a boolean");
     if (typeof supportedPrepinEgressCatalogOnly !== "boolean") {
@@ -748,7 +792,7 @@ export function buildV08RangedPositioningABEnvironment(
         deadlineFinisher,
         paretoNoMeleeFocus || paretoNoMeleeFocusCatalogOnly,
         jitNoMeleeFocus || jitNoMeleeFocusCatalogOnly,
-        supportedRangedDelta,
+        supportedRangedDelta || supportedRangedDeltaCatalogOnly,
         responseNeutralAdvance,
         supportedPrepinEgress || supportedPrepinEgressCatalogOnly,
         supportedBandAdvance || supportedBandAdvanceCatalogOnly,
@@ -788,7 +832,16 @@ export function buildV08RangedPositioningABEnvironment(
     environment.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = jitNoMeleeFocusCatalogOnly
         ? "jit-catalog-only-control"
         : V08_A13_PRODUCTION_VERSION;
-    environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDelta ? V08_A13_PRODUCTION_VERSION : "";
+    const supportedRangedDeltaExperiment = supportedRangedDelta || supportedRangedDeltaCatalogOnly;
+    environment.V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS = supportedRangedDeltaExperiment
+        ? V08_A13_PRODUCTION_VERSION
+        : "";
+    environment.V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY = supportedRangedDeltaLiveOnly ? "1" : "0";
+    environment.V08_SUPPORTED_RANGED_DELTA_VERSIONS = supportedRangedDeltaCatalogOnly
+        ? "supported-ranged-delta-catalog-only-control"
+        : supportedRangedDelta
+          ? V08_A13_PRODUCTION_VERSION
+          : "";
     environment.V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS = responseNeutralAdvance ? V08_A13_PRODUCTION_VERSION : "";
     environment.V08_SUPPORTED_PREPIN_EGRESS = supportedPrepinEgress || supportedPrepinEgressCatalogOnly ? "1" : "0";
     environment.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS =
@@ -821,7 +874,7 @@ export function buildV08RangedPositioningABEnvironment(
     // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
     // the baseline and only production v0.8 receives the selected delta.
     environment.V08_RANGED_POSITION_VERSIONS =
-        supportedRangedDelta ||
+        supportedRangedDeltaExperiment ||
         responseNeutralAdvance ||
         supportedPrepinEgress ||
         supportedPrepinEgressCatalogOnly ||
@@ -866,6 +919,8 @@ export function buildV08RangedPositioningABInvocations(
         options.protectedAdvanceGuardrails ?? false,
         options.protectedAdvanceGuardrailsMode ?? "both",
         options.paretoNoMeleeFocusScope ?? "pure_ranged",
+        options.supportedRangedDeltaCatalogOnly ?? false,
+        options.supportedRangedDeltaLiveOnly ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -953,6 +1008,8 @@ export async function runV08RangedPositioningAB(
     const jitNoMeleeFocus = options.jitNoMeleeFocus ?? false;
     const jitNoMeleeFocusCatalogOnly = options.jitNoMeleeFocusCatalogOnly ?? false;
     const supportedRangedDelta = options.supportedRangedDelta ?? false;
+    const supportedRangedDeltaCatalogOnly = options.supportedRangedDeltaCatalogOnly ?? false;
+    const supportedRangedDeltaLiveOnly = options.supportedRangedDeltaLiveOnly ?? false;
     const responseNeutralAdvance = options.responseNeutralAdvance ?? false;
     const supportedPrepinEgress = options.supportedPrepinEgress ?? false;
     const supportedPrepinEgressCatalogOnly = options.supportedPrepinEgressCatalogOnly ?? false;
@@ -975,6 +1032,8 @@ export async function runV08RangedPositioningAB(
                 `paretoScope=${paretoNoMeleeFocusScope} ` +
                 `jitNoMeleeFocus=${jitNoMeleeFocus} jitCatalogOnly=${jitNoMeleeFocusCatalogOnly} ` +
                 `supportedRangedDelta=${supportedRangedDelta} ` +
+                `supportedRangedDeltaCatalogOnly=${supportedRangedDeltaCatalogOnly} ` +
+                `supportedRangedDeltaLiveOnly=${supportedRangedDeltaLiveOnly} ` +
                 `responseNeutralAdvance=${responseNeutralAdvance} ` +
                 `supportedPrepinEgress=${supportedPrepinEgress} ` +
                 `supportedPrepinCatalogOnly=${supportedPrepinEgressCatalogOnly} ` +
@@ -1019,6 +1078,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "jit-no-melee-focus": { type: "boolean", default: false },
             "jit-catalog-only": { type: "boolean", default: false },
             "supported-ranged-delta": { type: "boolean", default: false },
+            "supported-ranged-delta-catalog-only": { type: "boolean", default: false },
+            "supported-ranged-delta-live-only": { type: "boolean", default: false },
             "response-neutral-advance": { type: "boolean", default: false },
             "supported-prepin-egress": { type: "boolean", default: false },
             "supported-prepin-catalog-only": { type: "boolean", default: false },
@@ -1072,6 +1133,8 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         jitNoMeleeFocus: values["jit-no-melee-focus"]!,
         jitNoMeleeFocusCatalogOnly: values["jit-catalog-only"]!,
         supportedRangedDelta: values["supported-ranged-delta"]!,
+        supportedRangedDeltaCatalogOnly: values["supported-ranged-delta-catalog-only"]!,
+        supportedRangedDeltaLiveOnly: values["supported-ranged-delta-live-only"]!,
         responseNeutralAdvance: values["response-neutral-advance"]!,
         supportedPrepinEgress: values["supported-prepin-egress"]!,
         supportedPrepinEgressCatalogOnly: values["supported-prepin-catalog-only"]!,
@@ -1098,7 +1161,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
                 "[--pareto-scope pure_ranged|any_board|mixed_supported] " +
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
-                "[--supported-ranged-delta] [--response-neutral-advance] " +
+                "[--supported-ranged-delta|--supported-ranged-delta-catalog-only] " +
+                "[--supported-ranged-delta-live-only] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
                 "[--supported-band-advance|--supported-band-catalog-only|--supported-band-vs-legacy] " +
                 "[--supported-band-live-only] " +
