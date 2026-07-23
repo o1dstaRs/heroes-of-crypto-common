@@ -346,6 +346,135 @@ function setupProactiveScreenedClose(
     return { shooter, target, context, destination };
 }
 
+function setupSupportedBandAdvance(
+    options: {
+        destination?: XY;
+        guardRanged?: boolean;
+        includeGuard?: boolean;
+        shotDistance?: number;
+        shooterAbilities?: string[];
+        targetCanCounter?: boolean;
+        targetRanged?: boolean;
+        targetAmount?: number;
+        targetMaxHp?: number;
+        withActedReachableThreat?: boolean;
+        withCurrentPinner?: boolean;
+    } = {},
+): {
+    shooter: Unit;
+    target: Unit;
+    guard?: Unit;
+    context: IDecisionContext;
+    destination: XY;
+} {
+    const combat = createCombatTestContext();
+    const shooter = createTestUnit({
+        team: LOWER,
+        name: "Band archer",
+        attackType: RANGE,
+        speed: 1,
+        rangeShots: 8,
+        shotDistance: options.shotDistance ?? 5,
+        damageMin: 10,
+        damageMax: 10,
+        abilities: options.shooterAbilities ?? [],
+    });
+    const targetRanged = options.targetRanged ?? true;
+    const target = createTestUnit({
+        team: UPPER,
+        name: "Band target",
+        attackType: targetRanged ? RANGE : MELEE,
+        speed: 0,
+        rangeShots: targetRanged ? 8 : 0,
+        shotDistance: 16,
+        damageMin: 1,
+        damageMax: 1,
+        amountAlive: options.targetAmount ?? 20,
+        maxHp: options.targetMaxHp ?? 20,
+    });
+    const destination = options.destination ?? { x: 5, y: 6 };
+    placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 7 });
+    placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 1 });
+
+    let guard: Unit | undefined;
+    if (options.includeGuard ?? true) {
+        guard = createTestUnit({
+            team: LOWER,
+            name: "Band guard",
+            attackType: options.guardRanged ? RANGE : MELEE,
+            speed: 1,
+            rangeShots: options.guardRanged ? 1 : 0,
+        });
+        // Offset from the firing ray, but strictly between the proposed destination and the target.
+        placeUnit(combat.grid, combat.unitsHolder, guard, { x: 6, y: 5 });
+    }
+
+    const context = decisionContext(combat);
+    if (targetRanged && !options.targetCanCounter) {
+        context.fightProperties!.addRepliedAttack(target.getId());
+    }
+    if (options.withActedReachableThreat) {
+        const threat = createTestUnit({
+            team: UPPER,
+            name: "Acted hidden flanker",
+            attackType: MELEE,
+            speed: 1,
+            maxHp: 1,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, threat, { x: 7, y: 7 });
+        threat.applyBuff(
+            new Spell({
+                spellProperties: getSpellConfig("System", "Hidden"),
+                amount: 1,
+            }),
+        );
+        context.fightProperties!.addAlreadyMadeTurn(UPPER, threat.getId());
+    }
+    if (options.withCurrentPinner) {
+        const pinner = createTestUnit({
+            team: UPPER,
+            name: "Current hidden pinner",
+            attackType: MELEE,
+            speed: 0,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 6, y: 7 });
+        pinner.applyBuff(
+            new Spell({
+                spellProperties: getSpellConfig("System", "Hidden"),
+                amount: 1,
+            }),
+        );
+        context.fightProperties!.addAlreadyMadeTurn(UPPER, pinner.getId());
+    }
+    const destinationHash = (destination.x << 4) | destination.y;
+    context.matrix = combat.grid.getMatrix();
+    context.pathHelper = {
+        getMovePath: () => ({
+            cells: [destination],
+            hashes: new Set([destinationHash]),
+            knownPaths: new Map([
+                [
+                    destinationHash,
+                    [
+                        {
+                            cell: destination,
+                            route: [destination],
+                            weight: 1,
+                            firstAggrMet: false,
+                            hasLavaCell: false,
+                            hasWaterCell: false,
+                        },
+                    ],
+                ],
+            ]),
+        }),
+    } as unknown as PathHelper;
+    shooter.refreshPossibleAttackTypes(
+        combat.attackHandler.canLandRangeAttack(shooter, combat.grid.getEnemyAggrMatrixByUnitId(shooter.getId())),
+    );
+    return { shooter, target, guard, context, destination };
+}
+
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_VERSIONS;
     delete process.env.V08_RANGED_POSITION_MODE;
@@ -355,10 +484,339 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY;
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
     setDeterministicRandomSource(undefined);
 });
 
 describe("v0.8 protected ranged positioning", () => {
+    it("keeps the strict supported-band replacement default-off", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+        const { shooter, context } = setupSupportedBandAdvance();
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+            "move_unit",
+            "range_attack",
+        ]);
+        expect(policyEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(policyEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+    });
+
+    it("strictly closes one damage band at a root only behind an exact native melee screen", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        const { shooter, target, context, destination } = setupSupportedBandAdvance();
+        context.decisionOrigin = "root";
+        const policyEvents: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => policyEvents.push(event);
+
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [destination] });
+        expect(actions[1]).toMatchObject({ type: "range_attack", targetId: target.getId() });
+        expect(
+            policyEvents.filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel").map(({ stage }) => stage),
+        ).toEqual([
+            "ordinary_shot",
+            "eligible_shooter",
+            "target_no_counter",
+            "native_guard",
+            "current_signature",
+            "ranged_posture",
+            "reachable_route",
+            "zero_exposure_route",
+            "target_screened",
+            "strictly_closer",
+            "retained_signature",
+            "damage_band_improved",
+        ]);
+        const proposal = policyEvents.find(({ kind }) => kind === "v0.8_supported_band_advance");
+        expect(proposal?.kind).toBe("v0.8_supported_band_advance");
+        if (proposal?.kind !== "v0.8_supported_band_advance") throw new Error("missing supported-band proposal");
+        expect(proposal.details).toEqual({
+            fromCell: { x: 5, y: 7 },
+            toCell: destination,
+            targetId: target.getId(),
+            targetCreatureName: target.getName(),
+            exposureBefore: 0,
+            exposureAfter: 0,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 5,
+            minEnemyDistanceBefore: 6,
+            minEnemyDistanceAfter: 5,
+            rangedSuperior: false,
+            finishActive: false,
+        });
+    });
+
+    it("computes the same strict catalog for treatment and catalog-only control without selecting the control", () => {
+        const run = (selector: string): { actions: string[]; stages: Array<string | undefined> } => {
+            process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+            process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = selector;
+            process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+            const { shooter, context } = setupSupportedBandAdvance();
+            context.decisionOrigin = "root";
+            const policyEvents: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => policyEvents.push(event);
+            const actions = new StrategyV0_8().decideTurn(shooter, context);
+            return {
+                actions: actions.map((action) => action.type),
+                stages: policyEvents
+                    .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+                    .map(({ stage }) => stage),
+            };
+        };
+
+        const treatment = run("v0.8");
+        const control = run("supported-band-advance-catalog-only-control");
+        expect(treatment.actions).toEqual(["move_unit", "range_attack"]);
+        expect(control.actions).toEqual(["range_attack"]);
+        expect(control.stages).toEqual(treatment.stages);
+        expect(control.stages).toContain("damage_band_improved");
+    });
+
+    it("uses the strict replacement only at an explicit live root", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8";
+
+        const run = (decisionOrigin?: "root" | "rollout"): { actions: string[]; events: IAIPolicyEvent[] } => {
+            const { shooter, context } = setupSupportedBandAdvance();
+            context.decisionOrigin = decisionOrigin;
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            return {
+                actions: new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type),
+                events,
+            };
+        };
+
+        const root = run("root");
+        expect(root.actions).toEqual(["move_unit", "range_attack"]);
+        expect(root.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance");
+        for (const nonRoot of [run("rollout"), run()]) {
+            // The incumbent protected advance remains active outside measured roots.
+            expect(nonRoot.actions).toEqual(["move_unit", "range_attack"]);
+            expect(nonRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+            expect(nonRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+        }
+    });
+
+    it("preserves the deterministic catalog stream before treatment selection", () => {
+        const decideAndReadTail = (selector: string): number[] => {
+            process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+            process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = selector;
+            const { shooter, context } = setupSupportedBandAdvance();
+            context.decisionOrigin = "root";
+            setDeterministicRandomSource(makeRng(0x8badf00d));
+            const actions = new StrategyV0_8().decideTurn(shooter, context);
+            expect(actions.map((action) => action.type)).toEqual(
+                selector === "v0.8" ? ["move_unit", "range_attack"] : ["range_attack"],
+            );
+            return [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)];
+        };
+
+        expect(decideAndReadTail("v0.8")).toEqual(decideAndReadTail("supported-band-advance-catalog-only-control"));
+    });
+
+    it("requires native melee support rather than an empty or ranged guard slot", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        for (const options of [{ includeGuard: false }, { guardRanged: true }]) {
+            const { shooter, context } = setupSupportedBandAdvance(options);
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+
+            expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+                "range_attack",
+            ]);
+            expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+            expect(
+                events.filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel").map(({ stage }) => stage),
+            ).not.toContain("native_guard");
+        }
+    });
+
+    it("rejects a current pin and an acted enemy that can still reach the proposed cell next lap", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+
+        const pinned = setupSupportedBandAdvance({ withCurrentPinner: true });
+        pinned.context.decisionOrigin = "root";
+        const pinnedEvents: IAIPolicyEvent[] = [];
+        pinned.context.policyEventObserver = (event) => pinnedEvents.push(event);
+        const pinnedActions = new StrategyV0_8().decideTurn(pinned.shooter, pinned.context);
+        expect(pinnedActions.map((action) => action.type)).not.toEqual(["move_unit", "range_attack"]);
+        expect(pinnedEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+
+        const reachable = setupSupportedBandAdvance({ withActedReachableThreat: true });
+        reachable.context.decisionOrigin = "root";
+        const reachableEvents: IAIPolicyEvent[] = [];
+        reachable.context.policyEventObserver = (event) => reachableEvents.push(event);
+        expect(
+            new StrategyV0_8().decideTurn(reachable.shooter, reachable.context).map((action) => action.type),
+        ).toEqual(["range_attack"]);
+        expect(reachableEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(
+            reachableEvents
+                .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+                .map(({ stage }) => stage),
+        ).not.toContain("zero_exposure_route");
+    });
+
+    it("requires a strict close and a strictly improved exact damage divisor", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+
+        const lateral = setupSupportedBandAdvance({ destination: { x: 6, y: 7 } });
+        lateral.context.decisionOrigin = "root";
+        const lateralEvents: IAIPolicyEvent[] = [];
+        lateral.context.policyEventObserver = (event) => lateralEvents.push(event);
+        expect(new StrategyV0_8().decideTurn(lateral.shooter, lateral.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        expect(
+            lateralEvents.filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel").map(({ stage }) => stage),
+        ).not.toContain("strictly_closer");
+
+        const sameBand = setupSupportedBandAdvance({ shotDistance: 3 });
+        sameBand.context.decisionOrigin = "root";
+        const sameBandEvents: IAIPolicyEvent[] = [];
+        sameBand.context.policyEventObserver = (event) => sameBandEvents.push(event);
+        expect(new StrategyV0_8().decideTurn(sameBand.shooter, sameBand.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        const sameBandStages = sameBandEvents
+            .filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel")
+            .map(({ stage }) => stage);
+        expect(sameBandStages).toContain("retained_signature");
+        expect(sameBandStages).not.toContain("damage_band_improved");
+    });
+
+    it("holds every stronger ranged line before finish, including against zero enemy ranged output", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        for (const options of [{ targetAmount: 1 }, { targetRanged: false }]) {
+            const { shooter, context } = setupSupportedBandAdvance(options);
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+
+            expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+                "range_attack",
+            ]);
+            expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+            expect(
+                events.filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel").map(({ stage }) => stage),
+            ).not.toContain("ranged_posture");
+        }
+    });
+
+    it("releases only the stronger-ranged posture veto during finish and retains the safety proof", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+
+        const safe = setupSupportedBandAdvance({ targetAmount: 1, targetMaxHp: 1 });
+        safe.context.decisionOrigin = "root";
+        expect(new StrategyV0_8().decideTurn(safe.shooter, safe.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        while (safe.context.fightProperties!.getCurrentLap() < V08_DOMINANT_FINISH_START_LAP) {
+            safe.context.fightProperties!.flipLap();
+        }
+        safe.context.fightProperties!.addRepliedAttack(safe.target.getId());
+        const safeEvents: IAIPolicyEvent[] = [];
+        safe.context.policyEventObserver = (event) => safeEvents.push(event);
+        const safeActionTypes = new StrategyV0_8().decideTurn(safe.shooter, safe.context).map((action) => action.type);
+        expect(safeActionTypes).toEqual(["move_unit", "range_attack"]);
+        const safeProposal = safeEvents.find(({ kind }) => kind === "v0.8_supported_band_advance");
+        expect(safeProposal?.kind).toBe("v0.8_supported_band_advance");
+        if (safeProposal?.kind !== "v0.8_supported_band_advance") throw new Error("missing finish proposal");
+        expect(safeProposal.details).toMatchObject({ rangedSuperior: true, finishActive: true });
+
+        const unsafe = setupSupportedBandAdvance({
+            targetAmount: 1,
+            targetMaxHp: 1,
+            withActedReachableThreat: true,
+        });
+        unsafe.context.decisionOrigin = "root";
+        while (unsafe.context.fightProperties!.getCurrentLap() < V08_DOMINANT_FINISH_START_LAP) {
+            unsafe.context.fightProperties!.flipLap();
+        }
+        unsafe.context.fightProperties!.addRepliedAttack(unsafe.target.getId());
+        const unsafeEvents: IAIPolicyEvent[] = [];
+        unsafe.context.policyEventObserver = (event) => unsafeEvents.push(event);
+        expect(new StrategyV0_8().decideTurn(unsafe.shooter, unsafe.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        expect(unsafeEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+    });
+
+    it("rejects a live counter and special ranged attack signatures", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+
+        const counter = setupSupportedBandAdvance({ targetCanCounter: true });
+        counter.context.decisionOrigin = "root";
+        const counterEvents: IAIPolicyEvent[] = [];
+        counter.context.policyEventObserver = (event) => counterEvents.push(event);
+        expect(new StrategyV0_8().decideTurn(counter.shooter, counter.context).map((action) => action.type)).toEqual([
+            "range_attack",
+        ]);
+        expect(
+            counterEvents.filter(({ kind }) => kind === "v0.8_supported_band_advance_funnel").map(({ stage }) => stage),
+        ).toEqual(["ordinary_shot", "eligible_shooter"]);
+
+        for (const ability of ["Sniper", "Through Shot", "Large Caliber", "Area Throw", "Double Shot"]) {
+            const special = setupSupportedBandAdvance({ shooterAbilities: [ability] });
+            special.context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            special.context.policyEventObserver = (event) => events.push(event);
+            const actions = new StrategyV0_8().decideTurn(special.shooter, special.context);
+            expect(actions.some((action) => action.type === "move_unit")).toBe(false);
+            expect(events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        }
+    });
+
+    it("executes the strict move and retained shot through the authoritative action engine", () => {
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        const { shooter, target, context } = setupSupportedBandAdvance();
+        context.decisionOrigin = "root";
+        const actions = new StrategyV0_8().decideTurn(shooter, context);
+        const fightProperties = context.fightProperties!;
+        fightProperties.startFight();
+        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
+        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: context.grid,
+            unitsHolder: context.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, context.grid, context.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: context.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => getEnemiesCellsWithinMovementRange(shooter, context),
+        });
+        const hpBefore = target.getCumulativeHp();
+        const results = actions.map((action) => engine.apply(action));
+
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
+        expect(results.every(({ completed }) => completed)).toBe(true);
+        expect(target.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
     it("moves behind a native melee screen before a future pin while retaining the exact ordinary shot", () => {
         process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";

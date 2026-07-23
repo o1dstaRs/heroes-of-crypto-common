@@ -33,9 +33,12 @@ import { GREEN_TEAM, runMatch, type IDecisionObservation, type IMatchConfig, typ
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
+    V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES,
     V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES,
     type IAIPolicyEvent,
+    type IV08SupportedBandAdvanceDetails,
     type IV08SupportedPrepinEgressDetails,
+    type V08SupportedBandAdvanceFunnelStage,
     type V08SupportedPrepinEgressFunnelStage,
 } from "../ai/ai_strategy";
 import {
@@ -145,6 +148,12 @@ export interface IMirrorSideDiag {
     responseNeutralAdvances: number;
     /** Pre-search response-neutral advance proposals, including ones later replaced by a13. */
     responseNeutralAdvanceProposals: number;
+    /** Supported damage-band advances retained after a13 arbitration. */
+    supportedBandAdvanceSelections: number;
+    /** Selector-enabled root proposals for supported damage-band advances. */
+    supportedBandAdvanceProposals: number;
+    /** Root-catalog counts at each supported damage-band stage, including selector-disabled catalog-only runs. */
+    supportedBandAdvanceFunnel: Record<V08SupportedBandAdvanceFunnelStage, number>;
     /** Supported pre-pin egress proposals retained after a13 arbitration. */
     supportedPrepinEgressSelections: number;
     /** Pre-search supported pre-pin egress proposals, including ones later replaced by a13. */
@@ -165,6 +174,12 @@ const newSupportedPrepinEgressFunnel = (): Record<V08SupportedPrepinEgressFunnel
         number
     >;
 
+const newSupportedBandAdvanceFunnel = (): Record<V08SupportedBandAdvanceFunnelStage, number> =>
+    Object.fromEntries(V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map((stage) => [stage, 0])) as Record<
+        V08SupportedBandAdvanceFunnelStage,
+        number
+    >;
+
 export interface IMirrorGameRecord {
     game: number;
     seed: number;
@@ -178,7 +193,17 @@ export interface IMirrorGameRecord {
     rosterSig?: string;
     diag?: { green: IMirrorSideDiag; red: IMirrorSideDiag };
     /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
+    supportedBandAdvanceEvents?: IMirrorSupportedBandAdvanceEvent[];
+    /** Root proposals only; omitted when the game has none to keep large JSONL artifacts compact. */
     supportedPrepinEgressEvents?: IMirrorSupportedPrepinEgressEvent[];
+}
+
+export interface IMirrorSupportedBandAdvanceEvent extends IV08SupportedBandAdvanceDetails {
+    side: "green" | "red";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    retained: boolean;
 }
 
 export interface IMirrorSupportedPrepinEgressEvent extends IV08SupportedPrepinEgressDetails {
@@ -268,6 +293,9 @@ function newSideDiag(version: string): IMirrorSideDiag {
         supportedRangedEscapeProposals: 0,
         responseNeutralAdvances: 0,
         responseNeutralAdvanceProposals: 0,
+        supportedBandAdvanceSelections: 0,
+        supportedBandAdvanceProposals: 0,
+        supportedBandAdvanceFunnel: newSupportedBandAdvanceFunnel(),
         supportedPrepinEgressSelections: 0,
         supportedPrepinEgressProposals: 0,
         supportedPrepinEgressFunnel: newSupportedPrepinEgressFunnel(),
@@ -302,6 +330,8 @@ export function playMirrorGame(
     const redVersion = aIsGreen ? cfg.vB : cfg.vA;
 
     const diag = cfg.diag ? { green: newSideDiag(greenVersion), red: newSideDiag(redVersion) } : undefined;
+    const supportedBandAdvanceEvents: IMirrorSupportedBandAdvanceEvent[] = [];
+    const bandAdvanceRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedBandAdvanceEvent>();
     const supportedPrepinEgressEvents: IMirrorSupportedPrepinEgressEvent[] = [];
     const prepinRecordByEvent = new WeakMap<IAIPolicyEvent, IMirrorSupportedPrepinEgressEvent>();
     const observer = diag
@@ -345,6 +375,10 @@ export function playMirrorGame(
                   side.supportedRangedEscapes += 1;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvances += 1;
+              } else if (event.kind === "v0.8_supported_band_advance") {
+                  side.supportedBandAdvanceSelections += 1;
+                  const proposal = bandAdvanceRecordByEvent.get(event);
+                  if (proposal) proposal.retained = true;
               } else if (event.kind === "v0.8_supported_prepin_egress") {
                   side.supportedPrepinEgressSelections += 1;
                   const proposal = prepinRecordByEvent.get(event);
@@ -359,6 +393,22 @@ export function playMirrorGame(
                   side.supportedRangedEscapeProposals += 1;
               } else if (event.kind === "v0.8_response_neutral_advance") {
                   side.responseNeutralAdvanceProposals += 1;
+              } else if (event.kind === "v0.8_supported_band_advance") {
+                  side.supportedBandAdvanceProposals += 1;
+                  const proposal: IMirrorSupportedBandAdvanceEvent = {
+                      ...event.details,
+                      fromCell: { ...event.details.fromCell },
+                      toCell: { ...event.details.toCell },
+                      side: event.team === GREEN_TEAM ? "green" : "red",
+                      unitId: event.unitId,
+                      creatureName: event.creatureName,
+                      lap: event.lap,
+                      retained: false,
+                  };
+                  supportedBandAdvanceEvents.push(proposal);
+                  bandAdvanceRecordByEvent.set(event, proposal);
+              } else if (event.kind === "v0.8_supported_band_advance_funnel" && event.stage) {
+                  side.supportedBandAdvanceFunnel[event.stage] += 1;
               } else if (event.kind === "v0.8_supported_prepin_egress") {
                   side.supportedPrepinEgressProposals += 1;
                   const proposal: IMirrorSupportedPrepinEgressEvent = {
@@ -466,6 +516,7 @@ export function playMirrorGame(
         rejectedRed: result.rejectedRed ?? 0,
         ...(game === 0 ? { rosterSig: roster.map((u) => `L${u.level}:${u.creatureName}x${u.amount}`).join("|") } : {}),
         ...(diag ? { diag } : {}),
+        ...(supportedBandAdvanceEvents.length ? { supportedBandAdvanceEvents } : {}),
         ...(supportedPrepinEgressEvents.length ? { supportedPrepinEgressEvents } : {}),
     };
 }
@@ -555,6 +606,9 @@ interface IVersionAggregate {
     supportedRangedEscapeProposals: number;
     responseNeutralAdvances: number;
     responseNeutralAdvanceProposals: number;
+    supportedBandAdvanceSelections: number;
+    supportedBandAdvanceProposals: number;
+    supportedBandAdvanceFunnel: Record<V08SupportedBandAdvanceFunnelStage, number>;
     supportedPrepinEgressSelections: number;
     supportedPrepinEgressProposals: number;
     supportedPrepinEgressFunnel: Record<V08SupportedPrepinEgressFunnelStage, number>;
@@ -590,6 +644,9 @@ export function aggregateMirrorDiag(
                 supportedRangedEscapeProposals: 0,
                 responseNeutralAdvances: 0,
                 responseNeutralAdvanceProposals: 0,
+                supportedBandAdvanceSelections: 0,
+                supportedBandAdvanceProposals: 0,
+                supportedBandAdvanceFunnel: newSupportedBandAdvanceFunnel(),
                 supportedPrepinEgressSelections: 0,
                 supportedPrepinEgressProposals: 0,
                 supportedPrepinEgressFunnel: newSupportedPrepinEgressFunnel(),
@@ -624,6 +681,11 @@ export function aggregateMirrorDiag(
             a.supportedRangedEscapeProposals += side.supportedRangedEscapeProposals ?? 0;
             a.responseNeutralAdvances += side.responseNeutralAdvances ?? 0;
             a.responseNeutralAdvanceProposals += side.responseNeutralAdvanceProposals ?? 0;
+            a.supportedBandAdvanceSelections += side.supportedBandAdvanceSelections ?? 0;
+            a.supportedBandAdvanceProposals += side.supportedBandAdvanceProposals ?? 0;
+            for (const stage of V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES) {
+                a.supportedBandAdvanceFunnel[stage] += side.supportedBandAdvanceFunnel?.[stage] ?? 0;
+            }
             a.supportedPrepinEgressSelections += side.supportedPrepinEgressSelections ?? 0;
             a.supportedPrepinEgressProposals += side.supportedPrepinEgressProposals ?? 0;
             for (const stage of V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES) {
@@ -682,6 +744,17 @@ export function aggregateMirrorDiag(
             responseNeutralAdvancesPerGame: a.responseNeutralAdvances / Math.max(1, a.games),
             responseNeutralAdvanceProposals: a.responseNeutralAdvanceProposals,
             responseNeutralAdvanceProposalsPerGame: a.responseNeutralAdvanceProposals / Math.max(1, a.games),
+            supportedBandAdvanceSelections: a.supportedBandAdvanceSelections,
+            supportedBandAdvanceSelectionsPerGame: a.supportedBandAdvanceSelections / Math.max(1, a.games),
+            supportedBandAdvanceProposals: a.supportedBandAdvanceProposals,
+            supportedBandAdvanceProposalsPerGame: a.supportedBandAdvanceProposals / Math.max(1, a.games),
+            supportedBandAdvanceFunnel: a.supportedBandAdvanceFunnel,
+            supportedBandAdvanceFunnelPerGame: Object.fromEntries(
+                V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map((stage) => [
+                    stage,
+                    a.supportedBandAdvanceFunnel[stage] / Math.max(1, a.games),
+                ]),
+            ),
             supportedPrepinEgressSelections: a.supportedPrepinEgressSelections,
             supportedPrepinEgressSelectionsPerGame: a.supportedPrepinEgressSelections / Math.max(1, a.games),
             supportedPrepinEgressProposals: a.supportedPrepinEgressProposals,

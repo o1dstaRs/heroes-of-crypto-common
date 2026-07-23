@@ -11,7 +11,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import type { IAIPolicyEvent, IV08SupportedPrepinEgressDetails } from "../../src/ai";
+import type { IAIPolicyEvent, IV08SupportedBandAdvanceDetails, IV08SupportedPrepinEgressDetails } from "../../src/ai";
+import { V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES } from "../../src/ai/ai_strategy";
 import {
     aggregateMirrorDiag,
     buildMirrorRoster,
@@ -57,6 +58,17 @@ const PREPIN_DETAILS: IV08SupportedPrepinEgressDetails = {
     minEnemyDistanceBefore: 4,
     minEnemyDistanceAfter: 5,
     rangedSuperior: true,
+};
+
+const BAND_ADVANCE_DETAILS: IV08SupportedBandAdvanceDetails = {
+    ...PREPIN_DETAILS,
+    toCell: { x: 1, y: 1 },
+    divisorBefore: 2,
+    divisorAfter: 1,
+    targetDistanceAfter: 7,
+    minEnemyDistanceAfter: 3,
+    rangedSuperior: false,
+    finishActive: true,
 };
 
 function fakeResult(
@@ -244,6 +256,9 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.red.supportedRangedEscapes).toBe(1);
         expect(first.diag?.green.responseNeutralAdvanceProposals).toBe(1);
         expect(first.diag?.red.supportedRangedEscapeProposals).toBe(1);
+        expect(first.diag?.green.supportedBandAdvanceSelections).toBe(0);
+        expect(first.diag?.red.supportedBandAdvanceProposals).toBe(0);
+        expect(first.supportedBandAdvanceEvents).toBeUndefined();
         expect(first.diag?.green.supportedPrepinEgressSelections).toBe(0);
         expect(first.diag?.red.supportedPrepinEgressProposals).toBe(0);
         expect(first.supportedPrepinEgressEvents).toBeUndefined();
@@ -262,6 +277,8 @@ describe("measure_mirror_cohorts", () => {
                     supportedRangedEscapeProposals: number;
                     responseNeutralAdvances: number;
                     responseNeutralAdvanceProposals: number;
+                    supportedBandAdvanceSelections: number;
+                    supportedBandAdvanceProposals: number;
                     supportedPrepinEgressSelections: number;
                     supportedPrepinEgressProposals: number;
                 }
@@ -279,10 +296,108 @@ describe("measure_mirror_cohorts", () => {
                 supportedRangedEscapeProposals: 1,
                 responseNeutralAdvances: 1,
                 responseNeutralAdvanceProposals: 1,
+                supportedBandAdvanceSelections: 0,
+                supportedBandAdvanceProposals: 0,
                 supportedPrepinEgressSelections: 0,
                 supportedPrepinEgressProposals: 0,
             });
         }
+    });
+
+    test("tracks the supported band catalog and exact retained treatment proposal across side swaps", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const treatmentTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            for (const stage of V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES) {
+                config.policyProposalObserver?.({
+                    kind: "v0.8_supported_band_advance_funnel",
+                    unitId: `catalog-${treatmentTeam}-${stage}`,
+                    creatureName: "Arbalester",
+                    team: treatmentTeam,
+                    lap: 2,
+                    stage,
+                });
+            }
+            const proposal: IAIPolicyEvent = {
+                kind: "v0.8_supported_band_advance",
+                unitId: `band-proposal-${treatmentTeam}`,
+                creatureName: "Arbalester",
+                team: treatmentTeam,
+                lap: 2,
+                details: {
+                    ...BAND_ADVANCE_DETAILS,
+                    fromCell: { ...BAND_ADVANCE_DETAILS.fromCell },
+                    toCell: { ...BAND_ADVANCE_DETAILS.toCell },
+                },
+            };
+            config.policyProposalObserver?.(proposal);
+            config.policyEventObserver?.(proposal);
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        for (const record of records) {
+            const diag = record.diag!;
+            const treatment = diag.green.version === "v0.8" ? diag.green : diag.red;
+            const control = diag.green.version === "v0.8s" ? diag.green : diag.red;
+            expect(treatment.supportedBandAdvanceProposals).toBe(1);
+            expect(treatment.supportedBandAdvanceSelections).toBe(1);
+            expect(control.supportedBandAdvanceProposals).toBe(0);
+            expect(control.supportedBandAdvanceSelections).toBe(0);
+            expect(Object.values(treatment.supportedBandAdvanceFunnel).every((count) => count === 1)).toBe(true);
+            expect(Object.values(control.supportedBandAdvanceFunnel).every((count) => count === 0)).toBe(true);
+            expect(record.supportedBandAdvanceEvents).toHaveLength(1);
+            expect(record.supportedBandAdvanceEvents?.filter(({ retained }) => retained)).toHaveLength(1);
+            expect(record.supportedBandAdvanceEvents?.find(({ retained }) => retained)).toMatchObject({
+                ...BAND_ADVANCE_DETAILS,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: `band-proposal-${record.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM}`,
+                creatureName: "Arbalester",
+                lap: 2,
+                retained: true,
+            });
+            expect(record.supportedBandAdvanceEvents?.[0]?.finishActive).toBe(true);
+        }
+        expect(records[0].supportedBandAdvanceEvents?.find(({ retained }) => retained)?.side).toBe("green");
+        expect(records[1].supportedBandAdvanceEvents?.find(({ retained }) => retained)?.side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    supportedBandAdvanceSelections: number;
+                    supportedBandAdvanceSelectionsPerGame: number;
+                    supportedBandAdvanceProposals: number;
+                    supportedBandAdvanceProposalsPerGame: number;
+                    supportedBandAdvanceFunnel: Record<string, number>;
+                    supportedBandAdvanceFunnelPerGame: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            supportedBandAdvanceSelections: 2,
+            supportedBandAdvanceSelectionsPerGame: 1,
+            supportedBandAdvanceProposals: 2,
+            supportedBandAdvanceProposalsPerGame: 1,
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            supportedBandAdvanceSelections: 0,
+            supportedBandAdvanceSelectionsPerGame: 0,
+            supportedBandAdvanceProposals: 0,
+            supportedBandAdvanceProposalsPerGame: 0,
+        });
+        expect(Object.values(aggregate.versions["v0.8"].supportedBandAdvanceFunnel)).toEqual(
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 2),
+        );
+        expect(Object.values(aggregate.versions["v0.8"].supportedBandAdvanceFunnelPerGame)).toEqual(
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 1),
+        );
+        expect(Object.values(aggregate.versions["v0.8s"].supportedBandAdvanceFunnel)).toEqual(
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 0),
+        );
+        expect(Object.values(aggregate.versions["v0.8s"].supportedBandAdvanceFunnelPerGame)).toEqual(
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 0),
+        );
     });
 
     test("separates pre-pin egress proposals from retained selections and keeps the control at zero", () => {

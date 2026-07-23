@@ -163,6 +163,10 @@ export function buildV08A13SearchEnvironment(
         V07_VALUE_WEIGHTS: undefined,
         V07_VALUE_WEIGHTS_V2: JSON.stringify(V08_A13_VALUE_LEAF),
         V08_AGGRESSIVE: "1",
+        V08_SUPPORTED_BAND_ADVANCE: "0",
+        V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
+        V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
+        V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
         // Research-only strategy delta. Ordinary a13 construction records the global gate and selector as off;
         // paired runners may override both in their isolated child environment.
         V08_SUPPORTED_PREPIN_EGRESS: "0",

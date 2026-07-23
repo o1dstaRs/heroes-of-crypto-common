@@ -85,6 +85,11 @@ export interface IV08RangedPositioningABOptions {
     supportedPrepinEgressCatalogOnly?: boolean;
     /** Selects the pre-pin arm only for live/root incumbents while rollouts retain the catalog but not the move. */
     supportedPrepinEgressLiveOnly?: boolean;
+    supportedBandAdvance?: boolean;
+    /** Computes the same supported-band catalog for both runs while selecting it for neither strategy. */
+    supportedBandAdvanceCatalogOnly?: boolean;
+    /** Selects the supported-band arm only for live/root incumbents while rollouts remain selector-off. */
+    supportedBandAdvanceLiveOnly?: boolean;
     diag?: boolean;
 }
 
@@ -104,7 +109,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -136,6 +141,9 @@ export interface IV08RangedPositioningABManifest {
         supportedPrepinEgress: boolean;
         supportedPrepinEgressCatalogOnly: boolean;
         supportedPrepinEgressLiveOnly: boolean;
+        supportedBandAdvance: boolean;
+        supportedBandAdvanceCatalogOnly: boolean;
+        supportedBandAdvanceLiveOnly: boolean;
         diag: boolean;
         candidateVersion: typeof V08_A13_PRODUCTION_VERSION;
         controlVersion: typeof V08_A13_SOURCE_VERSION;
@@ -181,6 +189,7 @@ function validateBehaviorArmGeometry(
     supportedRangedDelta: boolean,
     responseNeutralAdvance: boolean,
     supportedPrepinEgress: boolean,
+    supportedBandAdvance: boolean,
 ): void {
     const enabledSpecialArms = [
         noMeleeTerminalPressure,
@@ -190,11 +199,13 @@ function validateBehaviorArmGeometry(
         supportedRangedDelta,
         responseNeutralAdvance,
         supportedPrepinEgress,
+        supportedBandAdvance,
     ].filter(Boolean).length;
     if (enabledSpecialArms > 1) {
         throw new Error(
             "noMeleeTerminalPressure, deadlineFinisher, paretoNoMeleeFocus, jitNoMeleeFocus, " +
-                "supportedRangedDelta, responseNeutralAdvance, and supportedPrepinEgress are mutually exclusive",
+                "supportedRangedDelta, responseNeutralAdvance, supportedPrepinEgress, and supportedBandAdvance " +
+                "are mutually exclusive",
         );
     }
     if (noMeleeTerminalPressure && (mode !== "off" || moveShots !== 0)) {
@@ -217,6 +228,9 @@ function validateBehaviorArmGeometry(
     }
     if (supportedPrepinEgress && ((mode !== "retreat" && mode !== "both") || moveShots !== 0)) {
         throw new Error("supportedPrepinEgress requires mode=retreat|both and moveShots=0");
+    }
+    if (supportedBandAdvance && (mode !== "both" || moveShots !== 0)) {
+        throw new Error("supportedBandAdvance requires mode=both and moveShots=0");
     }
 }
 
@@ -322,6 +336,31 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     ) {
         throw new Error("supportedPrepinEgressLiveOnly requires a supported pre-pin treatment or catalog control");
     }
+    if (options.supportedBandAdvance !== undefined && typeof options.supportedBandAdvance !== "boolean") {
+        throw new Error("supportedBandAdvance must be a boolean");
+    }
+    if (
+        options.supportedBandAdvanceCatalogOnly !== undefined &&
+        typeof options.supportedBandAdvanceCatalogOnly !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceCatalogOnly must be a boolean");
+    }
+    if (options.supportedBandAdvance && options.supportedBandAdvanceCatalogOnly) {
+        throw new Error("supportedBandAdvance and supportedBandAdvanceCatalogOnly are mutually exclusive");
+    }
+    if (
+        options.supportedBandAdvanceLiveOnly !== undefined &&
+        typeof options.supportedBandAdvanceLiveOnly !== "boolean"
+    ) {
+        throw new Error("supportedBandAdvanceLiveOnly must be a boolean");
+    }
+    if (
+        options.supportedBandAdvanceLiveOnly &&
+        !options.supportedBandAdvance &&
+        !options.supportedBandAdvanceCatalogOnly
+    ) {
+        throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
+    }
     validateBehaviorArmGeometry(
         options.mode,
         options.moveShots ?? 0,
@@ -332,6 +371,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
         options.supportedRangedDelta ?? false,
         options.responseNeutralAdvance ?? false,
         (options.supportedPrepinEgress ?? false) || (options.supportedPrepinEgressCatalogOnly ?? false),
+        (options.supportedBandAdvance ?? false) || (options.supportedBandAdvanceCatalogOnly ?? false),
     );
     if (options.noMeleeTerminalPressure && (options.cohorts.length !== 1 || options.cohorts[0] !== "pure_ranged")) {
         throw new Error("noMeleeTerminalPressure requires cohorts=pure_ranged, mode=off, and moveShots=0");
@@ -436,7 +476,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -468,6 +508,9 @@ export function buildV08RangedPositioningABManifest(
             supportedPrepinEgress: options.supportedPrepinEgress ?? false,
             supportedPrepinEgressCatalogOnly: options.supportedPrepinEgressCatalogOnly ?? false,
             supportedPrepinEgressLiveOnly: options.supportedPrepinEgressLiveOnly ?? false,
+            supportedBandAdvance: options.supportedBandAdvance ?? false,
+            supportedBandAdvanceCatalogOnly: options.supportedBandAdvanceCatalogOnly ?? false,
+            supportedBandAdvanceLiveOnly: options.supportedBandAdvanceLiveOnly ?? false,
             diag: options.diag ?? false,
             candidateVersion: V08_A13_PRODUCTION_VERSION,
             controlVersion: V08_A13_SOURCE_VERSION,
@@ -507,6 +550,9 @@ export function buildV08RangedPositioningABEnvironment(
     supportedPrepinEgress = false,
     supportedPrepinEgressCatalogOnly = false,
     supportedPrepinEgressLiveOnly = false,
+    supportedBandAdvance = false,
+    supportedBandAdvanceCatalogOnly = false,
+    supportedBandAdvanceLiveOnly = false,
 ): NodeJS.ProcessEnv {
     if (!isPositioningMode(mode)) throw new Error("mode must be advance|retreat|both|off");
     if (!isTimingMode(timingMode)) throw new Error("timingMode must be research_unbounded|operational_bounded");
@@ -548,6 +594,19 @@ export function buildV08RangedPositioningABEnvironment(
     if (supportedPrepinEgressLiveOnly && !supportedPrepinEgress && !supportedPrepinEgressCatalogOnly) {
         throw new Error("supportedPrepinEgressLiveOnly requires a supported pre-pin treatment or catalog control");
     }
+    if (typeof supportedBandAdvance !== "boolean") throw new Error("supportedBandAdvance must be a boolean");
+    if (typeof supportedBandAdvanceCatalogOnly !== "boolean") {
+        throw new Error("supportedBandAdvanceCatalogOnly must be a boolean");
+    }
+    if (supportedBandAdvance && supportedBandAdvanceCatalogOnly) {
+        throw new Error("supportedBandAdvance and supportedBandAdvanceCatalogOnly are mutually exclusive");
+    }
+    if (typeof supportedBandAdvanceLiveOnly !== "boolean") {
+        throw new Error("supportedBandAdvanceLiveOnly must be a boolean");
+    }
+    if (supportedBandAdvanceLiveOnly && !supportedBandAdvance && !supportedBandAdvanceCatalogOnly) {
+        throw new Error("supportedBandAdvanceLiveOnly requires a supported-band treatment or catalog control");
+    }
     validateBehaviorArmGeometry(
         mode,
         moveShots,
@@ -558,6 +617,7 @@ export function buildV08RangedPositioningABEnvironment(
         supportedRangedDelta,
         responseNeutralAdvance,
         supportedPrepinEgress || supportedPrepinEgressCatalogOnly,
+        supportedBandAdvance || supportedBandAdvanceCatalogOnly,
     );
 
     const environment = minimalChildEnvironment(sourceEnvironment);
@@ -602,10 +662,24 @@ export function buildV08RangedPositioningABEnvironment(
         : supportedPrepinEgress
           ? V08_A13_PRODUCTION_VERSION
           : "";
+    environment.V08_SUPPORTED_BAND_ADVANCE = supportedBandAdvance || supportedBandAdvanceCatalogOnly ? "1" : "0";
+    environment.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS =
+        supportedBandAdvance || supportedBandAdvanceCatalogOnly ? V08_A13_PRODUCTION_VERSION : "";
+    environment.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = supportedBandAdvanceLiveOnly ? "1" : "0";
+    environment.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = supportedBandAdvanceCatalogOnly
+        ? "supported-band-advance-catalog-only-control"
+        : supportedBandAdvance
+          ? V08_A13_PRODUCTION_VERSION
+          : "";
     // Incremental positioning arms compare against the same shipped positioning policy, so both seats receive
     // the baseline and only production v0.8 receives the selected delta.
     environment.V08_RANGED_POSITION_VERSIONS =
-        supportedRangedDelta || responseNeutralAdvance || supportedPrepinEgress || supportedPrepinEgressCatalogOnly
+        supportedRangedDelta ||
+        responseNeutralAdvance ||
+        supportedPrepinEgress ||
+        supportedPrepinEgressCatalogOnly ||
+        supportedBandAdvance ||
+        supportedBandAdvanceCatalogOnly
             ? V08_RANGED_POSITIONING_AB_VERSIONS
             : V08_A13_PRODUCTION_VERSION;
     environment.V08_RANGED_POSITION_MODE = mode;
@@ -636,6 +710,9 @@ export function buildV08RangedPositioningABInvocations(
         options.supportedPrepinEgress ?? false,
         options.supportedPrepinEgressCatalogOnly ?? false,
         options.supportedPrepinEgressLiveOnly ?? false,
+        options.supportedBandAdvance ?? false,
+        options.supportedBandAdvanceCatalogOnly ?? false,
+        options.supportedBandAdvanceLiveOnly ?? false,
     );
     return options.cohorts.map((cohort) => {
         const outBase = join(out, cohort);
@@ -726,6 +803,9 @@ export async function runV08RangedPositioningAB(
     const supportedPrepinEgress = options.supportedPrepinEgress ?? false;
     const supportedPrepinEgressCatalogOnly = options.supportedPrepinEgressCatalogOnly ?? false;
     const supportedPrepinEgressLiveOnly = options.supportedPrepinEgressLiveOnly ?? false;
+    const supportedBandAdvance = options.supportedBandAdvance ?? false;
+    const supportedBandAdvanceCatalogOnly = options.supportedBandAdvanceCatalogOnly ?? false;
+    const supportedBandAdvanceLiveOnly = options.supportedBandAdvanceLiveOnly ?? false;
     for (const invocation of invocations) {
         const sourceIdentity = discoverSourceIdentity();
         console.error(
@@ -741,6 +821,9 @@ export async function runV08RangedPositioningAB(
                 `supportedPrepinEgress=${supportedPrepinEgress} ` +
                 `supportedPrepinCatalogOnly=${supportedPrepinEgressCatalogOnly} ` +
                 `supportedPrepinLiveOnly=${supportedPrepinEgressLiveOnly} ` +
+                `supportedBandAdvance=${supportedBandAdvance} ` +
+                `supportedBandCatalogOnly=${supportedBandAdvanceCatalogOnly} ` +
+                `supportedBandLiveOnly=${supportedBandAdvanceLiveOnly} ` +
                 `games=${options.games} seed=${options.seed}`,
         );
         await prepareInvocation(invocation);
@@ -778,6 +861,9 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
             "supported-prepin-egress": { type: "boolean", default: false },
             "supported-prepin-catalog-only": { type: "boolean", default: false },
             "supported-prepin-live-only": { type: "boolean", default: false },
+            "supported-band-advance": { type: "boolean", default: false },
+            "supported-band-catalog-only": { type: "boolean", default: false },
+            "supported-band-live-only": { type: "boolean", default: false },
             diag: { type: "boolean", default: false },
             timing: { type: "string", default: "operational_bounded" },
         },
@@ -814,6 +900,9 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
         supportedPrepinEgress: values["supported-prepin-egress"]!,
         supportedPrepinEgressCatalogOnly: values["supported-prepin-catalog-only"]!,
         supportedPrepinEgressLiveOnly: values["supported-prepin-live-only"]!,
+        supportedBandAdvance: values["supported-band-advance"]!,
+        supportedBandAdvanceCatalogOnly: values["supported-band-catalog-only"]!,
+        supportedBandAdvanceLiveOnly: values["supported-band-live-only"]!,
         diag: values.diag!,
     };
     validateOptions(options);
@@ -831,6 +920,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
                 "[--supported-ranged-delta] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +
+                "[--supported-band-advance|--supported-band-catalog-only] [--supported-band-live-only] " +
                 "[--timing research_unbounded|operational_bounded]",
         );
         return;
