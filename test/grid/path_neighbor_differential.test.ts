@@ -17,7 +17,9 @@ const cellHash = (cell: XY): number => (cell.x << 4) | cell.y;
  *
  * This is deliberately a literal copy, rather than a second implementation derived from a neighbor table. Keep it
  * independent from PathHelper.getNeighborCells: an optimized production implementation must prove that it preserves
- * this behavior, including its bitwise hash coercions for fractional and malformed public inputs.
+ * this behavior, including its bitwise hash coercions for fractional and malformed public inputs. The override also
+ * selects getMovePath's generic Map/footprint-allocation fallback, so the end-to-end corpus compares that oracle with
+ * the guarded production 16x16 budget/aggression fast path.
  */
 class LegacyNeighborPathHelper extends PathHelper {
     private readonly legacyGridSettings: GridSettings;
