@@ -1,0 +1,178 @@
+{
+    "schema": "heroes-of-crypto/a13-melee-target-profile-compact/v1",
+    "createdAt": "2026-07-23T06:47:09.564Z",
+    "purpose": "Qualify the first Workstream 5 implementation slice only after fixed-work profiling proves melee target-layer construction remains material after Workstreams 2-4.",
+    "baseline": {
+        "gitHead": "d5ad223a2455c9fe005577b4d8461dae9c9a4572",
+        "gitTree": "b5b4ea540f4109107d2119a0bcd936fe9c9ac99b",
+        "srcEntryCount": 370,
+        "srcBytes": 9999264,
+        "srcManifestSha256": "eeb7d78381991f4619f07fe4dab264db72f7714529ffb84fe183b408b3e478ae",
+        "aiSourceSha256": "115f5ffc48006daa2ab7adb4da778acaf53cc2a47ecece080dd8119090afccbd",
+        "runnerSha256": "82eaa274cbb8c9efd7d3ad3fccbcf86aac8c7f457e71e82977b20692c2b455f6",
+        "sourceIdentitySha256": "73ae1b96110c26cf13a27a60c3fc7924fde92c2e8b8a192a5a1cbd555a29c9d9",
+        "workspaceLock": {
+            "path": "../../bun.lock",
+            "bytes": 438981,
+            "sha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54"
+        },
+        "unchangedDuringEveryCapture": true
+    },
+    "runtime": {
+        "bun": "1.3.14",
+        "platform": "darwin",
+        "release": "24.6.0",
+        "arch": "arm64",
+        "logicalCpuCount": 16,
+        "cpuModel": "Apple M4 Max"
+    },
+    "protocol": {
+        "aiVersion": "v0.8",
+        "mirror": true,
+        "fixedEnvironment": {
+            "V08_A13_SEARCH": "1",
+            "LIVETWIN": "1",
+            "FIGHT_MELEE_ROSTERS": "0"
+        },
+        "scrubbedEnvironmentPrefixes": ["SEARCH_", "V05_", "V06_", "V07_", "V08_", "Q2_", "SIM_"],
+        "warmup": {
+            "seed": 9001,
+            "maxLaps": 2,
+            "profiled": false
+        },
+        "measured": {
+            "seeds": [1, 42, 43, 44, 45, 46],
+            "maxLaps": 4,
+            "repeatsPerCapture": 9,
+            "captures": 3,
+            "matchesPerCapture": 54,
+            "profilerIntervalMicroseconds": 500
+        },
+        "attribution": {
+            "sourceSuffix": "/src/ai/ai.ts",
+            "exactFunctionNames": [
+                "doFindTarget",
+                "getLayersForAttacker_2",
+                "getBorderCells_2",
+                "filterCells",
+                "isFree"
+            ],
+            "method": "Chrome sample timeDeltas attributed through reconstructed leaf-to-root parent stacks; both the exact function name and source URL suffix must match.",
+            "inclusiveRecursionPolicy": "At most once per named target per sample.",
+            "denominator": "All nonnegative sample timeDeltas in each capture.",
+            "primaryTarget": "getLayersForAttacker_2",
+            "minimumPrimaryInclusiveShare": 0.03
+        }
+    },
+    "semantic": {
+        "matches": 162,
+        "actions": 7911,
+        "repeatsCompared": 27,
+        "capturesCompared": 3,
+        "actionDigest": "936289b1f1973a7b8eb2c692e828c487616e2c484a76894cc6e23fda2640b951",
+        "resultDigest": "a59b54526c11505fc3c0d549e6e00eee57f50c557b97be9d73055f36de3ce4e8",
+        "identicalAcrossRepeatsAndCaptures": true,
+        "rejected": 0,
+        "stuck": 0
+    },
+    "captures": [
+        {
+            "capture": 1,
+            "matches": 54,
+            "actions": 2637,
+            "wallMilliseconds": 36332.669292,
+            "profileSamples": 45469,
+            "totalSampledMicroseconds": 35267402,
+            "shares": {
+                "doFindTarget": 0.26608852560219776,
+                "getLayersForAttacker_2": 0.1422786969111022,
+                "getBorderCells_2": 0.0790600056108471,
+                "filterCells": 0.06220401491439602,
+                "isFree": 0.05160986907966739
+            },
+            "profileSha256": "be2ac0319bb718e77c2d5362ccc2fcc5715a58bb2fb63c7340a080f74d92174b",
+            "workloadSha256": "39728b69e5fe58517d7311db3d3c9b15e13f41e8a14e8148e27883ee9575d08e"
+        },
+        {
+            "capture": 2,
+            "matches": 54,
+            "actions": 2637,
+            "wallMilliseconds": 35044.434417,
+            "profileSamples": 43840,
+            "totalSampledMicroseconds": 33998765,
+            "shares": {
+                "doFindTarget": 0.27188340517662923,
+                "getLayersForAttacker_2": 0.14862575155303434,
+                "getBorderCells_2": 0.08481702203006491,
+                "filterCells": 0.06235682384345431,
+                "isFree": 0.051680406626534815
+            },
+            "profileSha256": "fdafc6d0510c1cc333d5ee4e0ccc076dc6109c69589f95e5af20937038d57bc3",
+            "workloadSha256": "151ad50721461002599903f8afb9e16f4363a55ec1e4fae5fe878b5375a2e52a"
+        },
+        {
+            "capture": 3,
+            "matches": 54,
+            "actions": 2637,
+            "wallMilliseconds": 36353.219708,
+            "profileSamples": 45543,
+            "totalSampledMicroseconds": 35253989,
+            "shares": {
+                "doFindTarget": 0.2646580221035412,
+                "getLayersForAttacker_2": 0.14130196727524932,
+                "getBorderCells_2": 0.07967821740683019,
+                "filterCells": 0.060329882102136016,
+                "isFree": 0.05051955964472559
+            },
+            "profileSha256": "298a206398995a8dc80d8dce0ac127ff69c724df687474331ab0e3aafe6d2e0e",
+            "workloadSha256": "0d310ac94d1a9d6cfcac434bd872bec878a9efd67abf49c6cc5c1bdcb4dd7703"
+        }
+    ],
+    "pooled": {
+        "profileSamples": 134852,
+        "totalSampledMicroseconds": 104520156,
+        "shares": {
+            "doFindTarget": 0.2674910091025888,
+            "getLayersForAttacker_2": 0.14401384934787123,
+            "getBorderCells_2": 0.08114119156117601,
+            "filterCells": 0.061621588088712764,
+            "isFree": 0.051265059344151764
+        },
+        "getLayersForAttacker_2ParentShares": {
+            "infinitePathSearchRollouts": 0.1090240814412868,
+            "actualPathSearchRollouts": 0.03213028116796917,
+            "infinitePathLiveMatches": 0.0021140228684695035,
+            "actualPathLiveMatches": 0.0007454638701457736
+        }
+    },
+    "gates": {
+        "captureShares": [0.1422786969111022, 0.14862575155303434, 0.14130196727524932],
+        "everyCaptureAtOrAboveThreePercent": true,
+        "pooledShare": 0.14401384934787123,
+        "pooledAtOrAboveThreePercent": true,
+        "qualified": true
+    },
+    "rawEvidence": {
+        "reportSha256": "39192750d15e955ea7f7e0af0b8f68506eb82ac49eb950e1919960bd56e6c73b",
+        "rawProfilesRetainedDuringInvestigation": true,
+        "rawProfilesCommitted": false,
+        "reason": "The three Chrome profiles total approximately 9 MiB; their hashes and the compact attribution needed to reproduce the gate are retained here."
+    },
+    "limitations": [
+        "The workspace lockfile and both node_modules realpaths were sealed, but installed dependency contents were not recursively hashed.",
+        "CPU sampling attributes time, not total short-lived allocation volume. The candidate qualification must add deterministic logical-allocation counters.",
+        "This report qualifies investigation of one narrow implementation slice; it is not evidence that any candidate is correct or faster."
+    ],
+    "nextCandidate": {
+        "scope": "Fuse ordered border emission and free-cell filtering in the private melee target-layer builder.",
+        "mustPreserve": [
+            "Bottom, top, left, right, and large-attacker extra-cell order.",
+            "Equal-coordinate duplicate occurrences as distinct returned objects.",
+            "Loose nonzero matrix comparison and lookup-before-bounds behavior.",
+            "Stateful attacker.getCells call count and x-before-y comparison order.",
+            "Large-attacker base, left, left-down, and down short-circuit order.",
+            "Seven eager layers, target scan order, tie behavior, and all malformed/custom shapes."
+        ],
+        "rejectedForFirstSlice": "Do not snapshot a Unit footprint or introduce a typed occupancy mask until the no-gate fused slice is measured independently."
+    }
+}
