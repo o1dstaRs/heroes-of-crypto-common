@@ -23,6 +23,7 @@ import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
 import type {
+    IAIPolicyEvent,
     IDecisionContext,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
@@ -43,6 +44,7 @@ const SUPPORTED_BAND_ADVANCE_ENABLED_ENV = "V08_SUPPORTED_BAND_ADVANCE";
 const SUPPORTED_BAND_ADVANCE_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY";
+const SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -1038,6 +1040,55 @@ function protectedAdvanceShot(
     return [moveAction(unit, best.route, best.footprint), ...decision];
 }
 
+/**
+ * Research-only direct duel between the strict full-damage close and the shipped protected advance. At a measured
+ * root every participating version builds both catalogs, shipped legacy first and strict second, before its version
+ * chooses a result. Legacy therefore receives the incumbent's incoming RNG state; both seats then share the same
+ * total catalog consumption even when their chosen actions differ. Branch events are buffered and only the selected
+ * policy's events are published, so a speculative catalog can never masquerade as a live proposal.
+ */
+function supportedBandAdvanceVsLegacy(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    strategyVersion: string,
+    responseNeutralAdvance: boolean,
+): GameAction[] {
+    const strictVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const legacyVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const selectsStrict = strictVersions.has(strategyVersion);
+    const selectsLegacy = legacyVersions.has(strategyVersion);
+    if (!selectsStrict && !selectsLegacy) return decision;
+
+    const strictEvents: IAIPolicyEvent[] = [];
+    const legacyEvents: IAIPolicyEvent[] = [];
+    const legacyDecision = protectedAdvanceShot(
+        unit,
+        { ...context, policyEventObserver: (event) => legacyEvents.push(event) },
+        decision,
+        responseNeutralAdvance,
+    );
+    const strictDecision = supportedBandAdvance(
+        unit,
+        { ...context, policyEventObserver: (event) => strictEvents.push(event) },
+        decision,
+        strategyVersion,
+    );
+    const selectedEvents = selectsStrict ? strictEvents : legacyEvents;
+    for (const event of selectedEvents) context.policyEventObserver?.(event);
+    return selectsStrict ? strictDecision : legacyDecision;
+}
+
 function preferRetreat(left: IRouteView, right: IRouteView): boolean {
     const leftUnscreened = left.protection.reachableThreats - left.protection.screenedThreats;
     const rightUnscreened = right.protection.reachableThreats - right.protection.screenedThreats;
@@ -1187,17 +1238,38 @@ export function prioritizeV08RangedPositioning(
         .filter(Boolean);
     const responseNeutralAdvance = responseNeutralAdvanceVersions.includes(strategyVersion);
     const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
-    // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. Both seats still
-    // build the strict catalog; hypothetical rollouts and omitted-origin callers retain the incumbent policy.
+    // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. A direct duel
+    // computes shipped and strict catalogs in the same order for both seats before choosing by version. Rollouts
+    // and omitted-origin callers retain the incumbent policy.
     const bandAdvanceActiveHere = mode === "both" && supportedBandAdvanceActiveHere(context);
-    const advanced =
-        !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
-            ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
-            : decision;
+    const bandAdvanceLegacyControlVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const bandAdvanceSelectorVersions = new Set(
+        (process.env[SUPPORTED_BAND_ADVANCE_VERSIONS_ENV] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+    );
+    const bandAdvanceVsLegacy =
+        mode === "both" &&
+        context.decisionOrigin === "root" &&
+        process.env[SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV] === "1" &&
+        bandAdvanceLegacyControlVersions.size > 0 &&
+        (bandAdvanceSelectorVersions.has(strategyVersion) || bandAdvanceLegacyControlVersions.has(strategyVersion));
+    const advanced = bandAdvanceVsLegacy
+        ? supportedBandAdvanceVsLegacy(unit, context, decision, strategyVersion, responseNeutralAdvance)
+        : !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
+          ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
+          : decision;
     const retreated =
         mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
-    const bandAdvanced = bandAdvanceActiveHere
-        ? supportedBandAdvance(unit, context, retreated, strategyVersion)
-        : retreated;
+    const bandAdvanced =
+        bandAdvanceActiveHere && !bandAdvanceVsLegacy
+            ? supportedBandAdvance(unit, context, retreated, strategyVersion)
+            : retreated;
     return supportedPrepinEgress(unit, context, bandAdvanced, strategyVersion);
 }

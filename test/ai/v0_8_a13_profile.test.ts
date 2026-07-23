@@ -55,6 +55,7 @@ const ENV_KEYS = [
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "V08_SUPPORTED_BAND_ADVANCE",
     "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS",
+    "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS",
     "V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY",
     "V08_SUPPORTED_BAND_ADVANCE_VERSIONS",
     "V08_SUPPORTED_PREPIN_EGRESS",
@@ -129,6 +130,7 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
             V08_SUPPORTED_BAND_ADVANCE: "0",
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
             V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
@@ -170,6 +172,7 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = "v0.7";
         process.env.V08_SUPPORTED_BAND_ADVANCE = "1";
         process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.6";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
         process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
         process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.7";
         process.env.V08_SUPPORTED_PREPIN_EGRESS = "1";
@@ -254,6 +257,7 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS).toBe("v0.7");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE).toBe("1");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS).toBe("v0.6");
+        expect(process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS).toBe("v0.8s");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY).toBe("1");
         expect(process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS).toBe("v0.7");
         expect(process.env.V08_SUPPORTED_PREPIN_EGRESS).toBe("1");
