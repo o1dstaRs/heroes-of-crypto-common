@@ -18,6 +18,7 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../candidates";
 import { otherTeam } from "./v0_1";
+import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import { StrategyV0_7 } from "./v0_7";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
@@ -227,6 +228,16 @@ export class StrategyV0_8 extends StrategyV0_7 {
     /** Plain v0.8 shots name and aim at the stack that the authoritative trajectory actually hits first. */
     protected override requireResolvedPrimaryRangeTarget(): boolean {
         return true;
+    }
+    /** Default-off native screen-pressure A/B; other AI versions cannot opt in through this environment key. */
+    protected override visibleEdgeScreenPressureEnabled(): boolean {
+        return (
+            process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE === "1" &&
+            strategyVersionMatchesExperimentScope(
+                this.version,
+                process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE_VERSIONS ?? "v0.8",
+            )
+        );
     }
     /** a13 uses living-stack ranged output, not the historical per-creature proxy. */
     protected override rangedOutput(team: number, unitsHolder: UnitsHolder): number {

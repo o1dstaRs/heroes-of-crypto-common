@@ -525,6 +525,20 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(evaluation.affectedUnits[0]?.[0]?.getId()).toBe(rearAim!.targetId);
             expect(evaluation.affectedUnits.flat().some((unit) => unit.getId() === rear.getId())).toBe(true);
 
+            const enrichedAnchor = enumerateCandidates(shooter, context, rearAim!.actions, {
+                enrichIncumbentMetadata: true,
+            }).candidates[0];
+            const anchorAction = enrichedAnchor.actions.find(
+                (entry): entry is Extract<GameAction, { type: "range_attack" }> => entry.type === "range_attack",
+            );
+            // The finish scheduler reads candidate.targetId and must see the actual primary. The exact special
+            // geometry action nevertheless keeps its intentional rear aim anchor.
+            expect(enrichedAnchor.kind).toBe("incumbent");
+            expect(enrichedAnchor.targetId).toBe(front.getId());
+            expect(enrichedAnchor.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
+            expect(anchorAction?.targetId).toBe(rear.getId());
+            expect(anchorAction?.aimCell).toEqual(rear.getBaseCell());
+
             const covered = ofKind(
                 enumerateCandidates(shooter, context, endTurn(shooter), {
                     maxShotAims: 1,
