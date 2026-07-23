@@ -53,6 +53,7 @@ export function processThroughShotAbility(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     decreaseNumberOfShots = true,
     secondaryDamage?: ISecondaryDamage[],
+    damageMultiplier = 1,
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
@@ -113,6 +114,8 @@ export function processThroughShotAbility(
                     .getFightProperties()
                     .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
             );
+            // Second volley of a Double Shot (incl. Crafted Double Shot): scale this volley by its multiplier.
+            throughShotMultiplier *= damageMultiplier;
             const paralysisAttackerEffect = attackerUnit.getEffect("Paralysis");
             if (paralysisAttackerEffect) {
                 throughShotMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;

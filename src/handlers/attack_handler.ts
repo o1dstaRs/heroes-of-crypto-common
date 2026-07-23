@@ -604,6 +604,65 @@ export class AttackHandler {
         if (throughShotResult.landed) {
             primaryAssimilationLanded = true;
             resolveAssimilation();
+
+            // Double Shot (incl. Crafted Double Shot) on a Through-Shot attacker fires a SECOND piercing
+            // volley down the same lane. The generic double-shot path (processDoubleShotAbility, reached only
+            // further below) delivers its second shot as an AOE splash — which a Through-Shot unit like Tsar
+            // Cannon has no radius for — and this early return skips it entirely, so the crafted double shot
+            // silently did nothing. Re-run the through shot here, scaling the volley by the Double Shot
+            // multiplier: 100% for the base ability, stack-scaled 20/40/60/80/100% + luck for the crafted one.
+            const doubleShotAbility =
+                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
+            if (doubleShotAbility && !attackerUnit.isDead() && !attackerUnit.isSkippingThisTurn()) {
+                let secondVolleyMultiplier = attackerUnit.calculateAbilityMultiplier(
+                    doubleShotAbility,
+                    FightStateManager.getInstance()
+                        .getFightProperties()
+                        .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
+                );
+                // ARTIFACT Dual Strike Charm: the second (Double Shot) volley deals extra damage. Paralysis is
+                // deliberately NOT applied here — processThroughShotAbility already folds it into its own
+                // multiplier, so applying it again would double-count the slow.
+                const dualStrikeCharmBuff = attackerUnit.getBuff("Dual Strike Charm");
+                if (dualStrikeCharmBuff) {
+                    secondVolleyMultiplier *= 1 + dualStrikeCharmBuff.getPower() / 100;
+                }
+                if (secondVolleyMultiplier > 0) {
+                    const secondThroughShot = AllAbilities.processThroughShotAbility(
+                        attackerUnit,
+                        targetUnits,
+                        attackerUnit,
+                        hoverRangeAttackDivisors,
+                        hoverRangeAttackPosition,
+                        unitsHolder,
+                        this.grid,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        false, // bonus volley — do not consume another range shot
+                        (damageForAnimation.secondary ??= []),
+                        secondVolleyMultiplier,
+                    );
+                    for (const uId of secondThroughShot.unitIdsDied) {
+                        if (!unitIdsDied.includes(uId)) {
+                            unitIdsDied.push(uId);
+                        }
+                    }
+                    for (const ad of secondThroughShot.animationData) {
+                        animationData.push(ad);
+                    }
+                    // Append THIS volley's per-pierced-unit damage as its own splash entries, so the client
+                    // draws a second floating number on every unit the second shot passed through.
+                    if (secondThroughShot.perUnitDamage.length) {
+                        (damageForAnimation.splash ??= []).push(
+                            ...secondThroughShot.perUnitDamage.map((entry) => ({
+                                ...entry,
+                                position: { ...entry.position },
+                            })),
+                        );
+                    }
+                }
+            }
+
             unitsHolder.refreshStackPowerForAllUnits();
             return { completed: true, unitIdsDied, animationData, abilityStolen };
         }
