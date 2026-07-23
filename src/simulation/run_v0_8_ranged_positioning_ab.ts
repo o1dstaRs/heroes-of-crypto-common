@@ -77,7 +77,7 @@ export interface IV08RangedPositioningABOptions {
     /** Enables identical target-covered catalogs for both seats without allowing either selector to fire. */
     paretoNoMeleeFocusCatalogOnly?: boolean;
     paretoNoMeleeFocusDamageFloor?: number;
-    /** Keeps the legacy all-ranged eligibility or catalogs the strict exact-Pareto arm across every board. */
+    /** Selects legacy all-ranged, unrestricted mixed, or screened fixed-cohort exact-Pareto eligibility. */
     paretoNoMeleeFocusScope?: PureRangedParetoNoMeleeFocusScope;
     jitNoMeleeFocus?: boolean;
     /** Enables the JIT arm's target-covered catalog for both seats while disabling its selector. */
@@ -119,7 +119,7 @@ export interface IV08RangedPositioningABSourceIdentity {
 }
 
 export interface IV08RangedPositioningABManifest {
-    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v12";
+    schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13";
     source: IV08RangedPositioningABSourceIdentity;
     geometry: {
         cohort: MirrorCohortName;
@@ -197,7 +197,7 @@ const isProtectedAdvanceGuardrailMode = (value: string): value is V08ProtectedAd
 const isParetoDamageFloor = (value: number): boolean => value === 0.9 || value === 0.95 || value === 1;
 
 const isParetoScope = (value: string): value is PureRangedParetoNoMeleeFocusScope =>
-    value === "pure_ranged" || value === "any_board";
+    value === "pure_ranged" || value === "any_board" || value === "mixed_supported";
 
 function validateBehaviorArmGeometry(
     mode: V08RangedPositioningMode,
@@ -323,7 +323,7 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     const paretoDamageFloor = options.paretoNoMeleeFocusDamageFloor ?? 1;
     const paretoScope = options.paretoNoMeleeFocusScope ?? "pure_ranged";
     if (!isParetoScope(paretoScope)) {
-        throw new Error("paretoNoMeleeFocusScope must be pure_ranged or any_board");
+        throw new Error("paretoNoMeleeFocusScope must be pure_ranged, any_board, or mixed_supported");
     }
     if (!isParetoDamageFloor(paretoDamageFloor)) {
         throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
@@ -337,6 +337,14 @@ function validateOptions(options: IV08RangedPositioningABOptions): void {
     if (paretoScope === "any_board" && !options.paretoNoMeleeFocus && !options.paretoNoMeleeFocusCatalogOnly) {
         throw new Error(
             "paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
+        );
+    }
+    if (paretoScope === "mixed_supported" && paretoDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusScope=mixed_supported requires paretoNoMeleeFocusDamageFloor=1");
+    }
+    if (paretoScope === "mixed_supported" && !options.paretoNoMeleeFocus && !options.paretoNoMeleeFocusCatalogOnly) {
+        throw new Error(
+            "paretoNoMeleeFocusScope=mixed_supported requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
         );
     }
     if (options.jitNoMeleeFocus !== undefined && typeof options.jitNoMeleeFocus !== "boolean") {
@@ -550,7 +558,7 @@ export function buildV08RangedPositioningABManifest(
 ): IV08RangedPositioningABManifest {
     const moveShots = options.moveShots ?? 0;
     const payload = {
-        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v12" as const,
+        schema: "hoc.v0_8_ranged_positioning_ab_experiment.v13" as const,
         source,
         geometry: {
             cohort: invocation.cohort,
@@ -652,7 +660,7 @@ export function buildV08RangedPositioningABEnvironment(
         throw new Error("paretoNoMeleeFocusDamageFloor must be one of 0.9, 0.95, or 1");
     }
     if (!isParetoScope(paretoNoMeleeFocusScope)) {
-        throw new Error("paretoNoMeleeFocusScope must be pure_ranged or any_board");
+        throw new Error("paretoNoMeleeFocusScope must be pure_ranged, any_board, or mixed_supported");
     }
     if (!paretoNoMeleeFocus && paretoNoMeleeFocusDamageFloor !== 1) {
         throw new Error("paretoNoMeleeFocusDamageFloor below 1 requires paretoNoMeleeFocus");
@@ -663,6 +671,14 @@ export function buildV08RangedPositioningABEnvironment(
     if (paretoNoMeleeFocusScope === "any_board" && !paretoNoMeleeFocus && !paretoNoMeleeFocusCatalogOnly) {
         throw new Error(
             "paretoNoMeleeFocusScope=any_board requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
+        );
+    }
+    if (paretoNoMeleeFocusScope === "mixed_supported" && paretoNoMeleeFocusDamageFloor !== 1) {
+        throw new Error("paretoNoMeleeFocusScope=mixed_supported requires paretoNoMeleeFocusDamageFloor=1");
+    }
+    if (paretoNoMeleeFocusScope === "mixed_supported" && !paretoNoMeleeFocus && !paretoNoMeleeFocusCatalogOnly) {
+        throw new Error(
+            "paretoNoMeleeFocusScope=mixed_supported requires paretoNoMeleeFocus or paretoNoMeleeFocusCatalogOnly",
         );
     }
     if (typeof jitNoMeleeFocus !== "boolean") throw new Error("jitNoMeleeFocus must be a boolean");
@@ -1031,7 +1047,7 @@ export function parseV08RangedPositioningABOptions(args: readonly string[]): IV0
     }
     if (!isMoveShotCap(moveShots)) throw new Error("--move-shots must be 0|1|2");
     if (!isParetoScope(paretoNoMeleeFocusScope)) {
-        throw new Error("--pareto-scope must be pure_ranged|any_board");
+        throw new Error("--pareto-scope must be pure_ranged|any_board|mixed_supported");
     }
     if (!isProtectedAdvanceGuardrailMode(protectedAdvanceGuardrailsMode)) {
         throw new Error(
@@ -1080,7 +1096,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
                 "[--concurrency 12] [--out sim-out/ranged-ab] [--mode advance|retreat|both|off] " +
                 "[--move-shots 0|1|2] [--no-melee-terminal-pressure] [--deadline-finisher] " +
                 "[--pareto-no-melee-focus|--pareto-catalog-only] [--pareto-damage-floor 0.9..1] " +
-                "[--pareto-scope pure_ranged|any_board] " +
+                "[--pareto-scope pure_ranged|any_board|mixed_supported] " +
                 "[--jit-no-melee-focus|--jit-catalog-only] " +
                 "[--supported-ranged-delta] [--response-neutral-advance] " +
                 "[--supported-prepin-egress|--supported-prepin-catalog-only] [--supported-prepin-live-only] [--diag] " +

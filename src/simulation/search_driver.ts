@@ -73,6 +73,7 @@ import {
     anyBoardParetoNoMeleeFocusActorAbility,
     DEFAULT_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE,
     isParetoNoMeleeFocusStationaryIncumbent,
+    mixedSupportedParetoNoMeleeFocusContext,
     PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP,
     pureRangedParetoNoMeleeFocusLapEligible,
     pureRangedParetoNoMeleeFocusActorAbility,
@@ -170,7 +171,10 @@ import {
  * one. Both measured seats receive the same catalog; the scoped candidate seat may select the engine-validated
  * redirect. SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE defaults to `pure_ranged`; `any_board` widens catalog
  * collection to mixed boards but requires exact Pareto, native/current actor and target cards, original stacks,
- * and production v0.8 selection.
+ * and production v0.8 selection. `mixed_supported` is the narrower fixed-cohort arm: it structurally excludes
+ * pure boards, admits only native Cyclops/Large-Caliber or Tsar-Cannon/Through-Shot actors, requires every
+ * reachable melee threat to be screened by an original native melee ally, and targets native Tsar Cannons only.
+ * Each mixed-supported proposal emits a sparse v13 audit row even when SEARCH_AUDIT_TURNS is disabled.
  * SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS=1 is an independent default-off, version-scoped scheduler for ordinary
  * original shooters on those all-ranged boards. During laps 1..11 it locks an inherited stationary shot already
  * aimed at an armed original No Melee barrier, or redirects another stationary shot when the barrier has at most
@@ -269,6 +273,7 @@ import {
 
 const MAX_LAP_HORIZON_TURNS = 64;
 const MAX_REPLY_HORIZON_TURNS = 12;
+const MIXED_SUPPORTED_PARETO_AUDIT_SCHEMA = "hoc.search.pareto_focus.v13";
 
 type SearchMode = "off" | "search" | "ablation" | "oracle";
 type HorizonMode = "leaf" | "turns" | "reply" | "lap";
@@ -994,11 +999,14 @@ export class SearchDriver {
             this.pureRangedParetoNoMeleeFocusScope = DEFAULT_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE;
         } else if (
             rawPureRangedParetoNoMeleeFocusScope === "pure_ranged" ||
-            rawPureRangedParetoNoMeleeFocusScope === "any_board"
+            rawPureRangedParetoNoMeleeFocusScope === "any_board" ||
+            rawPureRangedParetoNoMeleeFocusScope === "mixed_supported"
         ) {
             this.pureRangedParetoNoMeleeFocusScope = rawPureRangedParetoNoMeleeFocusScope;
         } else {
-            throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE must be pure_ranged or any_board");
+            throw new Error(
+                "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE must be pure_ranged, any_board, or mixed_supported",
+            );
         }
         const rawPureRangedParetoNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS;
         if (!this.pureRangedParetoNoMeleeFocus) {
@@ -1035,10 +1043,13 @@ export class SearchDriver {
             this.pureRangedParetoNoMeleeFocusDamageFloor = damageFloor;
         }
         if (
-            this.pureRangedParetoNoMeleeFocusScope === "any_board" &&
+            this.pureRangedParetoNoMeleeFocusScope !== "pure_ranged" &&
             this.pureRangedParetoNoMeleeFocusDamageFloor !== 1
         ) {
-            throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE=any_board requires damage floor 1");
+            throw new Error(
+                `SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE=${this.pureRangedParetoNoMeleeFocusScope} ` +
+                    "requires damage floor 1",
+            );
         }
         const rawPureRangedJitNoMeleeFocus = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS;
         if (
@@ -1250,6 +1261,11 @@ export class SearchDriver {
             pureRangedDeadlineFinisherSeat &&
             this.pureRangedTerminalState?.eligible === true &&
             unit.hasAbilityActive("Endless Quiver");
+        const mixedSupportedParetoContext =
+            this.pureRangedParetoNoMeleeFocus && this.pureRangedParetoNoMeleeFocusScope === "mixed_supported"
+                ? mixedSupportedParetoNoMeleeFocusContext(unit, this.deps.unitsHolder, this.pureRangedTerminalState)
+                : undefined;
+        const incumbentRangedTargetId = incumbent.find((action) => action.type === "range_attack")?.targetId;
         // Catalog expansion is global rather than version-scoped: both experiment seats enumerate the exact same
         // target-covered catalog, while only the scoped candidate seat may select the Pareto redirect below.
         const pureRangedParetoNoMeleeFocusCatalogBoard =
@@ -1261,11 +1277,18 @@ export class SearchDriver {
                   Number.isFinite(currentLap) &&
                   currentLap >= 1 &&
                   currentLap < PURE_RANGED_PARETO_NO_MELEE_FOCUS_END_LAP
-                : this.pureRangedParetoNoMeleeFocus &&
-                  incumbentKind === "shot" &&
-                  anyBoardParetoNoMeleeFocusActorAbility(unit, this.pureRangedTerminalState) !== undefined &&
-                  pureRangedParetoNoMeleeFocusLapEligible(currentLap) &&
-                  isParetoNoMeleeFocusStationaryIncumbent(unit, incumbent);
+                : this.pureRangedParetoNoMeleeFocusScope === "any_board"
+                  ? this.pureRangedParetoNoMeleeFocus &&
+                    incumbentKind === "shot" &&
+                    anyBoardParetoNoMeleeFocusActorAbility(unit, this.pureRangedTerminalState) !== undefined &&
+                    pureRangedParetoNoMeleeFocusLapEligible(currentLap) &&
+                    isParetoNoMeleeFocusStationaryIncumbent(unit, incumbent)
+                  : this.pureRangedParetoNoMeleeFocus &&
+                    incumbentKind === "shot" &&
+                    mixedSupportedParetoContext !== undefined &&
+                    !mixedSupportedParetoContext.noMeleeTargetIds.includes(incumbentRangedTargetId ?? "") &&
+                    pureRangedParetoNoMeleeFocusLapEligible(currentLap) &&
+                    isParetoNoMeleeFocusStationaryIncumbent(unit, incumbent);
         // Catalog expansion is also global for the JIT arm. Its stricter pre-enumeration guards ensure that
         // move-shots and all other action classes retain their stock a13 catalogs exactly.
         const pureRangedJitNoMeleeFocusCatalogBoard =
@@ -1531,6 +1554,7 @@ export class SearchDriver {
                     this.pureRangedParetoNoMeleeFocusDamageFloor,
                     this.pureRangedParetoNoMeleeFocusScope,
                 );
+                const proposalDecisionOrdinal = this.counters.decisions;
                 if (focusCandidates.length) {
                     const proposal = focusCandidates[0];
                     this.counters.pureRangedParetoNoMeleeFocusProposals += 1;
@@ -1558,6 +1582,67 @@ export class SearchDriver {
                     focusProbeCompleted = false;
                 }
                 const focus = focusCandidates.find(({ candidate }) => candidate === focusCandidate);
+                const proposal = focusCandidates[0];
+                if (proposal && this.pureRangedParetoNoMeleeFocusScope === "mixed_supported" && this.auditPath) {
+                    const auditedProposal = focus ?? proposal;
+                    const incumbentCandidate = candidates[0];
+                    const incumbentTarget = incumbentCandidate.targetId
+                        ? this.deps.unitsHolder.getAllUnits().get(incumbentCandidate.targetId)
+                        : undefined;
+                    const proposedTarget = this.deps.unitsHolder.getAllUnits().get(auditedProposal.noMeleeTargetId);
+                    this.turnRows.push(
+                        JSON.stringify({
+                            schema: MIXED_SUPPORTED_PARETO_AUDIT_SCHEMA,
+                            t: "pareto_focus",
+                            seed: this.match.seed,
+                            green: this.match.greenVersion,
+                            red: this.match.redVersion,
+                            side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+                            unitId: unit.getId(),
+                            decisionOrdinal: proposalDecisionOrdinal,
+                            lap: currentLap,
+                            scope: this.pureRangedParetoNoMeleeFocusScope,
+                            status: focus
+                                ? "valid_override"
+                                : focusProbeCompleted
+                                  ? "rejected_probe"
+                                  : "deadline_fallback",
+                            actor: {
+                                name: unit.getName(),
+                                ability: auditedProposal.actorAbility,
+                            },
+                            support: auditedProposal.support,
+                            proposalCount: focusCandidates.length,
+                            incumbent: {
+                                targetId: incumbentCandidate.targetId ?? null,
+                                targetName: incumbentTarget?.getName() ?? null,
+                                actions: incumbentCandidate.actions,
+                                expectedKill: incumbentCandidate.features.expectedKill,
+                                expectedNetDamage: incumbentCandidate.features.expectedDamage,
+                                enemyDamage: incumbentCandidate.shotFeatures?.enemyDamage ?? null,
+                                friendlyFireDamage: incumbentCandidate.shotFeatures?.friendlyFireDamage ?? null,
+                                primaryTargetDamage: incumbentCandidate.shotFeatures?.primaryTargetDamage ?? null,
+                            },
+                            proposal: {
+                                targetId: auditedProposal.noMeleeTargetId,
+                                targetName: proposedTarget?.getName() ?? null,
+                                actions: auditedProposal.candidate.actions,
+                                expectedKill: auditedProposal.candidate.features.expectedKill,
+                                expectedNetDamage: auditedProposal.candidate.features.expectedDamage,
+                                enemyDamage: auditedProposal.candidate.shotFeatures?.enemyDamage ?? null,
+                                friendlyFireDamage: auditedProposal.candidate.shotFeatures?.friendlyFireDamage ?? null,
+                                primaryTargetDamage:
+                                    auditedProposal.candidate.shotFeatures?.primaryTargetDamage ?? null,
+                                expectedNoMeleeDamage: auditedProposal.expectedNoMeleeDamage,
+                                expectedEnemyDamageDelta: auditedProposal.expectedEnemyDamageDelta,
+                                expectedNetDamageDelta: auditedProposal.expectedNetDamageDelta,
+                                enemyDamageRatio: auditedProposal.enemyDamageRatio,
+                                netDamageRatio: auditedProposal.netDamageRatio,
+                                minimumDamageRatio: auditedProposal.minimumDamageRatio,
+                            },
+                        }),
+                    );
+                }
                 if (focusCandidate && focus) {
                     this.counters.decisions += 1;
                     this.counters.pureRangedParetoNoMeleeFocusValidOverrides += 1;
@@ -1803,7 +1888,7 @@ export class SearchDriver {
             pureRangedParetoNoMeleeFocus: this.pureRangedParetoNoMeleeFocus,
             pureRangedParetoNoMeleeFocusVersions: [...this.pureRangedParetoNoMeleeFocusVersions],
             pureRangedParetoNoMeleeFocusDamageFloor: this.pureRangedParetoNoMeleeFocusDamageFloor,
-            ...(this.pureRangedParetoNoMeleeFocusScope === "any_board"
+            ...(this.pureRangedParetoNoMeleeFocusScope !== "pure_ranged"
                 ? { pureRangedParetoNoMeleeFocusScope: this.pureRangedParetoNoMeleeFocusScope }
                 : {}),
             pureRangedParetoNoMeleeFocusProposals: c.pureRangedParetoNoMeleeFocusProposals,
