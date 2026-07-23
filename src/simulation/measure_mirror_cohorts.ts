@@ -99,9 +99,19 @@ export const PURE_RANGED_ROSTER_NAMES: readonly { level: number; creatureName: s
     { level: 4, creatureName: "Tsar Cannon" },
 ];
 
-export type MirrorCohortName = ArchetypeName | "pure_ranged";
+/** Fixed mixed screen used to oversample native Large Caliber and Through Shot decisions. */
+export const MIXED_CYCLOPS_TSAR_ROSTER_NAMES: readonly { level: number; creatureName: string }[] = [
+    { level: 1, creatureName: "Squire" },
+    { level: 1, creatureName: "Arbalester" },
+    { level: 2, creatureName: "Pikeman" },
+    { level: 2, creatureName: "Elf" },
+    { level: 3, creatureName: "Cyclops" },
+    { level: 4, creatureName: "Tsar Cannon" },
+];
 
-export const MIRROR_COHORTS: readonly MirrorCohortName[] = [...ARCHETYPE_NAMES, "pure_ranged"];
+export type MirrorCohortName = ArchetypeName | "pure_ranged" | "mixed_cyclops_tsar";
+
+export const MIRROR_COHORTS: readonly MirrorCohortName[] = [...ARCHETYPE_NAMES, "pure_ranged", "mixed_cyclops_tsar"];
 
 export interface IMirrorRunConfig {
     cohort: MirrorCohortName;
@@ -278,31 +288,34 @@ export function buildMirrorRoster(
     seed: number,
     amountMode: StackAmountMode,
 ): IArmyUnitSpec[] {
-    const base =
-        cohort === "pure_ranged"
-            ? PURE_RANGED_ROSTER_NAMES.map(({ level, creatureName }) => {
-                  const spec = creaturesByLevel(level).find((c) => c.creatureName === creatureName);
-                  if (!spec) {
-                      throw new Error(`Catalog is missing ${creatureName} at level ${level}`);
-                  }
-                  return {
-                      faction: spec.faction,
-                      creatureName: spec.creatureName,
-                      level: spec.level,
-                      size: spec.size,
-                      amount: 0,
-                  };
-              })
-            : buildArchetypeRoster(cohort, buildSharedArchetypeOffers(makeRng(seed))).roster;
+    let base: IArmyUnitSpec[];
+    if (cohort === "pure_ranged" || cohort === "mixed_cyclops_tsar") {
+        const fixedRosterNames = cohort === "pure_ranged" ? PURE_RANGED_ROSTER_NAMES : MIXED_CYCLOPS_TSAR_ROSTER_NAMES;
+        base = fixedRosterNames.map(({ level, creatureName }) => {
+            const spec = creaturesByLevel(level).find((c) => c.creatureName === creatureName);
+            if (!spec) {
+                throw new Error(`Catalog is missing ${creatureName} at level ${level}`);
+            }
+            return {
+                faction: spec.faction,
+                creatureName: spec.creatureName,
+                level: spec.level,
+                size: spec.size,
+                amount: 0,
+            };
+        });
+    } else {
+        base = buildArchetypeRoster(cohort, buildSharedArchetypeOffers(makeRng(seed))).roster;
+    }
     return base.map((unit) => ({
         ...unit,
         amount: resolveStackAmount(unit.creatureName, unit.level, DEFAULT_AMOUNT_BY_LEVEL, amountMode),
     }));
 }
 
-/** pure_ranged fields the standard blind LiveTwin setup (the melee_coevo one) to isolate the version effect. */
+/** Fixed mirror cohorts use the ordinary blind LiveTwin setup rather than adding another setup factor. */
 const mirrorSetup = (cohort: MirrorCohortName): ReturnType<typeof setupForArchetype> =>
-    setupForArchetype(cohort === "pure_ranged" ? "melee_coevo" : cohort);
+    setupForArchetype(cohort === "pure_ranged" || cohort === "mixed_cyclops_tsar" ? "melee_coevo" : cohort);
 
 function newSideDiag(version: string): IMirrorSideDiag {
     return {
