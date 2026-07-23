@@ -2367,6 +2367,26 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 bound: this source pair is <strong>not qualified</strong>.
                             </p>
                         </div>
+                        <div class="callout warn">
+                            <h4>Near-grid revision · v5 infrastructure-invalid, no performance verdict</h4>
+                            <p>
+                                Source pair <code>188452c…a67f → 77ee461…384e</code> narrows the rounding fast path to
+                                exact-grid values and near-grid values inside a strict, bounded recovery window. Its
+                                sealed semantic stage completed 160 tasks / 320 matches with zero semantic mismatches,
+                                rejected actions, stuck matches, or exceptions. The observed total ratio
+                                <strong>0.9082936×</strong> came from that single correctness capture, which was
+                                preregistered as qualification-ineligible; it is development provenance, not a
+                                performance result.
+                            </p>
+                            <p>
+                                V5 then stopped before candidate import or any micro work because its source identity
+                                froze <code>ce24e407…</code>, the type-tagged dependency-manifest digest, while the
+                                declared and executed sorted-JSON source codec correctly produced
+                                <code>4f7dd18b…</code> for the same unchanged 372-entry tree. No micro, profile, macro,
+                                closure, or aggregate artifact exists. The zero-retry attempt is infrastructure-invalid
+                                and remains unqualified; it is neither a performance pass nor a performance failure.
+                            </p>
+                        </div>
                         <div class="grid-2">
                             <div class="callout">
                                 <h4>Exact source and oracle boundary</h4>
@@ -2519,6 +2539,25 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 >. All five executable runners remain beside these records. The compact record retains
                                 the exact source archives, all producer and aggregate hashes, every gate, and the
                                 unqualified decision.
+                            </p>
+                            <p>
+                                The later near-grid revision retains the
+                                <a
+                                    href="./evidence/a13_stat_rounding_near_grid_v4_infrastructure_incident_2026-07-23.json"
+                                    >v4 dependency-topology incident</a
+                                >,
+                                <a href="./evidence/a13_stat_rounding_near_grid_v5_replication_protocol_2026-07-23.json"
+                                    >v5 zero-retry protocol</a
+                                >,
+                                <a href="./evidence/a13_stat_rounding_near_grid_v5_attempt_ledger_2026-07-23.jsonl"
+                                    >closed v5 ledger</a
+                                >, and
+                                <a
+                                    href="./evidence/a13_stat_rounding_near_grid_v5_infrastructure_incident_2026-07-23.json"
+                                    >v5 source-codec incident</a
+                                >. V4 produced no semantic data; v5 produced limited exactness evidence but no
+                                qualifying timing data. Neither attempt may be resumed, rerun, or pooled into a future
+                                campaign.
                             </p>
                         </div>
                     </article>
@@ -3588,6 +3627,16 @@ bun test \
                                     decision: all decisive hashes and values are in the dated compact record, protocols,
                                     incident record, and append-only ledgers.
                                 </li>
+                                <li>
+                                    <code
+                                        >/private/tmp/hoc-stat-rounding-near-grid-v5-qualification.eU9OEp/formal-v5</code
+                                    >
+                                    — the preserved v5 terminal tree: one accepted semantic artifact and the rejected
+                                    micro pre-measurement logs. Its 12-entry tree seal is
+                                    <code>c34fc008…0f88ee</code>. The temporary tree is nondurable; the dated v5
+                                    incident durably records every decisive artifact, log, ledger, runner, and protocol
+                                    hash.
+                                </li>
                             </ul>
                             <p class="small">
                                 <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
@@ -3626,11 +3675,14 @@ bun test \
                             The broader stat-rounding source pair is also not qualified. Its v2 producer inputs are
                             valid, but the v2 verifier incident permits no performance verdict; the one sealed-input v3
                             reanalysis passed every gate except the robust-p99 bootstrap upper bound (1.0520465 against
-                            ≤ 1.05). Do not rerun either candidate, weaken thresholds, pin them into consumers, or
-                            continue the now-sub-3% builder seam. Revert to the last qualified baseline, then choose a
-                            different profile-backed cost or preregister a materially revised source pair. Deeper search
-                            remains blocked until independently sealed latency headroom passes both throughput and tail
-                            gates.
+                            ≤ 1.05). The near-grid revision remains independently unqualified because v5 stopped on a
+                            frozen source-manifest codec identity error before micro measurement. Its exact 160-task
+                            semantic panel does not supply performance qualification. Do not resume or rerun v5, weaken
+                            thresholds, pin either unqualified source into consumers, or continue the now-sub-3% builder
+                            seam. Keep the last qualified baseline pinned and move to a different profile-backed cost
+                            unless a wholly fresh v6 is separately justified, preregistered, and equipped with one
+                            shared pre-output source-seal check. Deeper search remains blocked until independently
+                            sealed latency headroom passes both throughput and tail gates.
                         </p>
                     </div>
                 </div>

@@ -1,0 +1,176 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-v5-infrastructure-incident/v1",
+    "incidentId": "a13-stat-rounding-near-grid-v5-source-manifest-codec-misbinding-20260723",
+    "recordedAt": "2026-07-23T15:09:32.000Z",
+    "campaign": {
+        "id": "a13-stat-rounding-near-grid-77ee4616-20260723-v5",
+        "status": "infrastructure-invalid-after-accepted-semantic-before-micro-measurement",
+        "protocolCommit": "7b6220ad6a787b230648ec4b54b94c306c1b6fcc",
+        "authorizationCommit": "996862134db685241654f36f9e065218fe0427aa",
+        "closedLedgerCommit": "40310a30317af1b93b400fd57a0d65103cf54af4",
+        "zeroRetryHonored": true
+    },
+    "failure": {
+        "stage": "micro",
+        "phase": "run-seal-source-identity-before-candidate-import",
+        "attempt": 1,
+        "attemptId": "70fed002-27cf-4262-956d-20d9ef8fa026",
+        "exitCode": 1,
+        "error": "before: src manifest mismatch: 4f7dd18b5e06f5774ef38f69c45a34563cd91d91063f86ffea61f36af148cf04 != ce24e407ee41f2e0c90954345a05ddfc0281b65080f152b80a6fd269a8a6f234",
+        "expectedManifestSha256": "ce24e407ee41f2e0c90954345a05ddfc0281b65080f152b80a6fd269a8a6f234",
+        "observedManifestSha256": "4f7dd18b5e06f5774ef38f69c45a34563cd91d91063f86ffea61f36af148cf04",
+        "microArtifactProduced": false,
+        "candidateImported": false,
+        "correctnessExecuted": false,
+        "warmupExecuted": false,
+        "calibrationExecuted": false,
+        "timingExecuted": false
+    },
+    "cause": {
+        "kind": "frozen-source-manifest-codec-misbinding",
+        "summary": "The micro runner and protocol froze the type-tagged runtime-dependency manifest digest for the candidate src entries, then asserted it as the distinct sorted-JSON source-manifest digest. The executed source codec correctly produced a different digest for the same unchanged 372-entry source tree.",
+        "sourceEntryCount": 372,
+        "sourceBytes": 10011554,
+        "executedCodec": "heroes-of-crypto/a13-stat-rounding-near-grid-micro-source/sorted-json-v1",
+        "executedDigestSha256": "4f7dd18b5e06f5774ef38f69c45a34563cd91d91063f86ffea61f36af148cf04",
+        "mistakenlyFrozenCodec": "heroes-of-crypto/a13-stat-rounding-near-grid-micro-manifest/type-tagged-v1",
+        "mistakenlyFrozenDigestSha256": "ce24e407ee41f2e0c90954345a05ddfc0281b65080f152b80a6fd269a8a6f234",
+        "preflightGap": "The campaign preflight recomputed the pair-runner source codec and dependency seals, but did not execute the distinct micro source-seal assertion. The micro --help probe exits before runSeal and could not detect this mismatch.",
+        "sourceDrift": false,
+        "candidateCommit": "77ee4616688f764fcfe49d4a1b15ec19e1ef384e",
+        "candidatePairManifestSha256": "1532611d2da05f628b92f3e51101bfdd0149089deadad25836da7dc51d4d8b9f",
+        "gitSrcDeltaFromCandidateToClosedLedgerCommit": []
+    },
+    "stages": {
+        "semantic": {
+            "status": "accepted",
+            "attempt": 1,
+            "attemptId": "294b9d90-7336-4711-85b1-bf1d0c8d8806",
+            "artifact": {
+                "path": "/private/tmp/hoc-stat-rounding-near-grid-v5-qualification.eU9OEp/formal-v5/semantic.json",
+                "bytes": 225222,
+                "sha256": "7b6e8050583eeecd9cecea5fb7b10a0aadd00325b214403cacd9d600b7ff6db1"
+            },
+            "exactness": {
+                "passed": true,
+                "taskCount": 160,
+                "measuredMatchesPerVariant": 160,
+                "measuredMatchesTotal": 320,
+                "semanticMismatchCount": 0,
+                "rejectedActions": 0,
+                "stuckMatches": 0,
+                "exceptions": 0,
+                "rowsSha256": "a3c96344f44eaefcb1d15b8cd7e7559bb9db05a925587c6df48177de8a483b3c"
+            },
+            "qualificationEligible": false,
+            "ineligibleSingleCaptureTimingObservation": {
+                "baselineTotalMs": 131705.573167,
+                "candidateTotalMs": 119627.329209,
+                "totalRatio": 0.9082936001296996,
+                "interpretation": "Development provenance only. The protocol forbids using or pooling this single correctness capture as a performance verdict."
+            }
+        },
+        "micro": {
+            "status": "rejected-before-work",
+            "artifactProduced": false
+        },
+        "profile": {
+            "status": "not-started"
+        },
+        "macroCaptures": {
+            "status": "not-started",
+            "captureIds": ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9"]
+        },
+        "qualificationInputsClosure": {
+            "status": "not-started"
+        },
+        "aggregation": {
+            "status": "not-started",
+            "aggregateExists": false
+        }
+    },
+    "evidence": {
+        "ledger": {
+            "path": "docs/evidence/a13_stat_rounding_near_grid_v5_attempt_ledger_2026-07-23.jsonl",
+            "records": 6,
+            "bytes": 38652,
+            "sha256": "2ac226fc0b4666a809e8b5e13e60f2e5c2cea75e8d426c027a76a47df95417c2",
+            "terminalRecordSha256": "cc2bf20f2aede3e03be2f104eb8df7c162c9c8fbdad05e3dd7d9e85de76f435d"
+        },
+        "protocol": {
+            "path": "docs/evidence/a13_stat_rounding_near_grid_v5_replication_protocol_2026-07-23.json",
+            "bytes": 29851,
+            "sha256": "2f9504f930f89e911b2098a52034e44fe08861919eeadc107a5acd462034da8b"
+        },
+        "runners": {
+            "campaign": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_campaign.ts",
+                "bytes": 76092,
+                "sha256": "d90cfd410f22f75ed189638073cd8bd17a8a342cf1fc942dd6fa00c7f4084d17"
+            },
+            "pair": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_pair.ts",
+                "bytes": 70734,
+                "sha256": "2ac2cfb84b3ab74507cdf1e3cc730b947a54de95cbe1ae6cf2b8a9d5ad1ead57"
+            },
+            "micro": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_micro.ts",
+                "bytes": 102713,
+                "sha256": "40c553be78d41b955a21e448e3e9d9017fea7f5dd21f819c688f7ab18823f740"
+            },
+            "profile": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_profile.ts",
+                "bytes": 121545,
+                "sha256": "11e006700540488b8a20a8fc8039210190adcfbe2a81f0d0f93a5ba8aceb31e4"
+            },
+            "replication": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_replication.ts",
+                "bytes": 223865,
+                "sha256": "2b9d9bccad3848875641ac586cfc3c82351ebbbd39a219fa58fbd47dc39c963b"
+            },
+            "quantile": {
+                "path": "docs/evidence/tools/a13_stat_rounding_near_grid_v5_quantile.ts",
+                "bytes": 4247,
+                "sha256": "f71c0d4a2798124f54862094ac0bce11a1f6daf2627d5c85e304652828533b4e"
+            }
+        },
+        "outputTree": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v5-qualification.eU9OEp/formal-v5",
+            "codec": "sorted-json-object-array-with-directories/v1",
+            "entryCount": 12,
+            "fileBytes": 226091,
+            "manifestSha256": "c34fc00870815ceb29484d83be655a7cfa986251b616a785f5a9f4f8dd0f88ee"
+        },
+        "logs": {
+            "semanticStdout": {
+                "bytes": 193,
+                "sha256": "d9211cc5f5892bd8d361f4a22fcddc50145bae5ef048f0881073401982c91b28"
+            },
+            "semanticStderr": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "microStdout": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "microStderr": {
+                "bytes": 676,
+                "sha256": "3fc7cd63def11a336795659940be2ee7e95da8e6328cf2897fa1439773d6544d"
+            }
+        }
+    },
+    "disposition": {
+        "summary": "V5 is infrastructure-invalid, not qualified and not performance-failed. The accepted semantic stage establishes exactness only for its sealed 160-task / 320-match corpus. Its single-capture timing was preregistered as qualification-ineligible and must not be interpreted as a performance verdict, pooled, or used to change any gate.",
+        "v5RetryAuthorized": false,
+        "v5ResumeAuthorized": false,
+        "v5SemanticEvidenceAcceptedAsLimitedCorrectness": true,
+        "v5SemanticTimingAcceptedForQualification": false,
+        "v5MicroEvidenceAccepted": false,
+        "v5PerformanceVerdictExists": false,
+        "v4OrV5EvidenceMayBePooled": false,
+        "candidateQualified": false,
+        "candidateMayBePinnedOrDeployed": false,
+        "remediation": "This incident authorizes no retry. Either move to a different profile-backed optimization, or separately preregister a fresh v6 only after committing one shared source-manifest codec/helper and an audit-only preauthorization check that executes the exact micro source-seal assertion under the frozen minimal environment. Any v6 must disclose the already observed v5 semantic timing as development provenance, use wholly fresh artifacts, pool none of v4/v5, retain candidate bytes, schedules, estimators, and gates, and remain zero retry."
+    }
+}
