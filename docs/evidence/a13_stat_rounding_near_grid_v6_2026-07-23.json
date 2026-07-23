@@ -1,0 +1,407 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-near-grid-v6-evidence/v1",
+    "recordedAt": "2026-07-23T16:35:02.050Z",
+    "workstream": {
+        "number": 5,
+        "slice": "guarded distance-one melee targeting plus exact-grid and strict bounded near-grid unit-stat rounding",
+        "status": "valid-unqualified",
+        "deploymentDecision": "do-not-pin-or-deploy",
+        "sourceDisposition": "The V6 campaign is terminal. Do not resume it, rerun or select tasks, add captures, reaggregate under different rules, pool it into a successor, or change a threshold. This result authorizes no consumer pin or deployment and does not itself authorize rewriting shared-main history."
+    },
+    "source": {
+        "baseline": {
+            "commit": "188452cad6ec718540b7c452a579ac3cea73a67f",
+            "tree": "efa549a827ba1ef8d8321c2fa47219859a17ffca",
+            "archiveSha256": "bd8de4690d92d6c0a952ded8fb8f66c3dafec404bb47a4f9b2c597b757cc5e2a",
+            "srcEntries": 371,
+            "srcBytes": 10004717,
+            "srcManifestSha256": "076d0689decdfbb071c9632a05103d10bc7181e34500f980bae3c58433398370"
+        },
+        "candidate": {
+            "commit": "77ee4616688f764fcfe49d4a1b15ec19e1ef384e",
+            "tree": "a21e23f17eb6ebdb7a679b9841850b28a2b85ffb",
+            "archiveSha256": "d39e824171255bd67fdf5f4f2b91d72b8bcea278b889003990c03feff33bb76b",
+            "srcEntries": 372,
+            "srcBytes": 10011554,
+            "srcManifestSha256": "1532611d2da05f628b92f3e51101bfdd0149089deadad25836da7dc51d4d8b9f"
+        },
+        "formalRuntimeDelta": [
+            "src/ai/ai.ts",
+            "src/ai/decision_path_catalog.ts",
+            "src/ai/internal/melee_target_layers.ts",
+            "src/units/stat_rounding.ts",
+            "src/units/unit.ts"
+        ],
+        "attributionBoundary": "The source pair contains the previously unqualified guarded distance-one code as well as exact-grid and near-grid rounding. All V6 empirical artifacts are fresh and no V4/V5 measurements were pooled, but the observed macro ratio applies to the combined five-file source delta and cannot be attributed to near-grid rounding alone."
+    },
+    "campaign": {
+        "id": "a13-stat-rounding-near-grid-77ee4616-20260723-v6",
+        "protocolCommit": "14c860064e20a8c8479755a9ac9703bff0be489a",
+        "authorizationCommit": "d8a99c264c2812af29f42ee322f36c59e2495950",
+        "closedLedgerCommit": "79a383dd7e824d4056e49532e89f0c63e4c25751",
+        "producerStages": 13,
+        "aggregationAttempts": 1,
+        "zeroRetryHonored": true,
+        "noShadowAttemptsAttested": true,
+        "additionalMeasurementsAfterResult": 0,
+        "outcome": "valid-unqualified"
+    },
+    "sourcePreflight": {
+        "mode": "source-preflight-only",
+        "executionBoundary": "Executed under the frozen minimal environment before output-root creation, log creation, attempt-ID allocation, candidate import, correctness work, warmup, calibration, or timing.",
+        "stdout": {
+            "bytes": 8274,
+            "sha256": "01bf86f8fa431fc620dbb7a7d82d05faa37b95ab4c2938c353843b50b13fdd4c"
+        },
+        "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "sourceManifestHelperSha256": "f8a23a4be15c64440c09d1b6051bde98f12513bbe42344fa50bd4a67c9cefd47",
+        "normalizedBaselineManifestSha256": "076d0689decdfbb071c9632a05103d10bc7181e34500f980bae3c58433398370",
+        "normalizedCandidateManifestSha256": "1532611d2da05f628b92f3e51101bfdd0149089deadad25836da7dc51d4d8b9f",
+        "passed": true,
+        "v5CodecGapClosed": true
+    },
+    "semantic": {
+        "artifact": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6/semantic.json",
+            "bytes": 225229,
+            "sha256": "871dc168fc625bab123868edb7c9d3dc8120b16ddaa3a404ff4471cb9cd22e15"
+        },
+        "tasks": 160,
+        "measuredMatches": 320,
+        "semanticMismatches": 0,
+        "rejectedActions": 0,
+        "stuckMatches": 0,
+        "exceptions": 0,
+        "rowsSha256": "a3c96344f44eaefcb1d15b8cd7e7559bb9db05a925587c6df48177de8a483b3c",
+        "singleCaptureTotalRatio": 0.9111344208012113,
+        "singleCaptureTimingQualificationEligible": false,
+        "passed": true
+    },
+    "micro": {
+        "artifact": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6/micro.json",
+            "bytes": 375289,
+            "sha256": "648b918d89d5936398c05e9e64fc8b16ed45b38d65c93d8c21de6add86794359"
+        },
+        "correctness": {
+            "rawBinary64Patterns": 1000000,
+            "rawBinary64Comparisons": 2000000,
+            "curatedComparisons": 32664,
+            "nearGridComparisons": 301404,
+            "signedZeroExpected": 36,
+            "signedZeroObserved": 36,
+            "actualTraceCreatures": 54,
+            "actualTraceContexts": 108,
+            "actualTraceComparisons": 1092,
+            "dynamicMutationAndBoxedFallbackPassed": true,
+            "mismatches": 0,
+            "passed": true
+        },
+        "exactGrid": {
+            "candidateToLegacyRatio": 0.22816073712074844,
+            "bootstrapUpper95": 0.22929552237830253,
+            "maximum": 0.45,
+            "passed": true
+        },
+        "actualTrace": {
+            "candidateToLegacyRatio": 0.27744909467048295,
+            "bootstrapUpper95": 0.27845650892023316,
+            "maximum": 0.7,
+            "passed": true
+        },
+        "qualified": true
+    },
+    "profile": {
+        "artifact": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6/profile.json",
+            "bytes": 606344,
+            "sha256": "031f629ccd8cfd3f4f7588bf4955a0ed5354ce442b22a8c01654450e8d9e5591"
+        },
+        "sidecars": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6/profile.json.profiles",
+            "entries": 18,
+            "bytes": 24286465,
+            "verifierManifestSha256": "82a295897645d822e6510de3ca02a443544ede9a7ae1839d3ed128a640067fc1",
+            "campaignManifestSha256": "5da3ce302deda3071b10f5e6a3b236bebcd721531c68b641e9b069cd9bad546c"
+        },
+        "timingExcludedTelemetry": {
+            "roundingCalls": 3605338,
+            "oracleChecks": 3605338,
+            "oracleMismatches": 0,
+            "fast": 3536863,
+            "exactGridFast": 3253220,
+            "nearGridFast": 283643,
+            "numericFallback": 68475,
+            "dynamicFallback": 0,
+            "fastPathShare": 0.9810073285777922
+        },
+        "adjustBaseStatsCandidateToBaselineRatio": 0.6595755964971938,
+        "nativeToFixedUnderAdjustCandidateToBaselineRatio": 0.029159750372920384,
+        "candidateNativeToFixedUnderAdjustShare": 0.0013171667735467994,
+        "candidateCombinedMeleeBuilderShare": 0.021136227429117242,
+        "allPreregisteredGatesPassed": true
+    },
+    "macro": {
+        "fixedWork": {
+            "aiVersion": "v0.8",
+            "captures": 10,
+            "taskPairsPerCapture": 160,
+            "taskPairs": 1600,
+            "measuredMatches": 3200,
+            "maps": 4,
+            "maxLaps": 2,
+            "bootstrapSamples": 20000
+        },
+        "exactness": {
+            "semanticMismatches": 0,
+            "rejectedActions": 0,
+            "stuckMatches": 0,
+            "exceptions": 0,
+            "semanticIdentitySha256": "f7cb1803d011e057c92e940769e98933ff7172e90730d3411bb47effe7022f77",
+            "passed": true
+        },
+        "captureTotalRatios": {
+            "r0": 0.9011789095239658,
+            "r1": 0.9069354685070382,
+            "r2": 0.9041361798013339,
+            "r3": 0.8967858913536555,
+            "r4": 0.8929009160050128,
+            "r5": 0.8910007361674434,
+            "r6": 0.8998121529759491,
+            "r7": 0.9054826020248755,
+            "r8": 0.9056259485162929,
+            "r9": 0.8937837139162496
+        },
+        "pooledTotalRatio": 0.8997650570418037,
+        "pooledTotalBootstrap95": {
+            "lower": 0.8884190674682031,
+            "median": 0.8997190341555839,
+            "upper": 0.9101754302022774
+        },
+        "geometricRatioBootstrapUpper95": 0.9027136388638222,
+        "orderBootstrapUpper95": {
+            "ab": 0.9132696549000107,
+            "ba": 0.9084264772352065
+        },
+        "perMapTotalRatios": {
+            "1": 0.9065452644493152,
+            "2": 0.896642331729694,
+            "3": 0.8974541128753594,
+            "4": 0.8981776026493375
+        },
+        "robust": {
+            "p50": 0.8911722303272449,
+            "p95": 0.9489834028510344,
+            "p99": 0.964208203003065,
+            "p99BootstrapUpper95": 1.0626657917541145,
+            "maximum": 0.9694207936909346,
+            "fasterTasks": 160,
+            "totalTasks": 160
+        },
+        "passedGates": [
+            "totalRatioBootstrapUpper95",
+            "geometricRatioBootstrapUpper95",
+            "robustP50",
+            "robustP99",
+            "robustFasterTasks",
+            "robustMaximumRatio",
+            "abTotalRatioBootstrapUpper95",
+            "baTotalRatioBootstrapUpper95",
+            "perMapTotalRatio",
+            "fasterCaptures",
+            "captureTotalRatioMaximum"
+        ],
+        "failedGates": [
+            {
+                "name": "robustP99BootstrapUpper95",
+                "observed": 1.0626657917541145,
+                "threshold": 1.05,
+                "absoluteMiss": 0.01266579175411442
+            }
+        ],
+        "qualified": false
+    },
+    "tailDiagnostics": {
+        "robustMaximumTask": {
+            "seed": 24,
+            "gridType": 1,
+            "ratio": 0.9694207936909346,
+            "abMedian": 0.9785079775893998,
+            "baMedian": 0.9604180004291282
+        },
+        "rawReplicateRatios": {
+            "observations": 1600,
+            "ratiosAboveOne": 47,
+            "tasksWithAnyRatioAboveOne": 41,
+            "maximum": 1.3007059200231574,
+            "maximumSeed": 40,
+            "maximumGridType": 1,
+            "maximumTaskRobustRatio": 0.8681081792255748
+        },
+        "interpretation": "The governed bootstrap resamples the five capture pairs with replacement before recomputing task medians and p99. Repetition of noisy pair observations widens the p99 confidence bound even though every task-level robust point estimate is faster. This diagnostic cannot authorize omission, rerun, or threshold changes."
+    },
+    "artifacts": {
+        "aggregate": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6/aggregate.json",
+            "bytes": 5548093,
+            "sha256": "952d606d8d952d1980638ee5f4872bb4c6a1fa619f159b8042f7700146aebade"
+        },
+        "captures": {
+            "r0": {
+                "bytes": 224455,
+                "sha256": "637f2751c968c08f2ffb2d9b2525be3810c04543a5229fb56fcf8c0def57858c"
+            },
+            "r1": {
+                "bytes": 224449,
+                "sha256": "2f99e661adc3e5c9e18687cd2dc41962de7bdaa0099efc5181fac3ed12b48fdb"
+            },
+            "r2": {
+                "bytes": 224451,
+                "sha256": "2bb115e08327d406b246f634bf24cf7b9f1bcc4a6ffa909c8219619e9a3c1646"
+            },
+            "r3": {
+                "bytes": 224446,
+                "sha256": "88d70cefbc827ad3a615174c7aafcc56ab295f8735f14751253d1b846c2937ee"
+            },
+            "r4": {
+                "bytes": 224446,
+                "sha256": "22caf6130a4ec6a61844ab075f37989abc32a6278bd92d67e8b2f3fdf12c2080"
+            },
+            "r5": {
+                "bytes": 224449,
+                "sha256": "ec963e225cd317767a4358296bb2190d13fbaa846db9e65d6025b1301a1a86f8"
+            },
+            "r6": {
+                "bytes": 224443,
+                "sha256": "31051a1bbd406a048a89333ae9b8772d71d9cc5b1f6ae4a0ebca1efa46b5c19f"
+            },
+            "r7": {
+                "bytes": 224447,
+                "sha256": "41adc5aa5436580539152ea5a845f27ee9d553ea807e482e1774760697861d9f"
+            },
+            "r8": {
+                "bytes": 224452,
+                "sha256": "6b5fb720b6ea1a22a2029628105cc127b5798cfa97b89efe88ccebcf831fe6dc"
+            },
+            "r9": {
+                "bytes": 224442,
+                "sha256": "dd5ff08c2911c8614516c31e7b3167111de51419607856dd2d01126a07e621a6"
+            }
+        },
+        "formalOutputTree": {
+            "path": "/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6",
+            "codec": "sorted-json-object-array-with-directories/v1",
+            "entries": 102,
+            "files": 58,
+            "directories": 44,
+            "fileBytes": 33289059,
+            "manifestSha256": "cd94428e50ffe33e05f23a4dd3e2c7effb1e98c4bca9d9e89d2fc62587890567"
+        }
+    },
+    "evidence": {
+        "protocol": {
+            "path": "docs/evidence/a13_stat_rounding_near_grid_v6_replication_protocol_2026-07-23.json",
+            "bytes": 33979,
+            "sha256": "44ef1ac72b6504cc62d2f6a4fe22104df19682baf3f85611541938e22ec157ec"
+        },
+        "ledger": {
+            "path": "docs/evidence/a13_stat_rounding_near_grid_v6_attempt_ledger_2026-07-23.jsonl",
+            "aggregationInputView": {
+                "records": 30,
+                "bytes": 223938,
+                "sha256": "5545e16d0388084cd70bc880ceeaf7fb960809c31129401d67119c75214235c5",
+                "chainTipSha256": "29a5fb7645531666f93a7a7c94497ef2dc9ea31939e207b62a0a62ae2897a984"
+            },
+            "closedView": {
+                "records": 31,
+                "bytes": 227441,
+                "sha256": "7f1faf94fbf06a09e8ff08c276a1071d8c1aa679e25d0e12742ecece6fd125a0",
+                "terminalRecordSha256": "1354a3118c896977b6a0b1cd2fe698ac430cc7aa8363110e721ef091001a181a"
+            }
+        },
+        "runners": {
+            "campaign": {
+                "bytes": 82974,
+                "sha256": "c1aa32b8d3f87ddc1b7c87d8adb3b7bae99f07662c556e2190d03176a3c9a16b"
+            },
+            "pair": {
+                "bytes": 70734,
+                "sha256": "50c51dae00711664ea73b9135d194a513fbeb07f51aeb5bbeb5e94695ad28d4d"
+            },
+            "micro": {
+                "bytes": 105551,
+                "sha256": "cf65c2e6811017375f0f4c6217933f0148c0fc5ee594579c355ad4cd5908480f"
+            },
+            "profile": {
+                "bytes": 121545,
+                "sha256": "11e006700540488b8a20a8fc8039210190adcfbe2a81f0d0f93a5ba8aceb31e4"
+            },
+            "replication": {
+                "bytes": 229680,
+                "sha256": "c160ce2f0013231d1fcb8ac77b41d0f2bc2c8652a8f7ef324ca8cb35dc924b66"
+            },
+            "quantile": {
+                "bytes": 4247,
+                "sha256": "f71c0d4a2798124f54862094ac0bce11a1f6daf2627d5c85e304652828533b4e"
+            },
+            "sourceManifest": {
+                "bytes": 6932,
+                "sha256": "f8a23a4be15c64440c09d1b6051bde98f12513bbe42344fa50bd4a67c9cefd47"
+            }
+        }
+    },
+    "provenanceAndPooling": {
+        "v3TimingUsed": false,
+        "v4EvidenceUsed": false,
+        "v5MeasurementsPooled": false,
+        "v5SemanticTimingReadForFrozenProvenanceValidationOnly": true,
+        "v5SemanticTotalRatio": 0.9082936001296996,
+        "reusedV5RunnerSourceIsMeasurementReuse": false,
+        "allV6EmpiricalArtifactsFresh": true,
+        "v6MayBePooledIntoSuccessorQualification": false
+    },
+    "functionalValidation": {
+        "sourceHead": "d4473776e0f33aa8c1fa535b0d755a7d333edf51",
+        "focusedCandidateContracts": {
+            "files": 5,
+            "testsPassed": 35,
+            "testsFailed": 0,
+            "expectCalls": 2147743
+        },
+        "focusedA13AndActionLegality": {
+            "files": 4,
+            "testsPassed": 43,
+            "testsFailed": 0,
+            "expectCalls": 243
+        },
+        "currentCommonMainCi": {
+            "files": 195,
+            "testsPassed": 1901,
+            "testsFailed": 0,
+            "expectCalls": 2768612,
+            "lintPassed": true
+        },
+        "clientCiAtSourceHead": {
+            "lintPassed": true,
+            "typecheckPassed": true,
+            "commonTestsPassed": true,
+            "siteBuildPassed": true
+        }
+    },
+    "decision": {
+        "exactnessPassed": true,
+        "microPassed": true,
+        "profilePassed": true,
+        "macroAverageThroughputPassed": true,
+        "macroPointTailsPassed": true,
+        "macroTailConfidencePassed": false,
+        "overallQualified": false,
+        "performanceVerdict": "valid-unqualified",
+        "candidateMayBePinnedOrDeployed": false,
+        "reason": "Qualification is conjunctive. The robust-p99 bootstrap upper 95% bound is 1.0626657917541145 against the immutable <= 1.05 gate. That sole failure overrides the otherwise favorable exactness, micro, profile, throughput, map, order, capture, and point-tail results.",
+        "nextAction": "Keep the last qualified baseline pinned in authoritative consumers and move to a different profile-backed cost. Preserve this terminal V6 record without additional measurement."
+    }
+}

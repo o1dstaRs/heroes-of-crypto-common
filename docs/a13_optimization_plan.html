@@ -2367,25 +2367,44 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 bound: this source pair is <strong>not qualified</strong>.
                             </p>
                         </div>
-                        <div class="callout warn">
-                            <h4>Near-grid revision · v5 infrastructure-invalid, no performance verdict</h4>
+                        <div class="callout danger">
+                            <h4>Near-grid revision · V6 valid-unqualified</h4>
                             <p>
                                 Source pair <code>188452c…a67f → 77ee461…384e</code> narrows the rounding fast path to
-                                exact-grid values and near-grid values inside a strict, bounded recovery window. Its
-                                sealed semantic stage completed 160 tasks / 320 matches with zero semantic mismatches,
-                                rejected actions, stuck matches, or exceptions. The observed total ratio
-                                <strong>0.9082936×</strong> came from that single correctness capture, which was
-                                preregistered as qualification-ineligible; it is development provenance, not a
-                                performance result.
+                                exact-grid values and near-grid values inside a strict, bounded recovery window. V5
+                                remains a closed historical source-codec incident. V6 used a normalized source-manifest
+                                helper and an exact micro preflight before output creation, then generated fresh
+                                semantic, micro, profile, and ten-capture macro evidence. No V4 or V5 measurement was
+                                pooled.
                             </p>
                             <p>
-                                V5 then stopped before candidate import or any micro work because its source identity
-                                froze <code>ce24e407…</code>, the type-tagged dependency-manifest digest, while the
-                                declared and executed sorted-JSON source codec correctly produced
-                                <code>4f7dd18b…</code> for the same unchanged 372-entry tree. No micro, profile, macro,
-                                closure, or aggregate artifact exists. The zero-retry attempt is infrastructure-invalid
-                                and remains unqualified; it is neither a performance pass nor a performance failure.
+                                V6 completed 1,600 exact task pairs / 3,200 matches with zero semantic mismatches,
+                                rejected actions, stuck matches, or exceptions. Pooled time was
+                                <strong>0.8997651×</strong>; every capture, map, order, and all 160 robust tasks were
+                                faster, with robust p99/max of <strong>0.9642082×/0.9694208×</strong>. The sole
+                                conjunctive failure was the robust-p99 bootstrap upper 95% bound:
+                                <strong>1.0626658</strong> against <strong>≤ 1.05</strong>. The terminal verdict is
+                                <strong>valid-unqualified</strong>. Zero retry was honored; do not add captures, rerun,
+                                reaggregate, relax the threshold, pin, or deploy this source on the strength of V6.
                             </p>
+                        </div>
+                        <div class="metric-grid" style="margin-bottom: 1rem">
+                            <div class="metric">
+                                <strong>0.899765×</strong>
+                                <span>V6 pooled macro time</span>
+                            </div>
+                            <div class="metric">
+                                <strong>160 / 160</strong>
+                                <span>V6 robust tasks faster</span>
+                            </div>
+                            <div class="metric">
+                                <strong>1.062666</strong>
+                                <span>p99-bootstrap upper 95% · gate ≤ 1.05</span>
+                            </div>
+                            <div class="metric">
+                                <strong>0</strong>
+                                <span>reruns or added captures</span>
+                            </div>
                         </div>
                         <div class="grid-2">
                             <div class="callout">
@@ -2555,9 +2574,18 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 <a
                                     href="./evidence/a13_stat_rounding_near_grid_v5_infrastructure_incident_2026-07-23.json"
                                     >v5 source-codec incident</a
-                                >. V4 produced no semantic data; v5 produced limited exactness evidence but no
-                                qualifying timing data. Neither attempt may be resumed, rerun, or pooled into a future
-                                campaign.
+                                >,
+                                <a href="./evidence/a13_stat_rounding_near_grid_v6_2026-07-23.json"
+                                    >V6 compact terminal evidence</a
+                                >,
+                                <a href="./evidence/a13_stat_rounding_near_grid_v6_replication_protocol_2026-07-23.json"
+                                    >V6 zero-retry protocol</a
+                                >, and
+                                <a href="./evidence/a13_stat_rounding_near_grid_v6_attempt_ledger_2026-07-23.jsonl"
+                                    >closed V6 ledger</a
+                                >. V4 produced no semantic data; V5 produced limited exactness evidence but no
+                                qualifying timing data. V6 freshly reproduced the full campaign and is valid but
+                                unqualified. None may be resumed, rerun, or pooled into a successor qualification.
                             </p>
                         </div>
                     </article>
@@ -3637,6 +3665,17 @@ bun test \
                                     incident durably records every decisive artifact, log, ledger, runner, and protocol
                                     hash.
                                 </li>
+                                <li>
+                                    <code
+                                        >/private/tmp/hoc-stat-rounding-near-grid-v6-qualification.wfNoyf/formal-v6</code
+                                    >
+                                    — the terminal V6 tree: 13 accepted producer artifacts, 18 profile sidecars, logs,
+                                    and the single valid-unqualified aggregate. Its 102-entry / 33,289,059-byte tree
+                                    seal is <code>cd94428e…90567</code>; aggregate SHA-256 is
+                                    <code>952d606d…ebade</code>. The temporary tree is nondurable; the compact V6 record
+                                    retains every decisive source, protocol, runner, ledger, artifact, and decision
+                                    seal.
+                                </li>
                             </ul>
                             <p class="small">
                                 <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
@@ -3673,16 +3712,15 @@ bun test \
                         </p>
                         <p>
                             The broader stat-rounding source pair is also not qualified. Its v2 producer inputs are
-                            valid, but the v2 verifier incident permits no performance verdict; the one sealed-input v3
-                            reanalysis passed every gate except the robust-p99 bootstrap upper bound (1.0520465 against
-                            ≤ 1.05). The near-grid revision remains independently unqualified because v5 stopped on a
-                            frozen source-manifest codec identity error before micro measurement. Its exact 160-task
-                            semantic panel does not supply performance qualification. Do not resume or rerun v5, weaken
-                            thresholds, pin either unqualified source into consumers, or continue the now-sub-3% builder
-                            seam. Keep the last qualified baseline pinned and move to a different profile-backed cost
-                            unless a wholly fresh v6 is separately justified, preregistered, and equipped with one
-                            shared pre-output source-seal check. Deeper search remains blocked until independently
-                            sealed latency headroom passes both throughput and tail gates.
+                            valid, but the v2 verifier incident permits no performance verdict; the sealed-input v3
+                            reanalysis failed only the robust-p99 bootstrap upper bound (1.0520465 against ≤ 1.05). V5
+                            remains a historical source-codec incident. The fresh normalized V6 near-grid campaign is
+                            valid and faster by every descriptive task, capture, map, order, throughput, and point-tail
+                            measure, but its robust-p99 bootstrap upper bound is 1.0626658 against ≤ 1.05. That
+                            conjunctive failure is final. Do not rerun, reaggregate, weaken thresholds, or pin either
+                            unqualified source into consumers. Keep the last qualified baseline pinned, close the
+                            now-sub-3% builder seam, and move to a different profile-backed cost. Deeper search remains
+                            blocked until independently sealed latency headroom passes both throughput and tail gates.
                         </p>
                     </div>
                 </div>
