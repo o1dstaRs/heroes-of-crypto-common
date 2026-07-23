@@ -11,9 +11,10 @@
  *  - records nine identical repeats of the six-seed corpus in a Chrome CPU profile;
  *  - rejects engine-declined actions, stuck matches, semantic drift, or source/HEAD drift.
  *
- * The parent parses sample stacks from each .cpuprofile. Inclusive attribution requires both the
- * exact function name and a source URL ending in /src/ai/ai.ts, so identically named helpers in
- * dependencies cannot contaminate the result.
+ * The parent parses sample stacks from each .cpuprofile. Inclusive attribution requires both each
+ * exact function name and its registered source URL suffix, so identically named helpers in
+ * dependencies cannot contaminate the result. The primary target is the legacy layer builder or
+ * the fused internal builder, selected fail-closed from the measured source tree.
  *
  * Evidence run:
  *   bun docs/evidence/tools/a13_melee_target_profile.ts \
@@ -49,7 +50,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-const SCHEMA = "heroes-of-crypto/a13-melee-target-profile/v1" as const;
+const SCHEMA = "heroes-of-crypto/a13-melee-target-profile/v2" as const;
 const CAPTURE_SCHEMA = "heroes-of-crypto/a13-melee-target-capture/v1" as const;
 const RUNNER_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(RUNNER_PATH), "../../..");
@@ -57,6 +58,7 @@ const WORKSPACE_ROOT = resolve(ROOT, "../..");
 const SOURCE_ROOT = join(ROOT, "src");
 const WORKSPACE_LOCK_PATH = join(WORKSPACE_ROOT, "bun.lock");
 const AI_SOURCE_SUFFIX = "/src/ai/ai.ts";
+const FUSED_SOURCE_SUFFIX = "/src/ai/internal/melee_target_layers.ts";
 const PROFILE_INTERVAL_US = 500;
 const EVIDENCE_CAPTURES = 3;
 const EVIDENCE_REPEATS = 9;
@@ -67,7 +69,6 @@ const WARMUP_MAX_LAPS = 2;
 const PROFILE_SEEDS = [1, 42, 43, 44, 45, 46] as const;
 const PROFILE_MAX_LAPS = 4;
 const AI_VERSION = "v0.8";
-const PRIMARY_TARGET = "getLayersForAttacker_2" as const;
 const MINIMUM_PRIMARY_SHARE = 0.03;
 const TARGET_FUNCTIONS = [
     "doFindTarget",
@@ -75,7 +76,15 @@ const TARGET_FUNCTIONS = [
     "getBorderCells_2",
     "filterCells",
     "isFree",
+    "buildMeleeTargetLayers",
+    "appendIfFree",
+    "appendSmallLayer",
+    "appendBigLayer",
+    "isFreeAt",
 ] as const;
+const PRIMARY_TARGET = existsSync(join(SOURCE_ROOT, "ai/internal/melee_target_layers.ts"))
+    ? ("buildMeleeTargetLayers" as const)
+    : ("getLayersForAttacker_2" as const);
 const ENVIRONMENT_PREFIXES = ["SEARCH_", "V05_", "V06_", "V07_", "V08_", "Q2_", "SIM_"] as const;
 const FIXED_ENVIRONMENT = Object.freeze({
     V08_A13_SEARCH: "1",
@@ -87,6 +96,7 @@ const SELECTED_SOURCE_PATHS = [
     "src/ai/ai_strategy.ts",
     "src/ai/candidates.ts",
     "src/ai/decision_path_catalog.ts",
+    "src/ai/internal/melee_target_layers.ts",
     "src/simulation/army.ts",
     "src/simulation/battle_engine.ts",
     "src/simulation/search_driver.ts",
@@ -95,6 +105,18 @@ const SELECTED_SOURCE_PATHS = [
 ] as const;
 
 type TargetFunction = (typeof TARGET_FUNCTIONS)[number];
+const TARGET_SOURCE_SUFFIXES = {
+    doFindTarget: AI_SOURCE_SUFFIX,
+    getLayersForAttacker_2: AI_SOURCE_SUFFIX,
+    getBorderCells_2: AI_SOURCE_SUFFIX,
+    filterCells: AI_SOURCE_SUFFIX,
+    isFree: AI_SOURCE_SUFFIX,
+    buildMeleeTargetLayers: FUSED_SOURCE_SUFFIX,
+    appendIfFree: FUSED_SOURCE_SUFFIX,
+    appendSmallLayer: FUSED_SOURCE_SUFFIX,
+    appendBigLayer: FUSED_SOURCE_SUFFIX,
+    isFreeAt: FUSED_SOURCE_SUFFIX,
+} as const satisfies Readonly<Record<TargetFunction, string>>;
 type RunMode = "evidence" | "smoke";
 
 interface ISourceEntry {
@@ -211,7 +233,7 @@ interface IParentStackRow {
 
 interface IFunctionAttribution {
     functionName: TargetFunction;
-    sourceSuffix: typeof AI_SOURCE_SUFFIX;
+    sourceSuffix: string;
     matchedNodeIds: number[];
     matchedNodeCount: number;
     inclusiveSampledMicroseconds: number;
@@ -646,8 +668,12 @@ function normalizedSourceUrl(url: string | undefined): string {
     return normalizedPath(decodeURIComponent(withoutSuffix));
 }
 
+function targetSourceSuffix(name: TargetFunction): string {
+    return TARGET_SOURCE_SUFFIXES[name];
+}
+
 function isExactTargetFrame(frame: ICallFrame | undefined, name: TargetFunction): boolean {
-    return frame?.functionName === name && normalizedSourceUrl(frame.url).endsWith(AI_SOURCE_SUFFIX);
+    return frame?.functionName === name && normalizedSourceUrl(frame.url).endsWith(targetSourceSuffix(name));
 }
 
 function relativeFrameUrl(url: string | undefined): string {
@@ -755,7 +781,7 @@ function parseProfile(path: string): IProfileAttribution {
         const sortedNodeIds = [...matchedNodeIds[name]].sort((left, right) => left - right);
         functions[name] = {
             functionName: name,
-            sourceSuffix: AI_SOURCE_SUFFIX,
+            sourceSuffix: targetSourceSuffix(name),
             matchedNodeIds: sortedNodeIds,
             matchedNodeCount: sortedNodeIds.length,
             inclusiveSampledMicroseconds: inclusive[name],
@@ -867,7 +893,7 @@ function pooledAttribution(captures: readonly ICaptureReport[]): IProfileAttribu
         }
         functions[name] = {
             functionName: name,
-            sourceSuffix: AI_SOURCE_SUFFIX,
+            sourceSuffix: targetSourceSuffix(name),
             matchedNodeIds: [...matchedNodeIds].sort((left, right) => left - right),
             matchedNodeCount: matchedNodeIds.size,
             inclusiveSampledMicroseconds,
@@ -1001,8 +1027,10 @@ async function orchestrate(args: string[]): Promise<void> {
                     profilerIntervalMicroseconds: PROFILE_INTERVAL_US,
                 },
                 attribution: {
-                    sourceSuffix: AI_SOURCE_SUFFIX,
-                    exactFunctionNames: TARGET_FUNCTIONS,
+                    exactFrames: TARGET_FUNCTIONS.map((functionName) => ({
+                        functionName,
+                        sourceSuffix: targetSourceSuffix(functionName),
+                    })),
                     method:
                         "Chrome sample timeDeltas attributed through reconstructed leaf-to-root parent stacks; " +
                         "a function matches only when both functionName and source URL suffix match",

@@ -1,0 +1,234 @@
+{
+    "schema": "heroes-of-crypto/a13-melee-layers-compact/v1",
+    "createdAt": "2026-07-23T07:55:10.214Z",
+    "purpose": "Qualify the first reversible Workstream 5 slice: fuse ordered melee-border emission and free-cell filtering without changing legacy values, order, ownership, side effects, actions, or results.",
+    "baselineAttribution": {
+        "evidencePath": "docs/evidence/a13_melee_target_profile_2026-07-22.json",
+        "reportSha256": "39192750d15e955ea7f7e0af0b8f68506eb82ac49eb950e1919960bd56e6c73b",
+        "gitHead": "d5ad223a2455c9fe005577b4d8461dae9c9a4572",
+        "srcManifestSha256": "eeb7d78381991f4619f07fe4dab264db72f7714529ffb84fe183b408b3e478ae",
+        "captures": 3,
+        "matches": 162,
+        "actions": 7911,
+        "rejected": 0,
+        "stuck": 0,
+        "getLayersForAttackerCaptureShares": [0.1422786969111022, 0.14862575155303434, 0.14130196727524932],
+        "getLayersForAttackerPooledShare": 0.14401384934787123,
+        "borderBuilderPooledShare": 0.08114119156117601,
+        "filterPooledShare": 0.061621588088712764,
+        "isFreePooledShare": 0.051265059344151764
+    },
+    "candidate": {
+        "baselineCommit": "f24a78d985d30124e5d2e7bfa6ed30eca52de907",
+        "baselineSrcManifestSha256": "11083c9077d1ab166fd4e40531a251876b8d44b6fb0d07dc9a03ffbdad60ddd9",
+        "candidateSrcManifestSha256": "505b84481c0407a4fac3698e1484925df27419b5ef49ca964c8845766df8b1c6",
+        "runtimeDeltaManifestSha256": "271ae1cccc6805485a3d924ace04272c23ddf428dd1794cb16c48fb4b7b2a591",
+        "runtimeDelta": [
+            {
+                "path": "src/ai/ai.ts",
+                "change": "modified",
+                "baselineSha256": "115f5ffc48006daa2ab7adb4da778acaf53cc2a47ecece080dd8119090afccbd",
+                "candidateSha256": "02f56c80806b28b29e393c07d77a83ebeb532b780440bc59897673b8268efe7d"
+            },
+            {
+                "path": "src/ai/internal/melee_target_layers.ts",
+                "change": "added",
+                "baselineSha256": null,
+                "candidateSha256": "18114a5eb7205de721b2cd6788445b0c8ac352759d017b112813e177a9ebe069"
+            }
+        ],
+        "scope": "The private getLayersForAttacker_2 wrapper delegates to a size-specialized numeric emitter that allocates only surviving XY objects.",
+        "preserved": [
+            "Bottom, top, left, right, and large-attacker extra-cell order.",
+            "Coordinate-equal corner duplicates as distinct fresh objects.",
+            "Loose nonzero matrix comparison and lookup-before-bounds behavior.",
+            "Stateful attacker.getCells call count, x-before-y comparisons, and thrown errors.",
+            "Large-attacker base, left, left-down, and down short-circuit order.",
+            "Eager layer construction, false-target side effects, target scan order, tie behavior, and RNG."
+        ]
+    },
+    "correctness": {
+        "testPath": "test/ai/melee_target_layers.test.ts",
+        "testSha256": "30018c6e64aaded3e1f5527bcbe2afc3b3914a50eeda6c5f138368951cfc97a3",
+        "tests": 10,
+        "assertions": 735746,
+        "failures": 0,
+        "coverage": [
+            "Every target anchor on a 16x16 grid for both attacker sizes.",
+            "Dimensions 1 through 17, edges, outside anchors, and odd layer cutoffs.",
+            "4096 seeded matrices plus ragged, sparse, malformed, NaN, undefined, and custom loose values.",
+            "Proxy-backed matrix access order and stateful, accessor-backed, and throwing attacker footprints.",
+            "Duplicate order, deep fresh ownership, mutation isolation, and eager false-target behavior."
+        ],
+        "microExactComparisons": 2402,
+        "microGetterCallsCompared": 56351,
+        "microOutputCellsCompared": 237899,
+        "microSemanticDigestSha256": "9a5589cd86103acfd5dfc3f461e66455c48faed0f6b3c9a02eaa10bb57e796b7",
+        "productionTargetContract": "Both private runtime call sites pass a fresh plain {x,y}. Accessor- or Proxy-backed target coordinates are outside this internal fast-path contract because the candidate snapshots the plain coordinates once per layer."
+    },
+    "micro": {
+        "runnerPath": "docs/evidence/tools/a13_melee_layers_micro.ts",
+        "runnerSha256": "7cb9d48dd38b82fea29bdec3082e6da097b7a7a203d002b2029e46b2cee93e07",
+        "reportSha256": "4865d391e3dc195abfda926abbbaf3812d79a5c359ddb567ae72915c6f71de51",
+        "sourceIdentitySha256": "d9f64d173981ba2fa5be35bf6bdb4799973fb1b63edaeabd9b07040464888e66",
+        "protocol": {
+            "blocks": 60,
+            "schedule": "ABBA with reversed family traversal",
+            "cyclesPerBlock": 1212,
+            "warmupMilliseconds": 750.243917,
+            "bootstrapSamples": 20000
+        },
+        "legacyNanosecondsPerCorpus": 105026.17935918592,
+        "candidateNanosecondsPerCorpus": 59405.85752200219,
+        "ratioOfTotals": 0.5656290449149465,
+        "ratioOfTotalsBootstrap95": [0.5587293207866357, 0.572564344432425],
+        "pairedLogRatio": 0.5635024455346342,
+        "pairedLogBootstrap95": [0.5574991842958104, 0.5698050207406804],
+        "allEightFamilyPointsPassed": true,
+        "worstFamilyPointRatio": 0.6513223157459822,
+        "logicalObjects": {
+            "legacy": 3881,
+            "candidate": 1167,
+            "removed": 2714,
+            "reductionFraction": 0.6993043030146869,
+            "measuredHeapBytes": false
+        },
+        "qualified": true
+    },
+    "candidateProfile": {
+        "runnerPath": "docs/evidence/tools/a13_melee_target_profile.ts",
+        "runnerSha256": "690dd503b52455cfad59137dd1ba2b0074737e4bd856c1e7e065624101c0a5cb",
+        "reportSha256": "7b66237d5ba147fdfd8f67d7d4ca3438bb990ead5560954fa4a4fe51fcdac00b",
+        "sourceIdentitySha256": "b4e2bbbffbf0c47f91b3b5f8edfb6b0d174dee38627f88e3047c0b37af5dc378",
+        "captures": [
+            {
+                "capture": 1,
+                "profileSha256": "fe937295c6e49712d57312653cdfca3223b50c988dea3cb0f779292030315d72",
+                "workloadSha256": "6cb8e4f3d7710d0a87b16f8414283030031f952f9d743295285534b2fff2b356",
+                "builderShare": 0.06540811911227522
+            },
+            {
+                "capture": 2,
+                "profileSha256": "992c706a4fa780055812e335e7185969f5bb570e08a8c9b06b98f1dbe6d6b6d6",
+                "workloadSha256": "39bc27b048bb23da2084961cf6ea76ba10c5846f61484916cd217ac471ab1f32",
+                "builderShare": 0.0665174481092312
+            },
+            {
+                "capture": 3,
+                "profileSha256": "c4e4621d93baed0edba07b271f4720b18927579ccbf1d3122eacacde31032506",
+                "workloadSha256": "adb1c6de5cf768684d364d670db80f1b186713fc5ed39780fbc9cb99002a60d0",
+                "builderShare": 0.06649012351028863
+            }
+        ],
+        "matches": 162,
+        "actions": 7911,
+        "actionDigest": "936289b1f1973a7b8eb2c692e828c487616e2c484a76894cc6e23fda2640b951",
+        "resultDigest": "a59b54526c11505fc3c0d549e6e00eee57f50c557b97be9d73055f36de3ce4e8",
+        "rejected": 0,
+        "stuck": 0,
+        "sampleCount": 123563,
+        "totalSampledMicroseconds": 95757472,
+        "pooledShares": {
+            "doFindTarget": 0.19580799919195863,
+            "buildMeleeTargetLayers": 0.06613470330545067,
+            "appendSmallLayer": 0.052354796918615394,
+            "appendBigLayer": 0.011415182305564625,
+            "isFreeAt": 0.04990100406994871
+        },
+        "baselineToCandidateBuilderShareRatio": 0.4592246065564128,
+        "everyCaptureAtOrAboveMaterialityThreshold": true,
+        "qualifiedAsAttributionNotLatency": true
+    },
+    "macro": {
+        "protocolPath": "docs/evidence/a13_melee_layers_replication_protocol_2026-07-22.json",
+        "protocolSha256": "9ec0344871a106cd8aa0c3afe0bec0a91ab317363c00980a682e2007dea8f41c",
+        "captureRunnerPath": "docs/evidence/tools/a13_melee_layers_pair.ts",
+        "captureRunnerSha256": "cb67d838d58289b516b1f021026f0897938822bc62622df14e81c692b301d3f9",
+        "aggregationRunnerPath": "docs/evidence/tools/a13_melee_layers_replication.ts",
+        "aggregationRunnerSha256": "d7ff50b13fcb5e5aff35bdfe65e34d38c7ac394d899319affd0e454ba6167904",
+        "aggregateReportSha256": "0cf3a74bab8787490ab0ee6301c44bd4b9f4b26686c8ffb8143ccf7b9faa229a",
+        "captureReportSha256": {
+            "r0": "2eb0eeb7bcceae63fb035d910265b64ce34399950b12d4208fd553e7ec3124c7",
+            "r1": "a5b41eb17dc374b4eb9309deeadd294d52b53a1afd5255ccbda1dba7c0be74be",
+            "r2": "88292c604bb34b84cb25da17f26175a9fdcf1fbe69bc793876d4d7c4c92cd49a",
+            "r3": "a869b8434fb236ae5f7be5394e8e68260cf473d23f222f5f9e9c550749f6883c",
+            "r4": "33b5f0ad7b3834e6b83cd654e4c79e21018532b9d9f14fd82647f0b326eedd4f",
+            "r5": "65657a9fcfea28e474caee2d50ef68738c8a97809598d2aaafdc2bca5e48a7bc"
+        },
+        "fixedWork": {
+            "captures": 6,
+            "taskPairs": 480,
+            "matches": 960,
+            "robustTasks": 80,
+            "acceptedActionsPerCapture": 2657,
+            "abObservations": 240,
+            "baObservations": 240
+        },
+        "exactness": {
+            "passed": true,
+            "semanticMismatchCount": 0,
+            "rejectedActions": 0,
+            "stuckMatches": 0,
+            "exceptions": 0,
+            "semanticIdentitySha256": "02e2be268a17fccafc8585209b2c1933cdef9766f498995a7d17a8fc5c04c953"
+        },
+        "performance": {
+            "pooledTotalRatio": 0.8783539769736691,
+            "pooledGeometricMeanRatio": 0.8833735412115544,
+            "totalRatioBootstrap95": [0.85950870740382, 0.8959284128138107],
+            "geometricRatioBootstrap95": [0.8646806449672537, 0.9013825090228592],
+            "robustP50": 0.88911165491781,
+            "robustP95": 0.9658315089500922,
+            "robustP99": 0.9822029419381072,
+            "robustMaximum": 1.0004186694317292,
+            "robustFasterTasks": 79,
+            "robustSlowerTasks": 1,
+            "robustP99BootstrapUpper95": 1.0366216200257208,
+            "abTotalRatioBootstrapUpper95": 0.897548118234114,
+            "baTotalRatioBootstrapUpper95": 0.8954498312965034,
+            "maximumMapRatio": 0.8909319091639978,
+            "fasterCaptures": 6,
+            "maximumCaptureRatio": 0.8932150239874597
+        },
+        "allPreregisteredGatesPassed": true,
+        "qualified": true
+    },
+    "supersededEvidence": {
+        "genericCandidateModuleSha256": "9b1fe3626737a7388a799f60599a7c1e16cc3c606aed9a75710bd95137303af1",
+        "failedOneShotMacroReportSha256": "ef4c585d4d14c82cd28799cea15a7eec7e919a6b85ea626010341deff51b5834",
+        "disposition": "Retained but not pooled because the specialized candidate has a different source hash.",
+        "failedGate": "The one-shot point p99 was 1.017682450088706. This motivated the committed six-capture order-balanced protocol; it was not deleted or selectively rerun."
+    },
+    "regressionSuite": {
+        "fullCommon": {
+            "passed": 1861,
+            "failed": 11,
+            "assertions": 1368747,
+            "newFailures": 0,
+            "baselineFailuresUnchanged": true
+        },
+        "buildTypecheck": "passed",
+        "formatAndDiffChecks": "passed"
+    },
+    "limitations": [
+        "Installed dependency contents were not recursively hashed. Package, workspace-lock, dependency realpaths, source roots, runner bytes, protocol bytes, and every input report were sealed.",
+        "The micro corpus is synthetic, evenly weights small and large attackers, and uses a stable trivial getCells closure; it is not production-frequency telemetry.",
+        "Logical allocation counts are source-level object counts, not measured heap bytes or GC time.",
+        "CPU profiles attribute sampled time at 500 microseconds; overlapping logical/inlined frames must not be summed, and the profile is not a latency comparison.",
+        "The internal candidate assumes a stable plain target XY, as both private production callers provide. Custom target-coordinate accessors are outside its fast-path contract.",
+        "The offline aggregator cannot prove the absence of shadow attempts or recursively seal dependencies. The runners and stopping rule were committed before r0, and all six retained capture hashes are recorded.",
+        "This qualifies one local, behavior-preserving engine slice. It is not a ranked deployment, a deeper-search claim, or completion of Workstream 5."
+    ],
+    "nextHypothesis": {
+        "scope": "Avoid building unconsumed distance-2 through distance-7 layers in the infinite-path target scan only.",
+        "evidence": "The infinite-path loop exits after depth 0 because resultMovementDistance starts truthy and every later assignment is also truthy. Candidate profiles attribute most remaining builder time to that parent.",
+        "requiredGuard": "Retain eager behavior for custom/stateful units and matrices; admit a lazy path only for provably canonical Unit and Grid-produced inputs.",
+        "requiredGates": [
+            "A separately committed exact oracle for the distance-1 layer and fail-closed fallback traces.",
+            "A dedicated ABBA consumer microbenchmark with upper-95% ratio at or below 0.80.",
+            "Fresh source-paired exact macro evidence with no p50, p99, or map regression.",
+            "Three post-change profiles showing at least 50% lower infinite-parent work; stop this seam if total builder share falls below 3%."
+        ],
+        "status": "hypothesis-only"
+    }
+}

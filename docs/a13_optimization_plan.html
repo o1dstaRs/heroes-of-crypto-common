@@ -2262,99 +2262,123 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                     that remain material after Workstreams 2–4.
                                 </p>
                             </div>
-                            <span class="status active">Attribution qualified · 14.40% layer subtree</span>
+                            <span class="status done">First slice qualified · 12.16% macro reduction</span>
                         </div>
                         <div class="metric-grid" style="margin-bottom: 1rem">
                             <div class="metric">
-                                <strong>14.40%</strong>
-                                <span>pooled target-layer share</span>
+                                <strong>0.5656×</strong>
+                                <span>primitive time vs legacy</span>
                             </div>
                             <div class="metric">
-                                <strong>14.13–14.86%</strong>
-                                <span>three independent captures</span>
+                                <strong>−69.93%</strong>
+                                <span>logical temporary objects</span>
                             </div>
                             <div class="metric">
-                                <strong>7,911</strong>
-                                <span>identical accepted actions</span>
+                                <strong>0.8784×</strong>
+                                <span>six-capture macro time</span>
                             </div>
                             <div class="metric">
-                                <strong>0 / 0</strong>
-                                <span>rejected / stuck</span>
+                                <strong>480 / 480</strong>
+                                <span>exact task pairs</span>
                             </div>
                         </div>
                         <div class="callout good">
                             <p>
-                                The post-Workstream-4 fixed-work profile passed its preregistered attribution gate.
-                                Across three serial 500 µs captures, <code>getLayersForAttacker_2</code> consumed
-                                14.23%, 14.86%, and 14.13% of sampled time (14.40% pooled), versus a 3% minimum in every
-                                capture. The border builder alone was 8.11% pooled; filtering was 6.16% and
-                                <code>isFree</code> was 5.13%. All 27 repeated corpora produced the same action and
-                                result digests.
+                                The first independently reversible slice is qualified. It emits the legacy
+                                bottom→top→left→right border numerically, filters each candidate immediately, and
+                                allocates only surviving <code>XY</code> objects. A frozen legacy oracle passed 10
+                                differential tests with 735,746 assertions, including every 16×16 target anchor, both
+                                attacker sizes, 4,096 seeded matrices, malformed and Proxy-backed matrices, stateful
+                                footprint getters, duplicate order, and fresh ownership.
+                            </p>
+                        </div>
+                        <div class="callout good">
+                            <p>
+                                The isolated primitive runs at 0.5656× legacy time (paired-bootstrap upper 95% bound
+                                0.5726); all eight workload families improved. Source-level logical objects fell from
+                                3,881 to 1,167 (−69.93%). Six preregistered traversal captures then compared 480 exact
+                                task pairs / 960 matches: pooled time was 0.87835×, the clustered upper 95% bound was
+                                0.89593, robust p50 was 0.88911, and robust p99 was 0.98220. All six capture totals,
+                                both AB/BA orders, and all four maps improved; there were zero semantic mismatches,
+                                rejected actions, stuck matches, or exceptions.
                             </p>
                         </div>
                         <div class="grid-3">
                             <div>
-                                <h4>Implementation slice</h4>
+                                <h4>Qualified slice</h4>
                                 <ul>
                                     <li>
-                                        Attribute time and allocation volume separately to XY construction, key
-                                        encoding, maps/sets, matrix scans, iteration, and object↔ID adapters.
+                                        Keep the private wrapper and size-specialized ordered layer builder as one
+                                        rollback unit.
                                     </li>
                                     <li>
-                                        Prototype <code>id = y × 16 + x</code>, typed arrays, and masks in one isolated
-                                        dominant loop; do not start with a battle-state rewrite.
+                                        Preserve lookup-before-bounds, loose nonzero comparison, callback count and
+                                        order, large-footprint short-circuiting, duplicate coordinates, and fresh
+                                        returned objects.
                                     </li>
                                     <li>
-                                        Convert to <code>XY</code> only at the proven public/rendering boundary and
-                                        count every conversion in the benchmark.
+                                        Keep the stable plain-target-<code>XY</code> contract local: both production
+                                        callers pass a fresh literal; accessor-backed target coordinates are not part of
+                                        this internal fast path.
                                     </li>
                                     <li>
-                                        Start with the smaller no-gate seam: emit the legacy border numerically and
-                                        filter it in one pass, preserving every duplicate, lookup, callback, and
-                                        short-circuit. Measure a typed footprint snapshot only as a separate follow-up.
+                                        Do not broaden this result into a global numeric board representation or a
+                                        cached footprint without a new oracle and source-paired gate.
                                     </li>
                                 </ul>
                             </div>
                             <div>
-                                <h4>Exact oracle</h4>
+                                <h4>Retained evidence</h4>
                                 <ul>
-                                    <li>Compare every set/mask against the current object representation.</li>
-                                    <li>Cover out-of-grid projected rays separately; never coerce them into 0–255.</li>
                                     <li>
-                                        Preserve iteration order, malformed/custom-grid fallbacks, fresh-object
-                                        ownership, and any legacy packed-key collision behavior.
+                                        The compact record seals both source roots, the exact two-file delta, package
+                                        and lock bytes, runners, protocol, six raw capture hashes, and the aggregate.
+                                    </li>
+                                    <li>
+                                        The original one-shot p99 failure remains recorded. It was superseded by a
+                                        stronger source hash and was never pooled or selectively rerun.
+                                    </li>
+                                    <li>
+                                        The full common suite is 1,861 pass / the same 11 peer-owned baseline failures;
+                                        this slice introduced no new failure.
                                     </li>
                                 </ul>
                             </div>
                             <div>
-                                <h4>Exit gate</h4>
+                                <h4>Next measured seam</h4>
                                 <ul>
-                                    <li>A sealed attribution report identifies a material, optimizable cost center.</li>
                                     <li>
-                                        Exact battle/action hashes across tournament replay corpora; lower allocations
-                                        and GC self time; p99 improves with p50.
+                                        The post-change builder is still 6.61% pooled and <code>isFreeAt</code> is
+                                        4.99%; the old border/filter frames are gone.
                                     </li>
                                     <li>
-                                        End-to-end gain survives adapter overhead. Remove the prototype if broad
-                                        conversion merely moves allocations to boundaries.
+                                        The infinite-path consumer appears to inspect only depth 0 while eagerly
+                                        building every layer. Treat a guarded single-layer path as a hypothesis, not as
+                                        part of this qualification.
+                                    </li>
+                                    <li>
+                                        Require a new fallback oracle, ≤0.80 micro upper bound, exact source-paired
+                                        macro, and ≥50% lower infinite-parent profile work. Stop this seam if the total
+                                        builder falls below 3%.
                                     </li>
                                 </ul>
                             </div>
                         </div>
                         <div class="callout">
                             <p>
-                                Compact baseline evidence is retained in
-                                <a href="./evidence/a13_melee_target_profile_2026-07-22.json"
-                                    >docs/evidence/a13_melee_target_profile_2026-07-22.json</a
-                                >
-                                and is generated by
-                                <a href="./evidence/tools/a13_melee_target_profile.ts"
-                                    >docs/evidence/tools/a13_melee_target_profile.ts</a
-                                >. The source manifest, workspace lock, runner, workload metadata, and raw Chrome
-                                profile hashes are sealed there. Installed dependency contents were not recursively
-                                hashed, and the profile measures CPU time rather than allocation volume; candidate
-                                qualification must close both gaps with source-pair seals and logical-allocation
-                                counters.
+                                Compact candidate evidence is retained in
+                                <a href="./evidence/a13_melee_layers_2026-07-22.json"
+                                    >docs/evidence/a13_melee_layers_2026-07-22.json</a
+                                >; the
+                                <a href="./evidence/a13_melee_target_profile_2026-07-22.json">baseline profile</a>,
+                                <a href="./evidence/a13_melee_layers_replication_protocol_2026-07-22.json"
+                                    >preregistered replication protocol</a
+                                >, <a href="./evidence/tools/a13_melee_layers_micro.ts">micro runner</a>,
+                                <a href="./evidence/tools/a13_melee_layers_pair.ts">capture runner</a>, and
+                                <a href="./evidence/tools/a13_melee_layers_replication.ts">aggregator</a> are retained
+                                beside it. Installed dependency contents were not recursively hashed; allocation
+                                reduction is a logical object count rather than heap bytes, and CPU profile frames
+                                overlap and must not be summed.
                             </p>
                         </div>
                     </article>
@@ -3393,6 +3417,21 @@ bun test \
                                     candidate contains the rejected wrapper/subclass design and is not performance
                                     evidence for the final separate catalog.
                                 </li>
+                                <li>
+                                    <code>/tmp/a13-melee-layers-micro-specialized-v2.json</code> — qualified 60-block
+                                    ABBA primitive report; SHA-256 <code>4865d391…de51</code>.
+                                </li>
+                                <li>
+                                    <code>/tmp/a13-melee-target-profile-specialized-final-v3.json</code> and its
+                                    <code>.profiles</code> directory — three post-candidate 500 µs captures; compact
+                                    report SHA-256 <code>7b66237d…00b</code>.
+                                </li>
+                                <li>
+                                    <code>/tmp/hoc-ws5-replication-specialized.TslqWJ</code> — the six immutable
+                                    source-paired captures and qualified aggregate; aggregate SHA-256
+                                    <code>0cf3a74b…229a</code>. Every full capture hash is retained in the compact
+                                    Workstream 5 record.
+                                </li>
                             </ul>
                             <p class="small">
                                 <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
@@ -3421,11 +3460,14 @@ bun test \
                             not broaden the catalog without a new oracle and qualification.
                         </p>
                         <p>
-                            Workstream 5 attribution is now complete: melee target-layer construction remains a 14.40%
-                            pooled cost center after Workstreams 2–4. Prototype only its independently reversible
-                            ordered border/filter loop first, with exhaustive ordered-value, ownership, malformed-shape,
-                            and custom-callback differentials before performance claims. Deeper search remains blocked
-                            until these behavior-preserving changes create sealed end-to-end latency headroom.
+                            Keep the qualified first Workstream 5 slice: the ordered border/filter fusion is exact
+                            across 480 source-paired tasks and reduces the deadline-free a13 macro to 0.87835× baseline
+                            with robust p50 and p99 improvements. Do not call the workstream complete. Reprofiled
+                            builder work remains 6.61%, mostly under the infinite-path consumer; investigate its
+                            apparently unconsumed deeper layers only as a separately reversible, canonical-input fast
+                            path with a new fallback oracle and full performance gate. Deeper search remains blocked
+                            until each additional behavior-preserving change creates independently sealed latency
+                            headroom.
                         </p>
                     </div>
                 </div>

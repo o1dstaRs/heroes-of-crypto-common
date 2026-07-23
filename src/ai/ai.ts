@@ -25,6 +25,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
 import type { IReadonlyKnownPaths, IReadonlyWeightedRoute } from "../grid/path_definitions";
 import type { IDecisionPathSource } from "./decision_path_catalog";
+import { buildMeleeTargetLayers } from "./internal/melee_target_layers";
 
 const DEBUG_AI = false;
 
@@ -2068,74 +2069,7 @@ function getLayersForAttacker_2(
     isCurrentUnitSmall = true,
     isTargetUnitSmall = true,
 ): HoCMath.XY[][] {
-    const result: HoCMath.XY[][] = [];
-    for (let i = 1; i < matrix.length / 2; i++) {
-        const borderCells = filterCells(
-            getBorderCells_2(cellToAttack, isCurrentUnitSmall, i),
-            matrix,
-            isCurrentUnitSmall,
-            attacker,
-        );
-        result[i - 1] = borderCells;
-    }
-    if (isTargetUnitSmall) {
-        return result;
-    } else {
-        return [];
-    }
-}
-
-function getBorderCells_2(currentCell: HoCMath.XY, isSmallUnit = true, distance = 1): HoCMath.XY[] {
-    /*
-    distance 1, current small:
-    0 0 0 0 0 0 0
-    0 0 0 0 0 0 0
-    0 x x x 0 0 0
-    0 x c x 0 0 0
-    0 x x x 0 0 0
-    distance 1, current big:
-    0 0 0 0 0 0 0
-    0 x x x x 0 0
-    0 x 0 0 x 0 0
-    0 x c 0 x 0 0
-    0 x x x x 0 0
-    distance 2, current small:
-    0 0 0 0 0 0 0 0
-    x x x x x 0 0 0
-    x 0 0 0 x 0 0 0
-    x 0 c 0 x 0 0 0
-    x 0 0 0 x 0 0 0
-    x x x x x 0 0 0
-    distance 2, current big:
-    x x x x x x 0 0
-    x 0 0 0 0 x 0 0
-    x 0 0 0 0 x 0 0
-    x 0 c 0 0 x 0 0
-    x 0 0 0 0 x 0 0
-    x x x x x x 0 0
-    */
-    // we might add same cell few times but it is set so who cares
-    const borderCells = new Set<HoCMath.XY>();
-    // bottom line
-    for (let i = 0; i < distance * 2 + 1; i++) {
-        borderCells.add({ x: currentCell.x - distance + i, y: currentCell.y - distance });
-    }
-    // top line
-    for (let i = 0; i < distance * 2 + 1; i++) {
-        borderCells.add({ x: currentCell.x - distance + i, y: currentCell.y + distance + (isSmallUnit ? 0 : 1) });
-    }
-    // left line
-    for (let i = 0; i < distance /*- 1*/ * 2 + 1; i++) {
-        borderCells.add({ x: currentCell.x - distance, y: currentCell.y - distance + i });
-    }
-    // right line
-    for (let i = 0; i < distance /*- 1*/ * 2 + 1; i++) {
-        borderCells.add({ x: currentCell.x + distance + (isSmallUnit ? 0 : 1), y: currentCell.y - distance + i });
-    }
-    if (!isSmallUnit) {
-        borderCells.add({ x: currentCell.x + distance + 1, y: currentCell.y + distance + 1 });
-    }
-    return Array.from(borderCells);
+    return buildMeleeTargetLayers(cellToAttack, matrix, attacker, isCurrentUnitSmall, isTargetUnitSmall);
 }
 
 //return cells by distance from the cell to attack
