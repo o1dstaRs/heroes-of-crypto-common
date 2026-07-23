@@ -148,7 +148,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         return false;
     }
     /** Default-off experiment seam. Only v0.8 may opt into screen-pressure ranking. */
-    protected visibleEdgeScreenPressureEnabled(): boolean {
+    protected visibleEdgeScreenPressureEnabled(_context: IDecisionContext): boolean {
         return false;
     }
     /** Compatibility seam: historical versions retain the amount-blind proxy; newer versions may refine it. */
@@ -590,7 +590,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         const isThroughShot = unit.hasAbilityActive("Through Shot");
         const from = unit.getPosition();
         const screenPressureEnabled =
-            this.visibleEdgeScreenPressureEnabled() &&
+            this.visibleEdgeScreenPressureEnabled(context) &&
             this.requireResolvedPrimaryRangeTarget() &&
             !isThroughShot &&
             !isAOE &&

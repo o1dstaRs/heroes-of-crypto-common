@@ -230,13 +230,14 @@ export class StrategyV0_8 extends StrategyV0_7 {
         return true;
     }
     /** Default-off native screen-pressure A/B; other AI versions cannot opt in through this environment key. */
-    protected override visibleEdgeScreenPressureEnabled(): boolean {
+    protected override visibleEdgeScreenPressureEnabled(context: IDecisionContext): boolean {
         return (
             process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE === "1" &&
             strategyVersionMatchesExperimentScope(
                 this.version,
                 process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE_VERSIONS ?? "v0.8",
-            )
+            ) &&
+            context.grid.getGridType() === PBTypes.GridVals.NORMAL
         );
     }
     /** a13 uses living-stack ranged output, not the historical per-creature proxy. */
