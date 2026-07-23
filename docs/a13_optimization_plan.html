@@ -1112,7 +1112,9 @@
                                     <td><strong>Numeric 256-cell core</strong></td>
                                     <td>Cell IDs, typed arrays, masks, and object adapters at boundaries.</td>
                                     <td>State/action hash parity with fewer allocations and lower GC tail latency.</td>
-                                    <td><span class="status active">Attribution qualified · candidate next</span></td>
+                                    <td>
+                                        <span class="status active">First slice qualified · second slice rejected</span>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>6</td>
@@ -2303,6 +2305,27 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 rejected actions, stuck matches, or exceptions.
                             </p>
                         </div>
+                        <div class="callout warn">
+                            <p>
+                                The separately committed distance-one follow-up is <strong>not qualified</strong>. Its
+                                exact micro gate passed at 0.05905× (upper 95% bound 0.05987), all six macro captures
+                                and all four maps were faster, and pooled macro time was 0.94137× (bootstrap upper 95%
+                                bound 0.95361). However, the immutable conjunctive tail gate found two slower robust
+                                tasks out of 80: seed 1 / map 2 at 1.02451× and seed 1 / map 3 at 1.00919×. That yields
+                                robust p99 1.01240, p99-bootstrap upper 95% 1.12461, and only 78 faster tasks against
+                                the required 79. No capture was discarded, repeated, or reinterpreted.
+                            </p>
+                        </div>
+                        <div class="callout">
+                            <p>
+                                Attribution still proves the hypothesis did useful work: full-builder calls fell from
+                                52,813 to 11,927, infinite-parent sampled work fell 77.32%, and the replacement
+                                first-layer builder plus remaining full builder occupy 1.989% of candidate CPU. That is
+                                below the preregistered 3% stop threshold, so this builder seam is closed. Passing
+                                exactness, micro, pooled throughput, and attribution cannot override a failed macro tail
+                                gate; the source must not be pinned or deployed as a qualified slice.
+                            </p>
+                        </div>
                         <div class="grid-3">
                             <div>
                                 <h4>Qualified slice</h4>
@@ -2345,21 +2368,23 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 </ul>
                             </div>
                             <div>
-                                <h4>Next measured seam</h4>
+                                <h4>Closed follow-up</h4>
                                 <ul>
                                     <li>
-                                        The post-change builder is still 6.61% pooled and <code>isFreeAt</code> is
-                                        4.99%; the old border/filter frames are gone.
+                                        The guarded first-layer source is exact across 6,056 micro comparisons, 960
+                                        macro matches, and 72 profiled repeats, with zero mismatches, rejections, stuck
+                                        matches, or exceptions.
                                     </li>
                                     <li>
-                                        The infinite-path consumer appears to inspect only depth 0 while eagerly
-                                        building every layer. Treat a guarded single-layer path as a hypothesis, not as
-                                        part of this qualification.
+                                        Its intended fixed work is gone, but the only two slower robust tasks use the
+                                        sole two-melee roster and only 21 actions. This is descriptive low-exposure
+                                        evidence, not permission to omit those tasks.
                                     </li>
                                     <li>
-                                        Require a new fallback oracle, ≤0.80 micro upper bound, exact source-paired
-                                        macro, and ≥50% lower infinite-parent profile work. Stop this seam if the total
-                                        builder falls below 3%.
+                                        Do not rerun this candidate, relax its thresholds, or optimize the remaining
+                                        actual-path builder: that work is observable and the combined seam is already
+                                        below its stop threshold. Select a broader profile-backed hotspot under a fresh
+                                        source identity and protocol.
                                     </li>
                                 </ul>
                             </div>
@@ -2376,9 +2401,18 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 >, <a href="./evidence/tools/a13_melee_layers_micro.ts">micro runner</a>,
                                 <a href="./evidence/tools/a13_melee_layers_pair.ts">capture runner</a>, and
                                 <a href="./evidence/tools/a13_melee_layers_replication.ts">aggregator</a> are retained
-                                beside it. Installed dependency contents were not recursively hashed; allocation
-                                reduction is a logical object count rather than heap bytes, and CPU profile frames
-                                overlap and must not be summed.
+                                beside it. The rejected follow-up is retained independently in
+                                <a href="./evidence/a13_melee_first_layer_2026-07-23.json"
+                                    >its compact evidence record</a
+                                >,
+                                <a href="./evidence/a13_melee_first_layer_replication_protocol_2026-07-23.json"
+                                    >immutable protocol</a
+                                >, and
+                                <a href="./evidence/a13_melee_first_layer_attempt_ledger_2026-07-23.jsonl"
+                                    >append-only attempt ledger</a
+                                >, with all four executable runners beside them. Installed dependency contents were not
+                                recursively hashed; allocation reduction is a logical object count rather than heap
+                                bytes, and CPU profile frames overlap and must not be summed.
                             </p>
                         </div>
                     </article>
@@ -3432,6 +3466,14 @@ bun test \
                                     <code>0cf3a74b…229a</code>. Every full capture hash is retained in the compact
                                     Workstream 5 record.
                                 </li>
+                                <li>
+                                    <code>/tmp/hoc-ws5-first-layer-evidence.aRDzMQ</code> — the immutable failed
+                                    follow-up attempt: 60-block micro, six 80-task macro captures, aggregate, four
+                                    profiles per source, and timing-excluded call counters. The aggregate SHA-256 is
+                                    <code>3dfac38f…39d</code> and the profile report SHA-256 is
+                                    <code>860aa85b…840</code>. The dated compact record and ledger retain every full
+                                    hash; the temporary directory is not required to interpret the decision.
+                                </li>
                             </ul>
                             <p class="small">
                                 <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
@@ -3462,12 +3504,14 @@ bun test \
                         <p>
                             Keep the qualified first Workstream 5 slice: the ordered border/filter fusion is exact
                             across 480 source-paired tasks and reduces the deadline-free a13 macro to 0.87835× baseline
-                            with robust p50 and p99 improvements. Do not call the workstream complete. Reprofiled
-                            builder work remains 6.61%, mostly under the infinite-path consumer; investigate its
-                            apparently unconsumed deeper layers only as a separately reversible, canonical-input fast
-                            path with a new fallback oracle and full performance gate. Deeper search remains blocked
-                            until each additional behavior-preserving change creates independently sealed latency
-                            headroom.
+                            with robust p50 and p99 improvements. Reject the guarded distance-one follow-up for release:
+                            despite a 5.86% pooled macro improvement and a 77.32% reduction in its intended profile
+                            frame, it failed three immutable tail gates on two low-exposure tasks. Do not rerun it,
+                            weaken its thresholds, pin it into consumers, or continue optimizing that now-sub-3% builder
+                            seam. Move to a broader profile-backed cost that benefits ranged and low-melee boards, and
+                            qualify any materially revised source against the last qualified baseline under a fresh
+                            preregistration. Deeper search remains blocked until independently sealed latency headroom
+                            passes both throughput and tail gates.
                         </p>
                     </div>
                 </div>

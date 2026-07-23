@@ -1,0 +1,189 @@
+{
+    "schema": "heroes-of-crypto/a13-melee-first-layer-evidence/v1",
+    "recordedAt": "2026-07-23T09:49:50.300Z",
+    "workstream": {
+        "number": 5,
+        "slice": "guarded distance-one melee target-layer construction",
+        "hypothesis": "The canonical infinite-path target scan observes only distance one, so later layers can be omitted without changing any observable result.",
+        "status": "unqualified",
+        "deploymentDecision": "do-not-pin-or-deploy",
+        "sourceDisposition": "Revert this source candidate or materially revise it and preregister a fresh qualification. Never rerun or relax this attempt."
+    },
+    "source": {
+        "baseline": {
+            "commit": "188452cad6ec718540b7c452a579ac3cea73a67f",
+            "tree": "efa549a827ba1ef8d8321c2fa47219859a17ffca",
+            "archiveSrcManifestSha256": "474e045a76ab61f6abe77180d9daab74950b8242e27545b9c90b16288d5954b9",
+            "archiveIdentitySha256": "c97e3bb2a2c7fa3b6ca74c7ec99c1819b8acf55258c786eebbcb19756ec1e822"
+        },
+        "candidate": {
+            "commit": "ce6719c37f2c6e56b95abdf9cbc2a966db5169a4",
+            "tree": "856b8280cbc692fea3b9bcd556f31225a7fcdc39",
+            "archiveSrcManifestSha256": "c478c30f255613cf29ab9e3ecf6f494e0a12abc4fafd84147053a6dac33e746a",
+            "archiveIdentitySha256": "c856c74ed9bfc42c7e93d2838dab5f1425eb4541dbeb9e1d9ce0dfc5a8a6ab54"
+        },
+        "exactRuntimeDelta": [
+            "src/ai/ai.ts",
+            "src/ai/decision_path_catalog.ts",
+            "src/ai/internal/melee_target_layers.ts"
+        ],
+        "workspaceLockSha256": "227ac3cc87c8488dea87841311baf509e361c22610ffc0ee21c553245e58ab54",
+        "dependencyLimitation": "The lockfile bytes and shared node_modules realpaths were sealed, but installed dependency contents were not recursively hashed."
+    },
+    "preregistration": {
+        "protocolPath": "docs/evidence/a13_melee_first_layer_replication_protocol_2026-07-23.json",
+        "protocolCommit": "12babf57853dd0a50a59bd636ec07855f328a6b0",
+        "protocolSha256": "31000e4fa34257746a1b879045762a3b0df9b4a50e1c8fda8ab2526a1b911efa",
+        "attemptLedgerPath": "docs/evidence/a13_melee_first_layer_attempt_ledger_2026-07-23.jsonl",
+        "attemptLedgerOpenedByCommit": "d7225c9b717fc55727a857cc5a3ea9fa9a91edc9",
+        "runnerSha256": {
+            "micro": "a346a3b88f8bf58044c7aec67b1a985964f502ab7d3f511dda369edf829b676b",
+            "pair": "8cebd3f2678214a2a22e3dae2536d73a5569dc6cf3ac9ceec1459a3250a7b53f",
+            "profile": "714f180db89849855868e7ee42656b7066cd535b0018a4aac748cdcdb8b72722",
+            "replication": "7ba5f177bb6aa386fba3ac534b7e84ca5b5712a62c35a31b3e762cc5fe57b500"
+        },
+        "stoppingRuleApplied": true,
+        "additionalCapturesPermitted": false,
+        "selectiveTaskRerunsPermitted": false,
+        "thresholdChangesPermitted": false
+    },
+    "host": {
+        "cpu": "Apple M4 Max",
+        "logicalCpuCount": 16,
+        "powerAtStart": "AC",
+        "retainedBackgroundLoad": true,
+        "knownBackgroundProcesses": ["local development servers", "idle local VM", "desktop applications"]
+    },
+    "micro": {
+        "artifactSha256": "94f18fa6b93b98e1cb23dbd29eed3df88f35a30e936071d49840e1ec0e30c7db",
+        "exactComparisons": 6056,
+        "blocks": 60,
+        "cyclesPerBlock": 3150,
+        "candidateToBaselineRatio": 0.05904546441432175,
+        "pairedBootstrapUpper95": 0.059866682001674075,
+        "maximumUpper95": 0.8,
+        "familiesPassed": 8,
+        "familiesTotal": 8,
+        "builderOwnedOutputMaterializationReduction": 0.9532871972318339,
+        "qualified": true,
+        "allocationScope": "Builder-owned returned-layer arrays and emitted XY objects only; Unit.getCells, runtime, JIT, and GC allocations are excluded."
+    },
+    "macro": {
+        "captureArtifactSha256": {
+            "r0": "7664670605770273f08ed5dcf3b2e484ac0fb3a4b70e36ed3a74c8cae83ba0fc",
+            "r1": "c21ccdb5e525d18d80f53ce559dbefbafd44c25fcef8adc73e4381dc988ef405",
+            "r2": "3934eec52f55b99b779e0ee136d73b969c8aac29cecb2a12a53213d90acf61c9",
+            "r3": "7472b6ac799e8a023eef75d956585701c2de7dcdf11e9b9b87d896b81447fe87",
+            "r4": "fa06493d1360979dfc15e75ceed7136253dbb9d5b1625be1e02e30507a7a7b8a",
+            "r5": "a0984db36a49468b93873423db9b51313ce36e7b3b9182e90863b7a08c505ee6"
+        },
+        "captureTotalRatios": {
+            "r0": 0.9375949799933445,
+            "r1": 0.9587891147151021,
+            "r2": 0.9384916484990503,
+            "r3": 0.9361791944166155,
+            "r4": 0.9256612734992022,
+            "r5": 0.9519576528862166
+        },
+        "aggregateArtifactSha256": "3dfac38f8fcd9720b947cd9d8bb9f5288f6b62508f37a848d1ccf50a4a20139d",
+        "taskPairs": 480,
+        "measuredMatches": 960,
+        "semanticMismatches": 0,
+        "rejectedActions": 0,
+        "stuckMatches": 0,
+        "exceptions": 0,
+        "allCaptureTotalsFaster": true,
+        "allMapsFaster": true,
+        "pooledTotalRatio": 0.9413667882436033,
+        "pooledTotalBootstrapUpper95": 0.9536142919167693,
+        "pooledGeometricUpper95": 0.9560581110672955,
+        "robust": {
+            "p50": 0.945497354394458,
+            "p99": 1.0124032426469673,
+            "p99BootstrapUpper95": 1.1246090703906384,
+            "maximum": 1.024507650212043,
+            "fasterTasks": 78,
+            "totalTasks": 80
+        },
+        "failedGates": [
+            {
+                "name": "robustP99",
+                "observed": 1.0124032426469673,
+                "required": "< 1"
+            },
+            {
+                "name": "robustP99BootstrapUpper95",
+                "observed": 1.1246090703906384,
+                "required": "<= 1.05"
+            },
+            {
+                "name": "robustFasterTasks",
+                "observed": 78,
+                "required": ">= 79"
+            }
+        ],
+        "slowerRobustTasks": [
+            {
+                "seed": 1,
+                "gridType": 2,
+                "actionsPerMatch": 21,
+                "robustRatio": 1.024507650212043,
+                "abRatios": [0.932399214220293, 1.0554885031183063, 1.2718217845117399],
+                "baRatios": [0.9944361518311617, 0.9990600373987659, 0.9925697093272937]
+            },
+            {
+                "seed": 1,
+                "gridType": 3,
+                "actionsPerMatch": 21,
+                "robustRatio": 1.0091856153195424,
+                "abRatios": [0.9631259969806281, 1.1221651016692364, 0.9540934830529743],
+                "baRatios": [1.0574479448802256, 1.0623448782088127, 1.0298607067333372]
+            }
+        ],
+        "tailInterpretation": "The only slower robust tasks are the two shortest seed-1 tasks, and their replicate ratios are noisy. This is descriptive evidence, not permission to discard or rerun them and not proof that the source cannot regress.",
+        "qualified": false
+    },
+    "profile": {
+        "artifactSha256": "860aa85b361cf1d5a2740dc09f15a700e1e28d198ca0458283947b4ec94d9840",
+        "capturesPerVariant": 4,
+        "repeatsCompared": 72,
+        "matchesPerCapture": 54,
+        "actionsPerCapture": 2637,
+        "semanticDigestsIdentical": true,
+        "instrumentedTraceMatchedUninstrumented": true,
+        "rejectedActions": 0,
+        "stuckMatches": 0,
+        "fullBuilderCalls": {
+            "baseline": 52813,
+            "candidate": 11927,
+            "candidateToBaselineRatio": 0.22583454831196864
+        },
+        "firstBuilderCalls": {
+            "baseline": 0,
+            "candidate": 40886
+        },
+        "fullBuilderUnderDoFindTargetMicroseconds": {
+            "baseline": 8604558,
+            "candidate": 1951465,
+            "reduction": 0.773205666113239
+        },
+        "candidateBuilderShare": {
+            "full": 0.01601754263867938,
+            "first": 0.0038749194871145853,
+            "combined": 0.019892462125793965
+        },
+        "guardSampledMicroseconds": 788,
+        "qualified": true,
+        "stopSeam": true,
+        "stopReason": "The combined candidate builder share is below the preregistered 3% threshold."
+    },
+    "decision": {
+        "exactnessPassed": true,
+        "intendedSeamRemovalPassed": true,
+        "macroThroughputImproved": true,
+        "macroTailPassed": false,
+        "overallQualified": false,
+        "reason": "Every gate is conjunctive. Passing semantics, micro, aggregate throughput, and profile attribution cannot override the failed robust macro-tail gates.",
+        "nextAction": "Close this attempt without further measurement. Select a new profile-backed seam or create a materially different source candidate, then freeze a fresh protocol before qualification."
+    }
+}
