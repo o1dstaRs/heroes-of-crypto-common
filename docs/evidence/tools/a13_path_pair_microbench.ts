@@ -154,6 +154,14 @@ interface IPathWorkload {
     profile: string;
 }
 
+type SemanticCorpusName = "timed-live-shaped" | "fallback-edge";
+
+interface ISemanticPathCase extends IPathWorkload {
+    gridSize: number;
+    semanticCorpus: SemanticCorpusName;
+    edgeTags: readonly string[];
+}
+
 interface IManifestEntry {
     path: string;
     kind: "file" | "symlink";
@@ -631,6 +639,193 @@ function pathWorkloads(seed: number, obstacles: IObstacleModule["ObstacleType"])
     return Object.freeze(workloads);
 }
 
+function timedSemanticCases(workloads: readonly IPathWorkload[]): readonly ISemanticPathCase[] {
+    return Object.freeze(
+        workloads.map((workload) =>
+            Object.freeze({
+                ...workload,
+                gridSize: GRID_SIZE,
+                semanticCorpus: "timed-live-shaped" as const,
+                edgeTags: Object.freeze(["live-shaped"]),
+            }),
+        ),
+    );
+}
+
+function denseMatrix(gridSize: number): number[][] {
+    return Array.from({ length: gridSize }, () => Array<number>(gridSize).fill(0));
+}
+
+function fallbackSemanticCases(seed: number): readonly ISemanticPathCase[] {
+    const cases: ISemanticPathCase[] = [];
+    const add = (options: {
+        id: string;
+        gridSize?: number;
+        currentCell?: IXY;
+        matrix?: number[][];
+        maxSteps?: number;
+        aggrBoard?: number[][];
+        canFly?: boolean;
+        isSmallUnit?: boolean;
+        isMadeOfFire?: boolean;
+        edgeTags: string[];
+    }): void => {
+        const gridSize = options.gridSize ?? GRID_SIZE;
+        const currentCell = Object.freeze(
+            options.currentCell ?? { x: Math.min(4, gridSize - 1), y: Math.min(4, gridSize - 1) },
+        );
+        const ordinal = cases.length;
+        cases.push(
+            Object.freeze({
+                id: options.id,
+                gridSize,
+                currentCell,
+                matrix: options.matrix ?? denseMatrix(gridSize),
+                maxSteps: options.maxSteps ?? 3.3,
+                aggrBoard: options.aggrBoard,
+                canFly: options.canFly ?? false,
+                isSmallUnit: options.isSmallUnit ?? true,
+                isMadeOfFire: options.isMadeOfFire ?? false,
+                randomSeed: (seed ^ Math.imul(ordinal + 1, 0x85eb_ca6b)) >>> 0,
+                profile: options.edgeTags.join("/"),
+                semanticCorpus: "fallback-edge" as const,
+                edgeTags: Object.freeze([...options.edgeTags]),
+            }),
+        );
+    };
+
+    for (const gridSize of [1, 7, 15, 17, 31]) {
+        const middle = Math.floor(gridSize / 2);
+        add({
+            id: `edge-custom-grid-${gridSize}`,
+            gridSize,
+            currentCell: { x: middle, y: middle },
+            maxSteps: gridSize === 1 ? 6.3 : 2,
+            edgeTags: ["custom-grid", `grid-${gridSize}`],
+        });
+    }
+
+    add({
+        id: "edge-fractional-x",
+        currentCell: { x: 3.5, y: 4 },
+        edgeTags: ["fractional-coordinate", "fractional-x"],
+    });
+    add({
+        id: "edge-fractional-y",
+        currentCell: { x: 4, y: 5.25 },
+        edgeTags: ["fractional-coordinate", "fractional-y"],
+    });
+    add({
+        id: "edge-fractional-custom-grid",
+        gridSize: 7,
+        currentCell: { x: 2.5, y: 3.5 },
+        edgeTags: ["custom-grid", "fractional-coordinate", "fractional-xy"],
+    });
+    add({
+        id: "edge-negative-zero-x",
+        currentCell: { x: -0, y: 4 },
+        edgeTags: ["negative-zero", "negative-zero-x"],
+    });
+    add({
+        id: "edge-negative-zero-y",
+        currentCell: { x: 4, y: -0 },
+        edgeTags: ["negative-zero", "negative-zero-y"],
+    });
+    add({
+        id: "edge-nan-x",
+        currentCell: { x: Number.NaN, y: 4 },
+        edgeTags: ["non-finite-coordinate", "nan-x"],
+    });
+    add({
+        id: "edge-nan-y",
+        currentCell: { x: 4, y: Number.NaN },
+        edgeTags: ["non-finite-coordinate", "nan-y"],
+    });
+    add({
+        id: "edge-positive-infinity-x",
+        currentCell: { x: Number.POSITIVE_INFINITY, y: 4 },
+        edgeTags: ["non-finite-coordinate", "positive-infinity-x"],
+    });
+    add({
+        id: "edge-negative-infinity-x",
+        currentCell: { x: Number.NEGATIVE_INFINITY, y: 4 },
+        edgeTags: ["non-finite-coordinate", "negative-infinity-x"],
+    });
+    add({
+        id: "edge-positive-infinity-y",
+        currentCell: { x: 4, y: Number.POSITIVE_INFINITY },
+        edgeTags: ["non-finite-coordinate", "positive-infinity-y"],
+    });
+    add({
+        id: "edge-negative-infinity-y",
+        currentCell: { x: 4, y: Number.NEGATIVE_INFINITY },
+        edgeTags: ["non-finite-coordinate", "negative-infinity-y"],
+    });
+    add({
+        id: "edge-malformed-large-anchor-x-zero",
+        currentCell: { x: 0, y: 4 },
+        isSmallUnit: false,
+        edgeTags: ["malformed-large-anchor", "large-anchor-x-zero"],
+    });
+
+    const raggedMatrix = denseMatrix(GRID_SIZE);
+    raggedMatrix[2] = [0, 0];
+    raggedMatrix[3] = [];
+    raggedMatrix[5] = Array<number>(9);
+    raggedMatrix[5][4] = 0;
+    add({
+        id: "edge-ragged-matrix-rows",
+        currentCell: { x: 4, y: 4 },
+        matrix: raggedMatrix,
+        edgeTags: ["ragged-matrix", "sparse-row"],
+    });
+
+    const sparseMatrix = new Array<number[]>(GRID_SIZE);
+    sparseMatrix[4] = Array<number>(GRID_SIZE);
+    sparseMatrix[4][4] = 0;
+    sparseMatrix[4][5] = 0;
+    sparseMatrix[5] = Array<number>(GRID_SIZE);
+    sparseMatrix[5][4] = 0;
+    add({
+        id: "edge-sparse-matrix-outer-and-cells",
+        currentCell: { x: 4, y: 4 },
+        matrix: sparseMatrix,
+        edgeTags: ["sparse-matrix", "sparse-outer", "sparse-cells"],
+    });
+
+    const raggedAggro = denseMatrix(GRID_SIZE);
+    delete raggedAggro[3];
+    add({
+        id: "edge-ragged-aggr-exception",
+        currentCell: { x: 4, y: 4 },
+        aggrBoard: raggedAggro,
+        edgeTags: ["ragged-aggr", "expected-exception"],
+    });
+
+    add({
+        id: "edge-budget-nan",
+        maxSteps: Number.NaN,
+        edgeTags: ["non-finite-budget", "nan-budget"],
+    });
+    add({
+        id: "edge-budget-positive-infinity",
+        maxSteps: Number.POSITIVE_INFINITY,
+        edgeTags: ["non-finite-budget", "positive-infinity-budget"],
+    });
+    add({
+        id: "edge-budget-negative-infinity",
+        maxSteps: Number.NEGATIVE_INFINITY,
+        edgeTags: ["non-finite-budget", "negative-infinity-budget"],
+    });
+    add({
+        id: "edge-budget-zero",
+        maxSteps: 0,
+        edgeTags: ["zero-budget"],
+    });
+
+    return Object.freeze(cases);
+}
+
 function float64Bits(value: number): string {
     const bytes = Buffer.allocUnsafe(8);
     bytes.writeDoubleBE(value, 0);
@@ -695,13 +890,33 @@ function shapeMovePath(movePath: IMovePath): Record<string, unknown> {
     };
 }
 
+function shapeNumericArray(values: number[]): Record<string, unknown> {
+    const entries: Array<{ index: number; value: string }> = [];
+    for (let index = 0; index < values.length; index++) {
+        if (Object.prototype.hasOwnProperty.call(values, index)) {
+            entries.push({ index, value: float64Bits(values[index]) });
+        }
+    }
+    return { length: values.length, entries };
+}
+
+function shapeNumericMatrix(matrix: number[][]): Record<string, unknown> {
+    const rows: Array<{ index: number; row: Record<string, unknown> }> = [];
+    for (let index = 0; index < matrix.length; index++) {
+        if (Object.prototype.hasOwnProperty.call(matrix, index)) {
+            rows.push({ index, row: shapeNumericArray(matrix[index]) });
+        }
+    }
+    return { length: matrix.length, rows };
+}
+
 function shapeWorkload(workload: IPathWorkload): Record<string, unknown> {
     return {
         id: workload.id,
         currentCell: shapeXY(workload.currentCell),
-        matrix: workload.matrix.map((row) => row.map(float64Bits)),
+        matrix: shapeNumericMatrix(workload.matrix),
         maxSteps: float64Bits(workload.maxSteps),
-        aggrBoard: workload.aggrBoard?.map((row) => row.map(float64Bits)) ?? null,
+        aggrBoard: workload.aggrBoard ? shapeNumericMatrix(workload.aggrBoard) : null,
         canFly: workload.canFly,
         isSmallUnit: workload.isSmallUnit,
         isMadeOfFire: workload.isMadeOfFire,
@@ -710,12 +925,21 @@ function shapeWorkload(workload: IPathWorkload): Record<string, unknown> {
     };
 }
 
+function shapeSemanticCase(semanticCase: ISemanticPathCase): Record<string, unknown> {
+    return {
+        ...shapeWorkload(semanticCase),
+        gridSize: float64Bits(semanticCase.gridSize),
+        semanticCorpus: semanticCase.semanticCorpus,
+        edgeTags: semanticCase.edgeTags,
+    };
+}
+
 function workloadDigest(workloads: readonly IPathWorkload[]): string {
     return digest(workloads.map(shapeWorkload));
 }
 
-function makeHelper(variant: IVariantRuntime): IPathHelperInstance {
-    const settings = new variant.GridSettings(GRID_SIZE, 2048, 0, 1024, -1024, 5, 0.06);
+function makeHelper(variant: IVariantRuntime, gridSize = GRID_SIZE): IPathHelperInstance {
+    const settings = new variant.GridSettings(gridSize, 2048, 0, 1024, -1024, 5, 0.06);
     return new variant.PathHelper(settings);
 }
 
@@ -738,96 +962,192 @@ function errorShape(error: unknown): Record<string, unknown> {
 function executeSemanticCase(
     variant: IVariantRuntime,
     helper: IPathHelperInstance,
-    workload: IPathWorkload,
-): Record<string, unknown> {
+    workload: ISemanticPathCase,
+): { outcome: Record<string, unknown> & { returned: boolean }; rngTail: string[] } {
     const previous = variant.random.getDeterministicRandomSource();
     const source = mulberry32(workload.randomSeed);
     variant.random.setDeterministicRandomSource(source);
-    let outcome: Record<string, unknown>;
     try {
-        outcome = {
-            returned: true,
-            value: shapeMovePath(
-                helper.getMovePath(
-                    workload.currentCell as IXY,
-                    workload.matrix,
-                    workload.maxSteps,
-                    workload.aggrBoard,
-                    workload.canFly,
-                    workload.isSmallUnit,
-                    workload.isMadeOfFire,
+        let outcome: Record<string, unknown> & { returned: boolean };
+        try {
+            outcome = {
+                returned: true,
+                value: shapeMovePath(
+                    helper.getMovePath(
+                        workload.currentCell as IXY,
+                        workload.matrix,
+                        workload.maxSteps,
+                        workload.aggrBoard,
+                        workload.canFly,
+                        workload.isSmallUnit,
+                        workload.isMadeOfFire,
+                    ),
                 ),
-            ),
-        };
-    } catch (error) {
-        outcome = { returned: false, exception: errorShape(error) };
+            };
+        } catch (error) {
+            outcome = { returned: false, exception: errorShape(error) };
+        }
+        return { outcome, rngTail: Array.from({ length: 8 }, () => float64Bits(source())) };
+    } finally {
+        variant.random.setDeterministicRandomSource(previous);
     }
-    const rngTail = Array.from({ length: 8 }, () => float64Bits(source()));
-    variant.random.setDeterministicRandomSource(previous);
-    return { outcome, rngTail };
+}
+
+function verifySemanticCorpus(
+    baseline: IVariantRuntime,
+    candidate: IVariantRuntime,
+    cases: readonly ISemanticPathCase[],
+): Record<string, unknown> & { passed: boolean } {
+    const baselineHelpers = new Map<number, IPathHelperInstance>();
+    const candidateHelpers = new Map<number, IPathHelperInstance>();
+    const helperFor = (
+        helpers: Map<number, IPathHelperInstance>,
+        variant: IVariantRuntime,
+        gridSize: number,
+    ): IPathHelperInstance => {
+        let helper = helpers.get(gridSize);
+        if (!helper) {
+            helper = makeHelper(variant, gridSize);
+            helpers.set(gridSize, helper);
+        }
+        return helper;
+    };
+    const baselineHash = createHash("sha256");
+    const candidateHash = createHash("sha256");
+    const mismatches: Array<Record<string, unknown>> = [];
+    const inputsBefore = digest(cases.map(shapeSemanticCase));
+    let mutationDetected = false;
+    let mismatchCount = 0;
+    let baselineExceptionCount = 0;
+    let candidateExceptionCount = 0;
+    for (const semanticCase of cases) {
+        const before = digest(shapeSemanticCase(semanticCase));
+        const baselineResult = executeSemanticCase(
+            baseline,
+            helperFor(baselineHelpers, baseline, semanticCase.gridSize),
+            semanticCase,
+        );
+        const afterBaseline = digest(shapeSemanticCase(semanticCase));
+        const candidateResult = executeSemanticCase(
+            candidate,
+            helperFor(candidateHelpers, candidate, semanticCase.gridSize),
+            semanticCase,
+        );
+        const afterCandidate = digest(shapeSemanticCase(semanticCase));
+        const baselineJson = canonicalJson(baselineResult);
+        const candidateJson = canonicalJson(candidateResult);
+        baselineHash.update(`${semanticCase.id}\0${baselineJson}\n`);
+        candidateHash.update(`${semanticCase.id}\0${candidateJson}\n`);
+        if (!baselineResult.outcome.returned) baselineExceptionCount++;
+        if (!candidateResult.outcome.returned) candidateExceptionCount++;
+        const inputsUnchanged = before === afterBaseline && before === afterCandidate;
+        mutationDetected ||= !inputsUnchanged;
+        if (baselineJson !== candidateJson || !inputsUnchanged) {
+            mismatchCount++;
+            if (mismatches.length < 12) {
+                mismatches.push({
+                    caseId: semanticCase.id,
+                    gridSize: semanticCase.gridSize,
+                    profile: semanticCase.profile,
+                    edgeTags: semanticCase.edgeTags,
+                    outputsIdentical: baselineJson === candidateJson,
+                    inputsUnchanged,
+                    inputSha256: { before, afterBaseline, afterCandidate },
+                    baselineResultSha256: sha256(baselineJson),
+                    candidateResultSha256: sha256(candidateJson),
+                    baselineReturned: baselineResult.outcome.returned,
+                    candidateReturned: candidateResult.outcome.returned,
+                });
+            }
+        }
+    }
+    const inputsAfter = digest(cases.map(shapeSemanticCase));
+    const baselineSha256 = baselineHash.digest("hex");
+    const candidateSha256 = candidateHash.digest("hex");
+    const passed =
+        baselineSha256 === candidateSha256 && !mutationDetected && inputsBefore === inputsAfter && mismatchCount === 0;
+    const gridSizeCounts = new Map<number, number>();
+    const edgeTagCounts = new Map<string, number>();
+    for (const semanticCase of cases) {
+        gridSizeCounts.set(semanticCase.gridSize, (gridSizeCounts.get(semanticCase.gridSize) ?? 0) + 1);
+        for (const tag of semanticCase.edgeTags) edgeTagCounts.set(tag, (edgeTagCounts.get(tag) ?? 0) + 1);
+    }
+    return {
+        passed,
+        corpus: cases[0]?.semanticCorpus ?? null,
+        cases: cases.length,
+        caseIds: cases.map((semanticCase) => semanticCase.id),
+        gridSizeCounts: Object.fromEntries([...gridSizeCounts].sort((a, b) => a[0] - b[0])),
+        edgeTagCounts: Object.fromEntries([...edgeTagCounts].sort(([a], [b]) => a.localeCompare(b))),
+        baselineSha256,
+        candidateSha256,
+        exceptions: {
+            baseline: baselineExceptionCount,
+            candidate: candidateExceptionCount,
+            countsEqual: baselineExceptionCount === candidateExceptionCount,
+        },
+        inputs: {
+            denseNumericRowsFrozen: false,
+            sparseAndRaggedTopologyEncoded: true,
+            beforeSha256: inputsBefore,
+            afterSha256: inputsAfter,
+            unchanged: inputsBefore === inputsAfter && !mutationDetected,
+        },
+        mismatchCount,
+        mismatches,
+    };
 }
 
 function verifySemantics(
     baseline: IVariantRuntime,
     candidate: IVariantRuntime,
-    workloads: readonly IPathWorkload[],
+    timedLiveCases: readonly ISemanticPathCase[],
+    fallbackEdgeCases: readonly ISemanticPathCase[],
 ): Record<string, unknown> & { passed: boolean } {
-    const baselineHelper = makeHelper(baseline);
-    const candidateHelper = makeHelper(candidate);
-    const baselineHash = createHash("sha256");
-    const candidateHash = createHash("sha256");
-    const mismatches: Array<Record<string, unknown>> = [];
-    const workloadsBefore = workloadDigest(workloads);
-    let mutationDetected = false;
-    for (const workload of workloads) {
-        const before = digest(shapeWorkload(workload));
-        const baselineResult = executeSemanticCase(baseline, baselineHelper, workload);
-        const afterBaseline = digest(shapeWorkload(workload));
-        const candidateResult = executeSemanticCase(candidate, candidateHelper, workload);
-        const afterCandidate = digest(shapeWorkload(workload));
-        const baselineJson = canonicalJson(baselineResult);
-        const candidateJson = canonicalJson(candidateResult);
-        baselineHash.update(`${workload.id}\0${baselineJson}\n`);
-        candidateHash.update(`${workload.id}\0${candidateJson}\n`);
-        const inputsUnchanged = before === afterBaseline && before === afterCandidate;
-        mutationDetected ||= !inputsUnchanged;
-        if ((baselineJson !== candidateJson || !inputsUnchanged) && mismatches.length < 12) {
-            mismatches.push({
-                workloadId: workload.id,
-                profile: workload.profile,
-                outputsIdentical: baselineJson === candidateJson,
-                inputsUnchanged,
-                inputSha256: { before, afterBaseline, afterCandidate },
-                baselineResultSha256: sha256(baselineJson),
-                candidateResultSha256: sha256(candidateJson),
-                baselineResult: baselineResult,
-                candidateResult: candidateResult,
-            });
-        }
-    }
-    const workloadsAfter = workloadDigest(workloads);
-    const baselineSha256 = baselineHash.digest("hex");
-    const candidateSha256 = candidateHash.digest("hex");
-    const passed =
-        baselineSha256 === candidateSha256 &&
-        !mutationDetected &&
-        workloadsBefore === workloadsAfter &&
-        mismatches.length === 0;
+    const timedLiveShaped = verifySemanticCorpus(baseline, candidate, timedLiveCases);
+    const fallbackEdge = verifySemanticCorpus(baseline, candidate, fallbackEdgeCases);
+    const inputsBefore = digest({
+        timedLiveShaped: (timedLiveShaped.inputs as { beforeSha256: string }).beforeSha256,
+        fallbackEdge: (fallbackEdge.inputs as { beforeSha256: string }).beforeSha256,
+    });
+    const inputsAfter = digest({
+        timedLiveShaped: (timedLiveShaped.inputs as { afterSha256: string }).afterSha256,
+        fallbackEdge: (fallbackEdge.inputs as { afterSha256: string }).afterSha256,
+    });
+    const baselineSha256 = digest({
+        timedLiveShaped: timedLiveShaped.baselineSha256,
+        fallbackEdge: fallbackEdge.baselineSha256,
+    });
+    const candidateSha256 = digest({
+        timedLiveShaped: timedLiveShaped.candidateSha256,
+        fallbackEdge: fallbackEdge.candidateSha256,
+    });
+    const mismatchCount = (timedLiveShaped.mismatchCount as number) + (fallbackEdge.mismatchCount as number);
+    const inputsUnchanged =
+        (timedLiveShaped.inputs as { unchanged: boolean }).unchanged &&
+        (fallbackEdge.inputs as { unchanged: boolean }).unchanged &&
+        inputsBefore === inputsAfter;
     return {
-        passed,
-        cases: workloads.length,
+        passed:
+            timedLiveShaped.passed &&
+            fallbackEdge.passed &&
+            baselineSha256 === candidateSha256 &&
+            inputsUnchanged &&
+            mismatchCount === 0,
+        cases: timedLiveCases.length + fallbackEdgeCases.length,
         comparison:
-            "ordered cells/hashes/knownPaths/routes; Float64 bit patterns for every coordinate, key, and weight; per-result WeakMap traversal IDs preserving all container/route/XY reference aliases; flags; exception name/message/cause; eight-draw RNG tail",
+            "ordered cells/hashes/knownPaths/routes; Float64 bit patterns for every coordinate, key, and weight; per-result WeakMap traversal IDs preserving all container/route/XY reference aliases; exact exception name/message/cause; eight-draw RNG tail; sparse/ragged input topology and immutability",
         baselineSha256,
         candidateSha256,
+        corpora: { timedLiveShaped, fallbackEdge },
         inputs: {
             denseNumericRowsFrozen: false,
-            beforeSha256: workloadsBefore,
-            afterSha256: workloadsAfter,
-            unchanged: workloadsBefore === workloadsAfter && !mutationDetected,
+            sparseAndRaggedTopologyEncoded: true,
+            beforeSha256: inputsBefore,
+            afterSha256: inputsAfter,
+            unchanged: inputsUnchanged,
         },
-        mismatchCount: mismatches.length,
-        mismatches,
+        mismatchCount,
     };
 }
 
@@ -1390,7 +1710,9 @@ async function main(): Promise<void> {
     assertMatchingObstacleValues(baseline, candidate);
     const workloads = pathWorkloads(cli.seed, baseline.obstacleType);
     const workloadsBefore = workloadDigest(workloads);
-    const semantics = verifySemantics(baseline, candidate, workloads);
+    const timedLiveSemanticCases = timedSemanticCases(workloads);
+    const fallbackEdgeCases = fallbackSemanticCases(cli.seed);
+    const semantics = verifySemantics(baseline, candidate, timedLiveSemanticCases, fallbackEdgeCases);
     const benchmark = semantics.passed ? benchmarkResult(cli, baseline, candidate, workloads) : null;
     const workloadsAfter = workloadDigest(workloads);
     const baselineAfter = sourceSeal(cli.baselineRoot);
