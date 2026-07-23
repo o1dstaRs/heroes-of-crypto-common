@@ -86,6 +86,7 @@ interface ICliOptions {
     bootstrapSeed: number;
     bootstrapSamples: number;
     smoke: boolean;
+    invertOrder: boolean;
 }
 
 interface IArmyModule {
@@ -287,6 +288,7 @@ Options:
   --warmup-seed=4294967295        Discarded balanced warmup on every map
   --bootstrap-seed=2704611998     Deterministic seed-cluster bootstrap seed
   --bootstrap-samples=20000       Default: 20000 (smoke: 1000)
+  --invert-order                  Flip every measured and warmup AB/BA pair; individually ineligible
   --smoke                         Structural run; never marked qualified
   --help
 
@@ -355,6 +357,7 @@ function commandLine(): ICliOptions | undefined {
         options: {
             help: { type: "boolean", default: false },
             smoke: { type: "boolean", default: false },
+            "invert-order": { type: "boolean", default: false },
             "baseline-root": { type: "string" },
             "candidate-root": { type: "string" },
             out: { type: "string" },
@@ -386,6 +389,7 @@ function commandLine(): ICliOptions | undefined {
         candidateRoot,
         out,
         smoke,
+        invertOrder: values["invert-order"] ?? false,
         seeds: parseIntegerList(values.seeds ?? (smoke ? "1-2" : DEFAULT_SEEDS.join(",")), "--seeds", 0, UINT32_MAX),
         gridTypes: parseIntegerList(
             values["grid-types"] ?? (smoke ? "1,2" : DEFAULT_GRID_TYPES.join(",")),
@@ -963,7 +967,8 @@ async function main(): Promise<void> {
         const warmupRows: IWarmupRow[] = [];
         for (let index = 0; index < options.gridTypes.length; index++) {
             const gridType = options.gridTypes[index];
-            const order: TaskOrder = index % 2 === 0 ? "AB" : "BA";
+            const defaultOrder: TaskOrder = index % 2 === 0 ? "AB" : "BA";
+            const order: TaskOrder = options.invertOrder ? (defaultOrder === "AB" ? "BA" : "AB") : defaultOrder;
             const first =
                 order === "AB"
                     ? run(baseline, options.warmupSeed, gridType, options.maxLaps, "warmup", true)
@@ -1002,7 +1007,8 @@ async function main(): Promise<void> {
         const rows: ITaskRow[] = [];
         for (let ordinal = 0; ordinal < tasks.length; ordinal++) {
             const task = tasks[ordinal];
-            const order: TaskOrder = (task.seedIndex + task.gridIndex) % 2 === 0 ? "AB" : "BA";
+            const defaultOrder: TaskOrder = (task.seedIndex + task.gridIndex) % 2 === 0 ? "AB" : "BA";
+            const order: TaskOrder = options.invertOrder ? (defaultOrder === "AB" ? "BA" : "AB") : defaultOrder;
             const first =
                 order === "AB"
                     ? run(baseline, task.seed, task.gridType, options.maxLaps, "measured")
@@ -1114,7 +1120,8 @@ async function main(): Promise<void> {
             options.maxLaps === DEFAULT_MAX_LAPS &&
             options.warmupSeed === DEFAULT_WARMUP_SEED &&
             options.bootstrapSeed === DEFAULT_BOOTSTRAP_SEED &&
-            options.bootstrapSamples === DEFAULT_BOOTSTRAP_SAMPLES;
+            options.bootstrapSamples === DEFAULT_BOOTSTRAP_SAMPLES &&
+            !options.invertOrder;
         const eligible = !options.smoke && standardEvidenceProtocol;
         const qualified = eligible && exactnessPassed && performancePassed;
         const report = {
@@ -1122,6 +1129,7 @@ async function main(): Promise<void> {
             generatedAt: new Date().toISOString(),
             command: {
                 smoke: options.smoke,
+                invertOrder: options.invertOrder,
                 seeds: options.seeds,
                 gridTypes: options.gridTypes,
                 maxLaps: options.maxLaps,
@@ -1258,7 +1266,7 @@ async function main(): Promise<void> {
                 2,
             ),
         );
-        if (!options.smoke && !qualified) {
+        if (eligible && !qualified) {
             throw new Error(`A13 melee target-layer qualification gates failed; report retained at ${options.out}`);
         }
     } finally {
