@@ -163,6 +163,11 @@ export function buildV08A13SearchEnvironment(
         V07_VALUE_WEIGHTS: undefined,
         V07_VALUE_WEIGHTS_V2: JSON.stringify(V08_A13_VALUE_LEAF),
         V08_AGGRESSIVE: "1",
+        // Research-only post-catalog vetoes for the shipped protected-advance catalog. Production remains
+        // sealed default-off; the paired runner supplies all three gates together for its live-root arm.
+        V08_PROTECTED_ADVANCE_GUARDRAILS: "0",
+        V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY: "0",
+        V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS: "",
         V08_SUPPORTED_BAND_ADVANCE: "0",
         V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
         V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",

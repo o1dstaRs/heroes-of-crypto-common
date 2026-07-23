@@ -25,6 +25,7 @@ import { canUnitLandAt } from "../ai";
 import type {
     IAIPolicyEvent,
     IDecisionContext,
+    V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandAdvanceFunnelStage,
     V08SupportedPrepinEgressFunnelStage,
 } from "../ai_strategy";
@@ -45,6 +46,9 @@ const SUPPORTED_BAND_ADVANCE_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_VERSIONS
 const SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS";
 const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY";
 const SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS";
+const PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS";
+const PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY";
+const PROTECTED_ADVANCE_GUARDRAILS_VERSIONS_ENV = "V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -67,6 +71,24 @@ interface IRouteView {
     readonly minEnemyDistance: number;
     readonly nearestFrontlineDistance: number;
     readonly futureDivisor: number;
+}
+
+interface IProtectedAdvanceMetadata {
+    readonly fromCell: XY;
+    readonly toCell: XY;
+    readonly targetId: string;
+    readonly targetCreatureName: string;
+    readonly divisorBefore: number;
+    readonly divisorAfter: number;
+    readonly ownRangedOutput: number;
+    readonly enemyRangedOutput: number;
+    readonly finishActive: boolean;
+    readonly reachableThreatsAfter: number;
+}
+
+interface IProtectedAdvanceCatalog {
+    readonly decision: GameAction[];
+    readonly metadata?: IProtectedAdvanceMetadata;
 }
 
 const cellDistance = (left: readonly XY[], right: readonly XY[]): number => {
@@ -836,12 +858,12 @@ function minimumFootprintResponseDivisor(target: Unit, footprint: readonly XY[],
  * the destination next turn. The current shot stays untouched for Sniper/AOE/piercing geometry and exposed
  * destinations.
  */
-function protectedAdvanceShot(
+function protectedAdvanceShotCatalog(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
     responseNeutralAdvance: boolean,
-): GameAction[] {
+): IProtectedAdvanceCatalog {
     const attackHandler = context.attackHandler;
     const shot = decision.find((action) => action.type === "range_attack");
     if (
@@ -861,11 +883,11 @@ function protectedAdvanceShot(
         unit.hasDebuffActive("Rangebane") ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))
     ) {
-        return decision;
+        return { decision };
     }
     const target = context.unitsHolder.getAllUnits().get(shot.targetId);
     if (!target || target.isDead() || isHidden(target)) {
-        return decision;
+        return { decision };
     }
     // Closing distance can also improve the target's immediate ranged response. Until that exchange is priced
     // exactly (including interception and special damage), keep the advance conservative: only close on a target
@@ -884,9 +906,10 @@ function protectedAdvanceShot(
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
     if (targetCanCounter && !responseNeutralAdvance) {
-        return decision;
+        return { decision };
     }
     const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
+    const ownRangedOutput = rangedOutput(context.unitsHolder.getAllAllies(unit.getTeam()));
     const enemyRangedOutput = rangedOutput(enemies);
     const finishActive = v08DominantFinishState(
         context.unitsHolder,
@@ -896,12 +919,8 @@ function protectedAdvanceShot(
     // If our live ranged army already wins the distance battle, keep shooting from safety and make the weaker
     // side close. Once the commanding/universal finish sprint is armed, crossing a safe band is direct combat
     // rather than passive posture and must not be vetoed on the road to Armageddon.
-    if (
-        !finishActive &&
-        enemyRangedOutput > 0 &&
-        rangedOutput(context.unitsHolder.getAllAllies(unit.getTeam())) > enemyRangedOutput
-    ) {
-        return decision;
+    if (!finishActive && enemyRangedOutput > 0 && ownRangedOutput > enemyRangedOutput) {
+        return { decision };
     }
     const frontliners = context.unitsHolder
         .getAllAllies(unit.getTeam())
@@ -924,11 +943,11 @@ function protectedAdvanceShot(
         false,
     );
     if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) {
-        return decision;
+        return { decision };
     }
     const currentDivisor = currentEvaluation.rangeAttackDivisors[0] ?? 1;
     if (currentDivisor <= 1) {
-        return decision;
+        return { decision };
     }
 
     let currentResponseDivisor: number | undefined;
@@ -940,7 +959,7 @@ function protectedAdvanceShot(
             target.hasAbilityActive("Large Caliber") ||
             target.hasAbilityActive("Area Throw")
         ) {
-            return decision;
+            return { decision };
         }
         const response = attackHandler.evaluateRangeAttack(
             context.unitsHolder.getAllUnits(),
@@ -952,11 +971,11 @@ function protectedAdvanceShot(
             false,
         );
         if (response.affectedUnits[0]?.[0]?.getId() !== unit.getId()) {
-            return decision;
+            return { decision };
         }
         currentResponseDivisor = response.rangeAttackDivisors[0];
         if (!Number.isFinite(currentResponseDivisor)) {
-            return decision;
+            return { decision };
         }
     }
 
@@ -1026,7 +1045,7 @@ function protectedAdvanceShot(
         }
     }
     if (!best) {
-        return decision;
+        return { decision };
     }
     if (targetCanCounter) {
         context.policyEventObserver?.({
@@ -1037,7 +1056,94 @@ function protectedAdvanceShot(
             lap: context.fightProperties?.getCurrentLap() ?? 0,
         });
     }
-    return [moveAction(unit, best.route, best.footprint), ...decision];
+    return {
+        decision: [moveAction(unit, best.route, best.footprint), ...decision],
+        metadata: {
+            fromCell: { ...unit.getBaseCell() },
+            toCell: { ...best.route.cell },
+            targetId: target.getId(),
+            targetCreatureName: target.getName(),
+            divisorBefore: currentDivisor,
+            divisorAfter: bestDivisor,
+            ownRangedOutput,
+            enemyRangedOutput,
+            finishActive,
+            reachableThreatsAfter: best.protection.reachableThreats,
+        },
+    };
+}
+
+function protectedAdvanceShot(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    responseNeutralAdvance: boolean,
+): GameAction[] {
+    return protectedAdvanceShotCatalog(unit, context, decision, responseNeutralAdvance).decision;
+}
+
+function protectedAdvanceGuardrailsActive(context: IDecisionContext, strategyVersion: string): boolean {
+    if (
+        process.env[PROTECTED_ADVANCE_GUARDRAILS_ENABLED_ENV] !== "1" ||
+        process.env[PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY_ENV] !== "1" ||
+        context.decisionOrigin !== "root"
+    ) {
+        return false;
+    }
+    return (process.env[PROTECTED_ADVANCE_GUARDRAILS_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .includes(strategyVersion);
+}
+
+/**
+ * Live-root post-catalog guardrails for the shipped protected advance. The incumbent catalog is built exactly
+ * once before version selection, preserving its incoming and outgoing seeded path stream. A pre-finish shooter
+ * holds when its ranged army is stronger (including against zero enemy ranged output), and a pre-finish close
+ * must reach full damage. Dominant/urgent finish pressure releases both vetoes. Every other proposal, including
+ * a zero-reach full-damage close without a native melee screen, remains the exact incumbent decision.
+ */
+function protectedAdvanceShotWithGuardrails(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    responseNeutralAdvance: boolean,
+): GameAction[] {
+    const legacyEvents: IAIPolicyEvent[] = [];
+    const catalog = protectedAdvanceShotCatalog(
+        unit,
+        { ...context, policyEventObserver: (event) => legacyEvents.push(event) },
+        decision,
+        responseNeutralAdvance,
+    );
+    const metadata = catalog.metadata;
+    let reason: V08ProtectedAdvanceGuardrailReason | undefined;
+    if (metadata && !metadata.finishActive) {
+        if (metadata.ownRangedOutput > metadata.enemyRangedOutput) {
+            reason = "ranged_superior_hold";
+        } else if (!Number.isFinite(metadata.divisorAfter) || metadata.divisorAfter !== 1) {
+            reason = "partial_band";
+        }
+    }
+    if (!reason || !metadata) {
+        for (const event of legacyEvents) context.policyEventObserver?.(event);
+        return catalog.decision;
+    }
+
+    context.policyEventObserver?.({
+        kind: "v0.8_protected_advance_guardrail",
+        unitId: unit.getId(),
+        creatureName: unit.getName(),
+        team: unit.getTeam(),
+        lap: context.fightProperties?.getCurrentLap() ?? 0,
+        details: {
+            reason,
+            ...metadata,
+            rangedSuperior: metadata.ownRangedOutput > metadata.enemyRangedOutput,
+        },
+    });
+    return decision;
 }
 
 /**
@@ -1260,10 +1366,13 @@ export function prioritizeV08RangedPositioning(
         process.env[SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV] === "1" &&
         bandAdvanceLegacyControlVersions.size > 0 &&
         (bandAdvanceSelectorVersions.has(strategyVersion) || bandAdvanceLegacyControlVersions.has(strategyVersion));
+    const protectedAdvanceGuardrails = protectedAdvanceGuardrailsActive(context, strategyVersion);
     const advanced = bandAdvanceVsLegacy
         ? supportedBandAdvanceVsLegacy(unit, context, decision, strategyVersion, responseNeutralAdvance)
         : !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
-          ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
+          ? protectedAdvanceGuardrails
+              ? protectedAdvanceShotWithGuardrails(unit, context, decision, responseNeutralAdvance)
+              : protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
           : decision;
     const retreated =
         mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
