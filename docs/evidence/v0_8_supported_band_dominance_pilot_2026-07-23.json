@@ -1,0 +1,123 @@
+{
+    "schema": "heroes-of-crypto/v0-8-supported-band-dominance-pilot-evidence/v1",
+    "recordedAt": "2026-07-23T18:43:24.249Z",
+    "candidate": {
+        "head": "9963e759350e669e8b4f19cf9da1cacd365d00ac",
+        "tree": "f440ea6567f248c949fd03150ada3d07d614043a",
+        "pushed": true,
+        "clean": true
+    },
+    "protocol": {
+        "path": "docs/evidence/v0_8_supported_band_dominance_protocol_2026-07-23.json",
+        "sha256": "f7be79bce44c1fe0e36a8cc004febb342d47748415cdb265e1bb0f63273611d6"
+    },
+    "analyzer": {
+        "path": "/tmp/hoc-dominance-overlay-paired-analysis-v1.mjs",
+        "sha256": "a029d3de012ea111023714f75618da842040b467d38916c5e3358c558f7311ae",
+        "readOnlyBeforeLaunch": true,
+        "selfTestAssertions": 37
+    },
+    "phase": {
+        "name": "pilot",
+        "cohort": "hybrid",
+        "gamesPerArm": 2000,
+        "pairSeedClusters": 1000,
+        "baseSeed": 2703034961,
+        "concurrencyPerArm": 6,
+        "amountMode": "expBudget",
+        "liveTwin": true,
+        "pairedSideSwap": true,
+        "symmetricRosters": true,
+        "timing": "research_unbounded",
+        "mode": "both",
+        "moveShots": 0
+    },
+    "completionBarrier": {
+        "treatmentExitCode": 0,
+        "controlExitCode": 0,
+        "treatmentRecordsBeforeOutcomeParse": 2000,
+        "controlRecordsBeforeOutcomeParse": 2000,
+        "outcomesOpenedOnlyAfterBothArmsCompleted": true
+    },
+    "raw": {
+        "treatment": {
+            "winsA": 992,
+            "winsB": 992,
+            "draws": 16,
+            "candidateScore": 0.5,
+            "averageLaps": 6.278,
+            "armageddonDecided": 56,
+            "rejectedActions": 0
+        },
+        "control": {
+            "winsA": 992,
+            "winsB": 992,
+            "draws": 16,
+            "candidateScore": 0.5,
+            "averageLaps": 6.278,
+            "armageddonDecided": 56,
+            "rejectedActions": 0
+        }
+    },
+    "telemetry": {
+        "strictEligibleComparisons": 74,
+        "dominanceProposals": 0,
+        "dominanceFilteredComparisons": 74,
+        "invalidComparisons": 0,
+        "retainedActualDifferences": 0,
+        "comparisonByCandidateSide": {
+            "green": 28,
+            "red": 46
+        },
+        "metricTuple": {
+            "strictDivisorAfter": 1,
+            "shippedDivisorAfter": 1,
+            "strictReachableThreatsAfter": 0,
+            "shippedReachableThreatsAfter": 0,
+            "comparisons": 74
+        },
+        "identicalExecutableRoutes": 38,
+        "differentExecutableRoutes": 36
+    },
+    "pairedDelta": {
+        "score": 0,
+        "armageddon": 0,
+        "meanLaps": 0,
+        "candidateGreenScore": 0,
+        "candidateRedScore": 0
+    },
+    "verdict": {
+        "passed": false,
+        "disposition": "not-testable-stop",
+        "failedExposureGates": {
+            "dominanceProposals": {
+                "value": 0,
+                "minimum": 3
+            },
+            "retainedActualDifferences": {
+                "value": 0,
+                "minimum": 2
+            }
+        },
+        "integrityPassed": true,
+        "interpretation": "The candidate was inert on this pilot lane: every eligible strict route tied shipped on full-damage divisor and reachable-threat count, so the fail-closed selector preserved shipped exactly.",
+        "authorizedNextPhase": null,
+        "largerScoutStarted": false,
+        "crossPhasePoolingAllowed": false
+    },
+    "hashes": {
+        "treatment": {
+            "experiment": "94b29838efafb969f1a7f73ed729c3ef26e840d673efc1de25e9ef6137530926",
+            "records": "bcebbb8fcd447a2c2faa3edefb9831c3a1f83703ccfb388ef1dde4d7d5c68f2f",
+            "summary": "0748145e3a507ff19a67492d934c12586bd67f8023774c292939c8367a8c434a",
+            "normalizedManifest": "5bc56002face02ddc32a406dca574475d61e8620ce1bd1e9439d7f0d7babd8f7"
+        },
+        "control": {
+            "experiment": "421c1e0333263a6928896e68181328b855fb2442350bcedd05fc3913434327d5",
+            "records": "b53b5741b3dd6e6dfdf814e390d602644ab74e14fab4745e1cb80c292ba8d0b1",
+            "summary": "a66a7a100fa88b48e31aecbf2360f80e5c4b0fdb309d89f282535382ad7f345a",
+            "normalizedManifest": "d8f73b4a6ec8b592b92cb9fc441619640c2c1be1549772c2c5a61a54a909ef0d"
+        },
+        "pathIndependentComposite": "cec0f5d18316d65d01d74327ca6761fe848c6bcbddb80f7a567edd6cf4faa801"
+    }
+}
