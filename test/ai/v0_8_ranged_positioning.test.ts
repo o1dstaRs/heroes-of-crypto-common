@@ -1680,6 +1680,78 @@ describe("v0.8 protected ranged positioning", () => {
         ).toEqual(["screened_closer_eligible", "screened_closer_filtered"]);
     });
 
+    it("filters different paths that land on the same destination footprint in a different cell order", () => {
+        const strictDetails: IV08SupportedBandAdvanceDetails = {
+            fromCell: { x: 5, y: 7 },
+            toCell: { x: 5, y: 4 },
+            targetId: "target",
+            targetCreatureName: "Target",
+            exposureBefore: 0,
+            exposureAfter: 0,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 3,
+            minEnemyDistanceBefore: 6,
+            minEnemyDistanceAfter: 3,
+            rangedSuperior: false,
+            finishActive: false,
+            targetScreenedAfter: true,
+            screeningGuardId: "strict-guard",
+            retainedSignatureAfter: true,
+        };
+        const strictSummary: IV08SupportedBandDuelDecisionSummary = {
+            actionTypes: ["move_unit", "range_attack"],
+            movePath: [
+                { x: 5, y: 6 },
+                { x: 5, y: 5 },
+                { x: 5, y: 4 },
+            ],
+            moveTargetCells: [
+                { x: 5, y: 4 },
+                { x: 6, y: 4 },
+            ],
+            moveHasLavaCell: false,
+            moveHasWaterCell: false,
+            rangeTargetId: "target",
+            rangeAimCell: { x: 5, y: 1 },
+            rangeAimSide: 0,
+        };
+        const shippedSummary: IV08SupportedBandDuelDecisionSummary = {
+            ...strictSummary,
+            movePath: [
+                { x: 4, y: 6 },
+                { x: 4, y: 5 },
+                { x: 5, y: 4 },
+            ],
+            moveTargetCells: [
+                { x: 6, y: 4 },
+                { x: 5, y: 4 },
+            ],
+        };
+        const shippedMetadata: IV08ProtectedAdvanceCatalogMetadata = {
+            fromCell: { ...strictDetails.fromCell },
+            toCell: { ...strictDetails.toCell },
+            targetId: strictDetails.targetId,
+            targetCreatureName: strictDetails.targetCreatureName,
+            divisorBefore: 2,
+            divisorAfter: 1,
+            ownRangedOutput: 80,
+            enemyRangedOutput: 20,
+            finishActive: false,
+            reachableThreatsAfter: 0,
+            targetDistanceBefore: 6,
+            targetDistanceAfter: 4,
+            targetScreenedAfter: false,
+            screeningGuardId: null,
+            retainedSignatureAfter: true,
+        };
+
+        expect(
+            compareV08SupportedBandScreenedCloser(strictDetails, strictSummary, shippedMetadata, shippedSummary),
+        ).toMatchObject({ dominant: false, metadataValid: true, reason: "filtered" });
+    });
+
     it("separates valid screened-closer filters from malformed catalog integrity failures", () => {
         const strictDetails: IV08SupportedBandAdvanceDetails = {
             fromCell: { x: 5, y: 7 },

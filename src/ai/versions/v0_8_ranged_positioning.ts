@@ -1158,6 +1158,15 @@ const sameCells = (left: readonly XY[] | null, right: readonly XY[] | null): boo
         left.length === right.length &&
         left.every((cell, index) => cell.x === right[index]!.x && cell.y === right[index]!.y));
 
+const sameCellFootprint = (left: readonly XY[] | null, right: readonly XY[] | null): boolean => {
+    if (left === right) return true;
+    if (left === null || right === null || left.length !== right.length) return false;
+    const canonical = (cells: readonly XY[]): XY[] => [...cells].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+    const canonicalLeft = canonical(left);
+    const canonicalRight = canonical(right);
+    return canonicalLeft.every((cell, index) => sameCell(cell, canonicalRight[index]!));
+};
+
 function sameSupportedBandDuelDecision(
     left: IV08SupportedBandDuelDecisionSummary,
     right: IV08SupportedBandDuelDecisionSummary,
@@ -1510,6 +1519,7 @@ export function compareV08SupportedBandScreenedCloser(
         shippedTargetDistanceAfter !== null &&
         shippedTargetDistanceAfter < shippedTargetDistanceBefore &&
         strictTargetDistanceAfter! < shippedTargetDistanceAfter! &&
+        !sameCellFootprint(strictSummary.moveTargetCells, shippedSummary.moveTargetCells) &&
         !sameSupportedBandDuelDecision(strictSummary, shippedSummary);
     return {
         dominant,
