@@ -28,8 +28,10 @@ export type {
     IAIStrategy,
     IDecisionContext,
     IPlacementContext,
+    IV08ProtectedAdvanceGuardrailDetails,
     IV08SupportedBandAdvanceDetails,
     IV08SupportedPrepinEgressDetails,
+    V08ProtectedAdvanceGuardrailReason,
 } from "./ai_strategy";
 
 // Browser-safe identity and immutable configuration for the promoted v0.8+a13

@@ -492,6 +492,9 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
+    delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS;
+    delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY;
+    delete process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS;
     setDeterministicRandomSource(undefined);
 });
 
@@ -509,6 +512,191 @@ describe("v0.8 protected ranged positioning", () => {
         ]);
         expect(policyEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
         expect(policyEvents.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+    });
+
+    it("keeps the protected-advance guardrails default-off", () => {
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+        const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+        context.decisionOrigin = "root";
+        const events: IAIPolicyEvent[] = [];
+        context.policyEventObserver = (event) => events.push(event);
+
+        expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+            "move_unit",
+            "range_attack",
+        ]);
+        expect(events.map(({ kind }) => kind)).not.toContain("v0.8_protected_advance_guardrail");
+    });
+
+    it("post-vetoes only pre-finish stronger-ranged and partial-band legacy advances", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+
+        const run = (
+            options: Parameters<typeof setupSupportedBandAdvance>[0],
+            version: "v0.8" | "v0.8s",
+        ): { actions: string[]; events: IAIPolicyEvent[] } => {
+            const { shooter, context } = setupSupportedBandAdvance(options);
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            const strategy = version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S();
+            return { actions: strategy.decideTurn(shooter, context).map((action) => action.type), events };
+        };
+
+        const stronger = run({ targetRanged: false }, "v0.8");
+        expect(stronger.actions).toEqual(["range_attack"]);
+        expect(stronger.events.find(({ kind }) => kind === "v0.8_protected_advance_guardrail")?.details).toMatchObject({
+            reason: "ranged_superior_hold",
+            divisorBefore: 2,
+            divisorAfter: 1,
+            enemyRangedOutput: 0,
+            rangedSuperior: true,
+            finishActive: false,
+        });
+        expect(run({ targetRanged: false }, "v0.8s").actions).toEqual(["move_unit", "range_attack"]);
+
+        const partialOptions = {
+            destination: { x: 4, y: 4 },
+            shotDistance: 2,
+            targetAbilities: ["No Melee"],
+            includeGuard: false,
+        };
+        const partialControl = run(partialOptions, "v0.8s");
+        expect(partialControl.actions).toEqual(["move_unit", "range_attack"]);
+        const partial = run(partialOptions, "v0.8");
+        expect(partial.actions).toEqual(["range_attack"]);
+        expect(partial.events.find(({ kind }) => kind === "v0.8_protected_advance_guardrail")?.details).toMatchObject({
+            reason: "partial_band",
+            divisorBefore: 4,
+            divisorAfter: 2,
+            rangedSuperior: false,
+            finishActive: false,
+        });
+    });
+
+    it("preserves safe full-damage legacy closes without a native guard", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+        const run = (version: "v0.8" | "v0.8s") => {
+            const { shooter, target, context, destination } = setupSupportedBandAdvance({ includeGuard: false });
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            const actions = (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S()).decideTurn(
+                shooter,
+                context,
+            );
+            return { actions, events, targetId: target.getId(), destination };
+        };
+
+        const treatment = run("v0.8");
+        const control = run("v0.8s");
+        expect(treatment.actions.map((action) => action.type)).toEqual(control.actions.map((action) => action.type));
+        expect(treatment.actions).toMatchObject([
+            { type: "move_unit", targetCells: [treatment.destination] },
+            { type: "range_attack", targetId: treatment.targetId },
+        ]);
+        expect(control.actions).toMatchObject([
+            { type: "move_unit", targetCells: [control.destination] },
+            { type: "range_attack", targetId: control.targetId },
+        ]);
+        expect(treatment.events.map(({ kind }) => kind)).not.toContain("v0.8_protected_advance_guardrail");
+    });
+
+    it("releases both protected-advance guardrails during dominant or urgent finish", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+        const cases: Array<Parameters<typeof setupSupportedBandAdvance>[0]> = [
+            { targetRanged: false },
+            {
+                destination: { x: 4, y: 4 },
+                shotDistance: 2,
+                targetAbilities: ["No Melee"],
+                includeGuard: false,
+            },
+        ];
+
+        for (const options of cases) {
+            const { shooter, target, context } = setupSupportedBandAdvance(options);
+            context.decisionOrigin = "root";
+            while (context.fightProperties!.getCurrentLap() < V08_URGENT_FINISH_START_LAP) {
+                context.fightProperties!.flipLap();
+            }
+            context.fightProperties!.addRepliedAttack(target.getId());
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            expect(new StrategyV0_8().decideTurn(shooter, context).map((action) => action.type)).toEqual([
+                "move_unit",
+                "range_attack",
+            ]);
+            expect(events.map(({ kind }) => kind)).not.toContain("v0.8_protected_advance_guardrail");
+        }
+    });
+
+    it("hard-gates protected-advance guardrails to configured explicit live roots", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+        const run = (origin?: "root" | "rollout", liveOnly = "1", version: "v0.8" | "v0.8s" = "v0.8") => {
+            process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = liveOnly;
+            const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+            context.decisionOrigin = origin;
+            return (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S())
+                .decideTurn(shooter, context)
+                .map((action) => action.type);
+        };
+
+        expect(run("root")).toEqual(["range_attack"]);
+        expect(run("rollout")).toEqual(["move_unit", "range_attack"]);
+        expect(run()).toEqual(["move_unit", "range_attack"]);
+        expect(run("root", "0")).toEqual(["move_unit", "range_attack"]);
+        expect(run("root", "1", "v0.8s")).toEqual(["move_unit", "range_attack"]);
+    });
+
+    it("builds one legacy catalog with equal RNG tails before guardrail selection", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
+        process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS = "v0.8";
+        const run = (version: "v0.8" | "v0.8s") => {
+            const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+            context.decisionOrigin = "root";
+            const originalPathHelper = context.pathHelper;
+            let catalogCalls = 0;
+            context.pathHelper = {
+                getMovePath: (...args: Parameters<PathHelper["getMovePath"]>) => {
+                    catalogCalls += 1;
+                    getRandomInt(0, 1_000_000);
+                    return originalPathHelper.getMovePath(...args);
+                },
+            } as PathHelper;
+            setDeterministicRandomSource(makeRng(0x51ec7));
+            const actions = (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S())
+                .decideTurn(shooter, context)
+                .map((action) => action.type);
+            return {
+                actions,
+                catalogCalls,
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const treatment = run("v0.8");
+        const control = run("v0.8s");
+        expect(treatment.actions).toEqual(["range_attack"]);
+        expect(control.actions).toEqual(["move_unit", "range_attack"]);
+        expect(treatment.catalogCalls).toBe(1);
+        expect(control.catalogCalls).toBe(1);
+        expect(treatment.tail).toEqual(control.tail);
     });
 
     it("strictly closes one damage band at a root only behind an exact native melee screen", () => {

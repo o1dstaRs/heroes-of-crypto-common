@@ -11,7 +11,12 @@
 
 import { describe, expect, test } from "bun:test";
 
-import type { IAIPolicyEvent, IV08SupportedBandAdvanceDetails, IV08SupportedPrepinEgressDetails } from "../../src/ai";
+import type {
+    IAIPolicyEvent,
+    IV08ProtectedAdvanceGuardrailDetails,
+    IV08SupportedBandAdvanceDetails,
+    IV08SupportedPrepinEgressDetails,
+} from "../../src/ai";
 import { V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES } from "../../src/ai/ai_strategy";
 import {
     aggregateMirrorDiag,
@@ -23,6 +28,7 @@ import {
     summarizeMirrorRecords,
     type IMirrorGameRecord,
     type IMirrorRunConfig,
+    type IMirrorSideDiag,
 } from "../../src/simulation/measure_mirror_cohorts";
 import {
     GREEN_TEAM,
@@ -69,6 +75,21 @@ const BAND_ADVANCE_DETAILS: IV08SupportedBandAdvanceDetails = {
     minEnemyDistanceAfter: 3,
     rangedSuperior: false,
     finishActive: true,
+};
+
+const PROTECTED_ADVANCE_GUARDRAIL_DETAILS: IV08ProtectedAdvanceGuardrailDetails = {
+    reason: "ranged_superior_hold",
+    fromCell: { x: 0, y: 1 },
+    toCell: { x: 1, y: 1 },
+    targetId: "guardrail-target",
+    targetCreatureName: "Guardrail target",
+    divisorBefore: 2,
+    divisorAfter: 1,
+    ownRangedOutput: 200,
+    enemyRangedOutput: 100,
+    rangedSuperior: true,
+    finishActive: false,
+    reachableThreatsAfter: 0,
 };
 
 function fakeResult(
@@ -259,9 +280,27 @@ describe("measure_mirror_cohorts", () => {
         expect(first.diag?.green.supportedBandAdvanceSelections).toBe(0);
         expect(first.diag?.red.supportedBandAdvanceProposals).toBe(0);
         expect(first.supportedBandAdvanceEvents).toBeUndefined();
+        expect(first.diag?.green.protectedAdvanceGuardrailVetoes).toBe(0);
+        expect(first.diag?.red.protectedAdvanceGuardrailVetoesByReason).toEqual({
+            ranged_superior_hold: 0,
+            partial_band: 0,
+        });
+        expect(first.diag?.green.protectedAdvanceGuardrailProposals).toBe(0);
+        expect(first.diag?.red.protectedAdvanceGuardrailProposalsByReason).toEqual({
+            ranged_superior_hold: 0,
+            partial_band: 0,
+        });
+        expect(first.protectedAdvanceGuardrailEvents).toBeUndefined();
         expect(first.diag?.green.supportedPrepinEgressSelections).toBe(0);
         expect(first.diag?.red.supportedPrepinEgressProposals).toBe(0);
         expect(first.supportedPrepinEgressEvents).toBeUndefined();
+
+        // Historical JSONL records omit the additive guardrail counters; aggregation must treat them as zero.
+        const historicalSide = swapped.diag!.green as Partial<IMirrorSideDiag>;
+        delete historicalSide.protectedAdvanceGuardrailVetoes;
+        delete historicalSide.protectedAdvanceGuardrailVetoesByReason;
+        delete historicalSide.protectedAdvanceGuardrailProposals;
+        delete historicalSide.protectedAdvanceGuardrailProposalsByReason;
 
         const aggregate = aggregateMirrorDiag([first, swapped], cfg) as {
             versions: Record<
@@ -279,6 +318,10 @@ describe("measure_mirror_cohorts", () => {
                     responseNeutralAdvanceProposals: number;
                     supportedBandAdvanceSelections: number;
                     supportedBandAdvanceProposals: number;
+                    protectedAdvanceGuardrailVetoes: number;
+                    protectedAdvanceGuardrailVetoesByReason: Record<string, number>;
+                    protectedAdvanceGuardrailProposals: number;
+                    protectedAdvanceGuardrailProposalsByReason: Record<string, number>;
                     supportedPrepinEgressSelections: number;
                     supportedPrepinEgressProposals: number;
                 }
@@ -298,6 +341,16 @@ describe("measure_mirror_cohorts", () => {
                 responseNeutralAdvanceProposals: 1,
                 supportedBandAdvanceSelections: 0,
                 supportedBandAdvanceProposals: 0,
+                protectedAdvanceGuardrailVetoes: 0,
+                protectedAdvanceGuardrailVetoesByReason: {
+                    ranged_superior_hold: 0,
+                    partial_band: 0,
+                },
+                protectedAdvanceGuardrailProposals: 0,
+                protectedAdvanceGuardrailProposalsByReason: {
+                    ranged_superior_hold: 0,
+                    partial_band: 0,
+                },
                 supportedPrepinEgressSelections: 0,
                 supportedPrepinEgressProposals: 0,
             });
@@ -398,6 +451,167 @@ describe("measure_mirror_cohorts", () => {
         expect(Object.values(aggregate.versions["v0.8s"].supportedBandAdvanceFunnelPerGame)).toEqual(
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES.map(() => 0),
         );
+    });
+
+    test("tracks protected-advance guardrail vetoes, reasons, and detached seed-forensic events", () => {
+        const cfg: IMirrorRunConfig = { ...BASE_CFG, vA: "v0.8", vB: "v0.8s", diag: true };
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            const candidateTeam = config.greenVersion === "v0.8" ? GREEN_TEAM : RED_TEAM;
+            const vetoes: IAIPolicyEvent[] = [
+                {
+                    kind: "v0.8_protected_advance_guardrail",
+                    unitId: "stronger-ranged-veto",
+                    creatureName: "Arbalester",
+                    team: candidateTeam,
+                    lap: 2,
+                    details: {
+                        ...PROTECTED_ADVANCE_GUARDRAIL_DETAILS,
+                        fromCell: { ...PROTECTED_ADVANCE_GUARDRAIL_DETAILS.fromCell },
+                        toCell: { ...PROTECTED_ADVANCE_GUARDRAIL_DETAILS.toCell },
+                    },
+                },
+                {
+                    kind: "v0.8_protected_advance_guardrail",
+                    unitId: "partial-band-veto",
+                    creatureName: "Orc",
+                    team: candidateTeam,
+                    lap: 3,
+                    details: {
+                        ...PROTECTED_ADVANCE_GUARDRAIL_DETAILS,
+                        reason: "partial_band",
+                        fromCell: { x: 3, y: 4 },
+                        toCell: { x: 4, y: 4 },
+                        targetId: "partial-target",
+                        targetCreatureName: "Tsar Cannon",
+                        divisorBefore: 4,
+                        divisorAfter: 2,
+                        ownRangedOutput: 100,
+                        enemyRangedOutput: 200,
+                        rangedSuperior: false,
+                    },
+                },
+            ];
+            for (const veto of vetoes) config.policyProposalObserver?.(veto);
+            config.policyEventObserver?.(vetoes[0]);
+            return fakeResult(config, "draw");
+        };
+        const records = [playMirrorGame(cfg, 0, { matchRunner }), playMirrorGame(cfg, 1, { matchRunner })];
+
+        for (const record of records) {
+            const candidate = record.diag!.green.version === "v0.8" ? record.diag!.green : record.diag!.red;
+            const control = record.diag!.green.version === "v0.8s" ? record.diag!.green : record.diag!.red;
+            expect(candidate.protectedAdvanceGuardrailVetoes).toBe(1);
+            expect(candidate.protectedAdvanceGuardrailVetoesByReason).toEqual({
+                ranged_superior_hold: 1,
+                partial_band: 0,
+            });
+            expect(candidate.protectedAdvanceGuardrailProposals).toBe(2);
+            expect(candidate.protectedAdvanceGuardrailProposalsByReason).toEqual({
+                ranged_superior_hold: 1,
+                partial_band: 1,
+            });
+            expect(control.protectedAdvanceGuardrailVetoes).toBe(0);
+            expect(control.protectedAdvanceGuardrailVetoesByReason).toEqual({
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            });
+            expect(control.protectedAdvanceGuardrailProposals).toBe(0);
+            expect(control.protectedAdvanceGuardrailProposalsByReason).toEqual({
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            });
+            expect(record.protectedAdvanceGuardrailEvents).toHaveLength(2);
+            expect(record.protectedAdvanceGuardrailEvents?.[0]).toMatchObject({
+                ...PROTECTED_ADVANCE_GUARDRAIL_DETAILS,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: "stronger-ranged-veto",
+                creatureName: "Arbalester",
+                lap: 2,
+                retained: true,
+            });
+            expect(record.protectedAdvanceGuardrailEvents?.[1]).toMatchObject({
+                reason: "partial_band",
+                fromCell: { x: 3, y: 4 },
+                toCell: { x: 4, y: 4 },
+                targetId: "partial-target",
+                targetCreatureName: "Tsar Cannon",
+                divisorBefore: 4,
+                divisorAfter: 2,
+                ownRangedOutput: 100,
+                enemyRangedOutput: 200,
+                rangedSuperior: false,
+                finishActive: false,
+                reachableThreatsAfter: 0,
+                side: record.greenVersion === "v0.8" ? "green" : "red",
+                unitId: "partial-band-veto",
+                creatureName: "Orc",
+                lap: 3,
+                retained: false,
+            });
+            expect(record.protectedAdvanceGuardrailEvents?.map(({ retained }) => retained)).toEqual([true, false]);
+        }
+        expect(records[0].protectedAdvanceGuardrailEvents?.[0].side).toBe("green");
+        expect(records[1].protectedAdvanceGuardrailEvents?.[0].side).toBe("red");
+
+        const aggregate = aggregateMirrorDiag(records, cfg) as {
+            versions: Record<
+                string,
+                {
+                    protectedAdvanceGuardrailVetoes: number;
+                    protectedAdvanceGuardrailVetoesPerGame: number;
+                    protectedAdvanceGuardrailVetoesByReason: Record<string, number>;
+                    protectedAdvanceGuardrailVetoesByReasonPerGame: Record<string, number>;
+                    protectedAdvanceGuardrailProposals: number;
+                    protectedAdvanceGuardrailProposalsPerGame: number;
+                    protectedAdvanceGuardrailProposalsByReason: Record<string, number>;
+                    protectedAdvanceGuardrailProposalsByReasonPerGame: Record<string, number>;
+                }
+            >;
+        };
+        expect(aggregate.versions["v0.8"]).toMatchObject({
+            protectedAdvanceGuardrailVetoes: 2,
+            protectedAdvanceGuardrailVetoesPerGame: 1,
+            protectedAdvanceGuardrailVetoesByReason: {
+                ranged_superior_hold: 2,
+                partial_band: 0,
+            },
+            protectedAdvanceGuardrailVetoesByReasonPerGame: {
+                ranged_superior_hold: 1,
+                partial_band: 0,
+            },
+            protectedAdvanceGuardrailProposals: 4,
+            protectedAdvanceGuardrailProposalsPerGame: 2,
+            protectedAdvanceGuardrailProposalsByReason: {
+                ranged_superior_hold: 2,
+                partial_band: 2,
+            },
+            protectedAdvanceGuardrailProposalsByReasonPerGame: {
+                ranged_superior_hold: 1,
+                partial_band: 1,
+            },
+        });
+        expect(aggregate.versions["v0.8s"]).toMatchObject({
+            protectedAdvanceGuardrailVetoes: 0,
+            protectedAdvanceGuardrailVetoesPerGame: 0,
+            protectedAdvanceGuardrailVetoesByReason: {
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            },
+            protectedAdvanceGuardrailVetoesByReasonPerGame: {
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            },
+            protectedAdvanceGuardrailProposals: 0,
+            protectedAdvanceGuardrailProposalsPerGame: 0,
+            protectedAdvanceGuardrailProposalsByReason: {
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            },
+            protectedAdvanceGuardrailProposalsByReasonPerGame: {
+                ranged_superior_hold: 0,
+                partial_band: 0,
+            },
+        });
     });
 
     test("separates pre-pin egress proposals from retained selections and keeps the control at zero", () => {

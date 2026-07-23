@@ -59,6 +59,7 @@ export interface IPlacementContext {
 export type AIPolicyEventKind =
     | "v0.8_supported_ranged_escape"
     | "v0.8_response_neutral_advance"
+    | "v0.8_protected_advance_guardrail"
     | "v0.8_supported_prepin_egress"
     | "v0.8_supported_prepin_egress_funnel"
     | "v0.8_supported_band_advance"
@@ -128,8 +129,31 @@ export interface IV08SupportedBandAdvanceDetails extends IV08SupportedPrepinEgre
     finishActive: boolean;
 }
 
+export type V08ProtectedAdvanceGuardrailReason = "ranged_superior_hold" | "partial_band";
+
+/** Detached incumbent proposal that a live-root guardrail converted back to the original ranged shot. */
+export interface IV08ProtectedAdvanceGuardrailDetails {
+    reason: V08ProtectedAdvanceGuardrailReason;
+    fromCell: XY;
+    toCell: XY;
+    targetId: string;
+    targetCreatureName: string;
+    divisorBefore: number;
+    divisorAfter: number;
+    ownRangedOutput: number;
+    enemyRangedOutput: number;
+    rangedSuperior: boolean;
+    finishActive: boolean;
+    reachableThreatsAfter: number;
+}
+
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export type IAIPolicyEvent =
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_protected_advance_guardrail";
+          details: IV08ProtectedAdvanceGuardrailDetails;
+          stage?: never;
+      })
     | (IAIPolicyEventBase & {
           kind: "v0.8_supported_band_advance";
           details: IV08SupportedBandAdvanceDetails;
@@ -155,6 +179,7 @@ export type IAIPolicyEvent =
               AIPolicyEventKind,
               | "v0.8_supported_band_advance"
               | "v0.8_supported_band_advance_funnel"
+              | "v0.8_protected_advance_guardrail"
               | "v0.8_supported_prepin_egress"
               | "v0.8_supported_prepin_egress_funnel"
           >;
