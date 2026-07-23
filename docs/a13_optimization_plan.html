@@ -709,12 +709,13 @@
                         A measured optimization sequence for reducing per-turn simulation cost on an M4 Max, preserving
                         deterministic ranked behavior, and buying enough headroom to evaluate horizons beyond 12 unit
                         turns. The ranged-ray candidate remains under release gates; pathfinding, aura-refresh, and
-                        decision-scoped reachability now have sealed, qualifying local results. Workstream 4 is
+                        decision-scoped reachability now have sealed, qualifying local results. Workstream 5's first
+                        slice also qualified, while its two follow-ups are closed unqualified. Workstream 4 is
                         deliberately narrower than the original “shared geometry” proposal: it reuses only canonical
                         reachability within one synchronous decision.
                     </p>
                     <div class="badges">
-                        <span class="badge">Revision 2026-07-22</span>
+                        <span class="badge">Revision 2026-07-23</span>
                         <span class="badge">Bun 1.3.14 · arm64</span>
                         <span class="badge">Grid 16×16 · 128 px/cell</span>
                         <span class="status active">Local candidate, not deployed</span>
@@ -726,11 +727,11 @@
                         <dt>Workstreams</dt>
                         <dd>8</dd>
                         <dt>Latest qualified</dt>
-                        <dd>#4 reachability catalog</dd>
+                        <dd>#5 ordered border/filter fusion</dd>
                         <dt>Exact macro pairs</dt>
-                        <dd style="color: var(--green)">80/80</dd>
+                        <dd style="color: var(--green)">480/480</dd>
                         <dt>A13 total reduction</dt>
-                        <dd>5.00%</dd>
+                        <dd>12.16%</dd>
                         <dt>Catalog overhead upper 95%</dt>
                         <dd>3.05%</dd>
                         <dt>Exact boundaries</dt>
@@ -740,7 +741,7 @@
                         <dt>Aura median reduction</dt>
                         <dd>37.19%</dd>
                         <dt>Next</dt>
-                        <dd>#5 numeric core · measure first</dd>
+                        <dd>Different profile-backed cost</dd>
                     </dl>
                 </aside>
             </div>
@@ -1113,7 +1114,9 @@
                                     <td>Cell IDs, typed arrays, masks, and object adapters at boundaries.</td>
                                     <td>State/action hash parity with fewer allocations and lower GC tail latency.</td>
                                     <td>
-                                        <span class="status active">First slice qualified · second slice rejected</span>
+                                        <span class="status active"
+                                            >First slice qualified · two follow-ups unqualified</span
+                                        >
                                     </td>
                                 </tr>
                                 <tr>
@@ -2326,6 +2329,83 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 gate; the source must not be pinned or deployed as a qualified slice.
                             </p>
                         </div>
+                        <div class="metric-grid" style="margin-bottom: 1rem">
+                            <div class="metric">
+                                <strong>0.90513×</strong>
+                                <span>combined candidate pooled macro time</span>
+                            </div>
+                            <div class="metric">
+                                <strong>160 / 160</strong>
+                                <span>robust tasks faster</span>
+                            </div>
+                            <div class="metric">
+                                <strong>1.052046</strong>
+                                <span>p99-bootstrap upper 95% · gate ≤ 1.05</span>
+                            </div>
+                            <div class="metric">
+                                <strong>0</strong>
+                                <span>new measurement attempts in v3</span>
+                            </div>
+                        </div>
+                        <div class="callout danger">
+                            <h4>Fresh stat-rounding source pair · not qualified</h4>
+                            <p>
+                                The next source pair, <code>188452c…a67f → 4d8d94a…236d8</code>, added guarded
+                                exact-grid stat rounding on top of the already rejected distance-one source. It used ten
+                                entirely fresh captures; no predecessor measurements were read or pooled. That means the
+                                macro result evaluates the <em>combined</em> five-runtime-file candidate and must not be
+                                attributed to stat rounding alone.
+                            </p>
+                            <p>
+                                The sealed-input v3 reanalysis passed exactness, micro, profile, pooled throughput, both
+                                orders, every map, all ten capture totals, robust p50/p99 point estimates, the maximum
+                                task ratio, and the faster-task count. It failed only the conjunctive robust-p99
+                                bootstrap gate: upper 95% <strong>1.052046478353611</strong> against
+                                <strong>≤ 1.05</strong>. Pooled time was 0.9051318×, robust p50/p99 were
+                                0.8978978×/0.9614126×, the maximum robust ratio was 0.9987532×, and all 160 robust tasks
+                                were faster. Those strong descriptive results do not override the failed confidence
+                                bound: this source pair is <strong>not qualified</strong>.
+                            </p>
+                        </div>
+                        <div class="grid-2">
+                            <div class="callout">
+                                <h4>Exact source and oracle boundary</h4>
+                                <p>
+                                    Commit <code>4d8d94a…236d8</code> replaced 28 one- or two-decimal conversions in
+                                    <code>Unit.adjustBaseStats</code>. The helper skips native <code>toFixed</code> only
+                                    when a safe scaled integer round-trips to the identical binary64 value. Every tie,
+                                    neighbor, subnormal, non-finite value, <code>1e21</code> boundary, boxed value,
+                                    unsupported digit count, and replaced <code>Number</code>/<code>toFixed</code> path
+                                    retains legacy behavior and evaluation order.
+                                </p>
+                                <p>
+                                    The permanent unit oracle passes 7 tests / 1,032,671 expectations. Sealed
+                                    correctness added 2,000,000 raw-binary64 comparisons, 32,664 curated
+                                    boundary/grid-neighbor comparisons, mutation and boxed fallbacks, and 1,092
+                                    production-stat entries covering 54 creatures in 108/108 contexts. The macro corpus
+                                    then completed 1,600 exact task pairs / 3,200 measured matches with zero semantic
+                                    mismatches, rejected actions, stuck matches, or exceptions.
+                                </p>
+                            </div>
+                            <div class="callout warn">
+                                <h4>Why v2 has no performance verdict</h4>
+                                <p>
+                                    All 13 v2 producer stages were accepted and closed under the zero-retry ledger, but
+                                    the independent aggregator stopped before constructing an aggregate. Its
+                                    micro-prerequisite verifier used an algebraically equivalent Type-7 interpolation
+                                    expression whose result differed from the producer by one ULP
+                                    (<code>5.55e−17</code>). Therefore v2 is invalid, not a pass or fail, and no macro
+                                    value was inspected before remediation freeze.
+                                </p>
+                                <p>
+                                    V3 changed only that micro-validation interpolation, retained the sealed v2 producer
+                                    bytes, macro estimator, schedules, gates, and candidate bytes, and allowed exactly
+                                    one aggregation attempt with zero new measurements. Its failed tail bound closes the
+                                    candidate: do not add captures, selectively rerun, trim, winsorize, or relax the
+                                    threshold.
+                                </p>
+                            </div>
+                        </div>
                         <div class="grid-3">
                             <div>
                                 <h4>Qualified slice</h4>
@@ -2413,6 +2493,32 @@ firstStep(required) = ceil((2 · M · required − M + 1) / (2 · A))</pre>
                                 >, with all four executable runners beside them. Installed dependency contents were not
                                 recursively hashed; allocation reduction is a logical object count rather than heap
                                 bytes, and CPU profile frames overlap and must not be summed.
+                            </p>
+                        </div>
+                        <div class="callout">
+                            <p>
+                                The combined stat-rounding attempt is retained in
+                                <a href="./evidence/a13_stat_rounding_2026-07-23.json">its compact evidence record</a>,
+                                the
+                                <a href="./evidence/a13_stat_rounding_replication_protocol_2026-07-23.json"
+                                    >v2 producer protocol</a
+                                >
+                                and
+                                <a href="./evidence/a13_stat_rounding_attempt_ledger_2026-07-23.jsonl"
+                                    >closed producer ledger</a
+                                >. The invalid v2 aggregation is documented separately in the
+                                <a href="./evidence/a13_stat_rounding_v2_aggregation_incident_2026-07-23.json"
+                                    >incident record</a
+                                >. The only permitted remediation is sealed by the
+                                <a href="./evidence/a13_stat_rounding_reanalysis_protocol_2026-07-23_v3.json"
+                                    >v3 reanalysis protocol</a
+                                >
+                                and
+                                <a href="./evidence/a13_stat_rounding_reanalysis_attempt_ledger_2026-07-23_v3.jsonl"
+                                    >zero-retry reanalysis ledger</a
+                                >. All five executable runners remain beside these records. The compact record retains
+                                the exact source archives, all producer and aggregate hashes, every gate, and the
+                                unqualified decision.
                             </p>
                         </div>
                     </article>
@@ -3474,6 +3580,14 @@ bun test \
                                     <code>860aa85b…840</code>. The dated compact record and ledger retain every full
                                     hash; the temporary directory is not required to interpret the decision.
                                 </li>
+                                <li>
+                                    <code>/private/tmp/hoc-stat-round-qualification.SkXqG1</code> — immutable source
+                                    archives, 13 accepted v2 producer-stage artifacts, 18 profile sidecars, and the
+                                    single v3 sealed-input reanalysis. The v3 aggregate SHA-256 is
+                                    <code>bc98b521…c5a61</code>. This local directory is not required to interpret the
+                                    decision: all decisive hashes and values are in the dated compact record, protocols,
+                                    incident record, and append-only ledgers.
+                                </li>
                             </ul>
                             <p class="small">
                                 <code>/tmp</code> files are not durable build artifacts. The permanent exhaustive test
@@ -3506,12 +3620,17 @@ bun test \
                             across 480 source-paired tasks and reduces the deadline-free a13 macro to 0.87835× baseline
                             with robust p50 and p99 improvements. Reject the guarded distance-one follow-up for release:
                             despite a 5.86% pooled macro improvement and a 77.32% reduction in its intended profile
-                            frame, it failed three immutable tail gates on two low-exposure tasks. Do not rerun it,
-                            weaken its thresholds, pin it into consumers, or continue optimizing that now-sub-3% builder
-                            seam. Move to a broader profile-backed cost that benefits ranged and low-melee boards, and
-                            qualify any materially revised source against the last qualified baseline under a fresh
-                            preregistration. Deeper search remains blocked until independently sealed latency headroom
-                            passes both throughput and tail gates.
+                            frame, it failed three immutable tail gates on two low-exposure tasks.
+                        </p>
+                        <p>
+                            The broader stat-rounding source pair is also not qualified. Its v2 producer inputs are
+                            valid, but the v2 verifier incident permits no performance verdict; the one sealed-input v3
+                            reanalysis passed every gate except the robust-p99 bootstrap upper bound (1.0520465 against
+                            ≤ 1.05). Do not rerun either candidate, weaken thresholds, pin them into consumers, or
+                            continue the now-sub-3% builder seam. Revert to the last qualified baseline, then choose a
+                            different profile-backed cost or preregister a materially revised source pair. Deeper search
+                            remains blocked until independently sealed latency headroom passes both throughput and tail
+                            gates.
                         </p>
                     </div>
                 </div>

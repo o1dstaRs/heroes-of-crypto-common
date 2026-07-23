@@ -1,0 +1,309 @@
+{
+    "schema": "heroes-of-crypto/a13-stat-rounding-evidence/v1",
+    "recordedAt": "2026-07-23T13:39:00.879Z",
+    "workstream": {
+        "number": 5,
+        "slice": "guarded distance-one melee targeting plus exact-grid unit-stat rounding",
+        "hypothesis": "Avoid native decimal string formatting when a one- or two-decimal unit stat is already exactly representable on the requested grid, while retaining native conversion for every other value and observable runtime mutation.",
+        "status": "unqualified",
+        "deploymentDecision": "do-not-pin-or-deploy",
+        "sourceDisposition": "Do not add captures, rerun selected work, or relax the failed gate. Revert this combined unqualified source pair to the last qualified baseline, or create a materially different candidate under a fresh preregistration."
+    },
+    "source": {
+        "baseline": {
+            "commit": "188452cad6ec718540b7c452a579ac3cea73a67f",
+            "tree": "efa549a827ba1ef8d8321c2fa47219859a17ffca",
+            "archiveSha256": "bd8de4690d92d6c0a952ded8fb8f66c3dafec404bb47a4f9b2c597b757cc5e2a",
+            "archiveSrcManifestSha256": "076d0689decdfbb071c9632a05103d10bc7181e34500f980bae3c58433398370"
+        },
+        "candidate": {
+            "commit": "4d8d94a65aeb77ca953e2ee410b40eaa81d236d8",
+            "tree": "5c7cefd52f27e6344ed8902a1b5f90eb3caba0da",
+            "archiveSha256": "449e57bdb30e12b5f046ba1956187bc573d732608eb4f8a3ef888d727e8bf3a2",
+            "archiveSrcManifestSha256": "bceb951f49bcddd5cf63e3a5e3b3e5f77f1bbef96965e3bb66b4ff622eab0043"
+        },
+        "formalRuntimeDelta": [
+            "src/ai/ai.ts",
+            "src/ai/decision_path_catalog.ts",
+            "src/ai/internal/melee_target_layers.ts",
+            "src/units/stat_rounding.ts",
+            "src/units/unit.ts"
+        ],
+        "statRoundingCommit": {
+            "commit": "4d8d94a65aeb77ca953e2ee410b40eaa81d236d8",
+            "parent": "f2b4c42491f5a5f862c5009cf167d8b61f1308b0",
+            "paths": ["src/units/stat_rounding.ts", "src/units/unit.ts", "test/units/stat_rounding.test.ts"],
+            "roundingCallSitesInUnitAdjustBaseStats": 28
+        },
+        "attributionBoundary": "The formal baseline-to-candidate pair contains the previously unqualified guarded distance-one source as well as the new stat-rounding source. None of the predecessor attempt's measurements were read or pooled; all ten macro captures for this pair were fresh. The formal verdict therefore applies to the combined source pair and the observed macro ratio must not be attributed to stat rounding alone."
+    },
+    "sourceValidation": {
+        "helperContract": "roundUnitStat returns the exact Object.is-equivalent result of Number(value.toFixed(digits)); only exact one- or two-decimal primitive-number values in the guarded scaled-integer range bypass native formatting. Ties, subnormals, non-finite values, the 1e21 boundary, negative zero normalization, boxed values, unsupported digits, replaced Number, and replaced or non-callable toFixed retain the legacy path and evaluation order.",
+        "directUnitTest": {
+            "command": "bun test test/units/stat_rounding.test.ts",
+            "testsPassed": 7,
+            "testsFailed": 0,
+            "expectCalls": 1032671
+        },
+        "sealedMicroCorrectness": {
+            "rawFloat64Patterns": 1000000,
+            "digitsPerPattern": [1, 2],
+            "rawFloat64Comparisons": 2000000,
+            "curatedBoundaryAndGridNeighborComparisons": 32664,
+            "dynamicMutationAndBoxedFallbackPassed": true,
+            "representativeTrace": {
+                "creatures": 54,
+                "scenarioContexts": 108,
+                "contextsCovered": 108,
+                "entries": 1092,
+                "independentlyCalculatedFastEligible": 982,
+                "fastEligibleFraction": 0.8992673992673993,
+                "sha256": "1238d022277afdd706b09e4db5100c4d61dcc41c2039d8d24778d95a4f61a8b4"
+            },
+            "mismatches": 0,
+            "passed": true
+        }
+    },
+    "producerCampaignV2": {
+        "campaignId": "a13-stat-rounding-4d8d94a-20260723-v2",
+        "protocol": {
+            "path": "docs/evidence/a13_stat_rounding_replication_protocol_2026-07-23.json",
+            "commit": "4c8b0fcd9363874396e8bcdf9336fc905b73002c",
+            "bytes": 21370,
+            "sha256": "96eaf0ab6753955a853a9f3f3ed91ca4435f92b0166f5c2781a87a8efb181a65"
+        },
+        "authorizationCommit": "453b142517195ee068ea9510ffef47bb70e00359",
+        "closedLedgerCommit": "30ef1c441c33cf870e482d5a5b282fa6ada51e8d",
+        "attemptLedger": {
+            "path": "docs/evidence/a13_stat_rounding_attempt_ledger_2026-07-23.jsonl",
+            "bytes": 197208,
+            "sha256": "94926abe0565b3151e120ca14c22fd9429927a6c26f7cbb8f040136357d72680",
+            "records": 29,
+            "chainTipSha256": "9a5237cccc06ba16e1aa9f658fb3f5ca358fe78ae42a09d8ab470c54a200f2b4"
+        },
+        "acceptedStages": ["semantic", "micro", "profile", "r0", "r1", "r3", "r2", "r4", "r5", "r7", "r6", "r8", "r9"],
+        "acceptedStageCount": 13,
+        "allProducerStagesAccepted": true,
+        "zeroRetryHonored": true,
+        "noShadowAttemptsAttested": true,
+        "inputClosureRecorded": true
+    },
+    "aggregationIncidentV2": {
+        "path": "docs/evidence/a13_stat_rounding_v2_aggregation_incident_2026-07-23.json",
+        "commit": "1441922922f677476928e7445543fb78f78dc1e0",
+        "bytes": 3189,
+        "sha256": "96474baca02c5b53fbbc6cf1fe1082d08ede4d45fa39950e49288b072ea9ca5c",
+        "status": "invalidated-before-aggregate-output",
+        "aggregateExists": false,
+        "assertion": "micro actualTrace bootstrap ratioOfTotalsBootstrap95.lower95",
+        "producerStored": 0.32440328365332727,
+        "verifierRecomputed": 0.3244032836533272,
+        "absoluteDifference": 5.551115123125783e-17,
+        "ulpDistance": 1,
+        "rootCause": "The producer and verifier used algebraically equivalent Type-7 interpolation expressions that evaluate one ULP apart in IEEE-754 for this value.",
+        "scope": "The verifier stopped on a micro-prerequisite equality assertion before constructing or writing a macro aggregate. No valid v2 performance verdict exists, and no macro-performance values were inspected before the v3 remediation was frozen.",
+        "performanceVerdict": "invalid",
+        "campaignRetried": false
+    },
+    "sealedInputReanalysisV3": {
+        "campaignId": "a13-stat-rounding-4d8d94a-20260723-v3",
+        "mode": "sealed-v2-input-reanalysis",
+        "protocol": {
+            "path": "docs/evidence/a13_stat_rounding_reanalysis_protocol_2026-07-23_v3.json",
+            "commit": "def04e2f2a392080221880e0b04523c23fdc1a00",
+            "bytes": 4805,
+            "sha256": "dfeaac11308c1419e79b16fc8be25eba331ce2304830f4aeb3b9957d165c9f60"
+        },
+        "authorizationCommit": "38f281d675fdc4aee08238324d5f04e779539f8d",
+        "attemptStartedCommit": "1d5da9b8ef0c0bc36b08e750ad5efaa7adb39246",
+        "closedLedgerCommit": "1eb7d3bf4d3755bc8d10219b0eb8cd4b268a68a1",
+        "runner": {
+            "path": "docs/evidence/tools/a13_stat_rounding_replication.ts",
+            "schema": "heroes-of-crypto/a13-stat-rounding-reanalysis/v3",
+            "bytes": 241097,
+            "sha256": "1aab6e3f1e3ac766e0470b4eca6c0c14eaf188e4b4300cf223bc348903c179c3"
+        },
+        "attemptLedger": {
+            "path": "docs/evidence/a13_stat_rounding_reanalysis_attempt_ledger_2026-07-23_v3.jsonl",
+            "bytes": 8603,
+            "sha256": "4f6050d5572fa8db941901eacdf3b4044cf32512b4200ad0b52a470bed000373",
+            "records": 4,
+            "chainTipSha256": "b1eb3ce135993e89f9013ddc14157b73d1bda434afb314e0bb472a3b61a95930"
+        },
+        "correction": {
+            "scope": "micro-bootstrap-validation-only",
+            "producerInterpolation": "lower * (1 - fraction) + upper * fraction",
+            "macroEstimatorChanged": false,
+            "macroScheduleChanged": false,
+            "gatesChanged": false,
+            "candidateBytesChanged": false
+        },
+        "measurementAttempts": 0,
+        "aggregationAttempts": 1,
+        "aggregationAttemptsMaximum": 1,
+        "zeroRetryHonored": true,
+        "prerequisiteEvidenceValid": true
+    },
+    "micro": {
+        "artifact": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2/micro.json",
+            "bytes": 364779,
+            "sha256": "cd97a2496379eaa7ced8f1cb46fdcaba900f8febd5d9837c3aeb7ada1bcd3401"
+        },
+        "blocks": 60,
+        "exactGridCandidateToLegacyRatio": 0.18639008639282714,
+        "exactGridBootstrapUpper95": 0.18740700735633745,
+        "exactGridBootstrapUpper95Maximum": 0.45,
+        "representativeTraceCandidateToLegacyRatio": 0.32569052728840997,
+        "representativeTraceBootstrapUpper95": 0.32695637823053925,
+        "representativeTraceBootstrapUpper95Maximum": 0.7,
+        "passed": true
+    },
+    "profile": {
+        "artifact": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2/profile.json",
+            "bytes": 593967,
+            "sha256": "f120a38b60be6c55e10391d58ef3979a2267c212cadea9c04d0778754a11aa44"
+        },
+        "sidecars": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v2/profile.json.profiles",
+            "entryCount": 18,
+            "bytes": 23361812,
+            "campaignManifestSha256": "b7b27c7ce04d1c063a8905082485b1ef4231bb81e4341d0e73ee1ad79a8e51ae"
+        },
+        "timingExcludedTelemetry": {
+            "adjustBaseStatsCallsPerVariant": 361835,
+            "roundingCalls": 3605338,
+            "oracleChecks": 3605338,
+            "oracleMismatches": 0,
+            "fast": 3253220,
+            "numericFallback": 352118,
+            "dynamicFallback": 0,
+            "fastPathShare": 0.9023342610318367
+        },
+        "adjustBaseStatsSampledCandidateToBaselineRatio": 0.7025451994345538,
+        "nativeToFixedUnderAdjustCandidateToBaselineRatio": 0.14690767186064213,
+        "candidateNativeToFixedUnderAdjustShare": 0.006593731068646662,
+        "previousFirstLayerGuard": {
+            "fullBuilderCallsBaseline": 52813,
+            "fullBuilderCallsCandidate": 11927,
+            "fullBuilderUnderDoFindTargetReduction": 0.7759506991094343,
+            "candidateCombinedBuilderShare": 0.019791176640519038
+        },
+        "allPreregisteredGatesPassed": true
+    },
+    "macro": {
+        "fixedWork": {
+            "aiVersion": "v0.8",
+            "captures": 10,
+            "taskPairsPerCapture": 160,
+            "taskPairs": 1600,
+            "measuredMatches": 3200,
+            "maps": 4,
+            "maxLaps": 2,
+            "bootstrapSamples": 20000
+        },
+        "exactness": {
+            "semanticMismatches": 0,
+            "rejectedActions": 0,
+            "stuckMatches": 0,
+            "exceptions": 0,
+            "semanticIdentitySha256": "f7cb1803d011e057c92e940769e98933ff7172e90730d3411bb47effe7022f77",
+            "passed": true
+        },
+        "captureTotalRatios": {
+            "r0": 0.9067903205137455,
+            "r1": 0.9041661833449922,
+            "r2": 0.9082049346302692,
+            "r3": 0.8959705347256709,
+            "r4": 0.8998784625457066,
+            "r5": 0.8966764047282936,
+            "r6": 0.9072645699195564,
+            "r7": 0.9063163117498758,
+            "r8": 0.9166389210207183,
+            "r9": 0.9095010510195701
+        },
+        "captureArtifactSha256": {
+            "r0": "4e0accb2048900a66741fd50924cdc668bd32ff5a4502dd29e0cb3294a72907d",
+            "r1": "e07fbc01e882f5389602d94dc42b26eea66a54ae5b7ed87bccc0a7109fe8c37e",
+            "r2": "93c6265c2e4d16c4a08fb93e18d4880b619e4440807d1ff35cbc59c92986fa9c",
+            "r3": "b013a447aecafea283177549548436df42a77bf0f0592eb72020fdd0fe1b6faf",
+            "r4": "fb3f1169a8091c2396642d666df65eca8b14ff0f8629d243a957a8100db5f663",
+            "r5": "e37a6103a82316ce28da2b20363db2db473b8ea3f8d572334ea7fff370710024",
+            "r6": "cd05e3a1a47a653a2346f2f634ffb8558c6a6f4dfe89a82f8c00f0555bd5ae70",
+            "r7": "adf459c6bbc54279bf303568aa1e048995f188236de71b8f1b648eba3862e317",
+            "r8": "9a0dcd5981a4020aced626937675cc534e04475ea51cc8ddf63e5bf8f73809c7",
+            "r9": "3c58de2a315b26ae2535e670567e8b7bf9aa57f6778bac18d012c29e28318023"
+        },
+        "pooledTotalRatio": 0.9051317932005616,
+        "pooledTotalBootstrapUpper95": 0.9161743704585315,
+        "geometricRatioBootstrapUpper95": 0.9086778710456156,
+        "orderBootstrapUpper95": {
+            "ab": 0.9208187789886079,
+            "ba": 0.9131635400214141
+        },
+        "perMapTotalRatios": {
+            "1": 0.9106602732880383,
+            "2": 0.9038196343334602,
+            "3": 0.9015315857362691,
+            "4": 0.9043279497763015
+        },
+        "robust": {
+            "p50": 0.897897774847669,
+            "p95": 0.9489201731108685,
+            "p99": 0.9614125845474867,
+            "p99BootstrapUpper95": 1.052046478353611,
+            "maximum": 0.9987532318449394,
+            "fasterTasks": 160,
+            "totalTasks": 160
+        },
+        "passedGates": [
+            "totalRatioBootstrapUpper95",
+            "geometricRatioBootstrapUpper95",
+            "robustP50",
+            "robustP99",
+            "robustFasterTasks",
+            "robustMaximumRatio",
+            "abTotalRatioBootstrapUpper95",
+            "baTotalRatioBootstrapUpper95",
+            "perMapTotalRatio",
+            "fasterCaptures",
+            "captureTotalRatioMaximum"
+        ],
+        "failedGates": [
+            {
+                "name": "robustP99BootstrapUpper95",
+                "observed": 1.052046478353611,
+                "required": "<= 1.05"
+            }
+        ],
+        "allPassExceptTailConfidenceBound": true,
+        "qualified": false
+    },
+    "reanalysisArtifacts": {
+        "claim": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis/aggregation-attempt-1.claim.json",
+            "bytes": 3157,
+            "sha256": "28a42017a032350054306ba6f1fced96e0184eba8f4e73f540554359569aacc0"
+        },
+        "aggregate": {
+            "path": "/private/tmp/hoc-stat-round-qualification.SkXqG1/formal-v3-analysis/aggregate.json",
+            "bytes": 5547848,
+            "sha256": "bc98b5216e48c0d98ea72dd6e4c4681e265e4cfb147c424cdb253515470c5a61"
+        },
+        "ephemeralPathLimitation": "The large raw producer and reanalysis artifacts are local /private/tmp files. Their exact hashes, schedules, gates, and decisive numeric summaries are retained in committed protocols, append-only ledgers, the incident record, and this compact record."
+    },
+    "decision": {
+        "exactnessPassed": true,
+        "microPassed": true,
+        "profilePassed": true,
+        "macroAverageThroughputPassed": true,
+        "macroPointTailsPassed": true,
+        "macroTailConfidencePassed": false,
+        "overallQualified": false,
+        "reason": "Qualification is conjunctive. The robust-p99 bootstrap upper 95% bound is 1.052046478353611 against the immutable <= 1.05 gate, so the exact candidate is unqualified even though every task, capture, map, order, point tail, and average-throughput gate passed.",
+        "stoppingRuleApplied": true,
+        "additionalMeasurementsRunAfterResult": 0,
+        "nextAction": "Close this source candidate without further measurement. Revert the unqualified combined candidate to the last qualified baseline, then select a different profile-backed cost; or materially revise the source and freeze a fresh source-pair protocol. Do not continue the now-sub-3% melee-builder seam."
+    }
+}
