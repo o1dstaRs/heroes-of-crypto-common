@@ -489,6 +489,7 @@ afterEach(() => {
     delete process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS;
+    delete process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
     delete process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS;
     setDeterministicRandomSource(undefined);
@@ -612,6 +613,165 @@ describe("v0.8 protected ranged positioning", () => {
             expect(nonRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
             expect(nonRoot.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
         }
+    });
+
+    it("directly duels the strict full-damage policy against shipped legacy only at explicit roots", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+
+        const run = (version: "v0.8" | "v0.8s", origin?: "root" | "rollout") => {
+            const { shooter, context } = setupSupportedBandAdvance({ targetRanged: false });
+            context.decisionOrigin = origin;
+            return (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S())
+                .decideTurn(shooter, context)
+                .map((action) => action.type);
+        };
+
+        // The strict seat holds its stronger ranged line against a melee-only army; shipped legacy safely closes.
+        expect(run("v0.8", "root")).toEqual(["range_attack"]);
+        expect(run("v0.8s", "root")).toEqual(["move_unit", "range_attack"]);
+        // Hypothetical search continuations remain the shipped policy for both versions.
+        expect(run("v0.8", "rollout")).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8s", "rollout")).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8")).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8s")).toEqual(["move_unit", "range_attack"]);
+        delete process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY;
+        expect(run("v0.8", "root")).toEqual(["move_unit", "range_attack"]);
+        expect(run("v0.8s", "root")).toEqual(["move_unit", "range_attack"]);
+    });
+
+    it("computes both duel catalogs with equal RNG tails and publishes only the selected branch telemetry", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+        // Deliberately scope funnels to both versions: the legacy seat must still suppress its speculative strict arm.
+        process.env.V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS = "v0.8,v0.8s";
+
+        const run = (version: "v0.8" | "v0.8s") => {
+            const { shooter, context } = setupSupportedBandAdvance();
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            const catalogDestinations = [
+                { x: 4, y: 6 },
+                { x: 5, y: 6 },
+            ];
+            let catalogCalls = 0;
+            context.pathHelper = {
+                getMovePath: () => {
+                    const destination = catalogDestinations[catalogCalls]!;
+                    catalogCalls += 1;
+                    getRandomInt(0, 1_000_000);
+                    const destinationHash = (destination.x << 4) | destination.y;
+                    return {
+                        cells: [destination],
+                        hashes: new Set([destinationHash]),
+                        knownPaths: new Map([
+                            [
+                                destinationHash,
+                                [
+                                    {
+                                        cell: destination,
+                                        route: [destination],
+                                        weight: 1,
+                                        firstAggrMet: false,
+                                        hasLavaCell: false,
+                                        hasWaterCell: false,
+                                    },
+                                ],
+                            ],
+                        ]),
+                    };
+                },
+            } as PathHelper;
+            setDeterministicRandomSource(makeRng(0x6f00d));
+            const actions = (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S()).decideTurn(
+                shooter,
+                context,
+            );
+            return {
+                actions: actions.map((action) => action.type),
+                destination: actions.find((action) => action.type === "move_unit")?.targetCells[0],
+                catalogCalls,
+                events,
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const strict = run("v0.8");
+        const legacy = run("v0.8s");
+        expect(strict.actions).toEqual(["move_unit", "range_attack"]);
+        expect(legacy.actions).toEqual(["move_unit", "range_attack"]);
+        // Legacy receives the first catalog and strict the second, regardless of which version selects each branch.
+        expect(legacy.destination).toEqual({ x: 4, y: 6 });
+        expect(strict.destination).toEqual({ x: 5, y: 6 });
+        expect(strict.catalogCalls).toBe(2);
+        expect(legacy.catalogCalls).toBe(2);
+        expect(strict.tail).toEqual(legacy.tail);
+        expect(strict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance");
+        expect(strict.events.map(({ kind }) => kind)).toContain("v0.8_supported_band_advance_funnel");
+        expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance_funnel");
+    });
+
+    it("does not duplicate pinned retreat after duel branch selection", () => {
+        process.env.V08_RANGED_POSITION_VERSIONS = "v0.8,v0.8s";
+        process.env.V08_RANGED_POSITION_MODE = "both";
+        process.env.V08_SUPPORTED_BAND_ADVANCE = "0";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY = "1";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_VERSIONS = "v0.8";
+        process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS = "v0.8s";
+
+        const run = (version: "v0.8" | "v0.8s") => {
+            const { shooter, context } = setupPinnedShooter(3);
+            context.decisionOrigin = "root";
+            const events: IAIPolicyEvent[] = [];
+            context.policyEventObserver = (event) => events.push(event);
+            const originalPathHelper = context.pathHelper;
+            let movePathCalls = 0;
+            context.pathHelper = {
+                getMovePath: (...args: Parameters<PathHelper["getMovePath"]>) => {
+                    movePathCalls += 1;
+                    return originalPathHelper.getMovePath(...args);
+                },
+            } as PathHelper;
+            setDeterministicRandomSource(makeRng(0x6f00e));
+            const actions = (version === "v0.8" ? new StrategyV0_8() : new StrategyV0_8S()).decideTurn(
+                shooter,
+                context,
+            );
+            return {
+                actions,
+                events,
+                movePathCalls,
+                tail: [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)],
+            };
+        };
+
+        const strict = run("v0.8");
+        const legacy = run("v0.8s");
+        delete process.env.V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS;
+        const shippedBaseline = run("v0.8");
+        expect(strict.actions.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(legacy.actions.map((action) => action.type)).toEqual(["move_unit"]);
+        expect(strict.actions[0]).toMatchObject({
+            type: "move_unit",
+            path: legacy.actions[0]?.type === "move_unit" ? legacy.actions[0].path : undefined,
+            targetCells: legacy.actions[0]?.type === "move_unit" ? legacy.actions[0].targetCells : undefined,
+        });
+        expect(strict.movePathCalls).toBe(shippedBaseline.movePathCalls);
+        expect(legacy.movePathCalls).toBe(shippedBaseline.movePathCalls);
+        expect(strict.tail).toEqual(legacy.tail);
+        expect(strict.tail).toEqual(shippedBaseline.tail);
+        expect(strict.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
+        expect(legacy.events.map(({ kind }) => kind)).not.toContain("v0.8_supported_band_advance");
     });
 
     it("preserves the deterministic catalog stream before treatment selection", () => {
