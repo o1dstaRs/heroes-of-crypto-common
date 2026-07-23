@@ -459,6 +459,30 @@ describe("v0.8 candidate policy", () => {
         expect(treatment.targetId).not.toBe(fixture.rear.getId());
     });
 
+    it("keeps screen-pressure treatment off on unobstructed Lava and Block lines", () => {
+        usePureV06ShotScore();
+        const unobstructedCells = {
+            shooter: { x: 2, y: 12 },
+            screen: { x: 6, y: 12 },
+            rear: { x: 10, y: 12 },
+            bestDamageTarget: { x: 6, y: 2 },
+        };
+
+        for (const gridType of [PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER]) {
+            const fixture = setupVisibleEdgeScreenPressure(91, {}, {}, gridType, unobstructedCells);
+            process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE = "0";
+            const baseline = rangeAction(new StrategyV0_8().decideTurn(fixture.shooter, fixture.context));
+            enableVisibleEdgeScreenPressure();
+            const treatment = rangeAction(new StrategyV0_8().decideTurn(fixture.shooter, fixture.context));
+
+            expect(fixture.context.grid.getGridType()).toBe(gridType);
+            expect(baseline.targetId).toBe(fixture.bestDamageTarget.getId());
+            expect(JSON.stringify(treatment)).toBe(JSON.stringify(baseline));
+            expect(treatment.targetId).not.toBe(fixture.screen.getId());
+            expect(treatment.targetId).not.toBe(fixture.rear.getId());
+        }
+    });
+
     it("classifies only a live dangerous ranged or viable caster rear as screen pressure", () => {
         usePureV06ShotScore();
         enableVisibleEdgeScreenPressure();
