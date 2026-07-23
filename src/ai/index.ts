@@ -28,6 +28,7 @@ export type {
     IAIStrategy,
     IDecisionContext,
     IPlacementContext,
+    IV08SupportedBandAdvanceDetails,
     IV08SupportedPrepinEgressDetails,
 } from "./ai_strategy";
 

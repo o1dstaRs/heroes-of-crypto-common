@@ -60,7 +60,9 @@ export type AIPolicyEventKind =
     | "v0.8_supported_ranged_escape"
     | "v0.8_response_neutral_advance"
     | "v0.8_supported_prepin_egress"
-    | "v0.8_supported_prepin_egress_funnel";
+    | "v0.8_supported_prepin_egress_funnel"
+    | "v0.8_supported_band_advance"
+    | "v0.8_supported_band_advance_funnel";
 
 export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
     "ordinary_shot",
@@ -78,6 +80,23 @@ export const V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES = [
 ] as const;
 
 export type V08SupportedPrepinEgressFunnelStage = (typeof V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_STAGES)[number];
+
+export const V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES = [
+    "ordinary_shot",
+    "eligible_shooter",
+    "target_no_counter",
+    "native_guard",
+    "current_signature",
+    "ranged_posture",
+    "reachable_route",
+    "zero_exposure_route",
+    "target_screened",
+    "strictly_closer",
+    "retained_signature",
+    "damage_band_improved",
+] as const;
+
+export type V08SupportedBandAdvanceFunnelStage = (typeof V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES)[number];
 
 interface IAIPolicyEventBase {
     unitId: string;
@@ -103,8 +122,24 @@ export interface IV08SupportedPrepinEgressDetails {
     rangedSuperior: boolean;
 }
 
+/** Detached geometry for one strict, fully screened ranged damage-band proposal. */
+export interface IV08SupportedBandAdvanceDetails extends IV08SupportedPrepinEgressDetails {
+    /** Whether v0.8's dominant or urgent anti-Armageddon finish sprint released the ranged-superiority hold. */
+    finishActive: boolean;
+}
+
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export type IAIPolicyEvent =
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_band_advance";
+          details: IV08SupportedBandAdvanceDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
+          kind: "v0.8_supported_band_advance_funnel";
+          stage: V08SupportedBandAdvanceFunnelStage;
+          details?: never;
+      })
     | (IAIPolicyEventBase & {
           kind: "v0.8_supported_prepin_egress";
           details: IV08SupportedPrepinEgressDetails;
@@ -116,7 +151,13 @@ export type IAIPolicyEvent =
           details?: never;
       })
     | (IAIPolicyEventBase & {
-          kind: Exclude<AIPolicyEventKind, "v0.8_supported_prepin_egress" | "v0.8_supported_prepin_egress_funnel">;
+          kind: Exclude<
+              AIPolicyEventKind,
+              | "v0.8_supported_band_advance"
+              | "v0.8_supported_band_advance_funnel"
+              | "v0.8_supported_prepin_egress"
+              | "v0.8_supported_prepin_egress_funnel"
+          >;
           stage?: never;
           details?: never;
       });

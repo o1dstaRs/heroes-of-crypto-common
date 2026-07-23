@@ -49,6 +49,9 @@ const BASE_OPTIONS: IV08RangedPositioningABOptions = {
     supportedPrepinEgress: false,
     supportedPrepinEgressCatalogOnly: false,
     supportedPrepinEgressLiveOnly: false,
+    supportedBandAdvance: false,
+    supportedBandAdvanceCatalogOnly: false,
+    supportedBandAdvanceLiveOnly: false,
     diag: false,
 };
 
@@ -105,6 +108,10 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_A13_SEARCH: "0",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
+            V08_SUPPORTED_BAND_ADVANCE: "0",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",
@@ -192,6 +199,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             supportedPrepinEgress: false,
             supportedPrepinEgressCatalogOnly: false,
             supportedPrepinEgressLiveOnly: false,
+            supportedBandAdvance: false,
+            supportedBandAdvanceCatalogOnly: false,
+            supportedBandAdvanceLiveOnly: false,
             diag: true,
         });
         expect(parseV08RangedPositioningABOptions([]).moveShots).toBe(0);
@@ -207,6 +217,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgress).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgressCatalogOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).supportedPrepinEgressLiveOnly).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandAdvance).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceCatalogOnly).toBe(false);
+        expect(parseV08RangedPositioningABOptions([]).supportedBandAdvanceLiveOnly).toBe(false);
         expect(parseV08RangedPositioningABOptions([]).diag).toBe(false);
         expect(() => parseV08RangedPositioningABOptions(["--games", "3"])).toThrow("paired side swaps");
         expect(() => parseV08RangedPositioningABOptions(["--mode", "unsafe"])).toThrow("--mode");
@@ -450,7 +463,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             dirty: false,
         });
         expect(manifest).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6",
             arm: {
                 jitNoMeleeFocus: true,
                 jitNoMeleeFocusCatalogOnly: false,
@@ -627,7 +640,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
 
         const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
         expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6",
             arm: {
                 supportedPrepinEgress: true,
                 supportedPrepinEgressCatalogOnly: false,
@@ -695,6 +708,117 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         ).toThrow("requires a supported pre-pin");
     });
 
+    it("isolates live-root supported-band advance with a catalog-identical selector-off control", () => {
+        const treatment: IV08RangedPositioningABOptions = {
+            ...BASE_OPTIONS,
+            cohorts: ["hybrid"],
+            mode: "both",
+            supportedBandAdvance: true,
+            supportedBandAdvanceLiveOnly: true,
+            diag: true,
+        };
+        const control: IV08RangedPositioningABOptions = {
+            ...treatment,
+            supportedBandAdvance: false,
+            supportedBandAdvanceCatalogOnly: true,
+        };
+        const [treatmentInvocation] = buildV08RangedPositioningABInvocations(treatment, { PATH: "/bin" });
+        const [controlInvocation] = buildV08RangedPositioningABInvocations(control, { PATH: "/bin" });
+
+        expect(treatmentInvocation.environment).toMatchObject({
+            SEARCH_VERSIONS: "v0.8,v0.8s",
+            V08_RANGED_POSITION_MODE: "both",
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE: "1",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "v0.8",
+        });
+        expect(controlInvocation.environment).toMatchObject({
+            V08_RANGED_POSITION_VERSIONS: "v0.8,v0.8s",
+            V08_SUPPORTED_BAND_ADVANCE: "1",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "1",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "supported-band-advance-catalog-only-control",
+        });
+        const differingEnvironmentKeys = [
+            ...new Set([
+                ...Object.keys(treatmentInvocation.environment),
+                ...Object.keys(controlInvocation.environment),
+            ]),
+        ].filter((key) => treatmentInvocation.environment[key] !== controlInvocation.environment[key]);
+        expect(differingEnvironmentKeys).toEqual(["V08_SUPPORTED_BAND_ADVANCE_VERSIONS"]);
+
+        const source = { head: "a".repeat(40), tree: "b".repeat(40), dirty: false } as const;
+        expect(buildV08RangedPositioningABManifest(treatmentInvocation, treatment, source)).toMatchObject({
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6",
+            arm: {
+                supportedBandAdvance: true,
+                supportedBandAdvanceCatalogOnly: false,
+                supportedBandAdvanceLiveOnly: true,
+            },
+        });
+        expect(buildV08RangedPositioningABManifest(controlInvocation, control, source)).toMatchObject({
+            arm: {
+                supportedBandAdvance: false,
+                supportedBandAdvanceCatalogOnly: true,
+                supportedBandAdvanceLiveOnly: true,
+            },
+        });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-advance",
+                "--supported-band-live-only",
+            ]),
+        ).toMatchObject({ supportedBandAdvance: true, supportedBandAdvanceLiveOnly: true });
+        expect(
+            parseV08RangedPositioningABOptions([
+                "--cohorts",
+                "hybrid",
+                "--mode",
+                "both",
+                "--supported-band-catalog-only",
+                "--supported-band-live-only",
+            ]),
+        ).toMatchObject({ supportedBandAdvanceCatalogOnly: true, supportedBandAdvanceLiveOnly: true });
+
+        for (const mode of ["advance", "retreat", "off"] as const) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...treatment, mode })).toThrow("mode=both");
+        }
+        expect(() => buildV08RangedPositioningABInvocations({ ...treatment, moveShots: 1 })).toThrow("moveShots=0");
+        expect(() =>
+            buildV08RangedPositioningABInvocations({ ...treatment, supportedBandAdvanceCatalogOnly: true }),
+        ).toThrow("mutually exclusive");
+        for (const conflictingArm of [
+            { noMeleeTerminalPressure: true },
+            { deadlineFinisher: true },
+            { paretoNoMeleeFocus: true },
+            { paretoNoMeleeFocusCatalogOnly: true },
+            { jitNoMeleeFocus: true },
+            { jitNoMeleeFocusCatalogOnly: true },
+            { supportedRangedDelta: true },
+            { responseNeutralAdvance: true },
+            { supportedPrepinEgress: true },
+            { supportedPrepinEgressCatalogOnly: true },
+        ]) {
+            expect(() => buildV08RangedPositioningABInvocations({ ...treatment, ...conflictingArm })).toThrow(
+                "mutually exclusive",
+            );
+        }
+        expect(() =>
+            buildV08RangedPositioningABInvocations({
+                ...BASE_OPTIONS,
+                cohorts: ["hybrid"],
+                mode: "both",
+                supportedBandAdvanceLiveOnly: true,
+            }),
+        ).toThrow("requires a supported-band");
+    });
+
     it("builds a stable, source-bound manifest containing the exact auditable arm", () => {
         const options: IV08RangedPositioningABOptions = {
             ...BASE_OPTIONS,
@@ -714,7 +838,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
         const second = buildV08RangedPositioningABManifest(invocation, options, source);
 
         expect(first).toMatchObject({
-            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v5",
+            schema: "hoc.v0_8_ranged_positioning_ab_experiment.v6",
             source,
             geometry: {
                 cohort: "hybrid",
@@ -746,6 +870,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                 supportedPrepinEgress: false,
                 supportedPrepinEgressCatalogOnly: false,
                 supportedPrepinEgressLiveOnly: false,
+                supportedBandAdvance: false,
+                supportedBandAdvanceCatalogOnly: false,
+                supportedBandAdvanceLiveOnly: false,
                 diag: true,
                 candidateVersion: "v0.8",
                 controlVersion: "v0.8s",
@@ -769,6 +896,10 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "off",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
+            V08_SUPPORTED_BAND_ADVANCE: "0",
+            V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
+            V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY: "0",
+            V08_SUPPORTED_BAND_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_RANGED_DELTA_VERSIONS: "",
             V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: "",
             V08_SUPPORTED_PREPIN_EGRESS: "0",

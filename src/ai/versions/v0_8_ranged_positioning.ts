@@ -22,7 +22,11 @@ import type { IWeightedRoute } from "../../grid/path_definitions";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
-import type { IDecisionContext, V08SupportedPrepinEgressFunnelStage } from "../ai_strategy";
+import type {
+    IDecisionContext,
+    V08SupportedBandAdvanceFunnelStage,
+    V08SupportedPrepinEgressFunnelStage,
+} from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
@@ -35,6 +39,10 @@ const SUPPORTED_PREPIN_EGRESS_ENABLED_ENV = "V08_SUPPORTED_PREPIN_EGRESS";
 const SUPPORTED_PREPIN_EGRESS_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_VERSIONS";
 const SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_PREPIN_EGRESS_FUNNEL_VERSIONS";
 const SUPPORTED_PREPIN_EGRESS_LIVE_ONLY_ENV = "V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY";
+const SUPPORTED_BAND_ADVANCE_ENABLED_ENV = "V08_SUPPORTED_BAND_ADVANCE";
+const SUPPORTED_BAND_ADVANCE_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS_ENV = "V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS";
+const SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV = "V08_SUPPORTED_BAND_ADVANCE_LIVE_ONLY";
 
 const TURN_CONSUMING_NON_MELEE = new Set<GameAction["type"]>([
     "range_attack",
@@ -564,6 +572,236 @@ function preferAdvance(left: IRouteView, leftDivisor: number, right: IRouteView,
     return left.route.cell.x < right.route.cell.x;
 }
 
+function supportedBandAdvanceActiveHere(context: IDecisionContext): boolean {
+    if (process.env[SUPPORTED_BAND_ADVANCE_ENABLED_ENV] !== "1") return false;
+    return process.env[SUPPORTED_BAND_ADVANCE_LIVE_ONLY_ENV] !== "1" || context.decisionOrigin === "root";
+}
+
+/**
+ * Research-only replacement for the legacy protected advance at measured roots. Both experiment seats build the
+ * same route catalog (and therefore consume the same seeded path tie-breaks); only the selector-scoped seat may
+ * retain the proposal. A move is eligible only when a native melee guard remains interposed, every living enemy is
+ * outside its optimistic next-activation melee horizon, the exact shot signature is unchanged, and the primary
+ * target crosses into a strictly better ranged damage band.
+ */
+function supportedBandAdvance(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+    strategyVersion: string,
+): GameAction[] {
+    const attackHandler = context.attackHandler;
+    const fightProperties = context.fightProperties;
+    const shot = decision[0];
+    if (
+        !attackHandler ||
+        !fightProperties ||
+        decision.length !== 1 ||
+        shot?.type !== "range_attack" ||
+        !shot.aimCell ||
+        shot.aimSide === undefined
+    ) {
+        return decision;
+    }
+
+    const selectorVersions = (process.env[SUPPORTED_BAND_ADVANCE_VERSIONS_ENV] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const selectorEnabled = selectorVersions.includes(strategyVersion);
+    const funnelVersions = (
+        process.env[SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS_ENV] ??
+        process.env[SUPPORTED_BAND_ADVANCE_VERSIONS_ENV] ??
+        ""
+    )
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const funnelEnabled = funnelVersions.includes(strategyVersion);
+    const emitFunnel = (stage: V08SupportedBandAdvanceFunnelStage): void => {
+        if (!funnelEnabled) return;
+        context.policyEventObserver?.({
+            kind: "v0.8_supported_band_advance_funnel",
+            unitId: unit.getId(),
+            creatureName: unit.getName(),
+            team: unit.getTeam(),
+            lap: fightProperties.getCurrentLap(),
+            stage,
+        });
+    };
+
+    emitFunnel("ordinary_shot");
+    if (
+        unit.getUnitProperties().attack_type !== RANGE ||
+        !unit.isRangeCapable() ||
+        !unit.canMove() ||
+        unit.getRangeShots() <= 0 ||
+        unit.hasAbilityActive("Sniper") ||
+        unit.hasAbilityActive("Through Shot") ||
+        unit.hasAbilityActive("Large Caliber") ||
+        unit.hasAbilityActive("Area Throw") ||
+        unit.hasAbilityActive("Double Shot") ||
+        unit.hasDebuffActive("Range Null Field Aura") ||
+        unit.hasDebuffActive("Rangebane") ||
+        attackHandler.canBeAttackedByMelee(
+            unit.getPosition(),
+            unit.isSmallSize(),
+            context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+        ) ||
+        !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))
+    ) {
+        return decision;
+    }
+    emitFunnel("eligible_shooter");
+
+    const target = context.unitsHolder.getAllUnits().get(shot.targetId);
+    if (!target || target.isDead() || isHidden(target)) return decision;
+    const targetCanCounter =
+        target.isRangeCapable() &&
+        target.getRangeShots() > 0 &&
+        !unit.canSkipResponse() &&
+        !fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
+        target.canRespond(RANGE) &&
+        !target.hasDebuffActive("Range Null Field Aura") &&
+        !target.hasDebuffActive("Rangebane") &&
+        !attackHandler.canBeAttackedByMelee(
+            target.getPosition(),
+            target.isSmallSize(),
+            context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+        );
+    if (targetCanCounter) return decision;
+    emitFunnel("target_no_counter");
+
+    const enemies = context.unitsHolder.getAllAllies(otherTeam(unit.getTeam())).filter((enemy) => !enemy.isDead());
+    if (!enemies.length) return decision;
+    const guards = nativeMeleeGuards(unit, context);
+    if (!guards.length) return decision;
+    emitFunnel("native_guard");
+
+    const settings = context.grid.getSettings();
+    const currentOrigin = unit.getPosition();
+    const currentTargetPosition = getRangeAttackSideCenter(
+        settings,
+        shot.aimCell,
+        shot.aimSide as RangeAttackCellSide,
+        currentOrigin,
+    );
+    const currentEvaluation = attackHandler.evaluateRangeAttack(
+        context.unitsHolder.getAllUnits(),
+        unit,
+        currentOrigin,
+        currentTargetPosition,
+        false,
+        false,
+        false,
+    );
+    if (currentEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId()) return decision;
+    const currentDivisor = currentEvaluation.rangeAttackDivisors[0];
+    if (currentDivisor === undefined || !Number.isFinite(currentDivisor) || currentDivisor <= 1) return decision;
+    emitFunnel("current_signature");
+
+    const ownRangedOutput = rangedOutput(context.unitsHolder.getAllAllies(unit.getTeam()));
+    const enemyRangedOutput = rangedOutput(enemies);
+    const rangedSuperior = ownRangedOutput > enemyRangedOutput;
+    const finishActive = v08DominantFinishState(
+        context.unitsHolder,
+        unit.getTeam(),
+        fightProperties.getCurrentLap(),
+    ).active;
+    // The stronger ranged line should hold and force the opponent, even when the opponent has no ranged output.
+    // A dominant/urgent finish sprint releases only this posture veto; every geometry and safety proof still applies.
+    if (rangedSuperior && !finishActive) return decision;
+    emitFunnel("ranged_posture");
+
+    const currentTargetDistance = cellDistance(unit.getCells(), target.getCells());
+    const currentMinEnemyDistance = Math.min(
+        ...enemies.map((enemy) => cellDistance(unit.getCells(), enemy.getCells())),
+    );
+    const currentExposure = protectionAt(unit.getCells(), enemies, guards).reachableThreats;
+    const routes = reachableRoutes(unit, context);
+    if (routes.length) emitFunnel("reachable_route");
+
+    let hasZeroExposureRoute = false;
+    let hasTargetScreenedRoute = false;
+    let hasStrictlyCloserRoute = false;
+    let hasRetainedSignatureRoute = false;
+    let hasImprovedBandRoute = false;
+    let best: IRouteView | undefined;
+    let bestDivisor = currentDivisor;
+    let bestTargetDistance = currentTargetDistance;
+    for (const route of routes) {
+        const view = routeView(unit, context, route, enemies, guards);
+        if (!view || view.protection.reachableThreats !== 0) continue;
+        hasZeroExposureRoute = true;
+        if (!guards.some((guard) => allyScreensThreat(view.footprint, guard, target))) continue;
+        hasTargetScreenedRoute = true;
+        const targetDistance = cellDistance(view.footprint, target.getCells());
+        if (targetDistance >= currentTargetDistance) continue;
+        hasStrictlyCloserRoute = true;
+        const targetPosition = getRangeAttackSideCenter(
+            settings,
+            shot.aimCell,
+            shot.aimSide as RangeAttackCellSide,
+            view.position,
+        );
+        const candidateEvaluation = attackHandler.evaluateRangeAttack(
+            context.unitsHolder.getAllUnits(),
+            unit,
+            view.position,
+            targetPosition,
+            false,
+            false,
+            false,
+        );
+        if (
+            candidateEvaluation.affectedUnits[0]?.[0]?.getId() !== target.getId() ||
+            !hasSameNonRegressingRangeSignature(currentEvaluation, candidateEvaluation)
+        ) {
+            continue;
+        }
+        hasRetainedSignatureRoute = true;
+        const divisor = candidateEvaluation.rangeAttackDivisors[0];
+        if (divisor === undefined || !Number.isFinite(divisor) || divisor >= currentDivisor) continue;
+        hasImprovedBandRoute = true;
+        if (!best || preferAdvance(view, divisor, best, bestDivisor)) {
+            best = view;
+            bestDivisor = divisor;
+            bestTargetDistance = targetDistance;
+        }
+    }
+    if (hasZeroExposureRoute) emitFunnel("zero_exposure_route");
+    if (hasTargetScreenedRoute) emitFunnel("target_screened");
+    if (hasStrictlyCloserRoute) emitFunnel("strictly_closer");
+    if (hasRetainedSignatureRoute) emitFunnel("retained_signature");
+    if (hasImprovedBandRoute) emitFunnel("damage_band_improved");
+    if (!best || !selectorEnabled) return decision;
+
+    context.policyEventObserver?.({
+        kind: "v0.8_supported_band_advance",
+        unitId: unit.getId(),
+        creatureName: unit.getName(),
+        team: unit.getTeam(),
+        lap: fightProperties.getCurrentLap(),
+        details: {
+            fromCell: { ...unit.getBaseCell() },
+            toCell: { ...best.route.cell },
+            targetId: target.getId(),
+            targetCreatureName: target.getName(),
+            exposureBefore: currentExposure,
+            exposureAfter: best.protection.reachableThreats,
+            divisorBefore: currentDivisor,
+            divisorAfter: bestDivisor,
+            targetDistanceBefore: currentTargetDistance,
+            targetDistanceAfter: bestTargetDistance,
+            minEnemyDistanceBefore: currentMinEnemyDistance,
+            minEnemyDistanceAfter: best.minEnemyDistance,
+            rangedSuperior,
+            finishActive,
+        },
+    });
+    return [moveAction(unit, best.route, best.footprint), shot];
+}
+
 /**
  * Conservative lower bound for the responder's divisor after the actor occupies `footprint`. The engine
  * measures the response at the first occupied point, not the destination centre, so use the closest point of
@@ -946,11 +1184,17 @@ export function prioritizeV08RangedPositioning(
         .filter(Boolean);
     const responseNeutralAdvance = responseNeutralAdvanceVersions.includes(strategyVersion);
     const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
+    // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. Both seats still
+    // build the strict catalog; hypothetical rollouts and omitted-origin callers retain the incumbent policy.
+    const bandAdvanceActiveHere = mode === "both" && supportedBandAdvanceActiveHere(context);
     const advanced =
-        mode === "both" || mode === "advance"
+        !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
             ? protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
             : decision;
     const retreated =
         mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, supportedDelta) : advanced;
-    return supportedPrepinEgress(unit, context, retreated, strategyVersion);
+    const bandAdvanced = bandAdvanceActiveHere
+        ? supportedBandAdvance(unit, context, retreated, strategyVersion)
+        : retreated;
+    return supportedPrepinEgress(unit, context, bandAdvanced, strategyVersion);
 }
