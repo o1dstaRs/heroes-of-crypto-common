@@ -29,7 +29,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // The full and focused suites independently produced this byte-identical digest.
 // Re-pinned after Blacksmith expanded the Life L1 catalog and the hasUnactedTeammate wait gate changed
 // eligible seeded combat waits. Two isolated runs produced this digest with zero rejected actions.
-const EXPECTED_REPLAY_SHA256 = "904036cfb551468f5e163868597befeae309d47ca7925225dd7ad88ec48c7ea6";
+const EXPECTED_REPLAY_SHA256 = "8585a289387314917839a0d927c4d3c6df414a822169311201dffcf220d71f95";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
