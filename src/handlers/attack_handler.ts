@@ -48,6 +48,8 @@ export interface IAttackResult {
     unitIdsDied: string[];
     animationData?: IAnimationData[];
     abilityStolen?: AllAbilities.IAbilityStolen[];
+    /** Healing actually restored by this cast, so the caller can put it on the spell_cast event. */
+    healed?: { unitId: string; amount: number }[];
 }
 
 export interface IAttackObstacle {
@@ -235,6 +237,9 @@ export class AttackHandler {
     ): IAttackResult {
         const animationData: IAnimationData[] = [];
         const unitIdsDied: string[] = [];
+        // Healing restored by this cast, reported on the result so the spell_cast event can carry it
+        // (ranked's scene log is rebuilt from events, not from this handler's own log text).
+        const healedUnits: { unitId: string; amount: number }[] = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -282,6 +287,9 @@ export class AttackHandler {
                             Math.floor(currentActiveSpell.getPower() * attackerUnit.getAmountAlive() * holyCrossFactor),
                         );
                         clarifyingStr = `for ${healPower} hp`;
+                        if (healPower) {
+                            healedUnits.push({ unitId: targetUnit.getId(), amount: healPower });
+                        }
                     }
                 } else if (currentActiveSpell.getPowerType() === SpellPowerType.RESURRECT) {
                     const wasHp = targetUnit.getHp();
@@ -463,7 +471,7 @@ export class AttackHandler {
             }
             this.sceneLog.updateLog(mirroredStr);
 
-            return { completed: true, unitIdsDied, animationData };
+            return { completed: true, unitIdsDied, animationData, healed: healedUnits };
         }
 
         return { completed: false, unitIdsDied, animationData };

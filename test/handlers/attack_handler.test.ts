@@ -211,6 +211,11 @@ describe("AttackHandler", () => {
             expect(result.completed).toBe(true);
             expect(target.getHp()).toBeGreaterThan(12);
             expect(caster.hasSpellRemaining("Heal")).toBe(false);
+
+            // The handler must REPORT what it restored, not just log it: ranked rebuilds its scene log
+            // from the spell_cast event, so a heal with no reported amount reads as a bare "cast Heal on
+            // X" with no number. The amount is what the target actually gained, capped by missing HP.
+            expect(result.healed).toEqual([{ unitId: target.getId(), amount: target.getHp() - 12 }]);
         });
 
         it("applies common enemy debuffs", () => {

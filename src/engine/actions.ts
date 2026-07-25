@@ -58,7 +58,11 @@ export type GameAction =
     | { type: "area_throw_attack"; attackerId: string; targetCell: XY }
     | { type: "cast_spell"; casterId: string; spellName: string; targetId?: string; targetCell?: XY }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
-    | { type: "split_unit"; unitId: string; amount: number }
+    // `cells` places the peeled-off stack in the SAME action. Omit it (the sidebar's "Split Selected"
+    // button) and the new stack is created unplaced, for the player to position separately. Supplying it
+    // is what lets the shift+drag placement gesture be a single authoritative action instead of a
+    // split-then-place pair whose second half races other players for the target cell.
+    | { type: "split_unit"; unitId: string; amount: number; cells?: XY[] }
     | { type: "delete_unit"; unitId: string }
     // Once per lap per team, the acting team may extend its running turn clock (see
     // FightProperties.requestAdditionalTurnTime). Carries the requesting team; the engine only

@@ -107,5 +107,13 @@ export type GameEvent =
           targetCell?: XY;
           unitIdsDied: string[];
           animations: IGameAnimationEvent[];
+          /**
+           * How much each unit was actually healed (after magic resist, Holy Cross and the missing-HP
+           * cap). Ranked rebuilds its scene log from these events rather than from the engine's own text,
+           * so without this a heal reads as a bare "cast Heal on X" with no number — see
+           * RankedPlayScene.buildAuthoritativeSceneLogLines. One entry per healed unit; a mass heal has
+           * many, and a heal that restored nothing has none.
+           */
+          healed?: { unitId: string; amount: number }[];
       }
     | { type: "fight_finished"; winningTeam: TeamType };

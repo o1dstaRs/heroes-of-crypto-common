@@ -2035,6 +2035,55 @@ describe("GameActionEngine", () => {
         ).toBe(3);
     });
 
+    it("splits AND places the peeled stack when the drag gesture supplies target cells", () => {
+        const setup = setupPlacementFight({
+            amountAlive: 7,
+            canSplitUnit: () => true,
+            createSplitUnit: (sourceUnit, amount) =>
+                createTestUnit({ name: sourceUnit.getName(), team: sourceUnit.getTeam(), amountAlive: amount }),
+        });
+
+        const target = { x: 4, y: 4 };
+        const result = setup.engine.apply({
+            type: "split_unit",
+            unitId: setup.unit.getId(),
+            amount: 3,
+            cells: [target],
+        });
+        const splitEvent = result.events.find((event) => event.type === "unit_split");
+        const placedEvent = result.events.find((event) => event.type === "unit_placed");
+        const newUnitId = splitEvent?.type === "unit_split" ? splitEvent.newUnitId : "";
+
+        expect(result.completed).toBe(true);
+        // The placement rides in the SAME action, so no second round-trip can lose the cell.
+        expect(placedEvent?.type === "unit_placed" ? placedEvent.unitId : "").toBe(newUnitId);
+        expect(setup.grid.getOccupantUnitId(target)).toBe(newUnitId);
+        expect(setup.unit.getAmountAlive()).toBe(4);
+        expect(setup.unitsHolder.getAllUnits().get(newUnitId)?.getAmountAlive()).toBe(3);
+    });
+
+    it("leaves the source stack whole when the drag target is not placeable", () => {
+        const setup = setupPlacementFight({
+            amountAlive: 7,
+            canSplitUnit: () => true,
+            createSplitUnit: (sourceUnit, amount) =>
+                createTestUnit({ name: sourceUnit.getName(), team: sourceUnit.getTeam(), amountAlive: amount }),
+        });
+
+        // Outside the fixture's placement predicate (it only allows cells with x <= 4 && y <= 4).
+        const result = setup.engine.apply({
+            type: "split_unit",
+            unitId: setup.unit.getId(),
+            amount: 3,
+            cells: [{ x: 7, y: 7 }],
+        });
+
+        // The peel must be all-or-nothing: a refused target can't leave a halved stack with nowhere to go.
+        expect(result.completed).toBe(false);
+        expect(setup.unit.getAmountAlive()).toBe(7);
+        expect(setup.unitsHolder.getAllUnits().size).toBe(1);
+    });
+
     it("rejects invalid or over-cap placement stack splits", () => {
         const setup = setupPlacementFight({
             amountAlive: 7,

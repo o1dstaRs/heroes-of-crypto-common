@@ -843,6 +843,7 @@ export class GameActionEngine {
                 targetCell: target?.getBaseCell(),
                 unitIdsDied,
                 animations: this.serializeAnimations(result.animationData ?? []),
+                healed: result.healed?.length ? result.healed : undefined,
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
@@ -953,10 +954,11 @@ export class GameActionEngine {
         }
 
         const targetType = spell.getSpellTargetType();
+        let healed: { unitId: string; amount: number }[] = [];
         if (targetType === SpellTargetType.ALL_FLYING) {
             this.massCastOnFlyers(spell, caster, team);
         } else if (targetType === SpellTargetType.ALL_ALLIES) {
-            this.massCastOnAllies(spell, caster, team);
+            healed = this.massCastOnAllies(spell, caster, team);
         } else {
             this.massCastOnEnemies(spell, caster, team);
         }
@@ -970,6 +972,7 @@ export class GameActionEngine {
                 targetCell: action.targetCell ? { ...action.targetCell } : undefined,
                 unitIdsDied: [],
                 animations: [],
+                healed: healed.length ? healed : undefined,
             },
         ];
         events.push(...this.turnEngine.completeTurn(caster));
@@ -1115,7 +1118,8 @@ export class GameActionEngine {
         applyTo(this.context.unitsHolder.getAllAllies(team));
         applyTo(this.context.unitsHolder.getAllEnemyUnits(team));
     }
-    private massCastOnAllies(spell: Spell, caster: Unit, team: number): void {
+    private massCastOnAllies(spell: Spell, caster: Unit, team: number): { unitId: string; amount: number }[] {
+        const healed: { unitId: string; amount: number }[] = [];
         const isHeal = spell.getPowerType() === SpellPowerType.HEAL;
         if (!isHeal) {
             this.context.sceneLog.updateLog(`${caster.getName()} cast ${spell.getName()} on allies`);
@@ -1137,6 +1141,7 @@ export class GameActionEngine {
                         this.context.sceneLog.updateLog(
                             `${caster.getName()} mass healed ${unit.getName()} for ${healPower} hp`,
                         );
+                        healed.push({ unitId: unit.getId(), amount: healPower });
                     }
                 }
                 continue;
@@ -1170,6 +1175,8 @@ export class GameActionEngine {
                 );
             }
         }
+
+        return healed;
     }
     private massCastOnEnemies(spell: Spell, caster: Unit, team: number): void {
         this.context.sceneLog.updateLog(`${caster.getName()} cast ${spell.getName()} on enemies`);
@@ -1343,23 +1350,72 @@ export class GameActionEngine {
             return this.reject("split_unit_factory_missing");
         }
 
+        // A drag-split names the cell the peeled stack lands on. Validate and occupy it BEFORE mutating the
+        // source, so a blocked target leaves the whole action a clean no-op rather than a silently halved
+        // stack with nowhere to stand.
+        let placement: { position: XY; cells: XY[] } | undefined;
+        if (action.cells?.length) {
+            if (!this.isValidPlacementFootprint(splitUnit, action.cells)) {
+                return this.reject("invalid_placement");
+            }
+            // The hook asks "may this unit stand on these cells", so hand it the placement this split is
+            // performing rather than the split action it can't read.
+            const asPlacement: Extract<GameAction, { type: "place_unit" }> = {
+                type: "place_unit",
+                unitId: splitUnit.getId(),
+                team: splitUnit.getTeam(),
+                unitName: splitUnit.getName(),
+                cells: action.cells,
+            };
+            if (this.context.canPlaceUnit && !this.context.canPlaceUnit(splitUnit, action.cells, asPlacement)) {
+                return this.reject("placement_not_available");
+            }
+            const position = getPositionForCells(this.context.grid.getSettings(), action.cells);
+            if (!position) {
+                return this.reject("invalid_placement");
+            }
+            const occupied = this.context.grid.occupyCells(
+                action.cells,
+                splitUnit.getId(),
+                splitUnit.getTeam(),
+                splitUnit.getAttackRange(),
+                splitUnit.hasAbilityActive("Made of Fire"),
+                splitUnit.hasAbilityActive("Made of Water"),
+            );
+            if (!occupied) {
+                return this.reject("placement_blocked");
+            }
+            splitUnit.setPosition(position.x, position.y);
+            placement = { position, cells: structuredClone(action.cells) };
+        }
+
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
         sourceUnit.setAmountAlive(sourceAmount);
         this.context.unitsHolder.addUnit(splitUnit);
 
-        return {
-            completed: true,
-            events: [
-                {
-                    type: "unit_split",
-                    sourceUnitId: sourceUnit.getId(),
-                    newUnitId: splitUnit.getId(),
-                    team: sourceUnit.getTeam(),
-                    sourceAmount,
-                    splitAmount: action.amount,
-                },
-            ],
-        };
+        const events: GameEvent[] = [
+            {
+                type: "unit_split",
+                sourceUnitId: sourceUnit.getId(),
+                newUnitId: splitUnit.getId(),
+                team: sourceUnit.getTeam(),
+                sourceAmount,
+                splitAmount: action.amount,
+            },
+        ];
+        // Emit the placement too, so every listener that already knows how to render/track a placed unit
+        // (grid occupancy mirrors, the ranked scene's hydrate) picks the new stack up with no special case.
+        if (placement) {
+            events.push({
+                type: "unit_placed",
+                unitId: splitUnit.getId(),
+                team: splitUnit.getTeam(),
+                position: { ...placement.position },
+                cells: placement.cells,
+            });
+        }
+
+        return { completed: true, events };
     }
     private validateTurnAction(unitId: string): Unit | Error {
         const unit = this.validateActionUnit(unitId);
