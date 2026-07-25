@@ -135,7 +135,8 @@ export declare namespace PBTypes {
         ARACHNA_SPIDER = 45,
         MERMAID = 46,
         DRYAD = 47,
-        BLACKSMITH = 48
+        BLACKSMITH = 48,
+        ASH_MOTH = 49
     }
     class StringList extends pb_1.Message {
         #private;
