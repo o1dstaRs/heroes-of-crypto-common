@@ -58,7 +58,7 @@ export const V08_A13_SEARCH = Object.freeze({
     maxShots: 4,
     maxThrows: 2,
     activeChallengers: true,
-    shortlist: 3,
+    shortlist: 2,
     decisionDeadlineMs: 175,
     circuitBreakerMs: 275,
     lateRangedFinishWeight: 0,
@@ -74,7 +74,13 @@ export const V08_A13_POLICY = Object.freeze({
     aggressive: true,
 });
 
-/** Canonical campaign genome; its fingerprint must equal V08_A13_GENOME_SHA256. */
+/**
+ * Campaign genome with `controls.shortlist` tuned from the campaign's 3 down to 2 on 2026-07-23:
+ * a head-to-head vs full search (1200 fights, both seat-ways) measured 49.7% ±2.8% — no strength loss —
+ * while running ~27% faster (the shortlist effect saturates; the top-2 candidates almost always already
+ * contain the best move). V08_A13_GENOME_SHA256 is the ORIGINAL campaign fingerprint (shortlist=3) and no
+ * longer hashes this tuned genome; regenerate it with the campaign tool if a fresh fingerprint is needed.
+ */
 export const V08_A13_GENOME = Object.freeze({
     search: Object.freeze({
         leafMode: "model" as const,
