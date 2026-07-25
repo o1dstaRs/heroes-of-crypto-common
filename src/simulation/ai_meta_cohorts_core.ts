@@ -569,12 +569,17 @@ function chooseArtifact(
     const ids = tier === 1 ? TIER1_IDS : TIER2_IDS;
     const score = (id: number): number =>
         tier === 1 ? tier1ContextScore(id, own, opponent) : tier2ContextScore(id, own, opponent, map);
-    if (rng() < AI_META_EXPLORATION_RATE) {
+    // AI_META_ARTIFACT_UNIFORM=1: force every artifact assignment to be uniform-random (never the scorer's
+    // exploit pick). Since the win-rate sample counts only "explore" (uniform) fights, this makes ALL games
+    // contribute an even, unbiased artifact sample — for measuring raw artifact PERFORMANCE rather than the
+    // draft scorer's preference. Pick% collapses to ~1/N per artifact (as expected under uniform).
+    const forceUniform = process.env.AI_META_ARTIFACT_UNIFORM === "1";
+    if (forceUniform || rng() < AI_META_EXPLORATION_RATE) {
         const id = ids[Math.floor(rng() * ids.length)];
         return {
             id,
             mode: "explore",
-            propensity: AI_META_EXPLORATION_RATE / ids.length,
+            propensity: forceUniform ? 1 / ids.length : AI_META_EXPLORATION_RATE / ids.length,
             contextualScore: score(id),
         };
     }
