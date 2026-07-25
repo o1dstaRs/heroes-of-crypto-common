@@ -62,8 +62,8 @@
     },
     "Break": {
         "name": "Break",
-        "laps": 1,
+        "laps": 2,
         "power": 0,
-        "desc": "Disables all the unit's abilities for one turn."
+        "desc": "Disables all the unit's abilities for two laps."
     }
 }
