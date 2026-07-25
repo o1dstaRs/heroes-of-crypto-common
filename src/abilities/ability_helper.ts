@@ -47,6 +47,35 @@ export function getAbilitiesWithPosisionCoefficient(
     return abilities;
 }
 
+/**
+ * The abilities whose SECOND strike the Dual Strike Charm artifact amplifies (the natives and the two the
+ * Blacksmith's Craft grants). Kept here so the damage paths and the UI that previews them read one list.
+ */
+export const DUAL_STRIKE_ABILITY_NAMES: readonly string[] = [
+    "Double Punch",
+    "Double Shot",
+    "Crafted Double Punch",
+    "Crafted Double Shot",
+];
+
+export const DUAL_STRIKE_CHARM_BUFF = "Dual Strike Charm";
+
+/**
+ * Fold the Dual Strike Charm artifact into a second-strike multiplier. Every damage path that lands a
+ * second attack calls this AND so does the tooltip that previews the number, so what a player is shown
+ * on hover is exactly what the strike deals — the charm used to be invisible until the damage landed.
+ * A unit without the artifact's marker buff is returned untouched.
+ */
+export function withDualStrikeCharm(multiplier: number, unit: Unit): number {
+    const charm = unit.getBuff(DUAL_STRIKE_CHARM_BUFF);
+    return charm ? multiplier * (1 + charm.getPower() / 100) : multiplier;
+}
+
+/** The charm's own contribution as a percentage (0 when the unit isn't carrying it) — for attribution. */
+export function dualStrikeCharmPercent(unit: Unit): number {
+    return unit.getBuff(DUAL_STRIKE_CHARM_BUFF)?.getPower() ?? 0;
+}
+
 export const abilityToTextureName = (abilityName: string): string =>
     `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
 

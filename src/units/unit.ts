@@ -2501,20 +2501,28 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // MORALE
         this.unitProperties.attack_multiplier = 1;
-        if (synergyMoraleIncrease > 0) {
-            // this.initialUnitProperties.morale = synergyMoraleIncrease;
-            this.unitProperties.morale = this.initialUnitProperties.morale + synergyMoraleIncrease;
-        } else {
-            this.unitProperties.morale = this.initialUnitProperties.morale;
-        }
-        // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Second buff property carries morale.
-        const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
-        if (cursedWardMoraleBuff) {
-            this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
-        }
-        const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
-        if (crownOfCommandMoraleBuff) {
-            this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
+        // Rebuild morale from the base only when we own the computation. A ranked snapshot already carries
+        // the server's final morale, and the client seeds initialUnitProperties WITH it, so recomputing
+        // here re-applied the artifact delta on every refreshUnits(). See morale_authoritative — the twin
+        // of the luck_authoritative guard above. The locks below (Madness/Sadness/Courage/Morale/Dismorale)
+        // stay live either way: they assign fixed values rather than accumulating, so they agree with the
+        // server instead of drifting from it, and they also drive attack_multiplier.
+        if (!this.unitProperties.morale_authoritative) {
+            if (synergyMoraleIncrease > 0) {
+                // this.initialUnitProperties.morale = synergyMoraleIncrease;
+                this.unitProperties.morale = this.initialUnitProperties.morale + synergyMoraleIncrease;
+            } else {
+                this.unitProperties.morale = this.initialUnitProperties.morale;
+            }
+            // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Second buff property carries morale.
+            const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
+            if (cursedWardMoraleBuff) {
+                this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
+            }
+            const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
+            if (crownOfCommandMoraleBuff) {
+                this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
+            }
         }
         if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
             this.unitProperties.morale = 0;

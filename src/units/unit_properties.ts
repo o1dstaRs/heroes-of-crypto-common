@@ -117,6 +117,13 @@ export class UnitProperties {
     // luck spread that diverges from the server. Left undefined for locally-simulated units (sandbox),
     // which compute luck themselves.
     public luck_authoritative?: boolean;
+    // The morale twin of luck_authoritative. A ranked snapshot's morale is the server's FINAL value: base
+    // + synergy + artifact deltas (Cursed Ward / Crown of Command) + every gain and loss accumulated during
+    // the fight. adjustBaseStats must therefore not rebuild it from initialUnitProperties, because the
+    // client seeds that base WITH the server's already-adjusted number and would subtract the artifact
+    // delta a second time on every refreshUnits() — the "-18 morale from one Cursed Ward" bug. Left
+    // undefined for locally-simulated units (sandbox), which own the whole computation.
+    public morale_authoritative?: boolean;
     public constructor(
         faction: FactionType,
         name: string,

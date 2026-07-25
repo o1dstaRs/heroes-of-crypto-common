@@ -22,6 +22,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
+import { withDualStrikeCharm } from "./ability_helper";
 import { processRangeAOEAbility } from "./aoe_range_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
@@ -139,11 +140,9 @@ export function processDoubleShotAbility(
             doubleShotAbility,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
         );
-        // ARTIFACT Dual Strike Charm: the second (Double Shot) attack deals extra damage.
-        const dualStrikeCharmBuff = fromUnit.getBuff("Dual Strike Charm");
-        if (dualStrikeCharmBuff) {
-            abilityMultiplier *= 1 + dualStrikeCharmBuff.getPower() / 100;
-        }
+        // ARTIFACT Dual Strike Charm: the second (Double Shot) attack deals extra damage. Shared with the
+        // tooltip preview (RenderableUnit) so the hovered % is the % this volley lands.
+        abilityMultiplier = withDualStrikeCharm(abilityMultiplier, fromUnit);
         const paralysisAttackerEffect = fromUnit.getEffect("Paralysis");
         if (paralysisAttackerEffect) {
             abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;

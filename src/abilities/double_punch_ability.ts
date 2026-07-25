@@ -15,6 +15,7 @@ import { Unit } from "../units/unit";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 
+import { withDualStrikeCharm } from "./ability_helper";
 import { hasAnyDeepWoundsAbility } from "./deep_wounds_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPenetratingBiteAbility } from "./penetrating_bite_ability";
@@ -61,11 +62,9 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
             doublePunchAbility,
             FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
         );
-        // ARTIFACT Dual Strike Charm: the second (Double Punch) attack deals extra damage.
-        const dualStrikeCharmBuff = fromUnit.getBuff("Dual Strike Charm");
-        if (dualStrikeCharmBuff) {
-            abilityMultiplier *= 1 + dualStrikeCharmBuff.getPower() / 100;
-        }
+        // ARTIFACT Dual Strike Charm: the second (Double Punch) attack deals extra damage. Shared with the
+        // tooltip preview (RenderableUnit) so the hovered % is the % this strike lands.
+        abilityMultiplier = withDualStrikeCharm(abilityMultiplier, fromUnit);
         const paralysisAttackerEffect = fromUnit.getEffect("Paralysis");
         if (paralysisAttackerEffect) {
             abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;

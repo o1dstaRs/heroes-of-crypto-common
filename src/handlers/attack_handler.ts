@@ -622,10 +622,7 @@ export class AttackHandler {
                 // ARTIFACT Dual Strike Charm: the second (Double Shot) volley deals extra damage. Paralysis is
                 // deliberately NOT applied here — processThroughShotAbility already folds it into its own
                 // multiplier, so applying it again would double-count the slow.
-                const dualStrikeCharmBuff = attackerUnit.getBuff("Dual Strike Charm");
-                if (dualStrikeCharmBuff) {
-                    secondVolleyMultiplier *= 1 + dualStrikeCharmBuff.getPower() / 100;
-                }
+                secondVolleyMultiplier = AbilityHelper.withDualStrikeCharm(secondVolleyMultiplier, attackerUnit);
                 if (secondVolleyMultiplier > 0) {
                     const secondThroughShot = AllAbilities.processThroughShotAbility(
                         attackerUnit,
