@@ -10,6 +10,7 @@
  */
 
 import { getAbilitiesWithPosisionCoefficient } from "../abilities/ability_helper";
+import { hasAnyDeepWoundsAbility } from "../abilities/deep_wounds_ability";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getCellsAroundPosition, getPositionForCell } from "../grid/grid_math";
@@ -138,11 +139,9 @@ export function estimatePrimaryMeleeDamage(
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }
 
-    const hasDeepWounds =
-        unit.hasAbilityActive("Deep Wounds Level 1") ||
-        unit.hasAbilityActive("Deep Wounds Level 2") ||
-        unit.hasAbilityActive("Deep Wounds Level 3");
-    const deepWoundsMultiplier = hasDeepWounds ? 1 + (target.getEffect("Deep Wounds")?.getPower() ?? 0) / 100 : 1;
+    const deepWoundsMultiplier = hasAnyDeepWoundsAbility(unit)
+        ? 1 + (target.getEffect("Deep Wounds")?.getPower() ?? 0) / 100
+        : 1;
     // AttackHandler includes Deep Wounds in its supplied ability multiplier and Unit.calculateAttackDamage
     // applies the same target-state multiplier again. Preserve that authoritative behavior here.
     handlerMultiplier *= deepWoundsMultiplier;

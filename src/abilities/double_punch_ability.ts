@@ -15,6 +15,7 @@ import { Unit } from "../units/unit";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 
+import { hasAnyDeepWoundsAbility } from "./deep_wounds_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPenetratingBiteAbility } from "./penetrating_bite_ability";
 
@@ -71,12 +72,7 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
         }
 
         const deepWoundsEffect = toUnit.getEffect("Deep Wounds");
-        if (
-            deepWoundsEffect &&
-            (fromUnit.hasAbilityActive("Deep Wounds Level 1") ||
-                fromUnit.hasAbilityActive("Deep Wounds Level 2") ||
-                fromUnit.hasAbilityActive("Deep Wounds Level 3"))
-        ) {
+        if (deepWoundsEffect && hasAnyDeepWoundsAbility(fromUnit)) {
             abilityMultiplier *= 1 + deepWoundsEffect.getPower() / 100;
         }
 

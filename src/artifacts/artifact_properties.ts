@@ -35,7 +35,7 @@ export enum Tier1Artifact {
     SWIFT_BOOTS = 5, // +1 movement to melee units
     WINGED_BOOTS = 6, // +1 movement to flying units
     DUAL_STRIKE_CHARM = 7, // +50% damage on a unit's second attack
-    WOUNDING_CHARM = 8, // +1 Deep Wounds stack to all allies
+    WOUNDING_CHARM = 8, // grants the Deep Wounds Level 1 card to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk per archer in the army (scales with archer count), no downside
     HELM_OF_FOCUS = 11, // +25% mind resist
@@ -130,7 +130,10 @@ export const ARTIFACT_POWER = {
     FARSIGHT_QUIVER_RANGE_PERCENT: 50,
     TOME_BUFF_POWER_PERCENT: 50,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
-    WOUNDING_CHARM_DEEP_WOUNDS_PERCENT: 50,
+    // Base amplification of the "Deep Wounds Level 1" card the charm grants army-wide. Mirrors that
+    // ability's power in configuration/abilities.json — the displayed figure only, since the applied
+    // amount also scales with stack power and luck (Unit.calculateAbilityCount).
+    WOUNDING_CHARM_DEEP_WOUNDS_PERCENT: 6,
 } as const;
 
 export interface ArtifactProperties {
@@ -235,7 +238,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "wounding_charm",
         "Wounding Charm",
         "Wounding Charm",
-        "Grants the whole army a Deep Wounds ability at {}% strength (melee hits stack damage amplification).",
+        "Grants the whole army Deep Wounds Level 1: each attack or response stacks +{}% damage amplification on the target.",
     ),
     [Tier1Artifact.CURSED_WARD]: t1(
         Tier1Artifact.CURSED_WARD,

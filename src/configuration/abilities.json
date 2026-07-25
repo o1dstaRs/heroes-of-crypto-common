@@ -801,6 +801,21 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Deep Wounds Level 0": {
+        "name": "Deep Wounds Level 0",
+        "type": "EFFECT",
+        "desc": [
+            "Applies Deep Wounds effect on attack or response",
+            "to deal {}% more damage next time. Only for the ability owner. The effect stacks"
+        ],
+        "power": 3,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Deep Wounds",
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Deep Wounds Level 1": {
         "name": "Deep Wounds Level 1",
         "type": "EFFECT",

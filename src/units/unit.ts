@@ -399,7 +399,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return abilityToDelete;
     }
-    // Grant an ability by name at runtime (e.g. the Wounding Charm artifact granting "Deep Wounds Level 1"
+    // Grant an ability by name at runtime (e.g. the Wounding Charm artifact granting "Deep Wounds Level 0"
     // to a unit that doesn't natively have it). Idempotent — no-op if the unit already has it. Builds the
     // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
     // hasAbilityActive / processDeepWoundsAbility all see it.
@@ -1732,6 +1732,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ability.getPowerType() !== AbilityPowerType.STEAL_ARMOR_ON_HIT &&
             ability.getPowerType() !== AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK &&
             ability.getName() !== "Shatter Armor" &&
+            ability.getName() !== "Deep Wounds Level 0" &&
             ability.getName() !== "Deep Wounds Level 1" &&
             ability.getName() !== "Deep Wounds Level 2" &&
             ability.getName() !== "Deep Wounds Level 3"
@@ -1742,6 +1743,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const madeOfFireBuff = this.getBuff("Made of Fire");
 
         if (
+            ability.getName() === "Deep Wounds Level 0" ||
             ability.getName() === "Deep Wounds Level 1" ||
             ability.getName() === "Deep Wounds Level 2" ||
             ability.getName() === "Deep Wounds Level 3"
@@ -1989,7 +1991,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const deepWoundsPower = enemyUnit.getEffect("Deep Wounds")?.getPower() ?? 0;
         if (
             deepWoundsPower > 0 &&
-            (this.getAbility("Deep Wounds Level 1") ||
+            (this.getAbility("Deep Wounds Level 0") ||
+                this.getAbility("Deep Wounds Level 1") ||
                 this.getAbility("Deep Wounds Level 2") ||
                 this.getAbility("Deep Wounds Level 3"))
         ) {

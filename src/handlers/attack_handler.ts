@@ -1501,12 +1501,7 @@ export class AttackHandler {
         }
 
         const deepWoundsTargetEffect = targetUnit.getEffect("Deep Wounds");
-        if (
-            deepWoundsTargetEffect &&
-            (attackerUnit.hasAbilityActive("Deep Wounds Level 1") ||
-                attackerUnit.hasAbilityActive("Deep Wounds Level 2") ||
-                attackerUnit.hasAbilityActive("Deep Wounds Level 3"))
-        ) {
+        if (deepWoundsTargetEffect && AllAbilities.hasAnyDeepWoundsAbility(attackerUnit)) {
             abilityMultiplier *= 1 + deepWoundsTargetEffect.getPower() / 100;
         }
 
@@ -1773,12 +1768,7 @@ export class AttackHandler {
                     }
 
                     const deepWoundsAttackerEffect = attackerUnit.getEffect("Deep Wounds");
-                    if (
-                        deepWoundsAttackerEffect &&
-                        (targetUnit.hasAbilityActive("Deep Wounds Level 1") ||
-                            targetUnit.hasAbilityActive("Deep Wounds Level 2") ||
-                            targetUnit.hasAbilityActive("Deep Wounds Level 3"))
-                    ) {
+                    if (deepWoundsAttackerEffect && AllAbilities.hasAnyDeepWoundsAbility(targetUnit)) {
                         abilityMultiplier *= 1 + deepWoundsAttackerEffect.getPower() / 100;
                     }
 

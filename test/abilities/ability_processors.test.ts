@@ -40,6 +40,7 @@ import { processSkewerStrikeAbility } from "../../src/abilities/skewer_strike_ab
 import { processSpitBallAbility } from "../../src/abilities/spit_ball_ability";
 import { processStunAbility } from "../../src/abilities/stun_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
+import { ARTIFACT_POWER } from "../../src/artifacts/artifact_properties";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -673,18 +674,18 @@ describe("ability processors", () => {
         expect(mechanism.hasEffectActive("Paralysis")).toBe(true);
     });
 
-    it("Wounding Charm ADDS its scaled Level-1 bonus on top of native Deep Wounds instead of scaling them down", () => {
+    it("Wounding Charm grants a full-strength Level-1 card that ADDS on top of higher native Deep Wounds", () => {
         const sceneLog = new SceneLogMock();
         type TestUnit = ReturnType<typeof createTestUnit>;
-        // Mirror UnitsHolder.applyArtifacts' Wounding Charm setup: grant the Level-1 card (idempotent
-        // for native owners) + the percent marker buff (power 50 = half-strength contribution).
+        // Mirror UnitsHolder.applyArtifacts' Wounding Charm setup: grant the Level-1 card (idempotent for
+        // native Level-1 owners) + the marker buff nothing reads the power of.
         const applyWoundingCharm = (unit: TestUnit): void => {
             unit.grantAbility("Deep Wounds Level 1");
             const buff = new Spell({
                 spellProperties: getSpellConfig("System", "Wounding Charm"),
                 amount: 1,
             });
-            buff.setPower(50);
+            buff.setPower(ARTIFACT_POWER.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
             unit.applyBuff(buff);
         };
         // Each measurement hits a FRESH target so accumulated effect power never leaks between cases.
@@ -702,22 +703,22 @@ describe("ability processors", () => {
         expect(level1Power).toBeGreaterThan(0);
         expect(level2Power).toBeGreaterThan(level1Power);
 
-        // A plain unit's charm-granted wounds stay at the scaled fraction (50% of Level 1) — unchanged.
+        // A plain unit wounds at the SAME strength as a native Level-1 wounder — no scaling applied.
         const recruit = createTestUnit({ name: "Recruit", team: PBTypes.TeamVals.UPPER });
         applyWoundingCharm(recruit);
-        expect(measure(recruit)).toBeCloseTo(level1Power * 0.5, 0);
+        expect(measure(recruit)).toBeCloseTo(level1Power, 0);
 
-        // Native deep-wounders keep FULL native power and the charm bonus stacks ON TOP — the charm
-        // must never scale a native card down (the regression: Wolf dropped to half, White Tiger's
-        // total fell below its own native Level 2).
+        // A native Level-1 owner gains nothing: grantAbility is idempotent, so the Wolf just keeps its own
+        // card. Guards the other direction too — the charm must never scale a native card DOWN.
         const wolf = createTestUnit({ name: "Wolf", abilities: ["Deep Wounds Level 1"] });
         applyWoundingCharm(wolf);
-        expect(measure(wolf)).toBeCloseTo(level1Power * 1.5, 0);
+        expect(measure(wolf)).toBeCloseTo(level1Power, 0);
 
+        // Higher-level natives DO stack the granted card on top of their own.
         const tiger = createTestUnit({ name: "White Tiger", abilities: ["Deep Wounds Level 2"] });
         applyWoundingCharm(tiger);
         const tigerWithCharm = measure(tiger);
-        expect(tigerWithCharm).toBeCloseTo(level2Power + level1Power * 0.5, 0);
+        expect(tigerWithCharm).toBeCloseTo(level2Power + level1Power, 0);
         expect(tigerWithCharm).toBeGreaterThan(level2Power);
     });
 

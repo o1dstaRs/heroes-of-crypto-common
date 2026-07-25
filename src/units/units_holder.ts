@@ -503,8 +503,11 @@ export class UnitsHolder {
                     }
                     break;
                 case Tier1Artifact.WOUNDING_CHARM:
-                    // Grant Level-1 Deep Wounds to the whole army (like the Wolf) so EVERY unit inflicts Deep
-                    // Wounds on attack — plus the marker buff still adds +1 stack on top for units that had it.
+                    // Grant Level-1 Deep Wounds (the Wolf's card) at FULL strength so every unit inflicts Deep
+                    // Wounds on attack. grantAbility is idempotent, so a unit that already owns Level 1 natively
+                    // gains nothing from the charm; higher-level natives (White Tiger, Griffin, Behemoth) DO
+                    // stack it on top, since processDeepWoundsAbility sums the cards a unit holds. The buff
+                    // itself is just the visible marker — nothing reads its power.
                     applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
                     unit.grantAbility("Deep Wounds Level 1");
                     break;
