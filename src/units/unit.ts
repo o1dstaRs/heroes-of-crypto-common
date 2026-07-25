@@ -1725,6 +1725,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
+    // Total Deep Wounds a unit applies in one hit. The cards STACK — their base powers sum — but the flat
+    // terms (luck, the team's synergy ability power) apply once to the UNIT, not once per card: a White Tiger
+    // carrying the Wounding Charm's Level 1 on top of its native Level 2 adds its luck a single time. Floored
+    // as a whole rather than per card, and identical to calculateAbilityCount for a unit holding one card.
+    public calculateDeepWoundsCount(abilities: Ability[], synergyAbilityPowerIncrease: number): number {
+        if (!abilities.length) {
+            return 0;
+        }
+
+        const madeOfFireBuff = this.getBuff("Made of Fire");
+        let stackedPower = 0;
+        for (const ability of abilities) {
+            stackedPower +=
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0);
+        }
+
+        return Number(Math.max(0, stackedPower + this.getLuck() + synergyAbilityPowerIncrease).toFixed(1));
+    }
     public calculateAbilityCount(ability: Ability, synergyAbilityPowerIncrease: number): number {
         if (
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&

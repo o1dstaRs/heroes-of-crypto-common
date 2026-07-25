@@ -61,7 +61,7 @@ export function processDeepWoundsAbility(
         .getFightProperties()
         .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam());
 
-    let powerSum = 0;
+    const heldAbilities = [];
     let deepWoundsEffect;
     for (const abilityName of DEEP_WOUNDS_ABILITY_NAMES) {
         const ability = fromUnit.getAbility(abilityName);
@@ -71,8 +71,10 @@ export function processDeepWoundsAbility(
         }
         // Every card yields an identical freshly built "Deep Wounds" effect, so the first one wins.
         deepWoundsEffect ??= abilityEffect;
-        powerSum += fromUnit.calculateAbilityCount(ability, additionalAbilityPower);
+        heldAbilities.push(ability);
     }
+    // Every card the unit holds resolves as ONE application: the powers stack and luck is added once.
+    const powerSum = fromUnit.calculateDeepWoundsCount(heldAbilities, additionalAbilityPower);
 
     if (powerSum && deepWoundsEffect) {
         const activeDeepWoundsEffect = targetUnit.getEffect("Deep Wounds");

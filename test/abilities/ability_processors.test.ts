@@ -41,6 +41,7 @@ import { processSpitBallAbility } from "../../src/abilities/spit_ball_ability";
 import { processStunAbility } from "../../src/abilities/stun_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
 import { ARTIFACT_POWER } from "../../src/artifacts/artifact_properties";
+import { LUCK_MAX_VALUE_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -720,6 +721,48 @@ describe("ability processors", () => {
         const tigerWithCharm = measure(tiger);
         expect(tigerWithCharm).toBeCloseTo(level2Power + level1Power, 0);
         expect(tigerWithCharm).toBeGreaterThan(level2Power);
+    });
+
+    it("stacks Deep Wounds card powers but counts luck ONCE for a unit holding two cards", () => {
+        const sceneLog = new SceneLogMock();
+        const measure = (luck: number, cards: string[], charm: boolean, stackPower = 5): number => {
+            const attacker = createTestUnit({
+                name: "White Tiger",
+                team: PBTypes.TeamVals.UPPER,
+                abilities: cards,
+                luck,
+                // Defaults to MAX_UNIT_STACK_POWER, so each card contributes exactly its configured power.
+                stackPower,
+            });
+            if (charm) {
+                attacker.grantAbility("Deep Wounds Level 1");
+            }
+            return processDeepWoundsAbility(
+                attacker,
+                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LOWER, amountAlive: 3 }),
+                attacker,
+                sceneLog,
+            );
+        };
+
+        const LUCK = 10;
+        const oneCard = measure(0, ["Deep Wounds Level 2"], false);
+        const twoCards = measure(0, ["Deep Wounds Level 2"], true);
+        // Powers stack: native Level 2 plus the charm's Level 1.
+        expect(twoCards).toBeGreaterThan(oneCard);
+
+        // Luck is a flat bonus on the UNIT, so it must move both totals by exactly the same amount — the
+        // regression is luck being added per card, which paid a two-card unit twice.
+        expect(measure(LUCK, ["Deep Wounds Level 2"], false)).toBeCloseTo(oneCard + LUCK, 1);
+        expect(measure(LUCK, ["Deep Wounds Level 2"], true)).toBeCloseTo(twoCards + LUCK, 1);
+
+        // Negative luck (clamped to -LUCK_MAX_VALUE_TOTAL) subtracts once, and floors the whole application
+        // at zero rather than going negative — here a lone Level 1 at stack power 1 is worth 1.2 vs -10 luck.
+        expect(measure(-LUCK_MAX_VALUE_TOTAL, ["Deep Wounds Level 2"], true)).toBeCloseTo(
+            twoCards - LUCK_MAX_VALUE_TOTAL,
+            1,
+        );
+        expect(measure(-LUCK_MAX_VALUE_TOTAL, [], true, 1)).toBe(0);
     });
 
     it("processes low-level melee utility abilities", () => {
