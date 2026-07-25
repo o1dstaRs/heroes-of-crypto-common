@@ -10,6 +10,7 @@
  */
 
 import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../ai";
+import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
@@ -955,7 +956,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 team: unit.getTeam(),
             });
         }
-        const strategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
+        // A mindless unit ("AI Driven": Berserker, Frenzied Boar) thinks with the pinned v0.1 instead of
+        // its team's brain — see ai/unit_ai_overrides. Resolving it HERE rather than inside decideTurn
+        // also takes search and lookahead off the unit, since both gate on strategy.version just below.
+        const teamStrategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
+        const strategy = isMindlessAiUnit(unit) ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
         const matrix = grid.getMatrix();
         const searchApplies = search.appliesTo(strategy.version);
         const decisionPathCatalog = searchApplies

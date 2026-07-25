@@ -841,7 +841,12 @@ export function playV07SelfplayPassiveAuditGame(
     }
     const template = v07ArchetypeTemplate(spec.template);
     const tally = createV07SelfplayPassiveAuditTally();
-    const pending = new Map<string, IV07PassiveDecisionScope[]>();
+    // One entry per decided turn, in order. A turn the audit IGNORES — a unit deciding with a strategy
+    // other than the audited version, e.g. a mindless "AI Driven" creature pinned to v0.1 — queues an
+    // explicit `null` rather than nothing, so the execution observation it still emits has something to
+    // pair with. Keeping the queue 1:1 with decisions means a genuinely unmatched execution (a real
+    // pairing bug) still throws below instead of being silently tolerated.
+    const pending = new Map<string, (IV07PassiveDecisionScope | null)[]>();
     const setup = liveTwinSetup();
     const roster = template.roster.map((unit) => ({ ...unit }));
     const redRoster = template.roster.map((unit) => ({ ...unit }));
@@ -865,20 +870,22 @@ export function playV07SelfplayPassiveAuditGame(
                 game: spec.game,
                 seed: spec.seed,
             });
-            if (scope) {
-                const queue = pending.get(scope.unitId) ?? [];
-                queue.push(scope);
-                pending.set(scope.unitId, queue);
-            }
+            const unitId = scope?.unitId ?? observation.unit.getId();
+            const queue = pending.get(unitId) ?? [];
+            queue.push(scope ?? null);
+            pending.set(unitId, queue);
         },
         turnExecutionObserver: (observation) => {
             const queue = pending.get(observation.unitId);
-            const scope = queue?.shift();
-            if (!scope) {
+            if (!queue?.length) {
                 throw new Error(`execution observation has no decision scope for ${observation.unitId}`);
             }
-            if (!queue?.length) pending.delete(observation.unitId);
-            observeV07SelfplayTurnExecution(tally, observation, scope);
+            const scope = queue.shift();
+            if (!queue.length) pending.delete(observation.unitId);
+            // `null` = the decision was ignored (non-audited strategy version); nothing to tally.
+            if (scope) {
+                observeV07SelfplayTurnExecution(tally, observation, scope);
+            }
         },
     });
     if (pending.size) throw new Error(`match ended with ${pending.size} unmatched decision scope(s)`);

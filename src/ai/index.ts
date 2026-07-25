@@ -112,6 +112,16 @@ const STRATEGIES: readonly IAIStrategy[] = [
     STRATEGY_V0_8,
 ];
 
+// Mindless-unit AI pin ("AI Driven" -> v0.1). Re-exported here so the simulation engine and the client
+// controller resolve a unit's brain through one rule.
+export {
+    MINDLESS_AI_ABILITY,
+    MINDLESS_AI_VERSION,
+    aiVersionForUnit,
+    isMindlessAiUnit,
+    type IAiOverrideUnit,
+} from "./unit_ai_overrides";
+
 const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));
 
 export const AI_VERSIONS: readonly string[] = STRATEGIES.map((s) => s.version);

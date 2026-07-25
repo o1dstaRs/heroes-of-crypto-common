@@ -65,6 +65,10 @@ export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export {
     getAIStrategy,
+    aiVersionForUnit,
+    isMindlessAiUnit,
+    MINDLESS_AI_ABILITY,
+    MINDLESS_AI_VERSION,
     enumerateCandidates,
     getEnemiesCellsWithinMovementRange,
     AI_VERSIONS,
