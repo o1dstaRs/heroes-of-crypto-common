@@ -187,6 +187,20 @@ describe("Angelic Host army passive", () => {
             expect(flyer.hasBuffActive("Angelic Host")).toBe(false);
         }
 
+        // Break lasts two laps, so the army bonus is still suppressed after the first one.
+        carrier.minusLap();
+        expect(carrier.hasEffectActive("Break")).toBe(true);
+        expect(carrier.hasAbilityActive("Angelic Host")).toBe(false);
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        for (const flyer of [carrier, alliedFlyer]) {
+            expect(flyer.getAttack()).toBe(10);
+            expect(flyer.getArmor()).toBe(10);
+            expect(flyer.getRangeArmor()).toBe(10);
+            expect(flyer.getSteps()).toBe(3);
+            expect(flyer.hasBuffActive("Angelic Host")).toBe(false);
+        }
+
         carrier.minusLap();
         expect(carrier.hasEffectActive("Break")).toBe(false);
         expect(carrier.hasAbilityActive("Angelic Host")).toBe(true);

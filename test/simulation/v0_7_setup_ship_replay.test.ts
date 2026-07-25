@@ -29,7 +29,16 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // The full and focused suites independently produced this byte-identical digest.
 // Re-pinned after Blacksmith expanded the Life L1 catalog and the hasUnactedTeammate wait gate changed
 // eligible seeded combat waits. Two isolated runs produced this digest with zero rejected actions.
-const EXPECTED_REPLAY_SHA256 = "8585a289387314917839a0d927c4d3c6df414a822169311201dffcf220d71f95";
+// Re-pinned after four stacked changes that each legitimately move the seeded combat traces. Per-commit
+// isolation separated them, starting from 905bbcf (the last commit reproducing 8585a28):
+//   2e88592  Wounding Charm grants a full-strength Deep Wounds card   8585a28 -> ea81764
+//   c642eab  Break lasts two laps                                     ea81764 -> 9f83bc2
+//   208ee33  mindless "AI Driven" units pinned to v0.1                9f83bc2 -> caf1913
+//   v0.1 mindless units fall through OBSTACLE_ATTACK                  caf1913 -> the value below
+// Isolation also confirmed two commits in that range leave this fixture byte-identical: 4efb68b (a13
+// shortlist 3 -> 2, a v0.8 search control this v0.7 fixture does not exercise) and 1e2314e (Deep Wounds
+// luck counted once). Two isolated runs produced the digest below.
+const EXPECTED_REPLAY_SHA256 = "6d84c0669c0f3c1884a118f8573fa904261135eae510d6f459ba640fcfb3dfce";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

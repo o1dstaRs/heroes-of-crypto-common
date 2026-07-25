@@ -102,7 +102,8 @@ describe("v0.8 a13 production profile", () => {
             maxShots: 4,
             maxThrows: 2,
             activeChallengers: true,
-            shortlist: 3,
+            // Tuned from the campaign's 3 on 2026-07-23 (4efb68b): no measured strength loss, ~27% faster.
+            shortlist: 2,
             decisionDeadlineMs: 175,
             circuitBreakerMs: 275,
         });
@@ -133,7 +134,7 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_MAX_SHOTS: "4",
             SEARCH_MAX_THROWS: "2",
             SEARCH_ACTIVE_CHALLENGERS: "1",
-            SEARCH_SHORTLIST: "3",
+            SEARCH_SHORTLIST: "2",
             SEARCH_DECISION_DEADLINE_MS: "175",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
@@ -263,7 +264,7 @@ describe("v0.8 a13 production profile", () => {
             activeChallengers: true,
             maxMoveShotComposites: 0,
             aggressiveV08: true,
-            shortlist: 3,
+            shortlist: 2,
             decisionDeadlineMs: 175,
             circuitBreakerMs: 275,
             pureRangedNoMeleePressure: false,

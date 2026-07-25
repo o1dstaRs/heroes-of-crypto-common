@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto";
 
 import { enumerateCandidates, type ICandidateSet, type IDecisionContext, type IEnumerateOptions } from "../ai";
+import { isMindlessAiUnit } from "../ai/unit_ai_overrides";
 import type { GameAction } from "../engine/actions";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -102,6 +103,12 @@ export interface IV07PassiveDimensionTally {
 export interface IV07SelfplayPassiveAuditTally {
     games: number;
     ignoredStrategyTurns: number;
+    /**
+     * Turns a MINDLESS unit ("AI Driven": Berserker, Frenzied Boar) decided with its pinned strategy
+     * rather than the audited version — by design, not an anomaly, so these are counted apart from
+     * ignoredStrategyTurns (which the reducer still treats as a hard error).
+     */
+    mindlessStrategyTurns: number;
     global: IV07PassiveDimensionTally;
     byTemplate: Partial<Record<V07ArchetypeTemplateName, IV07PassiveDimensionTally>>;
     byArchetype: Partial<Record<V07Archetype, IV07PassiveDimensionTally>>;
@@ -305,6 +312,12 @@ export interface IV07SelfplayPassiveAuditReport {
     byLapBand: IV07PassiveDimensionSummary[];
     byCreature: IV07PassiveDimensionSummary[];
     ignoredStrategyTurns: number;
+    /**
+     * Turns a MINDLESS unit ("AI Driven": Berserker, Frenzied Boar) decided with its pinned strategy
+     * rather than the audited version — by design, not an anomaly, so these are counted apart from
+     * ignoredStrategyTurns (which the reducer still treats as a hard error).
+     */
+    mindlessStrategyTurns: number;
     integrity: IV07SelfplayPassiveAuditIntegrity & { smoothExecutionPass: boolean };
     limitations: string[];
 }
@@ -369,6 +382,7 @@ export function createV07SelfplayPassiveAuditTally(): IV07SelfplayPassiveAuditTa
     return {
         games: 0,
         ignoredStrategyTurns: 0,
+        mindlessStrategyTurns: 0,
         global: emptyDimension(),
         byTemplate: {},
         byArchetype: {},
@@ -582,7 +596,14 @@ export function observeV07SelfplayPassiveDecision(
     provenance: IV07PassiveDecisionProvenance = { game: -1, seed: 0 },
 ): IV07PassiveDecisionScope | undefined {
     if (observation.strategyVersion !== V07_SELFPLAY_PASSIVE_AUDIT_VERSION) {
-        tally.ignoredStrategyTurns += 1;
+        // A mindless unit is PINNED to its own strategy in every mode, so its turns legitimately aren't the
+        // audited version — the audit's templates include Berserker. Count those separately so the reducer's
+        // "no foreign strategy turns" guard still catches a genuinely mis-versioned run.
+        if (isMindlessAiUnit(observation.unit)) {
+            tally.mindlessStrategyTurns += 1;
+        } else {
+            tally.ignoredStrategyTurns += 1;
+        }
         return undefined;
     }
     const template = v07ArchetypeTemplate(templateName);
@@ -787,6 +808,7 @@ export function mergeV07SelfplayPassiveAuditTallies(
 ): void {
     target.games += source.games;
     target.ignoredStrategyTurns += source.ignoredStrategyTurns;
+    target.mindlessStrategyTurns += source.mindlessStrategyTurns;
     mergeDimension(target.global, source.global);
     mergeDimensions(target.byTemplate, source.byTemplate);
     mergeDimensions(target.byArchetype, source.byArchetype);
@@ -1043,6 +1065,7 @@ export function finalizeV07SelfplayPassiveAudit(
         byLapBand: dimensionList(tally.byLapBand),
         byCreature: dimensionList(tally.byCreature),
         ignoredStrategyTurns: tally.ignoredStrategyTurns,
+        mindlessStrategyTurns: tally.mindlessStrategyTurns,
         integrity: {
             ...tally.integrity,
             smoothExecutionPass: tally.integrity.rejectedActions === 0 && tally.integrity.recoveryTurns === 0,

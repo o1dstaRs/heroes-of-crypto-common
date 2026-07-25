@@ -26,6 +26,7 @@ import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { isMindlessAiUnit } from "../unit_ai_overrides";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
 
@@ -196,6 +197,14 @@ export class StrategyV0_1 implements IAIStrategy {
         }
 
         if (type === AIActionType.OBSTACLE_ATTACK) {
+            // A MINDLESS unit ("AI Driven": Berserker, Frenzied Boar) never spends its turn on the mountain.
+            // These creatures are pinned to this strategy for flavour and balance (see ai/unit_ai_overrides),
+            // and a berserk creature hammering a rock while an enemy stands next to it reads as a bug, not as
+            // rage — v0.8 stopped taking mountain turns for the same reason. Fall through to the normal
+            // decision so it charges instead; fallbackTurn still yields a wait when nothing else is legal.
+            if (isMindlessAiUnit(unit)) {
+                return this.fallbackTurn(unit, context);
+            }
             // Break the destructible centre mountain (BLOCK_CENTER map): cellToAttack = the struck centre
             // cell, cellToMove = the (reachable) cell to strike from. The engine wants the obstacle's pixel
             // POSITION, so convert the cell. (This mapping was previously missing in the headless path, so
