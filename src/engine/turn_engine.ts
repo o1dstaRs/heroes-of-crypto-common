@@ -204,6 +204,13 @@ export class TurnEngine {
                 currentLap: this.fightProperties.getCurrentLap(),
             });
 
+            // Smoke spell: decrement every cloud's remaining-laps on lap transition, dropping expired ones.
+            // Emitted as a dedicated event so the client removes the dispersed cloud visuals.
+            const expiredSmoke = this.fightProperties.getSmokeClouds().minusAllLaps();
+            if (expiredSmoke.length > 0) {
+                events.push({ type: "smoke_expired", cells: expiredSmoke });
+            }
+
             const gridType = this.fightProperties.getGridType();
             const meltable = gridType === PBTypes.GridVals.LAVA_CENTER || gridType === PBTypes.GridVals.WATER_CENTER;
             if (

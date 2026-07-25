@@ -2485,10 +2485,21 @@ export class AttackHandler {
         const affectedCells: Array<HoCMath.XY[]> = [];
         const rangeAttackDivisors: number[] = [];
         let attackObstacle: IAttackObstacle | undefined;
+        // Smoke (Smoke spell): once the ray has crossed ANY smoked cell, every subsequent target on this shot
+        // takes half damage. The cloud is neutral — applies to ranged attacks of BOTH teams. We track the flag
+        // across the whole trajectory (not per-cell) so a single arrow piercing multiple targets after the
+        // smoke stays halved for all of them, matching the user's "arrow becomes 1/2, then 1/4..." intent: the
+        // existing range-falloff divisor already doubles per shot-distance, and smoke doubles it once more.
+        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        let pathCrossedSmoke = false;
 
         for (const cellToPosition of cellsToPositions) {
             const cell = cellToPosition[0];
             const position = cellToPosition[1];
+
+            if (!pathCrossedSmoke && smokeClouds.has(cell)) {
+                pathCrossedSmoke = true;
+            }
 
             const possibleUnitId = this.grid.getOccupantUnitId(cell);
             if (possibleUnitId === "B" && !isSelection && !isAOEShot) {
@@ -2575,7 +2586,13 @@ export class AttackHandler {
             }
 
             affectedUnits.push(unitsThisShot);
-            rangeAttackDivisors.push(this.getRangeAttackDivisor(attackerUnit, position, attackerPosition));
+            // Smoke halves damage by doubling the range-falloff divisor (capped at 8, same ceiling as
+            // getRangeAttackDivisor). pathCrossedSmoke is sticky for the rest of this ray.
+            let divisor = this.getRangeAttackDivisor(attackerUnit, position, attackerPosition);
+            if (pathCrossedSmoke) {
+                divisor = Math.min(8, divisor * 2);
+            }
+            rangeAttackDivisors.push(divisor);
 
             if (isThroughShot && possibleUnit.hasAbilityActive("Arrows Wingshield Aura")) {
                 break;

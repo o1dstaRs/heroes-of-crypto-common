@@ -108,4 +108,11 @@ export type GameEvent =
           unitIdsDied: string[];
           animations: IGameAnimationEvent[];
       }
+    // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
+    // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.
+    | { type: "smoke_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
+    // A creature stepped onto a smoked cell (or otherwise occupied it) — that cell's smoke disperses now.
+    | { type: "smoke_dispel"; cells: XY[] }
+    // Lap transition decremented every cloud; these cells hit 0 laps and dispersed this tick.
+    | { type: "smoke_expired"; cells: XY[] }
     | { type: "fight_finished"; winningTeam: TeamType };

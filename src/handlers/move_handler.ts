@@ -10,6 +10,7 @@
  */
 
 import { MORALE_CHANGE_FOR_DISTANCE } from "../constants";
+import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { NO_UPDATE, UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
 import { getCellsAroundPosition, getPositionForCell, getPositionForCells } from "../grid/grid_math";
@@ -30,6 +31,9 @@ export interface IDirectedMoveResult {
     log: string;
     deleteUnit: boolean;
     newPosition?: XY;
+    // Smoked cells the moving unit just occupied (and thus dispersed). Forwarded to a `smoke_dispel` event by
+    // the action engine so the client can drop the cloud visuals. Empty for moves that don't touch smoke.
+    dispelledSmokeCells?: XY[];
 }
 
 export class MoveHandler {
@@ -342,6 +346,16 @@ export class MoveHandler {
                 unit.hasAbilityActive("Made of Water"),
             );
         }
+        // Smoke spell: a creature stepping onto a smoked cell disperses the smoke from EVERY cell it now
+        // occupies (large units clear their whole 2x2 footprint). Collected so the action engine can emit a
+        // `smoke_dispel` event for the client to remove the cloud visuals.
+        const dispelledSmokeCells: XY[] = [];
+        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        for (const cell of targetCells) {
+            if (smokeClouds.dispel(cell)) {
+                dispelledSmokeCells.push({ x: cell.x, y: cell.y });
+            }
+        }
         let deleteUnit = false;
         const bodyPosition = unit.getPosition();
         if (!bodyNewPosition) {
@@ -369,7 +383,12 @@ export class MoveHandler {
             };
         }
 
-        return { log: "", newPosition: bodyNewPosition, deleteUnit: deleteUnit };
+        return {
+            log: "",
+            newPosition: bodyNewPosition,
+            deleteUnit: deleteUnit,
+            dispelledSmokeCells: dispelledSmokeCells.length ? dispelledSmokeCells : undefined,
+        };
     }
     private getShiftedCells(
         cells: XY[],

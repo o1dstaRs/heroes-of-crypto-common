@@ -27,4 +27,13 @@ message Fight {
     repeated string up_next = 20;
     double steps_morale_multiplier = 21;
     map<uint32, bool> has_additional_time_requested_per_team = 22;
+    repeated SmokeCell smoke_clouds = 23;
+}
+
+// One cell currently covered by a transient Smoke cloud (Smoke spell). Carried on the Fight so it survives
+// snapshot/restore; the engine decrements laps on lap-transition and dispels on creature-occupy.
+message SmokeCell {
+    int32 x = 1;
+    int32 y = 2;
+    int32 laps_remaining = 3;
 }

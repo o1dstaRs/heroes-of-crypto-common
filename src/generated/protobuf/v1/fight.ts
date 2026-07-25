@@ -32,9 +32,10 @@ export namespace PBTypes {
             up_next?: string[];
             steps_morale_multiplier?: number;
             has_additional_time_requested_per_team?: Map<number, boolean>;
+            smoke_clouds?: SmokeCell[];
         }) {
             super();
-            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9, 11, 12, 14, 15, 16, 20], this.#one_of_decls);
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9, 11, 12, 14, 15, 16, 20, 23], this.#one_of_decls);
             if (!Array.isArray(data) && typeof data == "object") {
                 if ("id" in data && data.id != undefined) {
                     this.id = data.id;
@@ -101,6 +102,9 @@ export namespace PBTypes {
                 }
                 if ("has_additional_time_requested_per_team" in data && data.has_additional_time_requested_per_team != undefined) {
                     this.has_additional_time_requested_per_team = data.has_additional_time_requested_per_team;
+                }
+                if ("smoke_clouds" in data && data.smoke_clouds != undefined) {
+                    this.smoke_clouds = data.smoke_clouds;
                 }
             }
             if (!this.already_made_turn_by_team)
@@ -244,6 +248,12 @@ export namespace PBTypes {
         set has_additional_time_requested_per_team(value: Map<number, boolean>) {
             pb_1.Message.setField(this, 22, value as any);
         }
+        get smoke_clouds() {
+            return pb_1.Message.getRepeatedWrapperField(this, SmokeCell, 23) as SmokeCell[];
+        }
+        set smoke_clouds(value: SmokeCell[]) {
+            pb_1.Message.setRepeatedWrapperField(this, 23, value);
+        }
         static fromObject(data: {
             id?: Uint8Array;
             current_lap?: number;
@@ -275,6 +285,7 @@ export namespace PBTypes {
             has_additional_time_requested_per_team?: {
                 [key: number]: boolean;
             };
+            smoke_clouds?: ReturnType<typeof SmokeCell.prototype.toObject>[];
         }): Fight {
             const message = new Fight({});
             if (data.id != null) {
@@ -343,6 +354,9 @@ export namespace PBTypes {
             if (typeof data.has_additional_time_requested_per_team == "object") {
                 message.has_additional_time_requested_per_team = new Map(Object.entries(data.has_additional_time_requested_per_team).map(([key, value]) => [Number(key), value]));
             }
+            if (data.smoke_clouds != null) {
+                message.smoke_clouds = data.smoke_clouds.map((item) => SmokeCell.fromObject(item));
+            }
             return message;
         }
         toObject() {
@@ -377,6 +391,7 @@ export namespace PBTypes {
                 has_additional_time_requested_per_team?: {
                     [key: number]: boolean;
                 };
+                smoke_clouds?: ReturnType<typeof SmokeCell.prototype.toObject>[];
             } = {};
             if (this.id != null) {
                 data.id = this.id;
@@ -444,6 +459,9 @@ export namespace PBTypes {
             if (this.has_additional_time_requested_per_team != null) {
                 data.has_additional_time_requested_per_team = (Object.fromEntries)(this.has_additional_time_requested_per_team);
             }
+            if (this.smoke_clouds != null) {
+                data.smoke_clouds = this.smoke_clouds.map((item) => item.toObject());
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -510,6 +528,8 @@ export namespace PBTypes {
                     writer.writeBool(2, value);
                 });
             }
+            if (this.smoke_clouds.length)
+                writer.writeRepeatedMessage(23, this.smoke_clouds, (item) => item.serialize(writer));
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -589,6 +609,9 @@ export namespace PBTypes {
                     case 22:
                         reader.readMessage(message, () => pb_1.Map.deserializeBinary(message.has_additional_time_requested_per_team as any, reader, reader.readUint32, reader.readBool));
                         break;
+                    case 23:
+                        reader.readMessage(message, () => pb_1.Message.addToRepeatedWrapperField(message, 23, SmokeCell.deserialize(reader), SmokeCell));
+                        break;
                     default: reader.skipField();
                 }
             }
@@ -599,6 +622,119 @@ export namespace PBTypes {
         }
         static deserializeBinary(bytes: Uint8Array): Fight {
             return Fight.deserialize(bytes);
+        }
+    }
+    export class SmokeCell extends pb_1.Message {
+        #one_of_decls: number[][] = [];
+        constructor(data?: any[] | {
+            x?: number;
+            y?: number;
+            laps_remaining?: number;
+        }) {
+            super();
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
+            if (!Array.isArray(data) && typeof data == "object") {
+                if ("x" in data && data.x != undefined) {
+                    this.x = data.x;
+                }
+                if ("y" in data && data.y != undefined) {
+                    this.y = data.y;
+                }
+                if ("laps_remaining" in data && data.laps_remaining != undefined) {
+                    this.laps_remaining = data.laps_remaining;
+                }
+            }
+        }
+        get x() {
+            return pb_1.Message.getFieldWithDefault(this, 1, 0) as number;
+        }
+        set x(value: number) {
+            pb_1.Message.setField(this, 1, value);
+        }
+        get y() {
+            return pb_1.Message.getFieldWithDefault(this, 2, 0) as number;
+        }
+        set y(value: number) {
+            pb_1.Message.setField(this, 2, value);
+        }
+        get laps_remaining() {
+            return pb_1.Message.getFieldWithDefault(this, 3, 0) as number;
+        }
+        set laps_remaining(value: number) {
+            pb_1.Message.setField(this, 3, value);
+        }
+        static fromObject(data: {
+            x?: number;
+            y?: number;
+            laps_remaining?: number;
+        }): SmokeCell {
+            const message = new SmokeCell({});
+            if (data.x != null) {
+                message.x = data.x;
+            }
+            if (data.y != null) {
+                message.y = data.y;
+            }
+            if (data.laps_remaining != null) {
+                message.laps_remaining = data.laps_remaining;
+            }
+            return message;
+        }
+        toObject() {
+            const data: {
+                x?: number;
+                y?: number;
+                laps_remaining?: number;
+            } = {};
+            if (this.x != null) {
+                data.x = this.x;
+            }
+            if (this.y != null) {
+                data.y = this.y;
+            }
+            if (this.laps_remaining != null) {
+                data.laps_remaining = this.laps_remaining;
+            }
+            return data;
+        }
+        serialize(): Uint8Array;
+        serialize(w: pb_1.BinaryWriter): void;
+        serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
+            const writer = w || new pb_1.BinaryWriter();
+            if (this.x != 0)
+                writer.writeInt32(1, this.x);
+            if (this.y != 0)
+                writer.writeInt32(2, this.y);
+            if (this.laps_remaining != 0)
+                writer.writeInt32(3, this.laps_remaining);
+            if (!w)
+                return writer.getResultBuffer();
+        }
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): SmokeCell {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new SmokeCell();
+            while (reader.nextField()) {
+                if (reader.isEndGroup())
+                    break;
+                switch (reader.getFieldNumber()) {
+                    case 1:
+                        message.x = reader.readInt32();
+                        break;
+                    case 2:
+                        message.y = reader.readInt32();
+                        break;
+                    case 3:
+                        message.laps_remaining = reader.readInt32();
+                        break;
+                    default: reader.skipField();
+                }
+            }
+            return message;
+        }
+        serializeBinary(): Uint8Array {
+            return this.serialize();
+        }
+        static deserializeBinary(bytes: Uint8Array): SmokeCell {
+            return SmokeCell.deserialize(bytes);
         }
     }
 }

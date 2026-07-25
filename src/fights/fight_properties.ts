@@ -64,6 +64,7 @@ import {
     UNITS_TO_SYNERGY_LEVEL,
 } from "../synergies/synergy_properties";
 import { ToFactionName, ToFactionType } from "../factions/faction_type";
+import { SmokeClouds } from "../spells/smoke_clouds";
 
 type RandomIntFn = (min: number, max: number) => number;
 
@@ -110,6 +111,9 @@ export class FightProperties {
     private obstacleHitsLeftLeft: number = 0;
     private obstacleHitsLeftRight: number = 0;
     private additionalNarrowingLaps: number = 0;
+    // Transient cell-resident smoke clouds (Smoke spell). Carried on the fight so it snapshots with the rest
+    // of the state and the ranked server can replay from a snapshot across restarts.
+    private smokeClouds: SmokeClouds = new SmokeClouds();
     public constructor() {
         this.id = createSecureUuid();
         this.currentLap = 1;
@@ -162,6 +166,13 @@ export class FightProperties {
     }
     public getGridType(): GridType {
         return this.gridType;
+    }
+    public getSmokeClouds(): SmokeClouds {
+        return this.smokeClouds;
+    }
+    // Replace the smoke store wholesale — used when restoring a fight from a snapshot (ranked server replay).
+    public setSmokeClouds(clouds: SmokeClouds): void {
+        this.smokeClouds = clouds;
     }
     public getPlacementType(): PlacementType {
         return this.placementType;
@@ -1246,6 +1257,11 @@ export class FightProperties {
             Array.from(fight.has_additional_time_requested_per_team.entries()),
         );
 
+        // Deserialize smokeClouds (transient cell-resident Smoke spell effect).
+        fightProperties.smokeClouds = SmokeClouds.fromJSON(
+            fight.smoke_clouds.map((c) => ({ x: c.x, y: c.y, l: c.laps_remaining })),
+        );
+
         return fightProperties;
     }
     public serialize(): Uint8Array {
@@ -1283,6 +1299,9 @@ export class FightProperties {
             up_next: this.upNextQueue.toArray(),
             steps_morale_multiplier: this.stepsMoraleMultiplier,
             has_additional_time_requested_per_team: new Map(Array.from(this.hasAdditionalTimeRequestedPerTeam)),
+            smoke_clouds: this.smokeClouds
+                .toJSON()
+                .map((c) => new PBFight.SmokeCell({ x: c.x, y: c.y, laps_remaining: c.l })),
         });
 
         return fight.serializeBinary();

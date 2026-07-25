@@ -1007,6 +1007,62 @@
             "conflicts_with": ["Magic Mirror"],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Smoke": {
+            "name": "Smoke",
+            "level": 2,
+            "desc": [
+                "Throws a 2x2 smoke cloud onto free cells anywhere on the battlefield.",
+                "Any ranged attack (either side) whose arrow path crosses a smoked cell deals HALF damage (its range divisor doubles: full -> 1/2, 1/2 -> 1/4).",
+                "A creature stepping onto a smoked cell disperses the smoke from that cell.",
+                "Lasts 3 laps."
+            ],
+            "target": "FREE_CELL",
+            "power": 50,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 4,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Ashen Boon": {
+            "name": "Ashen Boon",
+            "level": 1,
+            "desc": ["Adds {}% of additional damage to an ally.", "Lasts 3 laps."],
+            "target": "ANY_ALLY",
+            "power": 10,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Misfortune": {
+            "name": "Misfortune",
+            "level": 2,
+            "desc": ["The affected unit's luck is at its lowest level.", "Lasts 3 laps."],
+            "target": "ANY_ENEMY",
+            "power": 0,
+            "power_type": "MIND",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Death": {
