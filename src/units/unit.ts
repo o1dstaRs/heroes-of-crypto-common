@@ -2267,6 +2267,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const lapsTotal = Number.MAX_SAFE_INTEGER;
         const applied = new AppliedSpell(auraEffectName, power, lapsTotal, firstSpellProperty, secondSpellProperty);
+        // AURA Rallying Volley (Zena): hand the ranged ally its extra shots HERE, as the aura lands. It cannot
+        // be done in adjustBaseStats — that pass runs before the aura refresh, so it would never see one — and
+        // the top-up must happen exactly once: rallying_volley_granted makes stepping out and back in, a
+        // second Zena, or another refresh a no-op, so shots already FIRED stay spent. The quiver is topped up,
+        // never refilled. Effect-helper scoping already guarantees only RANGED allies get here.
+        if (isBuff && auraEffectName === "Rallying Volley Aura") {
+            const bonus = Math.max(0, Math.floor(power));
+            if (bonus > this.unitProperties.rallying_volley_granted) {
+                this.unitProperties.range_shots += bonus - this.unitProperties.rallying_volley_granted;
+                this.unitProperties.rallying_volley_granted = bonus;
+            }
+        }
         if (isBuff) {
             this.deleteBuff(auraEffectName);
             this.buffs.push(applied);
@@ -2778,19 +2790,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.range_shots,
                 Math.floor(this.maxRangeShots * actualStackPowerCoeff),
             );
-        }
-
-        // AURA Rallying Volley (Zena): allies within 2 cells get +N shots, handed over ONCE. Tracked on the
-        // unit rather than recomputed, because this pass runs on every aura refresh — a plain "+N while in
-        // range" would re-gift the shots every time somebody moved. Comparing against what was already
-        // granted also makes a second Zena a no-op (the aura does not stack) and means shots already FIRED
-        // are gone for good: the quiver is topped up, never refilled. Applied after the Limited Supply
-        // clamp above, which would otherwise trim the bonus straight back off.
-        const rallyingVolleyAura = this.getAppliedAuraEffect("Rallying Volley Aura");
-        const rallyingVolleyBonus = rallyingVolleyAura ? Math.max(0, Math.floor(rallyingVolleyAura.getPower())) : 0;
-        if (rallyingVolleyBonus > this.unitProperties.rallying_volley_granted) {
-            this.unitProperties.range_shots += rallyingVolleyBonus - this.unitProperties.rallying_volley_granted;
-            this.unitProperties.rallying_volley_granted = rallyingVolleyBonus;
         }
 
         const endlessQuiverAbility = this.getAbility("Endless Quiver");
