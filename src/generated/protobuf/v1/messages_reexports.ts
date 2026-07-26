@@ -1,3 +1,4 @@
+// @ts-nocheck
 // AUTO-GENERATED. DO NOT EDIT.
 // Re-exports message classes from PBTypes.* as top-level named exports.
 
