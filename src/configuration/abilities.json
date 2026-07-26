@@ -702,6 +702,21 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Book of Chaos": {
+        "name": "Book of Chaos",
+        "type": "INFO",
+        "desc": [
+            "Allows the caster to access the following spells:",
+            "Riot, Magic Mirror, Mass Riot, Mass Magic Mirror"
+        ],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Unyielding Power": {
         "name": "Unyielding Power",
         "type": "ATTACK",

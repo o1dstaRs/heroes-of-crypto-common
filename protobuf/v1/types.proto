@@ -164,4 +164,5 @@ enum CreatureVals {
     MERMAID = 46 [(creature_level) = FIRST, (creature_faction) = MIGHT];
     DRYAD = 47 [(creature_level) = FIRST, (creature_faction) = NATURE];
     BLACKSMITH = 48 [(creature_level) = FIRST, (creature_faction) = LIFE];
+    ASH_MOTH = 49 [(creature_level) = FIRST, (creature_faction) = CHAOS];
 }
