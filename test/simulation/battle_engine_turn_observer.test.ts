@@ -126,7 +126,10 @@ describe("battle engine turn execution observer", () => {
         // Re-pinned 31 -> 10 -> 20 after enabling Abomination (41), then Champion/Frenzied Boar (42/43),
         // shifted roster draws the same way. Re-pinned 20 -> 35 after v0.1 stopped emitting illegal
         // forced-target melees, which changed the fight trajectory while retaining a genuine skip.
-        const { decisions, turns } = runObservedMatch(35, 5);
+        // Re-pinned 35 -> 33 after enabling Ash Moth (49) grew the L1 pool 15 -> 16 and shifted the seeded
+        // roster draw off a skipping trajectory. Seed 33 is the lowest that again yields a turn whose
+        // incumbent genuinely decides to skip within 5 laps (33/48/63/75/101/104/114 all qualify).
+        const { decisions, turns } = runObservedMatch(33, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
@@ -178,7 +181,9 @@ describe("battle engine turn execution observer", () => {
 
     test("reports a deliberately rejected strategy action separately from defend recovery", () => {
         let injectedUnitId: string | undefined;
-        const { result, turns } = runObservedMatchWithV01Transform(35, 5, (unit, _context, incumbent) => {
+        // Seed 35 -> 33 alongside the skip test above: this injection needs a turn whose incumbent decided
+        // to skip, and Ash Moth's entry into the L1 pool shifted seed 35 off that trajectory.
+        const { result, turns } = runObservedMatchWithV01Transform(33, 5, (unit, _context, incumbent) => {
             if (!injectedUnitId && incumbent.some((action) => action.type === "end_turn")) {
                 injectedUnitId = unit.getId();
                 return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];

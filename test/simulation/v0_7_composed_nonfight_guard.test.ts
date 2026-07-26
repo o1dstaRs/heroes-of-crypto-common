@@ -282,7 +282,8 @@ describe("ranked conditional dual-genome compatibility", () => {
         });
         expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
         // Re-pinned after Blacksmith expanded the Life L1 catalog and shifted the seeded round-3 draft picks.
-        expect(mixed.lower.creatureIds).toEqual([31, 36, 48, 26, 38, 20]);
+        // Re-pinned again after Ash Moth (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
+        expect(mixed.lower.creatureIds).toEqual([32, 36, 31, 26, 38, 20]);
     });
 });
 

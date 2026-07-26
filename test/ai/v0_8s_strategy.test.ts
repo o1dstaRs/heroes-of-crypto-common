@@ -173,8 +173,10 @@ describe("v0.8 search measurement alias", () => {
 
         // Re-pinned after the hasUnactedTeammate wait gate changed these seeded action traces. Two isolated
         // runs produced the same hashes with no rejected actions or rejected waits for either version.
-        expect(digest("v0.7")).toBe("e9a602b75b4c4a3c29204b4de8503cec76c29f703196f327d9b53cbcb9ea8c53");
-        expect(digest("v0.8")).toBe("d3d0b790ba677cfa6fdae3f398e5312650ecb79052440d1cf341ceaef7b5476e");
+        // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
+        // every seeded roster draw and therefore both traces. Two isolated runs reproduced these hashes.
+        expect(digest("v0.7")).toBe("3fd3be31318935c70ef475caaf4b61671aeccf1da811da4c2ee80de556fcadb6");
+        expect(digest("v0.8")).toBe("1f4a920557f8ce7c5d0ee4752a6b50012d56a75f934724a956ae55af05fcbf6d");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

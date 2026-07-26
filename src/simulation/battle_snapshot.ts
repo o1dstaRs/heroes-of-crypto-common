@@ -177,6 +177,12 @@ const FIGHT_FIELDS = [
     "obstacleHitsLeftLeft",
     "obstacleHitsLeftRight",
     "additionalNarrowingLaps",
+    // Cell-resident Smoke clouds (Ash Moth's Book of Chaos). Mutable battle state like any other: the turn
+    // engine decrements it per lap and the move handler dispels a cell when a creature steps on it. It MUST
+    // be captured — a rollout that placed or expired smoke would otherwise leave it behind in the live
+    // fight, which is exactly the leak the lookahead's "search does not mutate live state" test asserts.
+    // Safe to deep-clone: SmokeClouds holds only a Map of plain cells + lap counters.
+    "smokeClouds",
 ] as const;
 
 /** The mutable UnitsHolder caches (derived, but snapshotted so restore is byte-for-byte). */

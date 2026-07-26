@@ -2469,10 +2469,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
             } else if (this.hasDebuffActive("Misfortune")) {
-                // Misfortune: lock luck to its minimum while the debuff is active. Mirrors the Luck Aura
-                // max-sentinel above; luck_mod is zeroed so the floor cannot be lifted by per-turn rolls,
-                // synergy, or artifact luck. See the Sadness block below for the morale equivalent.
-                this.unitProperties.luck = -LUCK_MAX_VALUE_TOTAL;
+                // Misfortune NEUTRALIZES luck to exactly 0 while the debuff is active — it strips whatever
+                // the unit had rather than inverting it. A stack sitting on +10 from Clover of Fortune or a
+                // Leprechaun's Luck Aura drops to 0, NOT to -10: the spell is meant to deny an advantage,
+                // not to hand the caster a guaranteed-unlucky target on top of it (-10 would make every
+                // hit against it roll bad luck, which is a second effect the spell never promised).
+                // luck_mod is zeroed too, so the 0 cannot be lifted back by per-turn rolls, synergy or
+                // artifact luck. See the Sadness block below for the morale equivalent.
+                this.unitProperties.luck = 0;
                 this.unitProperties.luck_mod = 0;
             } else {
                 this.unitProperties.luck = synergyLuckIncrease;

@@ -38,7 +38,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Isolation also confirmed two commits in that range leave this fixture byte-identical: 4efb68b (a13
 // shortlist 3 -> 2, a v0.8 search control this v0.7 fixture does not exercise) and 1e2314e (Deep Wounds
 // luck counted once). Two isolated runs produced the digest below.
-const EXPECTED_REPLAY_SHA256 = "6d84c0669c0f3c1884a118f8573fa904261135eae510d6f459ba640fcfb3dfce";
+// Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft catalog 15 -> 16. Like every
+// previous catalog change, the larger pool shifts the deterministic roster draws, so all seeded traces
+// legitimately change. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "dcb8466ac27b11e4235a9bafb4f59b6eb0bceb6204c2e9df4340e2ff0eefe4ac";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

@@ -1050,7 +1050,7 @@
         "Misfortune": {
             "name": "Misfortune",
             "level": 2,
-            "desc": ["The affected unit's luck is at its lowest level.", "Lasts 3 laps."],
+            "desc": ["The affected unit loses all of its luck (set to 0).", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
             "power": 0,
             "power_type": "MIND",
