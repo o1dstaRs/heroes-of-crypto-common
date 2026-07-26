@@ -5,12 +5,13 @@
  * -----------------------------------------------------------------------------
  */
 
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 
 import { ArmorAugment, getArmorPower } from "../../src/augments/augment_properties";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { Spell } from "../../src/spells/spell";
+import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { createTestUnit } from "../helpers/combat";
 
 const armorAugmentBuff = (level: ArmorAugment): Spell => {
@@ -35,6 +36,8 @@ const withAndWithout = (level: ArmorAugment, magicResist: number, armor: number)
 };
 
 describe("Armor augment grants magic armor too", () => {
+    afterEach(() => setDeterministicRandomSource(undefined));
+
     it("raises magic resist by the augment's own percentage, at every level", () => {
         for (const level of [ArmorAugment.LEVEL_1, ArmorAugment.LEVEL_2, ArmorAugment.LEVEL_3]) {
             const { plain, augmented } = withAndWithout(level, 20, 12);
@@ -61,6 +64,9 @@ describe("Armor augment grants magic armor too", () => {
     });
 
     it("still composes with an independent Magic Shield roll instead of replacing it", () => {
+        // adjustBaseStats rolls the turn's luck before deriving stack-powered Magic Shield. Replay the exact
+        // same roll for both units so this assertion isolates only the Armor augment.
+        setDeterministicRandomSource(() => 0);
         const shielded = createTestUnit({
             name: "Squire",
             abilities: ["Magic Shield"],
@@ -70,6 +76,7 @@ describe("Armor augment grants magic armor too", () => {
         shielded.adjustBaseStats(true, 1, 0, 0, 0, 0, 0, 0);
         const shieldedOnly = shielded.getMagicResist();
 
+        setDeterministicRandomSource(() => 0);
         const both = createTestUnit({ name: "Squire", abilities: ["Magic Shield"], magicResist: 20, stackPower: 5 });
         both.applyBuff(armorAugmentBuff(ArmorAugment.LEVEL_3));
         both.adjustBaseStats(true, 1, 0, 0, 0, 0, 0, 0);
