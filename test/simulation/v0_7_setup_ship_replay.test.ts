@@ -41,9 +41,14 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft catalog 15 -> 16. Like every
 // previous catalog change, the larger pool shifts the deterministic roster draws, so all seeded traces
 // legitimately change. Two isolated runs produced this byte-identical digest.
-// Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft catalog 12 -> 13. Same legitimate
+// Re-pinned again after enabling Zena (Might L2) grew the L2 draft catalog 12 -> 13. Same legitimate
 // roster-draw shift as every previous catalog change. Two isolated runs produced this digest.
-const EXPECTED_REPLAY_SHA256 = "744a3c92f5d9f7c1c6525d420e085691c422e7104befde66695190929cc5243d";
+// Re-pinned again after Zena's kit started actually FIRING in seeded fights: her Chakram now ricochets on
+// responses as well as on the initiating shot, and the Rallying Volley aura now reaches ranged allies (its
+// power type was missing from the effect_helper whitelist, so it had been inert). Both change combat
+// outcomes wherever she is drafted, so every seeded trace legitimately moves. Two isolated runs produced
+// this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "ff0863178443a7b24874aca5b3b764f2d87e531c29fd697a47de22de3500d1fb";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

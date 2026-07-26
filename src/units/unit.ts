@@ -1084,6 +1084,31 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             (this.getRangeShots() > 0 && this.getRangeShotDistance() > 0)
         );
     }
+    /**
+     * Spend the arrows ONE ranged volley costs against `target`, and report how many were spent.
+     *
+     * Owns two rules that used to live only in the single-target damage path, which is how a splash
+     * shooter (Gargantuan's Area Throw, Cyclops' Large Caliber) came to ignore Dense Flesh entirely — its
+     * shots route through the AOE tail, which just decremented once:
+     *   - UNLIMITED_SUPPLIES spends nothing at all.
+     *   - Dense Flesh makes a volley aimed at that unit cost its ability power instead of one.
+     * Call this from EVERY path that consumes a volley so the two can never drift apart again.
+     */
+    public spendShotsAgainst(target?: Unit): number {
+        for (const ability of this.getAbilities()) {
+            if (ability.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
+                return 0;
+            }
+        }
+        const cost =
+            target?.hasAbilityActive("Dense Flesh") === true
+                ? Math.max(1, Math.floor(target.getAbility("Dense Flesh")?.getPower() ?? 1))
+                : 1;
+        for (let i = 0; i < cost; i++) {
+            this.decreaseNumberOfShots();
+        }
+        return cost;
+    }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
         if (this.unitProperties.range_shots < 0) {
@@ -1989,22 +2014,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (this.getRangeShots() <= 0) {
                 return 0;
             }
-            let gotUnlimitedSupplies = false;
-            for (const abil of this.getAbilities()) {
-                if (abil.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
-                    gotUnlimitedSupplies = true;
-                }
-            }
-            if (decreaseNumberOfShots && !gotUnlimitedSupplies) {
-                this.decreaseNumberOfShots();
-                // Dense Flesh: a shot aimed at this target consumes ability-power shots total
-                if (enemyUnit.hasAbilityActive("Dense Flesh")) {
-                    const denseFleshAbility = enemyUnit.getAbility("Dense Flesh");
-                    const totalShotsCost = Math.max(1, Math.floor(denseFleshAbility?.getPower() ?? 1));
-                    for (let i = 1; i < totalShotsCost; i++) {
-                        this.decreaseNumberOfShots();
-                    }
-                }
+            if (decreaseNumberOfShots) {
+                // Unlimited-supplies and Dense Flesh both live in spendShotsAgainst, shared with the AOE tail.
+                this.spendShotsAgainst(enemyUnit);
             }
         }
 

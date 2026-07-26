@@ -476,6 +476,28 @@ export class AttackHandler {
 
         return { completed: false, unitIdsDied, animationData };
     }
+    /**
+     * Chip the center mountains for a chakram whose disc crossed them. Each distinct mountain CELL the disc
+     * touched is one hit on that cell's mountain (left half vs right, split at mid-column) — the same
+     * per-strike loss a melee mountain attack deals via encounterObstacleHit. A mountain reduced to 0 is
+     * cleared to walkable, exactly like an obstacle_attack destroying it.
+     */
+    private applyChakramMountainHits(mountainCells: HoCMath.XY[]): void {
+        if (!mountainCells.length) {
+            return;
+        }
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const midColumn = this.grid.getSettings().getGridSize() >> 1;
+        for (const cell of mountainCells) {
+            fightProperties.encounterObstacleHit(cell.x >= midColumn);
+        }
+        if (fightProperties.getObstacleHitsLeftLeft() <= 0) {
+            this.grid.clearMountainSide(false);
+        }
+        if (fightProperties.getObstacleHitsLeftRight() <= 0) {
+            this.grid.clearMountainSide(true);
+        }
+    }
     public handleRangeAttack(
         unitsHolder: UnitsHolder,
         hoverRangeAttackDivisors: number[],
@@ -741,32 +763,39 @@ export class AttackHandler {
             rangeResponseUnit = undefined;
         }
 
-        // ABILITY Chakram (Zena): the throw ricochets in half circles from the unit it just struck to the
-        // next enemy along each arc (resolveChakramBounces owns the geometry, the ally exclusion and the
-        // Angel stop). Its victims JOIN affectedUnits, so they resolve through the very same AOE tail as
-        // Large Caliber / Area Throw — that is what earns the bounces ARTIFACT Giant's Maul's +% at impact,
-        // the victim's status resistance, Flesh Shield ordering and the per-unit damage numbers, instead of
-        // being a bespoke second damage path that every future AOE change would have to remember.
-        const chakramBounces = AllAbilities.resolveChakramBounces(
+        // ABILITY Chakram (Zena): the throw's 1-cell disc traces a FULL circle at every enemy/mountain it
+        // touches, damaging everyone it passes through and chipping every mountain cell it crosses, chaining
+        // until a circle finds nothing new. resolveChakramTrajectory PRECOMPUTES the whole flight so the client
+        // only replays it. Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large
+        // Caliber / Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
+        const chakramTrajectory = AllAbilities.resolveChakramTrajectory(
             attackerUnit,
             targetUnit,
             unitsHolder,
             this.grid,
             () => HoCLib.getRandomInt(0, 100) / 100,
         );
-        if (chakramBounces.length && affectedUnits) {
-            for (const bounce of chakramBounces) {
-                if (!affectedUnits.some((unit) => unit.getId() === bounce.unit.getId())) {
-                    affectedUnits.push(bounce.unit);
+        if (chakramTrajectory.hitUnits.length && affectedUnits) {
+            for (const hitUnit of chakramTrajectory.hitUnits) {
+                if (!affectedUnits.some((unit) => unit.getId() === hitUnit.getId())) {
+                    affectedUnits.push(hitUnit);
                 }
             }
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} chakram ricochets to ${chakramBounces.map((b) => b.unit.getName()).join(", ")}`,
+                `${attackerUnit.getName()} chakram ricochets to ${chakramTrajectory.hitUnits
+                    .map((u) => u.getName())
+                    .join(", ")}`,
             );
-            // Hand the client the exact sweeps so it can fly the disc along them (see IVisibleDamage).
-            damageForAnimation.chakramArcs = chakramBounces.map((bounce) => ({
-                targetUnitId: bounce.unit.getId(),
-                cells: bounce.arcCells.map((cell) => ({ x: cell.x, y: cell.y })),
+        }
+        this.applyChakramMountainHits(chakramTrajectory.mountainCells);
+        if (chakramTrajectory.steps.length) {
+            // Hand the client the exact circles + per-leg hits so it flies the disc and lands each hit as the
+            // disc reaches it (see IVisibleDamage.chakramArcs).
+            damageForAnimation.chakramArcs = chakramTrajectory.steps.map((step) => ({
+                targetUnitId: step.hitUnitIds[0] ?? "",
+                cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
+                hitUnitIds: [...step.hitUnitIds],
+                mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
             }));
         }
 
@@ -856,30 +885,37 @@ export class AttackHandler {
         };
 
         if (rangeResponseUnit && rangeResponseUnits) {
-            // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw ricochets exactly like the initiating
-            // one — the disc does not care who threw it. Same helper, same ally exclusion and Angel stop,
-            // with the RESPONDER as the attacker and its shooter as the primary victim.
-            const responseChakramBounces = AllAbilities.resolveChakramBounces(
+            // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
+            // the disc does not care who threw it. Same full-circle trajectory, ally exclusion, Angel stop and
+            // mountain chipping, with the RESPONDER as the attacker and its shooter as the primary victim.
+            const responseChakramTrajectory = AllAbilities.resolveChakramTrajectory(
                 targetUnit,
                 rangeResponseUnit,
                 unitsHolder,
                 this.grid,
                 () => HoCLib.getRandomInt(0, 100) / 100,
             );
-            if (responseChakramBounces.length) {
-                for (const bounce of responseChakramBounces) {
-                    if (!rangeResponseUnits.some((unit) => unit.getId() === bounce.unit.getId())) {
-                        rangeResponseUnits.push(bounce.unit);
+            if (responseChakramTrajectory.hitUnits.length) {
+                for (const hitUnit of responseChakramTrajectory.hitUnits) {
+                    if (!rangeResponseUnits.some((unit) => unit.getId() === hitUnit.getId())) {
+                        rangeResponseUnits.push(hitUnit);
                     }
                 }
                 this.sceneLog.updateLog(
-                    `${targetUnit.getName()} chakram ricochets to ${responseChakramBounces.map((b) => b.unit.getName()).join(", ")}`,
+                    `${targetUnit.getName()} chakram ricochets to ${responseChakramTrajectory.hitUnits
+                        .map((u) => u.getName())
+                        .join(", ")}`,
                 );
+            }
+            this.applyChakramMountainHits(responseChakramTrajectory.mountainCells);
+            if (responseChakramTrajectory.steps.length) {
                 damageForAnimation.chakramArcs = [
                     ...(damageForAnimation.chakramArcs ?? []),
-                    ...responseChakramBounces.map((bounce) => ({
-                        targetUnitId: bounce.unit.getId(),
-                        cells: bounce.arcCells.map((cell) => ({ x: cell.x, y: cell.y })),
+                    ...responseChakramTrajectory.steps.map((step) => ({
+                        targetUnitId: step.hitUnitIds[0] ?? "",
+                        cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
+                        hitUnitIds: [...step.hitUnitIds],
+                        mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
                     })),
                 ];
             }
