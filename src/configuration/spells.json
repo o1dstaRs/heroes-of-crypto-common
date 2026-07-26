@@ -173,7 +173,7 @@
             "name": "Armor Augment",
             "level": 0,
             "desc": [
-                "Level []. Augment boosts the entire team's base armor by {}%.",
+                "Level []. Augment boosts the entire team's base armor and magic armor by {}%.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

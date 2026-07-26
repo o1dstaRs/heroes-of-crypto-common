@@ -64,7 +64,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned once more when the creature wave merged with those Zena fixes: both sides had moved this
 // fixture independently, so neither branch's value survives the merge. Two isolated runs on the merged
 // tree produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "64a2203348bd922727dc81174c58406cf7938edf8d11d7e941c453adf0e6aba2";
+// Re-pinned again after the Armor augment started hardening MAGIC armor by the same percentage it adds
+// to physical armor. Every seeded fight where a side buys that augment now resolves magic damage
+// differently, so the traces legitimately move. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "391da1bed4a8bf81453eada4c02c9032f50e0f6071bf2fec6a0c6e09dacb6d0e";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

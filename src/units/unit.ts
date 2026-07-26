@@ -2875,6 +2875,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.initialUnitProperties.magic_resist +
               this.initialUnitProperties.magic_resist / madeOfFireBuff.getPower()
             : this.initialUnitProperties.magic_resist;
+        // The Armor augment hardens MAGIC armor by the same percentage it adds to physical armor (see the
+        // base_armor block above — identical shape: a % of the unit's own stat). Applied to the base here,
+        // BEFORE the independent ability rolls below, so it composes with Magic Shield / Wardguard / Warding
+        // Mane exactly the way the physical half composes with the armor multipliers.
+        const armorAugmentMagicBuff = this.getBuff("Armor Augment");
+        if (armorAugmentMagicBuff) {
+            this.unitProperties.magic_resist += roundUnitStat(
+                (this.unitProperties.magic_resist / 100) * armorAugmentMagicBuff.getPower(),
+                2,
+            );
+        }
         const enchantedSkinAbility = this.getAbility("Enchanted Skin");
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
