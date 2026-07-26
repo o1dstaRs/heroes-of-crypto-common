@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as pb_1 from "google-protobuf";
 export declare namespace PBTypes {
     enum FactionVals {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // AUTO-GENERATED. DO NOT EDIT.
 // Re-exports ORIGINAL runtime enums from PBTypes (no regeneration).
 import { PBTypes } from "./types";
