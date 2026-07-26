@@ -69,6 +69,7 @@ export enum AbilityPowerType {
     POISON_ON_HIT = 56,
     HAMSTRING = 57,
     ABSORB_FIRST_HIT = 58,
+    ADDITIONAL_RANGE_SHOTS = 59,
 }
 
 export const AllAbilityPowerTypes = [
@@ -131,6 +132,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.POISON_ON_HIT,
     AbilityPowerType.HAMSTRING,
     AbilityPowerType.ABSORB_FIRST_HIT,
+    AbilityPowerType.ADDITIONAL_RANGE_SHOTS,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -196,6 +198,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     POISON_ON_HIT: AbilityPowerType.POISON_ON_HIT,
     HAMSTRING: AbilityPowerType.HAMSTRING,
     ABSORB_FIRST_HIT: AbilityPowerType.ABSORB_FIRST_HIT,
+    ADDITIONAL_RANGE_SHOTS: AbilityPowerType.ADDITIONAL_RANGE_SHOTS,
 };
 
 export enum AbilityType {

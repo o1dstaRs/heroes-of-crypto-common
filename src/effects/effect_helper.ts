@@ -48,6 +48,16 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         return true;
     }
 
+    // AURA Rallying Volley (Zena): extra shots are only meaningful to a unit that SHOOTS, so it lands on
+    // ranged allies alone — the same shape as the DISABLE_RANGE_ATTACK rule just below. An aura power type
+    // absent from these lists is silently never applied, which is why a new aura shows up on nobody.
+    if (
+        unit.getAttackType() === PBTypes.AttackVals.RANGE &&
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_SHOTS
+    ) {
+        return true;
+    }
+
     if (
         unit.getAttackType() === PBTypes.AttackVals.RANGE &&
         auraEffectProperties.power_type === AbilityPowerType.DISABLE_RANGE_ATTACK

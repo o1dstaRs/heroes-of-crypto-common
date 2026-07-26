@@ -4,6 +4,7 @@ export * from "./blindness_ability";
 export * from "./boar_saliva_ability";
 export * from "./chain_lightning_ability";
 export * from "./craft_ability";
+export * from "./chakram_ability";
 export * from "./deep_wounds_ability";
 export * from "./devour_essense_ability";
 export * from "./double_punch_ability";

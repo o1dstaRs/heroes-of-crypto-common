@@ -54,9 +54,16 @@ export function processRangeAOEAbility(
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
+    // The AOE abilities that route their splash through this tail. Being listed here is what earns an
+    // ability the whole AOE package: ARTIFACT Giant's Maul's +% at impact, the victim's status resistance
+    // hardening against physical AOE, Flesh Shield owners resolving first, and the per-unit damage
+    // breakdown the client renders. Zena's Chakram bounces are AOE hits for exactly these reasons.
     let aoeAbility = attackerUnit.getAbility("Area Throw");
     if (!aoeAbility) {
         aoeAbility = attackerUnit.getAbility("Large Caliber");
+    }
+    if (!aoeAbility) {
+        aoeAbility = attackerUnit.getAbility("Chakram");
     }
 
     let maxDamage = 0;

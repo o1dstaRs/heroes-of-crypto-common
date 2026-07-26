@@ -741,6 +741,35 @@ export class AttackHandler {
             rangeResponseUnit = undefined;
         }
 
+        // ABILITY Chakram (Zena): the throw ricochets in half circles from the unit it just struck to the
+        // next enemy along each arc (resolveChakramBounces owns the geometry, the ally exclusion and the
+        // Angel stop). Its victims JOIN affectedUnits, so they resolve through the very same AOE tail as
+        // Large Caliber / Area Throw — that is what earns the bounces ARTIFACT Giant's Maul's +% at impact,
+        // the victim's status resistance, Flesh Shield ordering and the per-unit damage numbers, instead of
+        // being a bespoke second damage path that every future AOE change would have to remember.
+        const chakramBounces = AllAbilities.resolveChakramBounces(
+            attackerUnit,
+            targetUnit,
+            unitsHolder,
+            this.grid,
+            () => HoCLib.getRandomInt(0, 100) / 100,
+        );
+        if (chakramBounces.length && affectedUnits) {
+            for (const bounce of chakramBounces) {
+                if (!affectedUnits.some((unit) => unit.getId() === bounce.unit.getId())) {
+                    affectedUnits.push(bounce.unit);
+                }
+            }
+            this.sceneLog.updateLog(
+                `${attackerUnit.getName()} chakram ricochets to ${chakramBounces.map((b) => b.unit.getName()).join(", ")}`,
+            );
+            // Hand the client the exact sweeps so it can fly the disc along them (see IVisibleDamage).
+            damageForAnimation.chakramArcs = chakramBounces.map((bounce) => ({
+                targetUnitId: bounce.unit.getId(),
+                cells: bounce.arcCells.map((cell) => ({ x: cell.x, y: cell.y })),
+            }));
+        }
+
         // handle attack damage
         let aoeRangeAttackResult = AllAbilities.processRangeAOEAbility(
             attackerUnit,
@@ -827,6 +856,34 @@ export class AttackHandler {
         };
 
         if (rangeResponseUnit && rangeResponseUnits) {
+            // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw ricochets exactly like the initiating
+            // one — the disc does not care who threw it. Same helper, same ally exclusion and Angel stop,
+            // with the RESPONDER as the attacker and its shooter as the primary victim.
+            const responseChakramBounces = AllAbilities.resolveChakramBounces(
+                targetUnit,
+                rangeResponseUnit,
+                unitsHolder,
+                this.grid,
+                () => HoCLib.getRandomInt(0, 100) / 100,
+            );
+            if (responseChakramBounces.length) {
+                for (const bounce of responseChakramBounces) {
+                    if (!rangeResponseUnits.some((unit) => unit.getId() === bounce.unit.getId())) {
+                        rangeResponseUnits.push(bounce.unit);
+                    }
+                }
+                this.sceneLog.updateLog(
+                    `${targetUnit.getName()} chakram ricochets to ${responseChakramBounces.map((b) => b.unit.getName()).join(", ")}`,
+                );
+                damageForAnimation.chakramArcs = [
+                    ...(damageForAnimation.chakramArcs ?? []),
+                    ...responseChakramBounces.map((bounce) => ({
+                        targetUnitId: bounce.unit.getId(),
+                        cells: bounce.arcCells.map((cell) => ({ x: cell.x, y: cell.y })),
+                    })),
+                ];
+            }
+
             aoeRangeResponseResult = AllAbilities.processRangeAOEAbility(
                 targetUnit,
                 rangeResponseUnits,

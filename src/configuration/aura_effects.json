@@ -103,5 +103,13 @@
         "power": 0,
         "is_buff": false,
         "power_type": "DISABLE_FLY_MOVEMENT"
+    },
+    "Rallying Volley": {
+        "name": "Rallying Volley",
+        "range": 2,
+        "desc": "Ranged allies within range gain +{} shots.",
+        "power": 2,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_RANGE_SHOTS"
     }
 }

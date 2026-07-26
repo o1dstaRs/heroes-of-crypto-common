@@ -111,3 +111,29 @@ export class SmokeClouds {
         return store;
     }
 }
+
+/** Minimal grid surface this module needs, so it stays free of a Grid import cycle. */
+export interface ISmokeGrid {
+    getOccupantUnitId(cell: XY): string | undefined;
+}
+
+/**
+ * Whether a single cell can take smoke.
+ *
+ * Forbidden: off-grid, the centre MOUNTAIN ("B"), a cell already NARROWED away ("H"), and any cell a
+ * creature stands on. Terrain fluids are fine — lava ("L") and water ("W") are ground the cloud can sit
+ * over, and lava in particular is an intended play (smoke the lava lane).
+ *
+ * Shared by the engine's smokeCast and the client's aim preview on purpose: the preview must highlight
+ * exactly the placements the engine will accept, or it teaches the player a rule the game does not have.
+ */
+export function isSmokeableCell(grid: ISmokeGrid, withinGrid: boolean, cell: XY): boolean {
+    if (!withinGrid) {
+        return false;
+    }
+    const occupant = grid.getOccupantUnitId(cell);
+    if (!occupant) {
+        return true;
+    }
+    return occupant === "L" || occupant === "W";
+}

@@ -283,7 +283,8 @@ describe("ranked conditional dual-genome compatibility", () => {
         expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
         // Re-pinned after Blacksmith expanded the Life L1 catalog and shifted the seeded round-3 draft picks.
         // Re-pinned again after Ash Moth (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
-        expect(mixed.lower.creatureIds).toEqual([32, 36, 31, 26, 38, 20]);
+        // Re-pinned again after Zena (50) grew the L2 pool, which swaps 36 for her in the same seeded draw.
+        expect(mixed.lower.creatureIds).toEqual([32, 50, 31, 26, 38, 20]);
     });
 });
 

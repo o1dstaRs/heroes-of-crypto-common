@@ -74,10 +74,10 @@ describe("pick_sim", () => {
             15,
             14,
             13, // four globally distinct L1 offers (16-creature pool: Mermaid, Dryad, Blacksmith, Ash Moth)
+            13,
             12,
             11,
-            10,
-            9, // four globally distinct L2 offers
+            10, // four globally distinct L2 offers (13-creature pool after enabling Zena)
             12,
             12,
             12,
@@ -93,11 +93,11 @@ describe("pick_sim", () => {
             10,
             9,
             8, // L1 bans after excluding all four offers (16-creature pool)
+            9,
             8,
             7,
             6,
-            5,
-            4, // L2 bans after excluding all four offers
+            5, // L2 bans after excluding all four offers (13-creature pool after enabling Zena)
             8,
             7,
             6, // L3 bans

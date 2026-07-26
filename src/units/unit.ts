@@ -67,7 +67,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
-    "Book of Chaos": new Set(["Smoke", "Misfortune"]),
+    "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword"]),
     "Blacksmith Tools": new Set(["Craft"]),
     Enchants: new Set(["Armor Rune", "Weapon Rune"]),
 };
@@ -1685,6 +1685,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
+        // Rallying Volley (Zena) hands over a flat COUNT of shots, not a percentage and not stack-powered,
+        // so the stored aura power is the raw configured value. Every power type missing from this function
+        // falls through to the percentage tail at the end, which returns (1 * 100) - 100 = 0 — that is why
+        // the aura applied to ranged allies but granted them nothing.
+        if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_SHOTS) {
+            return auraEffect.getPower();
+        }
+
         const madeOfFireBuff = this.getBuff("Made of Fire");
 
         if (
@@ -2465,18 +2473,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // carry the server's already-rolled luck incl. auras; recomputing here would roll a divergent
         // per-turn spread on top of it). See UnitProperties.luck_authoritative.
         if (!this.unitProperties.luck_authoritative) {
-            if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
-                this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
+            // Misfortune is checked BEFORE the max-luck sentinel on purpose: a Luck Aura would otherwise
+            // pin luck to +10 and the debuff would never be read at all.
+            if (this.hasDebuffActive("Misfortune")) {
+                // Misfortune bottoms luck out at -10 — UNLESS the target is actively luck-buffed, in which
+                // case the two CANCEL to exactly 0 rather than stacking into a double penalty. Qualifying
+                // sources are the Leprechaun's Luck Aura (it arrives as a "Luck Aura" buff, the same one
+                // that raises the max-luck sentinel below) and the Clover of Fortune artifact. "Fortune" is
+                // matched by name as well, so a future luck buff under that name is covered without another
+                // edit here. luck_mod is zeroed either way, so the result cannot be lifted back by per-turn
+                // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
+                const luckBuffed =
+                    baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
+                    this.hasBuffActive("Luck Aura") ||
+                    this.hasBuffActive("Clover of Fortune") ||
+                    this.hasBuffActive("Fortune");
+                this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
-            } else if (this.hasDebuffActive("Misfortune")) {
-                // Misfortune NEUTRALIZES luck to exactly 0 while the debuff is active — it strips whatever
-                // the unit had rather than inverting it. A stack sitting on +10 from Clover of Fortune or a
-                // Leprechaun's Luck Aura drops to 0, NOT to -10: the spell is meant to deny an advantage,
-                // not to hand the caster a guaranteed-unlucky target on top of it (-10 would make every
-                // hit against it roll bad luck, which is a second effect the spell never promised).
-                // luck_mod is zeroed too, so the 0 cannot be lifted back by per-turn rolls, synergy or
-                // artifact luck. See the Sadness block below for the morale equivalent.
-                this.unitProperties.luck = 0;
+            } else if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
+                this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
             } else {
                 this.unitProperties.luck = synergyLuckIncrease;
@@ -2753,6 +2768,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
+        // AURA Rallying Volley (Zena): allies within 2 cells get +N shots, handed over ONCE. Tracked on the
+        // unit rather than recomputed, because this pass runs on every aura refresh — a plain "+N while in
+        // range" would re-gift the shots every time somebody moved. Comparing against what was already
+        // granted also makes a second Zena a no-op (the aura does not stack) and means shots already FIRED
+        // are gone for good: the quiver is topped up, never refilled. Applied after the Limited Supply
+        // clamp above, which would otherwise trim the bonus straight back off.
+        const rallyingVolleyAura = this.getAppliedAuraEffect("Rallying Volley Aura");
+        const rallyingVolleyBonus = rallyingVolleyAura ? Math.max(0, Math.floor(rallyingVolleyAura.getPower())) : 0;
+        if (rallyingVolleyBonus > this.unitProperties.rallying_volley_granted) {
+            this.unitProperties.range_shots += rallyingVolleyBonus - this.unitProperties.rallying_volley_granted;
+            this.unitProperties.rallying_volley_granted = rallyingVolleyBonus;
+        }
+
         const endlessQuiverAbility = this.getAbility("Endless Quiver");
         if (endlessQuiverAbility) {
             this.unitProperties.range_shots_mod = endlessQuiverAbility.getPower();
@@ -2951,7 +2979,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const riotBuff = this.getBuff("Riot");
         const massRiotBuff = this.getBuff("Mass Riot");
-        const ashenBoonBuff = this.getBuff("Ashen Boon");
+        const fireforgedSwordBuff = this.getBuff("Fireforged Sword");
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {
@@ -2960,8 +2988,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_mod = this.initialUnitProperties.attack_mod;
         }
 
-        if (ashenBoonBuff) {
-            this.unitProperties.attack_mod += (this.unitProperties.base_attack * ashenBoonBuff.getPower()) / 100;
+        if (fireforgedSwordBuff) {
+            this.unitProperties.attack_mod += (this.unitProperties.base_attack * fireforgedSwordBuff.getPower()) / 100;
         }
 
         const weaknessDebuff = this.getDebuff("Weakness");

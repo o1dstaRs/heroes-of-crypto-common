@@ -426,6 +426,18 @@
         "aura_effect": "Arrows Wingshield",
         "can_be_cast": false
     },
+    "Rallying Volley Aura": {
+        "name": "Rallying Volley Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allied RANGED units in range gain +{} shots"],
+        "power": 2,
+        "power_type": "ADDITIONAL_RANGE_SHOTS",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Rallying Volley",
+        "can_be_cast": false
+    },
     "Angelic Host": {
         "name": "Angelic Host",
         "type": "MASS_BUFF",
@@ -624,6 +636,21 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Chakram": {
+        "name": "Chakram",
+        "type": "ATTACK",
+        "desc": [
+            "Ranged attacks ricochet in a half circle to the next enemy, up to {} times.",
+            "Each bounce deals ~100% of the damage (90-110% by luck) and never hits allies."
+        ],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Through Shot": {
         "name": "Through Shot",
         "type": "ATTACK",
@@ -705,7 +732,7 @@
     "Book of Chaos": {
         "name": "Book of Chaos",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells:", "Smoke", "Misfortune"],
+        "desc": ["Allows the caster to access the following spells:", "Smoke, Misfortune, Fireforged Sword"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,

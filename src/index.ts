@@ -30,6 +30,8 @@ export * from "./effects/effect_properties";
 export * from "./effects/effect_factory";
 export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
+export * as SmokeHelper from "./spells/smoke_clouds";
+export * as RayTraversal from "./grid/ray_traversal";
 export * from "./spells/spell";
 export * as PickHelper from "./picks/pick_helper";
 export * as PickSim from "./picks/pick_sim";

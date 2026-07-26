@@ -231,9 +231,12 @@ describe("B1 full-game league genome", () => {
         expect(wiredConfig?.greenAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(["lower", "both"]).toContain(wiredGate);
 
-        // Re-pinned after Blacksmith expanded the Life L1 offer pool: seed 150 preserves the fixture's
+        // Re-pinned after Blacksmith expanded the Life L1 offer pool: seed 150 preserved the fixture's
         // no-vision collision outcome without weakening the SEE_NONE or tight-placement assertions.
-        const noVision = resolveLeaguePick(150, alternative, opponent, true);
+        // Re-pinned 150 -> 54 after Zena (50) grew the L2 pool and shifted the same draw (seed 150 now
+        // leaks known opponent creatures). 54 is the lowest of the two seeds under 500 that still satisfy
+        // all three assertions; the search stays out of the test so they cannot pass tautologically.
+        const noVision = resolveLeaguePick(54, alternative, opponent, true);
         expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
         expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");

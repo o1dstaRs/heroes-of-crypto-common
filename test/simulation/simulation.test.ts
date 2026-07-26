@@ -284,7 +284,11 @@ describe("tournament", () => {
 
 describe("battle engine determinism (seeded for reproducible measurement)", () => {
     it("reproduces a match exactly from the same seed, and a different seed can diverge", () => {
-        const roster = buildRoster(makeRng(123));
+        // Roster seed re-pinned 123 -> 108 after enabling Zena (50) grew the L2 pool and shifted the
+        // deterministic roster draw: seed 123 no longer fields a summoner, which the Wolf assertion below
+        // needs to prove that summoned stacks show up in the action log. Determinism itself (b equals a) is
+        // seed-independent; only that assertion is.
+        const roster = buildRoster(makeRng(108));
         const cfg = (seed: number) => ({ greenVersion: "v0.2", redVersion: "v0.3", roster, seed, maxLaps: 60 });
         const a = runMatch(cfg(4242));
         const b = runMatch(cfg(4242));

@@ -127,9 +127,11 @@ describe("battle engine turn execution observer", () => {
         // shifted roster draws the same way. Re-pinned 20 -> 35 after v0.1 stopped emitting illegal
         // forced-target melees, which changed the fight trajectory while retaining a genuine skip.
         // Re-pinned 35 -> 33 after enabling Ash Moth (49) grew the L1 pool 15 -> 16 and shifted the seeded
-        // roster draw off a skipping trajectory. Seed 33 is the lowest that again yields a turn whose
-        // incumbent genuinely decides to skip within 5 laps (33/48/63/75/101/104/114 all qualify).
-        const { decisions, turns } = runObservedMatch(33, 5);
+        // roster draw off a skipping trajectory.
+        // Re-pinned 33 -> 31 after enabling Zena (50) grew the L2 pool the same way. Seed 31 is the lowest
+        // that again yields a turn whose incumbent genuinely decides to skip within 5 laps (31/48/63/75/
+        // 126/140/143/156/186 all qualify).
+        const { decisions, turns } = runObservedMatch(31, 5);
 
         expect(turns).toHaveLength(decisions.length);
         expect(turns.length).toBeGreaterThan(0);
@@ -181,9 +183,10 @@ describe("battle engine turn execution observer", () => {
 
     test("reports a deliberately rejected strategy action separately from defend recovery", () => {
         let injectedUnitId: string | undefined;
-        // Seed 35 -> 33 alongside the skip test above: this injection needs a turn whose incumbent decided
-        // to skip, and Ash Moth's entry into the L1 pool shifted seed 35 off that trajectory.
-        const { result, turns } = runObservedMatchWithV01Transform(33, 5, (unit, _context, incumbent) => {
+        // Seed 35 -> 33 -> 31 alongside the skip test above: this injection needs a turn whose incumbent
+        // decided to skip, and each catalog growth (Ash Moth into L1, then Zena into L2) shifted the
+        // previous seed off that trajectory.
+        const { result, turns } = runObservedMatchWithV01Transform(31, 5, (unit, _context, incumbent) => {
             if (!injectedUnitId && incumbent.some((action) => action.type === "end_turn")) {
                 injectedUnitId = unit.getId();
                 return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];

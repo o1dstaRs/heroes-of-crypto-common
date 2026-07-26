@@ -24,7 +24,7 @@ import {
     getMagicMirrorPower,
     hasAlreadyAppliedSpell,
     isMirrored,
-    spellToTextureNames,
+    spellToTextureName,
 } from "../../src/spells/spell_helper";
 import {
     SpellMultiplierType,
@@ -200,7 +200,7 @@ describe("spell_helper", () => {
         expect(canCastSummon(summon, matrix, { x: 2, y: 2 })).toBe(false);
         expect(canCastSummon(summon, matrix)).toBe(false);
         expect(canCastSummon(spell("Life", "Heal"), matrix, { x: 1, y: 1 })).toBe(false);
-        expect(spellToTextureNames("Magic Mirror")).toEqual(["magic_mirror_256", "magic_mirror_font"]);
+        expect(spellToTextureName("Magic Mirror")).toBe("magic_mirror_256");
     });
 
     it("loads the Chaos:Misfortune luck-floor debuff config", () => {
@@ -210,7 +210,7 @@ describe("spell_helper", () => {
         expect(misfortune.isBuff()).toBe(false);
         expect(misfortune.getMinimalCasterStackPower()).toBe(1);
         // Texture names follow the standard icon/title-strip convention.
-        expect(spellToTextureNames("Misfortune")).toEqual(["misfortune_256", "misfortune_font"]);
+        expect(spellToTextureName("Misfortune")).toBe("misfortune_256");
     });
 
     it("validates direct spell casts across main target types", () => {

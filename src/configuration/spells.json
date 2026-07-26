@@ -1030,8 +1030,8 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Ashen Boon": {
-            "name": "Ashen Boon",
+        "Fireforged Sword": {
+            "name": "Fireforged Sword",
             "level": 1,
             "desc": ["Adds {}% of additional damage to an ally.", "Lasts 3 laps."],
             "target": "ANY_ALLY",
@@ -1050,7 +1050,10 @@
         "Misfortune": {
             "name": "Misfortune",
             "level": 2,
-            "desc": ["The affected unit loses all of its luck (set to 0).", "Lasts 3 laps."],
+            "desc": [
+                "Drops the affected unit's luck to its minimum. A luck-buffed target (Luck Aura, Clover of Fortune) is reduced to 0 instead.",
+                "Lasts 3 laps."
+            ],
             "target": "ANY_ENEMY",
             "power": 0,
             "power_type": "MIND",

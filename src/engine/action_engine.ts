@@ -33,6 +33,7 @@ import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
+import { isSmokeableCell } from "../spells/smoke_clouds";
 import { Unit } from "../units/unit";
 import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
@@ -903,17 +904,20 @@ export class GameActionEngine {
         }
         const c = action.targetCell;
         const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+        // The WHOLE 2x2 must be placeable — a partial cast is rejected outright rather than quietly
+        // smoking two of four cells, so what the aim preview highlights is exactly what lands. Blocked by
+        // the mountain, a narrowed-away cell, a creature, or the edge of the board; lava and water are
+        // fine (smoking the lava lane is an intended play). See isSmokeableCell, shared with the client.
+        const settings = this.context.grid.getSettings();
+        const allPlaceable = cells.every((cell) =>
+            isSmokeableCell(this.context.grid, isCellWithinGrid(settings, cell), cell),
+        );
+        if (!allPlaceable) {
+            return this.reject("spell_not_available");
+        }
         const laps = spell.getLapsTotal();
         const placed: XY[] = [];
         for (const cell of cells) {
-            if (!isCellWithinGrid(this.context.grid.getSettings(), cell)) {
-                continue;
-            }
-            // Only free cells get smoked — a creature standing on a cell blocks the smoke from taking hold
-            // there (consistent with "a creature stepping on a smoked cell disperses it").
-            if (this.context.grid.getOccupantUnitId(cell)) {
-                continue;
-            }
             this.context.fightProperties.getSmokeClouds().add(cell, laps);
             placed.push({ x: cell.x, y: cell.y });
         }

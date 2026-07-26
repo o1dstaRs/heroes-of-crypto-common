@@ -59,6 +59,13 @@ export interface IVisibleDamage {
     // a damage number. `render` stays false on a miss (there is no damage to draw).
     missed?: boolean;
     hits?: { amount: number; unitsDied: number }[];
+    /**
+     * Zena's Chakram: the half-circle sweeps the disc flew, in order, one per ricochet. Carried on the
+     * damage payload so the CLIENT can fly the chakram along the real path the engine resolved — without
+     * it the bounce damage simply appears on distant units with nothing visibly travelling between them.
+     * Cells, not world positions: the engine has no view geometry, so the scene converts them.
+     */
+    chakramArcs?: { targetUnitId: string; cells: XY[] }[];
     // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw). Each entry carries the
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the

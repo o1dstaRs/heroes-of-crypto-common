@@ -69,6 +69,12 @@ export class UnitProperties {
     public readonly attack_range: number;
     public range_shots: number;
     public range_shots_mod: number;
+    /**
+     * Extra ranged shots this unit has ALREADY been handed by a Rallying Volley Aura (Zena). The grant is
+     * one-off: standing in the aura tops the quiver up once, and firing those shots spends them for good —
+     * stepping out and back in, or a second Zena, tops up nothing (the aura does not stack).
+     */
+    public rallying_volley_granted: number;
     public shot_distance: number;
     public magic_resist: number;
     public magic_resist_mod: number;
@@ -199,6 +205,7 @@ export class UnitProperties {
         this.attack_range = attack_range;
         this.range_shots = range_shots;
         this.range_shots_mod = 0;
+        this.rallying_volley_granted = 0;
         this.shot_distance = shot_distance;
         this.magic_resist = magic_resist;
         this.magic_resist_mod = 0;

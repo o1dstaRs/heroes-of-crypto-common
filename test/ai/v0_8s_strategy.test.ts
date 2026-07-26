@@ -175,8 +175,10 @@ describe("v0.8 search measurement alias", () => {
         // runs produced the same hashes with no rejected actions or rejected waits for either version.
         // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
         // every seeded roster draw and therefore both traces. Two isolated runs reproduced these hashes.
-        expect(digest("v0.7")).toBe("3fd3be31318935c70ef475caaf4b61671aeccf1da811da4c2ee80de556fcadb6");
-        expect(digest("v0.8")).toBe("1f4a920557f8ce7c5d0ee4752a6b50012d56a75f934724a956ae55af05fcbf6d");
+        // Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft pool 12 -> 13, shifting the same
+        // seeded draw. Two isolated runs reproduced these hashes.
+        expect(digest("v0.7")).toBe("d80afc10ccb8ccc2d7381867a940827fa2157bffd68fe9f086fe0556108607e4");
+        expect(digest("v0.8")).toBe("739d986340d9ff5d5d999a7f7dd5bbacade95dbfeee69644c9d88ea3b4c60c92");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
