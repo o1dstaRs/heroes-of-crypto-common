@@ -32,7 +32,12 @@ import {
     calculateStackPoweredSpellDamage,
     isThrownOffensiveSpell,
 } from "../spells/spell_damage";
-import { FIRE_WALL_ORIENTATIONS, fireWallCells, isFireWallableCell } from "../spells/fire_walls";
+import {
+    FIRE_WALL_ORIENTATIONS,
+    fireWallCells,
+    isFireWallableCell,
+    normalizeFireWallOrientation,
+} from "../spells/fire_walls";
 import { SpellMultiplierType, SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
@@ -447,8 +452,14 @@ class CandidateGenerator {
                         return `rg:${a.targetId}@${cell(a.aimCell)}/${a.aimSide ?? "-"}`;
                     case "area_throw_attack":
                         return `at:${cell(a.targetCell)}`;
-                    case "cast_spell":
-                        return `cs:${a.spellName}>${a.targetId ?? "-"}@${cell(a.targetCell)}`;
+                    case "cast_spell": {
+                        // Fire Wall rotations at one anchor cover different cells and are therefore distinct
+                        // engine actions. Other spells ignore targetOrientation, so keep their historical
+                        // identity stable even if a malformed caller supplies one.
+                        const orientation =
+                            a.spellName === "Fire Wall" ? `/${normalizeFireWallOrientation(a.targetOrientation)}` : "";
+                        return `cs:${a.spellName}>${a.targetId ?? "-"}@${cell(a.targetCell)}${orientation}`;
+                    }
                     case "obstacle_attack":
                         return `mn:${cell(a.targetPosition)}@${cell(a.attackFrom)}`;
                     default:
@@ -1716,11 +1727,45 @@ class CandidateGenerator {
      * ever casts beneficial spells). Target-type coverage:
      *   ANY_ALLY (Heal/buffs/Resurrection)         -> per-ally canCastSpell
      *   ANY_ENEMY (debuffs)                        -> per-enemy canCastSpell
+     *   ALLIES_AREA (Blacksmith Craft)             -> every useful in-grid 2x2 ally footprint
      *   ENEMY_WITHIN_MOVEMENT_RANGE (Castling)     -> small enemies on getEnemiesCellsWithinMovementRange
      *   ALL_ALLIES / ALL_ENEMIES / ALL_FLYING      -> single mass candidate via canMassCastSpell
      *   RANDOM_CLOSE_TO_CASTER summons             -> deterministic first empty adjacent cell
      * AUTO-targeted entries (system effects like Morale) are not player-castable and are skipped.
      */
+    /**
+     * Blacksmith Craft targets a 2x2 area rather than one unit. Its target cell has no persistent terrain
+     * meaning: two anchors affecting the same living allies produce the same stochastic Craft operation. Scan
+     * in stable grid order and retain the first anchor for each sorted recipient-id set, avoiding four copies
+     * of an isolated small ally (or nine copies of an isolated large ally) in the rollout catalog.
+     */
+    private addAlliesAreaCastCandidates(spell: Spell): void {
+        const { grid, unitsHolder } = this.context;
+        const gs = grid.getSettings();
+        const gridSize = gs.getGridSize();
+        const team = this.unit.getTeam();
+        const seenRecipientSets = new Set<string>();
+        for (let x = 0; x < gridSize - 1; x += 1) {
+            for (let y = 0; y < gridSize - 1; y += 1) {
+                const anchor = { x, y };
+                const cells = [anchor, { x: x + 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }];
+                const affected = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                const recipientIds = affected
+                    .filter((unit) => unit.getTeam() === team && !unit.isDead())
+                    .map((unit) => unit.getId())
+                    .sort();
+                if (!recipientIds.length) {
+                    continue;
+                }
+                const recipientSet = recipientIds.join("|");
+                if (seenRecipientSets.has(recipientSet)) {
+                    continue;
+                }
+                seenRecipientSets.add(recipientSet);
+                this.pushSpell(spell, undefined, anchor);
+            }
+        }
+    }
     /**
      * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
      * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. The engine
@@ -1820,7 +1865,15 @@ class CandidateGenerator {
         ax = Math.round(ax / allies.length);
         ay = Math.round(ay / allies.length);
 
+        const gridSize = gs.getGridSize();
+        const plans: Array<{
+            threat: number;
+            orientations: number[];
+            samples: Array<{ cell: XY; frac: number }>;
+        }> = [];
         let best: { cell: XY; orientation: number; score: number } | undefined;
+        const isLegalWall = (cell: XY, orientation: number): boolean =>
+            fireWallCells(cell, orientation).every((c) => isFireWallableCell(grid, isCellWithinGrid(gs, c), c));
         for (const e of blockable) {
             const ec = e.getBaseCell();
             const dx = ax - ec.x;
@@ -1831,37 +1884,71 @@ class CandidateGenerator {
             }
             // Threat this enemy represents if it reaches us, and thus what blocking it is worth.
             const threat = Math.max(1, e.getAmountAlive()) * Math.max(1, e.getAttackDamageMax());
-            // Whichever orientation is closest to perpendicular to the approach: minimal |cos| between the
-            // wall's own direction and the direction the enemy is coming from.
-            let orientation = FIRE_WALL_ORIENTATIONS[0];
-            let bestAlignment = Number.POSITIVE_INFINITY;
-            for (const candidate of FIRE_WALL_ORIENTATIONS) {
-                const [a0, a1] = fireWallCells({ x: 0, y: 0 }, candidate);
+            // Try orientations closest to perpendicular first. If the ideal rotation crosses an edge/body,
+            // another legal rotation at that exact approach anchor is still a useful wall.
+            const orientations = FIRE_WALL_ORIENTATIONS.map((orientation, index) => {
+                const [a0, a1] = fireWallCells({ x: 0, y: 0 }, orientation);
                 const wx = a1.x - a0.x;
                 const wy = a1.y - a0.y;
-                const alignment = Math.abs((wx * dx + wy * dy) / (Math.hypot(wx, wy) * approach));
-                if (alignment < bestAlignment) {
-                    bestAlignment = alignment;
-                    orientation = candidate;
-                }
-            }
-            for (const frac of [0.25, 0.35, 0.5]) {
-                const anchor = {
+                return {
+                    orientation,
+                    index,
+                    alignment: Math.abs((wx * dx + wy * dy) / (Math.hypot(wx, wy) * approach)),
+                };
+            })
+                .sort((left, right) => left.alignment - right.alignment || left.index - right.index)
+                .map(({ orientation }) => orientation);
+            const samples = [0.25, 0.35, 0.5].map((frac) => ({
+                frac,
+                cell: {
                     x: Math.round(ec.x + dx * frac),
                     y: Math.round(ec.y + dy * frac),
-                };
-                const cells = fireWallCells(anchor, orientation);
-                if (!cells.every((c) => isFireWallableCell(grid, isCellWithinGrid(gs, c), c))) {
-                    continue;
-                }
+                },
+            }));
+            plans.push({ threat, orientations, samples });
+            for (const { cell: anchor, frac } of samples) {
                 const score = threat / Math.max(frac, 0.01);
-                if (!best || score > best.score) {
-                    best = { cell: anchor, orientation, score };
+                for (const orientation of orientations) {
+                    if (!isLegalWall(anchor, orientation)) {
+                        continue;
+                    }
+                    if (!best || score > best.score) {
+                        best = { cell: anchor, orientation, score };
+                    }
+                    break;
+                }
+            }
+        }
+
+        // At a field edge every sampled centre can be invalid even though shifting the wall one cell sideways
+        // still blocks the same approach. Only pay for this bounded full-grid fallback when all exact samples
+        // failed. Score by proximity to the sampled approach cells; stable plan/x/y/orientation order resolves
+        // ties deterministically.
+        if (!best) {
+            for (const { threat, orientations, samples } of plans) {
+                for (let x = 0; x < gridSize; x += 1) {
+                    for (let y = 0; y < gridSize; y += 1) {
+                        const cell = { x, y };
+                        const distance = Math.min(
+                            ...samples.map(({ cell: sample }) => Math.hypot(cell.x - sample.x, cell.y - sample.y)),
+                        );
+                        const score = threat / (1 + distance);
+                        for (const orientation of orientations) {
+                            if (!isLegalWall(cell, orientation)) {
+                                continue;
+                            }
+                            if (!best || score > best.score) {
+                                best = { cell, orientation, score };
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }
         if (best) {
-            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score / 10 }, best.orientation);
+            // A newly placed wall deals no immediate damage; its internal threat score chooses geometry only.
+            this.pushSpell(spell, undefined, best.cell, {}, best.orientation);
         }
     }
     /**
@@ -1892,9 +1979,10 @@ class CandidateGenerator {
      *
      * Serves both meteor spells. Meteorite drops a 2x2 anchored at its bottom-left corner — an even-sided block
      * has no centre cell to pivot on — while the Magic Dragon's Meteor Shower drops a 3x3 anchored at its
-     * CENTRE. Either way the anchors worth testing come off the enemies themselves: every block that could
-     * catch a given enemy has its anchor within one cell of that enemy, so the offsets below cover the whole
-     * search space with no grid sweep, and the optimum is still guaranteed to be in the set.
+     * CENTRE. Either way the anchors worth testing come off every OCCUPIED enemy cell, not only its base cell:
+     * a large unit can be caught by a block whose anchor lies two cells from its base. The offsets below cover
+     * every block that can catch any enemy footprint while a set prevents overlapping footprints from making
+     * us evaluate the same anchor repeatedly.
      *
      * Scored by damage that isn't overkill (a stack only has so much health to take) plus the kills it lands.
      * Determinism: strict improvement only, walked in enemy then offset order, so ties keep the first block and
@@ -1917,39 +2005,46 @@ class CandidateGenerator {
         const anchorOffsets = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, -1];
 
         let best: { cell: XY; value: number; kill: 0 | 1 } | undefined;
+        const seenAnchors = new Set<string>();
         for (const enemy of this.enemies) {
-            const ec = enemy.getBaseCell();
-            for (const ox of anchorOffsets) {
-                for (const oy of anchorOffsets) {
-                    const anchor = { x: ec.x + ox, y: ec.y + oy };
-                    const cells: XY[] = [];
-                    for (const dx of spread) {
-                        for (const dy of spread) {
-                            cells.push({ x: anchor.x + dx, y: anchor.y + dy });
-                        }
-                    }
-                    if (cells.some((c) => !isCellWithinGrid(gs, c))) {
-                        continue;
-                    }
-                    const caught = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
-                    let value = 0;
-                    let kill: 0 | 1 = 0;
-                    for (const unit of caught) {
-                        if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
+            for (const ec of enemy.getCells()) {
+                for (const ox of anchorOffsets) {
+                    for (const oy of anchorOffsets) {
+                        const anchor = { x: ec.x + ox, y: ec.y + oy };
+                        const anchorKey = `${anchor.x},${anchor.y}`;
+                        if (seenAnchors.has(anchorKey)) {
                             continue;
                         }
-                        const dealt = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
-                        const hp = unit.getCumulativeHp();
-                        value += Math.min(dealt, hp);
-                        if (dealt >= hp) {
-                            kill = 1;
+                        seenAnchors.add(anchorKey);
+                        const cells: XY[] = [];
+                        for (const dx of spread) {
+                            for (const dy of spread) {
+                                cells.push({ x: anchor.x + dx, y: anchor.y + dy });
+                            }
                         }
-                    }
-                    if (value <= 0) {
-                        continue;
-                    }
-                    if (!best || value > best.value) {
-                        best = { cell: anchor, value, kill };
+                        if (cells.some((c) => !isCellWithinGrid(gs, c))) {
+                            continue;
+                        }
+                        const caught = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                        let value = 0;
+                        let kill: 0 | 1 = 0;
+                        for (const unit of caught) {
+                            if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
+                                continue;
+                            }
+                            const dealt = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
+                            const hp = unit.getCumulativeHp();
+                            value += Math.min(dealt, hp);
+                            if (dealt >= hp) {
+                                kill = 1;
+                            }
+                        }
+                        if (value <= 0) {
+                            continue;
+                        }
+                        if (!best || value > best.value) {
+                            best = { cell: anchor, value, kill };
+                        }
                     }
                 }
             }
@@ -2061,6 +2156,11 @@ class CandidateGenerator {
                             undefined,
                         )
                     ) {
+                        // Vine Throw is a targeted debuff, not a stack-powered damage spell, but the engine
+                        // still throws it along the same blocked line as Fire Strike and Ring of Fire.
+                        if (spell.getName() === "Vine Throw" && !this.hasSpellLineOfSight(enemy)) {
+                            continue;
+                        }
                         // A stack-powered DAMAGE spell must be valued at the damage it lands — a debuff
                         // candidate carries neither number. The THROWN ones (Fire Strike, Ring of Fire) also
                         // need the line of sight the engine re-checks; Lightning Strike is called down out of
@@ -2079,6 +2179,11 @@ class CandidateGenerator {
                         this.pushSpell(spell, enemy.getId());
                     }
                 }
+                continue;
+            }
+
+            if (targetType === SpellTargetType.ALLIES_AREA) {
+                this.addAlliesAreaCastCandidates(spell);
                 continue;
             }
 

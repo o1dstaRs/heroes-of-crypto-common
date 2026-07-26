@@ -2268,6 +2268,151 @@ describe("GameActionEngine", () => {
     });
 });
 
+describe("action engine — custom targeted spell legality", () => {
+    const enemySpells: readonly {
+        spellName: string;
+        spells?: string[];
+        abilities?: string[];
+        stackPower: number;
+    }[] = [
+        { spellName: "Vine Throw", abilities: ["Vine Throw"], stackPower: 3 },
+        { spellName: "Fire Strike", spells: ["Life:Fire Strike"], stackPower: 1 },
+        { spellName: "Lightning Strike", spells: ["Nature:Lightning Strike"], stackPower: 1 },
+        { spellName: "Ring of Fire", spells: ["Nature:Ring of Fire"], stackPower: 4 },
+    ];
+
+    for (const spellCase of enemySpells) {
+        it(`${spellCase.spellName} rejects a Hidden enemy without spending its charge or turn`, () => {
+            const setup = setupActionFight({
+                lowerAbilities: spellCase.abilities,
+                lowerSpells: spellCase.spells,
+                lowerStackPower: spellCase.stackPower,
+                upperCell: { x: 6, y: 3 },
+                upperMaxHp: 10_000,
+                supportCell: { x: 3, y: 6 },
+            });
+            setup.upper.applyBuff(
+                new Spell({
+                    spellProperties: getSpellConfig("System", "Hidden"),
+                    amount: 1,
+                }),
+            );
+            const chargesBefore = setup.lower
+                .getSpells()
+                .find((spell) => spell.getName() === spellCase.spellName)
+                ?.getAmount();
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.lower.getId(),
+                spellName: spellCase.spellName,
+                targetId: setup.upper.getId(),
+            });
+
+            expect(result.completed).toBe(false);
+            expect(result.rejectionReason).toBe("spell_not_available");
+            expect(
+                setup.lower
+                    .getSpells()
+                    .find((spell) => spell.getName() === spellCase.spellName)
+                    ?.getAmount(),
+            ).toBe(chargesBefore);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        });
+
+        it(`${spellCase.spellName} rejects an allied target without spending its charge or turn`, () => {
+            const setup = setupActionFight({
+                lowerAbilities: spellCase.abilities,
+                lowerSpells: spellCase.spells,
+                lowerStackPower: spellCase.stackPower,
+                upperCell: { x: 6, y: 3 },
+                supportCell: { x: 3, y: 6 },
+            });
+            const chargesBefore = setup.lower
+                .getSpells()
+                .find((spell) => spell.getName() === spellCase.spellName)
+                ?.getAmount();
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.lower.getId(),
+                spellName: spellCase.spellName,
+                targetId: setup.lowerSupport.getId(),
+            });
+
+            expect(result.completed).toBe(false);
+            expect(result.rejectionReason).toBe("spell_not_available");
+            expect(
+                setup.lower
+                    .getSpells()
+                    .find((spell) => spell.getName() === spellCase.spellName)
+                    ?.getAmount(),
+            ).toBe(chargesBefore);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        });
+
+        it(`${spellCase.spellName} still accepts a visible enemy target`, () => {
+            const setup = setupActionFight({
+                lowerAbilities: spellCase.abilities,
+                lowerSpells: spellCase.spells,
+                lowerStackPower: spellCase.stackPower,
+                upperCell: { x: 6, y: 3 },
+                upperMaxHp: 10_000,
+                supportCell: { x: 3, y: 6 },
+            });
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.lower.getId(),
+                spellName: spellCase.spellName,
+                targetId: setup.upper.getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        });
+    }
+
+    it("Armor Rune rejects an enemy but still accepts an ally", () => {
+        const enemySetup = setupActionFight({
+            lowerAbilities: ["Enchants"],
+            lowerSpells: ["System:Armor Rune"],
+            lowerStackPower: 1,
+            upperCell: { x: 6, y: 3 },
+            supportCell: { x: 3, y: 6 },
+        });
+        const rejected = enemySetup.engine.apply({
+            type: "cast_spell",
+            casterId: enemySetup.lower.getId(),
+            spellName: "Armor Rune",
+            targetId: enemySetup.upper.getId(),
+        });
+
+        expect(rejected.completed).toBe(false);
+        expect(rejected.rejectionReason).toBe("spell_not_available");
+        expect(enemySetup.lower.hasSpellRemaining("Armor Rune")).toBe(true);
+        expect(enemySetup.fightProperties.hasAlreadyMadeTurn(enemySetup.lower.getId())).toBe(false);
+
+        const allySetup = setupActionFight({
+            lowerAbilities: ["Enchants"],
+            lowerSpells: ["System:Armor Rune"],
+            lowerStackPower: 1,
+            upperCell: { x: 6, y: 3 },
+            supportCell: { x: 3, y: 6 },
+        });
+        const accepted = allySetup.engine.apply({
+            type: "cast_spell",
+            casterId: allySetup.lower.getId(),
+            spellName: "Armor Rune",
+            targetId: allySetup.lowerSupport.getId(),
+        });
+
+        expect(accepted.completed).toBe(true);
+        expect(allySetup.lower.hasSpellRemaining("Armor Rune")).toBe(false);
+        expect(allySetup.fightProperties.hasAlreadyMadeTurn(allySetup.lower.getId())).toBe(true);
+    });
+});
+
 // Vine Throw (Trent / Grove Spellbook) — the cast has to do three things at once: lay the vine on every
 // cell it crossed, snare the target's movement, and refuse the throw when the line is blocked. The
 // movement PRICE of a vined cell is pinned separately in test/spells/vine_movement.test.ts.

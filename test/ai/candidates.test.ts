@@ -41,6 +41,7 @@ import {
     ilActionSignature,
     ilCandidateFeatureVector,
 } from "../../src/simulation/il_dataset";
+import { fireWallCells, normalizeFireWallOrientation } from "../../src/spells/fire_walls";
 import { Spell } from "../../src/spells/spell";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -1471,6 +1472,320 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(queen.hasSpellRemaining("Castling")).toBe(true);
         const { candidates } = enumerateCandidates(queen, ctxFor(c), endTurn(queen));
         expect(ofKind(candidates, "spell").filter((candidate) => candidate.spellName === "Castling")).toHaveLength(0);
+    });
+
+    it("Battle Mage: Fire Strike respects thrown LOS and its clear candidate completes in the engine", () => {
+        const c = createCombatTestContext();
+        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        mage.setStackPower(5);
+        const blocker = createTestUnit({ team: LOWER, name: "Fireball blocker", attackType: MELEE });
+        const blocked = createTestUnit({
+            team: UPPER,
+            name: "Blocked target",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 100,
+        });
+        const clear = createTestUnit({
+            team: UPPER,
+            name: "Clear target",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 100,
+        });
+        placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, blocker, { x: 5, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, blocked, { x: 8, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, clear, { x: 2, y: 8 });
+        const context = ctxFor(c, true);
+
+        const strikes = ofKind(enumerateCandidates(mage, context, endTurn(mage)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Fire Strike",
+        );
+        expect(strikes.some((candidate) => candidate.targetId === blocked.getId())).toBe(false);
+        const clearStrike = strikes.find((candidate) => candidate.targetId === clear.getId());
+        expect(clearStrike).toBeDefined();
+        expect(clearStrike!.features.expectedDamage).toBeGreaterThan(0);
+
+        const hpBefore = clear.getCumulativeHp();
+        const result = startActionEngine(c, mage, context).apply(clearStrike!.actions[0]);
+        expect(result.completed).toBe(true);
+        expect(clear.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
+    it("Battle Mage: Meteorite finds a two-LARGE-unit cluster through their occupied footprint cells", () => {
+        const c = createCombatTestContext();
+        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        mage.setStackPower(5);
+        const first = makeReal(UPPER, "Nature", "Gargantuan");
+        const second = makeReal(UPPER, "Chaos", "Black Dragon");
+        placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
+        // The 2x2 at (8,8) catches (9,8) of the first footprint and (8,9) of the second, while neither
+        // base cell lies inside it. Base-cell-only anchor generation misses this unique two-target block.
+        placeLarge(c, first, { x: 10, y: 8 });
+        placeLarge(c, second, { x: 8, y: 10 });
+        const context = ctxFor(c, true);
+
+        const meteorite = ofKind(enumerateCandidates(mage, context, endTurn(mage)).candidates, "spell").find(
+            (candidate) => candidate.spellName === "Meteorite",
+        );
+        expect(meteorite?.targetCell).toEqual({ x: 8, y: 8 });
+        expect(meteorite!.features.expectedDamage).toBeGreaterThan(0);
+
+        const firstHpBefore = first.getCumulativeHp();
+        const secondHpBefore = second.getCumulativeHp();
+        const result = startActionEngine(c, mage, context).apply(meteorite!.actions[0]);
+        expect(result.completed).toBe(true);
+        expect(first.getCumulativeHp()).toBeLessThan(firstHpBefore);
+        expect(second.getCumulativeHp()).toBeLessThan(secondHpBefore);
+    });
+
+    it("Nightmare: Fire Wall emits an oriented FREE_CELL candidate accepted by the engine", () => {
+        const c = createCombatTestContext();
+        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        nightmare.setStackPower(5);
+        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, nightmare, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
+        const context = ctxFor(c, true);
+
+        const wall = ofKind(enumerateCandidates(nightmare, context, endTurn(nightmare)).candidates, "spell").find(
+            (candidate) => candidate.spellName === "Fire Wall",
+        );
+        expect(wall?.targetCell).toBeDefined();
+        const action = wall!.actions[0];
+        expect(action.type).toBe("cast_spell");
+        if (action.type !== "cast_spell") {
+            throw new Error("expected Fire Wall cast");
+        }
+        expect(action.targetCell).toBeDefined();
+        expect(action.targetOrientation).toBeDefined();
+        expect(wall!.features.expectedDamage).toBe(0);
+        const expectedCells = fireWallCells(action.targetCell!, normalizeFireWallOrientation(action.targetOrientation));
+
+        const result = startActionEngine(c, nightmare, context).apply(action);
+        expect(result.completed).toBe(true);
+        expect(context.fightProperties!.getFireWalls().cells()).toEqual(expectedCells);
+    });
+
+    it("Nightmare: Fire Wall identity keeps a different rotation at the same anchor", () => {
+        const c = createCombatTestContext();
+        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        nightmare.setStackPower(5);
+        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, nightmare, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
+        const context = ctxFor(c, true);
+
+        const generated = ofKind(enumerateCandidates(nightmare, context, endTurn(nightmare)).candidates, "spell").find(
+            (candidate) => candidate.spellName === "Fire Wall",
+        );
+        const generatedAction = generated?.actions[0];
+        expect(generatedAction?.type).toBe("cast_spell");
+        if (generatedAction?.type !== "cast_spell") {
+            throw new Error("expected generated Fire Wall cast");
+        }
+        const alternateOrientation = normalizeFireWallOrientation(
+            normalizeFireWallOrientation(generatedAction.targetOrientation) + 1,
+        );
+        const incumbent: GameAction[] = [{ ...generatedAction, targetOrientation: alternateOrientation }];
+
+        const challengers = ofKind(enumerateCandidates(nightmare, context, incumbent).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Fire Wall",
+        );
+        expect(challengers).toHaveLength(1);
+        expect(challengers[0].actions[0]).toEqual(generatedAction);
+    });
+
+    it("Nightmare: Fire Wall falls back to a shifted legal wall on a field-edge approach", () => {
+        const c = createCombatTestContext();
+        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        nightmare.setStackPower(5);
+        const enemy = createTestUnit({ team: UPPER, name: "Edge approach", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, nightmare, { x: 0, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 0, y: 0 });
+        const context = ctxFor(c, true);
+
+        const wall = ofKind(enumerateCandidates(nightmare, context, endTurn(nightmare)).candidates, "spell").find(
+            (candidate) => candidate.spellName === "Fire Wall",
+        );
+        const action = wall?.actions[0];
+        expect(action?.type).toBe("cast_spell");
+        if (action?.type !== "cast_spell" || !action.targetCell) {
+            throw new Error("expected edge fallback Fire Wall cast");
+        }
+        const expectedCells = fireWallCells(action.targetCell, normalizeFireWallOrientation(action.targetOrientation));
+        expect(expectedCells.every((cell) => cell.x >= 0 && cell.y >= 0)).toBe(true);
+        expect(wall!.features.expectedDamage).toBe(0);
+
+        expect(startActionEngine(c, nightmare, context).apply(action).completed).toBe(true);
+        expect(context.fightProperties!.getFireWalls().cells()).toEqual(expectedCells);
+    });
+
+    it("Magic Dragon: Ring of Fire respects thrown LOS and its clear candidate completes in the engine", () => {
+        const c = createCombatTestContext();
+        const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+        dragon.setStackPower(5);
+        const blocker = createTestUnit({ team: LOWER, name: "Ring blocker", attackType: MELEE });
+        const blocked = createTestUnit({
+            team: UPPER,
+            name: "Blocked target",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 1_000,
+        });
+        const clear = createTestUnit({
+            team: UPPER,
+            name: "Clear target",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 1_000,
+        });
+        placeLarge(c, dragon, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, blocker, { x: 6, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, blocked, { x: 10, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, clear, { x: 3, y: 10 });
+        const context = ctxFor(c, true);
+
+        const rings = ofKind(enumerateCandidates(dragon, context, endTurn(dragon)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Ring of Fire",
+        );
+        expect(rings.some((candidate) => candidate.targetId === blocked.getId())).toBe(false);
+        const clearRing = rings.find((candidate) => candidate.targetId === clear.getId());
+        expect(clearRing).toBeDefined();
+
+        const hpBefore = clear.getCumulativeHp();
+        const result = startActionEngine(c, dragon, context).apply(clearRing!.actions[0]);
+        expect(result.completed).toBe(true);
+        expect(clear.getCumulativeHp()).toBeLessThan(hpBefore);
+    });
+
+    it("Magic Dragon: called-down Lightning and Whirlpool remain legal through an occupied LOS", () => {
+        for (const spellName of ["Lightning Strike", "Whirlpool"]) {
+            const c = createCombatTestContext();
+            const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+            dragon.setStackPower(5);
+            const blocker = createTestUnit({ team: LOWER, name: `${spellName} blocker`, attackType: MELEE });
+            const target = createTestUnit({
+                team: UPPER,
+                name: `${spellName} target`,
+                attackType: MELEE,
+                amountAlive: 10,
+                maxHp: 1_000,
+            });
+            placeLarge(c, dragon, { x: 3, y: 3 });
+            placeUnit(c.grid, c.unitsHolder, blocker, { x: 6, y: 3 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 3 });
+            const context = ctxFor(c, true);
+
+            const candidate = ofKind(enumerateCandidates(dragon, context, endTurn(dragon)).candidates, "spell").find(
+                (entry) => entry.spellName === spellName && entry.targetId === target.getId(),
+            );
+            expect(candidate).toBeDefined();
+            const spell = dragon.getSpells().find((entry) => entry.getName() === spellName);
+            expect(spell).toBeDefined();
+            const chargesBefore = spell!.getAmount();
+            const hpBefore = target.getCumulativeHp();
+            expect(startActionEngine(c, dragon, context).apply(candidate!.actions[0]).completed).toBe(true);
+            expect(spell!.getAmount()).toBe(chargesBefore - 1);
+            if (spellName === "Lightning Strike") {
+                expect(target.getCumulativeHp()).toBeLessThan(hpBefore);
+                expect(target.hasDebuffActive("Whirlpool")).toBe(false);
+            } else {
+                expect(target.getCumulativeHp()).toBe(hpBefore);
+                expect(target.hasDebuffActive("Whirlpool")).toBe(true);
+                expect(target.canMove()).toBe(false);
+            }
+        }
+    });
+
+    it("Magic Dragon: Meteor Shower finds a two-LARGE-unit cluster through their occupied footprint cells", () => {
+        const c = createCombatTestContext();
+        const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+        dragon.setStackPower(5);
+        const first = makeReal(UPPER, "Nature", "Gargantuan");
+        const second = makeReal(UPPER, "Chaos", "Black Dragon");
+        placeLarge(c, dragon, { x: 3, y: 3 });
+        // The 3x3 centered at (8,8) catches non-base footprint cells of both large targets. Its centre is
+        // two cells away from either base on one axis, outside the old base-seeded offset set.
+        placeLarge(c, first, { x: 10, y: 7 });
+        placeLarge(c, second, { x: 7, y: 10 });
+        const context = ctxFor(c, true);
+
+        const shower = ofKind(enumerateCandidates(dragon, context, endTurn(dragon)).candidates, "spell").find(
+            (candidate) => candidate.spellName === "Meteor Shower",
+        );
+        expect(shower?.targetCell).toEqual({ x: 8, y: 8 });
+        expect(shower!.features.expectedDamage).toBeGreaterThan(0);
+
+        const firstHpBefore = first.getCumulativeHp();
+        const secondHpBefore = second.getCumulativeHp();
+        const result = startActionEngine(c, dragon, context).apply(shower!.actions[0]);
+        expect(result.completed).toBe(true);
+        expect(first.getCumulativeHp()).toBeLessThan(firstHpBefore);
+        expect(second.getCumulativeHp()).toBeLessThan(secondHpBefore);
+    });
+
+    it("Blacksmith: Craft enumerates useful in-grid 2x2 ally areas and the engine accepts one", () => {
+        const c = createCombatTestContext();
+        const blacksmith = makeReal(LOWER, "Life", "Blacksmith");
+        blacksmith.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, name: "Craft target", attackType: MELEE });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, blacksmith, { x: 4, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 4 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
+        const context = ctxFor(c, true);
+
+        const craft = ofKind(enumerateCandidates(blacksmith, context, endTurn(blacksmith)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Craft",
+        );
+        // Stable x/y scan keeps one representative for: Blacksmith only, both units, and ally only.
+        expect(craft.map(({ targetCell }) => targetCell)).toEqual([
+            { x: 3, y: 3 },
+            { x: 4, y: 3 },
+            { x: 5, y: 3 },
+        ]);
+        expect(craft.every((candidate) => candidate.targetCell !== undefined)).toBe(true);
+        expect(
+            craft.every(
+                ({ targetCell }) =>
+                    targetCell!.x >= 0 &&
+                    targetCell!.x + 1 < testGridSettings.getGridSize() &&
+                    targetCell!.y >= 0 &&
+                    targetCell!.y + 1 < testGridSettings.getGridSize(),
+            ),
+        ).toBe(true);
+
+        const coveringBoth = craft.find(({ targetCell }) => targetCell?.x === 4 && targetCell.y === 3);
+        expect(coveringBoth).toBeDefined();
+        const engine = startActionEngine(c, blacksmith, context);
+        expect(coveringBoth!.actions.map((action) => engine.apply(action).completed)).toEqual([true]);
+    });
+
+    it("Trent: Vine Throw excludes blocked targets and emits an engine-accepted clear cast", () => {
+        const c = createCombatTestContext();
+        const trent = makeReal(LOWER, "Nature", "Trent");
+        trent.setStackPower(5);
+        const blocker = createTestUnit({ team: LOWER, name: "Blocker", attackType: MELEE });
+        const blocked = createTestUnit({ team: UPPER, name: "Blocked target", attackType: MELEE });
+        const clear = createTestUnit({ team: UPPER, name: "Clear target", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, trent, { x: 2, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, blocker, { x: 5, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, blocked, { x: 8, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, clear, { x: 2, y: 8 });
+        const context = ctxFor(c, true);
+
+        const vines = ofKind(enumerateCandidates(trent, context, endTurn(trent)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Vine Throw",
+        );
+        expect(vines.some((candidate) => candidate.targetId === blocked.getId())).toBe(false);
+        const clearCast = vines.find((candidate) => candidate.targetId === clear.getId());
+        expect(clearCast).toBeDefined();
+
+        const engine = startActionEngine(c, trent, context);
+        expect(clearCast!.actions.map((action) => engine.apply(action).completed)).toEqual([true]);
+        expect(context.fightProperties!.getVines().size()).toBeGreaterThan(0);
     });
 
     it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {

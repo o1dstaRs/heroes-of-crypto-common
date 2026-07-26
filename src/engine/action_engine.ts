@@ -926,6 +926,29 @@ export class GameActionEngine {
         if (target && action.targetCell && !this.sameCell(action.targetCell, target.getBaseCell())) {
             return this.reject("spell_not_available");
         }
+        // Every unit-targeted spell must pass the same authoritative gate before dispatch. Most spells flow
+        // through AttackHandler.handleMagicAttack, which rejects Hidden enemies and calls canCastSpell; the
+        // custom handlers below bypass that path, so validating here prevents them from targeting an invisible
+        // enemy, the wrong team, a forced-target violation, an immune unit, or any other illegal recipient.
+        if (
+            target &&
+            ((target.getTeam() !== caster.getTeam() && target.hasBuffActive("Hidden")) ||
+                !SpellHelper.canCastSpell(
+                    false,
+                    this.context.grid.getSettings(),
+                    this.context.grid.getMatrix(),
+                    caster,
+                    target,
+                    spell,
+                    target.getBaseCell(),
+                    target.getMagicResist(),
+                    target.hasMindAttackResistance(),
+                    target.canBeHealed(),
+                    this.context.getCurrentEnemiesCellsWithinMovementRange?.(),
+                ))
+        ) {
+            return this.reject("spell_not_available");
+        }
         if (!target && this.isSummonSpell(spell)) {
             return this.summonSpell(action, caster, spell);
         }

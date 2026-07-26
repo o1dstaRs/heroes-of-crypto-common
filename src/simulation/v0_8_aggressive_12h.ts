@@ -6,8 +6,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import {
     appendFileSync,
     closeSync,
@@ -17,12 +17,14 @@ import {
     readFileSync,
     readdirSync,
     renameSync,
+    rmdirSync,
     statSync,
+    unlinkSync,
     writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { V08_TEST_CANDIDATE_GENOME, V08_TEST_CANDIDATE_GENOME_SHA256 } from "../ai/versions/v0_8_candidate_profile";
+import { V08_A13_GENOME, V08_A13_GENOME_SHA256 } from "../ai/versions/v0_8_a13_profile";
 import type { ITournamentSummary } from "./tournament";
 import {
     buildV08AlignedV1ProductionCandidateCatalog,
@@ -45,6 +47,13 @@ import {
     V07_ALIGNED_V2_PURE_RANGED_TERMINAL_WEIGHTS,
     isV07AlignedV2BehaviorEnvironmentKey,
 } from "./optimizer/v0_7_aligned_96h_v2_protocol";
+import {
+    fingerprintV08PostA13CoveragePlan,
+    V08_POST_A13_COVERAGE_LANES,
+    V08_POST_A13_COVERAGE_SCHEMA,
+    V08_POST_A13_COVERAGE_UNITS,
+    V08_POST_A13_LIVE_MAPS,
+} from "./v0_8_post_a13_coverage";
 
 /**
  * Research-only, resumable v0.8s aggressive-policy campaign.
@@ -57,11 +66,16 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v6" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v9" as const;
 const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
 const LEVEL4_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_l4_coverage.ts");
+const POST_A13_COVERAGE_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_post_a13_coverage.ts");
+export const V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA = V08_POST_A13_COVERAGE_SCHEMA;
+export const V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT = 24 as const;
+export const V08_CAMPAIGN_POST_A13_COVERAGE_LANES = V08_POST_A13_COVERAGE_LANES;
+export const V08_CAMPAIGN_POST_A13_COVERAGE_UNITS = V08_POST_A13_COVERAGE_UNITS;
 const LIVE_MAPS = "normal,lava,block";
 // At screen/validation sizes this effectively requires zero Armageddon-reached games; pooled long-run
 // promotion evidence may tolerate at most one per thousand.
@@ -71,8 +85,13 @@ const BASE_CANDIDATE_COUNT = 49;
 export const V08_CAMPAIGN_EXACT_ANCHOR_INDEX = 48 as const;
 export const V08_CAMPAIGN_EXACT_ANCHOR_ID = "c48" as const;
 export const V08_CAMPAIGN_INACTIVE_CONTROL_IDS = ["c37", "c38"] as const;
-export const V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS = ["screen", "adaptive", "level4"] as const;
-export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 4;
+export const V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS = [
+    "screen",
+    "adaptive",
+    "level4",
+    "post_a13_coverage",
+] as const;
+export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 6;
 const ADAPTIVE_GENERATOR_VERSION = V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION;
 const ADAPTIVE_PARENT_COUNT = 4;
 const ADAPTIVE_CHILD_TARGET = 24;
@@ -90,7 +109,7 @@ export const V08_CAMPAIGN_RESERVE_ELIGIBILITY = Object.freeze({
     minimumCandidateWinRate: 0.5,
     minimumDecisiveWinRate: 0.5,
 });
-export const V08_CAMPAIGN_SELECTION_VERSION = 1 as const;
+export const V08_CAMPAIGN_SELECTION_VERSION = 2 as const;
 export const V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION = 1 as const;
 
 interface ICli {
@@ -105,10 +124,22 @@ interface ICli {
     validationGames: number;
     topCandidates: number;
     level4PairsPerLane: number;
+    coveragePairsPerLane: number;
     screenSeed: number;
     level4Seed: number;
+    coverageSeed: number;
     validationSeed: number;
     unboundedSearch: boolean;
+}
+
+export interface IV08CampaignSourceIdentity {
+    branch: "main";
+    gitHead: string;
+    gitTree: string;
+    originMain: string;
+    clean: true;
+    bunVersion: string;
+    identitySha256: string;
 }
 
 interface IManifestCandidate {
@@ -144,6 +175,7 @@ interface IManifest {
     output: string;
     repositoryRoot: string;
     bun: string;
+    sourceIdentity: IV08CampaignSourceIdentity;
     config: Omit<ICli, "output">;
     liveMaps: typeof LIVE_MAPS;
     armageddonRateGate: typeof ARMAGEDDON_RATE_GATE;
@@ -186,8 +218,8 @@ interface IManifest {
     fingerprint: string;
 }
 
-export type JobKind = "screen" | "adaptive" | "level4" | "validation";
-const JOB_KINDS: ReadonlySet<JobKind> = new Set(["screen", "adaptive", "level4", "validation"]);
+export type JobKind = "screen" | "adaptive" | "level4" | "post_a13_coverage" | "validation";
+const JOB_KINDS: ReadonlySet<JobKind> = new Set(["screen", "adaptive", "level4", "post_a13_coverage", "validation"]);
 const VALIDATION_SELECTION_SOURCE_KINDS: ReadonlySet<JobKind> = new Set(V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS);
 
 /** The immutable pre-validation evidence scope used to create and verify a resumable shortlist. */
@@ -218,7 +250,7 @@ export interface IV08CampaignAdaptiveProposal {
 }
 
 export const V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS = Object.freeze([
-    Object.freeze({ field: "controls.meleeRangedTargetWeight", to: 2 as const }),
+    Object.freeze({ field: "controls.meleeRangedTargetWeight", to: 0 as const }),
     Object.freeze({ field: "controls.lateRangedFinishWeight", to: 4 as const }),
     Object.freeze({ field: "controls.pureRangedTerminalWeight", to: 1 as const }),
 ]);
@@ -247,10 +279,10 @@ interface IAdaptiveCatalog {
     manifestFingerprint: string;
     generatorVersion: typeof ADAPTIVE_GENERATOR_VERSION;
     sourceCampaignBaseIdentitySha256: string;
-    exactAnchorGenomeSha256: typeof V08_TEST_CANDIDATE_GENOME_SHA256;
+    exactAnchorGenomeSha256: typeof V08_A13_GENOME_SHA256;
     exactAnchorMutationFields: string[];
     exactAnchorMutationPlanSha256: string;
-    screenEvidenceSha256: string;
+    parentEvidenceSha256: string;
     parentCandidateIds: string[];
     parentGenomeSha256: string[];
     childTarget: typeof ADAPTIVE_CHILD_TARGET;
@@ -262,17 +294,17 @@ interface IAdaptiveCatalog {
 interface IAdaptiveCheckpoint {
     path: string;
     fingerprint: string;
-    screenEvidenceSha256: string;
+    parentEvidenceSha256: string;
     children: number;
 }
 
 interface IValidationSelection {
-    schema: "hoc.v0_8_aggressive_validation_selection.v1";
+    schema: "hoc.v0_8_aggressive_validation_selection.v2";
     version: typeof V08_CAMPAIGN_SELECTION_VERSION;
     manifestFingerprint: string;
     sourceEvidenceSha256: string;
     exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
-    exactAnchorGenomeSha256: typeof V08_TEST_CANDIDATE_GENOME_SHA256;
+    exactAnchorGenomeSha256: typeof V08_A13_GENOME_SHA256;
     inactiveControlCandidateId: (typeof V08_CAMPAIGN_INACTIVE_CONTROL_IDS)[number];
     inactiveControlGenomeSha256: string;
     candidateIds: string[];
@@ -292,6 +324,10 @@ export interface ICompletedJob {
     genomeSha256: string;
     bindingSha256: string;
     summaryPath: string;
+    summarySha256: string;
+    sourceSummarySha256: string;
+    recordsPath: string;
+    recordsSha256: string;
     manifestFingerprint: string;
     startedAt: string;
     startedAtMs: number;
@@ -304,6 +340,10 @@ export type IJobSpec = Omit<
     | "genomeSha256"
     | "bindingSha256"
     | "summaryPath"
+    | "summarySha256"
+    | "sourceSummarySha256"
+    | "recordsPath"
+    | "recordsSha256"
     | "manifestFingerprint"
     | "startedAt"
     | "startedAtMs"
@@ -318,11 +358,47 @@ interface IActiveJob {
     pid: number | null;
 }
 
+function isProcessAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ESRCH") return false;
+        if (code === "EPERM") return true;
+        throw error;
+    }
+}
+
+export function assertV08CampaignResumeHasNoLiveJobs(
+    activeJobs: Readonly<Record<string, { pid: number | null }>>,
+    processIsAlive: (pid: number) => boolean = isProcessAlive,
+): void {
+    const uncertain: string[] = [];
+    const live: string[] = [];
+    for (const [id, { pid }] of Object.entries(activeJobs)) {
+        if (pid === null) {
+            uncertain.push(id);
+        } else if (processIsAlive(pid)) {
+            live.push(`${id} (pid ${pid})`);
+        }
+    }
+    if (uncertain.length || live.length) {
+        const details = [
+            live.length ? `still running: ${live.join(", ")}` : null,
+            uncertain.length ? `spawn state is unknown: ${uncertain.join(", ")}` : null,
+        ].filter((detail): detail is string => detail !== null);
+        throw new Error(
+            `Cannot safely resume while prior active jobs may still write campaign artifacts (${details.join("; ")})`,
+        );
+    }
+}
+
 interface ICheckpoint {
     schema: typeof SCHEMA;
     kind: "checkpoint";
     manifestFingerprint: string;
-    phase: "screen" | "adaptive" | "level4" | "validation" | "complete";
+    phase: "screen" | "adaptive" | "level4" | "post_a13_coverage" | "validation" | "complete";
     validationRound: number;
     completed: ICompletedJob[];
     adaptiveCatalog: IAdaptiveCheckpoint | null;
@@ -355,6 +431,16 @@ interface ITournamentSummaryWithReached extends ITournamentSummary {
     armageddonReachedByOutcome: IV08CampaignArmageddonOutcomeBuckets;
 }
 
+export interface IV08CampaignPostA13UnitOutcome {
+    unit: string;
+    games: number;
+    candidateWins: number;
+    opponentWins: number;
+    draws: number;
+    candidateWinRate: number;
+    decisiveWinRate: number;
+}
+
 interface IRankedCandidate {
     rank: number;
     candidateId: string;
@@ -371,6 +457,7 @@ interface IRankedCandidate {
     validationCandidateWinRate: number;
     validationDecisiveWinRate: number;
     validationEvidenceSha256: string | null;
+    tournamentGames: number;
     games: number;
     winsA: number;
     winsB: number;
@@ -391,10 +478,26 @@ interface IRankedCandidate {
     level4ArmageddonRate: number;
     hasLevel4Evidence: boolean;
     level4CoveragePassed: boolean;
+    postA13CoverageGames: number;
+    postA13CandidateWins: number;
+    postA13OpponentWins: number;
+    postA13Draws: number;
+    postA13CandidateWinRate: number;
+    postA13DecisiveWinRate: number;
+    postA13CoverageEvidenceSha256: string | null;
+    postA13ArmageddonReached: number;
+    postA13ArmageddonDecided: number;
+    postA13ArmageddonRate: number;
+    hasPostA13CoverageEvidence: boolean;
+    postA13CoveragePassed: boolean;
+    postA13SpellExercisePassed: boolean;
+    passesPostA13StrengthGate: boolean;
+    postA13UnitOutcomes: IV08CampaignPostA13UnitOutcome[];
     passesArmageddonGate: boolean;
     passesStrengthGate: boolean;
     promotionEligible: boolean;
     level4SummaryPaths: string[];
+    postA13CoverageSummaryPaths: string[];
 }
 
 interface ICandidateMetadata {
@@ -471,6 +574,12 @@ export function jobWorkUnits(job: JobWork): number {
             throw new Error("A level-4 job must specify only a positive pairsPerLane count");
         }
         return job.pairsPerLane! * 16;
+    }
+    if (job.kind === "post_a13_coverage") {
+        if (!Number.isSafeInteger(job.pairsPerLane) || (job.pairsPerLane ?? 0) < 1 || job.games !== undefined) {
+            throw new Error("A post-A13 coverage job must specify only a positive pairsPerLane count");
+        }
+        return job.pairsPerLane! * V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT * 2;
     }
     if (!Number.isSafeInteger(job.games) || (job.games ?? 0) < 1 || job.pairsPerLane !== undefined) {
         throw new Error("A tournament job must specify only a positive games count");
@@ -704,14 +813,14 @@ export async function runV08CampaignDynamicQueue<T extends IV08CampaignDynamicQu
     };
 }
 
-function parseCli(argv: readonly string[]): ICli {
+export function parseV08CampaignCli(argv: readonly string[]): ICli {
     if (argv.includes("--help") || argv.includes("-h")) {
         console.log(
             "Usage: bun src/simulation/v0_8_aggressive_12h.ts [--output DIR] [--hours 12] " +
                 "[--concurrency TOTAL_WORKERS] [--screen-games 256] [--validation-games 1024] " +
                 `[--lanes ${V08_CAMPAIGN_DEFAULT_LANES}] [--top ${V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES}] ` +
-                "[--l4-pairs 16] [--screen-seed N] " +
-                "[--level4-seed N] " +
+                "[--l4-pairs 16] [--coverage-pairs 3] [--screen-seed N] " +
+                "[--level4-seed N] [--coverage-seed N] " +
                 "[--validation-seed N] [--unbounded-search]",
         );
         process.exit(0);
@@ -737,8 +846,10 @@ function parseCli(argv: readonly string[]): ICli {
         validationGames,
         topCandidates: positiveInteger(flagValue(argv, "--top"), V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES, "--top"),
         level4PairsPerLane: positiveInteger(flagValue(argv, "--l4-pairs"), 16, "--l4-pairs"),
+        coveragePairsPerLane: positiveInteger(flagValue(argv, "--coverage-pairs"), 3, "--coverage-pairs"),
         screenSeed: uint32Integer(flagValue(argv, "--screen-seed"), ADAPTIVE_SCREEN_SEED, "--screen-seed"),
         level4Seed: uint32Integer(flagValue(argv, "--level4-seed"), 30_260_719, "--level4-seed"),
+        coverageSeed: uint32Integer(flagValue(argv, "--coverage-seed"), 35_260_719, "--coverage-seed"),
         validationSeed: uint32Integer(flagValue(argv, "--validation-seed"), 40_260_719, "--validation-seed"),
         unboundedSearch: argv.includes("--unbounded-search"),
     };
@@ -755,23 +866,128 @@ function readJson<T>(path: string): T {
     return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
+const OUTPUT_LEASE_SCHEMA = "hoc.v0_8_aggressive_output_lease.v1" as const;
+
+export interface IV08CampaignOutputLeaseOwner {
+    schema: typeof OUTPUT_LEASE_SCHEMA;
+    pid: number;
+    leaseId: string;
+    acquiredAt: string;
+}
+
+export interface IV08CampaignOutputLease {
+    lockDirectory: string;
+    owner: IV08CampaignOutputLeaseOwner;
+    release(): void;
+}
+
+function readOutputLeaseOwner(ownerPath: string): IV08CampaignOutputLeaseOwner {
+    if (!existsSync(ownerPath)) {
+        throw new Error(`Campaign output lock has no owner record: ${ownerPath}`);
+    }
+    const owner = readJson<Partial<IV08CampaignOutputLeaseOwner>>(ownerPath);
+    if (
+        owner.schema !== OUTPUT_LEASE_SCHEMA ||
+        !Number.isSafeInteger(owner.pid) ||
+        (owner.pid ?? 0) < 1 ||
+        typeof owner.leaseId !== "string" ||
+        !/^[a-f0-9-]{16,}$/i.test(owner.leaseId) ||
+        typeof owner.acquiredAt !== "string" ||
+        !Number.isFinite(Date.parse(owner.acquiredAt))
+    ) {
+        throw new Error(`Campaign output lock has an invalid owner record: ${ownerPath}`);
+    }
+    return owner as IV08CampaignOutputLeaseOwner;
+}
+
+/**
+ * Acquire one host-wide writer lease before reading the manifest/checkpoint.
+ *
+ * mkdir is the atomic exclusion point. A dead owner's directory is atomically renamed out of the way before a
+ * retry; a live or ownerless lock fails closed. The lease stays present until the orchestrator's main promise
+ * settles, preventing two in-memory checkpoints from launching the same job into shared artifact paths.
+ */
+export function acquireV08CampaignOutputLease(
+    output: string,
+    processIsAlive: (pid: number) => boolean = isProcessAlive,
+): IV08CampaignOutputLease {
+    mkdirSync(output, { recursive: true });
+    const lockDirectory = join(resolve(output), ".v08-aggressive-orchestrator.lock");
+    const ownerPath = join(lockDirectory, "owner.json");
+    for (;;) {
+        try {
+            mkdirSync(lockDirectory);
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+            const existing = readOutputLeaseOwner(ownerPath);
+            if (processIsAlive(existing.pid)) {
+                throw new Error(
+                    `Campaign output is already leased by pid ${existing.pid} since ${existing.acquiredAt}: ${lockDirectory}`,
+                );
+            }
+            const staleDirectory = `${lockDirectory}.stale.${process.pid}.${randomUUID()}`;
+            try {
+                renameSync(lockDirectory, staleDirectory);
+            } catch (renameError) {
+                if ((renameError as NodeJS.ErrnoException).code === "ENOENT") continue;
+                throw renameError;
+            }
+            const staleEntries = readdirSync(staleDirectory);
+            if (staleEntries.length !== 1 || staleEntries[0] !== "owner.json") {
+                throw new Error(`Refusing to remove non-canonical stale campaign lock: ${staleDirectory}`);
+            }
+            unlinkSync(join(staleDirectory, "owner.json"));
+            rmdirSync(staleDirectory);
+            continue;
+        }
+
+        const owner: IV08CampaignOutputLeaseOwner = {
+            schema: OUTPUT_LEASE_SCHEMA,
+            pid: process.pid,
+            leaseId: randomUUID(),
+            acquiredAt: new Date().toISOString(),
+        };
+        try {
+            writeFileSync(ownerPath, `${JSON.stringify(owner, null, 2)}\n`, { flag: "wx" });
+        } catch (error) {
+            rmdirSync(lockDirectory);
+            throw error;
+        }
+        let released = false;
+        return {
+            lockDirectory,
+            owner,
+            release: () => {
+                if (released) return;
+                const persisted = readOutputLeaseOwner(ownerPath);
+                if (persisted.pid !== owner.pid || persisted.leaseId !== owner.leaseId) {
+                    throw new Error(`Campaign output lease ownership changed unexpectedly: ${lockDirectory}`);
+                }
+                unlinkSync(ownerPath);
+                rmdirSync(lockDirectory);
+                released = true;
+            },
+        };
+    }
+}
+
 function candidateId(index: number): string {
     return `c${String(index).padStart(2, "0")}`;
 }
 
-/** The pinned production-48 catalog plus the immutable, independently qualified r3 profile as c48. */
+/** The pinned production-48 catalog plus the exact currently shipped A13 genome as c48. */
 export function buildV08CampaignBaseGenomes(): IV08AlignedV1CandidateGenome[] {
     const production = buildV08AlignedV1ProductionCandidateCatalog();
     if (production.length !== PRODUCTION_CANDIDATE_COUNT) {
         throw new Error(`Expected exact ${PRODUCTION_CANDIDATE_COUNT}-candidate production catalog`);
     }
     const exactAnchor = normalizeV08AlignedV1CandidateGenome(
-        structuredClone(V08_TEST_CANDIDATE_GENOME) as IV08AlignedV1CandidateGenome,
+        structuredClone(V08_A13_GENOME) as IV08AlignedV1CandidateGenome,
     );
     const exactAnchorHash = fingerprintV08AlignedV1CandidateGenome(exactAnchor);
     const productionHashes = production.map(fingerprintV08AlignedV1CandidateGenome);
-    if (exactAnchorHash !== V08_TEST_CANDIDATE_GENOME_SHA256 || productionHashes.includes(exactAnchorHash)) {
-        throw new Error("Exact v0.8 r3 anchor identity drifted or duplicates the production catalog");
+    if (exactAnchorHash !== V08_A13_GENOME_SHA256 || productionHashes.includes(exactAnchorHash)) {
+        throw new Error("Exact v0.8 A13 anchor identity drifted or duplicates the production catalog");
     }
     const campaign = [...production, exactAnchor];
     if (
@@ -837,13 +1053,52 @@ function latestSummary(directory: string): string {
     return summaries[0];
 }
 
-function tournamentJsonl(directory: string): string {
+function latestJobRecords(directory: string, kind: JobKind): string {
+    const prefix =
+        kind === "level4"
+            ? "v08_l4_v0.8s_vs_v0.7_"
+            : kind === "post_a13_coverage"
+              ? "v08_post_a13_v0.8s_vs_v0.7_"
+              : "v0.8s_vs_v0.7_";
     const files = readdirSync(directory)
-        .filter((name) => name.startsWith("v0.8s_vs_v0.7_") && name.endsWith(".jsonl"))
+        .filter((name) => name.startsWith(prefix) && name.endsWith(".jsonl"))
         .map((name) => join(directory, name))
         .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs);
-    if (!files[0]) throw new Error(`Runner produced no tournament JSONL in ${directory}`);
+    if (!files[0]) throw new Error(`Runner produced no ${kind} records JSONL in ${directory}`);
     return files[0];
+}
+
+interface IArtifactHashCacheEntry {
+    size: number;
+    mtimeMs: number;
+    ctimeMs: number;
+    ino: number;
+    sha256: string;
+}
+
+const artifactHashCache = new Map<string, IArtifactHashCacheEntry>();
+
+function artifactSha256(path: string): string {
+    const stat = statSync(path);
+    const cached = artifactHashCache.get(path);
+    if (
+        cached &&
+        cached.size === stat.size &&
+        cached.mtimeMs === stat.mtimeMs &&
+        cached.ctimeMs === stat.ctimeMs &&
+        cached.ino === stat.ino
+    ) {
+        return cached.sha256;
+    }
+    const sha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+    artifactHashCache.set(path, {
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        ctimeMs: stat.ctimeMs,
+        ino: stat.ino,
+        sha256,
+    });
+    return sha256;
 }
 
 /**
@@ -1016,7 +1271,7 @@ function assertExactAnchorMutationCoverage(proposals: readonly IV08CampaignAdapt
     }
 }
 
-/** Select the exact unique child mutations used by generator v4, including c48's reserved finish coverage. */
+/** Select the exact unique child mutations used by generator v6, including c48's reserved finish coverage. */
 export function selectV08CampaignAdaptiveChildProposals(
     parent: IV08CampaignAdaptiveProposalParent,
     parents: readonly IV08CampaignAdaptiveProposalParent[],
@@ -1039,8 +1294,7 @@ export function selectV08CampaignAdaptiveChildProposals(
     }
     if (
         parent.candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
-        (parent.candidateIndex !== V08_CAMPAIGN_EXACT_ANCHOR_INDEX ||
-            parent.genomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256)
+        (parent.candidateIndex !== V08_CAMPAIGN_EXACT_ANCHOR_INDEX || parent.genomeSha256 !== V08_A13_GENOME_SHA256)
     ) {
         throw new Error("Exact c48 adaptive parent identity drifted");
     }
@@ -1231,6 +1485,17 @@ export function selectV08CampaignInactiveControl<T extends IV08CampaignResearchC
     return rankV08CampaignResearchCandidates([c37, c38])[0]!;
 }
 
+export function isV08CampaignPostA13SelectionEligible(row: {
+    candidateId: string;
+    postA13CoveragePassed: boolean;
+    postA13SpellExercisePassed: boolean;
+}): boolean {
+    return (
+        row.postA13CoveragePassed &&
+        (V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === row.candidateId) || row.postA13SpellExercisePassed)
+    );
+}
+
 export function isV08CampaignReserveEligible(
     row: Pick<IRankedCandidate, "candidateWinRate" | "decisiveWinRate">,
 ): boolean {
@@ -1245,13 +1510,18 @@ export function isV08CampaignReserveEligible(
 }
 
 export function selectV08CampaignLevel4CandidateIds<
-    T extends IV08CampaignResearchCandidate & Pick<IRankedCandidate, "armageddonRate" | "decisiveWinRate">,
+    T extends IV08CampaignResearchCandidate &
+        Pick<
+            IRankedCandidate,
+            "armageddonRate" | "decisiveWinRate" | "postA13CoveragePassed" | "postA13SpellExercisePassed"
+        >,
 >(rows: readonly T[], count: number): string[] {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error("level-4 reserve count must be positive");
-    const targetCount = Math.min(rows.length, Math.max(2, count));
-    const anchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
+    const eligible = rows.filter(isV08CampaignPostA13SelectionEligible);
+    const targetCount = Math.min(eligible.length, Math.max(2, count));
+    const anchor = eligible.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
     if (!anchor) throw new Error("Level-4 reserve requires the exact c48 anchor");
-    const inactiveControl = selectV08CampaignInactiveControl(rows);
+    const inactiveControl = selectV08CampaignInactiveControl(eligible);
     const selected: T[] = [];
     const seen = new Set<string>();
     const add = (row: T): void => {
@@ -1264,12 +1534,12 @@ export function selectV08CampaignLevel4CandidateIds<
 
     const remainingSlots = Math.max(0, targetCount - selected.length);
     const strengthSlots = Math.ceil(remainingSlots / 2);
-    const strength = rankV08CampaignResearchCandidates(rows);
+    const strength = rankV08CampaignResearchCandidates(eligible);
     for (const row of strength) {
         if (selected.length >= 2 + strengthSlots) break;
         add(row);
     }
-    const armReserve = rows
+    const armReserve = eligible
         .filter(isV08CampaignReserveEligible)
         .sort(
             (left, right) =>
@@ -1283,17 +1553,42 @@ export function selectV08CampaignLevel4CandidateIds<
 
 export function selectValidationCandidateIds(
     rows: readonly (IV08CampaignResearchCandidate &
-        Pick<IRankedCandidate, "armageddonRate" | "decisiveWinRate" | "hasLevel4Evidence" | "level4CoveragePassed">)[],
+        Pick<
+            IRankedCandidate,
+            | "armageddonRate"
+            | "decisiveWinRate"
+            | "hasLevel4Evidence"
+            | "level4CoveragePassed"
+            | "hasPostA13CoverageEvidence"
+            | "postA13CoveragePassed"
+            | "postA13SpellExercisePassed"
+        >)[],
     count: number,
 ): string[] {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error("validation candidate count must be positive");
     const targetCount = Math.max(2, count);
-    const covered = rows.filter((row) => row.level4CoveragePassed);
+    const covered = rows.filter(
+        (row) =>
+            row.level4CoveragePassed &&
+            row.postA13CoveragePassed &&
+            (V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === row.candidateId) || row.postA13SpellExercisePassed),
+    );
     const anchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
-    if (!anchor?.hasLevel4Evidence) throw new Error("Exact c48 anchor must complete its level-4 job before validation");
+    if (!anchor?.hasLevel4Evidence || !anchor.level4CoveragePassed) {
+        throw new Error("Exact c48 anchor must pass its level-4 job before validation");
+    }
+    if (!anchor.hasPostA13CoverageEvidence || !anchor.postA13CoveragePassed) {
+        throw new Error("Exact c48 anchor must pass its post-A13 coverage job before validation");
+    }
+    if (!anchor.postA13SpellExercisePassed) {
+        throw new Error("Exact c48 anchor must exercise every candidate-owned post-A13 spell kit");
+    }
     const screenedInactiveControl = selectV08CampaignInactiveControl(rows);
-    if (!screenedInactiveControl.hasLevel4Evidence) {
-        throw new Error("Best screened inactive-challenger control must complete its level-4 job");
+    if (!screenedInactiveControl.hasLevel4Evidence || !screenedInactiveControl.level4CoveragePassed) {
+        throw new Error("Best screened inactive-challenger control must pass its level-4 job");
+    }
+    if (!screenedInactiveControl.hasPostA13CoverageEvidence || !screenedInactiveControl.postA13CoveragePassed) {
+        throw new Error("Best screened inactive-challenger control must pass its post-A13 coverage job");
     }
     const inactiveControl = screenedInactiveControl;
     const selected: Array<(typeof rows)[number]> = [];
@@ -1336,13 +1631,59 @@ export interface IV08CampaignValidationStrengthEvidence {
     validationEvidenceSha256: string | null;
 }
 
-export interface IV08CampaignPromotionEvidence extends IV08CampaignValidationStrengthEvidence {
+export interface IV08CampaignPostA13StrengthEvidence {
+    postA13CoverageGames: number;
+    postA13CandidateWinRate: number;
+    postA13DecisiveWinRate: number;
+    postA13CoverageEvidenceSha256: string | null;
+    postA13ArmageddonRate: number;
+}
+
+export interface IV08CampaignPromotionEvidence
+    extends IV08CampaignValidationStrengthEvidence, IV08CampaignPostA13StrengthEvidence {
     isExactAnchor: boolean;
     unboundedSearch: boolean;
     hasValidationEvidence: boolean;
     level4CoveragePassed: boolean;
+    postA13CoveragePassed: boolean;
+    postA13SpellExercisePassed: boolean;
     armageddonRate: number;
     level4ArmageddonRate: number;
+}
+
+/** Common-random post-A13 evidence must not regress against the exact shipped A13 anchor. */
+export function isV08CampaignPostA13StrengthQualified(
+    candidate: IV08CampaignPostA13StrengthEvidence,
+    exactAnchor: IV08CampaignPostA13StrengthEvidence,
+): boolean {
+    for (const evidence of [candidate, exactAnchor]) {
+        if (
+            !Number.isSafeInteger(evidence.postA13CoverageGames) ||
+            evidence.postA13CoverageGames < 0 ||
+            !Number.isFinite(evidence.postA13CandidateWinRate) ||
+            evidence.postA13CandidateWinRate < 0 ||
+            evidence.postA13CandidateWinRate > 1 ||
+            !Number.isFinite(evidence.postA13DecisiveWinRate) ||
+            evidence.postA13DecisiveWinRate < 0 ||
+            evidence.postA13DecisiveWinRate > 1 ||
+            !Number.isFinite(evidence.postA13ArmageddonRate) ||
+            evidence.postA13ArmageddonRate < 0 ||
+            evidence.postA13ArmageddonRate > 1 ||
+            (evidence.postA13CoverageEvidenceSha256 !== null &&
+                !/^[a-f0-9]{64}$/.test(evidence.postA13CoverageEvidenceSha256))
+        ) {
+            throw new Error("Invalid v0.8 campaign post-A13 strength evidence");
+        }
+    }
+    return (
+        candidate.postA13CoverageGames > 0 &&
+        candidate.postA13CoverageGames === exactAnchor.postA13CoverageGames &&
+        candidate.postA13CoverageEvidenceSha256 !== null &&
+        candidate.postA13CoverageEvidenceSha256 === exactAnchor.postA13CoverageEvidenceSha256 &&
+        candidate.postA13CandidateWinRate >= exactAnchor.postA13CandidateWinRate &&
+        candidate.postA13DecisiveWinRate >= exactAnchor.postA13DecisiveWinRate &&
+        candidate.postA13ArmageddonRate <= exactAnchor.postA13ArmageddonRate
+    );
 }
 
 export function isV08CampaignPromotionStrengthQualified(
@@ -1390,13 +1731,16 @@ export function isV08CampaignPromotionStrengthQualified(
 /** Research fitness is never deployable until replayed inside the reviewed bounded operational envelope. */
 export function isV08CampaignPromotionEligible(
     evidence: IV08CampaignPromotionEvidence,
-    exactAnchor: IV08CampaignValidationStrengthEvidence,
+    exactAnchor: IV08CampaignValidationStrengthEvidence & IV08CampaignPostA13StrengthEvidence,
 ): boolean {
     return (
         !evidence.isExactAnchor &&
         !evidence.unboundedSearch &&
         evidence.hasValidationEvidence &&
         evidence.level4CoveragePassed &&
+        evidence.postA13CoveragePassed &&
+        evidence.postA13SpellExercisePassed &&
+        isV08CampaignPostA13StrengthQualified(evidence, exactAnchor) &&
         isV08CampaignPromotionStrengthQualified(evidence, exactAnchor) &&
         Number.isFinite(evidence.armageddonRate) &&
         evidence.armageddonRate >= 0 &&
@@ -1492,11 +1836,308 @@ function tournamentSummary(value: unknown, path: string): ITournamentSummaryWith
     return summary as ITournamentSummaryWithReached;
 }
 
+export interface IPostA13CoverageLaneSummary {
+    lane: {
+        unit: string;
+        level: number;
+        controlUnit: string;
+        owner: "candidate" | "opponent";
+    };
+    games: number;
+    candidateGreenGames: number;
+    candidateRedGames: number;
+    mapCensus: Array<{
+        mapType: number;
+        games: number;
+        candidateGreenGames: number;
+        candidateRedGames: number;
+    }>;
+    candidateWins: number;
+    opponentWins: number;
+    draws: number;
+    appearances: number;
+    actingTurns: number;
+    completedActions: number;
+    completedStrategyActions: number;
+    completedRecoveryActions: number;
+    rejectedStrategyActions: number;
+    rejectedRecoveryActions: number;
+    productiveActions: number;
+    turnsWithoutProductiveAction: number;
+    rejectedCandidate: number;
+    rejectedOpponent: number;
+    rawEndTurnDecisions: number;
+    actionTypes: Record<string, number>;
+    rejectionReasons: Record<string, number>;
+    spellDecisionTurns: number;
+    activeSpellTurns: number;
+    activeSpellChargesObserved: number;
+    activeSpellsObserved: Record<string, number>;
+    activeSpellChargesByName: Record<string, number>;
+    spellCasts: Record<string, number>;
+    armageddonReached: number;
+    armageddonDecided: number;
+}
+
+/** Candidate behavior must execute cleanly; fixed-opponent target decisions remain telemetry, not candidate gates. */
+export function isV08CampaignPostA13LaneBehaviorQualified(lane: IPostA13CoverageLaneSummary): boolean {
+    return (
+        lane.games > 0 &&
+        lane.appearances === lane.games &&
+        lane.actingTurns > 0 &&
+        lane.rejectedCandidate === 0 &&
+        (lane.lane.owner !== "candidate" ||
+            (lane.rejectedStrategyActions === 0 &&
+                lane.rejectedRecoveryActions === 0 &&
+                lane.rawEndTurnDecisions === 0))
+    );
+}
+
+/** A searched arm must actually exercise each candidate-owned spellcaster somewhere in its common panel. */
+export function isV08CampaignPostA13SpellExerciseQualified(lanes: readonly IPostA13CoverageLaneSummary[]): boolean {
+    const spellLanes = lanes.filter((lane) => lane.lane.owner === "candidate" && lane.activeSpellTurns > 0);
+    return (
+        spellLanes.length > 0 &&
+        spellLanes.every((lane) => Object.values(lane.spellCasts).reduce((sum, count) => sum + count, 0) > 0)
+    );
+}
+
+interface IPostA13CoverageSummary {
+    schema: typeof V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA;
+    candidateVersion: "v0.8s";
+    opponentVersion: "v0.7";
+    baseSeed: number;
+    pairsPerLane: number;
+    maps: readonly number[];
+    planSha256: string;
+    games: number;
+    lanes: IPostA13CoverageLaneSummary[];
+}
+
+interface ILevel4CoverageSummary {
+    games: number;
+    lanes: Array<{
+        lane: { owner: "candidate" | "opponent" };
+        games: number;
+        appearances: number;
+        actingTurns: number;
+        rejectedCandidate: number;
+        rawEndTurnDecisions: number;
+        armageddonReached: number;
+    }>;
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+    return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function validatedCountEntries(value: unknown): Array<[string, number]> | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const entries = Object.entries(value);
+    return entries.every(([key, count]) => key.length > 0 && isNonNegativeSafeInteger(count))
+        ? (entries as Array<[string, number]>)
+        : null;
+}
+
+function expectedPostA13MapCensus(pairsPerLane: number): IPostA13CoverageLaneSummary["mapCensus"] {
+    const census = V08_POST_A13_LIVE_MAPS.map((mapType) => ({
+        mapType,
+        games: 0,
+        candidateGreenGames: 0,
+        candidateRedGames: 0,
+    }));
+    for (let pair = 0; pair < pairsPerLane; pair += 1) {
+        const cell = census[pair % census.length]!;
+        cell.games += 2;
+        cell.candidateGreenGames += 1;
+        cell.candidateRedGames += 1;
+    }
+    return census;
+}
+
+/** Validate the exact 12-unit/two-owner census before coverage can affect fitness or promotion. */
+export function validateV08CampaignPostA13CoverageSummary(
+    value: unknown,
+    expected?: { baseSeed: number; pairsPerLane: number; games: number },
+    path = "<post-A13-coverage-summary>",
+): IPostA13CoverageSummary {
+    const summary = value as Partial<IPostA13CoverageSummary>;
+    if (
+        summary.schema !== V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA ||
+        summary.candidateVersion !== "v0.8s" ||
+        summary.opponentVersion !== "v0.7" ||
+        !Number.isSafeInteger(summary.baseSeed) ||
+        (summary.baseSeed ?? -1) < 0 ||
+        (summary.baseSeed ?? 0x1_0000_0000) > 0xffffffff ||
+        !Number.isSafeInteger(summary.pairsPerLane) ||
+        (summary.pairsPerLane ?? 0) < 1 ||
+        !Array.isArray(summary.maps) ||
+        fingerprintV08AlignedV1(summary.maps) !== fingerprintV08AlignedV1(V08_POST_A13_LIVE_MAPS) ||
+        typeof summary.planSha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(summary.planSha256) ||
+        summary.planSha256 !==
+            fingerprintV08PostA13CoveragePlan({
+                candidateVersion: "v0.8s",
+                opponentVersion: "v0.7",
+                baseSeed: summary.baseSeed!,
+                pairsPerLane: summary.pairsPerLane!,
+            }) ||
+        !Number.isSafeInteger(summary.games) ||
+        summary.games !== summary.pairsPerLane! * V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT * 2 ||
+        !Array.isArray(summary.lanes) ||
+        summary.lanes.length !== V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT ||
+        (expected !== undefined &&
+            (summary.baseSeed !== expected.baseSeed ||
+                summary.pairsPerLane !== expected.pairsPerLane ||
+                summary.games !== expected.games))
+    ) {
+        throw new Error(`Invalid post-A13 coverage result summary: ${path}`);
+    }
+    const laneKeys = new Set<string>();
+    const ownersByUnit = new Map<string, Set<string>>();
+    const expectedLanes = new Map(V08_POST_A13_COVERAGE_LANES.map((lane) => [`${lane.unit}:${lane.owner}`, lane]));
+    const expectedMapCensus = expectedPostA13MapCensus(summary.pairsPerLane!);
+    let games = 0;
+    for (const lane of summary.lanes) {
+        const owner = lane?.lane?.owner;
+        const unit = lane?.lane?.unit;
+        const laneGames = lane?.games;
+        const key = `${unit}:${owner}`;
+        const expectedLane = expectedLanes.get(key);
+        const actionTypes = validatedCountEntries(lane?.actionTypes);
+        const rejectionReasons = validatedCountEntries(lane?.rejectionReasons);
+        const activeSpellsObserved = validatedCountEntries(lane?.activeSpellsObserved);
+        const activeSpellChargesByName = validatedCountEntries(lane?.activeSpellChargesByName);
+        const spellCasts = validatedCountEntries(lane?.spellCasts);
+        const mapCensus = Array.isArray(lane?.mapCensus) ? lane.mapCensus : [];
+        const mapCensusByType = new Map(mapCensus.map((cell) => [cell?.mapType, cell]));
+        const completedActionCount = actionTypes?.reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        const rejectedActionCount = rejectionReasons?.reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        const productiveActionCount =
+            actionTypes
+                ?.filter(([type]) => ["move_unit", "melee_attack", "range_attack", "cast_spell"].includes(type))
+                .reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        const observedSpellCount = activeSpellsObserved?.reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        const observedChargeCount = activeSpellChargesByName?.reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        const castCount = spellCasts?.reduce((sum, [, count]) => sum + count, 0) ?? -1;
+        if (
+            typeof unit !== "string" ||
+            !unit ||
+            (owner !== "candidate" && owner !== "opponent") ||
+            !expectedLane ||
+            lane.lane.level !== expectedLane.level ||
+            lane.lane.controlUnit !== expectedLane.controlUnit ||
+            !Number.isSafeInteger(laneGames) ||
+            laneGames !== summary.pairsPerLane! * 2 ||
+            lane.candidateGreenGames !== summary.pairsPerLane ||
+            lane.candidateRedGames !== summary.pairsPerLane ||
+            mapCensus.length !== V08_POST_A13_LIVE_MAPS.length ||
+            mapCensusByType.size !== V08_POST_A13_LIVE_MAPS.length ||
+            expectedMapCensus.some((expectedCell) => {
+                const actual = mapCensusByType.get(expectedCell.mapType);
+                return (
+                    !actual ||
+                    actual.games !== expectedCell.games ||
+                    actual.candidateGreenGames !== expectedCell.candidateGreenGames ||
+                    actual.candidateRedGames !== expectedCell.candidateRedGames
+                );
+            }) ||
+            !Number.isSafeInteger(lane.candidateWins) ||
+            !Number.isSafeInteger(lane.opponentWins) ||
+            !Number.isSafeInteger(lane.draws) ||
+            lane.candidateWins < 0 ||
+            lane.opponentWins < 0 ||
+            lane.draws < 0 ||
+            lane.candidateWins + lane.opponentWins + lane.draws !== laneGames ||
+            !Number.isSafeInteger(lane.appearances) ||
+            lane.appearances !== laneGames ||
+            !Number.isSafeInteger(lane.actingTurns) ||
+            lane.actingTurns < 0 ||
+            !isNonNegativeSafeInteger(lane.completedActions) ||
+            !isNonNegativeSafeInteger(lane.completedStrategyActions) ||
+            !isNonNegativeSafeInteger(lane.completedRecoveryActions) ||
+            lane.completedActions !== lane.completedStrategyActions + lane.completedRecoveryActions ||
+            !isNonNegativeSafeInteger(lane.rejectedStrategyActions) ||
+            !isNonNegativeSafeInteger(lane.rejectedRecoveryActions) ||
+            !isNonNegativeSafeInteger(lane.productiveActions) ||
+            !isNonNegativeSafeInteger(lane.turnsWithoutProductiveAction) ||
+            lane.turnsWithoutProductiveAction > lane.actingTurns ||
+            !Number.isSafeInteger(lane.rejectedCandidate) ||
+            lane.rejectedCandidate < 0 ||
+            !Number.isSafeInteger(lane.rejectedOpponent) ||
+            lane.rejectedOpponent < 0 ||
+            !Number.isSafeInteger(lane.rawEndTurnDecisions) ||
+            lane.rawEndTurnDecisions < 0 ||
+            lane.rawEndTurnDecisions > lane.actingTurns ||
+            actionTypes === null ||
+            completedActionCount !== lane.completedActions ||
+            productiveActionCount !== lane.productiveActions ||
+            rejectionReasons === null ||
+            rejectedActionCount !== lane.rejectedStrategyActions + lane.rejectedRecoveryActions ||
+            !isNonNegativeSafeInteger(lane.spellDecisionTurns) ||
+            lane.spellDecisionTurns !== lane.actingTurns ||
+            !isNonNegativeSafeInteger(lane.activeSpellTurns) ||
+            lane.activeSpellTurns > lane.spellDecisionTurns ||
+            !isNonNegativeSafeInteger(lane.activeSpellChargesObserved) ||
+            activeSpellsObserved === null ||
+            activeSpellChargesByName === null ||
+            observedSpellCount < lane.activeSpellTurns ||
+            observedChargeCount !== lane.activeSpellChargesObserved ||
+            activeSpellsObserved.some(
+                ([spell, observations]) =>
+                    !activeSpellChargesByName.some(
+                        ([chargeSpell, charges]) => chargeSpell === spell && charges >= observations,
+                    ),
+            ) ||
+            spellCasts === null ||
+            castCount !== (lane.actionTypes.cast_spell ?? 0) ||
+            spellCasts.some(
+                ([spell, casts]) =>
+                    casts < 1 ||
+                    !activeSpellsObserved.some(
+                        ([observedSpell, observations]) => observedSpell === spell && observations >= casts,
+                    ) ||
+                    !activeSpellChargesByName.some(
+                        ([chargeSpell, charges]) => chargeSpell === spell && charges >= casts,
+                    ),
+            ) ||
+            !Number.isSafeInteger(lane.armageddonReached) ||
+            lane.armageddonReached < 0 ||
+            lane.armageddonReached > laneGames ||
+            !Number.isSafeInteger(lane.armageddonDecided) ||
+            lane.armageddonDecided < 0 ||
+            lane.armageddonDecided > lane.armageddonReached
+        ) {
+            throw new Error(`Invalid post-A13 coverage lane in ${path}`);
+        }
+        if (laneKeys.has(key)) throw new Error(`Duplicate post-A13 coverage lane ${key} in ${path}`);
+        laneKeys.add(key);
+        const owners = ownersByUnit.get(unit) ?? new Set<string>();
+        owners.add(owner);
+        ownersByUnit.set(unit, owners);
+        games += laneGames;
+    }
+    if (
+        V08_POST_A13_COVERAGE_UNITS.length !== V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT / 2 ||
+        expectedLanes.size !== V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT ||
+        ownersByUnit.size !== V08_POST_A13_COVERAGE_UNITS.length ||
+        [...expectedLanes.keys()].some((key) => !laneKeys.has(key)) ||
+        [...ownersByUnit.values()].some(
+            (owners) => owners.size !== 2 || !owners.has("candidate") || !owners.has("opponent"),
+        ) ||
+        games !== summary.games
+    ) {
+        throw new Error(`Post-A13 coverage summary has an incomplete unit/owner census: ${path}`);
+    }
+    return summary as IPostA13CoverageSummary;
+}
+
 /** Minimal version header check used before accepting any resumable manifest. */
 export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean {
     const manifest = value as {
         schema?: unknown;
         kind?: unknown;
+        sourceIdentity?: unknown;
         adaptive?: { generatorVersion?: unknown };
         scheduler?: { version?: unknown };
         campaignBaseIdentity?: {
@@ -1510,11 +2151,12 @@ export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean 
     return (
         manifest?.schema === V08_CAMPAIGN_SCHEMA &&
         manifest.kind === "manifest" &&
+        isV08CampaignSourceIdentityCurrent(manifest.sourceIdentity) &&
         manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
         manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION &&
         manifest.campaignBaseIdentity?.campaignCandidateCount === BASE_CANDIDATE_COUNT &&
         manifest.campaignBaseIdentity.exactAnchor?.id === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
-        manifest.campaignBaseIdentity.exactAnchor.genomeSha256 === V08_TEST_CANDIDATE_GENOME_SHA256 &&
+        manifest.campaignBaseIdentity.exactAnchor.genomeSha256 === V08_A13_GENOME_SHA256 &&
         Array.isArray(manifest.campaignBaseIdentity.inactiveControls) &&
         fingerprintV08AlignedV1(manifest.campaignBaseIdentity.inactiveControls.map(({ id }) => id)) ===
             fingerprintV08AlignedV1(V08_CAMPAIGN_INACTIVE_CONTROL_IDS) &&
@@ -1530,7 +2172,7 @@ export interface IV08CampaignAdaptiveCatalogProvenanceExpectation {
     campaignBaseIdentitySha256: string;
 }
 
-/** Minimal resume header check binding generator v4 to the full production-48-plus-c48 campaign base. */
+/** Minimal resume header check binding generator v6 to the full production-48-plus-A13 campaign base. */
 export function isV08CampaignAdaptiveCatalogProvenanceCurrent(
     value: unknown,
     expected: IV08CampaignAdaptiveCatalogProvenanceExpectation,
@@ -1551,7 +2193,7 @@ export function isV08CampaignAdaptiveCatalogProvenanceCurrent(
         catalog.manifestFingerprint === expected.manifestFingerprint &&
         catalog.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
         catalog.sourceCampaignBaseIdentitySha256 === expected.campaignBaseIdentitySha256 &&
-        catalog.exactAnchorGenomeSha256 === V08_TEST_CANDIDATE_GENOME_SHA256
+        catalog.exactAnchorGenomeSha256 === V08_A13_GENOME_SHA256
     );
 }
 
@@ -1582,7 +2224,7 @@ function buildCampaignBaseIdentity(candidates: readonly IManifestCandidate[]): I
         candidates.length !== BASE_CANDIDATE_COUNT ||
         !exactAnchor ||
         exactAnchor.id !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        exactAnchor.genomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        exactAnchor.genomeSha256 !== V08_A13_GENOME_SHA256 ||
         inactiveControls.some((candidate) => candidate === undefined)
     ) {
         throw new Error("Campaign base candidates do not contain the pinned anchor/control identities");
@@ -1602,7 +2244,105 @@ function buildCampaignBaseIdentity(candidates: readonly IManifestCandidate[]): I
     return { ...unsigned, identitySha256: fingerprintV08AlignedV1(unsigned) };
 }
 
-function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IManifest {
+const GIT_OBJECT_ID = /^[a-f0-9]{40,64}$/;
+
+function gitOutput(args: readonly string[]): string {
+    return execFileSync("git", [...args], {
+        cwd: REPOSITORY_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+}
+
+/** Validate the immutable source header without consulting the filesystem, so resume headers fail closed. */
+export function isV08CampaignSourceIdentityCurrent(value: unknown): value is IV08CampaignSourceIdentity {
+    const source = value as Partial<IV08CampaignSourceIdentity>;
+    if (
+        source?.branch !== "main" ||
+        !GIT_OBJECT_ID.test(source.gitHead ?? "") ||
+        !GIT_OBJECT_ID.test(source.gitTree ?? "") ||
+        source.originMain !== source.gitHead ||
+        source.clean !== true ||
+        typeof source.bunVersion !== "string" ||
+        !source.bunVersion ||
+        typeof source.identitySha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(source.identitySha256)
+    ) {
+        return false;
+    }
+    return (
+        source.identitySha256 ===
+        fingerprintV08AlignedV1({
+            branch: source.branch,
+            gitHead: source.gitHead,
+            gitTree: source.gitTree,
+            originMain: source.originMain,
+            clean: source.clean,
+            bunVersion: source.bunVersion,
+        })
+    );
+}
+
+/**
+ * Capture a source state suitable for durable research evidence.
+ *
+ * Every run starts and continues only from a clean main exactly matching the locally fetched origin/main.
+ * Ignored campaign output does not dirty this check, while source edits, untracked inputs, commits, rebases,
+ * branch changes, or a Bun runtime change invalidate it.
+ */
+export function captureV08CampaignSourceIdentity(): IV08CampaignSourceIdentity {
+    const branch = gitOutput(["rev-parse", "--abbrev-ref", "HEAD"]);
+    const gitHead = gitOutput(["rev-parse", "--verify", "HEAD"]);
+    const gitTree = gitOutput(["rev-parse", "--verify", "HEAD^{tree}"]);
+    const originMain = gitOutput(["rev-parse", "--verify", "origin/main"]);
+    const status = gitOutput(["status", "--porcelain=v1", "--untracked-files=all"]);
+    const bunVersion = (process.versions as Record<string, string | undefined>).bun ?? "";
+    if (
+        branch !== "main" ||
+        gitHead !== originMain ||
+        status !== "" ||
+        !GIT_OBJECT_ID.test(gitHead) ||
+        !GIT_OBJECT_ID.test(gitTree) ||
+        !bunVersion
+    ) {
+        const reasons = [
+            branch === "main" ? null : `branch=${branch || "<detached>"}`,
+            gitHead === originMain ? null : `HEAD=${gitHead} origin/main=${originMain}`,
+            status === "" ? null : "working tree is not clean",
+            bunVersion ? null : "Bun version is unavailable",
+        ].filter((reason): reason is string => reason !== null);
+        throw new Error(`Campaign source must be clean main exactly at origin/main: ${reasons.join("; ")}`);
+    }
+    const unsigned = {
+        branch: "main" as const,
+        gitHead,
+        gitTree,
+        originMain,
+        clean: true as const,
+        bunVersion,
+    };
+    return { ...unsigned, identitySha256: fingerprintV08AlignedV1(unsigned) };
+}
+
+function assertManifestSourceIdentityCurrent(manifest: IManifest): void {
+    const current = captureV08CampaignSourceIdentity();
+    if (
+        manifest.repositoryRoot !== REPOSITORY_ROOT ||
+        manifest.bun !== process.execPath ||
+        !isV08CampaignSourceIdentityCurrent(manifest.sourceIdentity) ||
+        current.identitySha256 !== manifest.sourceIdentity.identitySha256
+    ) {
+        throw new Error(
+            `Campaign source identity drifted from ${manifest.sourceIdentity.gitHead}/${manifest.sourceIdentity.gitTree}`,
+        );
+    }
+}
+
+function buildManifest(
+    cli: ICli,
+    bindings: IV08AlignedV1CandidateBinding[],
+    sourceIdentity: IV08CampaignSourceIdentity,
+): IManifest {
     const startedAtMs = Date.now();
     const config = {
         hours: cli.hours,
@@ -1612,8 +2352,10 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         validationGames: cli.validationGames,
         topCandidates: Math.min(cli.topCandidates, bindings.length),
         level4PairsPerLane: cli.level4PairsPerLane,
+        coveragePairsPerLane: cli.coveragePairsPerLane,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
+        coverageSeed: cli.coverageSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
@@ -1633,6 +2375,7 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
         output: cli.output,
         repositoryRoot: REPOSITORY_ROOT,
         bun: process.execPath,
+        sourceIdentity,
         config,
         liveMaps: LIVE_MAPS as typeof LIVE_MAPS,
         armageddonRateGate: ARMAGEDDON_RATE_GATE as typeof ARMAGEDDON_RATE_GATE,
@@ -1679,12 +2422,14 @@ function buildManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IM
 function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding[]): IManifest {
     const path = join(cli.output, "manifest.json");
     if (!existsSync(path)) {
+        const sourceIdentity = captureV08CampaignSourceIdentity();
         mkdirSync(cli.output, { recursive: true });
-        const manifest = buildManifest(cli, bindings);
+        const manifest = buildManifest(cli, bindings, sourceIdentity);
         atomicJson(path, manifest);
         return manifest;
     }
     const manifest = readJson<IManifest>(path);
+    assertManifestSourceIdentityCurrent(manifest);
     const requested = {
         hours: cli.hours,
         concurrency: cli.concurrency,
@@ -1693,8 +2438,10 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         validationGames: cli.validationGames,
         topCandidates: Math.min(cli.topCandidates, bindings.length),
         level4PairsPerLane: cli.level4PairsPerLane,
+        coveragePairsPerLane: cli.coveragePairsPerLane,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
+        coverageSeed: cli.coverageSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
@@ -1850,6 +2597,34 @@ export function isV08CampaignValidationEvidenceCommitted(
     return round < nextValidationRound;
 }
 
+export function classifyV08CampaignValidationRoundState({
+    pendingJobs,
+    nowMs,
+    deadlineAtMs,
+    stop,
+    launchesAllowed,
+}: {
+    pendingJobs: number;
+    nowMs: number;
+    deadlineAtMs: number;
+    stop: boolean;
+    launchesAllowed: boolean;
+}): "commit" | "launch" | "stop" {
+    if (
+        !Number.isSafeInteger(pendingJobs) ||
+        pendingJobs < 0 ||
+        !Number.isFinite(nowMs) ||
+        !Number.isFinite(deadlineAtMs)
+    ) {
+        throw new Error("Invalid validation round state");
+    }
+    // A complete common-random round commits even after the launch deadline or a stop request. Only pending
+    // work is prohibited; already-produced evidence must not be stranded behind an unadvanced barrier.
+    if (pendingJobs === 0) return "commit";
+    if (!launchesAllowed || nowMs >= deadlineAtMs || stop) return "stop";
+    return "launch";
+}
+
 function assertJobSpec(spec: IJobSpec, context: string): void {
     if (
         typeof spec.id !== "string" ||
@@ -1882,6 +2657,14 @@ function assertCompletedJob(job: ICompletedJob, manifest: IManifest, context: st
         !job.bindingSha256 ||
         typeof job.summaryPath !== "string" ||
         !job.summaryPath ||
+        typeof job.summarySha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(job.summarySha256) ||
+        typeof job.sourceSummarySha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(job.sourceSummarySha256) ||
+        typeof job.recordsPath !== "string" ||
+        !job.recordsPath ||
+        typeof job.recordsSha256 !== "string" ||
+        !/^[a-f0-9]{64}$/.test(job.recordsSha256) ||
         !Number.isSafeInteger(job.startedAtMs) ||
         Date.parse(job.startedAt) !== job.startedAtMs ||
         !Number.isSafeInteger(completedAtMs) ||
@@ -1914,20 +2697,29 @@ function assertJobMatchesSpec(
     }
 }
 
-function jobArtifactPaths(manifest: IManifest, job: ICompletedJob): { resultPath: string; summaryPath: string } {
+function jobArtifactPaths(
+    manifest: IManifest,
+    job: ICompletedJob,
+): { resultPath: string; summaryPath: string; recordsPath: string } {
     const jobsRoot = resolve(manifest.output, "jobs");
     const directory = resolve(jobsRoot, job.id);
     const summaryPath = resolve(manifest.output, job.summaryPath);
-    if (dirname(directory) !== jobsRoot || dirname(summaryPath) !== directory) {
+    const recordsPath = resolve(manifest.output, job.recordsPath);
+    if (
+        dirname(directory) !== jobsRoot ||
+        dirname(summaryPath) !== directory ||
+        dirname(recordsPath) !== directory ||
+        summaryPath === recordsPath
+    ) {
         throw new Error(`Job ${job.id} contains a non-canonical artifact path`);
     }
-    return { resultPath: join(directory, "result.json"), summaryPath };
+    return { resultPath: join(directory, "result.json"), summaryPath, recordsPath };
 }
 
 function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifySource: boolean): IResultFile {
     assertCompletedJob(job, manifest, `Completed job ${job.id}`);
     const paths = jobArtifactPaths(manifest, job);
-    if (!existsSync(paths.resultPath) || !existsSync(paths.summaryPath)) {
+    if (!existsSync(paths.resultPath) || !existsSync(paths.summaryPath) || !existsSync(paths.recordsPath)) {
         throw new Error(`Completed job ${job.id} is missing a committed artifact`);
     }
     const result = readJson<IResultFile>(paths.resultPath);
@@ -1935,9 +2727,16 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
         result.schema !== SCHEMA ||
         result.kind !== "job-result" ||
         result.manifestFingerprint !== manifest.fingerprint ||
-        fingerprintV08AlignedV1(result.job) !== fingerprintV08AlignedV1(job)
+        fingerprintV08AlignedV1(result.job) !== fingerprintV08AlignedV1(job) ||
+        fingerprintV08AlignedV1(result.summary) !== job.summarySha256
     ) {
         throw new Error(`Result ${job.id} is not exactly bound to its checkpoint provenance`);
+    }
+    if (
+        artifactSha256(paths.summaryPath) !== job.sourceSummarySha256 ||
+        artifactSha256(paths.recordsPath) !== job.recordsSha256
+    ) {
+        throw new Error(`Result ${job.id} source artifacts no longer match their committed hashes`);
     }
     if (job.kind === "level4") {
         const summary = result.summary as {
@@ -1969,6 +2768,24 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
         }
         return result;
     }
+    if (job.kind === "post_a13_coverage") {
+        validateV08CampaignPostA13CoverageSummary(
+            result.summary,
+            {
+                baseSeed: job.baseSeed,
+                pairsPerLane: job.pairsPerLane!,
+                games: jobWorkUnits(job),
+            },
+            job.summaryPath,
+        );
+        if (
+            verifySource &&
+            fingerprintV08AlignedV1(readJson<unknown>(paths.summaryPath)) !== fingerprintV08AlignedV1(result.summary)
+        ) {
+            throw new Error(`Post-A13 coverage result ${job.id} does not match its source summary`);
+        }
+        return result;
+    }
     const summary = tournamentSummary(result.summary, job.summaryPath);
     if (summary.games !== job.games || summary.baseSeed !== job.baseSeed) {
         throw new Error(`Tournament result ${job.id} has the wrong game count or seed`);
@@ -1976,7 +2793,7 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
     if (verifySource) {
         const source = {
             ...(readJson<ITournamentSummary>(paths.summaryPath) as ITournamentSummary),
-            ...armageddonEvidence(tournamentJsonl(dirname(paths.summaryPath))),
+            ...armageddonEvidence(paths.recordsPath),
         };
         if (fingerprintV08AlignedV1(source) !== fingerprintV08AlignedV1(result.summary)) {
             throw new Error(`Tournament result ${job.id} does not match its source artifacts`);
@@ -1990,11 +2807,11 @@ function assertValidationSelectionHeader(selection: IValidationSelection, manife
         ({ id }) => id === selection.inactiveControlCandidateId,
     );
     if (
-        selection.schema !== "hoc.v0_8_aggressive_validation_selection.v1" ||
+        selection.schema !== "hoc.v0_8_aggressive_validation_selection.v2" ||
         selection.version !== V08_CAMPAIGN_SELECTION_VERSION ||
         selection.manifestFingerprint !== manifest.fingerprint ||
         selection.exactAnchorCandidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        selection.exactAnchorGenomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        selection.exactAnchorGenomeSha256 !== V08_A13_GENOME_SHA256 ||
         !V08_CAMPAIGN_INACTIVE_CONTROL_IDS.includes(selection.inactiveControlCandidateId) ||
         !inactive ||
         selection.inactiveControlGenomeSha256 !== inactive.genomeSha256 ||
@@ -2007,7 +2824,7 @@ function assertValidationSelectionHeader(selection: IValidationSelection, manife
             (genomeSha256) => typeof genomeSha256 !== "string" || !/^[a-f0-9]{64}$/.test(genomeSha256),
         ) ||
         selection.candidateIds[0] !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        selection.candidateGenomeSha256[0] !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        selection.candidateGenomeSha256[0] !== V08_A13_GENOME_SHA256 ||
         selection.candidateIds[1] !== selection.inactiveControlCandidateId ||
         selection.candidateGenomeSha256[1] !== selection.inactiveControlGenomeSha256 ||
         !selection.candidateIds.includes(V08_CAMPAIGN_EXACT_ANCHOR_ID) ||
@@ -2044,7 +2861,7 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         checkpoint.schema !== SCHEMA ||
         checkpoint.kind !== "checkpoint" ||
         checkpoint.manifestFingerprint !== manifest.fingerprint ||
-        !["screen", "adaptive", "level4", "validation", "complete"].includes(checkpoint.phase) ||
+        !["screen", "adaptive", "level4", "post_a13_coverage", "validation", "complete"].includes(checkpoint.phase) ||
         !Number.isSafeInteger(checkpoint.validationRound) ||
         checkpoint.validationRound < 0 ||
         !Array.isArray(checkpoint.completed) ||
@@ -2085,8 +2902,10 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         }
         assertJobSpec(active.spec, `Active job ${id}`);
     }
-    // A resumed orchestrator cannot own children from the prior process. The result artifact, not stale PID state,
-    // is the recovery commit point; runJobQueue reconciles any result written just before interruption.
+    // A resumed orchestrator cannot adopt children from the prior process. Never clear a live/uncertain writer
+    // and relaunch its spec into the same directory: that would oversubscribe the host and race JSONL/summary
+    // artifacts. Dead recorded processes are safe to retry; result.json remains the only recovery commit point.
+    assertV08CampaignResumeHasNoLiveJobs(checkpoint.activeJobs);
     checkpoint.activeJobs = {};
     return checkpoint;
 }
@@ -2113,7 +2932,8 @@ function collectLeaderboard(
     const byCandidate = new Map<string, ITournamentSummaryWithReached[]>();
     const validationByCandidate = new Map<string, ITournamentSummaryWithReached[]>();
     const validationEvidenceByCandidate = new Map<string, Array<{ round: number; games: number; baseSeed: number }>>();
-    const level4ByCandidate = new Map<string, string[]>();
+    const level4ByCandidate = new Map<string, Array<{ path: string; summary: ILevel4CoverageSummary }>>();
+    const postA13CoverageByCandidate = new Map<string, Array<{ path: string; summary: IPostA13CoverageSummary }>>();
     for (const job of checkpoint.completed) {
         if (options.kinds && !options.kinds.has(job.kind)) continue;
         const candidate = metadata.get(job.candidateId);
@@ -2128,9 +2948,26 @@ function collectLeaderboard(
         const result = validateResultArtifact(manifest, job, false);
         if (!isV08CampaignValidationEvidenceCommitted(job, checkpoint.validationRound)) continue;
         if (job.kind === "level4") {
-            const paths = level4ByCandidate.get(job.candidateId) ?? [];
-            paths.push(job.summaryPath);
-            level4ByCandidate.set(job.candidateId, paths);
+            const summaries = level4ByCandidate.get(job.candidateId) ?? [];
+            summaries.push({ path: job.summaryPath, summary: result.summary as ILevel4CoverageSummary });
+            level4ByCandidate.set(job.candidateId, summaries);
+            continue;
+        }
+        if (job.kind === "post_a13_coverage") {
+            const summaries = postA13CoverageByCandidate.get(job.candidateId) ?? [];
+            summaries.push({
+                path: job.summaryPath,
+                summary: validateV08CampaignPostA13CoverageSummary(
+                    result.summary,
+                    {
+                        baseSeed: job.baseSeed,
+                        pairsPerLane: job.pairsPerLane!,
+                        games: jobWorkUnits(job),
+                    },
+                    job.summaryPath,
+                ),
+            });
+            postA13CoverageByCandidate.set(job.candidateId, summaries);
             continue;
         }
         const summary = tournamentSummary(result.summary, job.summaryPath);
@@ -2151,10 +2988,10 @@ function collectLeaderboard(
     const rows = [...byCandidate.entries()].map(([id, summaries]) => {
         const candidate = metadata.get(id);
         if (!candidate) throw new Error(`Leaderboard candidate ${id} is not registered`);
-        const games = summaries.reduce((sum, summary) => sum + summary.games, 0);
-        const winsA = summaries.reduce((sum, summary) => sum + summary.a.wins, 0);
-        const winsB = summaries.reduce((sum, summary) => sum + summary.b.wins, 0);
-        const draws = summaries.reduce((sum, summary) => sum + summary.draws, 0);
+        const tournamentGames = summaries.reduce((sum, summary) => sum + summary.games, 0);
+        const tournamentWinsA = summaries.reduce((sum, summary) => sum + summary.a.wins, 0);
+        const tournamentWinsB = summaries.reduce((sum, summary) => sum + summary.b.wins, 0);
+        const tournamentDraws = summaries.reduce((sum, summary) => sum + summary.draws, 0);
         const armageddonReached = summaries.reduce((sum, summary) => sum + summary.armageddonReached, 0);
         const armageddonDecided = summaries.reduce((sum, summary) => sum + summary.armageddonDecided, 0);
         const armageddonReachedCandidateWins = summaries.reduce(
@@ -2183,26 +3020,8 @@ function collectLeaderboard(
             (left, right) => left.round - right.round,
         );
         const validationEvidenceSha256 = validationEvidence.length ? fingerprintV08AlignedV1(validationEvidence) : null;
-        const candidateWinRate = games ? winsA / games : 0;
-        const drawRate = games ? draws / games : 0;
-        const decisiveWinRate = winsA + winsB ? winsA / (winsA + winsB) : 0.5;
-        const armageddonRate = games ? armageddonReached / games : 1;
-        const nonLossArmageddonReached = armageddonReachedCandidateWins + armageddonReachedDraws;
-        const nonLossArmageddonRate = games ? nonLossArmageddonReached / games : 1;
-        const level4Summaries = (level4ByCandidate.get(id) ?? []).map((path) =>
-            readJson<{
-                games: number;
-                lanes: Array<{
-                    lane: { owner: "candidate" | "opponent" };
-                    games: number;
-                    appearances: number;
-                    actingTurns: number;
-                    rejectedCandidate: number;
-                    rawEndTurnDecisions: number;
-                    armageddonReached: number;
-                }>;
-            }>(resolve(manifest.output, path)),
-        );
+        const level4Entries = level4ByCandidate.get(id) ?? [];
+        const level4Summaries = level4Entries.map(({ summary }) => summary);
         const level4Games = level4Summaries.reduce((sum, summary) => sum + summary.games, 0);
         const level4ArmageddonReached = level4Summaries.reduce(
             (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.armageddonReached, 0),
@@ -2224,10 +3043,98 @@ function collectLeaderboard(
                                 (lane.rejectedCandidate === 0 && lane.rawEndTurnDecisions === 0)),
                     ),
             );
+        const postA13CoverageEntries = postA13CoverageByCandidate.get(id) ?? [];
+        const postA13CoverageSummaries = postA13CoverageEntries.map(({ summary }) => summary);
+        const postA13CoverageGames = postA13CoverageSummaries.reduce((sum, summary) => sum + summary.games, 0);
+        const postA13CandidateWins = postA13CoverageSummaries.reduce(
+            (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.candidateWins, 0),
+            0,
+        );
+        const postA13OpponentWins = postA13CoverageSummaries.reduce(
+            (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.opponentWins, 0),
+            0,
+        );
+        const postA13Draws = postA13CoverageSummaries.reduce(
+            (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.draws, 0),
+            0,
+        );
+        const postA13CandidateWinRate = postA13CoverageGames ? postA13CandidateWins / postA13CoverageGames : 0;
+        const postA13DecisiveWinRate =
+            postA13CandidateWins + postA13OpponentWins
+                ? postA13CandidateWins / (postA13CandidateWins + postA13OpponentWins)
+                : 0.5;
+        const postA13CoverageEvidence = postA13CoverageSummaries
+            .map((summary) => ({
+                baseSeed: summary.baseSeed,
+                pairsPerLane: summary.pairsPerLane,
+                games: summary.games,
+                planSha256: summary.planSha256,
+            }))
+            .sort((left, right) => left.baseSeed - right.baseSeed);
+        const postA13CoverageEvidenceSha256 = postA13CoverageEvidence.length
+            ? fingerprintV08AlignedV1(postA13CoverageEvidence)
+            : null;
+        const postA13ArmageddonReached = postA13CoverageSummaries.reduce(
+            (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.armageddonReached, 0),
+            0,
+        );
+        const postA13ArmageddonDecided = postA13CoverageSummaries.reduce(
+            (sum, summary) => sum + summary.lanes.reduce((laneSum, lane) => laneSum + lane.armageddonDecided, 0),
+            0,
+        );
+        const postA13ArmageddonRate = postA13CoverageGames ? postA13ArmageddonReached / postA13CoverageGames : 1;
+        const hasPostA13CoverageEvidence = postA13CoverageSummaries.length > 0;
+        const postA13CoveragePassed =
+            hasPostA13CoverageEvidence &&
+            postA13CoverageSummaries.every((summary) => summary.lanes.every(isV08CampaignPostA13LaneBehaviorQualified));
+        const postA13SpellExercisePassed =
+            hasPostA13CoverageEvidence &&
+            postA13CoverageSummaries.every((summary) => isV08CampaignPostA13SpellExerciseQualified(summary.lanes));
+        const postA13UnitOutcomesByUnit = new Map<
+            string,
+            Pick<IV08CampaignPostA13UnitOutcome, "unit" | "games" | "candidateWins" | "opponentWins" | "draws">
+        >();
+        for (const summary of postA13CoverageSummaries) {
+            for (const lane of summary.lanes) {
+                const outcome = postA13UnitOutcomesByUnit.get(lane.lane.unit) ?? {
+                    unit: lane.lane.unit,
+                    games: 0,
+                    candidateWins: 0,
+                    opponentWins: 0,
+                    draws: 0,
+                };
+                outcome.games += lane.games;
+                outcome.candidateWins += lane.candidateWins;
+                outcome.opponentWins += lane.opponentWins;
+                outcome.draws += lane.draws;
+                postA13UnitOutcomesByUnit.set(lane.lane.unit, outcome);
+            }
+        }
+        const postA13UnitOutcomes = [...postA13UnitOutcomesByUnit.values()]
+            .sort((left, right) => left.unit.localeCompare(right.unit))
+            .map((outcome): IV08CampaignPostA13UnitOutcome => ({
+                ...outcome,
+                candidateWinRate: outcome.games ? outcome.candidateWins / outcome.games : 0,
+                decisiveWinRate:
+                    outcome.candidateWins + outcome.opponentWins
+                        ? outcome.candidateWins / (outcome.candidateWins + outcome.opponentWins)
+                        : 0.5,
+            }));
+        const games = tournamentGames + postA13CoverageGames;
+        const winsA = tournamentWinsA + postA13CandidateWins;
+        const winsB = tournamentWinsB + postA13OpponentWins;
+        const draws = tournamentDraws + postA13Draws;
+        const candidateWinRate = games ? winsA / games : 0;
+        const drawRate = games ? draws / games : 0;
+        const decisiveWinRate = winsA + winsB ? winsA / (winsA + winsB) : 0.5;
+        const armageddonRate = tournamentGames ? armageddonReached / tournamentGames : 1;
+        const nonLossArmageddonReached = armageddonReachedCandidateWins + armageddonReachedDraws;
+        const nonLossArmageddonRate = tournamentGames ? nonLossArmageddonReached / tournamentGames : 1;
         const passesArmageddonGate =
             armageddonRate <= ARMAGEDDON_RATE_GATE &&
             level4ArmageddonRate <= ARMAGEDDON_RATE_GATE &&
-            level4CoveragePassed;
+            level4CoveragePassed &&
+            postA13CoveragePassed;
         return {
             rank: 0,
             candidateId: id,
@@ -2244,6 +3151,7 @@ function collectLeaderboard(
             validationCandidateWinRate,
             validationDecisiveWinRate,
             validationEvidenceSha256,
+            tournamentGames,
             games,
             winsA,
             winsB,
@@ -2264,10 +3172,26 @@ function collectLeaderboard(
             level4ArmageddonRate,
             hasLevel4Evidence,
             level4CoveragePassed,
+            postA13CoverageGames,
+            postA13CandidateWins,
+            postA13OpponentWins,
+            postA13Draws,
+            postA13CandidateWinRate,
+            postA13DecisiveWinRate,
+            postA13CoverageEvidenceSha256,
+            postA13ArmageddonReached,
+            postA13ArmageddonDecided,
+            postA13ArmageddonRate,
+            hasPostA13CoverageEvidence,
+            postA13CoveragePassed,
+            postA13SpellExercisePassed,
+            passesPostA13StrengthGate: false,
+            postA13UnitOutcomes,
             passesArmageddonGate,
             passesStrengthGate: false,
             promotionEligible: false,
-            level4SummaryPaths: level4ByCandidate.get(id) ?? [],
+            level4SummaryPaths: level4Entries.map(({ path }) => path),
+            postA13CoverageSummaryPaths: postA13CoverageEntries.map(({ path }) => path),
         };
     });
     const exactAnchor = rows.find(
@@ -2278,6 +3202,9 @@ function collectLeaderboard(
             row.passesStrengthGate =
                 row.candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID &&
                 isV08CampaignPromotionStrengthQualified(row, exactAnchor);
+            row.passesPostA13StrengthGate =
+                row.candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID &&
+                isV08CampaignPostA13StrengthQualified(row, exactAnchor);
             row.promotionEligible = isV08CampaignPromotionEligible(
                 {
                     ...row,
@@ -2312,35 +3239,70 @@ function collectLeaderboard(
     return rows;
 }
 
-function validationSelectionEvidenceSha256(rows: readonly IRankedCandidate[]): string {
-    return fingerprintV08AlignedV1(
-        [...rows]
-            .sort((left, right) => left.candidateIndex - right.candidateIndex)
-            .map((row) => ({
-                candidateId: row.candidateId,
-                candidateIndex: row.candidateIndex,
-                genomeSha256: row.genomeSha256,
-                games: row.games,
-                winsA: row.winsA,
-                winsB: row.winsB,
-                draws: row.draws,
-                armageddonReached: row.armageddonReached,
-                nonLossArmageddonReached: row.nonLossArmageddonReached,
-                armageddonReachedCandidateWins: row.armageddonReachedCandidateWins,
-                armageddonReachedDraws: row.armageddonReachedDraws,
-                armageddonReachedCandidateLosses: row.armageddonReachedCandidateLosses,
-                candidateWinRate: row.candidateWinRate,
-                decisiveWinRate: row.decisiveWinRate,
-                level4Games: row.level4Games,
-                level4ArmageddonReached: row.level4ArmageddonReached,
-                hasLevel4Evidence: row.hasLevel4Evidence,
-                level4CoveragePassed: row.level4CoveragePassed,
-            })),
-    );
+function validationSelectionEvidenceSha256(
+    manifest: IManifest,
+    checkpoint: ICheckpoint,
+    rows: readonly IRankedCandidate[],
+): string {
+    const sourceJobs = checkpoint.completed
+        .filter(isV08CampaignValidationSelectionSourceJob)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((job) => {
+            validateResultArtifact(manifest, job, false);
+            return {
+                spec: normalizedJobSpec(job),
+                genomeSha256: job.genomeSha256,
+                bindingSha256: job.bindingSha256,
+                summarySha256: job.summarySha256,
+                sourceSummarySha256: job.sourceSummarySha256,
+                recordsSha256: job.recordsSha256,
+            };
+        });
+    const rankedEvidence = [...rows]
+        .sort((left, right) => left.candidateIndex - right.candidateIndex)
+        .map((row) => ({
+            candidateId: row.candidateId,
+            candidateIndex: row.candidateIndex,
+            genomeSha256: row.genomeSha256,
+            tournamentGames: row.tournamentGames,
+            games: row.games,
+            winsA: row.winsA,
+            winsB: row.winsB,
+            draws: row.draws,
+            armageddonReached: row.armageddonReached,
+            nonLossArmageddonReached: row.nonLossArmageddonReached,
+            armageddonReachedCandidateWins: row.armageddonReachedCandidateWins,
+            armageddonReachedDraws: row.armageddonReachedDraws,
+            armageddonReachedCandidateLosses: row.armageddonReachedCandidateLosses,
+            candidateWinRate: row.candidateWinRate,
+            decisiveWinRate: row.decisiveWinRate,
+            level4Games: row.level4Games,
+            level4ArmageddonReached: row.level4ArmageddonReached,
+            hasLevel4Evidence: row.hasLevel4Evidence,
+            level4CoveragePassed: row.level4CoveragePassed,
+            postA13CoverageGames: row.postA13CoverageGames,
+            postA13CandidateWins: row.postA13CandidateWins,
+            postA13OpponentWins: row.postA13OpponentWins,
+            postA13Draws: row.postA13Draws,
+            postA13CoverageEvidenceSha256: row.postA13CoverageEvidenceSha256,
+            postA13ArmageddonReached: row.postA13ArmageddonReached,
+            postA13ArmageddonDecided: row.postA13ArmageddonDecided,
+            hasPostA13CoverageEvidence: row.hasPostA13CoverageEvidence,
+            postA13CoveragePassed: row.postA13CoveragePassed,
+            postA13SpellExercisePassed: row.postA13SpellExercisePassed,
+            postA13UnitOutcomes: row.postA13UnitOutcomes,
+        }));
+    return fingerprintV08AlignedV1({
+        version: V08_CAMPAIGN_SELECTION_VERSION,
+        manifestFingerprint: manifest.fingerprint,
+        sourceJobs,
+        rankedEvidence,
+    });
 }
 
 function buildValidationSelection(
     manifest: IManifest,
+    checkpoint: ICheckpoint,
     rows: readonly IRankedCandidate[],
     count: number,
 ): IValidationSelection {
@@ -2353,12 +3315,12 @@ function buildValidationSelection(
         throw new Error("Validation selection did not retain the inactive-challenger control in slot 2");
     }
     const unsigned = {
-        schema: "hoc.v0_8_aggressive_validation_selection.v1" as const,
+        schema: "hoc.v0_8_aggressive_validation_selection.v2" as const,
         version: V08_CAMPAIGN_SELECTION_VERSION as typeof V08_CAMPAIGN_SELECTION_VERSION,
         manifestFingerprint: manifest.fingerprint,
-        sourceEvidenceSha256: validationSelectionEvidenceSha256(rows),
+        sourceEvidenceSha256: validationSelectionEvidenceSha256(manifest, checkpoint, rows),
         exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
-        exactAnchorGenomeSha256: V08_TEST_CANDIDATE_GENOME_SHA256,
+        exactAnchorGenomeSha256: V08_A13_GENOME_SHA256,
         inactiveControlCandidateId: inactiveControlCandidateId as IValidationSelection["inactiveControlCandidateId"],
         inactiveControlGenomeSha256: selected[1]!.genomeSha256,
         candidateIds,
@@ -2373,6 +3335,7 @@ function buildValidationSelection(
 function validateValidationSelection(
     selection: IValidationSelection,
     manifest: IManifest,
+    checkpoint: ICheckpoint,
     rows: readonly IRankedCandidate[],
 ): void {
     assertValidationSelectionHeader(selection, manifest);
@@ -2380,53 +3343,110 @@ function validateValidationSelection(
     const rowsById = new Map(rows.map((row) => [row.candidateId, row]));
     const expectedHashes = selection.candidateIds.map((id) => rowsById.get(id)?.genomeSha256);
     if (
-        selection.sourceEvidenceSha256 !== validationSelectionEvidenceSha256(rows) ||
+        selection.sourceEvidenceSha256 !== validationSelectionEvidenceSha256(manifest, checkpoint, rows) ||
         fingerprintV08AlignedV1(selection.candidateIds) !== fingerprintV08AlignedV1(expectedIds) ||
         expectedHashes.some((hash) => hash === undefined) ||
         fingerprintV08AlignedV1(selection.candidateGenomeSha256) !== fingerprintV08AlignedV1(expectedHashes) ||
-        selection.candidateIds.some((id, index) => {
+        selection.candidateIds.some((id) => {
             const row = rowsById.get(id);
-            return !row?.hasLevel4Evidence || (index >= 2 && !row.level4CoveragePassed);
+            return (
+                !row?.hasLevel4Evidence ||
+                !row.level4CoveragePassed ||
+                !row.hasPostA13CoverageEvidence ||
+                !row.postA13CoveragePassed ||
+                (!V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((controlId) => controlId === id) &&
+                    !row.postA13SpellExercisePassed)
+            );
         })
     ) {
         throw new Error("Persisted validation selection no longer matches its committed source evidence");
     }
 }
 
-function baseScreenEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint): string {
-    const jobs = checkpoint.completed
-        .filter((job) => job.kind === "screen")
-        .sort((left, right) => left.candidateId.localeCompare(right.candidateId));
-    if (jobs.length !== BASE_CANDIDATE_COUNT) {
-        throw new Error(`Adaptive generation requires all ${BASE_CANDIDATE_COUNT} base screens`);
+function baseParentEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint): string {
+    const relevant = checkpoint.completed.filter(
+        (job) =>
+            job.candidateIndex < BASE_CANDIDATE_COUNT && (job.kind === "screen" || job.kind === "post_a13_coverage"),
+    );
+    if (relevant.length !== BASE_CANDIDATE_COUNT * 2) {
+        throw new Error(
+            `Adaptive generation requires screen and post-A13 evidence for all ${BASE_CANDIDATE_COUNT} base candidates`,
+        );
     }
-    const rows = jobs.map((job) => {
-        const candidate = manifest.candidates.find(({ id }) => id === job.candidateId);
-        if (
-            !candidate ||
-            candidate.index !== job.candidateIndex ||
-            candidate.genomeSha256 !== job.genomeSha256 ||
-            candidate.bindingSha256 !== job.bindingSha256
-        ) {
-            throw new Error(`Base screen ${job.id} has invalid candidate provenance`);
+    const byCandidate = new Map<string, { screen?: ICompletedJob; coverage?: ICompletedJob }>();
+    for (const job of relevant) {
+        const pair = byCandidate.get(job.candidateId) ?? {};
+        if (job.kind === "screen") {
+            if (pair.screen) throw new Error(`Duplicate base screen evidence for ${job.candidateId}`);
+            pair.screen = job;
+        } else {
+            if (pair.coverage) throw new Error(`Duplicate base post-A13 evidence for ${job.candidateId}`);
+            pair.coverage = job;
         }
-        const result = validateResultArtifact(manifest, job, false);
-        tournamentSummary(result.summary, job.summaryPath);
+        byCandidate.set(job.candidateId, pair);
+    }
+    const rows = manifest.candidates.map((candidate) => {
+        const pair = byCandidate.get(candidate.id);
+        const screen = pair?.screen;
+        const coverage = pair?.coverage;
+        if (
+            !screen ||
+            !coverage ||
+            screen.id !== `screen-${candidate.id}` ||
+            coverage.id !== `post-a13-coverage-${candidate.id}` ||
+            screen.candidateIndex !== candidate.index ||
+            coverage.candidateIndex !== candidate.index ||
+            screen.genomeSha256 !== candidate.genomeSha256 ||
+            coverage.genomeSha256 !== candidate.genomeSha256 ||
+            screen.bindingSha256 !== candidate.bindingSha256 ||
+            coverage.bindingSha256 !== candidate.bindingSha256 ||
+            screen.games !== manifest.config.screenGames ||
+            screen.baseSeed !== manifest.config.screenSeed ||
+            coverage.pairsPerLane !== manifest.config.coveragePairsPerLane ||
+            coverage.baseSeed !== manifest.config.coverageSeed
+        ) {
+            throw new Error(`Base parent evidence for ${candidate.id} has invalid provenance`);
+        }
+        validateResultArtifact(manifest, screen, false);
+        validateResultArtifact(manifest, coverage, false);
         return {
-            candidateId: job.candidateId,
-            candidateIndex: job.candidateIndex,
-            genomeSha256: job.genomeSha256,
-            bindingSha256: job.bindingSha256,
-            games: job.games,
-            baseSeed: job.baseSeed,
-            summary: result.summary,
+            candidateId: candidate.id,
+            candidateIndex: candidate.index,
+            genomeSha256: candidate.genomeSha256,
+            bindingSha256: candidate.bindingSha256,
+            screen: {
+                games: screen.games,
+                baseSeed: screen.baseSeed,
+                summarySha256: screen.summarySha256,
+            },
+            postA13Coverage: {
+                pairsPerLane: coverage.pairsPerLane,
+                games: jobWorkUnits(coverage),
+                baseSeed: coverage.baseSeed,
+                summarySha256: coverage.summarySha256,
+            },
         };
     });
     return fingerprintV08AlignedV1({
-        kind: "adaptive-base-screen-evidence",
+        kind: "adaptive-base-parent-evidence",
         manifestFingerprint: manifest.fingerprint,
         rows,
     });
+}
+
+function selectBaseAdaptiveParents(manifest: IManifest, checkpoint: ICheckpoint): IRankedCandidate[] {
+    const baseRows = collectLeaderboard(manifest, checkpoint, null, {
+        kinds: new Set<JobKind>(["screen", "post_a13_coverage"]),
+        outputName: "base-parent-leaderboard.json",
+    });
+    if (baseRows.length !== BASE_CANDIDATE_COUNT) {
+        throw new Error(`Adaptive generation requires ${BASE_CANDIDATE_COUNT} complete base candidates`);
+    }
+    const parentRows = selectV08CampaignAdaptiveParents(baseRows.filter(isV08CampaignPostA13SelectionEligible));
+    if (parentRows.length !== ADAPTIVE_PARENT_COUNT) {
+        throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT} ranked parents`);
+    }
+    return parentRows;
 }
 
 function buildAdaptiveCatalog(
@@ -2434,15 +3454,8 @@ function buildAdaptiveCatalog(
     checkpoint: ICheckpoint,
     baseGenomes: readonly IV08AlignedV1CandidateGenome[],
 ): IAdaptiveCatalog {
-    const screenEvidenceSha256 = baseScreenEvidenceSha256(manifest, checkpoint);
-    const baseRows = collectLeaderboard(manifest, checkpoint, null, {
-        kinds: new Set<JobKind>(["screen"]),
-        outputName: "base-screen-leaderboard.json",
-    });
-    const parentRows = selectV08CampaignAdaptiveParents(baseRows);
-    if (parentRows.length !== ADAPTIVE_PARENT_COUNT) {
-        throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT} ranked parents`);
-    }
+    const parentEvidenceSha256 = baseParentEvidenceSha256(manifest, checkpoint);
+    const parentRows = selectBaseAdaptiveParents(manifest, checkpoint);
     const parents = parentRows.map((row) => {
         const genome = baseGenomes[row.candidateIndex];
         if (!genome || fingerprintV08AlignedV1CandidateGenome(genome) !== row.genomeSha256) {
@@ -2519,10 +3532,10 @@ function buildAdaptiveCatalog(
         manifestFingerprint: manifest.fingerprint,
         generatorVersion: ADAPTIVE_GENERATOR_VERSION as typeof ADAPTIVE_GENERATOR_VERSION,
         sourceCampaignBaseIdentitySha256: manifest.campaignBaseIdentity.identitySha256,
-        exactAnchorGenomeSha256: V08_TEST_CANDIDATE_GENOME_SHA256,
+        exactAnchorGenomeSha256: V08_A13_GENOME_SHA256,
         exactAnchorMutationFields,
         exactAnchorMutationPlanSha256,
-        screenEvidenceSha256,
+        parentEvidenceSha256,
         parentCandidateIds: parents.map(({ row }) => row.candidateId),
         parentGenomeSha256: parents.map(({ row }) => row.genomeSha256),
         childTarget: ADAPTIVE_CHILD_TARGET as typeof ADAPTIVE_CHILD_TARGET,
@@ -2538,7 +3551,7 @@ function validateAdaptiveCatalog(
     adaptive: IAdaptiveCatalog,
     baseGenomes: readonly IV08AlignedV1CandidateGenome[],
 ): IAdaptiveCatalog {
-    const expectedEvidence = baseScreenEvidenceSha256(manifest, checkpoint);
+    const expectedEvidence = baseParentEvidenceSha256(manifest, checkpoint);
     if (
         !isV08CampaignAdaptiveCatalogProvenanceCurrent(adaptive, {
             manifestFingerprint: manifest.fingerprint,
@@ -2551,11 +3564,11 @@ function validateAdaptiveCatalog(
         adaptive.automaticDeploy !== false ||
         adaptive.manifestFingerprint !== manifest.fingerprint ||
         adaptive.generatorVersion !== ADAPTIVE_GENERATOR_VERSION ||
-        adaptive.exactAnchorGenomeSha256 !== V08_TEST_CANDIDATE_GENOME_SHA256 ||
+        adaptive.exactAnchorGenomeSha256 !== V08_A13_GENOME_SHA256 ||
         !Array.isArray(adaptive.exactAnchorMutationFields) ||
         adaptive.exactAnchorMutationFields.some((field) => typeof field !== "string" || !field) ||
         !/^[a-f0-9]{64}$/.test(adaptive.exactAnchorMutationPlanSha256) ||
-        adaptive.screenEvidenceSha256 !== expectedEvidence ||
+        adaptive.parentEvidenceSha256 !== expectedEvidence ||
         adaptive.childTarget !== ADAPTIVE_CHILD_TARGET ||
         adaptive.children.length !== ADAPTIVE_CHILD_TARGET ||
         adaptive.parentCandidateIds.length !== ADAPTIVE_PARENT_COUNT ||
@@ -2564,19 +3577,14 @@ function validateAdaptiveCatalog(
     ) {
         throw new Error("Adaptive catalog header, evidence, or fingerprint is invalid");
     }
-    const expectedParents = selectV08CampaignAdaptiveParents(
-        collectLeaderboard(manifest, checkpoint, null, {
-            kinds: new Set<JobKind>(["screen"]),
-            outputName: "base-screen-leaderboard.json",
-        }),
-    );
+    const expectedParents = selectBaseAdaptiveParents(manifest, checkpoint);
     if (
         fingerprintV08AlignedV1(expectedParents.map(({ candidateId }) => candidateId)) !==
             fingerprintV08AlignedV1(adaptive.parentCandidateIds) ||
         fingerprintV08AlignedV1(expectedParents.map(({ genomeSha256 }) => genomeSha256)) !==
             fingerprintV08AlignedV1(adaptive.parentGenomeSha256)
     ) {
-        throw new Error("Adaptive catalog parents do not match the committed base-screen ranking");
+        throw new Error("Adaptive catalog parents do not match the committed base parent evidence");
     }
     const baseHashes = new Set(baseGenomes.map(fingerprintV08AlignedV1CandidateGenome));
     const expectedProposalParents: IV08CampaignAdaptiveProposalParent[] = expectedParents.map((row) => ({
@@ -2609,7 +3617,7 @@ function validateAdaptiveCatalog(
             })),
         ) !== fingerprintV08AlignedV1(expectedChildren)
     ) {
-        throw new Error("Adaptive catalog children do not match generator v4's deterministic mutation plan");
+        throw new Error("Adaptive catalog children do not match generator v6's deterministic mutation plan");
     }
     const seen = new Set(baseHashes);
     for (const [offset, child] of adaptive.children.entries()) {
@@ -2709,7 +3717,7 @@ function loadOrCreateAdaptiveCatalog(
         checkpoint.adaptiveCatalog = {
             path: relative(manifest.output, path),
             fingerprint: adaptive.fingerprint,
-            screenEvidenceSha256: adaptive.screenEvidenceSha256,
+            parentEvidenceSha256: adaptive.parentEvidenceSha256,
             children: adaptive.children.length,
         };
         saveCheckpoint(manifest, checkpoint);
@@ -2723,7 +3731,7 @@ function loadOrCreateAdaptiveCatalog(
     validateAdaptiveCatalog(manifest, checkpoint, adaptive, baseGenomes);
     if (
         checkpoint.adaptiveCatalog.fingerprint !== adaptive.fingerprint ||
-        checkpoint.adaptiveCatalog.screenEvidenceSha256 !== adaptive.screenEvidenceSha256 ||
+        checkpoint.adaptiveCatalog.parentEvidenceSha256 !== adaptive.parentEvidenceSha256 ||
         checkpoint.adaptiveCatalog.children !== adaptive.children.length
     ) {
         throw new Error("Checkpoint adaptive catalog commitment does not match its artifact");
@@ -2817,35 +3825,41 @@ async function runJob(
     if (!candidate || candidate.index !== spec.candidateIndex) {
         throw new Error(`Job ${spec.id} references an unregistered candidate`);
     }
+    assertManifestSourceIdentityCurrent(manifest);
     const directory = join(manifest.output, "jobs", spec.id);
     const resultPath = join(directory, "result.json");
     mkdirSync(directory, { recursive: true });
     const auditPath = join(directory, "search-audit.jsonl");
     const environment = childEnvironment(candidate.binding, auditPath, manifest.config.unboundedSearch);
     const logPath = join(manifest.output, "logs", `${spec.id}.log`);
-    const runner = spec.kind === "level4" ? LEVEL4_RUNNER : TOURNAMENT_RUNNER;
-    const args =
+    const isCoverageJob = spec.kind === "level4" || spec.kind === "post_a13_coverage";
+    const runner =
         spec.kind === "level4"
-            ? [
-                  runner,
-                  "v0.8s",
-                  "v0.7",
-                  String(spec.pairsPerLane),
-                  String(spec.baseSeed),
-                  directory,
-                  String(manifest.config.workersPerJob),
-              ]
-            : [
-                  runner,
-                  "v0.8s",
-                  "v0.7",
-                  String(spec.games),
-                  String(spec.baseSeed),
-                  directory,
-                  String(manifest.config.workersPerJob),
-                  `--maps=${LIVE_MAPS}`,
-                  "--livetwin",
-              ];
+            ? LEVEL4_RUNNER
+            : spec.kind === "post_a13_coverage"
+              ? POST_A13_COVERAGE_RUNNER
+              : TOURNAMENT_RUNNER;
+    const args = isCoverageJob
+        ? [
+              runner,
+              "v0.8s",
+              "v0.7",
+              String(spec.pairsPerLane),
+              String(spec.baseSeed),
+              directory,
+              String(manifest.config.workersPerJob),
+          ]
+        : [
+              runner,
+              "v0.8s",
+              "v0.7",
+              String(spec.games),
+              String(spec.baseSeed),
+              directory,
+              String(manifest.config.workersPerJob),
+              `--maps=${LIVE_MAPS}`,
+              "--livetwin",
+          ];
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
     checkpoint.activeJobs[spec.id] = { spec, startedAt, startedAtMs, pid: null };
@@ -2877,22 +3891,29 @@ async function runJob(
     if (status === "deadline") {
         return false;
     }
+    // A pre-spawn check prevents mixed revisions between jobs; the matching post-exit check also rejects a
+    // child whose source tree or Bun runtime changed while it was executing.
+    assertManifestSourceIdentityCurrent(manifest);
     const absoluteSummary = latestSummary(directory);
+    const absoluteRecords = latestJobRecords(directory, spec.kind);
     const rawSummary = readJson<unknown>(absoluteSummary);
-    const summary =
-        spec.kind === "level4"
-            ? rawSummary
-            : {
-                  ...(rawSummary as ITournamentSummary),
-                  ...armageddonEvidence(tournamentJsonl(directory)),
-              };
-    if (spec.kind !== "level4") tournamentSummary(summary, absoluteSummary);
+    const summary = isCoverageJob
+        ? rawSummary
+        : {
+              ...(rawSummary as ITournamentSummary),
+              ...armageddonEvidence(absoluteRecords),
+          };
+    if (!isCoverageJob) tournamentSummary(summary, absoluteSummary);
     const completedAtMs = Date.now();
     const job: ICompletedJob = {
         ...spec,
         genomeSha256: candidate.genomeSha256,
         bindingSha256: candidate.bindingSha256,
         summaryPath: relative(manifest.output, absoluteSummary),
+        summarySha256: fingerprintV08AlignedV1(summary),
+        sourceSummarySha256: artifactSha256(absoluteSummary),
+        recordsPath: relative(manifest.output, absoluteRecords),
+        recordsSha256: artifactSha256(absoluteRecords),
         manifestFingerprint: manifest.fingerprint,
         startedAt,
         startedAtMs,
@@ -2980,8 +4001,7 @@ async function runJobQueue(
     return result.status === "completed";
 }
 
-async function main(): Promise<void> {
-    const cli = parseCli(process.argv.slice(2));
+async function runCampaign(cli: ICli): Promise<void> {
     const baseGenomes = buildV08CampaignBaseGenomes();
     const baseBindings = baseGenomes.map((genome) =>
         validateV08AlignedV1CandidateBinding(bindV08AlignedV1Candidate(genome)),
@@ -3005,9 +4025,17 @@ async function main(): Promise<void> {
             `timing ${manifest.config.unboundedSearch ? "unbounded deterministic fitness" : "bound operational"}, ` +
             `catalog ${manifest.catalogIdentity.catalogSha256}`,
     );
+    const publishFinalEvidence = (): void => {
+        checkpoint.phase = "complete";
+        saveCheckpoint(manifest, checkpoint);
+        collectLeaderboard(manifest, checkpoint, adaptive);
+        console.log(`Final leaderboard: ${join(manifest.output, "leaderboard.json")}`);
+    };
+    const finishIncompletePhase = (): void => {
+        if (Date.now() >= manifest.deadlineAtMs || !stopRequested) publishFinalEvidence();
+    };
     if (Date.now() >= manifest.deadlineAtMs) {
-        console.log("Campaign wall deadline already reached; checkpoint left resumable.");
-        return;
+        console.log("Campaign wall deadline already reached; reconciling completed artifacts without new launches.");
     }
 
     checkpoint.phase = "screen";
@@ -3024,7 +4052,30 @@ async function main(): Promise<void> {
             };
         });
         const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
-        if (!ok) return;
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
+    // Every base arm sees every post-A13 creature before adaptive parents are chosen. Otherwise a parent can win
+    // the random screen while never exercising Dryad, Zena, Monk, Magic Dragon, or their new spell semantics.
+    checkpoint.phase = "post_a13_coverage";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const specs: IJobSpec[] = baseBindings.map((_binding, index) => ({
+            id: `post-a13-coverage-${candidateId(index)}`,
+            kind: "post_a13_coverage" as const,
+            candidateId: candidateId(index),
+            candidateIndex: index,
+            pairsPerLane: manifest.config.coveragePairsPerLane,
+            baseSeed: manifest.config.coverageSeed,
+        }));
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
     }
 
     adaptive = loadOrCreateAdaptiveCatalog(manifest, checkpoint, baseGenomes);
@@ -3041,21 +4092,44 @@ async function main(): Promise<void> {
             baseSeed: manifest.adaptive.screenSeed,
         }));
         const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
-        if (!ok) return;
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
+    // Adaptive children receive the identical common-random creature panel before any reserve is selected.
+    checkpoint.phase = "post_a13_coverage";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const specs: IJobSpec[] = adaptive.children.map((child) => ({
+            id: `post-a13-coverage-${child.id}`,
+            kind: "post_a13_coverage" as const,
+            candidateId: child.id,
+            candidateIndex: child.index,
+            pairsPerLane: manifest.config.coveragePairsPerLane,
+            baseSeed: manifest.config.coverageSeed,
+        }));
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
     }
 
     const preLevel4 = collectLeaderboard(manifest, checkpoint, adaptive, {
-        kinds: new Set<JobKind>(["screen", "adaptive"]),
+        kinds: new Set<JobKind>(["screen", "adaptive", "post_a13_coverage"]),
         outputName: "pre-level4-leaderboard.json",
     });
+    const preLevel4Eligible = preLevel4.filter(isV08CampaignPostA13SelectionEligible);
     const level4ReserveTarget = Math.min(
-        preLevel4.length,
+        preLevel4Eligible.length,
         manifest.config.topCandidates * manifest.adaptive.level4ReserveMultiplier,
     );
     // A zero count in a 256-game screen cannot establish the 0.1% target. Cover a fixed research-ranked reserve,
     // then let repeated fresh validation determine Armageddon safety without lucky-zero admission bias.
-    const preLevel4ById = new Map(preLevel4.map((row) => [row.candidateId, row]));
-    const level4Queue = selectV08CampaignLevel4CandidateIds(preLevel4, level4ReserveTarget).map((id) => {
+    const preLevel4ById = new Map(preLevel4Eligible.map((row) => [row.candidateId, row]));
+    const level4Queue = selectV08CampaignLevel4CandidateIds(preLevel4Eligible, level4ReserveTarget).map((id) => {
         const row = preLevel4ById.get(id);
         if (!row) throw new Error(`Level-4 reserve candidate ${id} is missing from the leaderboard`);
         return row;
@@ -3078,7 +4152,10 @@ async function main(): Promise<void> {
                 baseSeed: manifest.config.level4Seed,
             }));
         const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
-        if (!ok) return;
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
     }
     const validationSelectionSource = collectLeaderboard(manifest, checkpoint, adaptive, {
         kinds: VALIDATION_SELECTION_SOURCE_KINDS,
@@ -3091,16 +4168,18 @@ async function main(): Promise<void> {
     if (checkpoint.validationSelection === null) {
         checkpoint.validationSelection = buildValidationSelection(
             manifest,
+            checkpoint,
             validationSelectionSource,
             manifest.config.topCandidates,
         );
         saveCheckpoint(manifest, checkpoint);
     } else {
-        validateValidationSelection(checkpoint.validationSelection, manifest, validationSelectionSource);
+        validateValidationSelection(checkpoint.validationSelection, manifest, checkpoint, validationSelectionSource);
     }
     const validationSelection = checkpoint.validationSelection;
     if (validationSelection === null) throw new Error("Validation selection was not persisted");
-    while (Date.now() < manifest.deadlineAtMs && !stopRequested) {
+    let validationLaunchesAllowed = true;
+    for (;;) {
         leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
         const rowsById = new Map(leaderboard.map((row) => [row.candidateId, row]));
         const top = validationSelection.candidateIds.map((id) => rowsById.get(id)).filter((row) => row !== undefined);
@@ -3121,8 +4200,24 @@ async function main(): Promise<void> {
         for (const spec of roundSpecs) reconcileJobResult(manifest, checkpoint, registry, spec);
         const completedIds = new Set(checkpoint.completed.map(({ id }) => id));
         const pending = roundSpecs.filter(({ id }) => !completedIds.has(id));
+        const roundState = classifyV08CampaignValidationRoundState({
+            pendingJobs: pending.length,
+            nowMs: Date.now(),
+            deadlineAtMs: manifest.deadlineAtMs,
+            stop: stopRequested,
+            launchesAllowed: validationLaunchesAllowed,
+        });
+        if (roundState === "commit") {
+            // This atomic checkpoint advance is the evidence barrier. Until it succeeds, collectLeaderboard
+            // excludes every result in this round, so completion skew, shutdown, or resume cannot favor one arm.
+            checkpoint.validationRound += 1;
+            saveCheckpoint(manifest, checkpoint);
+            collectLeaderboard(manifest, checkpoint, adaptive);
+            if (Date.now() >= manifest.deadlineAtMs || stopRequested || !validationLaunchesAllowed) break;
+            continue;
+        }
+        if (roundState === "stop") break;
         if (
-            pending.length > 0 &&
             Date.now() +
                 estimateDynamicQueueDurationMs(
                     pending,
@@ -3131,7 +4226,7 @@ async function main(): Promise<void> {
                     manifest.config.lanes,
                 ) +
                 ADMISSION_SAFETY_MARGIN_MS >
-                manifest.deadlineAtMs
+            manifest.deadlineAtMs
         ) {
             const estimatedDurationMs = estimateDynamicQueueDurationMs(
                 pending,
@@ -3153,21 +4248,25 @@ async function main(): Promise<void> {
                 })}\n`,
             );
             console.log(`[defer] validation round ${round} needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`);
-            return;
+            validationLaunchesAllowed = false;
+            continue;
         }
         const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, roundSpecs, {
             admissionReserved: true,
         });
-        if (!ok) return;
-        // This atomic checkpoint advance is the evidence barrier. Until it succeeds, collectLeaderboard excludes
-        // every result in this round, so completion skew, shutdown, or resume cannot favor one shortlisted arm.
-        checkpoint.validationRound += 1;
-        saveCheckpoint(manifest, checkpoint);
-        collectLeaderboard(manifest, checkpoint, adaptive);
+        if (!ok) validationLaunchesAllowed = false;
     }
-    checkpoint.phase = "complete";
-    saveCheckpoint(manifest, checkpoint);
-    console.log(`Wall deadline reached. Final leaderboard: ${join(manifest.output, "leaderboard.json")}`);
+    if (Date.now() >= manifest.deadlineAtMs || !stopRequested) publishFinalEvidence();
+}
+
+async function main(): Promise<void> {
+    const cli = parseV08CampaignCli(process.argv.slice(2));
+    const lease = acquireV08CampaignOutputLease(cli.output);
+    try {
+        await runCampaign(cli);
+    } finally {
+        lease.release();
+    }
 }
 
 if ((import.meta as unknown as { main?: boolean }).main) {
