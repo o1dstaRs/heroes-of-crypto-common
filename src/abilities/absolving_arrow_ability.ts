@@ -9,29 +9,20 @@
  * -----------------------------------------------------------------------------
  */
 
-import { MAX_UNIT_STACK_POWER } from "../constants";
+import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import type { GridSettings } from "../grid/grid_settings";
 import { traceGridRayCells } from "../grid/ray_traversal";
 import type { ISceneLog } from "../scene/scene_log_interface";
-import { Unit } from "../units/unit";
+// Type-only, like craft_ability: unit.ts reads absolvingArrowFirstLiftChance for the card description, so a
+// value import here would close a runtime import cycle.
+import type { Unit } from "../units/unit";
 import { getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 
 import { isEquipmentOrMarkerSpellName } from "./ability_helper";
 
 export const ABSOLVING_ARROW_NAME = "Absolving Arrow";
-
-/**
- * Chance to lift the FIRST negative at a single stack. The ability's power is that chance at
- * MAX_UNIT_STACK_POWER, and the stacks between interpolate — 25 / 43.75 / 62.5 / 81.25 / 100.
- *
- * Deliberately NOT luck-modulated (unlike Unit.calculateAbilityApplyChance, and unlike Borrowed Grace):
- * at full strength the card promises a CERTAIN first cleanse, and a luck roll that quietly turned the
- * printed 100% into 97% would make the tooltip a lie. The randomness lives in the halving ladder below.
- * Chakram's bounce budget reads the stack the same bare way.
- */
-export const ABSOLVING_ARROW_MIN_CHANCE = 25;
 
 export interface IAbsolution {
     unitId: string;
@@ -68,19 +59,18 @@ function liftableNegatives(unit: Unit): string[] {
 }
 
 /**
- * The chance this Monk lifts the FIRST negative off an ally, at its current stack: from
- * ABSOLVING_ARROW_MIN_CHANCE at one stack up to the ability's power at MAX_UNIT_STACK_POWER.
+ * The chance this Monk lifts the FIRST negative off an ally: the plain stack-and-luck curve every other
+ * stack-powered ability uses (Unit.calculateAbilityApplyChance), so at the card's power of 100 the stacks
+ * read 20 / 40 / 60 / 80 / 100 before luck moves them. Clamped to a real probability because luck and the
+ * team's synergy bonus can push the raw figure past either end.
  */
-export function absolvingArrowFirstLiftChance(shooterUnit: Unit): number {
+export function absolvingArrowFirstLiftChance(shooterUnit: Unit, synergyAbilityPowerIncrease: number): number {
     const ability = shooterUnit.getAbility(ABSOLVING_ARROW_NAME);
     if (!ability) {
         return 0;
     }
 
-    const stackPower = Math.max(1, Math.min(MAX_UNIT_STACK_POWER, shooterUnit.getStackPower()));
-    const perStack = (ability.getPower() - ABSOLVING_ARROW_MIN_CHANCE) / (MAX_UNIT_STACK_POWER - 1);
-
-    return Math.max(0, Math.min(100, ABSOLVING_ARROW_MIN_CHANCE + perStack * (stackPower - 1)));
+    return Math.max(0, Math.min(100, shooterUnit.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease)));
 }
 
 /**
@@ -116,7 +106,10 @@ export function processAbsolvingArrowAbility(
 
     const absolutions: IAbsolution[] = [];
     const visitedUnitIds = new Set<string>([shooterUnit.getId()]);
-    const firstLiftChance = absolvingArrowFirstLiftChance(shooterUnit);
+    const firstLiftChance = absolvingArrowFirstLiftChance(
+        shooterUnit,
+        FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(shooterUnit.getTeam()),
+    );
 
     for (const [cell] of traceGridRayCells(gridSettings, shooterUnit.getPosition(), targetPosition)) {
         const occupantUnitId = grid.getOccupantUnitId(cell);

@@ -1397,9 +1397,8 @@
         "name": "Absolving Arrow",
         "type": "HEAL",
         "desc": [
-            "Allies the arrow passes through are absolved of one negative effect with a {}% chance",
-            "(25% at one stack, up to 100% at five); each further effect on the same ally is half",
-            "as likely to be lifted as the one before"
+            "Allies the arrow passes through are absolved of one negative effect with a {}% chance;",
+            "each further effect on the same ally is half as likely to be lifted as the one before"
         ],
         "power": 100,
         "power_type": "DISPEL_ON_TRAJECTORY",

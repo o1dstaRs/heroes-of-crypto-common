@@ -11,7 +11,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import {
-    ABSOLVING_ARROW_MIN_CHANCE,
     absolvingArrowFirstLiftChance,
     processAbsolvingArrowAbility,
 } from "../../src/abilities/absolving_arrow_ability";
@@ -28,7 +27,7 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
-import type { Unit } from "../../src/units/unit";
+import { Unit } from "../../src/units/unit";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import {
     createCombatTestContext,
@@ -217,14 +216,55 @@ describe("Absolving Arrow", () => {
             new SceneLogMock(),
         );
 
-    it("runs the first lift from 25% at one stack to the card's power at five", () => {
-        const first = (stackPower: number) => absolvingArrowFirstLiftChance(setup(stackPower).monk);
+    it("runs the first lift on the flat stack ladder, 20% per stack up to the card's power", () => {
+        const first = (stackPower: number) => absolvingArrowFirstLiftChance(setup(stackPower).monk, 0);
 
-        expect(first(1)).toBe(ABSOLVING_ARROW_MIN_CHANCE);
-        expect(first(2)).toBe(43.75);
-        expect(first(3)).toBe(62.5);
-        expect(first(4)).toBe(81.25);
+        expect(first(1)).toBe(20);
+        expect(first(2)).toBe(40);
+        expect(first(3)).toBe(60);
+        expect(first(4)).toBe(80);
         expect(first(5)).toBe(100);
+    });
+
+    it("moves the first lift with the shooter's luck and the team's synergy bonus", () => {
+        const monkWithLuck = (stackPower: number, luck: number) =>
+            createTestUnit({
+                name: "Monk",
+                team: PBTypes.TeamVals.LOWER,
+                abilities: ["Absolving Arrow"],
+                attackType: PBTypes.AttackVals.RANGE,
+                stackPower,
+                luck,
+            });
+
+        // Stack alone would print 60; luck moves it either way (getLuck caps the roll at +-10) and the
+        // team's synergy bonus stacks on top of that.
+        expect(absolvingArrowFirstLiftChance(monkWithLuck(3, -10), 0)).toBe(50);
+        expect(absolvingArrowFirstLiftChance(monkWithLuck(3, 10), 0)).toBe(70);
+        expect(absolvingArrowFirstLiftChance(monkWithLuck(3, 10), 10)).toBe(80);
+        // Never leaves [0, 100], however far luck and synergy push.
+        expect(absolvingArrowFirstLiftChance(monkWithLuck(5, 10), 0)).toBe(100);
+        expect(absolvingArrowFirstLiftChance(monkWithLuck(1, -10), -50)).toBe(0);
+    });
+
+    it("writes the exact chance onto the card when the ability is granted at runtime", () => {
+        // getCreatureConfig bakes the raw power into the card text before any unit exists (the client's
+        // refreshAbilitiesDescriptions then swaps in the live figure). A RUNTIME grant does have a unit, so
+        // common must print the real chance there — it used to fall through to the raw-power default.
+        const bearer = createTestUnit({
+            name: "Bearer",
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            stackPower: 2,
+        });
+        bearer.grantAbility("Absolving Arrow");
+
+        const index = bearer.getUnitProperties().abilities.indexOf("Absolving Arrow");
+        const description = bearer.getUnitProperties().abilities_descriptions[index];
+
+        // 20% per stack: two stacks reads 40, not the card's raw power of 100.
+        expect(description).toContain("40% chance");
+        expect(description).not.toContain("100% chance");
     });
 
     it("lifts the ally's only negative effect for certain at full stack", () => {
@@ -257,25 +297,25 @@ describe("Absolving Arrow", () => {
         expect(ally.hasDebuffActive("Sadness")).toBe(true);
     });
 
-    it("is a coin toss at one stack, and its ladder halves from 25% too", () => {
+    it("keeps the halving ladder at one stack, now starting from 20%", () => {
         const { monk, ally, enemy, ...context } = setup(1);
         const effectFactory = new EffectFactory();
         ally.applyEffect(effectFactory.makeEffect("Stun")!);
         ally.applyEffect(effectFactory.makeEffect("Break")!);
 
-        // 25% then 12.5%: a roll of 24 lifts the Stun, 12 would have lifted the Break, 13 does not.
-        setRolls(24, 13);
+        // 20% then 10%: a roll of 19 lifts the Stun, 9 would have lifted the Break, 10 does not.
+        setRolls(19, 10);
         const absolutions = absolve(monk, enemy, context as ReturnType<typeof createCombatTestContext>);
 
         expect(absolutions[0]?.liftedNames).toEqual(["Stun"]);
         expect(ally.hasEffectActive("Break")).toBe(true);
     });
 
-    it("lifts nothing at one stack when the roll misses the 25%", () => {
+    it("lifts nothing at one stack when the roll misses the 20%", () => {
         const { monk, ally, enemy, ...context } = setup(1);
         ally.applyEffect(new EffectFactory().makeEffect("Stun")!);
 
-        setRolls(25); // the boundary itself misses
+        setRolls(20); // the boundary itself misses
         expect(absolve(monk, enemy, context as ReturnType<typeof createCombatTestContext>)).toEqual([]);
         expect(ally.hasEffectActive("Stun")).toBe(true);
     });

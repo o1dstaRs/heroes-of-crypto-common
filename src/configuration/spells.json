@@ -164,7 +164,7 @@
             "is_buff": true,
             "self_cast_allowed": true,
             "self_debuff_applies": false,
-            "minimal_caster_stack_power": 3,
+            "minimal_caster_stack_power": 1,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0

@@ -126,6 +126,17 @@ export type GameEvent =
            * has one per enemy caught under its 2x2 (and none when it lands on empty ground).
            */
           damaged?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+          /**
+           * What a RESURRECT cast actually brought back, read exactly like `healed` and `damaged` above:
+           * ranked rebuilds both its scene log and its VFX from events, never from the engine's own text, so
+           * without this the Angel's cast reads as a bare "cast Resurrection on X" with no count and nothing
+           * to play the effect on.
+           *
+           * `amount` is whole stacks raised and is 0 when the cast only topped a survivor's health up; `hp`
+           * is the health restored either way. `position` is the target's world position after the raise,
+           * which is where the effect belongs.
+           */
+          resurrected?: { unitId: string; amount: number; hp: number; position: XY }[];
       }
     // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
     // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.

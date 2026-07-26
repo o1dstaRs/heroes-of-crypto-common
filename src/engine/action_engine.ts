@@ -998,6 +998,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: this.serializeAnimations(result.animationData ?? []),
                 healed: result.healed?.length ? result.healed : undefined,
+                resurrected: result.resurrected?.length ? result.resurrected : undefined,
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));

@@ -43,6 +43,13 @@ export interface IRangeAttackEvaluation {
     attackObstacle?: IAttackObstacle;
 }
 
+/**
+ * Multiplier on a Resurrection cast's hit-point budget (the caster's cumulative max hp). 1.5 = the raise is
+ * 50% stronger than the Angel stack's own health, so a single Angel is worth casting with. Applied before
+ * Holy Cross, which scales the already-boosted budget like it does healing.
+ */
+const RESURRECTION_POWER_FACTOR = 1.5;
+
 export interface IAttackResult {
     completed: boolean;
     unitIdsDied: string[];
@@ -50,6 +57,8 @@ export interface IAttackResult {
     abilityStolen?: AllAbilities.IAbilityStolen[];
     /** Healing actually restored by this cast, so the caller can put it on the spell_cast event. */
     healed?: { unitId: string; amount: number }[];
+    /** Stacks and health a RESURRECT cast brought back, for the spell_cast event. Same contract as `healed`. */
+    resurrected?: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[];
 }
 
 export interface IAttackObstacle {
@@ -240,6 +249,9 @@ export class AttackHandler {
         // Healing restored by this cast, reported on the result so the spell_cast event can carry it
         // (ranked's scene log is rebuilt from events, not from this handler's own log text).
         const healedUnits: { unitId: string; amount: number }[] = [];
+        // Stacks the cast raised, reported on the result so the spell_cast event can carry them (ranked's
+        // scene log and resurrection VFX are both rebuilt from events, not from this handler's log text).
+        const resurrectedUnits: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[] = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -294,12 +306,21 @@ export class AttackHandler {
                 } else if (currentActiveSpell.getPowerType() === SpellPowerType.RESURRECT) {
                     const wasHp = targetUnit.getHp();
                     const resurrectedAmount = targetUnit.applyResurrection(
-                        Math.floor(attackerUnit.getCumulativeMaxHp() * holyCrossFactor),
+                        Math.floor(attackerUnit.getCumulativeMaxHp() * RESURRECTION_POWER_FACTOR * holyCrossFactor),
                     );
+                    const restoredHp = targetUnit.getHp() - wasHp;
                     if (resurrectedAmount) {
                         clarifyingStr = `for ${resurrectedAmount} units`;
                     } else {
-                        clarifyingStr = `for ${targetUnit.getHp() - wasHp} hp`;
+                        clarifyingStr = `for ${restoredHp} hp`;
+                    }
+                    if (resurrectedAmount || restoredHp) {
+                        resurrectedUnits.push({
+                            unitId: targetUnit.getId(),
+                            amount: resurrectedAmount,
+                            hp: restoredHp,
+                            position: { ...targetUnit.getPosition() },
+                        });
                     }
                     unitsHolder.refreshStackPowerForAllUnits();
                 } else {
@@ -475,7 +496,7 @@ export class AttackHandler {
             }
             this.sceneLog.updateLog(mirroredStr);
 
-            return { completed: true, unitIdsDied, animationData, healed: healedUnits };
+            return { completed: true, unitIdsDied, animationData, healed: healedUnits, resurrected: resurrectedUnits };
         }
 
         return { completed: false, unitIdsDied, animationData };

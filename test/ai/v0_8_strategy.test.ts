@@ -510,10 +510,13 @@ describe("v0.8 candidate policy", () => {
             spells: ["System:Resurrection"],
             stackPower: 3,
         });
+        // Wind Flow still needs five stacks to cast, so a one-stack holder is genuinely below threshold.
+        // (This used to use Resurrection, until that spell's gate dropped to one stack so a lone Angel
+        // could raise — no stack can sit below a threshold of 1, which made the case unreachable.)
         const belowThresholdCaster = targetFor({
             attackType: PBTypes.AttackVals.MAGIC,
             rangeShots: 0,
-            spells: ["System:Resurrection"],
+            spells: ["System:Wind Flow"],
             stackPower: 1,
         });
         const exhaustedCaster = targetFor(

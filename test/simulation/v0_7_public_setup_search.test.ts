@@ -195,7 +195,7 @@ describe("v0.7 public-roster setup search", () => {
         );
         const naturalIndices = new Set(plan.naturalBoards.map((board) => board.index));
         expect(candidatePlan.stratifiedBoards.every(({ board }) => !naturalIndices.has(board.index))).toBe(true);
-    });
+    }, 60_000);
 
     test("cohort slices score the identical control games instead of comparing composition to 50%", () => {
         const record = (

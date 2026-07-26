@@ -34,9 +34,10 @@ const MOUNTAIN_MARKER = "B";
 
 /**
  * One leg of the disc's flight, PRECOMPUTED by the engine so the client only replays it (identical in sandbox
- * and ranked, no client re-roll). The 1-cell disc traces the full circle `circleCells` from `fromCell`, and —
- * in the order it reaches them — damages `hitUnitIds` and chips `mountainCells`. The first NEW thing the circle
- * touched seeds the next leg; the chain ends the moment a circle finds nothing new (then the disc flies home).
+ * and ranked, no client re-roll). The disc rides the arc `circleCells` from `fromCell`: on a normal ricochet
+ * leg that's a ≤180° curve TRUNCATED at the one thing it met — `hitUnitIds` holds that enemy, or `mountainCells`
+ * that chipped mountain cell — and the disc changes heading there. The final leg, a curve that met nothing, is
+ * a FULL 360° flourish loop with empty hits, after which the caller flies the disc home to Zena.
  */
 export interface IChakramStep {
     fromCell: XY;
@@ -73,25 +74,40 @@ function travelDirection(from: XY, to: XY): XY {
     return { x: dx / length, y: dy / length };
 }
 
+/** A full 360° sweep — the disc's terminal flourish loop when a ricochet leg finds nothing. */
+export const FULL_SWEEP = 2 * Math.PI;
+
+/** A half (180°) sweep — the forward flank the disc searches on a normal ricochet leg (its "random 180°"). */
+export const SEARCH_SWEEP = Math.PI;
+
 /**
- * The rounded cells swept by ONE full circle the 1-cell disc traces from `originCell`, in travel order.
+ * The rounded cells the 1-cell disc sweeps from `originCell`, in travel order, along an arc of `sweepRadians`.
  *
- * Same circle the ricochet always used — centre half a diameter off the touch point, square to the travel
- * direction, on the chosen flank — but swept a FULL 360° (was 180°) so the disc loops all the way around and
- * back. `side` (+1/-1) is the flank the loop bulges to. The precise "who does it go through" test is pure cell
- * membership on this list, which is what lets the server clip only whoever the disc actually passes over.
+ * The centre sits half a diameter off the origin, square to the travel direction, on the chosen flank (`side`
+ * +1/-1). A `SEARCH_SWEEP` (180°) arc is the curve the disc rides on a normal ricochet leg — it bulges out to
+ * the flank and comes back around, redirecting the disc's heading — and the caller truncates it at the first
+ * thing the disc meets. A `FULL_SWEEP` (360°) arc is the terminal flourish loop. The "who does it go through"
+ * test is pure cell membership on this list, so the server clips only whoever the disc actually passes over.
  */
-export function chakramCircleCells(originCell: XY, direction: XY, side: number, gridSettings: unknown): XY[] {
+export function chakramCircleCells(
+    originCell: XY,
+    direction: XY,
+    side: number,
+    gridSettings: unknown,
+    sweepRadians: number = FULL_SWEEP,
+): XY[] {
     const radius = CHAKRAM_ARC_DIAMETER / 2;
     const perpendicular = { x: -direction.y * side, y: direction.x * side };
     const centre = { x: originCell.x + perpendicular.x * radius, y: originCell.y + perpendicular.y * radius };
     const startAngle = Math.atan2(originCell.y - centre.y, originCell.x - centre.x);
-    const sweep = 2 * Math.PI * side;
+    const sweep = sweepRadians * side;
+    // Keep the sample density constant regardless of arc length, so no cell a shorter arc crosses is skipped.
+    const samples = Math.max(2, Math.round((CIRCLE_SAMPLES * sweepRadians) / FULL_SWEEP));
 
     const cells: XY[] = [];
     const seen = new Set<number>();
-    for (let sample = 1; sample <= CIRCLE_SAMPLES; sample += 1) {
-        const angle = startAngle + (sweep * sample) / CIRCLE_SAMPLES;
+    for (let sample = 1; sample <= samples; sample += 1) {
+        const angle = startAngle + (sweep * sample) / samples;
         const cell = {
             x: Math.round(centre.x + Math.cos(angle) * radius),
             y: Math.round(centre.y + Math.sin(angle) * radius),
@@ -111,16 +127,17 @@ export function chakramCircleCells(originCell: XY, direction: XY, side: number, 
 /**
  * Precompute the WHOLE chakram flight, deterministically, on the engine — the client only replays it.
  *
- * Starting from the unit the shot struck, the 1-cell disc traces a full circle (chakramCircleCells) and hits
- * EVERY enemy and chips EVERY mountain cell that circle passes through, in the order it reaches them. The FIRST
- * new thing it touches (enemy or mountain) seeds the next circle, so the disc walks from cluster to cluster;
- * the chain ends the moment a circle finds nothing new, and the caller then flies the disc home to Zena.
+ * The disc RICOCHETS. From the unit the shot struck it curves off along a ≤180° arc on a random flank; the
+ * FIRST new enemy (or mountain) that arc crosses is struck, and the disc CHANGES DIRECTION there and curves off
+ * again on a fresh random flank. It keeps bouncing this way — a new heading at every hit — until an arc finds
+ * nothing new, at which point it flies ONE full circle (the flourish) and the caller returns it to Zena.
  *
  * Rules:
  *  - ALLIES ARE NEVER HIT.
  *  - A victim / mountain-cell is only ever counted once per throw.
- *  - Angel's "Arrows Wingshield Aura" owner is never hit and stops the chain the instant the disc reaches it
- *    (units the same circle already crossed before it still land — it blocks propagation past itself).
+ *  - The disc always makes at least one loop: a lone target's first arc finds nobody, so the flourish circle IS
+ *    that one mandatory loop around the target (never an instant bounce home).
+ *  - Angel's "Arrows Wingshield Aura" owner is never hit and halts the disc the instant its arc reaches it.
  *  - Only the center mountains ("B") are touchable; the disc flies over lava/water.
  */
 export function resolveChakramTrajectory(
@@ -146,89 +163,104 @@ export function resolveChakramTrajectory(
     let originCell = primaryTarget.getBaseCell();
     let direction = travelDirection(attackerUnit.getBaseCell(), originCell);
 
-    // Hard bound so a pathological board can never loop forever; far above any real chain length.
+    // Hard bound so a pathological board can never loop forever; far above any real ricochet chain.
     const MAX_LEGS = 64;
     for (let leg = 0; leg < MAX_LEGS; leg += 1) {
         const side = rollSide() < 0.5 ? 1 : -1;
-        const circleCells = chakramCircleCells(originCell, direction, side, gridSettings);
+        // The forward 180° flank the disc chose this bounce — a radius-2 arc it rides looking for its next hit.
+        const searchArc = chakramCircleCells(originCell, direction, side, gridSettings, SEARCH_SWEEP);
 
-        const stepUnitIds: string[] = [];
-        const stepMountainCells: XY[] = [];
-        let nextCell: XY | undefined;
-        let stoppedByAngel = false;
-
-        // Mountains: the ring rolls straight over them, so an exact cell hit is right (a mountain fills whole
-        // cells). Chip each newly-touched mountain cell.
-        for (const cell of circleCells) {
-            if (grid.getOccupantUnitId(cell) !== MOUNTAIN_MARKER) {
-                continue;
+        // Walk the arc in travel order and STOP at the first new thing it meets — that's where the disc
+        // ricochets. A mountain on the exact cell, or an enemy within a cell of it (the 1-cell blade's reach).
+        let hitOrder = -1;
+        let hitEnemy: Unit | undefined;
+        let hitMountainCell: XY | undefined;
+        let hitIsAngel = false;
+        for (let i = 0; i < searchArc.length; i += 1) {
+            const cell = searchArc[i];
+            const mountainKey = (cell.x << 8) | cell.y;
+            if (grid.getOccupantUnitId(cell) === MOUNTAIN_MARKER && !chippedMountains.has(mountainKey)) {
+                hitOrder = i;
+                hitMountainCell = { x: cell.x, y: cell.y };
+                break;
             }
-            const key = (cell.x << 8) | cell.y;
-            if (chippedMountains.has(key)) {
-                continue;
-            }
-            chippedMountains.add(key);
-            stepMountainCells.push({ x: cell.x, y: cell.y });
-            mountainCells.push({ x: cell.x, y: cell.y });
-        }
-
-        // Units: whoever the 1-cell disc passes within CHAKRAM_CATCH_RADIUS of, in the order the ring reaches
-        // them (its earliest cell that clips the unit) — so the disc slices a whole line, not just cells that
-        // happen to land exactly on the rounded ring. An Angel is never hit and halts the disc where it sits:
-        // units the ring reached BEFORE it still land, nothing past it does.
-        const clipped: { unit: Unit; order: number; isAngel: boolean }[] = [];
-        for (const unit of unitsHolder.getAllUnits().values()) {
-            if (hitUnitIds.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
-                continue;
-            }
-            const unitCells = unit.isSmallSize() ? [unit.getBaseCell()] : unit.getCells();
-            let order = Number.POSITIVE_INFINITY;
-            for (let i = 0; i < circleCells.length && order === Number.POSITIVE_INFINITY; i += 1) {
-                const rc = circleCells[i];
+            let foundEnemy: Unit | undefined;
+            for (const unit of unitsHolder.getAllUnits().values()) {
+                if (hitUnitIds.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
+                    continue;
+                }
+                const unitCells = unit.isSmallSize() ? [unit.getBaseCell()] : unit.getCells();
                 for (const uc of unitCells) {
-                    if (Math.hypot(rc.x - uc.x, rc.y - uc.y) <= CHAKRAM_CATCH_RADIUS) {
-                        order = i;
+                    if (Math.hypot(cell.x - uc.x, cell.y - uc.y) <= CHAKRAM_CATCH_RADIUS) {
+                        foundEnemy = unit;
                         break;
                     }
                 }
+                if (foundEnemy) {
+                    break;
+                }
             }
-            if (order !== Number.POSITIVE_INFINITY) {
-                clipped.push({ unit, order, isAngel: unit.hasAbilityActive("Arrows Wingshield Aura") });
-            }
-        }
-        clipped.sort((a, b) => a.order - b.order);
-
-        for (const c of clipped) {
-            if (c.isAngel) {
-                stoppedByAngel = true;
+            if (foundEnemy) {
+                hitOrder = i;
+                hitEnemy = foundEnemy;
+                hitIsAngel = foundEnemy.hasAbilityActive("Arrows Wingshield Aura");
                 break;
             }
-            hitUnitIds.add(c.unit.getId());
-            hitUnits.push(c.unit);
-            stepUnitIds.push(c.unit.getId());
-            if (!nextCell) {
-                nextCell = c.unit.getBaseCell();
-            }
-        }
-        // A mountain seeds the next circle only if no enemy did.
-        if (!nextCell && stepMountainCells.length) {
-            nextCell = stepMountainCells[0];
         }
 
-        // ALWAYS record the circle the disc traced — even one that clipped nobody — so the player SEES the
-        // disc make its loop on every throw (the "search" sweep), not only when it connects. A no-hit circle
-        // just carries no victims; the client flies it and then heads home.
-        steps.push({
-            fromCell: { x: originCell.x, y: originCell.y },
-            circleCells,
-            hitUnitIds: stepUnitIds,
-            mountainCells: stepMountainCells,
-        });
-
-        // Chain ends when the disc is blocked by an Angel or a circle finds nothing new.
-        if (stoppedByAngel || !nextCell) {
+        if (hitOrder < 0) {
+            // The 180° search met nothing new: the disc's chain is done. It flies ONE full circle from here (the
+            // flourish — also a lone target's single mandatory loop), then the caller sends it home. No hits.
+            const flourish = chakramCircleCells(originCell, direction, side, gridSettings, FULL_SWEEP);
+            steps.push({
+                fromCell: { x: originCell.x, y: originCell.y },
+                circleCells: flourish,
+                hitUnitIds: [],
+                mountainCells: [],
+            });
             break;
         }
+
+        // The disc curves from its origin only as far as the thing it met, then ricochets off it.
+        const arcCells = searchArc.slice(0, hitOrder + 1);
+
+        if (hitIsAngel) {
+            // The Angel halts the disc the instant its arc reaches it — never struck, no flourish. The curve up
+            // to the Angel still flew, so record it (empty hits) for the visual, then stop.
+            steps.push({
+                fromCell: { x: originCell.x, y: originCell.y },
+                circleCells: arcCells,
+                hitUnitIds: [],
+                mountainCells: [],
+            });
+            break;
+        }
+
+        let nextCell: XY;
+        if (hitEnemy) {
+            hitUnitIds.add(hitEnemy.getId());
+            hitUnits.push(hitEnemy);
+            nextCell = hitEnemy.getBaseCell();
+            steps.push({
+                fromCell: { x: originCell.x, y: originCell.y },
+                circleCells: arcCells,
+                hitUnitIds: [hitEnemy.getId()],
+                mountainCells: [],
+            });
+        } else {
+            const cell = hitMountainCell as XY;
+            chippedMountains.add((cell.x << 8) | cell.y);
+            mountainCells.push({ x: cell.x, y: cell.y });
+            nextCell = { x: cell.x, y: cell.y };
+            steps.push({
+                fromCell: { x: originCell.x, y: originCell.y },
+                circleCells: arcCells,
+                hitUnitIds: [],
+                mountainCells: [{ x: cell.x, y: cell.y }],
+            });
+        }
+
+        // Ricochet: the next arc curves off from the thing just struck, on a fresh random flank.
         direction = travelDirection(originCell, nextCell);
         originCell = nextCell;
     }

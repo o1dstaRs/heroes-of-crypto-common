@@ -13,6 +13,7 @@ import Denque from "denque";
 import { Ability } from "../abilities/ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
+import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { getSpellConfig } from "../configuration/config_provider";
@@ -579,6 +580,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return description
                 .replace("{}", Number(chance.toFixed(2)).toString())
                 .replace("{}", Number(reduction.toFixed(2)).toString());
+        }
+        if (ability.getName() === ABSOLVING_ARROW_NAME) {
+            // Stack-and-luck scaled like the generic apply chance, but routed through the ability's own
+            // helper so the printed figure is exactly the one the lift rolls against. Without this the
+            // card fell through to the raw-power default below and always read 100%.
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
         }
         if (ability.getName() === "Blacksmith Tools") {
             // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
@@ -2486,8 +2496,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (projectedAmountResurrected > actualAmountResurrected) {
             this.unitProperties.hp = this.unitProperties.max_hp;
         } else {
+            // Health left over after the whole members the budget paid for; it belongs to the last one
+            // raised, which becomes the stack's wounded front member. A remainder of ZERO means the budget
+            // covered that member exactly, so it comes back at FULL health — writing the bare remainder
+            // here resurrected the stack with a 0 hp front member ("resurrection doesn't recover hp").
             const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
-            this.unitProperties.hp = hpStillToHeal;
+            this.unitProperties.hp = hpStillToHeal === 0 ? this.unitProperties.max_hp : hpStillToHeal;
         }
 
         const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
