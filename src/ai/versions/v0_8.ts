@@ -20,6 +20,12 @@ import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } fr
 import { otherTeam } from "./v0_1";
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import { StrategyV0_7 } from "./v0_7";
+import {
+    buildV08BacklineWardIntent,
+    preservesV08BacklineWardIntent,
+    prioritizeV08BacklineProtector,
+    v08BacklineProtectorPlacement,
+} from "./v0_8_backline_protector";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
@@ -153,6 +159,72 @@ function enumerateV08BoundaryCandidates(
     }).candidates;
 }
 
+const attacksForbiddenTarget = (unit: Unit, decision: readonly GameAction[]): boolean =>
+    decision.some(
+        (action) =>
+            (action.type === "melee_attack" || action.type === "range_attack") &&
+            unit.cannotAttackUnitId(action.targetId),
+    );
+
+/**
+ * Late-finish and learned overlays must not resurrect the target forbidden by Terrifying Gaze after the
+ * inherited strategy has checked it. Re-enumerate from a neutral incumbent and choose only engine-legal work.
+ */
+export function repairV08ForbiddenTargetDecision(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    if (!attacksForbiddenTarget(unit, decision)) return decision;
+    const candidates = enumerateV08BoundaryCandidates(unit, context, [
+        { type: "end_turn", unitId: unit.getId(), reason: "manual" },
+    ]).filter((candidate) => !attacksForbiddenTarget(unit, candidate.actions));
+    return (
+        selectV08ProductiveCandidate(candidates)?.actions ??
+        candidates.find((candidate) => candidate.kind === "wait")?.actions ??
+        candidates.find((candidate) => candidate.kind === "defend")?.actions ?? [
+            { type: "end_turn", unitId: unit.getId(), reason: "manual" },
+        ]
+    );
+}
+
+const bestV08WardSpell = (candidates: readonly IEnumeratedCandidate[]): IEnumeratedCandidate | undefined =>
+    candidates
+        .filter((candidate) => candidate.kind === "spell")
+        .sort(
+            (left, right) =>
+                right.features.expectedKill - left.features.expectedKill ||
+                right.features.expectedDamage - left.features.expectedDamage ||
+                (left.spellName ?? "").localeCompare(right.spellName ?? ""),
+        )[0];
+
+/**
+ * Keep a still-productive ranged/caster ward inside its assigned Abomination/Queen screen. When an inherited
+ * melee line would leave protection, prefer a legal stationary attack, then a cast, then a non-rushing hold.
+ */
+export function repairV08BacklineWardDecision(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    const intent = buildV08BacklineWardIntent(unit, context);
+    if (!intent || preservesV08BacklineWardIntent(intent, unit, context, decision)) return decision;
+    const candidates = enumerateV08BoundaryCandidates(unit, context, decision).filter(
+        (candidate) =>
+            !attacksForbiddenTarget(unit, candidate.actions) &&
+            preservesV08BacklineWardIntent(intent, unit, context, candidate.actions),
+    );
+    return (
+        selectV08DirectCombatCandidate(candidates)?.actions ??
+        bestV08WardSpell(candidates)?.actions ??
+        candidates.find((candidate) => candidate.kind === "wait")?.actions ??
+        candidates.find((candidate) => candidate.kind === "defend")?.actions ??
+        candidates.find((candidate) => candidate.kind === "move")?.actions ?? [
+            { type: "end_turn", unitId: unit.getId(), reason: "manual" },
+        ]
+    );
+}
+
 /**
  * Keep direct v0.8 from spending a turn on Luck Shield, an end-turn no-op, or a mountain while it can attack or
  * advance. Hourglass wait is deliberately different: it reactivates the unit later in the lap, and a 6,000-game
@@ -253,9 +325,14 @@ export class StrategyV0_8 extends StrategyV0_7 {
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         const productionContext: IPlacementContext = {
             ...context,
-            setupPlacementPolicy: context.setupPlacementPolicy ?? "legitimate-reveal",
+            // Ranked exposes the completed draft before deployment. v0.8 may use those public identities
+            // (never positions, stack state, or hidden pick-time information) to arm Queen's anti-fly screen.
+            setupPlacementPolicy: context.setupPlacementPolicy ?? "public-roster",
         };
-        return super.placeArmy(units, productionContext);
+        // Run the inherited path first so v0.7 primes its immutable initial-army profile even when the
+        // role-aware layout below overrides the returned cells.
+        const inherited = super.placeArmy(units, productionContext);
+        return v08BacklineProtectorPlacement(units, productionContext) ?? inherited;
     }
     protected override frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         const strongerRangedPosture = v08HasStrongerRangedPosture(
@@ -302,7 +379,15 @@ export class StrategyV0_8 extends StrategyV0_7 {
                 ? [{ type: "wait_turn", unitId: unit.getId() }]
                 : prioritized;
         const finished = prioritizeV08A13FinishDecision(unit, context, active);
-        return prioritizeV08RangedPositioning(unit, context, finished, this.version);
+        const positioned = prioritizeV08RangedPositioning(unit, context, finished, this.version);
+        const legalDecision = repairV08ForbiddenTargetDecision(unit, context, positioned);
+        const protectedDecision = prioritizeV08BacklineProtector(
+            unit,
+            context,
+            legalDecision,
+            this.canHourglass(unit, context),
+        );
+        return repairV08BacklineWardDecision(unit, context, protectedDecision);
     }
 }
 

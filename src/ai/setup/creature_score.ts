@@ -29,6 +29,10 @@ export interface ICreatureInfo {
     level: number;
     faction: number;
     ranged: boolean;
+    /** attack_type === "MAGIC" — a back-line spellcaster/support rather than a melee-magic hybrid. */
+    mage: boolean;
+    /** Owns at least one native spell charge or castable ability, including MELEE_MAGIC hybrids. */
+    caster: boolean;
     maxDamage: number;
     shots: number;
     distance: number;
@@ -100,6 +104,14 @@ const isAmplifiableCastableAbility = (name: string): boolean => {
     }
 };
 
+const isCastableAbility = (name: string): boolean => {
+    try {
+        return getAbilityConfig(name).can_be_cast;
+    } catch {
+        return false;
+    }
+};
+
 /** Browser-safe display-name lookup shared by runtime placement and simulation setup paths. */
 export const creatureIdForName = (name: string): number | undefined => {
     const id = CREATURE_IDS_BY_ENUM_KEY[name.toUpperCase().replace(/ /g, "_")];
@@ -130,6 +142,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 level: cfg.level ?? CreatureLevels[id] ?? 1,
                 faction: CreatureFactions[id] ?? 0,
                 ranged: cfg.attack_type === "RANGE",
+                mage: cfg.attack_type === "MAGIC",
+                caster: spellList.length > 0 || abilityList.some(isCastableAbility),
                 maxDamage: cfg.attack_damage_max ?? 0,
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,
@@ -159,6 +173,42 @@ const creatureIndex = (): Map<number, ICreatureInfo> => {
 };
 
 export const creatureInfo = (creatureId: number): ICreatureInfo | undefined => creatureIndex().get(creatureId);
+
+/** The two level-4 stacks whose tactical value is specifically tied to screening a fragile back line. */
+export const isBacklineProtectorCreature = (creatureId: number): boolean => {
+    const info = creatureIndex().get(creatureId);
+    return !!info && (info.name === "Abomination" || info.name === "Arachna Queen");
+};
+
+/** Native shooters and any spell-bearing stack are the assets Abomination/Queen are intended to screen. */
+export const isBacklineProtectionBeneficiaryCreature = (creatureId: number): boolean => {
+    const info = creatureIndex().get(creatureId);
+    return !!info && (info.ranged || info.caster);
+};
+
+export const backlineProtectionBeneficiaryCount = (creatureIds: readonly number[]): number =>
+    creatureIds.reduce((count, creatureId) => count + Number(isBacklineProtectionBeneficiaryCreature(creatureId)), 0);
+
+/**
+ * Hard draft-safety layer shared by live ranked and league training. A protector without a shooter or
+ * spell-bearing ward is a role mismatch, so remove it whenever the offer contains any ordinary legal
+ * alternative. If every legal choice is a protector, retain the original offer: the draft must still progress.
+ */
+export const eligibleBacklineProtectorChoices = (
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+): readonly number[] => {
+    const hasWard = backlineProtectionBeneficiaryCount(ownCreatureIds) > 0;
+    const knownFlyer = knownOpponentCreatureIds.some((creatureId) => creatureIndex().get(creatureId)?.canFly);
+    const ordinary = available.filter((creatureId) => {
+        const name = creatureIndex().get(creatureId)?.name;
+        if (name === "Abomination") return hasWard;
+        if (name === "Arachna Queen") return hasWard && knownFlyer;
+        return true;
+    });
+    return ordinary.length ? ordinary : available;
+};
 
 /**
  * Standalone draft value of a creature. Higher is better. Ranged units and high-pressure abilities are

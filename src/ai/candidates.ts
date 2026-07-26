@@ -25,7 +25,13 @@ import {
     type RangeAttackCellSide,
 } from "../grid/grid_math";
 import type { AttackHandler } from "../handlers/attack_handler";
-import { canCastSpell, canCastSummon, canMassCastSpell, isSpellLineOfSightClear } from "../spells/spell_helper";
+import {
+    canCastSpell,
+    canCastSummon,
+    canMassCastSpell,
+    isSpellLineOfSightClear,
+    isSpellUsableByCaster,
+} from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
 import {
     applyMagicResistToSpellDamage,
@@ -1685,11 +1691,7 @@ class CandidateGenerator {
     // ---- spells ----------------------------------------------------------------------------------
     /** Mirrors GameActionEngine.canUseSpell. */
     private canUseSpell(spell: Spell): boolean {
-        return (
-            spell.getLapsTotal() > 0 &&
-            spell.isRemaining() &&
-            spell.getMinimalCasterStackPower() <= this.unit.getStackPower()
-        );
+        return isSpellUsableByCaster(this.unit, spell);
     }
     private castAction(spell: Spell, targetId?: string, targetCell?: XY, targetOrientation?: number): GameAction {
         return {

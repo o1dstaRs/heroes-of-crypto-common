@@ -31,6 +31,12 @@ import {
     selectV08DirectCombatCandidate,
     v08TeamRangedOutput,
 } from "../ai/versions/v0_8";
+import {
+    buildV08BacklineProtectorIntent,
+    buildV08BacklineWardIntent,
+    preservesV08BacklineProtectorIntent,
+    preservesV08BacklineWardIntent,
+} from "../ai/versions/v0_8_backline_protector";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     selectV08STargetPressureCandidate,
@@ -1409,9 +1415,29 @@ export class SearchDriver {
                     !prioritizeV08SUrgency,
                 preserveAttackTargetCoverage: preserveBaselineAttackTargetCoverage,
             };
+            const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
+            const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
+                // Abomination/Arachna Queen are drafted and deployed as back-line protectors. Native v0.8
+                // establishes that intent; every a13 challenger must preserve its ward geometry (or answer an
+                // intruder) so rollout search cannot turn the role-aware hold into an unsupported charge.
+                if (
+                    backlineProtectorIntent &&
+                    !preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)
+                ) {
+                    return false;
+                }
+                // The protected ranged/caster stack owns the other half of the same contract: while its output
+                // remains live it may shoot, cast, or reposition within the screen, but search cannot promote a
+                // melee rush that walks out of the aura the protector is deliberately holding.
+                if (
+                    backlineWardIntent &&
+                    !preservesV08BacklineWardIntent(backlineWardIntent, unit, context, candidate.actions)
+                ) {
+                    return false;
+                }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
                 // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
                 if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) {

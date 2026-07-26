@@ -217,6 +217,15 @@ export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCel
  */
 export const spellToTextureName = (spellName: string): string => `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
 
+/** Shared charge/stack gate used by the engine and AI before target-specific spell legality. */
+export function isSpellUsableByCaster(casterUnit: Unit, spell: Spell): boolean {
+    return (
+        spell.getLapsTotal() > 0 &&
+        spell.isRemaining() &&
+        spell.getMinimalCasterStackPower() <= casterUnit.getStackPower()
+    );
+}
+
 export function canCastSpell(
     isLocked: boolean,
     gridSettings: GridSettings,
@@ -231,13 +240,7 @@ export function canCastSpell(
     currentEnemiesCellsWithinMovementRange?: XY[],
     targetGridCell?: XY,
 ) {
-    if (
-        isLocked ||
-        !spell ||
-        spell.getLapsTotal() <= 0 ||
-        !spell.isRemaining() ||
-        spell.getMinimalCasterStackPower() > casterUnit.getStackPower()
-    ) {
+    if (isLocked || !spell || !isSpellUsableByCaster(casterUnit, spell)) {
         return false;
     }
 

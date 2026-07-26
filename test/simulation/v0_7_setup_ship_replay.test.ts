@@ -67,7 +67,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned again after the Armor augment started hardening MAGIC armor by the same percentage it adds
 // to physical armor. Every seeded fight where a side buys that augment now resolves magic damage
 // differently, so the traces legitimately move. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "391da1bed4a8bf81453eada4c02c9032f50e0f6071bf2fec6a0c6e09dacb6d0e";
+// Re-pinned after v0.1 stopped emitting the one melee target forbidden by Terrifying Gaze. Clean-source
+// isolation changed only seed 2147640168's green candidate (one rejected action became zero); the other
+// seven mirrored traces stayed byte-identical before the Armor change above. Two runs on the combined
+// latest-main engine produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "5db6ec536edc87b5c9ecdb42b6b8f4ebfb6ed767cfe81634997ed7c6e32a91e8";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

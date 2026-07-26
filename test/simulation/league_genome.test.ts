@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Perk } from "../../src/perks/perk_properties";
-import { getKnownOpponentCreatures } from "../../src/picks/pick_sim";
+import { createPickSimState, getKnownOpponentCreatures, type IPickSimState } from "../../src/picks/pick_sim";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
 import {
     createLeagueGenome,
@@ -30,6 +30,7 @@ import {
     LEAGUE_GENOME_LAYOUT,
     leagueComposition,
     pickLeagueAugments,
+    pickLeagueCreature,
     pickLeaguePerk,
     pickLeaguePlacement,
     scoreLeagueCreature,
@@ -52,6 +53,7 @@ import {
     summarizeLeagueRecords,
     type ILeagueGameRecord,
 } from "../../src/simulation/league_eval";
+import { CreatureLevelList } from "../../src/units/unit_properties";
 
 const ENV_KEYS = [
     "LIVETWIN",
@@ -78,6 +80,21 @@ afterEach(() => {
 
 const creature = (name: string): number =>
     (PBTypes.CreatureVals as unknown as Record<string, number>)[name.toUpperCase().replace(/ /g, "_")];
+
+const levelFourPickState = (
+    choices: readonly number[],
+    own: readonly number[],
+    opponent: readonly number[],
+    revealedOpponentSlots: readonly number[] = [],
+): IPickSimState => {
+    const state = createPickSimState(() => 0);
+    state.phaseSequence = 10;
+    state.creaturesBanned = CreatureLevelList[4].filter((creatureId) => !choices.includes(creatureId));
+    state.lower.creatures = [...own];
+    state.upper.creatures = [...opponent];
+    state.lower.revealedOpponentSlots = [...revealedOpponentSlots];
+    return state;
+};
 
 const fakeMatch = (winner: "green" | "red" | "draw", config: IMatchConfig): IMatchResult =>
     ({
@@ -132,6 +149,40 @@ describe("B1 full-game league genome", () => {
         expect(scoreLeagueCreature(ground, [], [flyer], weights)).toBe(
             scoreLeagueCreature(ground, [], [ground], weights),
         );
+    });
+
+    it("uses the same protector eligibility gate in league training as live ranked", () => {
+        const anchor = {
+            ...createLeagueGenome("anchor"),
+            backlineProtectorDraftSafety: true,
+        };
+        const abomination = creature("Abomination");
+        const queen = creature("Arachna Queen");
+        const champion = creature("Champion");
+        const ward = creature("Arbalester");
+        const flyer = creature("Manticore");
+
+        expect(
+            pickLeagueCreature(levelFourPickState([abomination, champion], [], []), PBTypes.TeamVals.LOWER, anchor),
+        ).toBe(champion);
+        expect(
+            pickLeagueCreature(levelFourPickState([abomination, champion], [ward], []), PBTypes.TeamVals.LOWER, anchor),
+        ).toBe(abomination);
+        expect(
+            pickLeagueCreature(levelFourPickState([queen, champion], [ward], [flyer]), PBTypes.TeamVals.LOWER, anchor),
+        ).toBe(champion);
+        expect(
+            pickLeagueCreature(
+                levelFourPickState([queen, champion], [ward], [flyer], [0]),
+                PBTypes.TeamVals.LOWER,
+                anchor,
+            ),
+        ).toBe(queen);
+        expect(
+            [abomination, queen].includes(
+                pickLeagueCreature(levelFourPickState([abomination, queen], [], []), PBTypes.TeamVals.LOWER, anchor),
+            ),
+        ).toBe(true);
     });
 
     it("anchors setup at SEE_NONE, Armor3/Might3/Sniper1 and adaptive placement", () => {

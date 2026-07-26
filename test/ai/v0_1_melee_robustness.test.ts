@@ -170,6 +170,49 @@ describe("v0.1 melee robustness", () => {
         );
     });
 
+    it("never attacks the one enemy forbidden by Terrifying Gaze", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
+        const legal = createTestUnit({ name: "Legal Bystander", team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 5, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, legal, { x: 6, y: 5 });
+        attacker.setForbiddenTarget(manticore.getId());
+
+        expect(meleeAction(getAIStrategy("v0.1").decideTurn(attacker, contextFor(combat)))?.targetId).toBe(
+            legal.getId(),
+        );
+    });
+
+    it("falls back instead of emitting a rejected melee when Terrifying Gaze forbids the only target", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({ name: "Frenzied Boar", team: LOWER, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 5, y: 6 });
+        attacker.setForbiddenTarget(manticore.getId());
+
+        expect(meleeAction(getAIStrategy("v0.1").decideTurn(attacker, contextFor(combat)))).toBeUndefined();
+    });
+
+    it("keeps v0.8 late-finish overlays from resurrecting the forbidden Gaze target", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({ name: "Wolf Rider", team: LOWER, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
+        const legal = createTestUnit({ name: "Legal Bystander", team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 7, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 6, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, legal, { x: 7, y: 9 });
+        attacker.setForbiddenTarget(manticore.getId());
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        while (fightProperties.getCurrentLap() < 4) fightProperties.flipLap();
+
+        expect(meleeAction(getAIStrategy("v0.8").decideTurn(attacker, contextFor(combat)))?.targetId).not.toBe(
+            manticore.getId(),
+        );
+    });
+
     it("prefers an already-responded target but never overrides a live Aggr target", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });

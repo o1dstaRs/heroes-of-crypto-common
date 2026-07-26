@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
+import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 import {
     COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
@@ -149,6 +150,14 @@ export interface IRevealLayoutOptions {
     screenShooters: boolean;
     /** Compact every role toward the zone's low-x edge (anti-charge lane denial). */
     cornerShift: boolean;
+    /** v0.8-only: include live spellcasters and assign named protectors before generic ground melee. */
+    screenBacklineProtectors?: boolean;
+    /** v0.8-only stable priority order for exact protector unit ids. */
+    preferredGuardUnitIds?: readonly string[];
+    /** v0.8-only units that must remain offensive instead of filling a generic screen slot. */
+    excludedGuardUnitIds?: readonly string[];
+    /** v0.8-only stable priority order for the protected assets. */
+    preferredBacklineUnitIds?: readonly string[];
 }
 
 const isRangeUnit = (u: Unit): boolean => u.getAttackType() === RANGE;
@@ -223,29 +232,50 @@ export function layoutRevealPlacement(
             }
         }
     };
-    const ranged = units.filter(isRangeUnit).sort(bySizeLargeFirst);
-    const melee = units.filter(isMeleeUnit).sort(bySizeLargeFirst);
-    const support = units.filter((u) => !isRangeUnit(u) && !isMeleeUnit(u)).sort(bySizeLargeFirst);
+    const isBackline = (unit: Unit): boolean =>
+        isRangeUnit(unit) ||
+        (!!options.screenBacklineProtectors &&
+            unit.getCanCastSpells() &&
+            unit.getSpells().some((spell) => isSpellUsableByCaster(unit, spell)));
+    const preference = (unit: Unit, ids: readonly string[] | undefined): number => {
+        const index = ids?.indexOf(unit.getId()) ?? -1;
+        return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    const byGuardPriority = (a: Unit, b: Unit): number =>
+        (options.screenBacklineProtectors
+            ? preference(a, options.preferredGuardUnitIds) - preference(b, options.preferredGuardUnitIds)
+            : 0) || bySizeLargeFirst(a, b);
+    const byBacklinePriority = (a: Unit, b: Unit): number =>
+        (options.screenBacklineProtectors
+            ? preference(a, options.preferredBacklineUnitIds) - preference(b, options.preferredBacklineUnitIds)
+            : 0) || bySizeLargeFirst(a, b);
+    const backline = units.filter(isBackline).sort(byBacklinePriority);
+    // When v0.8 treats an exact-MELEE spellcaster as a ward, keep the role partitions disjoint. Otherwise the
+    // front-wall pass would place it a second time, overwrite its deep placement, and leave ghost occupancy.
+    const melee = units.filter((unit) => isMeleeUnit(unit) && !isBackline(unit)).sort(bySizeLargeFirst);
+    const support = units.filter((u) => !isBackline(u) && !isMeleeUnit(u)).sort(bySizeLargeFirst);
     const isFlyer = (u: Unit): boolean => u.canFly();
     const groundMelee = melee.filter((u) => !isFlyer(u));
     const flyers = melee.filter(isFlyer);
 
-    for (const u of ranged) {
+    for (const u of backline) {
         placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a)); // deep + cornered
     }
 
-    // Shooter screen: assign one ground-melee bodyguard per placed shooter (largest guards first, deepest
-    // shooters first), on the free legal cell adjacent to the shooter's footprint closest to the enemy.
+    // Back-line screen: assign one ground-melee bodyguard per placed shooter/spell-bearing stack. Abomination and
+    // Arachna Queen are purpose-built protectors and therefore consume the guard slots before generic tanks;
+    // their range-1 auras must begin the fight adjacent to the asset they protect.
     const guarded = new Set<string>();
-    if (options.screenShooters && ranged.length && groundMelee.length) {
-        const guardPool = [...groundMelee];
-        for (const shooter of ranged) {
-            const base = placements.get(shooter.getId());
+    if (options.screenShooters && backline.length && groundMelee.length) {
+        const excludedGuards = new Set(options.excludedGuardUnitIds ?? []);
+        const guardPool = groundMelee.filter((unit) => !excludedGuards.has(unit.getId())).sort(byGuardPriority);
+        for (const ward of backline) {
+            const base = placements.get(ward.getId());
             const guard = guardPool[0];
             if (!base || !guard) {
                 continue;
             }
-            const fp = footprintFor(shooter, base);
+            const fp = footprintFor(ward, base);
             const adjacent = new Map<number, XY>();
             for (const c of fp) {
                 for (let dx = -1; dx <= 1; dx += 1) {
@@ -257,8 +287,18 @@ export function layoutRevealPlacement(
                     }
                 }
             }
-            const spots = [...adjacent.values()]
-                .filter((cell) => footprintFree(footprintFor(guard, cell)))
+            // A large guard's base cell can sit two coordinates away while the near edge of its 2x2
+            // footprint is still adjacent. The historical shooter screen keeps its exact small-base search;
+            // v0.8 protector placement checks every legal base against the real footprints.
+            const candidateBases = options.screenBacklineProtectors ? baseCells : [...adjacent.values()];
+            const spots = candidateBases
+                .filter((cell) => {
+                    const guardFootprint = footprintFor(guard, cell);
+                    return (
+                        footprintFree(guardFootprint) &&
+                        (!options.screenBacklineProtectors || context.grid.areCellsAdjacent(fp, guardFootprint))
+                    );
+                })
                 .sort((a, b) => frontness(b) - frontness(a) || edgeness(a) - edgeness(b));
             const spot = spots[0];
             if (spot) {

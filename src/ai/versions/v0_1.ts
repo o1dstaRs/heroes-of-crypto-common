@@ -154,12 +154,19 @@ export class StrategyV0_1 implements IAIStrategy {
                 return this.fallbackTurn(unit, context);
             }
 
+            const attackFromCells = this.footprintForCell(unit, attackFrom, context);
+            if (this.version === "v0.1") {
+                targetId = this.preferRespondedMeleeTarget(unit, context, targetId, attackFromCells);
+                if (!targetId) {
+                    return this.fallbackTurn(unit, context);
+                }
+            }
+
             const target = unitsHolder.getAllUnits().get(targetId);
             if (!target || !this.isLegalMeleeTarget(unit, target, context)) {
                 return this.fallbackTurn(unit, context);
             }
 
-            const attackFromCells = this.footprintForCell(unit, attackFrom, context);
             if (!grid.areCellsAdjacent(attackFromCells, target.getCells())) {
                 return this.fallbackTurn(unit, context);
             }
@@ -172,10 +179,6 @@ export class StrategyV0_1 implements IAIStrategy {
             const route = movesToAttack ? this.routeForCell(aiAction, attackFrom) : undefined;
             if (movesToAttack && !route?.route.length) {
                 return this.fallbackTurn(unit, context);
-            }
-
-            if (this.version === "v0.1") {
-                targetId = this.preferRespondedMeleeTarget(unit, context, targetId, attackFromCells);
             }
 
             const actions = meleeAttackTypeSelectionPrefix(unit);
@@ -420,6 +423,9 @@ export class StrategyV0_1 implements IAIStrategy {
         if (target.isDead() || target.getTeam() === unit.getTeam() || target.hasBuffActive("Hidden")) {
             return false;
         }
+        if (unit.cannotAttackUnitId(target.getId())) {
+            return false;
+        }
         if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < target.getCumulativeHp()) {
             return false;
         }
@@ -437,22 +443,22 @@ export class StrategyV0_1 implements IAIStrategy {
         context: IDecisionContext,
         currentTargetId: string,
         attackFromCells: XY[],
-    ): string {
+    ): string | undefined {
         const fightProperties = context.fightProperties ?? FightStateManager.getInstance().getFightProperties();
-        if (fightProperties.hasAlreadyRepliedAttack(currentTargetId)) {
-            return currentTargetId;
-        }
-
         const candidates = context.unitsHolder
             .getAllEnemyUnits(unit.getTeam())
             .filter(
                 (target) =>
-                    target.getId() !== currentTargetId &&
                     this.isLegalMeleeTarget(unit, target, context) &&
-                    fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
                     context.grid.areCellsAdjacent(attackFromCells, target.getCells()),
-            )
-            .sort((a, b) => {
+            );
+        const current = candidates.find((target) => target.getId() === currentTargetId);
+        if (current && fightProperties.hasAlreadyRepliedAttack(currentTargetId)) {
+            return currentTargetId;
+        }
+
+        const sortByThreat = (targets: Unit[]): Unit[] =>
+            targets.sort((a, b) => {
                 const threatA = Math.max(1, a.getAttackDamageMax()) * Math.max(1, a.getAmountAlive());
                 const threatB = Math.max(1, b.getAttackDamageMax()) * Math.max(1, b.getAmountAlive());
                 if (threatA !== threatB) {
@@ -462,7 +468,13 @@ export class StrategyV0_1 implements IAIStrategy {
                 const cellB = b.getBaseCell();
                 return cellA.y - cellB.y || cellA.x - cellB.x || a.getName().localeCompare(b.getName());
             });
-        return candidates[0]?.getId() ?? currentTargetId;
+        const responded = sortByThreat(
+            candidates.filter(
+                (target) =>
+                    target.getId() !== currentTargetId && fightProperties.hasAlreadyRepliedAttack(target.getId()),
+            ),
+        );
+        return responded[0]?.getId() ?? current?.getId() ?? sortByThreat(candidates)[0]?.getId();
     }
     protected routeForCell(aiAction: IAIAction, cell: XY): IReadonlyWeightedRoute | undefined {
         return aiAction.currentActiveKnownPaths().get(cellKey(cell))?.[0];

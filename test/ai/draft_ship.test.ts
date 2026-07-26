@@ -23,6 +23,7 @@ import {
     LEAGUE_ROUND1_DRAFT_SPEC,
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
+    pickDraftGenomeCreature,
     projectDraftGenomeForShipping,
     V07_NONFIGHT_DRAFT_SPEC,
 } from "../../src/ai/setup/draft_ship";
@@ -59,6 +60,19 @@ describe("draft ship genome", () => {
         expect(draftGenomeCreatureScore(genome, creatureId)).toBe(scoreCreatureWeighted(creatureId, DRAFT_ANCHOR_W));
         expect(() => embedIntrinsicDraftWeights(new Array(DRAFT_FEATURE_DIM - 1).fill(0))).toThrow(RangeError);
         expect(() => embedIntrinsicDraftWeights([...DRAFT_ANCHOR_W.slice(0, -1), Number.NaN])).toThrow(TypeError);
+    });
+
+    it("applies own-roster protector eligibility before the immutable genome argmax", () => {
+        const genome = parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC);
+        const abomination = PBTypes.CreatureVals.ABOMINATION;
+        const champion = PBTypes.CreatureVals.CHAMPION;
+        const ward = PBTypes.CreatureVals.ARBALESTER;
+
+        expect(draftGenomeCreatureScore(genome, abomination)).toBeGreaterThan(
+            draftGenomeCreatureScore(genome, champion),
+        );
+        expect(pickDraftGenomeCreature(genome, [abomination, champion], [], [])).toBe(champion);
+        expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward], [])).toBe(abomination);
     });
 
     it("embeds the full intrinsic head while preserving every non-draft anchor weight", () => {

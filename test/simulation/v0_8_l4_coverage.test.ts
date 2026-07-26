@@ -5,6 +5,7 @@ import {
     auditV08Level4Turn,
     forceLevel4CoverageUnit,
     planV08Level4CoverageGame,
+    runV08Level4CoverageGame,
     V08_LEVEL4_CONTROL_UNIT,
     V08_LEVEL4_COVERAGE_LANES,
     V08_LEVEL4_COVERAGE_UNITS,
@@ -103,5 +104,19 @@ describe("v0.8 forced level-4 coverage", () => {
             rawEndTurnDecisions: 1,
             actionTypes: { move_unit: 1, defend_turn: 1 },
         });
+    });
+
+    test("keeps the exact A13 Level-4 Terrifying Gaze regressions rejection-free", () => {
+        const exactFailureOptions: IV08Level4CoverageOptions = {
+            candidateVersion: "v0.8",
+            opponentVersion: "v0.7",
+            pairsPerLane: 16,
+            baseSeed: 2026072601,
+        };
+
+        for (const game of [137, 156, 157]) {
+            const result = runV08Level4CoverageGame(exactFailureOptions, game);
+            expect(result.rejectedCandidate).toBe(0);
+        }
     });
 });

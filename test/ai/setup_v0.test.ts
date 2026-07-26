@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
-import { creatureInfo, scoreCreature } from "../../src/ai/setup/creature_score";
+import { eligibleBacklineProtectorChoices, creatureInfo, scoreCreature } from "../../src/ai/setup/creature_score";
 import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
 import { Perk } from "../../src/perks/perk_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -52,7 +52,23 @@ describe("SetupPolicyV0", () => {
         // pickCreature returns the max-scored candidate.
         const pool = [orc, PBTypes.CreatureVals.SCAVENGER, PBTypes.CreatureVals.TROGLODYTE];
         const best = pool.reduce((a, b) => (scoreCreature(b) > scoreCreature(a) ? b : a));
-        expect(policy.pickCreature(1, pool)).toBe(best);
+        expect(policy.pickCreature(1, pool, [], [])).toBe(best);
+    });
+
+    test("protector eligibility requires a real ward, and Queen also requires known flyer pressure", () => {
+        const abomination = PBTypes.CreatureVals.ABOMINATION;
+        const queen = PBTypes.CreatureVals.ARACHNA_QUEEN;
+        const champion = PBTypes.CreatureVals.CHAMPION;
+        const rangedWard = PBTypes.CreatureVals.ARBALESTER;
+        const hybridCasterWard = PBTypes.CreatureVals.BATTLE_MAGE;
+        const knownFlyer = PBTypes.CreatureVals.GRIFFIN;
+        const offer = [abomination, queen, champion];
+
+        expect(eligibleBacklineProtectorChoices(offer, [], [])).toEqual([champion]);
+        expect(eligibleBacklineProtectorChoices(offer, [rangedWard], [])).toEqual([abomination, champion]);
+        expect(eligibleBacklineProtectorChoices(offer, [hybridCasterWard], [knownFlyer])).toEqual(offer);
+        // A forced all-protector offer must still make draft progress.
+        expect(eligibleBacklineProtectorChoices([abomination, queen], [], [])).toEqual([abomination, queen]);
     });
 
     test("synergies: one measured-best synergy per faction fielded with 2+ units", () => {

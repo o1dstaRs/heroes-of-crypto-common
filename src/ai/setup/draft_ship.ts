@@ -22,7 +22,7 @@ import {
     scoreLeagueCreature,
     type ILeagueGenome,
 } from "../../simulation/league_genome";
-import { DRAFT_FEATURE_DIM } from "./creature_score";
+import { DRAFT_FEATURE_DIM, eligibleBacklineProtectorChoices } from "./creature_score";
 import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
 import v07NonfightDraftGenome from "./draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
@@ -169,4 +169,28 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
  */
 export function draftGenomeCreatureScore(genome: ILeagueGenome, creatureId: number): number {
     return scoreLeagueCreature(creatureId, [], [], genome.weights);
+}
+
+/**
+ * Live-ranked creature argmax with the same role-safety gate used by league training. Genome scores remain
+ * immutable; roster and fair revealed-opponent context only remove an inapplicable Queen/Abomination when at
+ * least one ordinary legal choice exists.
+ */
+export function pickDraftGenomeCreature(
+    genome: ILeagueGenome,
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+): number | undefined {
+    const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
+    let best: number | undefined;
+    let bestScore = -Infinity;
+    for (const creatureId of eligible) {
+        const score = draftGenomeCreatureScore(genome, creatureId);
+        if (score > bestScore) {
+            best = creatureId;
+            bestScore = score;
+        }
+    }
+    return best;
 }

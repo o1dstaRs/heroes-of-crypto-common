@@ -10,7 +10,13 @@
  */
 
 import { getUpgradePoints, Perk } from "../perks/perk_properties";
-import { creatureFeatures, creatureInfo, DRAFT_ANCHOR_W, DEFAULT_DRAFT_W } from "../ai/setup/creature_score";
+import {
+    creatureFeatures,
+    creatureInfo,
+    DRAFT_ANCHOR_W,
+    DEFAULT_DRAFT_W,
+    eligibleBacklineProtectorChoices,
+} from "../ai/setup/creature_score";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
     getKnownOpponentCreatures,
@@ -118,6 +124,11 @@ export interface ILeagueGenome {
     weights: number[];
     /** Debug/oracle entrants may inspect hidden picks. Never enable this on a deployable champion. */
     omniscientDraft?: boolean;
+    /**
+     * Opt-in latest-policy role gate. Kept explicit so frozen v0.7 league/setup controls retain their exact
+     * historical draft bytes while new-creature training can match ranked's protector eligibility.
+     */
+    backlineProtectorDraftSafety?: boolean;
 }
 
 export interface ILeagueAugment {
@@ -273,11 +284,14 @@ export function pickLeagueBundle(state: IPickSimState, team: PickTeam, genome: I
 }
 
 export function pickLeagueCreature(state: IPickSimState, team: PickTeam, genome: ILeagueGenome): number {
-    const choices = genome.omniscientDraft
+    const visibleChoices = genome.omniscientDraft
         ? getOmniscientCreatureChoices(state, team)
         : getVisibleCreatureChoices(state, team);
     const own = teamState(state, team).creatures;
     const opponent = leagueOpponentCreatures(state, team, !!genome.omniscientDraft);
+    const choices = genome.backlineProtectorDraftSafety
+        ? eligibleBacklineProtectorChoices(visibleChoices, own, opponent)
+        : visibleChoices;
     let best = choices[0] ?? 0;
     let bestScore = -Infinity;
     for (const creatureId of choices) {

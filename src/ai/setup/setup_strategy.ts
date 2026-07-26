@@ -115,8 +115,16 @@ export interface ISetupPolicy {
     pickPerk(): number;
     /** Index (0-based) of the best starting bundle. Each bundle is [l1CreatureId, l2CreatureId, tier1ArtifactId]. */
     pickBundle(bundles: readonly (readonly [number, number, number])[]): number;
-    /** Best creature id of the required level from the legal pool. */
-    pickCreature(level: number, available: readonly number[]): number;
+    /**
+     * Best creature id of the required level from the legal pool. `ownCreatureIds` is the acting seat's
+     * already-public own roster, so role-dependent choices never need hidden opponent information.
+     */
+    pickCreature(
+        level: number,
+        available: readonly number[],
+        ownCreatureIds: readonly number[],
+        knownOpponentCreatureIds: readonly number[],
+    ): number;
     /** Best Tier-2 artifact id from the offered set. */
     pickArtifactT2(offered: readonly number[]): number;
     /** One synergy per fielded faction (the measured-best of that faction's two), given the team's creatures. */

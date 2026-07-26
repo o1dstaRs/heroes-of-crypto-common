@@ -872,7 +872,13 @@ describe("v0.8 candidate policy", () => {
         expect(
             candidate.actions
                 .filter((action) => action.side === "green")
-                .filter((action) => ["defend_turn", "obstacle_attack"].includes(action.actionType)),
+                .filter(
+                    (action) =>
+                        action.actionType === "obstacle_attack" ||
+                        (action.actionType === "defend_turn" &&
+                            action.creatureName !== "Abomination" &&
+                            action.creatureName !== "Arachna Queen"),
+                ),
         ).toEqual([]);
     });
 });

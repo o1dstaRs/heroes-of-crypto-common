@@ -11,7 +11,7 @@
 
 import { CreatureFactions } from "../../generated/protobuf/v1/creature_gen";
 import { Perk } from "../../perks/perk_properties";
-import { scoreCreature } from "./creature_score";
+import { eligibleBacklineProtectorChoices, scoreCreature } from "./creature_score";
 import {
     AUGMENT_PRIORITY,
     BEST_SYNERGY_BY_FACTION,
@@ -64,8 +64,14 @@ export class SetupPolicyV0 implements ISetupPolicy {
         });
         return bestIdx;
     }
-    public pickCreature(_level: number, available: readonly number[]): number {
-        return bestBy(available, (id) => scoreCreature(id)) ?? available[0] ?? 0;
+    public pickCreature(
+        _level: number,
+        available: readonly number[],
+        ownCreatureIds: readonly number[],
+        knownOpponentCreatureIds: readonly number[],
+    ): number {
+        const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
+        return bestBy(eligible, (id) => scoreCreature(id)) ?? available[0] ?? 0;
     }
     public pickArtifactT2(offered: readonly number[]): number {
         return bestBy(offered, (id) => TIER2_ARTIFACT_WINRATE[id] ?? 0) ?? offered[0] ?? 0;
