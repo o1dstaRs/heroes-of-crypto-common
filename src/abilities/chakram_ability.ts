@@ -22,11 +22,15 @@ export const CHAKRAM_ARC_DIAMETER = 4;
 /** The circle is sampled this many times — dense enough that no cell the disc's 1-cell path crosses is skipped. */
 const CIRCLE_SAMPLES = 96;
 
+/**
+ * How near a swept ring cell a unit must be, in cells, for the 1-cell disc to clip it. Exact-cell-only made the
+ * chakram almost never connect (enemies are rarely sitting on the precise rounded ring), so the disc catches
+ * whoever it passes within this much of — the physical reach of a 1-cell blade. Tune up for a wider bite.
+ */
+export const CHAKRAM_CATCH_RADIUS = 1;
+
 /** grid.getOccupantUnitId returns this for a center-mountain cell (the only obstacle the disc can touch). */
 const MOUNTAIN_MARKER = "B";
-
-/** Obstacle markers the disc does NOT interact with — it flies over lava/water; holes read as empty. */
-const NON_MOUNTAIN_OBSTACLES = new Set<string>(["L", "W", "H"]);
 
 /**
  * One leg of the disc's flight, PRECOMPUTED by the engine so the client only replays it (identical in sandbox
@@ -153,45 +157,62 @@ export function resolveChakramTrajectory(
         let nextCell: XY | undefined;
         let stoppedByAngel = false;
 
-        // Walk the circle IN ORDER so hits/chips are recorded the way the disc reaches them (the client
-        // times each damage animation to that order) and the FIRST new touch seeds the next circle.
+        // Mountains: the ring rolls straight over them, so an exact cell hit is right (a mountain fills whole
+        // cells). Chip each newly-touched mountain cell.
         for (const cell of circleCells) {
-            const occupant = grid.getOccupantUnitId(cell);
-            if (!occupant || NON_MOUNTAIN_OBSTACLES.has(occupant)) {
+            if (grid.getOccupantUnitId(cell) !== MOUNTAIN_MARKER) {
                 continue;
             }
-            if (occupant === MOUNTAIN_MARKER) {
-                const key = (cell.x << 8) | cell.y;
-                if (chippedMountains.has(key)) {
-                    continue;
+            const key = (cell.x << 8) | cell.y;
+            if (chippedMountains.has(key)) {
+                continue;
+            }
+            chippedMountains.add(key);
+            stepMountainCells.push({ x: cell.x, y: cell.y });
+            mountainCells.push({ x: cell.x, y: cell.y });
+        }
+
+        // Units: whoever the 1-cell disc passes within CHAKRAM_CATCH_RADIUS of, in the order the ring reaches
+        // them (its earliest cell that clips the unit) — so the disc slices a whole line, not just cells that
+        // happen to land exactly on the rounded ring. An Angel is never hit and halts the disc where it sits:
+        // units the ring reached BEFORE it still land, nothing past it does.
+        const clipped: { unit: Unit; order: number; isAngel: boolean }[] = [];
+        for (const unit of unitsHolder.getAllUnits().values()) {
+            if (hitUnitIds.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
+                continue;
+            }
+            const unitCells = unit.isSmallSize() ? [unit.getBaseCell()] : unit.getCells();
+            let order = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < circleCells.length && order === Number.POSITIVE_INFINITY; i += 1) {
+                const rc = circleCells[i];
+                for (const uc of unitCells) {
+                    if (Math.hypot(rc.x - uc.x, rc.y - uc.y) <= CHAKRAM_CATCH_RADIUS) {
+                        order = i;
+                        break;
+                    }
                 }
-                chippedMountains.add(key);
-                stepMountainCells.push({ x: cell.x, y: cell.y });
-                mountainCells.push({ x: cell.x, y: cell.y });
-                if (!nextCell) {
-                    nextCell = { x: cell.x, y: cell.y };
-                }
-                continue;
             }
-            // A unit cell.
-            if (hitUnitIds.has(occupant)) {
-                continue;
+            if (order !== Number.POSITIVE_INFINITY) {
+                clipped.push({ unit, order, isAngel: unit.hasAbilityActive("Arrows Wingshield Aura") });
             }
-            const unit = unitsHolder.getAllUnits().get(occupant);
-            if (!unit || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
-                continue;
-            }
-            // Angel: never takes the hit and stops the disc here — nothing past it on this circle is reached.
-            if (unit.hasAbilityActive("Arrows Wingshield Aura")) {
+        }
+        clipped.sort((a, b) => a.order - b.order);
+
+        for (const c of clipped) {
+            if (c.isAngel) {
                 stoppedByAngel = true;
                 break;
             }
-            hitUnitIds.add(unit.getId());
-            hitUnits.push(unit);
-            stepUnitIds.push(unit.getId());
+            hitUnitIds.add(c.unit.getId());
+            hitUnits.push(c.unit);
+            stepUnitIds.push(c.unit.getId());
             if (!nextCell) {
-                nextCell = unit.getBaseCell();
+                nextCell = c.unit.getBaseCell();
             }
+        }
+        // A mountain seeds the next circle only if no enemy did.
+        if (!nextCell && stepMountainCells.length) {
+            nextCell = stepMountainCells[0];
         }
 
         if (stepUnitIds.length || stepMountainCells.length) {

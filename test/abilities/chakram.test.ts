@@ -54,12 +54,32 @@ describe("Zena's Chakram", () => {
         placeUnit(grid, unitsHolder, zena, { x: 8, y: 3 });
         placeUnit(grid, unitsHolder, primary, primaryCell);
 
-        // Two enemies and an ally, each on a distinct cell the FIRST circle actually crosses — the mechanic
-        // must clip BOTH enemies (not just the first one it reaches) and leave the ally untouched.
+        // The mechanic must clip BOTH enemies (not just the first) and leave the ally untouched. EnemyA sits
+        // exactly on the ring; EnemyB sits ONE cell off it — the forgiving 1-cell catch has to still clip it,
+        // which is the whole point (enemies are rarely on the precise rounded ring).
         const ring = firstCircleCells(grid, primaryCell);
+        const ringSet = new Set(ring.map((c) => (c.x << 8) | c.y));
         const enemyCellA = ring[Math.floor(ring.length * 0.25)];
-        const enemyCellB = ring[Math.floor(ring.length * 0.5)];
         const allyCell = ring[Math.floor(ring.length * 0.75)];
+        const ringMid = ring[Math.floor(ring.length * 0.5)];
+        let enemyCellB = ringMid;
+        for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+        ] as const) {
+            const cand = { x: ringMid.x + dx, y: ringMid.y + dy };
+            const key = (cand.x << 8) | cand.y;
+            const clashes =
+                (cand.x === primaryCell.x && cand.y === primaryCell.y) ||
+                (cand.x === enemyCellA.x && cand.y === enemyCellA.y) ||
+                (cand.x === allyCell.x && cand.y === allyCell.y);
+            if (!ringSet.has(key) && !clashes) {
+                enemyCellB = cand; // one cell off the ring, still within the disc's reach
+                break;
+            }
+        }
 
         const enemyA = createTestUnit({ name: "EnemyA", team: PBTypes.TeamVals.UPPER });
         const enemyB = createTestUnit({ name: "EnemyB", team: PBTypes.TeamVals.UPPER });
