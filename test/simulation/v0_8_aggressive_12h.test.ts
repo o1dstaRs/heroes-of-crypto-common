@@ -57,6 +57,7 @@ import {
     V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT,
     V08_CAMPAIGN_POST_A13_COVERAGE_LANES,
     V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA,
+    V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS,
     V08_CAMPAIGN_SCHEMA,
     V08_CAMPAIGN_SCHEDULER_VERSION,
     V08_CAMPAIGN_SELECTION_VERSION,
@@ -186,6 +187,18 @@ describe("v0.8 aggressive campaign orchestration", () => {
             researchRow({ candidateId: "c38", candidateIndex: 38, candidateWinRate: 0.64 }),
             researchRow({ candidateId: "leader", candidateIndex: 10, candidateWinRate: 0.75 }),
             researchRow({ candidateId: "runner-up", candidateIndex: 11, candidateWinRate: 0.7 }),
+            researchRow({
+                candidateId: "failed-behavior",
+                candidateIndex: 12,
+                candidateWinRate: 1,
+                postA13CoveragePassed: false,
+            }),
+            researchRow({
+                candidateId: "failed-spells",
+                candidateIndex: 13,
+                candidateWinRate: 0.99,
+                postA13SpellExercisePassed: false,
+            }),
         ];
 
         expect(selectV08CampaignAdaptiveParents(rows).map(({ candidateId }) => candidateId)).toEqual([
@@ -197,6 +210,16 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(() => selectV08CampaignAdaptiveParents(rows.filter(({ candidateId }) => candidateId !== "c48"))).toThrow(
             "exact c48",
         );
+        expect(() =>
+            selectV08CampaignAdaptiveParents(
+                rows.map((row) => (row.candidateId === "c48" ? { ...row, postA13CoveragePassed: false } : row)),
+            ),
+        ).toThrow("post-A13 behavior coverage");
+        expect(() =>
+            selectV08CampaignAdaptiveParents(
+                rows.map((row) => (row.candidateId === "c48" ? { ...row, postA13SpellExercisePassed: false } : row)),
+            ),
+        ).toThrow("every intrinsic post-A13 spell kit");
     });
 
     it("excludes failed post-A13 behavior or spell exercise before research selection", () => {
@@ -829,43 +852,49 @@ describe("v0.8 aggressive campaign orchestration", () => {
     });
 
     it("accepts only the exact 12-unit, 24-lane post-A13 census", () => {
-        const lanes = V08_CAMPAIGN_POST_A13_COVERAGE_LANES.map((lane) => ({
-            lane,
-            games: 6,
-            candidateGreenGames: 3,
-            candidateRedGames: 3,
-            mapCensus: V08_POST_A13_LIVE_MAPS.map((mapType) => ({
-                mapType,
-                games: 2,
-                candidateGreenGames: 1,
-                candidateRedGames: 1,
-            })),
-            candidateWins: 3,
-            opponentWins: 2,
-            draws: 1,
-            appearances: 6,
-            actingTurns: 8,
-            completedActions: 4,
-            completedStrategyActions: 4,
-            completedRecoveryActions: 0,
-            rejectedStrategyActions: 0,
-            rejectedRecoveryActions: 0,
-            productiveActions: 4,
-            turnsWithoutProductiveAction: 4,
-            rejectedCandidate: 0,
-            rejectedOpponent: 0,
-            rawEndTurnDecisions: 0,
-            actionTypes: { move_unit: 3, cast_spell: 1 },
-            rejectionReasons: {},
-            spellDecisionTurns: 8,
-            activeSpellTurns: 3,
-            activeSpellChargesObserved: 6,
-            activeSpellsObserved: { Example: 3 },
-            activeSpellChargesByName: { Example: 6 },
-            spellCasts: { Example: 1 },
-            armageddonReached: 0,
-            armageddonDecided: 0,
-        }));
+        const lanes = V08_CAMPAIGN_POST_A13_COVERAGE_LANES.map((lane) => {
+            const intrinsicSpell =
+                V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS[
+                    lane.unit as keyof typeof V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS
+                ]?.[0] ?? "Example";
+            return {
+                lane,
+                games: 6,
+                candidateGreenGames: 3,
+                candidateRedGames: 3,
+                mapCensus: V08_POST_A13_LIVE_MAPS.map((mapType) => ({
+                    mapType,
+                    games: 2,
+                    candidateGreenGames: 1,
+                    candidateRedGames: 1,
+                })),
+                candidateWins: 3,
+                opponentWins: 2,
+                draws: 1,
+                appearances: 6,
+                actingTurns: 8,
+                completedActions: 4,
+                completedStrategyActions: 4,
+                completedRecoveryActions: 0,
+                rejectedStrategyActions: 0,
+                rejectedRecoveryActions: 0,
+                productiveActions: 4,
+                turnsWithoutProductiveAction: 4,
+                rejectedCandidate: 0,
+                rejectedOpponent: 0,
+                rawEndTurnDecisions: 0,
+                actionTypes: { move_unit: 3, cast_spell: 1 },
+                rejectionReasons: {},
+                spellDecisionTurns: 8,
+                activeSpellTurns: 3,
+                activeSpellChargesObserved: 6,
+                activeSpellsObserved: { [intrinsicSpell]: 3 },
+                activeSpellChargesByName: { [intrinsicSpell]: 6 },
+                spellCasts: { [intrinsicSpell]: 1 },
+                armageddonReached: 0,
+                armageddonDecided: 0,
+            };
+        });
         const coverageOptions = {
             candidateVersion: "v0.8s",
             opponentVersion: "v0.7",
@@ -950,13 +979,50 @@ describe("v0.8 aggressive campaign orchestration", () => {
         const candidateSpellLane = lanes.find(
             ({ lane }) => lane.unit === "Magic Dragon" && lane.owner === "candidate",
         )!;
+        const candidateIncidentalSpellLane = lanes.find(
+            ({ lane }) => lane.unit === "Mermaid" && lane.owner === "candidate",
+        )!;
         const opponentSpellLane = lanes.find(({ lane }) => lane.unit === "Magic Dragon" && lane.owner === "opponent")!;
+        expect(Object.keys(V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS)).toEqual([
+            "Blacksmith",
+            "Ash Moth",
+            "Trent",
+            "Battle Mage",
+            "Nightmare",
+            "Magic Dragon",
+        ]);
         expect(isV08CampaignPostA13LaneBehaviorQualified(candidateSpellLane)).toBe(true);
         expect(isV08CampaignPostA13LaneBehaviorQualified({ ...candidateSpellLane, spellCasts: {} })).toBe(true);
         expect(isV08CampaignPostA13SpellExerciseQualified(lanes)).toBe(true);
         expect(
             isV08CampaignPostA13SpellExerciseQualified(
+                lanes.map((lane) => (lane === candidateIncidentalSpellLane ? { ...lane, spellCasts: {} } : lane)),
+            ),
+        ).toBe(true);
+        expect(
+            isV08CampaignPostA13SpellExerciseQualified(
                 lanes.map((lane) => (lane === candidateSpellLane ? { ...lane, spellCasts: {} } : lane)),
+            ),
+        ).toBe(false);
+        for (const unit of Object.keys(V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS)) {
+            expect(
+                isV08CampaignPostA13SpellExerciseQualified(
+                    lanes.map((lane) =>
+                        lane.lane.owner === "candidate" && lane.lane.unit === unit ? { ...lane, spellCasts: {} } : lane,
+                    ),
+                ),
+            ).toBe(false);
+        }
+        expect(
+            isV08CampaignPostA13SpellExerciseQualified(
+                lanes.map((lane) =>
+                    lane === candidateSpellLane
+                        ? {
+                              ...lane,
+                              spellCasts: { "Wild Regeneration": 1 },
+                          }
+                        : lane,
+                ),
             ),
         ).toBe(false);
         expect(isV08CampaignPostA13LaneBehaviorQualified({ ...candidateSpellLane, rejectedStrategyActions: 1 })).toBe(

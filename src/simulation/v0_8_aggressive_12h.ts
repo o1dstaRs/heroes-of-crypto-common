@@ -76,6 +76,20 @@ export const V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA = V08_POST_A13_COVERAGE_SCHEM
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT = 24 as const;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANES = V08_POST_A13_COVERAGE_LANES;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_UNITS = V08_POST_A13_COVERAGE_UNITS;
+/**
+ * Intrinsic spell kits introduced after the A13 source boundary.
+ *
+ * The live-twin setup can grant unrelated spells to other stacks (for example, Wild Regeneration to Mermaid).
+ * Those incidental grants are useful gameplay telemetry, but they must neither satisfy nor fail this kit census.
+ */
+export const V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS = Object.freeze({
+    Blacksmith: Object.freeze(["Craft", "Armor Rune", "Weapon Rune"]),
+    "Ash Moth": Object.freeze(["Smoke", "Misfortune", "Fireforged Sword"]),
+    Trent: Object.freeze(["Vine Throw"]),
+    "Battle Mage": Object.freeze(["Fire Strike", "Meteorite"]),
+    Nightmare: Object.freeze(["Fire Wall"]),
+    "Magic Dragon": Object.freeze(["Whirlpool", "Lightning Strike", "Ring of Fire", "Meteor Shower"]),
+} as const);
 const LIVE_MAPS = "normal,lava,block";
 // At screen/validation sizes this effectively requires zero Armageddon-reached games; pooled long-run
 // promotion evidence may tolerate at most one per thousand.
@@ -1464,11 +1478,21 @@ export function rankV08CampaignResearchCandidates<T extends IV08CampaignResearch
     return [...rows].sort(compareV08CampaignResearchCandidates);
 }
 
-export function selectV08CampaignAdaptiveParents<T extends IV08CampaignResearchCandidate>(rows: readonly T[]): T[] {
+export function selectV08CampaignAdaptiveParents<
+    T extends IV08CampaignResearchCandidate &
+        Pick<IRankedCandidate, "postA13CoveragePassed" | "postA13SpellExercisePassed">,
+>(rows: readonly T[]): T[] {
     const exactAnchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
     if (!exactAnchor) throw new Error("Adaptive generation requires the exact c48 anchor");
+    if (!exactAnchor.postA13CoveragePassed) {
+        throw new Error("Exact c48 anchor must pass post-A13 behavior coverage before adaptive generation");
+    }
+    if (!exactAnchor.postA13SpellExercisePassed) {
+        throw new Error("Exact c48 anchor must exercise every intrinsic post-A13 spell kit before adaptive generation");
+    }
+    const eligible = rows.filter(isV08CampaignPostA13SelectionEligible);
     const leaders = rankV08CampaignResearchCandidates(
-        rows.filter(({ candidateId }) => candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID),
+        eligible.filter(({ candidateId }) => candidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID),
     ).slice(0, ADAPTIVE_PARENT_COUNT - 1);
     if (leaders.length !== ADAPTIVE_PARENT_COUNT - 1) {
         throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT - 1} non-anchor leaders`);
@@ -1893,13 +1917,19 @@ export function isV08CampaignPostA13LaneBehaviorQualified(lane: IPostA13Coverage
     );
 }
 
-/** A searched arm must actually exercise each candidate-owned spellcaster somewhere in its common panel. */
+/** A searched arm must cast from every intrinsic post-A13 spell kit somewhere in its common panel. */
 export function isV08CampaignPostA13SpellExerciseQualified(lanes: readonly IPostA13CoverageLaneSummary[]): boolean {
-    const spellLanes = lanes.filter((lane) => lane.lane.owner === "candidate" && lane.activeSpellTurns > 0);
-    return (
-        spellLanes.length > 0 &&
-        spellLanes.every((lane) => Object.values(lane.spellCasts).reduce((sum, count) => sum + count, 0) > 0)
+    const candidateLanesByUnit = new Map(
+        lanes.filter(({ lane }) => lane.owner === "candidate").map((lane) => [lane.lane.unit, lane]),
     );
+    return Object.entries(V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS).every(([unit, intrinsicSpells]) => {
+        const lane = candidateLanesByUnit.get(unit);
+        return (
+            lane !== undefined &&
+            lane.activeSpellTurns > 0 &&
+            intrinsicSpells.reduce((sum, spellName) => sum + (lane.spellCasts[spellName] ?? 0), 0) > 0
+        );
+    });
 }
 
 interface IPostA13CoverageSummary {
@@ -3442,7 +3472,7 @@ function selectBaseAdaptiveParents(manifest: IManifest, checkpoint: ICheckpoint)
     if (baseRows.length !== BASE_CANDIDATE_COUNT) {
         throw new Error(`Adaptive generation requires ${BASE_CANDIDATE_COUNT} complete base candidates`);
     }
-    const parentRows = selectV08CampaignAdaptiveParents(baseRows.filter(isV08CampaignPostA13SelectionEligible));
+    const parentRows = selectV08CampaignAdaptiveParents(baseRows);
     if (parentRows.length !== ADAPTIVE_PARENT_COUNT) {
         throw new Error(`Adaptive generation requires ${ADAPTIVE_PARENT_COUNT} ranked parents`);
     }
