@@ -215,14 +215,15 @@ export function resolveChakramTrajectory(
             nextCell = stepMountainCells[0];
         }
 
-        if (stepUnitIds.length || stepMountainCells.length) {
-            steps.push({
-                fromCell: { x: originCell.x, y: originCell.y },
-                circleCells,
-                hitUnitIds: stepUnitIds,
-                mountainCells: stepMountainCells,
-            });
-        }
+        // ALWAYS record the circle the disc traced — even one that clipped nobody — so the player SEES the
+        // disc make its loop on every throw (the "search" sweep), not only when it connects. A no-hit circle
+        // just carries no victims; the client flies it and then heads home.
+        steps.push({
+            fromCell: { x: originCell.x, y: originCell.y },
+            circleCells,
+            hitUnitIds: stepUnitIds,
+            mountainCells: stepMountainCells,
+        });
 
         // Chain ends when the disc is blocked by an Angel or a circle finds nothing new.
         if (stoppedByAngel || !nextCell) {
