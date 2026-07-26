@@ -280,7 +280,7 @@ export class LookaheadDriver {
                 grid.getAggrMatrixByTeam(enemyTeam),
                 unit.canFly(),
                 unit.isSmallSize(),
-                unit.hasAbilityActive("Made of Fire"),
+                unit.canTraverseLava(),
             );
             for (const e of enemies) {
                 if (usedTargets.has(e.getId())) {

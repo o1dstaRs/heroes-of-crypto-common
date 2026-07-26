@@ -554,7 +554,7 @@ class CandidateGenerator {
             (this.context.grid.areAllCellsEmpty(f, this.unit.getId()) ||
                 this.context.grid.canOccupyCells(
                     f,
-                    this.unit.hasAbilityActive("Made of Fire"),
+                    this.unit.canTraverseLava(),
                     this.unit.hasAbilityActive("Made of Water"),
                 ))
         );

@@ -329,7 +329,7 @@ export class GameActionEngine {
             this.context.grid.areAllCellsEmpty(targetCells, unit.getId()) ||
             this.context.grid.canOccupyCells(
                 targetCells,
-                unit.hasAbilityActive("Made of Fire"),
+                unit.canTraverseLava(),
                 unit.hasAbilityActive("Made of Water"),
             )
         )) {
@@ -1036,7 +1036,7 @@ export class GameActionEngine {
             summoned.getId(),
             team,
             summoned.getAttackRange(),
-            summoned.hasAbilityActive("Made of Fire"),
+            summoned.canTraverseLava(),
             summoned.hasAbilityActive("Made of Water"),
         );
         if (!occupied) {
@@ -1254,7 +1254,7 @@ export class GameActionEngine {
             unit.getId(),
             unit.getTeam(),
             unit.getAttackRange(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
             unit.hasAbilityActive("Made of Water"),
         );
         if (!occupied) {
@@ -1350,43 +1350,31 @@ export class GameActionEngine {
             return this.reject("split_unit_factory_missing");
         }
 
-        // A drag-split names the cell the peeled stack lands on. Validate and occupy it BEFORE mutating the
-        // source, so a blocked target leaves the whole action a clean no-op rather than a silently halved
-        // stack with nowhere to stand.
+        // Where the peeled stack lands. A drag-split names its own cells and must get exactly those or
+        // nothing. A plain split (the sidebar's "Split Selected") names none, so we walk the ring around the
+        // source and take the nearest cell that fits — the new stack appears beside the unit it came from
+        // instead of at the board origin. Either way the target is validated and occupied BEFORE the source
+        // is mutated, so a refusal leaves the action a clean no-op rather than a halved stack with nowhere
+        // to stand.
+        const explicitCells = action.cells?.length ? action.cells : undefined;
+        const candidates = explicitCells ? [explicitCells] : this.splitCellsBesideSource(splitUnit, sourceUnit);
+
         let placement: { position: XY; cells: XY[] } | undefined;
-        if (action.cells?.length) {
-            if (!this.isValidPlacementFootprint(splitUnit, action.cells)) {
-                return this.reject("invalid_placement");
+        let refusal: GameActionRejectionReason | undefined;
+        for (const cells of candidates) {
+            const attempt = this.occupyForSplit(splitUnit, cells);
+            if (typeof attempt === "string") {
+                refusal = attempt;
+                continue;
             }
-            // The hook asks "may this unit stand on these cells", so hand it the placement this split is
-            // performing rather than the split action it can't read.
-            const asPlacement: Extract<GameAction, { type: "place_unit" }> = {
-                type: "place_unit",
-                unitId: splitUnit.getId(),
-                team: splitUnit.getTeam(),
-                unitName: splitUnit.getName(),
-                cells: action.cells,
-            };
-            if (this.context.canPlaceUnit && !this.context.canPlaceUnit(splitUnit, action.cells, asPlacement)) {
-                return this.reject("placement_not_available");
-            }
-            const position = getPositionForCells(this.context.grid.getSettings(), action.cells);
-            if (!position) {
-                return this.reject("invalid_placement");
-            }
-            const occupied = this.context.grid.occupyCells(
-                action.cells,
-                splitUnit.getId(),
-                splitUnit.getTeam(),
-                splitUnit.getAttackRange(),
-                splitUnit.hasAbilityActive("Made of Fire"),
-                splitUnit.hasAbilityActive("Made of Water"),
-            );
-            if (!occupied) {
-                return this.reject("placement_blocked");
-            }
-            splitUnit.setPosition(position.x, position.y);
-            placement = { position, cells: structuredClone(action.cells) };
+            placement = attempt;
+            break;
+        }
+        // An explicit target is the whole point of the gesture, so failing it fails the split. An
+        // auto-picked cell is only a convenience: if the ring is full, still split and leave the new stack
+        // unplaced for the player to position, rather than refusing a legal split.
+        if (!placement && explicitCells) {
+            return this.reject(refusal ?? "invalid_placement");
         }
 
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
@@ -1624,6 +1612,99 @@ export class GameActionEngine {
             { x: destination.x + 1, y: destination.y + 1 },
         ];
     }
+    /**
+     * Validate + occupy `cells` for a freshly split stack, or say why it could not be done. Mirrors the
+     * checks placeUnit runs, so a split-with-placement is held to exactly the same rules as a placement.
+     */
+    private occupyForSplit(splitUnit: Unit, cells: XY[]): { position: XY; cells: XY[] } | GameActionRejectionReason {
+        if (!this.isValidPlacementFootprint(splitUnit, cells)) {
+            return "invalid_placement";
+        }
+        // The hook asks "may this unit stand on these cells", so hand it the placement this split performs
+        // rather than the split action it cannot read.
+        const asPlacement: Extract<GameAction, { type: "place_unit" }> = {
+            type: "place_unit",
+            unitId: splitUnit.getId(),
+            team: splitUnit.getTeam(),
+            unitName: splitUnit.getName(),
+            cells,
+        };
+        if (this.context.canPlaceUnit && !this.context.canPlaceUnit(splitUnit, cells, asPlacement)) {
+            return "placement_not_available";
+        }
+        const position = getPositionForCells(this.context.grid.getSettings(), cells);
+        if (!position) {
+            return "invalid_placement";
+        }
+        const occupied = this.context.grid.occupyCells(
+            cells,
+            splitUnit.getId(),
+            splitUnit.getTeam(),
+            splitUnit.getAttackRange(),
+            splitUnit.canTraverseLava(),
+            splitUnit.hasAbilityActive("Made of Water"),
+        );
+        if (!occupied) {
+            return "placement_blocked";
+        }
+        splitUnit.setPosition(position.x, position.y);
+        return { position, cells: structuredClone(cells) };
+    }
+    /**
+     * Candidate footprints for a split stack that names no target, nearest-first around the source's own
+     * footprint. Mirrors the sandbox's clone placement so ranked and sandbox drop the new stack in the same
+     * place. Cells already held by the source are skipped; everything else is left for occupyForSplit to
+     * judge, so an occupied or out-of-zone candidate simply loses to the next one.
+     */
+    private splitCellsBesideSource(splitUnit: Unit, sourceUnit: Unit): XY[][] {
+        const sourceCells = sourceUnit.getCells();
+        if (!sourceCells.length) {
+            return [];
+        }
+        const centerX = sourceCells.reduce((sum, cell) => sum + cell.x, 0) / sourceCells.length;
+        const centerY = sourceCells.reduce((sum, cell) => sum + cell.y, 0) / sourceCells.length;
+        const sourceKeys = new Set(sourceCells.map((cell) => `${cell.x}:${cell.y}`));
+
+        const anchors: XY[] = [];
+        const seen = new Set<string>();
+        for (const cell of sourceCells) {
+            for (let dx = -1; dx <= 1; dx += 1) {
+                for (let dy = -1; dy <= 1; dy += 1) {
+                    if (dx === 0 && dy === 0) {
+                        continue;
+                    }
+                    const x = cell.x + dx;
+                    const y = cell.y + dy;
+                    if (x < 0 || y < 0) {
+                        continue;
+                    }
+                    const key = `${x}:${y}`;
+                    if (sourceKeys.has(key) || seen.has(key)) {
+                        continue;
+                    }
+                    seen.add(key);
+                    anchors.push({ x, y });
+                }
+            }
+        }
+        anchors.sort(
+            (left, right) =>
+                (left.x - centerX) ** 2 +
+                (left.y - centerY) ** 2 -
+                ((right.x - centerX) ** 2 + (right.y - centerY) ** 2),
+        );
+
+        return anchors.map((anchor) =>
+            splitUnit.isSmallSize()
+                ? [anchor]
+                : [
+                      { x: anchor.x, y: anchor.y },
+                      { x: anchor.x + 1, y: anchor.y },
+                      { x: anchor.x, y: anchor.y + 1 },
+                      { x: anchor.x + 1, y: anchor.y + 1 },
+                  ],
+        );
+    }
     private isValidPlacementFootprint(unit: Unit, cells: XY[]): boolean {
         if (unit.isSmallSize()) {
             return cells.length === 1;
@@ -1659,7 +1740,7 @@ export class GameActionEngine {
             unit.getId(),
             unit.getTeam(),
             unit.getAttackRange(),
-            unit.hasAbilityActive("Made of Fire"),
+            unit.canTraverseLava(),
             unit.hasAbilityActive("Made of Water"),
         );
         unit.setPosition(previousPosition.x, previousPosition.y);
@@ -1849,7 +1930,7 @@ export class GameActionEngine {
             spawned.getId(),
             spawned.getTeam(),
             spawned.getAttackRange(),
-            spawned.hasAbilityActive("Made of Fire"),
+            spawned.canTraverseLava(),
             spawned.hasAbilityActive("Made of Water"),
         );
         if (!occupied) {

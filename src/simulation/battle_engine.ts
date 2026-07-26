@@ -1124,11 +1124,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     } else if (
                         !stationary &&
                         !grid.areAllCellsEmpty(afCells, unit.getId()) &&
-                        !grid.canOccupyCells(
-                            afCells,
-                            unit.hasAbilityActive("Made of Fire"),
-                            unit.hasAbilityActive("Made of Water"),
-                        )
+                        !grid.canOccupyCells(afCells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
                     ) {
                         cause = "cell_occupied";
                     } else {

@@ -864,7 +864,7 @@ export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.X
     }
     return (
         grid.areAllCellsEmpty(cells, unit.getId()) ||
-        grid.canOccupyCells(cells, unit.hasAbilityActive("Made of Fire"), unit.hasAbilityActive("Made of Water"))
+        grid.canOccupyCells(cells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
     );
 }
 

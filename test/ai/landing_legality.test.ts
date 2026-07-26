@@ -30,10 +30,13 @@ describe("AI landing legality", () => {
         const plain = createTestUnit({ team: LOWER, movementType: FLY });
         expect(canUnitLandAt(plain, lava, hazardCell)).toBe(false);
 
+        // "All army units may move over AND STAND in lava" — the marker buff alone carries that, without
+        // the artifact granting anyone the Made of Fire ability.
         const strider = createTestUnit({ team: LOWER });
         strider.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Lava Striders"), amount: 1 }));
         expect(strider.canTraverseLava()).toBe(true);
-        expect(canUnitLandAt(strider, lava, hazardCell)).toBe(false);
+        expect(strider.hasAbilityActive("Made of Fire")).toBe(false);
+        expect(canUnitLandAt(strider, lava, hazardCell)).toBe(true);
 
         const madeOfFire = createTestUnit({ team: LOWER, abilities: ["Made of Fire"] });
         expect(canUnitLandAt(madeOfFire, lava, hazardCell)).toBe(true);
@@ -41,6 +44,7 @@ describe("AI landing legality", () => {
         const madeOfWater = {
             getId: () => "made-of-water",
             isSmallSize: () => true,
+            canTraverseLava: () => false,
             hasAbilityActive: (name: string) => name === "Made of Water",
         } as IUnitAIRepr;
         expect(canUnitLandAt(madeOfWater, water, hazardCell)).toBe(true);

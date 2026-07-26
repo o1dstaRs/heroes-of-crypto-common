@@ -370,7 +370,7 @@ export class AttackHandler {
                                 attackerUnit.getId(),
                                 attackerUnit.getTeam(),
                                 attackerUnit.getAttackRange(),
-                                attackerUnit.hasAbilityActive("Made of Fire"),
+                                attackerUnit.canTraverseLava(),
                                 attackerUnit.hasAbilityActive("Made of Water"),
                             );
 
@@ -386,7 +386,7 @@ export class AttackHandler {
                                 debuffTarget.getId(),
                                 debuffTarget.getTeam(),
                                 debuffTarget.getAttackRange(),
-                                debuffTarget.hasAbilityActive("Made of Fire"),
+                                debuffTarget.canTraverseLava(),
                                 debuffTarget.hasAbilityActive("Made of Water"),
                             );
 
@@ -1362,7 +1362,7 @@ export class AttackHandler {
                 (this.grid.areAllCellsEmpty(attackFromCells, attackerUnit.getId()) ||
                     this.grid.canOccupyCells(
                         attackFromCells,
-                        attackerUnit.hasAbilityActive("Made of Fire"),
+                        attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
                     )) &&
                 (stationaryAttack || currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)
@@ -1397,7 +1397,7 @@ export class AttackHandler {
                     attackerUnit.getId(),
                     attackerUnit.getTeam(),
                     attackerUnit.getAttackRange(),
-                    attackerUnit.hasAbilityActive("Made of Fire"),
+                    attackerUnit.canTraverseLava(),
                     attackerUnit.hasAbilityActive("Made of Water"),
                 );
 
@@ -1424,7 +1424,7 @@ export class AttackHandler {
                 (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                     this.grid.canOccupyCells(
                         attackFromCells,
-                        attackerUnit.hasAbilityActive("Made of Fire"),
+                        attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
                     )) &&
                 (stationaryAttack || currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)
@@ -1457,7 +1457,7 @@ export class AttackHandler {
                     attackerUnit.getId(),
                     attackerUnit.getTeam(),
                     attackerUnit.getAttackRange(),
-                    attackerUnit.hasAbilityActive("Made of Fire"),
+                    attackerUnit.canTraverseLava(),
                     attackerUnit.hasAbilityActive("Made of Water"),
                 );
 
@@ -2341,7 +2341,7 @@ export class AttackHandler {
                     (this.grid.areAllCellsEmpty(attackFromCells, attackerUnit.getId()) ||
                         this.grid.canOccupyCells(
                             attackFromCells,
-                            attackerUnit.hasAbilityActive("Made of Fire"),
+                            attackerUnit.canTraverseLava(),
                             attackerUnit.hasAbilityActive("Made of Water"),
                         )) &&
                     (stationaryAttack ||
@@ -2377,7 +2377,7 @@ export class AttackHandler {
                         attackerUnit.getId(),
                         attackerUnit.getTeam(),
                         attackerUnit.getAttackRange(),
-                        attackerUnit.hasAbilityActive("Made of Fire"),
+                        attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
                     );
 
@@ -2414,7 +2414,7 @@ export class AttackHandler {
                     (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                         this.grid.canOccupyCells(
                             cells,
-                            attackerUnit.hasAbilityActive("Made of Fire"),
+                            attackerUnit.canTraverseLava(),
                             attackerUnit.hasAbilityActive("Made of Water"),
                         )) &&
                     (stationaryAttack ||
@@ -2448,7 +2448,7 @@ export class AttackHandler {
                         attackerUnit.getId(),
                         attackerUnit.getTeam(),
                         attackerUnit.getAttackRange(),
-                        attackerUnit.hasAbilityActive("Made of Fire"),
+                        attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
                     );
 

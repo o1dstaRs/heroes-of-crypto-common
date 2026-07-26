@@ -1141,8 +1141,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public canFly(): boolean {
         return this.unitProperties.movement_type === PBTypes.MovementVals.FLY;
     }
-    // Whether this unit may path over lava cells: either it is Made of Fire, or its army carries the
-    // Lava Striders artifact (ARTIFACT). Used as the isMadeOfFire argument to PathHelper.getMovePath.
+    // Whether lava is passable AND standable for this unit: either it is innately Made of Fire, or its
+    // army carries the Lava Striders artifact ("may move over and stand in lava"). Used as the
+    // isMadeOfFire argument to PathHelper.getMovePath and as the canOccupyLava argument everywhere a
+    // destination is validated — asking hasAbilityActive("Made of Fire") instead would exclude the whole
+    // Lava Striders half, which carries only the marker buff.
     public canTraverseLava(): boolean {
         return this.hasAbilityActive("Made of Fire") || !!this.getBuff("Lava Striders");
     }
@@ -1545,10 +1548,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
     public applyLavaWaterModifier(hasLavaCell: boolean, hasWaterCell: boolean): void {
-        // Made of Fire's central-lava boost (+10% all stats/abilities). Lava Striders grants the actual ability
-        // to the whole army (units_holder), so this single hasAbilityActive gate covers both innate Fire units
-        // and Lava-Striders armies uniformly.
-        if (hasLavaCell && this.hasAbilityActive("Made of Fire") && !this.hasBuffActive("Made of Fire")) {
+        // Made of Fire's central-lava boost (+10% all stats/abilities), earned by actually moving through
+        // (or flying over) lava — hasLavaCell comes from the travelled route. canTraverseLava covers both
+        // cohorts that may be in lava at all: innate Fire creatures and Lava Striders armies. A plain flyer
+        // crossing lava is deliberately excluded — it can pass over the cell but is not made of fire.
+        if (hasLavaCell && this.canTraverseLava() && !this.hasBuffActive("Made of Fire")) {
             const spellProperties = getSpellConfig("System", "Made of Fire");
             this.applyBuff(
                 new Spell({

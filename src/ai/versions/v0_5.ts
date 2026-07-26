@@ -728,11 +728,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         }
         const valid =
             context.grid.areAllCellsEmpty(fp, unit.getId()) ||
-            context.grid.canOccupyCells(
-                fp,
-                unit.hasAbilityActive("Made of Fire"),
-                unit.hasAbilityActive("Made of Water"),
-            );
+            context.grid.canOccupyCells(fp, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"));
         if (valid) {
             return decision;
         }
@@ -800,11 +796,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return (
                 f.length > 0 &&
                 (grid.areAllCellsEmpty(f, unit.getId()) ||
-                    grid.canOccupyCells(
-                        f,
-                        unit.hasAbilityActive("Made of Fire"),
-                        unit.hasAbilityActive("Made of Water"),
-                    ))
+                    grid.canOccupyCells(f, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water")))
             );
         };
         const base = unit.getBaseCell();
@@ -1188,11 +1180,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return (
                 f.length > 0 &&
                 (grid.areAllCellsEmpty(f, unit.getId()) ||
-                    grid.canOccupyCells(
-                        f,
-                        unit.hasAbilityActive("Made of Fire"),
-                        unit.hasAbilityActive("Made of Water"),
-                    ))
+                    grid.canOccupyCells(f, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water")))
             );
         };
         const adjacentFrom = (cell: XY, e: Unit): boolean => {
@@ -1505,11 +1493,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return (
                 fp.length > 0 &&
                 (grid.areAllCellsEmpty(fp, unit.getId()) ||
-                    grid.canOccupyCells(
-                        fp,
-                        unit.hasAbilityActive("Made of Fire"),
-                        unit.hasAbilityActive("Made of Water"),
-                    ))
+                    grid.canOccupyCells(fp, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water")))
             );
         };
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;

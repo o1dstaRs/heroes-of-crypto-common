@@ -2035,6 +2035,39 @@ describe("GameActionEngine", () => {
         ).toBe(3);
     });
 
+    it("drops a cell-less split beside the source instead of leaving it at the origin", () => {
+        const setup = setupPlacementFight({
+            amountAlive: 7,
+            canSplitUnit: () => true,
+            createSplitUnit: (sourceUnit, amount) =>
+                createTestUnit({ name: sourceUnit.getName(), team: sourceUnit.getTeam(), amountAlive: amount }),
+        });
+
+        const sourceCell = { x: 2, y: 2 };
+        expect(
+            setup.engine.apply({
+                type: "place_unit",
+                unitId: setup.unit.getId(),
+                team: setup.unit.getTeam(),
+                unitName: setup.unit.getName(),
+                cells: [sourceCell],
+            }).completed,
+        ).toBe(true);
+
+        const result = setup.engine.apply({ type: "split_unit", unitId: setup.unit.getId(), amount: 3 });
+        const splitEvent = result.events.find((event) => event.type === "unit_split");
+        const placedEvent = result.events.find((event) => event.type === "unit_placed");
+        const newUnitId = splitEvent?.type === "unit_split" ? splitEvent.newUnitId : "";
+        const placedCell = placedEvent?.type === "unit_placed" ? placedEvent.cells[0] : undefined;
+
+        expect(result.completed).toBe(true);
+        // The sidebar's "Split Selected" names no cell, so the engine picks one touching the source.
+        expect(placedCell).toBeDefined();
+        expect(Math.max(Math.abs(placedCell!.x - sourceCell.x), Math.abs(placedCell!.y - sourceCell.y))).toBe(1);
+        expect(setup.grid.getOccupantUnitId(placedCell!)).toBe(newUnitId);
+        expect(setup.unit.getAmountAlive()).toBe(4);
+    });
+
     it("splits AND places the peeled stack when the drag gesture supplies target cells", () => {
         const setup = setupPlacementFight({
             amountAlive: 7,

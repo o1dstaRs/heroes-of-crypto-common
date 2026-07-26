@@ -79,11 +79,7 @@ export class MoveHandler {
 
             if (
                 this.grid.areAllCellsEmpty(targetCells, unitId) ||
-                this.grid.canOccupyCells(
-                    targetCells,
-                    unit.hasAbilityActive("Made of Fire"),
-                    unit.hasAbilityActive("Made of Water"),
-                )
+                this.grid.canOccupyCells(targetCells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
             ) {
                 const systemMoveResult = this.finishDirectedUnitMove(unit, targetCells, undefined, updatePositionMask);
                 if (systemMoveResult.log) {
@@ -123,7 +119,7 @@ export class MoveHandler {
                                 this.grid.areAllCellsEmpty(shiftedCells, unitId) ||
                                 this.grid.canOccupyCells(
                                     shiftedCells,
-                                    unit.hasAbilityActive("Made of Fire"),
+                                    unit.canTraverseLava(),
                                     unit.hasAbilityActive("Made of Water"),
                                 )
                             ) {
@@ -167,7 +163,7 @@ export class MoveHandler {
                                 this.grid.areAllCellsEmpty(shiftedCells, unitId) ||
                                 this.grid.canOccupyCells(
                                     shiftedCells,
-                                    unit.hasAbilityActive("Made of Fire"),
+                                    unit.canTraverseLava(),
                                     unit.hasAbilityActive("Made of Water"),
                                 )
                             ) {
@@ -329,7 +325,7 @@ export class MoveHandler {
                 unit.getId(),
                 unit.getTeam(),
                 unit.getAttackRange(),
-                unit.hasAbilityActive("Made of Fire"),
+                unit.canTraverseLava(),
                 unit.hasAbilityActive("Made of Water"),
             );
         } else {
@@ -338,7 +334,7 @@ export class MoveHandler {
                 unit.getId(),
                 unit.getTeam(),
                 unit.getAttackRange(),
-                unit.hasAbilityActive("Made of Fire"),
+                unit.canTraverseLava(),
                 unit.hasAbilityActive("Made of Water"),
             );
         }
