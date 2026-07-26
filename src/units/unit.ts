@@ -68,6 +68,8 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
     "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword"]),
+    "Basic Tome of Battle Magic": new Set(["Fire Strike", "Meteorite"]),
+    "Tome of Elements": new Set(["Whirlpool", "Lightning Strike", "Ring of Fire", "Meteor Shower"]),
     "Blacksmith Tools": new Set(["Craft"]),
     Enchants: new Set(["Armor Rune", "Weapon Rune"]),
 };
@@ -600,6 +602,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public resetTarget(): void {
         this.unitProperties.target = this.initialUnitProperties.target;
     }
+    public getForbiddenTarget(): string {
+        return this.unitProperties.forbidden_target;
+    }
+    public setForbiddenTarget(forbiddenTargetUnitId: string): void {
+        this.unitProperties.forbidden_target = forbiddenTargetUnitId;
+    }
+    public resetForbiddenTarget(): void {
+        this.unitProperties.forbidden_target = "";
+    }
+    /**
+     * True when Terrifying Gaze bars this unit from touching `enemyUnitId` — both its own attacks and its
+     * retaliation. Every attack/response gate and every AI target filter routes through here, so the rule
+     * lives in exactly one place. The inverse of the `getTarget()` (Aggr) checks that sit beside it.
+     */
+    public cannotAttackUnitId(enemyUnitId: string): boolean {
+        const forbidden = this.unitProperties.forbidden_target;
+        return !!forbidden && forbidden === enemyUnitId;
+    }
     public getAbilities(): Ability[] {
         if (this.hasEffectActive("Break")) {
             return [];
@@ -694,6 +714,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.applied_effects.push(effect.getName());
             this.unitProperties.applied_effects_laps.push(effect.getLaps());
             this.unitProperties.applied_effects_powers.push(effect.getPower());
+            // Index-parallel to applied_effects; the sidebar draws it as a small count badge over the
+            // effect icon. Not part of the length guards above so an older snapshot without it still loads.
+            (this.unitProperties.applied_effects_stacks ??= []).push(effect.getStacks());
             this.unitProperties.applied_effects_descriptions.push(
                 effect.getDesc().replace(/\{\}/g, effect.getPower().toString()),
             );
@@ -727,6 +750,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     this.unitProperties.applied_effects_laps.splice(i, 1);
                     this.unitProperties.applied_effects_descriptions.splice(i, 1);
                     this.unitProperties.applied_effects_powers.splice(i, 1);
+                    this.unitProperties.applied_effects_stacks?.splice(i, 1);
                 }
             }
         }
@@ -744,6 +768,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.applied_effects_laps.splice(i, 1);
                 this.unitProperties.applied_effects_descriptions.splice(i, 1);
                 this.unitProperties.applied_effects_powers.splice(i, 1);
+                this.unitProperties.applied_effects_stacks?.splice(i, 1);
             }
         }
     }
@@ -1300,8 +1325,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public setWebMovementLocked(locked: boolean): void {
         this.unitProperties.web_movement_locked = locked;
     }
+    /**
+     * Whether the unit may leave the cells it stands on. A unit that cannot move is NOT stunned: it still
+     * takes its turn, still attacks whatever it can already reach, and still retaliates (see the
+     * !canMove() branch of the attack-cell search) — it simply has nowhere to step.
+     */
     public canMove(): boolean {
-        return !this.hasEffectActive("Paralysis") && !this.isWebMovementLocked();
+        return !this.hasEffectActive("Paralysis") && !this.hasDebuffActive("Whirlpool") && !this.isWebMovementLocked();
     }
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
@@ -1718,11 +1748,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
+        // Guiding Winds (Dryad) is a flat percentage of the affected archer's BASE shot distance, not
+        // stack-powered — the same treatment as Rallying Volley above, so the tooltip and the applied
+        // bonus are both the configured number.
+        if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE) {
+            return auraEffect.getPower();
+        }
+
         const madeOfFireBuff = this.getBuff("Made of Fire");
 
         if (
             auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE ||
             auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
+            auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE ||
             auraEffect.getPowerType() === AbilityPowerType.ABSORB_DEBUFF
         ) {
             calculatedCoeff +=
@@ -2335,6 +2373,52 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return buffProperties;
     }
+    /**
+     * Moves ONE applied buff off `from` and onto this unit, carrying its power, the laps it has LEFT and
+     * its rendered description across. Borrowed Grace (Monk) takes a blessing rather than copying it, so
+     * the entry has to survive the move intact — rebuilding it from configuration would hand back a full
+     * duration and lose any cast-time power (a Tome-amplified buff, an artifact's `;primary;secondary`
+     * suffix). An identically named buff already on the thief is replaced, never doubled.
+     */
+    public takeBuffFrom(from: Unit, buffName: string): boolean {
+        const applied = from.getBuff(buffName);
+        if (!applied) {
+            return false;
+        }
+        if (
+            from.unitProperties.applied_buffs.length !== from.unitProperties.applied_buffs_laps.length ||
+            from.unitProperties.applied_buffs.length !== from.unitProperties.applied_buffs_descriptions.length ||
+            from.unitProperties.applied_buffs.length !== from.unitProperties.applied_buffs_powers.length
+        ) {
+            return false;
+        }
+        const index = from.unitProperties.applied_buffs.indexOf(buffName);
+        if (index < 0) {
+            return false;
+        }
+
+        const laps = from.unitProperties.applied_buffs_laps[index];
+        const description = from.unitProperties.applied_buffs_descriptions[index];
+        const power = from.unitProperties.applied_buffs_powers[index];
+
+        from.deleteBuff(buffName);
+        this.deleteBuff(buffName);
+        this.buffs.push(
+            new AppliedSpell(
+                buffName,
+                applied.getPower(),
+                applied.getLaps(),
+                applied.getFirstSpellProperty(),
+                applied.getSecondSpellProperty(),
+            ),
+        );
+        this.unitProperties.applied_buffs.push(buffName);
+        this.unitProperties.applied_buffs_laps.push(laps);
+        this.unitProperties.applied_buffs_descriptions.push(description);
+        this.unitProperties.applied_buffs_powers.push(power);
+
+        return true;
+    }
     public applyDebuff(
         debuff: Spell,
         firstDebuffProperty?: number,
@@ -2454,6 +2538,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // target
         if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
+        }
+        // ...and its inverse: the fright wears off with the effect that caused it.
+        if (!this.hasEffectActive("Terrifying Gaze")) {
+            this.resetForbiddenTarget();
         }
 
         // HP
@@ -2776,6 +2864,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
             }
 
+            // Serene Mind (Monk): the same fixed magic armor as Magic Shield, one more independent roll.
+            const sereneMindAbility = this.getAbility("Serene Mind");
+            if (sereneMindAbility) {
+                magicResists.push(this.calculateAbilityMultiplier(sereneMindAbility, synergyAbilityPowerIncrease));
+            }
+
+            // AURA Warding Mane (Manticore): magic armor for every ally within 2 cells. Folded in as one more
+            // INDEPENDENT resistance roll rather than added to magic_resist, so it composes with Magic Shield
+            // and Wardguard the same way those compose with each other and can never push the unit to a flat
+            // 100% immunity. calculateAuraPower already returned it stack-powered, as a percentage.
+            const wardingManeAura = this.getAppliedAuraEffect("Warding Mane Aura");
+            if (wardingManeAura) {
+                magicResists.push(Math.max(0, wardingManeAura.getPower()) / 100);
+            }
+
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);
         }
 
@@ -2860,6 +2963,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const newSteps = this.unitProperties.steps - windFlowBuff.getPower();
             this.unitProperties.steps = Math.max(1, newSteps);
         }
+        // Vine Throw (Trent / Grove Spellbook): the struck creature is snared by the vine and loses a flat
+        // slice of its movement. Flat like Wind Flow rather than a percentage like Quagmire, so it bites
+        // hardest on the slow creatures the vine is meant to pin down.
+        const vineThrowDebuff = this.getDebuff("Vine Throw");
+        if (vineThrowDebuff) {
+            this.unitProperties.steps = Math.max(1, this.unitProperties.steps - vineThrowDebuff.getPower());
+        }
 
         const quagmireDebuff = this.getDebuff("Quagmire");
         const hamstrungDebuff = this.getDebuff("Hamstrung");
@@ -2937,6 +3047,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
             this.unitProperties.shot_distance += roundUnitStat(
                 (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
+                2,
+            );
+        }
+
+        // AURA Guiding Winds (Dryad): ranged allies within 2 cells shoot +% further. Same shape as the
+        // Farsight Quiver above — added off the INITIAL shot_distance so it neither compounds with Sniper
+        // Augment nor with the quiver, and so it self-reverts the moment the archer leaves the aura
+        // (shot_distance is rebuilt from initialUnitProperties on every pass).
+        const guidingWindsAura = this.getAppliedAuraEffect("Guiding Winds Aura");
+        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && guidingWindsAura) {
+            this.unitProperties.shot_distance += roundUnitStat(
+                (this.initialUnitProperties.shot_distance / 100) * guidingWindsAura.getPower(),
                 2,
             );
         }
@@ -3167,7 +3289,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             const baseCell = this.getBaseCell();
 
-            // Immobilized (this branch runs only when !canMove(), i.e. Paralysis): the unit cannot
+            // Immobilized (this branch runs only when !canMove(), i.e. Paralysis / Whirlpool): the unit cannot
             // step anywhere, so the ONLY valid cell to strike from is where it currently stands. The
             // valid attack-from anchors are therefore the unit's own current cells — not the ring of
             // cells around it. (Previously small units used getCellsAroundCell + an unconditional

@@ -92,6 +92,28 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Vine Throw": {
+            "name": "Vine Throw",
+            "level": 0,
+            "desc": [
+                "Hurls a vine at an enemy in line of sight, leaving it across every cell on the way.",
+                "A non-flying creature pays 1 extra step to cross a vined cell.",
+                "The struck creature also loses 1.5 steps.",
+                "Lasts 2 laps."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 1.5,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 2,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Battle Roar": {
             "name": "Battle Roar",
             "level": 0,
@@ -910,6 +932,48 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Fire Strike": {
+            "name": "Fire Strike",
+            "level": 1,
+            "desc": [
+                "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
+                "Damage = creatures alive x stack power x 0.8.",
+                "Magical: it ignores armor, but magic resistance cuts it down."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 0.8,
+            "power_type": "COMMON",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Meteorite": {
+            "name": "Meteorite",
+            "level": 2,
+            "desc": [
+                "Calls a meteorite down on any 2x2 block of the battlefield.",
+                "Every enemy caught under it takes {} damage.",
+                "Same formula as Fire Strike less 40%, because it strikes them all at once."
+            ],
+            "target": "FREE_CELL",
+            "power": 0.48,
+            "power_type": "COMMON",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 5,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Nature": {
@@ -926,6 +990,91 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Whirlpool": {
+            "name": "Whirlpool",
+            "level": 1,
+            "desc": [
+                "Opens a churning vortex under an enemy and chains it to the spot.",
+                "The creature cannot move at all — it may still attack and retaliate.",
+                "Lasts 1 lap."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Lightning Strike": {
+            "name": "Lightning Strike",
+            "level": 1,
+            "desc": [
+                "Calls a bolt down on any enemy on the battlefield, dealing {} damage.",
+                "It falls out of the sky, so no wall, body or mountain can block it.",
+                "Damage = creatures alive x stack power x 60.",
+                "Magical: it ignores armor, but magic resistance cuts it down."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 60,
+            "power_type": "COMMON",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Ring of Fire": {
+            "name": "Ring of Fire",
+            "level": 2,
+            "desc": [
+                "Bursts into flame around an enemy in line of sight, dealing {} damage.",
+                "Every unit on a cell touching the target — friend or foe — burns for the same amount.",
+                "Same formula as Lightning Strike less 20%."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 48,
+            "power_type": "COMMON",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 4,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Meteor Shower": {
+            "name": "Meteor Shower",
+            "level": 2,
+            "desc": [
+                "Rains meteors down on any 3x3 block of the battlefield.",
+                "Every enemy caught under it takes {} damage.",
+                "Same formula as Ring of Fire less 10%, because it strikes them all at once."
+            ],
+            "target": "FREE_CELL",
+            "power": 43.2,
+            "power_type": "COMMON",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 5,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
@@ -1063,6 +1212,29 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Fire Wall": {
+            "name": "Fire Wall",
+            "level": 2,
+            "desc": [
+                "Lays a burning wall across 3 cells in a straight line, in any of the four orientations.",
+                "Hold Shift while aiming to rotate it.",
+                "Entering a burning cell costs any creature 1 extra step (double the usual cost)",
+                "and sears it for 25% of its maximum health, friend or foe alike.",
+                "Lasts 3 laps."
+            ],
+            "target": "FREE_CELL",
+            "power": 25,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 4,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0

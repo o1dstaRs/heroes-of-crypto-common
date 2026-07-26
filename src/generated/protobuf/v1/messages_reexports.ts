@@ -113,3 +113,4 @@ import * as m_unit from "./unit";
 export const UnitData = m_unit.PBTypes.UnitData;
 export type UnitData = InstanceType<typeof m_unit.PBTypes.UnitData>;
 export type UnitDataObject = ReturnType<InstanceType<typeof m_unit.PBTypes.UnitData>["toObject"]>;
+

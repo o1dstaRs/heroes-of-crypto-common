@@ -18,6 +18,7 @@ import type { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import type { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
 import { SpellPowerType, SpellTargetType } from "./spell_properties";
+import { vinePathCells } from "./vines";
 
 const verifyEmptyCell = (gridMatrix: number[][], emptyGridCell?: XY): boolean => {
     if (!emptyGridCell) {
@@ -155,6 +156,48 @@ export function canMassCastSpell(
     }
 
     return canBeCasted;
+}
+
+/** Minimal grid surface the line-of-sight walk needs, mirroring ISmokeGrid for the same reason. */
+export interface ISpellSightGrid {
+    getOccupantUnitId(cell: XY): string | undefined;
+}
+
+/**
+ * Is the straight line from `from` to `to` clear enough for a THROWN spell to reach its target?
+ *
+ * The rule an archer's shot obeys: everything strictly BETWEEN the two cells must be clear. The target stands
+ * on the last cell of the walk, and the caster's own cell is excluded by the walk itself. Lava ("L") and water
+ * ("W") are open ground a projectile flies over; a body or the centre mountain is not. Distance is deliberately
+ * NOT considered — a spell has no shot range, so what the caster can SEE is the whole limit.
+ *
+ * `vinePathCells` supplies the walk: it is the same supercover line the range-attack blocker check uses, so a
+ * thrown spell crosses exactly the cells the player watched the aim line pass over.
+ *
+ * Shared by the engine's Fire Strike cast, the AI's candidate enumeration and the client's aim preview for the
+ * same reason isSmokeableCell is shared: three copies of a targeting rule is three chances to promise a cast
+ * the engine then refuses.
+ */
+export function isSpellLineOfSightClear(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+): boolean {
+    const pathCells = vinePathCells(from, to);
+    if (!pathCells.length) {
+        return false;
+    }
+    for (const cell of pathCells.slice(0, -1)) {
+        if (!isWithinGrid(cell)) {
+            return false;
+        }
+        const occupant = grid.getOccupantUnitId(cell);
+        if (occupant && occupant !== "L" && occupant !== "W") {
+            return false;
+        }
+    }
+    return true;
 }
 
 export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {
@@ -445,8 +488,39 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
     return mirrorPower;
 };
 
+/**
+ * The Magic Dragon's passive "Magic Mirror" ability, as a CHANCE in 0..100 (0 when the unit has no such
+ * ability, or while it is Broken).
+ *
+ * Deliberately separate from getMagicMirrorPower: the BUFF's power is a share of the damage (30% back) that
+ * is also re-used as the debuff-reflection probability, whereas the ability's power is only ever a
+ * probability — what it rebounds is the whole spell. Folding them into one number would make an 80% ability
+ * silently reflect 80% of the damage as well.
+ */
+export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
+    if (!targetUnit.hasAbilityActive("Magic Mirror")) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.floor(targetUnit.getAbilityPower("Magic Mirror"))));
+};
+
+/**
+ * Whether an incoming spell rebounds off `targetUnit` WHOLE — damage and effects both, landing on the caster
+ * IN ADDITION to landing on the holder, which is hit in full either way. Only the passive ability rebounds
+ * the whole spell; the Magic Mirror buff keeps its own partial behaviour.
+ */
+export const reboundsSpell = (targetUnit: Unit): boolean => {
+    const chance = getMagicMirrorAbilityChance(targetUnit);
+
+    return chance > 0 && getRandomInt(0, 100) < chance;
+};
+
 export const isMirrored = (targetUnit: Unit): boolean => {
-    return getRandomInt(0, 100) < Math.floor(getMagicMirrorPower(targetUnit));
+    // Either source can send a debuff back: the buff at its own power, the passive ability at its chance.
+    const chance = Math.max(getMagicMirrorPower(targetUnit), getMagicMirrorAbilityChance(targetUnit));
+
+    return getRandomInt(0, 100) < Math.floor(chance);
 };
 
 export const hasAlreadyAppliedSpell = (targetUnit: Unit, spell: Spell): boolean => {

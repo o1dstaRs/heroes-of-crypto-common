@@ -24,7 +24,12 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(1, [], [], [])).toBe(true);
         expect(canBanCreatureLevel(2, [], [], [])).toBe(true);
         expect(canBanCreatureLevel(2, levelTwo.slice(0, 2), [], [])).toBe(true);
-        expect(canBanCreatureLevel(2, levelTwo.slice(0, 10), [], [])).toBe(false);
+        // Re-pinned after Trent joined the Nature L2 catalog: the pool grew by one, so the ban that used to
+        // strand a pick is now the 11th rather than the 10th. Re-pinned again for the Chaos L2 Manticore —
+        // 12th now. Re-pinned again for the Might L2 Battle Mage — 13th now. Re-pinned back to the 12th after
+        // Zena (50) moved from Might L2 to Might L3, shrinking the L2 pool 17 -> 16.
+        expect(canBanCreatureLevel(2, levelTwo.slice(0, 11), [], [])).toBe(true);
+        expect(canBanCreatureLevel(2, levelTwo.slice(0, 12), [], [])).toBe(false);
         expect(canBanCreatureLevel(4, [], [], [])).toBe(true);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 8), [], [])).toBe(true);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 9), [], [])).toBe(true);
@@ -42,8 +47,8 @@ describe("pick_helper", () => {
         expect(canBanCreatureLevel(1, levelOne.slice(0, 11), [], [])).toBe(true);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 12), [], [])).toBe(false);
         expect(canBanCreatureLevel(1, levelOne.slice(0, 13), [], [])).toBe(false);
-        // L4 now has a 12-creature pool after enabling Arachna Queen. Both teams reserve one pick,
-        // so a 10th ban is legal with 9 already banned; an 11th is refused with 10 already banned.
+        // L4 still has a 12-creature pool: Arachna Queen and Magic Dragon in, Pegasus out to L3. Both teams
+        // reserve one pick, so a 10th ban is legal with 9 already banned; an 11th is refused with 10 banned.
         expect(canBanCreatureLevel(4, levelFour.slice(0, 4), [], [])).toBe(true);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 8), [], [])).toBe(true);
         expect(canBanCreatureLevel(4, levelFour.slice(0, 9), [], [])).toBe(true);

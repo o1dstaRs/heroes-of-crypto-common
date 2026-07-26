@@ -413,21 +413,25 @@ export class AttackHandler {
                     }
                 }
 
+                // The "already applied" guard has to look at the unit that is about to RECEIVE the mirrored
+                // copy — the attacker — not at the one that just took the original. Reading it off
+                // debuffTarget made this branch dead code: the debuff is applied to debuffTarget a few lines
+                // above, so the check was always true and no debuff was ever mirrored. The mass-cast path in
+                // GameActionEngine already checks the caster; this now matches it.
                 if (
                     currentActiveSpell.getPowerType() !== SpellPowerType.POSITION_CHANGE &&
                     SpellHelper.isMirrored(debuffTarget) &&
-                    !SpellHelper.hasAlreadyAppliedSpell(debuffTarget, currentActiveSpell) &&
+                    !SpellHelper.hasAlreadyAppliedSpell(attackerUnit, currentActiveSpell) &&
                     !(
                         currentActiveSpell.getPowerType() === SpellPowerType.MIND &&
                         attackerUnit.hasMindAttackResistance()
                     )
                 ) {
-                    attackerUnit.applyDebuff(
-                        currentActiveSpell,
-                        undefined,
-                        undefined,
-                        attackerUnit.getId() === targetUnit.getId(),
-                    );
+                    // Extended, always. A mirrored debuff lands on the unit whose turn is ending THIS
+                    // instant, so without the extra lap a 1-lap debuff (Whirlpool) would be consumed by the
+                    // caster's own completeTurn and the mirror would do nothing at all. This is the same
+                    // reason a self-cast gets the +1 — see the `extend` argument of applyDebuff.
+                    attackerUnit.applyDebuff(currentActiveSpell, undefined, undefined, true);
                     mirroredStr = `${debuffTarget.getName()} mirrored ${currentActiveSpell.getName()} to ${attackerUnit.getName()} for ${HoCLib.getLapString(
                         laps,
                     )}`;
@@ -598,6 +602,11 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
+        // ...and the inverse: Terrifying Gaze bars this one enemy while leaving every other target open.
+        if (attackerUnit.cannotAttackUnitId(targetUnit.getId())) {
+            return { completed: false, unitIdsDied, animationData };
+        }
+
         // Track initial amount for kill counting
         // let initialAmountAlive = targetUnit.getAmountAlive();
 
@@ -711,6 +720,19 @@ export class AttackHandler {
 
         targetUnitUndex++;
 
+        // ABILITY Absolving Arrow (Monk): the arrow cleanses the ALLIES it flies through on its way to the
+        // target. Resolved here — after every gate that can still cancel the shot (Hidden, a forced or
+        // forbidden target, Cowardice, a missing divisor), so a rejected action cannot hand out free
+        // cleanses — but before the miss roll, because the arrow crosses its own line either way.
+        AllAbilities.processAbsolvingArrowAbility(
+            attackerUnit,
+            hoverRangeAttackPosition,
+            unitsHolder.getAllUnits(),
+            this.grid,
+            this.gridSettings,
+            this.sceneLog,
+        );
+
         animationData.push({
             fromPosition: attackerUnit.getPosition(),
             toPosition: hoverRangeAttackPosition,
@@ -744,7 +766,8 @@ export class AttackHandler {
                 targetUnit.hasDebuffActive("Cowardice") &&
                 targetUnit.getCumulativeHp() < rangeResponseUnit.getCumulativeHp()
             ) &&
-            (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId())
+            (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId()) &&
+            !targetUnit.cannotAttackUnitId(attackerUnit.getId())
         ) {
             isResponseMissed =
                 HoCLib.getRandomInt(0, 100) <
@@ -754,6 +777,16 @@ export class AttackHandler {
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(rangeResponseUnit.getTeam()),
                 );
+            // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
+            // IT flies past (same rule as the initiating shot above).
+            AllAbilities.processAbsolvingArrowAbility(
+                targetUnit,
+                attackerUnit.getPosition(),
+                unitsHolder.getAllUnits(),
+                this.grid,
+                this.gridSettings,
+                this.sceneLog,
+            );
             animationData.push({
                 fromPosition: targetUnit.getPosition(),
                 toPosition: attackerUnit.getPosition(),
@@ -1008,6 +1041,9 @@ export class AttackHandler {
                 if (pegasusLightEffect) {
                     targetUnitPlusMorale += pegasusLightEffect.getPower();
                 }
+                // A counter-shot is a hit like any other: the responder's poison aura applies with the roles
+                // swapped, exactly as it does on its own turn. Same fix as the melee response path below.
+                AllAbilities.processPoisonAuraAbility(targetUnit, rangeResponseUnit, damageFromResponse, this.sceneLog);
             }
 
             AllAbilities.processOneInTheFieldAbility(targetUnit);
@@ -1141,6 +1177,9 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
+                // ABILITY Borrowed Grace (Monk): a landed shot takes one active buff off the target and
+                // wears it. An on-hit rider like the ones above — a missed or lethal shot takes nothing.
+                AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog);
             }
             if (recordPrimaryTargetDeath()) {
                 switchTargetUnit = true;
@@ -1205,6 +1244,9 @@ export class AttackHandler {
                         this.grid,
                         this.sceneLog,
                     );
+                    // A Monk that shoots BACK steals just the same — the theft rides the landed shot, not
+                    // the initiative (mirrors Predatory Assimilation's response branch).
+                    AllAbilities.processBorrowedGraceAbility(targetUnit, rangeResponseUnit, this.sceneLog);
                     if (rangeResponseUnit.isDead()) {
                         if (!unitIdsDied.includes(rangeResponseUnit.getId())) {
                             this.sceneLog.updateLog(`${rangeResponseUnit.getName()} died`);
@@ -1413,6 +1455,11 @@ export class AttackHandler {
             forcedTargetUnitId &&
             forcedTargetUnitId !== targetUnit.getId()
         ) {
+            return { completed: false, unitIdsDied, animationData };
+        }
+
+        // ...and the inverse: Terrifying Gaze bars this one enemy while leaving every other target open.
+        if (attackerUnit.cannotAttackUnitId(targetUnit.getId())) {
             return { completed: false, unitIdsDied, animationData };
         }
 
@@ -1762,7 +1809,8 @@ export class AttackHandler {
                     targetUnit.hasDebuffActive("Cowardice") &&
                     targetUnit.getCumulativeHp() < attackerUnit.getCumulativeHp()
                 ) &&
-                (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId())
+                (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId()) &&
+                !targetUnit.cannotAttackUnitId(attackerUnit.getId())
             ) {
                 const isResponseMissed =
                     HoCLib.getRandomInt(0, 100) <
@@ -1971,6 +2019,10 @@ export class AttackHandler {
                             });
                         }
                     }
+                    // A response is a hit like any other, so every on-hit rider the responder owns fires with
+                    // the roles swapped — including its poison aura. Left out originally, which made an
+                    // aura'd unit poison only on its own turn and not when it struck back.
+                    AllAbilities.processPoisonAuraAbility(targetUnit, attackerUnit, damageFromResponse, this.sceneLog);
                     AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
@@ -2057,6 +2109,7 @@ export class AttackHandler {
             );
             AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+            AllAbilities.processTerrifyingGazeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             {
                 const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
                     attackerUnit,
@@ -2216,6 +2269,7 @@ export class AttackHandler {
                 );
                 AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processTerrifyingGazeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 {
                     const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
                         attackerUnit,

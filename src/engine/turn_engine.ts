@@ -211,6 +211,20 @@ export class TurnEngine {
                 events.push({ type: "smoke_expired", cells: expiredSmoke });
             }
 
+            // Vine Throw: same lap accounting as smoke above — wither the vines whose budget ran out and let
+            // the client drop their visuals.
+            const expiredVines = this.fightProperties.getVines().minusAllLaps();
+            if (expiredVines.length > 0) {
+                events.push({ type: "vine_expired", cells: expiredVines });
+            }
+
+            // Fire Wall: same lap accounting again — burn out the walls whose budget ran out and let the
+            // client drop their visuals.
+            const expiredFireWalls = this.fightProperties.getFireWalls().minusAllLaps();
+            if (expiredFireWalls.length > 0) {
+                events.push({ type: "fire_wall_expired", cells: expiredFireWalls });
+            }
+
             const gridType = this.fightProperties.getGridType();
             const meltable = gridType === PBTypes.GridVals.LAVA_CENTER || gridType === PBTypes.GridVals.WATER_CENTER;
             if (

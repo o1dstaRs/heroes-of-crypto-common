@@ -91,6 +91,10 @@ export enum SpellMultiplierType {
     UNIT_AMOUNT = 2,
     UNIT_AMOUNT_POWER = 3,
     UNIT_CUMULATIVE_MAX_HP = 4,
+    // Damage scaled by BOTH the caster's surviving head-count and its stack power (see
+    // calculateStackPoweredSpellDamage). Used by the Battle Mage's offensive spells: a full stack throws a
+    // real fireball, a nearly-dead one barely a spark, so the spell decays with the stack that carries it.
+    UNIT_AMOUNT_STACK_POWER = 5,
 }
 
 export const AllSpellMultiplierTypes = [
@@ -98,6 +102,7 @@ export const AllSpellMultiplierTypes = [
     SpellMultiplierType.UNIT_AMOUNT,
     SpellMultiplierType.UNIT_AMOUNT_POWER,
     SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
+    SpellMultiplierType.UNIT_AMOUNT_STACK_POWER,
 ];
 
 export type AllSpellMultiplierType = (typeof AllSpellMultiplierTypes)[number];
@@ -108,6 +113,7 @@ export const ToSpellMultiplierType: { [spellMultiplierTypeName: string]: SpellMu
     UNIT_AMOUNT: SpellMultiplierType.UNIT_AMOUNT,
     UNIT_AMOUNT_POWER: SpellMultiplierType.UNIT_AMOUNT_POWER,
     UNIT_CUMULATIVE_MAX_HP: SpellMultiplierType.UNIT_CUMULATIVE_MAX_HP,
+    UNIT_AMOUNT_STACK_POWER: SpellMultiplierType.UNIT_AMOUNT_STACK_POWER,
 };
 
 export class SpellProperties {

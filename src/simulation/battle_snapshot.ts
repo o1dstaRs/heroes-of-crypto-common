@@ -183,6 +183,14 @@ const FIGHT_FIELDS = [
     // fight, which is exactly the leak the lookahead's "search does not mutate live state" test asserts.
     // Safe to deep-clone: SmokeClouds holds only a Map of plain cells + lap counters.
     "smokeClouds",
+    // Cell-resident vines (Trent's Vine Throw). Captured for exactly the same reason as smokeClouds above:
+    // the turn engine decrements it per lap, so a rollout that laid or withered a vine would otherwise leak
+    // that into the live fight. Safe to deep-clone: Vines holds only a Map of plain cells + lap counters.
+    "vines",
+    // Cell-resident fire walls (Nightmare's Book of Nightmares). Same reasoning again: the turn engine
+    // decrements it per lap and a rollout that lit or burnt out a wall would otherwise leak into the live
+    // fight. Safe to deep-clone: FireWalls holds only a Map of plain cells + lap counters.
+    "fireWalls",
 ] as const;
 
 /** The mutable UnitsHolder caches (derived, but snapshotted so restore is byte-for-byte). */

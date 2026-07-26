@@ -1,5 +1,7 @@
+export * from "./absolving_arrow_ability";
 export * from "./aggr_ability";
 export * from "./aoe_range_ability";
+export * from "./borrowed_grace_ability";
 export * from "./blindness_ability";
 export * from "./boar_saliva_ability";
 export * from "./chain_lightning_ability";
@@ -32,4 +34,5 @@ export * from "./shatter_armor_ability";
 export * from "./skewer_strike_ability";
 export * from "./spit_ball_ability";
 export * from "./stun_ability";
+export * from "./terrifying_gaze_ability";
 export * from "./through_shot_ability";

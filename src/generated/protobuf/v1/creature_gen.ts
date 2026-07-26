@@ -33,7 +33,7 @@ export const CreatureLevels: Record<number, number> = {
   "27": 3,
   "28": 3,
   "29": 4,
-  "30": 4,
+  "30": 3,
   "31": 1,
   "32": 1,
   "33": 1,
@@ -53,7 +53,14 @@ export const CreatureLevels: Record<number, number> = {
   "47": 1,
   "48": 1,
   "49": 1,
-  "50": 2
+  "50": 3,
+  "51": 2,
+  "52": 2,
+  "53": 2,
+  "54": 3,
+  "55": 2,
+  "56": 3,
+  "57": 4
 };
 export const CreatureFactions: Record<number, number> = {
   "0": 0,
@@ -106,7 +113,14 @@ export const CreatureFactions: Record<number, number> = {
   "47": 3,
   "48": 4,
   "49": 1,
-  "50": 2
+  "50": 2,
+  "51": 2,
+  "52": 3,
+  "53": 1,
+  "54": 4,
+  "55": 4,
+  "56": 1,
+  "57": 3
 };
 export const CreatureByLevel: number[][] = [
   [
@@ -144,7 +158,10 @@ export const CreatureByLevel: number[][] = [
     34,
     35,
     36,
-    50
+    51,
+    52,
+    53,
+    55
   ],
   [
     7,
@@ -153,8 +170,12 @@ export const CreatureByLevel: number[][] = [
     18,
     27,
     28,
+    30,
     37,
-    38
+    38,
+    50,
+    54,
+    56
   ],
   [
     9,
@@ -162,12 +183,12 @@ export const CreatureByLevel: number[][] = [
     19,
     20,
     29,
-    30,
     39,
     40,
     41,
     42,
     43,
-    44
+    44,
+    57
   ]
 ];

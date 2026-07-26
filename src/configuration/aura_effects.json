@@ -11,7 +11,7 @@
     "Poison Cloud": {
         "name": "Poison Cloud",
         "range": 2,
-        "desc": "Affected allies apply {}% of their attack damage to the target as Poison.",
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +35% poison damage per stack.",
         "power": 15,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
@@ -60,7 +60,7 @@
         "name": "Pegasus Might",
         "range": 2,
         "desc": "Allies within range gain +{} base attack and armor.",
-        "power": 3,
+        "power": 2,
         "is_buff": true,
         "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR"
     },
@@ -111,5 +111,29 @@
         "power": 2,
         "is_buff": true,
         "power_type": "ADDITIONAL_RANGE_SHOTS"
+    },
+    "Guiding Winds": {
+        "name": "Guiding Winds",
+        "range": 2,
+        "desc": "Ranged allies within range gain +{}% shot distance.",
+        "power": 30,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_SHOT_DISTANCE_PERCENTAGE"
+    },
+    "Venom Cloud": {
+        "name": "Venom Cloud",
+        "range": 2,
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +35% poison damage per stack.",
+        "power": 15,
+        "is_buff": true,
+        "power_type": "POISON_ON_HIT"
+    },
+    "Warding Mane": {
+        "name": "Warding Mane",
+        "range": 2,
+        "desc": "Affected allies gain {}% resistance to all magical attacks and debuffs.",
+        "power": 20,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"
     }
 }

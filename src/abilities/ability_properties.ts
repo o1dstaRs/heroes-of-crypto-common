@@ -70,6 +70,28 @@ export enum AbilityPowerType {
     HAMSTRING = 57,
     ABSORB_FIRST_HIT = 58,
     ADDITIONAL_RANGE_SHOTS = 59,
+    VINE_STRIDE = 60,
+    // Aura-only magic armor. Unlike the fixed MAGIC_RESIST_25/50/100 abilities, this is a stack-powered
+    // percentage folded into the holder's own magic resist as an independent resistance roll.
+    ADDITIONAL_MAGIC_RESIST_PERCENTAGE = 61,
+    // Takes an active (spell-cast) buff off the unit that was just shot and wears it for the rest of its
+    // duration. Auras, artifacts and augments are not takeable — see borrowed_grace_ability.ts.
+    STEAL_BUFF = 62,
+    // Lifts negative effects off the ALLIES a shot flies through, on the way to the enemy it was aimed at.
+    DISPEL_ON_TRAJECTORY = 63,
+    // A CHANCE (not a share) to rebound an incoming spell whole. Unlike the Magic Mirror BUFF, which sends a
+    // percentage of the damage back, the roll here is all-or-nothing and returns the spell entire. It does NOT
+    // shield the holder: the spell still lands on it in full, and the caster takes the same damage and effects
+    // on top.
+    MAGIC_MIRROR_REFLECT = 64,
+    // Aura-only shot range. A percentage added onto the affected archer's BASE shot_distance, the same
+    // shape as the Farsight Quiver artifact — it pushes the range-falloff threshold out rather than
+    // removing falloff.
+    ADDITIONAL_SHOT_DISTANCE_PERCENTAGE = 65,
+    // Throws a vine that both paints the board and snares. The behaviour lives in the cast
+    // (action_engine.vineThrowCast) rather than in a stat hook, but the type still has to be declared:
+    // every ability config is asserted to carry a non-zero power type.
+    VINE_THROW = 66,
 }
 
 export const AllAbilityPowerTypes = [
@@ -133,6 +155,13 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.HAMSTRING,
     AbilityPowerType.ABSORB_FIRST_HIT,
     AbilityPowerType.ADDITIONAL_RANGE_SHOTS,
+    AbilityPowerType.VINE_STRIDE,
+    AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE,
+    AbilityPowerType.STEAL_BUFF,
+    AbilityPowerType.DISPEL_ON_TRAJECTORY,
+    AbilityPowerType.MAGIC_MIRROR_REFLECT,
+    AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
+    AbilityPowerType.VINE_THROW,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -199,6 +228,13 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     HAMSTRING: AbilityPowerType.HAMSTRING,
     ABSORB_FIRST_HIT: AbilityPowerType.ABSORB_FIRST_HIT,
     ADDITIONAL_RANGE_SHOTS: AbilityPowerType.ADDITIONAL_RANGE_SHOTS,
+    VINE_STRIDE: AbilityPowerType.VINE_STRIDE,
+    ADDITIONAL_MAGIC_RESIST_PERCENTAGE: AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE,
+    STEAL_BUFF: AbilityPowerType.STEAL_BUFF,
+    DISPEL_ON_TRAJECTORY: AbilityPowerType.DISPEL_ON_TRAJECTORY,
+    MAGIC_MIRROR_REFLECT: AbilityPowerType.MAGIC_MIRROR_REFLECT,
+    ADDITIONAL_SHOT_DISTANCE_PERCENTAGE: AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
+    VINE_THROW: AbilityPowerType.VINE_THROW,
 };
 
 export enum AbilityType {

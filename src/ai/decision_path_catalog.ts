@@ -43,6 +43,7 @@ export interface IDecisionPathSource {
         canFly?: boolean,
         isSmallUnit?: boolean,
         isMadeOfFire?: boolean,
+        hasVineStride?: boolean,
     ): IReadonlyMovePath;
 }
 
@@ -61,6 +62,9 @@ interface ICanonicalMovePathInput {
     canFly: boolean;
     isSmallUnit: boolean;
     isMadeOfFire: boolean;
+    // Part of the cache key: a vine strider walks the same board at different prices, so it must not be
+    // served a path canonicalised for a unit without the passive.
+    hasVineStride: boolean;
 }
 
 /**
@@ -177,6 +181,7 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         canFly = false,
         isSmallUnit = true,
         isMadeOfFire = false,
+        hasVineStride = false,
     ): IReadonlyMovePath {
         if (this.stats) this.stats.requests++;
         if (
@@ -190,6 +195,7 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 canFly,
                 isSmallUnit,
                 isMadeOfFire,
+                hasVineStride,
             )
         ) {
             if (this.stats) this.stats.bypasses++;
@@ -201,6 +207,7 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 canFly,
                 isSmallUnit,
                 isMadeOfFire,
+                hasVineStride,
             );
         }
         if (this.cached !== undefined) {
@@ -218,6 +225,7 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             canFly,
             isSmallUnit,
             isMadeOfFire,
+            hasVineStride,
         );
         return this.cached;
     }
@@ -250,6 +258,7 @@ function canonicalInput(grid: Grid, unit: Unit, matrix: number[][]): ICanonicalM
         canFly: unit.canFly(),
         isSmallUnit: unit.isSmallSize(),
         isMadeOfFire: unit.canTraverseLava(),
+        hasVineStride: unit.hasAbilityActive("In Its Own World"),
     };
 }
 
@@ -270,7 +279,8 @@ function sameCanonicalInput(left: ICanonicalMovePathInput, right: ICanonicalMove
         Object.is(left.maxSteps, right.maxSteps) &&
         left.canFly === right.canFly &&
         left.isSmallUnit === right.isSmallUnit &&
-        left.isMadeOfFire === right.isMadeOfFire
+        left.isMadeOfFire === right.isMadeOfFire &&
+        left.hasVineStride === right.hasVineStride
     );
 }
 
@@ -283,6 +293,7 @@ function matchesCanonicalRequest(
     canFly: boolean,
     isSmallUnit: boolean,
     isMadeOfFire: boolean,
+    hasVineStride: boolean,
 ): boolean {
     return (
         canonical.matrix === matrix &&
@@ -292,6 +303,7 @@ function matchesCanonicalRequest(
         Object.is(canonical.maxSteps, maxSteps) &&
         canonical.canFly === canFly &&
         canonical.isSmallUnit === isSmallUnit &&
-        canonical.isMadeOfFire === isMadeOfFire
+        canonical.isMadeOfFire === isMadeOfFire &&
+        canonical.hasVineStride === hasVineStride
     );
 }

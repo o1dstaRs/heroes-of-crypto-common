@@ -409,7 +409,14 @@ proto.PBTypes.CreatureVals = {
   DRYAD: 47,
   BLACKSMITH: 48,
   ASH_MOTH: 49,
-  ZENA: 50
+  ZENA: 50,
+  WYVERN: 51,
+  TRENT: 52,
+  MANTICORE: 53,
+  MONK: 54,
+  BATTLE_MAGE: 55,
+  NIGHTMARE: 56,
+  MAGIC_DRAGON: 57
 };
 
 

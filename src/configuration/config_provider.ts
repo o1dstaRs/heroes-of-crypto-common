@@ -506,3 +506,26 @@ export const AURA_EFFECT_NAMES: ReadonlySet<string> = new Set(
 
 /** True when `name` is an aura effect (continuous, radius-based) rather than a directly-applied one. */
 export const isAuraEffectName = (name: string): boolean => name.endsWith(" Aura") || AURA_EFFECT_NAMES.has(name);
+
+/**
+ * The aura EFFECT names whose power type is POISON_ON_HIT — "Venom Cloud" (Wyvern, 1 cell) and the
+ * 2-cell "Poison Cloud", which no creature carries since the Dryad traded it for Guiding Winds but
+ * which stays declared as the wide-radius variant. Derived from the config rather than hard-coded so a third poison
+ * aura only has to be declared in aura_effects.json: the on-hit poison path, the tooltip folding and
+ * the client description refresh all read this set instead of matching one literal name.
+ */
+export const POISON_ON_HIT_AURA_EFFECT_NAMES: ReadonlySet<string> = new Set(
+    Object.keys(auraEffectsJson).filter(
+        // @ts-ignore: we do not know the type here yet
+        (key) => key !== "version" && auraEffectsJson[key]?.power_type === "POISON_ON_HIT",
+    ),
+);
+
+/**
+ * The BUFF name each of those auras leaves on an affected ally. units_holder applies auras as
+ * `${effectName} Aura`, which also happens to be the owning ability's name, so this one set covers both
+ * `unit.getBuff(...)` lookups and `unit.getAbility(...)` lookups.
+ */
+export const POISON_ON_HIT_AURA_BUFF_NAMES: ReadonlySet<string> = new Set(
+    Array.from(POISON_ON_HIT_AURA_EFFECT_NAMES, (name) => `${name} Aura`),
+);

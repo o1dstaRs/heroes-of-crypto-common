@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { Grid } from "../grid/grid";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
@@ -78,6 +79,40 @@ export function dualStrikeCharmPercent(unit: Unit): number {
 
 export const abilityToTextureName = (abilityName: string): string =>
     `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
+
+/**
+ * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
+ * and the engine's own per-lap markers. They live in the same applied_buffs/applied_debuffs lists as real
+ * spells, so anything that moves or lifts an entry (Borrowed Grace, Absolving Arrow) has to skip them —
+ * an artifact is worn, not cast, and a marker is rewritten by the next stat recompute anyway.
+ *
+ * Aura-applied entries are NOT listed here: they are recognised by their Number.MAX_SAFE_INTEGER laps
+ * (see Unit.applyAuraEffect) and are likewise off limits, since the aura refresh would re-grant them.
+ */
+export function isEquipmentOrMarkerSpellName(name: string): boolean {
+    if (name.endsWith(" Augment")) {
+        return true;
+    }
+    if (ENGINE_MARKER_SPELL_NAMES.has(name)) {
+        return true;
+    }
+    return ARTIFACT_BUFF_NAMES.has(name);
+}
+
+const ARTIFACT_BUFF_NAMES: ReadonlySet<string> = new Set(
+    [...TIER1_ARTIFACT_LIST, ...TIER2_ARTIFACT_LIST].map((artifact) => artifact.buffName).filter((name) => !!name),
+);
+
+// Morale/Dismorale are lap-scoped turn state; Hidden/Visible, Angelic Host and Water Shield are re-seeded
+// by UnitsHolder on every refresh, so taking or lifting one would either do nothing or desync the seeder.
+const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
+    "Morale",
+    "Dismorale",
+    "Hidden",
+    "Visible",
+    "Angelic Host",
+    "Water Shield",
+]);
 
 function addToTargetList(
     ix: number,

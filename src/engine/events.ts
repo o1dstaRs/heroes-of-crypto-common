@@ -115,6 +115,17 @@ export type GameEvent =
            * many, and a heal that restored nothing has none.
            */
           healed?: { unitId: string; amount: number }[];
+          /**
+           * Damage a DAMAGING spell actually dealt, per unit — the mirror image of `healed` above, and read
+           * the same way: ranked rebuilds its scene log and its floating numbers from events, never from the
+           * engine's own text, so without this the Battle Mage's Fire Strike would read as a bare "cast Fire
+           * Strike on X" with nothing landing on the board.
+           *
+           * `position` is the victim's world position at the moment of impact, captured BEFORE applyDamage
+           * because a killed stack is removed before the visuals play. Fire Strike has one entry; Meteorite
+           * has one per enemy caught under its 2x2 (and none when it lands on empty ground).
+           */
+          damaged?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
       }
     // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
     // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.
@@ -123,4 +134,31 @@ export type GameEvent =
     | { type: "smoke_dispel"; cells: XY[] }
     // Lap transition decremented every cloud; these cells hit 0 laps and dispersed this tick.
     | { type: "smoke_expired"; cells: XY[] }
+    // Vine Throw: the vine laid from the caster to the target. `cells` is in throw order (nearest the caster
+    // first) so the client can animate the vine growing along the path; `targetId` is the snared creature.
+    | { type: "vine_placed"; casterId: string; targetId: string; cells: XY[]; lapsRemaining: number }
+    // Vines that withered on lap transition — the client drops their visuals.
+    | { type: "vine_expired"; cells: XY[] }
+    // Fire Wall: the three cells set alight by one cast, in wall order (so the client can light them up in
+    // sequence). lapsRemaining is the per-cell budget at place time, mirroring FireWalls.add.
+    | { type: "fire_wall_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
+    // Walls that burnt out on lap transition — the client drops their visuals.
+    | { type: "fire_wall_expired"; cells: XY[] }
+    /**
+     * A creature crossed one or more burning cells during its move and got seared for each of them.
+     *
+     * Reported per crossing unit rather than per cell so the client pops ONE damage number for the whole
+     * walk, and carried as its own event (not folded into `unit_moved`) because ranked rebuilds both its
+     * scene log and its floating numbers from events. `position` is the victim's world position captured
+     * BEFORE the damage lands, for the same reason `damaged` on spell_cast captures it early: a stack that
+     * dies to the flames is gone by the time the visuals play.
+     */
+    | {
+          type: "fire_wall_burned";
+          unitId: string;
+          cells: XY[];
+          position: XY;
+          amount: number;
+          unitsDied: number;
+      }
     | { type: "fight_finished"; winningTeam: TeamType };

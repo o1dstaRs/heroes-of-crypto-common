@@ -41,6 +41,7 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DEBUFF ||
         auraEffectProperties.power_type === AbilityPowerType.ABSORB_DAMAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE ||
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS ||
         (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS_WALK && !unit.canFly())
@@ -48,12 +49,14 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         return true;
     }
 
-    // AURA Rallying Volley (Zena): extra shots are only meaningful to a unit that SHOOTS, so it lands on
-    // ranged allies alone — the same shape as the DISABLE_RANGE_ATTACK rule just below. An aura power type
-    // absent from these lists is silently never applied, which is why a new aura shows up on nobody.
+    // AURA Rallying Volley (Zena) and Guiding Winds (Dryad): extra shots and extra shot range are only
+    // meaningful to a unit that SHOOTS, so they land on ranged allies alone — the same shape as the
+    // DISABLE_RANGE_ATTACK rule just below. An aura power type absent from these lists is silently never
+    // applied, which is why a new aura shows up on nobody.
     if (
         unit.getAttackType() === PBTypes.AttackVals.RANGE &&
-        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_SHOTS
+        (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_RANGE_SHOTS ||
+            auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE)
     ) {
         return true;
     }

@@ -207,13 +207,23 @@ describe("v0.7 fixed archetype definitions", () => {
             ["Crusader", 8],
             ["Hydra", 2],
         ]);
+        // The frozen eight-template shape gives each archetype (its template count x
+        // DEFAULT_ROSTER_COMPOSITION) slots per level, so a level carrying more trait creatures than slots
+        // cannot seat them all. Pegasus dropping from level four to level three left the aura archetype with
+        // three level-three units (Crusader, Griffin, Pegasus) competing for its two level-three slots, so
+        // Griffin is the one that goes unseated. Every other trait unit must still appear.
+        const unseatableByArchetype: Partial<Record<(typeof V07_ARCHETYPES)[number], string[]>> = {
+            aura: ["Griffin"],
+        };
         for (const archetype of V07_ARCHETYPES) {
             const covered = new Set(
                 V07_ARCHETYPE_TEMPLATES.filter((template) => template.archetype === archetype).flatMap((template) =>
                     template.roster.map((unit) => unit.creatureName),
                 ),
             );
-            expect(V07_ARCHETYPE_TAXONOMY[archetype].every((name) => covered.has(name))).toBe(true);
+            expect(V07_ARCHETYPE_TAXONOMY[archetype].filter((name) => !covered.has(name))).toEqual(
+                unseatableByArchetype[archetype] ?? [],
+            );
         }
         expect(
             V07_ARCHETYPE_TEMPLATES.filter((template) => template.archetype === "aura").every((template) =>

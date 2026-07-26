@@ -31,11 +31,25 @@ export class Effect {
     public getPower(): number {
         return this.effectProperties.power;
     }
+    public getStacks(): number {
+        return this.effectProperties.stacks;
+    }
     public getProperties(): EffectProperties {
         return this.effectProperties;
     }
     public setPower(power: number): void {
         this.effectProperties.power = power;
+    }
+    public setStacks(stacks: number): void {
+        this.effectProperties.stacks = stacks;
+    }
+    /**
+     * Rewrites the description a freshly built effect carries. Used by stacking effects to append their
+     * live stack count — the string is what UnitProperties.applied_effects_descriptions serialises and the
+     * debuff tooltip renders, the same way Deep Wounds shows its accumulated power on the target.
+     */
+    public setDesc(desc: string): void {
+        this.effectProperties.desc = desc;
     }
     public extend(): void {
         if (

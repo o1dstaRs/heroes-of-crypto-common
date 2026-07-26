@@ -100,6 +100,12 @@ export class UnitProperties {
     public applied_buffs_descriptions: string[];
     public applied_debuffs_descriptions: string[];
     public applied_effects_powers: number[];
+    /**
+     * How many times each applied effect has stacked (index-parallel to applied_effects). Only stacking
+     * effects (Poison) go above 1. Deliberately NOT a constructor argument: every unit starts with no
+     * applied effects, so an empty default keeps the two positional call sites untouched.
+     */
+    public applied_effects_stacks: number[];
     public applied_buffs_powers: number[];
     public applied_debuffs_powers: number[];
     public aura_effects: string[];
@@ -114,6 +120,14 @@ export class UnitProperties {
     public large_texture_name: string;
     public stack_power: number;
     public target: string;
+    /**
+     * The exact inverse of `target`: the id of an enemy this unit may NOT attack or retaliate against, while
+     * every other enemy stays fair game. Written by Terrifying Gaze (Manticore) and cleared in adjustBaseStats
+     * as soon as the effect of the same name expires — mirroring how Aggr owns `target`. Like `target`, this is
+     * local turn state and is deliberately absent from UnitData/the wire format; the "Terrifying Gaze" effect
+     * itself is what replicates, and the id is re-derived from it.
+     */
+    public forbidden_target: string;
     /** Abilities that remain visible on the card but were permanently disabled by Predatory Assimilation. */
     public stolen_abilities: string[];
     /** Turn-start snapshot. A flyer may cross/land in Web this turn and is locked only on its next activation. */
@@ -229,6 +243,7 @@ export class UnitProperties {
         this.applied_buffs_descriptions = structuredClone(applied_buffs_descriptions);
         this.applied_debuffs_descriptions = structuredClone(applied_debuffs_descriptions);
         this.applied_effects_powers = structuredClone(applied_effects_powers);
+        this.applied_effects_stacks = [];
         this.applied_buffs_powers = structuredClone(applied_buffs_powers);
         this.applied_debuffs_powers = structuredClone(applied_debuffs_powers);
         this.aura_effects = structuredClone(aura_effects);
@@ -245,6 +260,7 @@ export class UnitProperties {
         this.large_texture_name = large_texture_name;
         this.stack_power = stack_power;
         this.target = target;
+        this.forbidden_target = "";
         this.stolen_abilities = structuredClone(stolenAbilities);
         this.web_movement_locked = webMovementLocked;
     }

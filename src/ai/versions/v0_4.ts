@@ -267,6 +267,10 @@ export class StrategyV0_4 extends StrategyV0_3 {
                 return false;
             }
         }
+        // Terrifying Gaze is the inverse of the forced target: this one enemy is off limits, the rest are not.
+        if (unit.cannotAttackUnitId(firstHit.getId())) {
+            return false;
+        }
         return true;
     }
     // FINDING (measured): the ARMY should wait to act with the mass buff up (+0.95pp overall / +3.9pp on
@@ -465,7 +469,9 @@ export class StrategyV0_4 extends StrategyV0_3 {
             if (forcedId) {
                 return this.fallbackTurn(unit, context);
             }
-            const alt = uh.getAllAllies(otherTeam(unit.getTeam())).find((e) => strikableInPlace(e));
+            const alt = uh
+                .getAllAllies(otherTeam(unit.getTeam()))
+                .find((e) => !unit.cannotAttackUnitId(e.getId()) && strikableInPlace(e));
             return alt ? inPlaceStrike(alt.getId()) : this.fallbackTurn(unit, context);
         };
 

@@ -48,7 +48,23 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // power type was missing from the effect_helper whitelist, so it had been inert). Both change combat
 // outcomes wherever she is drafted, so every seeded trace legitimately moves. Two isolated runs produced
 // this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "ff0863178443a7b24874aca5b3b764f2d87e531c29fd697a47de22de3500d1fb";
+// Re-pinned again after enabling Wyvern (Might L2) and Trent (Nature L2) grew the L2 draft catalog
+// 13 -> 15. Same legitimate roster-draw shift as every previous catalog change. The two creatures landed
+// in the same working tree, so this is one re-pin covering both. Two isolated runs produced this digest.
+// Re-pinned again after enabling Manticore (Chaos L2) grew the L2 draft catalog 15 -> 16. Same legitimate
+// roster-draw shift as every previous catalog change. Two isolated runs produced this byte-identical digest.
+// Re-pinned again after enabling Monk (Life L3) grew the L3 draft catalog 8 -> 9. Same legitimate
+// roster-draw shift as every previous catalog change. Two isolated runs produced this digest.
+// Re-pinned again after Battle Mage (55) / Nightmare (56) grew the draft catalogs AND the Venom Cloud Aura's
+// poison started stacking (+35% of each further poison), which moves both the roster draws and the combat
+// traces. Stacked causes in one shared working tree, so per-change isolation was not possible here.
+// Re-pinned again after poison started riding RESPONSES too (both the melee and the counter-shot paths),
+// so an aura'd unit now poisons what it strikes back at. That legitimately changes the seeded combat
+// traces wherever a poison aura is drafted. Two isolated runs produced this byte-identical digest.
+// Re-pinned once more when the creature wave merged with those Zena fixes: both sides had moved this
+// fixture independently, so neither branch's value survives the merge. Two isolated runs on the merged
+// tree produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "64a2203348bd922727dc81174c58406cf7938edf8d11d7e941c453adf0e6aba2";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

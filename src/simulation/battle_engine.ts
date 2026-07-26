@@ -1113,6 +1113,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         cause = "not_melee_selected";
                     } else if (forced && forced !== tgt.getId()) {
                         cause = "forced_target_mismatch";
+                    } else if (unit.cannotAttackUnitId(tgt.getId())) {
+                        cause = "terrifying_gaze";
                     } else if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < tgt.getCumulativeHp()) {
                         cause = "cowardice";
                     } else if (!grid.areCellsAdjacent(afCells, tgt.getCells())) {
@@ -1144,6 +1146,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         cause = "not_range_selected";
                     } else if (unit.getRangeShots() <= 0) {
                         cause = "no_ammo";
+                    } else if (unit.cannotAttackUnitId(tgt.getId())) {
+                        cause = "terrifying_gaze";
                     } else {
                         const primary = resolveRangeAttackPrimary(unit, tgt, action, grid, attackHandler, unitsHolder);
                         cause =

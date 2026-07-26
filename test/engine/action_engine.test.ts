@@ -23,6 +23,7 @@ import type { AttackType, GridType, MovementType, UnitSizeType } from "../../src
 import type { IWeightedRoute } from "../../src/grid/path_definitions";
 import { getPositionForCell, getPositionForCells, RangeAttackCellSide } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
+import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import { SpellProperties, SpellTargetType } from "../../src/spells/spell_properties";
@@ -40,6 +41,7 @@ const setupActionFight = (
         lowerSize?: UnitSizeType;
         lowerSpells?: string[];
         lowerStackPower?: number;
+        lowerMovementType?: MovementType;
         supportMovementType?: MovementType;
         upperMovementType?: MovementType;
         supportCell?: { x: number; y: number };
@@ -76,6 +78,7 @@ const setupActionFight = (
         morale: 4,
         spells: opts.lowerSpells,
         stackPower: opts.lowerStackPower,
+        movementType: opts.lowerMovementType,
     });
     const upper = createTestUnit({
         name: "Upper",
@@ -2262,5 +2265,227 @@ describe("GameActionEngine", () => {
         expect(result.rejectionReason).toBe("unsupported_action");
         expect(result.events).toEqual([]);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+    });
+});
+
+// Vine Throw (Trent / Grove Spellbook) — the cast has to do three things at once: lay the vine on every
+// cell it crossed, snare the target's movement, and refuse the throw when the line is blocked. The
+// movement PRICE of a vined cell is pinned separately in test/spells/vine_movement.test.ts.
+describe("action engine — Vine Throw", () => {
+    it("lays the vine along the path, snares the target, and spends the scroll", () => {
+        const setup = setupActionFight({
+            // Carried as a castable ABILITY (like Valkyrie's Wind Flow), not as a spellbook entry.
+            lowerAbilities: ["Vine Throw"],
+            lowerStackPower: 3,
+            upperCell: { x: 6, y: 3 },
+            // The harness parks the friendly support on (4,3) by default, which is ON the throw line and
+            // would (correctly) block it. Move it aside so this test exercises the clear-line case.
+            supportCell: { x: 3, y: 6 },
+        });
+        const vines = setup.fightProperties.getVines();
+        expect(vines.size()).toBe(0);
+        const stepsBefore = setup.upper.getSteps();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Vine Throw",
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        // Caster at (3,3), target at (6,3): the three cells in between and the target's own get vined,
+        // the caster's own cell does not.
+        expect(vines.has({ x: 3, y: 3 })).toBe(false);
+        for (const cell of [
+            { x: 4, y: 3 },
+            { x: 5, y: 3 },
+            { x: 6, y: 3 },
+        ]) {
+            expect(vines.has(cell)).toBe(true);
+        }
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "vine_placed",
+                casterId: setup.lower.getId(),
+                targetId: setup.upper.getId(),
+            }),
+        );
+        expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(setup.upper.getSteps()).toBeLessThan(stepsBefore);
+        expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it("refuses the throw when a body blocks the line and leaves no vine behind", () => {
+        const setup = setupActionFight({
+            // Carried as a castable ABILITY (like Valkyrie's Wind Flow), not as a spellbook entry.
+            lowerAbilities: ["Vine Throw"],
+            lowerStackPower: 3,
+            upperCell: { x: 6, y: 3 },
+            // The friendly support sits between caster and target, breaking line of sight.
+            supportCell: { x: 5, y: 3 },
+        });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Vine Throw",
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(setup.fightProperties.getVines().size()).toBe(0);
+        expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(false);
+        expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(true);
+    });
+});
+
+// The client's move pipeline end-to-end for a vine strider: compute the reachable set with the REAL
+// pathfinder (as Sandbox does), hand it to the engine as currentActiveKnownPaths (as Sandbox does), then
+// actually walk onto a cell that is only reachable BECAUSE of the vine discount. The earlier vine tests
+// only pinned the path COST — they never proved the engine accepts the resulting move, which is exactly
+// where "the range shows further but I cannot step there" would live.
+describe("action engine — walking the vine", () => {
+    const layVineRoad = (fromX: number, y: number, length: number) => {
+        const vines = FightStateManager.getInstance().getFightProperties().getVines();
+        const road = [];
+        for (let i = 1; i <= length; i++) {
+            const cell = { x: fromX + i, y };
+            vines.add(cell);
+            road.push(cell);
+        }
+        return road;
+    };
+
+    it("accepts a move onto a far vine cell that only the stride discount makes reachable", () => {
+        const opts: Parameters<typeof setupActionFight>[0] & {
+            currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
+        } = {
+            lowerAbilities: ["In Its Own World"],
+            // Keep the friendly support off the vine road running east from (3,3).
+            supportCell: { x: 3, y: 6 },
+            upperCell: { x: 12, y: 12 },
+        };
+        const setup = setupActionFight(opts);
+        const road = layVineRoad(3, 3, 6);
+
+        const steps = setup.lower.getSteps();
+        const movePath = new PathHelper(setup.grid.getSettings()).getMovePath(
+            { x: 3, y: 3 },
+            setup.grid.getMatrix(),
+            steps,
+            undefined,
+            setup.lower.canFly(),
+            setup.lower.isSmallSize(),
+            setup.lower.canTraverseLava(),
+            setup.lower.hasAbilityActive("In Its Own World"),
+        );
+
+        // The last vine cell is far beyond a plain walker's reach at these steps — that is the whole point.
+        const destination = road[road.length - 1];
+        const key = (destination.x << 4) | destination.y;
+        expect(movePath.hashes.has(key)).toBe(true);
+        const route = movePath.knownPaths.get(key)?.[0];
+        expect(route).toBeDefined();
+        expect(route!.weight).toBeLessThanOrEqual(steps);
+
+        // Wire the computed reachability into the engine exactly like the scene does, then walk it.
+        opts.currentActiveKnownPaths = movePath.knownPaths;
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path: route!.route as { x: number; y: number }[],
+        });
+
+        expect(result.rejectionReason).toBeUndefined();
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getBaseCell()).toEqual(destination);
+    });
+
+    it("still refuses a vine cell beyond the discounted budget", () => {
+        const opts: Parameters<typeof setupActionFight>[0] & {
+            currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
+        } = {
+            lowerAbilities: ["In Its Own World"],
+            supportCell: { x: 3, y: 6 },
+            upperCell: { x: 12, y: 12 },
+        };
+        const setup = setupActionFight(opts);
+        layVineRoad(3, 3, 12);
+
+        const movePath = new PathHelper(setup.grid.getSettings()).getMovePath(
+            { x: 3, y: 3 },
+            setup.grid.getMatrix(),
+            setup.lower.getSteps(),
+            undefined,
+            false,
+            true,
+            false,
+            true,
+        );
+        // Even at half price the budget runs out eventually; that cell must not be reachable.
+        const tooFar = { x: 3 + 12, y: 3 };
+        expect(movePath.hashes.has((tooFar.x << 4) | tooFar.y)).toBe(false);
+    });
+});
+
+// Standing in the enemy's vine is the same snare the throw applies. Crossing one is priced by the
+// pathfinder; ENDING UP in one is priced here. A flyer clears a vine it flies over but is gripped by one
+// it lands in, and a vine never snares the side that threw it.
+describe("action engine — standing in a vine", () => {
+    const layEnemyVine = (cell: { x: number; y: number }, team: number) => {
+        FightStateManager.getInstance().getFightProperties().getVines().add(cell, 2, team);
+    };
+
+    const walkOnto = (setup: ReturnType<typeof setupActionFight>, opts: { currentActiveKnownPaths?: unknown }) => {
+        const path = [
+            { x: 3, y: 3 },
+            { x: 3, y: 4 },
+        ];
+        const target = path[path.length - 1];
+        (opts as { currentActiveKnownPaths?: Map<number, IWeightedRoute[]> }).currentActiveKnownPaths = new Map([
+            [cellKey(target), [weightedRoute(path)]],
+        ]);
+        return setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path });
+    };
+
+    it("snares a walker that ends its move in an enemy vine", () => {
+        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, upperCell: { x: 12, y: 12 } };
+        const setup = setupActionFight(opts);
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.UPPER);
+        const stepsBefore = setup.lower.getSteps();
+
+        expect(walkOnto(setup, opts).completed).toBe(true);
+        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(true);
+        // Steps are recomputed on the turn/lap boundary, the same cadence as Quagmire — force the recalc
+        // here so the test pins the EFFECT rather than just the flag.
+        setup.lower.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(setup.lower.getSteps()).toBeLessThan(stepsBefore);
+    });
+
+    it("snares a FLYER that lands in one — flying clears a vine, it does not clear standing in it", () => {
+        const opts: Record<string, unknown> = {
+            supportCell: { x: 6, y: 6 },
+            upperCell: { x: 12, y: 12 },
+            lowerMovementType: PBTypes.MovementVals.FLY,
+        };
+        const setup = setupActionFight(opts);
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.UPPER);
+
+        expect(walkOnto(setup, opts).completed).toBe(true);
+        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(true);
+    });
+
+    it("leaves a unit standing in its OWN side's vine alone", () => {
+        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, upperCell: { x: 12, y: 12 } };
+        const setup = setupActionFight(opts);
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.LOWER); // same team as the mover
+        const stepsBefore = setup.lower.getSteps();
+
+        expect(walkOnto(setup, opts).completed).toBe(true);
+        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(false);
+        setup.lower.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(setup.lower.getSteps()).toBe(stepsBefore);
     });
 });

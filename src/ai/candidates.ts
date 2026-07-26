@@ -25,9 +25,15 @@ import {
     type RangeAttackCellSide,
 } from "../grid/grid_math";
 import type { AttackHandler } from "../handlers/attack_handler";
-import { canCastSpell, canCastSummon, canMassCastSpell } from "../spells/spell_helper";
+import { canCastSpell, canCastSummon, canMassCastSpell, isSpellLineOfSightClear } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
-import { SpellTargetType } from "../spells/spell_properties";
+import {
+    applyMagicResistToSpellDamage,
+    calculateStackPoweredSpellDamage,
+    isThrownOffensiveSpell,
+} from "../spells/spell_damage";
+import { FIRE_WALL_ORIENTATIONS, fireWallCells, isFireWallableCell } from "../spells/fire_walls";
+import { SpellMultiplierType, SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -294,6 +300,7 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     ).cells;
     const out: XY[] = [];
     for (const c of moveCells) {
@@ -535,6 +542,7 @@ class CandidateGenerator {
                 this.unit.canFly(),
                 this.unit.isSmallSize(),
                 this.unit.canTraverseLava(),
+                this.unit.hasAbilityActive("In Its Own World"),
             );
         }
         return this.movePathCache;
@@ -652,7 +660,8 @@ class CandidateGenerator {
     }
     private meleeTargets(): Unit[] {
         // Mirrors AttackHandler.handleMeleeAttack's guards: never a Hidden target, never a Cowardice-blocked
-        // one, and when the unit carries a FORCED target (aggro), only that enemy is accepted.
+        // one, when the unit carries a FORCED target (aggro) only that enemy is accepted, and when Terrifying
+        // Gaze has frightened it, the one gazer it may not touch is dropped.
         const forced = this.unit.getTarget();
         return this.enemies.filter((e) => {
             if (isHidden(e)) {
@@ -662,6 +671,9 @@ class CandidateGenerator {
                 return false;
             }
             if (forced && forced !== e.getId()) {
+                return false;
+            }
+            if (this.unit.cannotAttackUnitId(e.getId())) {
                 return false;
             }
             return true;
@@ -1276,6 +1288,9 @@ class CandidateGenerator {
             if (isHidden(enemy)) {
                 continue; // the engine's melee/hidden guard; a Hidden unit cannot be targeted
             }
+            if (this.unit.cannotAttackUnitId(enemy.getId())) {
+                continue; // frightened by Terrifying Gaze: the gazer is not a legal shot this turn
+            }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
                     if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) {
@@ -1665,18 +1680,26 @@ class CandidateGenerator {
             spell.getMinimalCasterStackPower() <= this.unit.getStackPower()
         );
     }
-    private castAction(spell: Spell, targetId?: string, targetCell?: XY): GameAction {
-        return { type: "cast_spell", casterId: this.unit.getId(), spellName: spell.getName(), targetId, targetCell };
+    private castAction(spell: Spell, targetId?: string, targetCell?: XY, targetOrientation?: number): GameAction {
+        return {
+            type: "cast_spell",
+            casterId: this.unit.getId(),
+            spellName: spell.getName(),
+            targetId,
+            targetCell,
+            targetOrientation,
+        };
     }
     private pushSpell(
         spell: Spell,
         targetId?: string,
         targetCell?: XY,
         overrides: Partial<ICandidateFeatures> = {},
+        targetOrientation?: number,
     ): void {
         this.push({
             kind: "spell",
-            actions: [this.castAction(spell, targetId, targetCell)],
+            actions: [this.castAction(spell, targetId, targetCell, targetOrientation)],
             spellName: spell.getName(),
             targetId,
             targetCell,
@@ -1763,6 +1786,176 @@ class CandidateGenerator {
         }
         if (best) {
             this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score / 10 });
+        }
+    }
+    /**
+     * Fire Wall candidate selection. Unlike Smoke (which shields us from shooters), a wall is a road block:
+     * it is worth casting only where something is going to walk into it, so the anchors worth testing come
+     * off the enemies that still have to close the distance.
+     *
+     * For each such enemy, anchors are sampled along the segment from it to our army's centroid — that
+     * segment IS its approach — and the wall is laid across that line, picking whichever of the four
+     * orientations is closest to perpendicular so the enemy cannot simply walk around the end of it.
+     *
+     * Scored by the threat being blocked over how far down the approach the wall sits (nearer the enemy =
+     * it pays the toll sooner, and has less room to path around). Determinism: strict improvement only,
+     * walked in enemy then fraction order, so ties keep the first wall and the lookahead stays reproducible.
+     */
+    private addFireWallCastCandidates(spell: Spell): void {
+        const { grid } = this.context;
+        const gs = grid.getSettings();
+        const allies = [this.unit, ...this.allies].filter((u) => !u.isDead());
+        const blockable = this.enemies.filter((e) => !e.isDead() && !isHidden(e));
+        if (!allies.length || !blockable.length) {
+            return;
+        }
+
+        let ax = 0;
+        let ay = 0;
+        for (const a of allies) {
+            const c = a.getBaseCell();
+            ax += c.x;
+            ay += c.y;
+        }
+        ax = Math.round(ax / allies.length);
+        ay = Math.round(ay / allies.length);
+
+        let best: { cell: XY; orientation: number; score: number } | undefined;
+        for (const e of blockable) {
+            const ec = e.getBaseCell();
+            const dx = ax - ec.x;
+            const dy = ay - ec.y;
+            const approach = Math.hypot(dx, dy);
+            if (approach < 1) {
+                continue; // already on top of us — a wall behind it blocks nothing.
+            }
+            // Threat this enemy represents if it reaches us, and thus what blocking it is worth.
+            const threat = Math.max(1, e.getAmountAlive()) * Math.max(1, e.getAttackDamageMax());
+            // Whichever orientation is closest to perpendicular to the approach: minimal |cos| between the
+            // wall's own direction and the direction the enemy is coming from.
+            let orientation = FIRE_WALL_ORIENTATIONS[0];
+            let bestAlignment = Number.POSITIVE_INFINITY;
+            for (const candidate of FIRE_WALL_ORIENTATIONS) {
+                const [a0, a1] = fireWallCells({ x: 0, y: 0 }, candidate);
+                const wx = a1.x - a0.x;
+                const wy = a1.y - a0.y;
+                const alignment = Math.abs((wx * dx + wy * dy) / (Math.hypot(wx, wy) * approach));
+                if (alignment < bestAlignment) {
+                    bestAlignment = alignment;
+                    orientation = candidate;
+                }
+            }
+            for (const frac of [0.25, 0.35, 0.5]) {
+                const anchor = {
+                    x: Math.round(ec.x + dx * frac),
+                    y: Math.round(ec.y + dy * frac),
+                };
+                const cells = fireWallCells(anchor, orientation);
+                if (!cells.every((c) => isFireWallableCell(grid, isCellWithinGrid(gs, c), c))) {
+                    continue;
+                }
+                const score = threat / Math.max(frac, 0.01);
+                if (!best || score > best.score) {
+                    best = { cell: anchor, orientation, score };
+                }
+            }
+        }
+        if (best) {
+            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score / 10 }, best.orientation);
+        }
+    }
+    /**
+     * What a stack-powered offensive spell (Fire Strike / Meteorite) would actually land on `target`, from the
+     * very same helper the engine deals and the spellbook card prints. The AI has to value a damage spell at
+     * what it does, or it will keep a fireball in its pocket while it walks into a melee it loses.
+     */
+    private stackPoweredSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
+        const value = applyMagicResistToSpellDamage(
+            calculateStackPoweredSpellDamage(spell.getPower(), this.unit.getAmountAlive(), this.unit.getStackPower()),
+            target.getMagicResist(),
+        );
+        return { value, kill: value >= target.getCumulativeHp() ? 1 : 0 };
+    }
+    /** A thrown spell needs the clear line the engine's cast re-checks — mirror it, never propose a refusal. */
+    private hasSpellLineOfSight(target: Unit): boolean {
+        const gs = this.context.grid.getSettings();
+        return isSpellLineOfSightClear(
+            this.context.grid,
+            (cell) => isCellWithinGrid(gs, cell),
+            this.unit.getBaseCell(),
+            target.getBaseCell(),
+        );
+    }
+    /**
+     * Meteorite candidate selection. Unlike Smoke this is pure offence, and the engine REFUSES a drop that
+     * catches nobody, so only blocks holding at least one enemy are enumerated.
+     *
+     * Serves both meteor spells. Meteorite drops a 2x2 anchored at its bottom-left corner — an even-sided block
+     * has no centre cell to pivot on — while the Magic Dragon's Meteor Shower drops a 3x3 anchored at its
+     * CENTRE. Either way the anchors worth testing come off the enemies themselves: every block that could
+     * catch a given enemy has its anchor within one cell of that enemy, so the offsets below cover the whole
+     * search space with no grid sweep, and the optimum is still guaranteed to be in the set.
+     *
+     * Scored by damage that isn't overkill (a stack only has so much health to take) plus the kills it lands.
+     * Determinism: strict improvement only, walked in enemy then offset order, so ties keep the first block and
+     * the lookahead stays reproducible.
+     */
+    private addMeteoriteCastCandidates(spell: Spell): void {
+        const { grid, unitsHolder } = this.context;
+        const gs = grid.getSettings();
+        const rawDamage = calculateStackPoweredSpellDamage(
+            spell.getPower(),
+            this.unit.getAmountAlive(),
+            this.unit.getStackPower(),
+        );
+        if (rawDamage <= 0) {
+            return;
+        }
+
+        // 3x3 about the centre for Meteor Shower, 2x2 up-and-right of the corner for Meteorite.
+        const spread = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
+        const anchorOffsets = spell.getName() === "Meteor Shower" ? [-1, 0, 1] : [0, -1];
+
+        let best: { cell: XY; value: number; kill: 0 | 1 } | undefined;
+        for (const enemy of this.enemies) {
+            const ec = enemy.getBaseCell();
+            for (const ox of anchorOffsets) {
+                for (const oy of anchorOffsets) {
+                    const anchor = { x: ec.x + ox, y: ec.y + oy };
+                    const cells: XY[] = [];
+                    for (const dx of spread) {
+                        for (const dy of spread) {
+                            cells.push({ x: anchor.x + dx, y: anchor.y + dy });
+                        }
+                    }
+                    if (cells.some((c) => !isCellWithinGrid(gs, c))) {
+                        continue;
+                    }
+                    const caught = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                    let value = 0;
+                    let kill: 0 | 1 = 0;
+                    for (const unit of caught) {
+                        if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
+                            continue;
+                        }
+                        const dealt = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
+                        const hp = unit.getCumulativeHp();
+                        value += Math.min(dealt, hp);
+                        if (dealt >= hp) {
+                            kill = 1;
+                        }
+                    }
+                    if (value <= 0) {
+                        continue;
+                    }
+                    if (!best || value > best.value) {
+                        best = { cell: anchor, value, kill };
+                    }
+                }
+            }
+        }
+        if (best) {
+            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.value, expectedKill: best.kill });
         }
     }
     private addSpells(): void {
@@ -1868,6 +2061,21 @@ class CandidateGenerator {
                             undefined,
                         )
                     ) {
+                        // A stack-powered DAMAGE spell must be valued at the damage it lands — a debuff
+                        // candidate carries neither number. The THROWN ones (Fire Strike, Ring of Fire) also
+                        // need the line of sight the engine re-checks; Lightning Strike is called down out of
+                        // the sky and has no line to keep, so gating it would hide a legal cast from the AI.
+                        if (spell.getMultiplierType() === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
+                            if (isThrownOffensiveSpell(spell.getName()) && !this.hasSpellLineOfSight(enemy)) {
+                                continue;
+                            }
+                            const damage = this.stackPoweredSpellDamage(spell, enemy);
+                            this.pushSpell(spell, enemy.getId(), undefined, {
+                                expectedDamage: damage.value,
+                                expectedKill: damage.kill,
+                            });
+                            continue;
+                        }
                         this.pushSpell(spell, enemy.getId());
                     }
                 }
@@ -1876,6 +2084,19 @@ class CandidateGenerator {
 
             if (targetType === SpellTargetType.FREE_CELL && spell.getName() === "Smoke") {
                 this.addSmokeCastCandidates(spell);
+                continue;
+            }
+
+            if (targetType === SpellTargetType.FREE_CELL && spell.getName() === "Fire Wall") {
+                this.addFireWallCastCandidates(spell);
+                continue;
+            }
+
+            if (
+                targetType === SpellTargetType.FREE_CELL &&
+                (spell.getName() === "Meteorite" || spell.getName() === "Meteor Shower")
+            ) {
+                this.addMeteoriteCastCandidates(spell);
                 continue;
             }
 

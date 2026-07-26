@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { PBTypes } from "./types";
 export type AllUnitsScoutAugmentType = PBTypes.AllUnitsScoutAugmentVals;
 export type AttackType = PBTypes.AttackVals;
