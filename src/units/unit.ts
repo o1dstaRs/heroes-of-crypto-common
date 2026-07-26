@@ -1109,6 +1109,31 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             (this.getRangeShots() > 0 && this.getRangeShotDistance() > 0)
         );
     }
+    /**
+     * Spend the arrows ONE ranged volley costs against `target`, and report how many were spent.
+     *
+     * Owns two rules that used to live only in the single-target damage path, which is how a splash
+     * shooter (Gargantuan's Area Throw, Cyclops' Large Caliber) came to ignore Dense Flesh entirely — its
+     * shots route through the AOE tail, which just decremented once:
+     *   - UNLIMITED_SUPPLIES spends nothing at all.
+     *   - Dense Flesh makes a volley aimed at that unit cost its ability power instead of one.
+     * Call this from EVERY path that consumes a volley so the two can never drift apart again.
+     */
+    public spendShotsAgainst(target?: Unit): number {
+        for (const ability of this.getAbilities()) {
+            if (ability.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
+                return 0;
+            }
+        }
+        const cost =
+            target?.hasAbilityActive("Dense Flesh") === true
+                ? Math.max(1, Math.floor(target.getAbility("Dense Flesh")?.getPower() ?? 1))
+                : 1;
+        for (let i = 0; i < cost; i++) {
+            this.decreaseNumberOfShots();
+        }
+        return cost;
+    }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
         if (this.unitProperties.range_shots < 0) {
@@ -2027,22 +2052,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (this.getRangeShots() <= 0) {
                 return 0;
             }
-            let gotUnlimitedSupplies = false;
-            for (const abil of this.getAbilities()) {
-                if (abil.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
-                    gotUnlimitedSupplies = true;
-                }
-            }
-            if (decreaseNumberOfShots && !gotUnlimitedSupplies) {
-                this.decreaseNumberOfShots();
-                // Dense Flesh: a shot aimed at this target consumes ability-power shots total
-                if (enemyUnit.hasAbilityActive("Dense Flesh")) {
-                    const denseFleshAbility = enemyUnit.getAbility("Dense Flesh");
-                    const totalShotsCost = Math.max(1, Math.floor(denseFleshAbility?.getPower() ?? 1));
-                    for (let i = 1; i < totalShotsCost; i++) {
-                        this.decreaseNumberOfShots();
-                    }
-                }
+            if (decreaseNumberOfShots) {
+                // Unlimited-supplies and Dense Flesh both live in spendShotsAgainst, shared with the AOE tail.
+                this.spendShotsAgainst(enemyUnit);
             }
         }
 
@@ -2293,6 +2305,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const lapsTotal = Number.MAX_SAFE_INTEGER;
         const applied = new AppliedSpell(auraEffectName, power, lapsTotal, firstSpellProperty, secondSpellProperty);
+        // AURA Rallying Volley (Zena): hand the ranged ally its extra shots HERE, as the aura lands. It cannot
+        // be done in adjustBaseStats — that pass runs before the aura refresh, so it would never see one — and
+        // the top-up must happen exactly once: rallying_volley_granted makes stepping out and back in, a
+        // second Zena, or another refresh a no-op, so shots already FIRED stay spent. The quiver is topped up,
+        // never refilled. Effect-helper scoping already guarantees only RANGED allies get here.
+        if (isBuff && auraEffectName === "Rallying Volley Aura") {
+            const bonus = Math.max(0, Math.floor(power));
+            if (bonus > this.unitProperties.rallying_volley_granted) {
+                this.unitProperties.range_shots += bonus - this.unitProperties.rallying_volley_granted;
+                this.unitProperties.rallying_volley_granted = bonus;
+            }
+        }
         if (isBuff) {
             this.deleteBuff(auraEffectName);
             this.buffs.push(applied);
@@ -2869,19 +2893,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.range_shots,
                 Math.floor(this.maxRangeShots * actualStackPowerCoeff),
             );
-        }
-
-        // AURA Rallying Volley (Zena): allies within 2 cells get +N shots, handed over ONCE. Tracked on the
-        // unit rather than recomputed, because this pass runs on every aura refresh — a plain "+N while in
-        // range" would re-gift the shots every time somebody moved. Comparing against what was already
-        // granted also makes a second Zena a no-op (the aura does not stack) and means shots already FIRED
-        // are gone for good: the quiver is topped up, never refilled. Applied after the Limited Supply
-        // clamp above, which would otherwise trim the bonus straight back off.
-        const rallyingVolleyAura = this.getAppliedAuraEffect("Rallying Volley Aura");
-        const rallyingVolleyBonus = rallyingVolleyAura ? Math.max(0, Math.floor(rallyingVolleyAura.getPower())) : 0;
-        if (rallyingVolleyBonus > this.unitProperties.rallying_volley_granted) {
-            this.unitProperties.range_shots += rallyingVolleyBonus - this.unitProperties.rallying_volley_granted;
-            this.unitProperties.rallying_volley_granted = rallyingVolleyBonus;
         }
 
         const endlessQuiverAbility = this.getAbility("Endless Quiver");

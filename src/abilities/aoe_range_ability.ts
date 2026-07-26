@@ -248,7 +248,15 @@ export function processRangeAOEAbility(
             FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(attackerUnit.getTeam()),
         );
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-        attackerUnit.decreaseNumberOfShots();
+        // Spend this volley's arrows through the SHARED helper, so a splash shot honours the same rules a
+        // single-target shot does. It previously decremented once flat, which silently exempted every
+        // splash shooter (Gargantuan's Area Throw, Cyclops' Large Caliber) from Dense Flesh: a Double Shot
+        // into an Abomination cost 2 arrows instead of 4.
+        //
+        // The surcharge is read from the PRIMARY target — affectedUnits[0], the first unit on the ray —
+        // because Dense Flesh reads "ranged attacks AIMED AT this unit". A splashed bystander that happens
+        // to have it does not make the shot more expensive.
+        attackerUnit.spendShotsAgainst(affectedUnits[0]);
 
         return {
             landed: true,

@@ -60,12 +60,14 @@ export interface IVisibleDamage {
     missed?: boolean;
     hits?: { amount: number; unitsDied: number }[];
     /**
-     * Zena's Chakram: the half-circle sweeps the disc flew, in order, one per ricochet. Carried on the
-     * damage payload so the CLIENT can fly the chakram along the real path the engine resolved — without
-     * it the bounce damage simply appears on distant units with nothing visibly travelling between them.
-     * Cells, not world positions: the engine has no view geometry, so the scene converts them.
+     * Zena's Chakram: one entry per FULL-circle leg the 1-cell disc flew, in flight order (see
+     * resolveChakramTrajectory). `cells` is the circle swept (the scene converts cells -> world and flies the
+     * disc along them); `hitUnitIds` is every enemy that leg damaged and `mountainCells` every mountain cell it
+     * chipped, BOTH in the order the disc reached them — so the client lands each unit's damage number + blood +
+     * push exactly as the disc arrives, instead of everything popping at once. `targetUnitId` is the leg's first
+     * victim, kept for back-compat. Cells, not world positions: the engine has no view geometry.
      */
-    chakramArcs?: { targetUnitId: string; cells: XY[] }[];
+    chakramArcs?: { targetUnitId: string; cells: XY[]; hitUnitIds?: string[]; mountainCells?: XY[] }[];
     // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw). Each entry carries the
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the

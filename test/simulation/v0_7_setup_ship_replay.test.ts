@@ -41,8 +41,13 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft catalog 15 -> 16. Like every
 // previous catalog change, the larger pool shifts the deterministic roster draws, so all seeded traces
 // legitimately change. Two isolated runs produced this byte-identical digest.
-// Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft catalog 12 -> 13. Same legitimate
+// Re-pinned again after enabling Zena (Might L2) grew the L2 draft catalog 12 -> 13. Same legitimate
 // roster-draw shift as every previous catalog change. Two isolated runs produced this digest.
+// Re-pinned again after Zena's kit started actually FIRING in seeded fights: her Chakram now ricochets on
+// responses as well as on the initiating shot, and the Rallying Volley aura now reaches ranged allies (its
+// power type was missing from the effect_helper whitelist, so it had been inert). Both change combat
+// outcomes wherever she is drafted, so every seeded trace legitimately moves. Two isolated runs produced
+// this byte-identical digest.
 // Re-pinned again after enabling Wyvern (Might L2) and Trent (Nature L2) grew the L2 draft catalog
 // 13 -> 15. Same legitimate roster-draw shift as every previous catalog change. The two creatures landed
 // in the same working tree, so this is one re-pin covering both. Two isolated runs produced this digest.
@@ -56,7 +61,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned again after poison started riding RESPONSES too (both the melee and the counter-shot paths),
 // so an aura'd unit now poisons what it strikes back at. That legitimately changes the seeded combat
 // traces wherever a poison aura is drafted. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "0f70a984b9f6adb21fcdc9bc314d6347eec87278d62f717312942684892595a5";
+// Re-pinned once more when the creature wave merged with those Zena fixes: both sides had moved this
+// fixture independently, so neither branch's value survives the merge. Two isolated runs on the merged
+// tree produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "64a2203348bd922727dc81174c58406cf7938edf8d11d7e941c453adf0e6aba2";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
