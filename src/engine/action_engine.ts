@@ -17,6 +17,7 @@ import {
 } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
+import { processFleshShieldAura } from "../abilities/flesh_shield_aura_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
@@ -40,7 +41,7 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
 import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../spells/spell_damage";
-import { VINE_STRIDE_COST_MULTIPLIER, vinePathCells } from "../spells/vines";
+import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
     fireWallCells,
@@ -1189,12 +1190,9 @@ export class GameActionEngine {
         // Everything before the target's own cell must be clear. The target obviously occupies the last cell,
         // and the caster's cell is already excluded by vinePathCells.
         for (const cell of pathCells.slice(0, -1)) {
-            if (!isCellWithinGrid(settings, cell)) {
-                return this.reject("spell_not_available");
-            }
-            const occupant = this.context.grid.getOccupantUnitId(cell);
-            // Lava and water are ground the vine creeps over; a body or the mountain is not.
-            if (occupant && occupant !== "L" && occupant !== "W") {
+            // Lava and water are ground the vine creeps over; a body or the mountain is not. Shared with the
+            // client's aim preview so a highlighted throw is never one this then refuses.
+            if (!isVineCrossableCell(this.context.grid, isCellWithinGrid(settings, cell), cell)) {
                 return this.reject("spell_not_available");
             }
         }
@@ -1266,9 +1264,51 @@ export class GameActionEngine {
         let casterPlusMorale = 0;
 
         for (const { unit, damage } of victims) {
+            // ABILITY Flesh Shield Aura (Abomination): a protected ally hands part of the hit to the
+            // Abomination standing beside it. Cast spell damage went straight to applyDamage and skipped
+            // this entirely, so the aura absorbed Fire Breath and Chain Lightning (whose ability modules
+            // call it themselves) but nothing the spellbook threw — Fire Strike and Meteorite passed
+            // through untouched. "magic" so the transfer is recalculated against magic resistance rather
+            // than armor, exactly as the other two magic call sites do.
+            const statisticHolder = this.context.attackHandler?.getDamageStatisticHolder();
+            let incomingDamage = damage;
+            if (statisticHolder) {
+                const fleshShieldResult = processFleshShieldAura(
+                    caster,
+                    unit,
+                    incomingDamage,
+                    false,
+                    this.context.grid,
+                    this.context.unitsHolder,
+                    this.context.sceneLog,
+                    statisticHolder,
+                    undefined,
+                    "magic",
+                );
+                incomingDamage = fleshShieldResult.remainingDamage;
+                casterPlusMorale += fleshShieldResult.increaseMorale;
+                for (const unitId of fleshShieldResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(unitId)) {
+                        unitIdsDied.push(unitId);
+                    }
+                }
+                for (const [teamKey, moraleDecrease] of Object.entries(
+                    fleshShieldResult.moraleDecreaseForTheUnitTeam,
+                )) {
+                    moraleDecreaseForTheUnitTeam[teamKey] =
+                        (moraleDecreaseForTheUnitTeam[teamKey] ?? 0) + moraleDecrease;
+                }
+            }
+
             const positionAtImpact = { ...unit.getPosition() };
             const amountAliveBefore = unit.getAmountAlive();
-            const damageDealt = unit.applyDamage(damage, 0 /* magic attack */, this.context.sceneLog, false, caster);
+            const damageDealt = unit.applyDamage(
+                incomingDamage,
+                0 /* magic attack */,
+                this.context.sceneLog,
+                false,
+                caster,
+            );
             const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
 
             damaged.push({ unitId: unit.getId(), position: positionAtImpact, amount: damageDealt, unitsDied });

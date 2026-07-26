@@ -1,3 +1,4 @@
+import { MAX_UNIT_STACK_POWER } from "../constants";
 /*
  * -----------------------------------------------------------------------------
  * This file is part of the common code of the Heroes of Crypto.
@@ -467,6 +468,12 @@ export function calculateBuffsDebuffsEffect(
     };
 }
 
+/**
+ * The reflected share, as a percentage: the buff's own power PLUS the holder's luck, clamped to 0..100.
+ * Luck moves it the same way it moves every other percentage in the game, so a lucky unit mirrors more —
+ * and the spell card shows this exact figure rather than the flat configured number (see
+ * magicMirrorDescriptionPercent, which the client uses to fill the {} placeholders).
+ */
 export const getMagicMirrorPower = (targetUnit: Unit): number => {
     let mirrorPower = 0;
     const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
@@ -476,6 +483,14 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
     }
     if (massMagicMirrorBuff) {
         mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
+    }
+    // STACK-POWERED, like the game's other scaling percentages: the configured power is what a FULL stack
+    // reflects, and a depleted one reflects proportionally less — 15/30/45/60/75 across the five tiers at
+    // power 75. Luck then lifts (or drops) it, exactly as it does for ability chances elsewhere. Both are
+    // applied only when a mirror is actually up, so an unbuffed unit still reflects nothing.
+    if (mirrorPower > 0) {
+        const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, targetUnit.getStackPower()));
+        mirrorPower = (mirrorPower / MAX_UNIT_STACK_POWER) * stackPower + targetUnit.getLuck();
     }
     if (mirrorPower > 100) {
         mirrorPower = 100;

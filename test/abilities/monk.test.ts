@@ -75,7 +75,7 @@ describe("Monk configuration", () => {
         expect(monk.attack_type).toBe(PBTypes.AttackVals.RANGE);
         expect(monk.movement_type).toBe(PBTypes.MovementVals.WALK);
         expect(monk.size).toBe(PBTypes.UnitSizeVals.SMALL);
-        expect(monk.abilities).toEqual(["Serene Mind", "Borrowed Grace", "Absolving Arrow"]);
+        expect(monk.abilities).toEqual(["Magic Shield", "Borrowed Grace", "Absolving Arrow"]);
     });
 
     it("trades 10-20% of the Cyclops' defence for 25-35% more offence", () => {
@@ -106,19 +106,21 @@ describe("Monk configuration", () => {
     });
 });
 
-describe("Serene Mind", () => {
+// The Monk used to carry "Serene Mind", a byte-for-byte duplicate of Magic Shield (same DEFENCE type,
+// same 50 power, same MAGIC_RESIST_50 power type, same text). It was removed in favour of the original.
+describe("Magic Shield on the Monk", () => {
     it("adds a 50% magic-armor roll on top of the Monk's own magic resist at full stack", () => {
-        const monk = createTestUnit({ name: "Monk", abilities: ["Serene Mind"], magicResist: 8, stackPower: 5 });
+        const monk = createTestUnit({ name: "Monk", abilities: ["Magic Shield"], magicResist: 8, stackPower: 5 });
 
         setNeutralLuckRoll();
         monk.adjustBaseStats(true, 1, 0, 0, 0, 0, 0, 0);
 
-        // Independent rolls, exactly like Magic Shield / Wardguard: 1 - (1 - 0.08)(1 - 0.5) = 54%.
+        // Independent rolls, exactly like Wardguard: 1 - (1 - 0.08)(1 - 0.5) = 54%.
         expect(monk.getMagicResist()).toBeCloseTo(54, 1);
     });
 
     it("scales with the stack, so a battered Monk wards less", () => {
-        const monk = createTestUnit({ name: "Monk", abilities: ["Serene Mind"], magicResist: 8, stackPower: 1 });
+        const monk = createTestUnit({ name: "Monk", abilities: ["Magic Shield"], magicResist: 8, stackPower: 1 });
 
         setNeutralLuckRoll();
         monk.adjustBaseStats(true, 1, 0, 0, 0, 0, 0, 0);

@@ -590,6 +590,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .join("\n")
                 .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
         }
+        if (ability.getName() === "Warding Mane Aura") {
+            // Stack-scaled and luck-moved by calculateAuraPower, so the card must print what this Manticore
+            // actually projects. The aura effect carries the power; without it we fall through to the
+            // raw-power default below and every stack reads the same number.
+            const wardingMane = ability.getAuraEffect();
+            if (wardingMane) {
+                return ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(/\{\}/g, Number(this.calculateAuraPower(wardingMane, 0).toFixed(2)).toString());
+            }
+        }
         if (ability.getName() === "Blacksmith Tools") {
             // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
             const { stun, nothing, double, frozen } = getCraftChances(this.getLuck());
@@ -2876,12 +2888,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const wardguardAbility = this.getAbility("Wardguard");
             if (wardguardAbility) {
                 magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
-            }
-
-            // Serene Mind (Monk): the same fixed magic armor as Magic Shield, one more independent roll.
-            const sereneMindAbility = this.getAbility("Serene Mind");
-            if (sereneMindAbility) {
-                magicResists.push(this.calculateAbilityMultiplier(sereneMindAbility, synergyAbilityPowerIncrease));
             }
 
             // AURA Warding Mane (Manticore): magic armor for every ally within 2 cells. Folded in as one more

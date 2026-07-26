@@ -202,6 +202,9 @@ describe("ability processors", () => {
             team: PBTypes.TeamVals.LOWER,
             amountAlive: 1,
             maxHp: 5,
+            // Magic Mirror is stack-powered now, so a full stack is what makes the power-100 buff below
+            // reflect in full — which is what this test is about.
+            stackPower: 5,
         });
         const chainedTarget = createTestUnit({
             name: "Chained Neighbor",

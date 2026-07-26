@@ -32,6 +32,7 @@ export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
 export * as SmokeHelper from "./spells/smoke_clouds";
 export * as FireWallHelper from "./spells/fire_walls";
+export * as VineHelper from "./spells/vines";
 export * as RayTraversal from "./grid/ray_traversal";
 export * from "./spells/spell";
 export * as PickHelper from "./picks/pick_helper";

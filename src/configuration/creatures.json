@@ -254,7 +254,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Serene Mind", "Borrowed Grace", "Absolving Arrow"]
+            "abilities": ["Magic Shield", "Borrowed Grace", "Absolving Arrow"]
         },
         "Tsar Cannon": {
             "name": "Tsar Cannon",
@@ -603,7 +603,7 @@
         },
         "Magic Dragon": {
             "name": "Magic Dragon",
-            "hp": 160,
+            "hp": 150,
             "steps": 3.4,
             "speed": 3.1,
             "armor": 25,

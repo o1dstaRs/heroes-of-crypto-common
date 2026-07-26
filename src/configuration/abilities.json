@@ -118,7 +118,7 @@
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
@@ -1342,7 +1342,7 @@
         "name": "Warding Mane Aura",
         "type": "BUFF_AURA",
         "desc": ["Allies within 2 cells gain {}% resistance to all magical attacks and debuffs"],
-        "power": 20,
+        "power": 25,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
@@ -1363,18 +1363,6 @@
         "skip_reponse": false,
         "stack_powered": true,
         "effect": "Terrifying Gaze",
-        "aura_effect": null,
-        "can_be_cast": false
-    },
-    "Serene Mind": {
-        "name": "Serene Mind",
-        "type": "DEFENCE",
-        "desc": ["Provides {}% resistance to all magical attacks and debuffs"],
-        "power": 50,
-        "power_type": "MAGIC_RESIST_50",
-        "skip_reponse": false,
-        "stack_powered": true,
-        "effect": null,
         "aura_effect": null,
         "can_be_cast": false
     },

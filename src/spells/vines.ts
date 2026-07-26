@@ -186,3 +186,30 @@ export function vinePathCells(from: XY, to: XY): XY[] {
     }
     return cells;
 }
+
+export interface IVineGrid {
+    getOccupantUnitId(cell: XY): string | undefined;
+}
+
+/**
+ * Whether the vine can creep across a single cell on its way to the target.
+ *
+ * Lava ("L") and water ("W") are ground the vine crosses; a body, the centre mountain ("B") or a narrowed
+ * cell ("H") stops it, as does anything off-board.
+ *
+ * NOTE: this deliberately does NOT special-case the target's own cell, which is occupied by definition —
+ * callers exclude it (see `vineThrowCast`, which checks `pathCells.slice(0, -1)`).
+ *
+ * Shared with the client's aim preview so a highlighted throw can never be one the engine then refuses —
+ * the same contract `isSmokeableCell` holds for Smoke.
+ */
+export function isVineCrossableCell(grid: IVineGrid, withinGrid: boolean, cell: XY): boolean {
+    if (!withinGrid) {
+        return false;
+    }
+    const occupant = grid.getOccupantUnitId(cell);
+    if (!occupant) {
+        return true;
+    }
+    return occupant === "L" || occupant === "W";
+}

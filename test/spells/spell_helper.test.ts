@@ -525,7 +525,9 @@ describe("spell_helper", () => {
     });
 
     it("calculates mirror power and detects already applied spells", () => {
-        const target = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        // Full stack: Magic Mirror is stack-powered (15/30/45/60/75 at power 75), so the 0..100 clamp this
+        // test exists to pin is only reachable from a full stack.
+        const target = createTestUnit({ team: PBTypes.TeamVals.LOWER, stackPower: 5 });
         const mirror = spell("Chaos", "Magic Mirror");
 
         mirror.setPower(150);
@@ -538,7 +540,9 @@ describe("spell_helper", () => {
         mirror.setPower(20);
         const massMirror = spell("Chaos", "Mass Magic Mirror");
         massMirror.setPower(70);
-        const massMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        // Full stack again: this asserts the stronger of the two mirrors wins (70 over 20), which is about
+        // the max() selection, not about stack scaling.
+        const massMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER, stackPower: 5 });
         massMirrorTarget.applyBuff(mirror);
         massMirrorTarget.applyBuff(massMirror);
         expect(getMagicMirrorPower(massMirrorTarget)).toBe(70);

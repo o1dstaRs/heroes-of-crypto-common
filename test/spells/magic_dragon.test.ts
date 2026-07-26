@@ -173,11 +173,24 @@ describe("Magic Dragon creature configuration", () => {
         const midpoint = (key: keyof IRawCreature): number =>
             ((cannon[key] as number) + (gargantuan[key] as number)) / 2;
 
-        for (const key of ["hp", "steps", "speed", "armor", "attack_damage_min", "attack_damage_max"] as const) {
+        for (const key of ["steps", "speed", "armor", "attack_damage_min", "attack_damage_max"] as const) {
             const ratio = dragon[key] / midpoint(key);
             expect(ratio).toBeGreaterThanOrEqual(0.85);
             expect(ratio).toBeLessThanOrEqual(0.9);
         }
+    });
+
+    // hp is a DELIBERATE exception to the band above, taken together with the 25% cut to the spellbook's
+    // damage: at 150 the dragon sits ~19% under the Tsar Cannon / Gargantuan midpoint of 185 rather than the
+    // 10-15% the brief asked for (the band would want 158-166). Pinned exactly rather than folded back into
+    // the loop so the deviation stays visible and a later nudge still has to come here and re-decide it.
+    it("carries a deliberately below-band 150 hp", () => {
+        const cannon = creatures.Life["Tsar Cannon"];
+        const gargantuan = creatures.Nature.Gargantuan;
+        const midpoint = (cannon.hp + gargantuan.hp) / 2;
+
+        expect(dragon.hp).toBe(150);
+        expect(dragon.hp / midpoint).toBeLessThan(0.85);
     });
 
     it("carries a caster's attack — around 60% of its level, the way the Battle Mage and Healer do", () => {
@@ -214,10 +227,10 @@ describe("Tome of Elements spell configuration", () => {
         expect(getSpellConfig("Nature", "Meteor Shower").minimal_caster_stack_power).toBe(5);
     });
 
-    it("prices Lightning Strike at 300 damage per living dragon at full stack power", () => {
+    it("prices Lightning Strike at 225 damage per living dragon at full stack power", () => {
         const power = natureSpells["Lightning Strike"].power;
-        expect(calculateStackPoweredSpellDamage(power, 1, MAX_UNIT_STACK_POWER)).toBe(300);
-        expect(calculateStackPoweredSpellDamage(power, 2, MAX_UNIT_STACK_POWER)).toBe(600);
+        expect(calculateStackPoweredSpellDamage(power, 1, MAX_UNIT_STACK_POWER)).toBe(225);
+        expect(calculateStackPoweredSpellDamage(power, 2, MAX_UNIT_STACK_POWER)).toBe(450);
     });
 
     // The three damage spells are a priced set, not three independent numbers. Pin the relationships in the
@@ -274,7 +287,7 @@ describe("action engine — Lightning Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(300); // 1 alive x stack power 5 x 60
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(225); // 1 alive x stack power 5 x 45
         expect(
             setup.caster
                 .getSpells()
@@ -302,7 +315,7 @@ describe("action engine — Lightning Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(600);
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(450);
     });
 
     it("is magical: magic resistance cuts it down", () => {
@@ -320,7 +333,7 @@ describe("action engine — Lightning Strike", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(225); // floor(300 * 0.75)
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(168); // floor(225 * 0.75)
     });
 });
 
@@ -343,10 +356,10 @@ describe("action engine — Ring of Fire", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(240); // the aimed target: 1 x 5 x 48
-        expect(before[1] - setup.enemies[1].getHp()).toBe(240); // (7,3) touches (6,3)
+        expect(before[0] - setup.enemies[0].getHp()).toBe(180); // the aimed target: 1 x 5 x 36
+        expect(before[1] - setup.enemies[1].getHp()).toBe(180); // (7,3) touches (6,3)
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // (9,3) is two cells away
-        expect(before[3] - setup.allies[0].getHp()).toBe(240); // an ally next to the target burns too
+        expect(before[3] - setup.allies[0].getHp()).toBe(180); // an ally next to the target burns too
         expect(setup.caster.getHp()).toBe(casterHpBefore);
     });
 
@@ -397,8 +410,8 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(216); // 1 x 5 x 43.2, floored
-        expect(before[1] - setup.enemies[1].getHp()).toBe(216);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(162); // 1 x 5 x 32.4, floored
+        expect(before[1] - setup.enemies[1].getHp()).toBe(162);
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // outside the block
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
     });
@@ -484,8 +497,8 @@ describe("Magic Mirror (passive)", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(300); // the spell landed as normal
-        expect(casterHpBefore - setup.caster.getHp()).toBe(300); // and came back on top
+        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(225); // the spell landed as normal
+        expect(casterHpBefore - setup.caster.getHp()).toBe(225); // and came back on top
     });
 
     it("rebounds once per mirror caught in a splash", () => {
@@ -509,9 +522,9 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(before[0] - setup.enemies[0].getHp()).toBe(240);
-        expect(before[1] - setup.enemies[1].getHp()).toBe(240);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(480); // 240 back off each mirror
+        expect(before[0] - setup.enemies[0].getHp()).toBe(180);
+        expect(before[1] - setup.enemies[1].getHp()).toBe(180);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(360); // 180 back off each mirror
     });
 
     it("costs the caster nothing when the roll misses, while the spell lands the same", () => {
@@ -531,7 +544,7 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(300);
+        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(225);
         expect(setup.caster.getHp()).toBe(casterHpBefore);
     });
 
@@ -575,6 +588,6 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(casterHpBefore - setup.caster.getHp()).toBe(150); // floor(300 * 0.5)
+        expect(casterHpBefore - setup.caster.getHp()).toBe(112); // floor(225 * 0.5)
     });
 });
