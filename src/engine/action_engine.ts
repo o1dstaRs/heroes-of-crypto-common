@@ -120,6 +120,14 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
     ) => Unit | undefined;
 }
 
+/** Damage a spell actually dealt to one victim, after its magic resistance. */
+const spellDamageDealt = (damaged: { unitId: string; amount: number }[], unitId: string): number =>
+    damaged.find((entry) => entry.unitId === unitId)?.amount ?? 0;
+
+/** Damage a splash spell actually dealt across everyone it caught, after each victim's magic resistance. */
+const spellDamageTotal = (damaged: { unitId: string; amount: number }[]): number =>
+    damaged.reduce((sum, entry) => sum + entry.amount, 0);
+
 export class GameActionEngine {
     private readonly context: IGameActionEngineContext;
     private readonly turnEngine: TurnEngine;
@@ -1459,7 +1467,8 @@ export class GameActionEngine {
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
-            `${caster.getName()} called a Meteorite onto ${enemies.length} target(s) (${rawDamage})`,
+            // Post-resistance total across everyone under the 2x2 — see the Lightning Strike log below.
+            `${caster.getName()} called a Meteorite onto ${enemies.length} target(s) (${spellDamageTotal(damaged)})`,
         );
 
         const events: GameEvent[] = [
@@ -1555,7 +1564,13 @@ export class GameActionEngine {
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(`${caster.getName()} ⚡ ${target.getName()} (${rawDamage})`);
+        // The number the victim ACTUALLY took, not the pre-resistance roll. Logging rawDamage printed the
+        // same figure whatever the target's magic resistance was, which read as "mdef does nothing" even
+        // though resolveSpellVictims had already cut the damage down. Fire Strike logs its reduced value
+        // the same way.
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} ⚡ ${target.getName()} (${spellDamageDealt(damaged, target.getId())})`,
+        );
 
         const events: GameEvent[] = [
             {
@@ -1630,7 +1645,9 @@ export class GameActionEngine {
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
-            `${caster.getName()} ringed ${target.getName()} in fire, catching ${caught.length} target(s) (${rawDamage})`,
+            // Post-resistance total across everyone caught — see the Lightning Strike log above. Each victim
+            // resists separately, so the sum is the honest single number for a splash.
+            `${caster.getName()} ringed ${target.getName()} in fire, catching ${caught.length} target(s) (${spellDamageTotal(damaged)})`,
         );
 
         const events: GameEvent[] = [
@@ -1701,7 +1718,8 @@ export class GameActionEngine {
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
-            `${caster.getName()} called a Meteor Shower onto ${enemies.length} target(s) (${rawDamage})`,
+            // Post-resistance total, as with Ring of Fire above.
+            `${caster.getName()} called a Meteor Shower onto ${enemies.length} target(s) (${spellDamageTotal(damaged)})`,
         );
 
         const events: GameEvent[] = [
