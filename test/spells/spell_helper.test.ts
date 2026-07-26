@@ -203,6 +203,16 @@ describe("spell_helper", () => {
         expect(spellToTextureNames("Magic Mirror")).toEqual(["magic_mirror_256", "magic_mirror_font"]);
     });
 
+    it("loads the Chaos:Misfortune luck-floor debuff config", () => {
+        const misfortune = spell("Chaos", "Misfortune");
+        expect(misfortune.getName()).toBe("Misfortune");
+        expect(misfortune.getSpellTargetType()).toBe(SpellTargetType.ANY_ENEMY);
+        expect(misfortune.isBuff()).toBe(false);
+        expect(misfortune.getMinimalCasterStackPower()).toBe(1);
+        // Texture names follow the standard icon/title-strip convention.
+        expect(spellToTextureNames("Misfortune")).toEqual(["misfortune_256", "misfortune_font"]);
+    });
+
     it("validates direct spell casts across main target types", () => {
         const caster = createTestUnit({
             name: "Caster",

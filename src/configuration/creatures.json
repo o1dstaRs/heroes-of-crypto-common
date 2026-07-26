@@ -852,7 +852,7 @@
             "exp": 6.1,
             "size": 1,
             "level": 1,
-            "spells": [],
+            "spells": ["Chaos:Smoke", "Chaos:Misfortune", "Chaos:Ashen Boon", "Chaos:Ashen Boon"],
             "abilities": ["Book of Chaos"]
         }
     },

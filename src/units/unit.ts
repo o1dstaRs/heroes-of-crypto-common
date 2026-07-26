@@ -67,6 +67,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
+    "Book of Chaos": new Set(["Smoke", "Misfortune"]),
     "Blacksmith Tools": new Set(["Craft"]),
     Enchants: new Set(["Armor Rune", "Weapon Rune"]),
 };
@@ -2467,6 +2468,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
                 this.unitProperties.luck = LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
+            } else if (this.hasDebuffActive("Misfortune")) {
+                // Misfortune: lock luck to its minimum while the debuff is active. Mirrors the Luck Aura
+                // max-sentinel above; luck_mod is zeroed so the floor cannot be lifted by per-turn rolls,
+                // synergy, or artifact luck. See the Sadness block below for the morale equivalent.
+                this.unitProperties.luck = -LUCK_MAX_VALUE_TOTAL;
+                this.unitProperties.luck_mod = 0;
             } else {
                 this.unitProperties.luck = synergyLuckIncrease;
                 if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
@@ -2940,12 +2947,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const riotBuff = this.getBuff("Riot");
         const massRiotBuff = this.getBuff("Mass Riot");
+        const ashenBoonBuff = this.getBuff("Ashen Boon");
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * massRiotBuff.getPower()) / 100;
         } else {
             this.unitProperties.attack_mod = this.initialUnitProperties.attack_mod;
+        }
+
+        if (ashenBoonBuff) {
+            this.unitProperties.attack_mod += (this.unitProperties.base_attack * ashenBoonBuff.getPower()) / 100;
         }
 
         const weaknessDebuff = this.getDebuff("Weakness");

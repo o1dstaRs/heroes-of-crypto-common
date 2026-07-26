@@ -1698,6 +1698,73 @@ class CandidateGenerator {
      *   RANDOM_CLOSE_TO_CASTER summons             -> deterministic first empty adjacent cell
      * AUTO-targeted entries (system effects like Morale) are not player-castable and are skipped.
      */
+    /**
+     * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
+     * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. The engine
+     * accepts any free-cell target (no range gate), so we search for the highest-value anchor cell:
+     *   - Prefer a cell whose 2x2 footprint sits on the segment from each enemy ranger to the centroid of our
+     *     own units, weighting by how much enemy ranged firepower would have to shoot through it.
+     *   - Require all 4 footprint cells to be free (the engine skips occupied cells, but a fully-blocked 2x2
+     *     is a wasted charge).
+     * Determinism: ties broken by grid order (no RNG), so the lookahead is reproducible.
+     */
+    private addSmokeCastCandidates(spell: Spell): void {
+        const { grid } = this.context;
+        const gs = grid.getSettings();
+        const enemyRangers = this.enemies.filter((e) => e.isRangeCapable() && e.getRangeShots() > 0);
+        if (enemyRangers.length === 0) {
+            return; // nobody to blindfire through — save the charge.
+        }
+        // Centroid of our living units (the army we want to shield).
+        const allies = [this.unit, ...this.allies].filter((u) => !u.isDead());
+        if (allies.length === 0) {
+            return;
+        }
+        let ax = 0;
+        let ay = 0;
+        for (const a of allies) {
+            const c = a.getBaseCell();
+            ax += c.x;
+            ay += c.y;
+        }
+        ax = Math.round(ax / allies.length);
+        ay = Math.round(ay / allies.length);
+
+        const gridSize = gs.getGridSize();
+        let best: { cell: XY; score: number } | undefined;
+        // Sample candidate anchors along each enemy-ranger -> ally-centroid segment (midpoint is the highest-
+        // value blocker; we also probe one cell either side for occupancy fit). Bounded by the grid.
+        for (const e of enemyRangers) {
+            const ec = e.getBaseCell();
+            const firepower = Math.max(1, e.getRangeShots()) * Math.max(1, e.getAttackDamageMax());
+            for (const frac of [0.45, 0.5, 0.55, 0.66]) {
+                const anchor = {
+                    x: Math.round(ec.x + (ax - ec.x) * frac),
+                    y: Math.round(ec.y + (ay - ec.y) * frac),
+                };
+                // The 2x2 expands +x/+y from the anchor; slide a little to fit if the anchor is at the edge.
+                for (const ox of [0, -1]) {
+                    for (const oy of [0, -1]) {
+                        const c = { x: anchor.x + ox, y: anchor.y + oy };
+                        const cells = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+                        if (cells.some((cc) => !isCellWithinGrid(gs, cc) || cc.x >= gridSize || cc.y >= gridSize)) {
+                            continue;
+                        }
+                        if (!grid.areAllCellsEmpty(cells, this.unit.getId())) {
+                            continue;
+                        }
+                        const score = firepower / frac; // closer to the ranger = more shots blinded
+                        if (!best || score > best.score) {
+                            best = { cell: c, score };
+                        }
+                    }
+                }
+            }
+        }
+        if (best) {
+            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score / 10 });
+        }
+    }
     private addSpells(): void {
         const spells = this.unit.getSpells();
         if (!spells.length) {
@@ -1804,6 +1871,11 @@ class CandidateGenerator {
                         this.pushSpell(spell, enemy.getId());
                     }
                 }
+                continue;
+            }
+
+            if (targetType === SpellTargetType.FREE_CELL && spell.getName() === "Smoke") {
+                this.addSmokeCastCandidates(spell);
                 continue;
             }
 

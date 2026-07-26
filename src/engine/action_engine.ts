@@ -373,19 +373,20 @@ export class GameActionEngine {
         // acted) rather than a do-nothing skip.
         unit.setMovedThisTurn(true);
 
-        return {
-            completed: true,
-            events: [
-                {
-                    type: "unit_moved",
-                    unitId: unit.getId(),
-                    from,
-                    to: { ...result.newPosition },
-                    path: structuredClone(action.path),
-                    targetCells: structuredClone(targetCells),
-                },
-            ],
-        };
+        const events: GameEvent[] = [
+            {
+                type: "unit_moved",
+                unitId: unit.getId(),
+                from,
+                to: { ...result.newPosition },
+                path: structuredClone(action.path),
+                targetCells: structuredClone(targetCells),
+            },
+        ];
+        if (result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
+        return { completed: true, events };
     }
     private meleeAttack(action: Extract<GameAction, { type: "melee_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
@@ -813,6 +814,10 @@ export class GameActionEngine {
         if (!target && spell.getSpellTargetType() === SpellTargetType.ALLIES_AREA) {
             return this.craftCast(action, caster, spell);
         }
+        // Smoke spell: a cell-targeted cloud cast anywhere on the field (no range gate — it throws freely).
+        if (!target && spell.getName() === "Smoke") {
+            return this.smokeCast(action, caster, spell);
+        }
         if (target && (spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune")) {
             return this.enchantCast(caster, target, spell);
         }
@@ -882,7 +887,54 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Blacksmith's Armor Rune / Weapon Rune: a single-target ally buff with a 50% chance per cast to add
+     * Smoke spell (Ash Moth / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
+     * battlefield. Only empty cells of the 2x2 block become smoked — cells already occupied by a creature (or
+     * off-grid) are skipped, so the cloud shapes around whatever is standing in it. Ranged attacks crossing a
+     * smoked cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the
+     * cloud lasts `spell.getLapsTotal()` laps. One cast = one charge.
+     */
+    private smokeCast(
+        action: Extract<GameAction, { type: "cast_spell" }>,
+        caster: Unit,
+        spell: Spell,
+    ): IGameActionResult {
+        if (!action.targetCell) {
+            return this.reject("spell_not_available");
+        }
+        const c = action.targetCell;
+        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+        const laps = spell.getLapsTotal();
+        const placed: XY[] = [];
+        for (const cell of cells) {
+            if (!isCellWithinGrid(this.context.grid.getSettings(), cell)) {
+                continue;
+            }
+            // Only free cells get smoked — a creature standing on a cell blocks the smoke from taking hold
+            // there (consistent with "a creature stepping on a smoked cell disperses it").
+            if (this.context.grid.getOccupantUnitId(cell)) {
+                continue;
+            }
+            this.context.fightProperties.getSmokeClouds().add(cell, laps);
+            placed.push({ x: cell.x, y: cell.y });
+        }
+        caster.useSpell(spell.getName());
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetCell: c,
+                unitIdsDied: [],
+                animations: [],
+            },
+        ];
+        if (placed.length > 0) {
+            events.push({ type: "smoke_placed", casterId: caster.getId(), cells: placed, lapsRemaining: laps });
+        }
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
      * +1 flat armor / attack. The bonus STACKS — the running total lives in the buff's first spell property, so
      * re-casting reads the current total, deletes the old buff, and re-applies it at +1 (see adjustBaseStats,
      * which folds that property into armor_mod / attack_mod, and the card's Buffs section, which shows "+N").
