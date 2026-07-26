@@ -14,6 +14,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
 import { normalizeMeleeMagicSelection } from "../melee_attack_type";
 import {
     type CasterRouterSpell,
@@ -42,6 +43,63 @@ const V07_AURA_WIND_ROUTER_POLICY = Object.freeze({
     spells: Object.freeze(["windflow"] as const),
     resurrectionPreemptsCommitted: false,
 }) satisfies ICasterRouterPolicy;
+const V07_REPAIR_DIRECT_KINDS = new Set(["melee", "shot", "area_throw"]);
+
+const attacksForbiddenTarget = (unit: Unit, decision: readonly GameAction[]): boolean =>
+    decision.some(
+        (action) =>
+            (action.type === "melee_attack" || action.type === "range_attack") &&
+            unit.cannotAttackUnitId(action.targetId),
+    );
+
+const bestV07LegalAttack = (candidates: readonly IEnumeratedCandidate[]): IEnumeratedCandidate | undefined =>
+    candidates
+        .filter(
+            (candidate) =>
+                V07_REPAIR_DIRECT_KINDS.has(candidate.kind) &&
+                Number.isFinite(candidate.features.expectedDamage) &&
+                candidate.features.expectedDamage > 0,
+        )
+        .sort(
+            (left, right) =>
+                right.features.expectedKill - left.features.expectedKill ||
+                right.features.expectedDamage - left.features.expectedDamage ||
+                Number(left.actions.some((action) => action.type === "move_unit")) -
+                    Number(right.actions.some((action) => action.type === "move_unit")),
+        )[0];
+
+/**
+ * A late v0.4/v0.5 overlay can replace v0.1's checked target after Terrifying Gaze has forbidden it. This
+ * repair is inert for every accepted incumbent; only an already-rejected attack is re-enumerated.
+ */
+export function repairV07ForbiddenTargetDecision(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    if (!attacksForbiddenTarget(unit, decision)) return decision;
+    const candidates = enumerateCandidates(
+        unit,
+        context,
+        [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }],
+        {
+            maxMoveDestinations: 1,
+            maxMeleePairs: 8,
+            maxShotAims: 6,
+            maxAreaThrowCells: 4,
+            enrichIncumbentMetadata: true,
+        },
+    ).candidates.filter((candidate) => !attacksForbiddenTarget(unit, candidate.actions));
+    return (
+        bestV07LegalAttack(candidates)?.actions ??
+        candidates.find((candidate) => candidate.kind === "spell")?.actions ??
+        candidates.find((candidate) => candidate.kind === "move")?.actions ??
+        candidates.find((candidate) => candidate.kind === "wait")?.actions ??
+        candidates.find((candidate) => candidate.kind === "defend")?.actions ?? [
+            { type: "end_turn", unitId: unit.getId(), reason: "manual" },
+        ]
+    );
+}
 
 export const isAuraSaturatedArmy = (units: readonly Unit[]): boolean =>
     units.length > 0 && units.every((unit) => unit.getAuraRanges().some((range) => range > 0));
@@ -179,11 +237,19 @@ export class StrategyV0_7 extends StrategyV0_6 {
             const incumbent = this.archetypeAnchor.decideTurn(unit, context);
             const policy = auraCasterRouterPolicy(this.version);
             const decision = policy ? routeUniversalCasterWithPolicy(unit, context, incumbent, policy) : incumbent;
-            return normalizeMeleeMagicSelection(unit, routeArachnaQueenAssimilation(unit, context, decision));
+            return repairV07ForbiddenTargetDecision(
+                unit,
+                context,
+                normalizeMeleeMagicSelection(unit, routeArachnaQueenAssimilation(unit, context, decision)),
+            );
         }
-        return normalizeMeleeMagicSelection(
+        return repairV07ForbiddenTargetDecision(
             unit,
-            routeArachnaQueenAssimilation(unit, context, super.decideTurn(unit, context)),
+            context,
+            normalizeMeleeMagicSelection(
+                unit,
+                routeArachnaQueenAssimilation(unit, context, super.decideTurn(unit, context)),
+            ),
         );
     }
     /**
