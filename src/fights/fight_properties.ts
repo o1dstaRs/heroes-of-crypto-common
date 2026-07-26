@@ -65,6 +65,8 @@ import {
 } from "../synergies/synergy_properties";
 import { ToFactionName, ToFactionType } from "../factions/faction_type";
 import { SmokeClouds } from "../spells/smoke_clouds";
+import { Vines } from "../spells/vines";
+import { FireWalls } from "../spells/fire_walls";
 
 type RandomIntFn = (min: number, max: number) => number;
 
@@ -114,6 +116,12 @@ export class FightProperties {
     // Transient cell-resident smoke clouds (Smoke spell). Carried on the fight so it snapshots with the rest
     // of the state and the ranked server can replay from a snapshot across restarts.
     private smokeClouds: SmokeClouds = new SmokeClouds();
+    // Transient cell-resident vines (Vine Throw). Same lifecycle as the smoke store above; unlike smoke, a
+    // vine is not dispelled by a creature standing on it.
+    private vines: Vines = new Vines();
+    // Transient cell-resident fire walls (Fire Wall spell). Same lifecycle as the two stores above; like a
+    // vine and unlike smoke, fire is not put out by a creature standing on it.
+    private fireWalls: FireWalls = new FireWalls();
     public constructor() {
         this.id = createSecureUuid();
         this.currentLap = 1;
@@ -173,6 +181,20 @@ export class FightProperties {
     // Replace the smoke store wholesale — used when restoring a fight from a snapshot (ranked server replay).
     public setSmokeClouds(clouds: SmokeClouds): void {
         this.smokeClouds = clouds;
+    }
+    public getVines(): Vines {
+        return this.vines;
+    }
+    // Replace the vine store wholesale — used when restoring a fight from a snapshot (ranked server replay).
+    public setVines(vines: Vines): void {
+        this.vines = vines;
+    }
+    public getFireWalls(): FireWalls {
+        return this.fireWalls;
+    }
+    // Replace the fire store wholesale — used when restoring a fight from a snapshot (ranked server replay).
+    public setFireWalls(fireWalls: FireWalls): void {
+        this.fireWalls = fireWalls;
     }
     public getPlacementType(): PlacementType {
         return this.placementType;
@@ -1262,6 +1284,31 @@ export class FightProperties {
             fight.smoke_clouds.map((c) => ({ x: c.x, y: c.y, l: c.laps_remaining })),
         );
 
+        // Deserialize vines (Vine Throw). `vine_cells` is field 24 in fight.proto, but the checked-in
+        // generated protobuf predates it — regenerating needs a `protoc` binary that is not installed here.
+        // Read it defensively so this compiles and runs today and starts restoring vines across snapshots the
+        // moment someone runs `bun run build:proto`. Until then a restored fight simply has no vines.
+        fightProperties.vines = Vines.fromJSON(
+            (fight as unknown as { vine_cells?: (PBFight.SmokeCell & { team?: number })[] }).vine_cells?.map((c) => ({
+                x: c.x,
+                y: c.y,
+                l: c.laps_remaining,
+                // `team` joins the wire shape when build:proto next runs; until then a restored vine
+                // defaults to team 0, which snares both sides — see the note in serialize().
+                t: c.team ?? 0,
+            })),
+        );
+
+        // Deserialize fire walls (Fire Wall). Read defensively for the same reason as vines above —
+        // `fire_wall_cells` is field 25 in fight.proto and the checked-in generated protobuf predates it.
+        fightProperties.fireWalls = FireWalls.fromJSON(
+            (fight as unknown as { fire_wall_cells?: PBFight.SmokeCell[] }).fire_wall_cells?.map((c) => ({
+                x: c.x,
+                y: c.y,
+                l: c.laps_remaining,
+            })),
+        );
+
         return fightProperties;
     }
     public serialize(): Uint8Array {
@@ -1302,7 +1349,14 @@ export class FightProperties {
             smoke_clouds: this.smokeClouds
                 .toJSON()
                 .map((c) => new PBFight.SmokeCell({ x: c.x, y: c.y, laps_remaining: c.l })),
-        });
+            // See the matching note in deserialize(): the generated Fight message ignores this key until
+            // `bun run build:proto` adds field 24, at which point vines start persisting with no code change.
+            vine_cells: this.vines.toJSON().map((c) => new PBFight.SmokeCell({ x: c.x, y: c.y, laps_remaining: c.l })),
+            // Same story as vine_cells: ignored by the generated message until field 25 is built.
+            fire_wall_cells: this.fireWalls
+                .toJSON()
+                .map((c) => new PBFight.SmokeCell({ x: c.x, y: c.y, laps_remaining: c.l })),
+        } as unknown as ConstructorParameters<typeof PBFight.Fight>[0]);
 
         return fight.serializeBinary();
     }

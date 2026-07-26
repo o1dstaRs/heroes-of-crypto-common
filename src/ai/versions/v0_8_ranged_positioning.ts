@@ -209,6 +209,7 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IReadonlyWeight
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     );
     const routes: IReadonlyWeightedRoute[] = [];
     for (const routeList of movePath.knownPaths.values()) {

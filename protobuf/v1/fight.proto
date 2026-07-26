@@ -28,6 +28,12 @@ message Fight {
     double steps_morale_multiplier = 21;
     map<uint32, bool> has_additional_time_requested_per_team = 22;
     repeated SmokeCell smoke_clouds = 23;
+    // Cells currently covered by a thrown vine (Vine Throw). Same {x, y, laps_remaining} shape as a smoke
+    // cell, so it reuses SmokeCell rather than declaring a near-identical message.
+    repeated SmokeCell vine_cells = 24;
+    // Cells currently alight from a Fire Wall cast. Same {x, y, laps_remaining} shape again, so it reuses
+    // SmokeCell for the same reason vine_cells does.
+    repeated SmokeCell fire_wall_cells = 25;
 }
 
 // One cell currently covered by a transient Smoke cloud (Smoke spell). Carried on the Fight so it survives

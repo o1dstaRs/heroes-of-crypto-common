@@ -310,16 +310,16 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const forced = unit.getTarget();
         const cowardlyVs = (e: Unit): boolean =>
             unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
-        const targets = context.unitsHolder
-            .getAllAllies(enemyTeam)
-            .filter(
-                (e) =>
-                    !e.isDead() &&
-                    !isHidden(e) &&
-                    !cowardlyVs(e) &&
-                    (!forced || e.getId() === forced) &&
-                    e.getCells().some((ec) => destFp.some((fc) => isAdjacentCell(fc, ec))),
-            );
+        const targets = context.unitsHolder.getAllAllies(enemyTeam).filter(
+            (e) =>
+                !e.isDead() &&
+                !isHidden(e) &&
+                !cowardlyVs(e) &&
+                (!forced || e.getId() === forced) &&
+                // Inverse of `forced`: Terrifying Gaze rules out this single enemy, not all the others.
+                !unit.cannotAttackUnitId(e.getId()) &&
+                e.getCells().some((ec) => destFp.some((fc) => isAdjacentCell(fc, ec))),
+        );
         if (!targets.length) {
             return decision;
         }

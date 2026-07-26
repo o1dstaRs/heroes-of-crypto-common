@@ -20,7 +20,7 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { getSpellConfig } from "../configuration/config_provider";
+import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
 import type { FightProperties } from "../fights/fight_properties";
@@ -1299,10 +1299,10 @@ export class UnitsHolder {
                         `${auraEffectProperties.name} Aura`,
                         auraEffectProperties.desc.replace(
                             /\{\}/g,
-                            // Poison Cloud's applied % is the base plus the AFFECTED ally's own luck (added at
-                            // hit time in processPoisonAuraAbility), so fold that ally's luck into the shown
-                            // number here instead of a separate "(plus luck)" clause. Other auras keep base.
-                            (auraEffectProperties.name === "Poison Cloud"
+                            // A poison aura's applied % is the base plus the AFFECTED ally's own luck (added
+                            // at hit time in processPoisonAuraAbility), so fold that ally's luck into the
+                            // shown number here instead of a separate "(plus luck)" clause. Others keep base.
+                            (POISON_ON_HIT_AURA_EFFECT_NAMES.has(auraEffectProperties.name)
                                 ? Math.max(0, auraEffectProperties.power + u.getLuck())
                                 : auraEffectProperties.power
                             ).toString(),

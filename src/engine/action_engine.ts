@@ -9,7 +9,12 @@
  * -----------------------------------------------------------------------------
  */
 
-import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
+import {
+    LUCK_CHANGE_FOR_SHIELD,
+    MORALE_CHANGE_FOR_CLOCK,
+    MORALE_CHANGE_FOR_KILL,
+    MORALE_CHANGE_FOR_SHIELD,
+} from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
 import * as EffectHelper from "../effects/effect_helper";
@@ -34,6 +39,15 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
+import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../spells/spell_damage";
+import { VINE_STRIDE_COST_MULTIPLIER, vinePathCells } from "../spells/vines";
+import {
+    fireWallBurnDamage,
+    fireWallCells,
+    isFireWallableCell,
+    normalizeFireWallOrientation,
+} from "../spells/fire_walls";
+import { getSpellConfig } from "../configuration/config_provider";
 import { Unit } from "../units/unit";
 import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
@@ -317,10 +331,20 @@ export class GameActionEngine {
         const travelledPath = pathIsFootprintOnly
             ? action.path
             : this.getTravelledMovePath(unit, knownMoveRoute?.route ?? action.path);
+        // The cell COUNT is a cheap sanity bound on the walk (real reachability is enforced by knownPaths
+        // above). It assumed a cell costs at least one step — no longer true: a vine strider (Trent, "In Its
+        // Own World") pays half a step per vined cell, so the same budget legitimately covers twice as many
+        // cells. Bound by the cheapest cell THIS unit could pay for, or a legal vine walk is rejected as
+        // invalid_move — which is exactly what "the range shows further but I cannot step there" looked like.
+        const cheapestCellCost =
+            unit.hasAbilityActive("In Its Own World") && this.context.fightProperties.getVines().size() > 0
+                ? VINE_STRIDE_COST_MULTIPLIER
+                : 1;
+        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
         if (
             !pathIsFootprintOnly &&
             (!travelledPath.length ||
-                travelledPath.length > Math.max(1, Math.ceil(unit.getSteps())) ||
+                travelledPath.length > maxTravelledCells ||
                 !this.isContinuousMovePath(unit, travelledPath))
         ) {
             return this.reject("invalid_move");
@@ -370,6 +394,29 @@ export class GameActionEngine {
             );
         }
 
+        // Vine Throw: standing in the enemy's vine is the same snare the throw itself applies. Charged on
+        // ARRIVAL, not on crossing — the movement penalty already prices passing through, and this is the
+        // price of ending up in it. Flyers are not spared here: they clear a vine they fly OVER, but one
+        // they choose to land in grips them like anything else.
+        //
+        // Own-team vines never snare. Trent walks his own vines at half price, and a vine that also
+        // punished his own side would fight the passive it exists to serve.
+        const vinesOnBoard = this.context.fightProperties.getVines();
+        if (vinesOnBoard.size() && !unit.hasDebuffActive("Vine Throw")) {
+            const snaringCell = targetCells.find((cell) => vinesOnBoard.snares(cell, unit.getTeam()));
+            if (snaringCell) {
+                unit.applyDebuff(
+                    new Spell({
+                        // Same lifetime the throw itself grants: read straight off the spell config so the
+                        // two can never drift apart.
+                        spellProperties: getSpellConfig("System", "Vine Throw"),
+                        amount: 1,
+                    }),
+                );
+                this.context.sceneLog.updateLog(`${unit.getName()} is snared by the vine`);
+            }
+        }
+
         // Mark that the unit moved this turn so a later end_turn reads as a real "manual" finish (it
         // acted) rather than a do-nothing skip.
         unit.setMovedThisTurn(true);
@@ -387,7 +434,80 @@ export class GameActionEngine {
         if (result.dispelledSmokeCells?.length) {
             events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
         }
+        // Fire Wall: sear the mover for every burning cell the walk entered. A footprint-only large-unit
+        // move has no ordered step route, so its final footprint stands in for the cells it crossed.
+        events.push(...this.applyFireWallBurn(unit, pathIsFootprintOnly ? targetCells : travelledPath));
         return { completed: true, events };
+    }
+    /**
+     * Fire Wall: burn a unit once for every burning cell its move entered.
+     *
+     * Runs AFTER the move has resolved, so a stack that dies in the flames is cleaned up on the same action
+     * instead of lingering as a corpse until its next turn. The starting cell is never counted — a unit that
+     * began its turn standing in the fire is not charged for staying put (getTravelledMovePath already drops
+     * it), only for cells it walks INTO.
+     *
+     * Damage is re-derived per cell rather than multiplied out, because a stack thinned by the first cell has
+     * a smaller maximum health for the second to take its share of.
+     */
+    private applyFireWallBurn(unit: Unit, crossedCells: XY[]): GameEvent[] {
+        const fireWalls = this.context.fightProperties.getFireWalls();
+        if (!fireWalls.size() || !crossedCells.length) {
+            return [];
+        }
+        // De-duplicate: a large unit reports the same cell once per body part it lands on, and the wall
+        // charges per cell entered, not per body part standing in it.
+        const seen = new Set<number>();
+        const burning: XY[] = [];
+        for (const cell of crossedCells) {
+            const key = (cell.x << 8) | (cell.y & 0xff);
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            if (fireWalls.has(cell)) {
+                burning.push({ x: cell.x, y: cell.y });
+            }
+        }
+        if (!burning.length) {
+            return [];
+        }
+
+        const position = { ...unit.getPosition() };
+        const amountAliveBefore = unit.getAmountAlive();
+        let total = 0;
+        for (let i = 0; i < burning.length; i++) {
+            const damage = fireWallBurnDamage(unit.getCumulativeMaxHp());
+            if (damage <= 0) {
+                break;
+            }
+            total += unit.applyDamage(damage, 0, this.context.sceneLog);
+            if (unit.isDead()) {
+                break;
+            }
+        }
+        if (total <= 0) {
+            return [];
+        }
+
+        const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
+        this.context.sceneLog.updateLog(
+            `${unit.getName()} was seared by the Fire Wall for ${total} damage crossing ${burning.length} of it`,
+        );
+        const events: GameEvent[] = [
+            {
+                type: "fire_wall_burned",
+                unitId: unit.getId(),
+                cells: burning,
+                position,
+                amount: total,
+                unitsDied,
+            },
+        ];
+        if (unit.isDead()) {
+            events.push(...this.cleanupDeadUnits([unit.getId()]));
+        }
+        return events;
     }
     private meleeAttack(action: Extract<GameAction, { type: "melee_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
@@ -819,8 +939,36 @@ export class GameActionEngine {
         if (!target && spell.getName() === "Smoke") {
             return this.smokeCast(action, caster, spell);
         }
+        // Fire Wall: a cell-targeted 3-cell line, laid anywhere on the field in one of four orientations.
+        if (!target && spell.getName() === "Fire Wall") {
+            return this.fireWallCast(action, caster, spell);
+        }
         if (target && (spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune")) {
             return this.enchantCast(caster, target, spell);
+        }
+        // Vine Throw: a targeted enemy cast that also paints the cells it crossed on the way there.
+        if (target && spell.getName() === "Vine Throw") {
+            return this.vineThrowCast(caster, target, spell);
+        }
+        // Battle Mage's Fire Strike: a fireball at one enemy in line of sight.
+        if (target && spell.getName() === "Fire Strike") {
+            return this.fireStrikeCast(caster, target, spell);
+        }
+        // Battle Mage's Meteorite: a 2x2 impact aimed at a cell rather than a unit (no range gate).
+        if (!target && spell.getName() === "Meteorite") {
+            return this.meteoriteCast(action, caster, spell);
+        }
+        // Magic Dragon's Lightning Strike: a bolt at one enemy anywhere, with no line of sight to keep.
+        if (target && spell.getName() === "Lightning Strike") {
+            return this.lightningStrikeCast(caster, target, spell);
+        }
+        // Magic Dragon's Ring of Fire: a burst around one enemy, splashing every unit that touches it.
+        if (target && spell.getName() === "Ring of Fire") {
+            return this.ringOfFireCast(caster, target, spell);
+        }
+        // Magic Dragon's Meteor Shower: a 3x3 impact aimed at a cell rather than a unit (no range gate).
+        if (!target && spell.getName() === "Meteor Shower") {
+            return this.meteorShowerCast(action, caster, spell);
         }
 
         const result = this.context.attackHandler.handleMagicAttack(
@@ -935,6 +1083,575 @@ export class GameActionEngine {
         if (placed.length > 0) {
             events.push({ type: "smoke_placed", casterId: caster.getId(), cells: placed, lapsRemaining: laps });
         }
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Fire Wall (Nightmare / Book of Nightmares): lays a burning wall across 3 cells in a straight line,
+     * anywhere on the battlefield, in whichever of the four orientations the player rotated the aim to.
+     *
+     * All-or-nothing like Smoke: the WHOLE line must be placeable or the cast is refused outright, so the
+     * three cells the aim preview highlighted are exactly the three that light up. Lava and water are
+     * ground the flames sit over; the mountain, a narrowed-away cell, a creature or the board edge are not.
+     *
+     * Two effects, both lasting `spell.getLapsTotal()` laps: entering a burning cell costs one extra step
+     * (see FIRE_WALL_CROSS_PENALTY in path_helper) and sears the crossing stack for a share of its maximum
+     * health (see applyFireWallBurn on the move path). Neither spares flyers. One cast = one charge.
+     */
+    private fireWallCast(
+        action: Extract<GameAction, { type: "cast_spell" }>,
+        caster: Unit,
+        spell: Spell,
+    ): IGameActionResult {
+        if (!action.targetCell) {
+            return this.reject("spell_not_available");
+        }
+        const orientation = normalizeFireWallOrientation(action.targetOrientation);
+        const cells = fireWallCells(action.targetCell, orientation);
+        const settings = this.context.grid.getSettings();
+        const allPlaceable = cells.every((cell) =>
+            isFireWallableCell(this.context.grid, isCellWithinGrid(settings, cell), cell),
+        );
+        if (!allPlaceable) {
+            return this.reject("spell_not_available");
+        }
+        const laps = spell.getLapsTotal();
+        this.context.fightProperties.getFireWalls().addAll(cells, laps);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(`${caster.getName()} raised a Fire Wall for ${getLapString(laps)}`);
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetCell: { ...action.targetCell },
+                unitIdsDied: [],
+                animations: [],
+            },
+            {
+                type: "fire_wall_placed",
+                casterId: caster.getId(),
+                cells: cells.map((c) => ({ x: c.x, y: c.y })),
+                lapsRemaining: laps,
+            },
+        ];
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Vine Throw (Trent / Grove Spellbook): a targeted enemy cast that leaves terrain behind it.
+     *
+     * The vine is thrown along the straight line to the target and lands on every cell it crossed plus the
+     * target's own. Line of sight is gated like a ranged shot — the mountain or any creature standing between
+     * caster and target stops the throw — but unlike an archer the caster needs no shot range: the vine is a
+     * spell, so the only reach limit is what it can see.
+     *
+     * Two effects, both lasting `spell.getLapsTotal()` laps: every vined cell costs a non-flying creature an
+     * extra step to enter (see VINE_CROSS_PENALTY in path_helper), and the struck creature is additionally
+     * snared for a flat slice of its movement (the "Vine Throw" debuff, see Unit.adjustBaseStats).
+     */
+    private vineThrowCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const from = caster.getBaseCell();
+        const to = target.getBaseCell();
+        if (!from || !to) {
+            return this.reject("spell_not_available");
+        }
+        const pathCells = vinePathCells(from, to);
+        if (!pathCells.length) {
+            return this.reject("spell_not_available");
+        }
+        const settings = this.context.grid.getSettings();
+        // Everything before the target's own cell must be clear. The target obviously occupies the last cell,
+        // and the caster's cell is already excluded by vinePathCells.
+        for (const cell of pathCells.slice(0, -1)) {
+            if (!isCellWithinGrid(settings, cell)) {
+                return this.reject("spell_not_available");
+            }
+            const occupant = this.context.grid.getOccupantUnitId(cell);
+            // Lava and water are ground the vine creeps over; a body or the mountain is not.
+            if (occupant && occupant !== "L" && occupant !== "W") {
+                return this.reject("spell_not_available");
+            }
+        }
+
+        const laps = spell.getLapsTotal();
+        this.context.fightProperties.getVines().addAll(pathCells, laps, caster.getTeam());
+        target.applyDebuff(
+            new Spell({
+                spellProperties: getSpellConfig("System", "Vine Throw", laps),
+                amount: 1,
+            }),
+        );
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} snared ${target.getName()} with Vine Throw for ${getLapString(laps)}`,
+        );
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetId: target.getId(),
+                targetCell: to,
+                unitIdsDied: [],
+                animations: [],
+            },
+            {
+                type: "vine_placed",
+                casterId: caster.getId(),
+                targetId: target.getId(),
+                cells: pathCells,
+                lapsRemaining: laps,
+            },
+        ];
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /** Line of sight for a thrown spell — the shared rule, so the aim preview cannot disagree with the cast. */
+    private hasClearSpellLineOfSight(from: XY, to: XY): boolean {
+        const settings = this.context.grid.getSettings();
+        return SpellHelper.isSpellLineOfSightClear(
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            from,
+            to,
+        );
+    }
+    /**
+     * Land already-resolved MAGICAL spell damage on each victim and do the bookkeeping a normal attack does:
+     * the per-unit payload the client draws floating numbers from, the damage statistic, and the morale swing a
+     * kill causes (the caster gains, the victim's same-name stacks across its team lose).
+     *
+     * Each victim's position and stack size are snapshotted BEFORE applyDamage, because a stack that dies is
+     * removed from the board before the visuals play — read it after and the number floats over nothing.
+     */
+    private applySpellDamageToUnits(
+        caster: Unit,
+        victims: Array<{ unit: Unit; damage: number }>,
+    ): {
+        damaged: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+        unitIdsDied: string[];
+        killed: Array<{ victim: Unit; killer: Unit }>;
+    } {
+        const damaged: { unitId: string; position: XY; amount: number; unitsDied: number }[] = [];
+        const unitIdsDied: string[] = [];
+        const killed: Array<{ victim: Unit; killer: Unit }> = [];
+        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
+        let casterPlusMorale = 0;
+
+        for (const { unit, damage } of victims) {
+            const positionAtImpact = { ...unit.getPosition() };
+            const amountAliveBefore = unit.getAmountAlive();
+            const damageDealt = unit.applyDamage(damage, 0 /* magic attack */, this.context.sceneLog, false, caster);
+            const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
+
+            damaged.push({ unitId: unit.getId(), position: positionAtImpact, amount: damageDealt, unitsDied });
+            this.context.attackHandler?.getDamageStatisticHolder().add({
+                unitName: caster.getName(),
+                damage: damageDealt,
+                team: caster.getTeam(),
+                lap: this.context.fightProperties.getCurrentLap(),
+            });
+
+            if (unit.isDead()) {
+                this.context.sceneLog.updateLog(`${unit.getName()} died`);
+                if (!unitIdsDied.includes(unit.getId())) {
+                    unitIdsDied.push(unit.getId());
+                }
+                // Morale is the reward for killing an ENEMY. Ring of Fire splashes onto allies and a spell
+                // rebounded by a Magic Mirror can kill the caster itself; neither is a kill to be proud of,
+                // so neither earns the caster morale nor demoralizes the victim's own side.
+                if (unit.getTeam() !== caster.getTeam()) {
+                    killed.push({ victim: unit, killer: caster });
+                    casterPlusMorale += MORALE_CHANGE_FOR_KILL;
+                    const teamKey = `${unit.getName()}:${unit.getTeam()}`;
+                    moraleDecreaseForTheUnitTeam[teamKey] =
+                        (moraleDecreaseForTheUnitTeam[teamKey] ?? 0) + MORALE_CHANGE_FOR_KILL;
+                }
+            }
+        }
+
+        if (Object.keys(moraleDecreaseForTheUnitTeam).length) {
+            this.context.unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
+        }
+        if (casterPlusMorale > 0) {
+            caster.increaseMorale(
+                casterPlusMorale,
+                this.context.fightProperties.getAdditionalMoralePerTeam(caster.getTeam()),
+            );
+        }
+
+        return { damaged, unitIdsDied, killed };
+    }
+    /**
+     * Fire Strike (Battle Mage / Basic Tome of Battle Magic): a small fireball thrown at a single enemy.
+     *
+     * Reach is LINE OF SIGHT — aimed like an archer's shot, but with no shot range of its own, so whatever the
+     * mage can see it can burn (see hasClearSpellLineOfSight). Damage is the stack-powered formula shared with
+     * the spellbook card, so the number the player read on the page is the number that lands: it is MAGICAL, so
+     * it ignores armor completely and only the target's magic resistance cuts it down. One cast = one charge.
+     */
+    private fireStrikeCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const from = caster.getBaseCell();
+        const to = target.getBaseCell();
+        if (!from || !to) {
+            return this.reject("spell_not_available");
+        }
+        // Every standard gate (enemy team, not self, 100% magic resist, stack power, charge left) in one call —
+        // this path bypasses handleMagicAttack, so it must not bypass its validation too.
+        if (
+            !SpellHelper.canCastSpell(
+                false,
+                this.context.grid.getSettings(),
+                this.context.grid.getMatrix(),
+                caster,
+                target,
+                spell,
+                to,
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
+        if (!this.hasClearSpellLineOfSight(from, to)) {
+            return this.reject("spell_not_available");
+        }
+
+        const damage = applyMagicResistToSpellDamage(
+            calculateStackPoweredSpellDamage(spell.getPower(), caster.getAmountAlive(), caster.getStackPower()),
+            target.getMagicResist(),
+        );
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, [{ unit: target, damage }]);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(`${caster.getName()} 🔥 ${target.getName()} (${damage})`);
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetId: target.getId(),
+                targetCell: to,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Meteorite (Battle Mage / Basic Tome of Battle Magic): a rock called down on a 2x2 block of the board.
+     *
+     * Aimed at a CELL rather than a unit, anywhere the mage likes — there is no range gate and no line of sight
+     * to keep, because it falls out of the sky. `action.targetCell` is the bottom-left of the block, the same
+     * corner convention Craft and Smoke use. Unlike Smoke it may be dropped straight onto occupied cells: that
+     * is the entire point of it.
+     *
+     * Every ENEMY standing under the block takes the damage — allies are not caught, and a large creature
+     * straddling two of the four cells is hit once (evaluateAffectedUnits dedupes by unit). Per target it is the
+     * Fire Strike formula less 40%, the price of hitting a whole cluster at once.
+     *
+     * A drop that catches nobody is REJECTED rather than silently burning the only charge — the same courtesy
+     * canMassCastSpell extends to a mass spell with no valid recipient.
+     */
+    private meteoriteCast(
+        action: Extract<GameAction, { type: "cast_spell" }>,
+        caster: Unit,
+        spell: Spell,
+    ): IGameActionResult {
+        if (!action.targetCell) {
+            return this.reject("spell_not_available");
+        }
+        const c = action.targetCell;
+        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+        // The WHOLE block has to be on the board, so the footprint the aim preview drew is the footprint that
+        // lands. Occupancy is deliberately NOT checked — a meteor is meant to come down on somebody's head.
+        const settings = this.context.grid.getSettings();
+        if (!cells.every((cell) => isCellWithinGrid(settings, cell))) {
+            return this.reject("spell_not_available");
+        }
+
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
+        if (!enemies.length) {
+            return this.reject("spell_not_available");
+        }
+
+        const rawDamage = calculateStackPoweredSpellDamage(
+            spell.getPower(),
+            caster.getAmountAlive(),
+            caster.getStackPower(),
+        );
+        const victims = enemies.map((unit) => ({
+            unit,
+            damage: applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist()),
+        }));
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} called a Meteorite onto ${enemies.length} target(s) (${rawDamage})`,
+        );
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetCell: c,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Turn one raw (pre-resistance) damage number into the list of units that will actually take it, honouring
+     * the Magic Dragon's passive "Magic Mirror" on the way.
+     *
+     * A rebound is an EXTRA hit, not a redirection: the spell still lands on the mirror-holder in full, and on
+     * a successful roll the caster takes the same damage again on top — cut down by the CASTER's own magic
+     * resistance rather than the holder's. This matches how the Magic Mirror BUFF already handles debuffs
+     * (attack_handler applies the debuff to the target and THEN mirrors a copy onto the attacker); the mirror
+     * punishes the caster, it does not protect the holder.
+     *
+     * Two rebounding targets in one splash therefore hit the caster twice. The caster is never asked to
+     * rebound a spell onto itself, so a mirror-carrying caster caught in its own blast cannot loop.
+     */
+    private resolveSpellVictims(
+        caster: Unit,
+        spell: Spell,
+        rawDamage: number,
+        targets: Unit[],
+    ): Array<{ unit: Unit; damage: number }> {
+        const victims: Array<{ unit: Unit; damage: number }> = [];
+        for (const unit of targets) {
+            victims.push({ unit, damage: applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist()) });
+            if (unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)) {
+                this.context.sceneLog.updateLog(
+                    `${unit.getName()} rebounded ${spell.getName()} back at ${caster.getName()}`,
+                );
+                victims.push({
+                    unit: caster,
+                    damage: applyMagicResistToSpellDamage(rawDamage, caster.getMagicResist()),
+                });
+            }
+        }
+
+        return victims;
+    }
+    /**
+     * Lightning Strike (Magic Dragon / Tome of Elements): a bolt called down on a single enemy.
+     *
+     * Where Fire Strike is aimed like an archer's shot, this one falls out of the sky: there is NO line of
+     * sight to keep and no range of its own, so the mountain, a wall of bodies or the sheer width of the board
+     * are all irrelevant — any enemy standing on the field is a legal target. Every other gate still applies
+     * (enemy team, not self, 100% magic resist, stack power, charge left), because this path bypasses
+     * handleMagicAttack and must not bypass its validation too.
+     *
+     * Damage is the stack-powered formula shared with the spellbook card, so the number the player read on the
+     * page is the number that lands: 300 per living dragon at full stack power. It is MAGICAL — armor does
+     * nothing, only the target's magic resistance cuts it down. One cast = one charge.
+     */
+    private lightningStrikeCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const to = target.getBaseCell();
+        if (!to) {
+            return this.reject("spell_not_available");
+        }
+        if (
+            !SpellHelper.canCastSpell(
+                false,
+                this.context.grid.getSettings(),
+                this.context.grid.getMatrix(),
+                caster,
+                target,
+                spell,
+                to,
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
+
+        const rawDamage = calculateStackPoweredSpellDamage(
+            spell.getPower(),
+            caster.getAmountAlive(),
+            caster.getStackPower(),
+        );
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(`${caster.getName()} ⚡ ${target.getName()} (${rawDamage})`);
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetId: target.getId(),
+                targetCell: to,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Ring of Fire (Magic Dragon / Tome of Elements): flame bursts around one enemy in line of sight.
+     *
+     * The footprint is the Cyclops' Large Caliber footprint — the aimed enemy's cell plus every cell touching
+     * it — and, like that splash, it does not care whose side anyone is on: an ally standing next to the
+     * target burns for exactly the same amount. Only the dragon itself is never caught in its own ring.
+     *
+     * Reach is LINE OF SIGHT, the gate Fire Strike uses, because unlike Lightning Strike this one is thrown
+     * rather than called down. Per target it is the Lightning Strike number less 20%, the price of covering a
+     * whole neighbourhood at once. A ring that catches nobody is REJECTED rather than silently burning the
+     * charge.
+     */
+    private ringOfFireCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const from = caster.getBaseCell();
+        const to = target.getBaseCell();
+        if (!from || !to) {
+            return this.reject("spell_not_available");
+        }
+        if (
+            !SpellHelper.canCastSpell(
+                false,
+                this.context.grid.getSettings(),
+                this.context.grid.getMatrix(),
+                caster,
+                target,
+                spell,
+                to,
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
+        if (!this.hasClearSpellLineOfSight(from, to)) {
+            return this.reject("spell_not_available");
+        }
+
+        const cells = [...getCellsAroundCell(this.context.grid.getSettings(), to), to];
+        // evaluateAffectedUnits dedupes by unit, so a large creature straddling two of the ring's cells burns
+        // once. The aimed target stands on one of these cells and so is already in the list.
+        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
+            (unit) => !unit.isDead() && unit.getId() !== caster.getId(),
+        );
+        if (!caught.length) {
+            return this.reject("spell_not_available");
+        }
+
+        const rawDamage = calculateStackPoweredSpellDamage(
+            spell.getPower(),
+            caster.getAmountAlive(),
+            caster.getStackPower(),
+        );
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} ringed ${target.getName()} in fire, catching ${caught.length} target(s) (${rawDamage})`,
+        );
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetId: target.getId(),
+                targetCell: to,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Meteor Shower (Magic Dragon / Tome of Elements): meteors rained over a 3x3 block of the board.
+     *
+     * Aimed at a CELL rather than a unit, anywhere the dragon likes — no range gate and no line of sight,
+     * because it falls out of the sky. `action.targetCell` is the CENTRE of the block: an odd-sided footprint
+     * pivots around the cursor the way the Fire Wall's 3-cell line does, unlike the even-sided 2x2 of Meteorite
+     * and Craft, which have no centre cell to anchor on and take a corner instead.
+     *
+     * Every ENEMY standing under the block takes the damage — allies are not caught (that is Ring of Fire's
+     * job), and a large creature straddling several of the nine cells is hit once. Per target it is the Ring of
+     * Fire number less 10%, the price of covering nine cells at once.
+     *
+     * A drop that catches nobody is REJECTED rather than silently burning the only charge — the same courtesy
+     * canMassCastSpell extends to a mass spell with no valid recipient.
+     */
+    private meteorShowerCast(
+        action: Extract<GameAction, { type: "cast_spell" }>,
+        caster: Unit,
+        spell: Spell,
+    ): IGameActionResult {
+        if (!action.targetCell) {
+            return this.reject("spell_not_available");
+        }
+        const c = action.targetCell;
+        const cells: XY[] = [];
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                cells.push({ x: c.x + dx, y: c.y + dy });
+            }
+        }
+        // The WHOLE block has to be on the board, so the footprint the aim preview drew is the footprint that
+        // lands. Occupancy is deliberately NOT checked — meteors are meant to come down on somebody's head.
+        const settings = this.context.grid.getSettings();
+        if (!cells.every((cell) => isCellWithinGrid(settings, cell))) {
+            return this.reject("spell_not_available");
+        }
+
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
+        if (!enemies.length) {
+            return this.reject("spell_not_available");
+        }
+
+        const rawDamage = calculateStackPoweredSpellDamage(
+            spell.getPower(),
+            caster.getAmountAlive(),
+            caster.getStackPower(),
+        );
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} called a Meteor Shower onto ${enemies.length} target(s) (${rawDamage})`,
+        );
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                targetCell: c,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }

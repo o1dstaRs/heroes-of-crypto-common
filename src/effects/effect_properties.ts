@@ -22,13 +22,21 @@ export interface IAuraOnMap {
 export class EffectProperties {
     public readonly name: string;
     public laps: number;
-    public readonly desc: string;
+    public desc: string;
     public power: number;
-    public constructor(name: string, laps: number, desc: string, power: number) {
+    /**
+     * How many times this effect has been re-applied on top of itself. Only stacking effects (Poison) move
+     * it off 1; everything else re-applies as a replacement and leaves it alone. It rides on the properties
+     * object rather than a parallel UnitProperties array so it survives the battle snapshot for free — the
+     * snapshot clones these objects and restores their prototypes (see battle_snapshot.ts).
+     */
+    public stacks: number;
+    public constructor(name: string, laps: number, desc: string, power: number, stacks = 1) {
         this.name = name;
         this.laps = laps;
         this.desc = desc;
         this.power = power;
+        this.stacks = stacks;
     }
 }
 

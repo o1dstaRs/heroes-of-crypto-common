@@ -179,7 +179,11 @@ describe("IL dataset v3", () => {
             vf: "01af95ce0fa9b93be9ef76579b56f458161c1eb368ac73f2d8a7a9f8373310c8",
             cf: "e332dbea45c3ebfe117de2276f530517c203b09bddaa71099e32c75f10a2111f",
             af: "fc05c543bbb06d280f523ee2971fb19e89558403ecfe86b35ad3e6c41cd1b885",
-            schema: "af3ae8883d0939e48f963a4bdfc0a4fe01dca4d5145830fcf02b6f3a2f941531",
+            // Re-pinned when cast_spell gained `targetOrientation` (Fire Wall's rotatable 3-cell footprint):
+            // the schema hash covers the per-action field whitelist, so widening it moves this hash and only
+            // this hash — af/cf/vf/wf are feature-vector orders and are untouched.
+            // af3ae888...41531 -> 8dfa8af2...28241.
+            schema: "8dfa8af25b132fbf2e81bca275f22a48f76e3b0e94e729e38fbcac729e028241",
         });
     });
 

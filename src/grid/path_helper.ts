@@ -20,6 +20,8 @@ import type { IMovePath, IWeightedRoute } from "./path_definitions";
 import { TeamVals } from "../generated/protobuf/v1";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
+import { VINE_CROSS_PENALTY, VINE_STRIDE_COST_MULTIPLIER } from "../spells/vines";
+import { FIRE_WALL_CROSS_PENALTY } from "../spells/fire_walls";
 import type { IPlacement } from "./placement_properties";
 import { UnitsHolder } from "../units/units_holder";
 
@@ -1177,6 +1179,7 @@ export class PathHelper {
         canFly = false,
         isSmallUnit = true,
         isMadeOfFire = false,
+        hasVineStride = false,
     ): IMovePath {
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];
@@ -1279,6 +1282,39 @@ export class PathHelper {
                 }
             }
             return aggrValue;
+        };
+
+        // Vine Throw terrain. Read off the live fight the same way attack_handler reads smoke clouds — the
+        // store is snapshotted with the rest of fight properties, so AI rollouts see the vines of whatever
+        // state they are exploring rather than the live board.
+        //
+        // A vined cell slows everything that wades through it, except flyers stepping over the top — and
+        // except Trent, whose "In Its Own World" turns its own vines into the fastest road on the board:
+        // half a plain step, with a diagonal costing no more than a straight one.
+        const vines = FightStateManager.getInstance().getFightProperties().getVines();
+        const hasAnyVine = vines.size() > 0;
+        const vineAdjustedCost = (baseCost: number, plainStepCost: number, cell: XY): number => {
+            if (!hasAnyVine || !vines.has(cell)) {
+                return baseCost;
+            }
+            if (hasVineStride) {
+                return plainStepCost * VINE_STRIDE_COST_MULTIPLIER;
+            }
+            return canFly ? baseCost : baseCost + VINE_CROSS_PENALTY;
+        };
+
+        // Fire Wall terrain, read off the live fight the same way. A burning cell costs one extra step on
+        // top of whatever the cell already cost — so a plain step through the wall is double price, and a
+        // vined-and-burning cell charges for both. Flyers are NOT spared here (a vine is something to step
+        // over; a wall of fire is not), which is also why this sits outside vineAdjustedCost's canFly check.
+        const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
+        const hasAnyFireWall = fireWalls.size() > 0;
+        const terrainAdjustedCost = (baseCost: number, plainStepCost: number, cell: XY): number => {
+            const cost = vineAdjustedCost(baseCost, plainStepCost, cell);
+            if (!hasAnyFireWall || !fireWalls.has(cell)) {
+                return cost;
+            }
+            return cost + FIRE_WALL_CROSS_PENALTY;
         };
 
         const indexedNeighbors: XY[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
@@ -1394,6 +1430,9 @@ export class PathHelper {
                     } else {
                         moveCost = PathHelper.DIAGONAL_MOVE_COST * aggr(n, curWeightedRoute);
                     }
+                    // Dividing back out the diagonal factor recovers the aggression-adjusted plain step, which
+                    // is what a vine strider pays for a diagonal.
+                    moveCost = terrainAdjustedCost(moveCost, moveCost / PathHelper.DIAGONAL_MOVE_COST, n);
 
                     if (remaining >= moveCost) {
                         // disallow sneaking between diagonals
@@ -1507,6 +1546,7 @@ export class PathHelper {
                     } else {
                         moveCost = aggr(n, curWeightedRoute);
                     }
+                    moveCost = terrainAdjustedCost(moveCost, moveCost, n);
                     if (remaining >= moveCost) {
                         if (indexedStepsRemaining) {
                             indexedStepsRemaining[keyNeighbor] = remaining - moveCost;

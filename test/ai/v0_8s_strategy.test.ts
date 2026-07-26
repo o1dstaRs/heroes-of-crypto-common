@@ -177,8 +177,10 @@ describe("v0.8 search measurement alias", () => {
         // every seeded roster draw and therefore both traces. Two isolated runs reproduced these hashes.
         // Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft pool 12 -> 13, shifting the same
         // seeded draw. Two isolated runs reproduced these hashes.
-        expect(digest("v0.7")).toBe("d80afc10ccb8ccc2d7381867a940827fa2157bffd68fe9f086fe0556108607e4");
-        expect(digest("v0.8")).toBe("739d986340d9ff5d5d999a7f7dd5bbacade95dbfeee69644c9d88ea3b4c60c92");
+        // Re-pinned after the L2/L3 catalogs grew (Wyvern..Nightmare) and poison began stacking; both shift the
+        // same seeded draw and its combat trace.
+        expect(digest("v0.7")).toBe("57e1d04de4e9119764375d2451b1d630220c7461ed71d36d19b5803269b1f9b8");
+        expect(digest("v0.8")).toBe("b6ab3f241ed4bed6b363f67e16016da7653754285721465d836acea1b48d1d33");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

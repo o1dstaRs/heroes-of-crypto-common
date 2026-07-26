@@ -786,7 +786,9 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_MAX_THROWS: "1",
         });
         const capture = (version: "v0.8s" | "v0.8"): IEnumeratedCandidate[] => {
-            const harness = buildBattle(203, version);
+            // Seed 204, not 203: adding Trent to the Nature L2 catalog shifted the seeded roster and 203 no
+            // longer deals this side a shooter, which is the posture these tests exist to exercise.
+            const harness = buildBattle(204, version);
             expect(harness.fightProperties.getCurrentLap()).toBeLessThan(V08_TARGET_PRESSURE_START_LAP);
             const unit = harness.unitsHolder
                 .getAllAllies(GREEN_TEAM)
@@ -2828,7 +2830,9 @@ describe("search driver — gating, hygiene, determinism", () => {
 
     it("keeps the normal rollout gate for an explicit stronger-ranged posture wait", () => {
         const buildStrongPosture = () => {
-            const harness = buildBattle(203, "v0.8s");
+            // Seed 204, not 203: adding Trent to the Nature L2 catalog shifted the seeded roster and 203 no
+            // longer deals this side a shooter, which is the posture these tests exist to exercise.
+            const harness = buildBattle(204, "v0.8s");
             const unit = [...harness.unitsHolder.getAllAllies(GREEN_TEAM)].find(
                 (candidate) =>
                     !candidate.isDead() &&

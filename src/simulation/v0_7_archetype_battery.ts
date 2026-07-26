@@ -162,7 +162,9 @@ const TEMPLATE_DEFINITIONS: Readonly<Record<V07ArchetypeTemplateName, ITemplateD
     },
     aura_support: {
         archetype: "aura",
-        creatureNames: ["Peasant", "Leprechaun", "White Tiger", "Valkyrie", "Griffin", "Pegasus"],
+        // Pegasus dropped from level four to level three, so it now fills the L3 slot Griffin used to hold
+        // and Angel takes the L4 one — the roster keeps its all-army (Pegasus Might) plus ranged-defense mix.
+        creatureNames: ["Peasant", "Leprechaun", "White Tiger", "Valkyrie", "Pegasus", "Angel"],
         purpose: "Defensive, control, and all-army aura coverage.",
     },
     aura_offense: {
@@ -250,14 +252,27 @@ export function validateV07ArchetypeTemplates(): void {
             }
         });
     }
+    // Trait coverage is bounded by the frozen roster shape: an archetype only owns
+    // (its template count x DEFAULT_ROSTER_COMPOSITION count) slots per level, so a level holding more
+    // trait creatures than slots can never seat them all. Pegasus dropping from level four to level three
+    // put three aura units (Crusader, Griffin, Pegasus) on the aura archetype's two level-three slots.
+    // Demand every SEATABLE unit be seated rather than every unit outright — an accidental omission still
+    // fails whenever the level has room, while the structural over-supply does not.
+    const levelOfCreature = new Map<string, number>(
+        [1, 2, 3, 4].flatMap((level) => creaturesByLevel(level).map((entry) => [entry.creatureName, level] as const)),
+    );
     for (const archetype of V07_ARCHETYPES) {
-        const covered = new Set(
-            V07_ARCHETYPE_TEMPLATES.filter((template) => template.archetype === archetype).flatMap((template) =>
-                template.roster.map((unit) => unit.creatureName),
-            ),
-        );
-        const missing = V07_ARCHETYPE_TAXONOMY[archetype].filter((name) => !covered.has(name));
-        if (missing.length) throw new Error(`${archetype} templates omit enabled trait units: ${missing.join(", ")}`);
+        const templates = V07_ARCHETYPE_TEMPLATES.filter((template) => template.archetype === archetype);
+        const covered = new Set(templates.flatMap((template) => template.roster.map((unit) => unit.creatureName)));
+        for (const { level, count } of DEFAULT_ROSTER_COMPOSITION) {
+            const pool = V07_ARCHETYPE_TAXONOMY[archetype].filter((name) => levelOfCreature.get(name) === level);
+            const seatable = Math.min(pool.length, templates.length * count);
+            if (pool.filter((name) => covered.has(name)).length >= seatable) {
+                continue;
+            }
+            const missing = pool.filter((name) => !covered.has(name));
+            throw new Error(`${archetype} templates omit enabled level-${level} trait units: ${missing.join(", ")}`);
+        }
     }
 }
 

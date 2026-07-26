@@ -233,15 +233,19 @@ describe("AI meta cohort generation", () => {
     });
 
     it("replays the ranked pair that exposed size-incompatible stolen Castling", async () => {
-        // Re-pinned 1013 -> 29 after Ash Moth grew the L1 pool 15 -> 16 and reshuffled every seeded draft.
+        // Re-pinned 1013 -> 29 after Ash Moth grew the L1 pool 15 -> 16, then 29 -> 104 after Trent grew the
+        // Nature L2 pool, then 104 -> 53 after Monk grew the Life L3 pool, then 53 -> 11 after
+        // Battle Mage / Nightmare / Magic Dragon landed and Zena moved L2 -> L3 — each change reshuffles
+        // every seeded draft again.
         // The pair index is NOT the point: the scenario is. This bug needs a large (2x2) Arachna Queen —
         // the ability THIEF, via Predatory Assimilation — facing another large unit, so a stolen Castling
-        // has a size-incompatible swap partner. Pair 1013 now drafts Abomination instead of the Queen, so
-        // it no longer reproduces anything; 29 is the lowest pair that again fields Black Dragon against
-        // Arachna Queen on the same map 4 (45/50/53/59/93/98/140/157/205 also qualify).
-        const record = await runMetaPairInWorker("ranked-draft", 29);
+        // has a size-incompatible swap partner. Re-pinned again 11 -> 233 after the poison aura began
+        // stacking and riding responses, which reshuffled the seeded draft once more. 233 is the lowest
+        // pair that again fields Black Dragon against Arachna Queen on the same map 4 (272/332/335/359/374
+        // also qualify within the first 400).
+        const record = await runMetaPairInWorker("ranked-draft", 233);
 
-        expect(record.pair).toBe(29);
+        expect(record.pair).toBe(233);
         expect(record.map).toBe(4);
         expect(record.armyA.roster.some((unit) => unit.creatureName === "Black Dragon")).toBe(true);
         expect(record.armyB.roster.some((unit) => unit.creatureName === "Arachna Queen")).toBe(true);

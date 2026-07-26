@@ -56,7 +56,18 @@ export type GameAction =
           hasWaterCell?: boolean;
       }
     | { type: "area_throw_attack"; attackerId: string; targetCell: XY }
-    | { type: "cast_spell"; casterId: string; spellName: string; targetId?: string; targetCell?: XY }
+    // `targetOrientation` only means anything to a spell whose footprint can be turned — today just Fire
+    // Wall, whose 3-cell line the player rotates with Shift while aiming (see FireWallOrientation). Omitted
+    // by every other cast, and normalized engine-side, so an absent or malformed value falls back to the
+    // default horizontal lay rather than rejecting the action.
+    | {
+          type: "cast_spell";
+          casterId: string;
+          spellName: string;
+          targetId?: string;
+          targetCell?: XY;
+          targetOrientation?: number;
+      }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
     // `cells` places the peeled-off stack in the SAME action. Omit it (the sidebar's "Split Selected"
     // button) and the new stack is created unplaced, for the player to position separately. Supplying it

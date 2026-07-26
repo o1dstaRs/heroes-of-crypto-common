@@ -1022,6 +1022,7 @@ export function findMountainMeleeStrike(
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1195,6 +1196,7 @@ function preferBackstabAttackCell(
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.

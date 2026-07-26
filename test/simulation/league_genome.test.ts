@@ -234,9 +234,15 @@ describe("B1 full-game league genome", () => {
         // Re-pinned after Blacksmith expanded the Life L1 offer pool: seed 150 preserved the fixture's
         // no-vision collision outcome without weakening the SEE_NONE or tight-placement assertions.
         // Re-pinned 150 -> 54 after Zena (50) grew the L2 pool and shifted the same draw (seed 150 now
-        // leaks known opponent creatures). 54 is the lowest of the two seeds under 500 that still satisfy
-        // all three assertions; the search stays out of the test so they cannot pass tautologically.
-        const noVision = resolveLeaguePick(54, alternative, opponent, true);
+        // leaks known opponent creatures). Re-pinned 54 -> 71 after Wyvern (51) and Trent (52) grew that
+        // pool 13 -> 15, shifting it again; 71 is the lowest surviving seed. Re-pinned 71 -> 645 after the
+        // Manticore (53) took that pool 15 -> 16 and shifted it once more; 645 is again the lowest
+        // survivor. Re-pinned 645 -> 591 after the Battle Mage (55) took that pool 16 -> 17; the other
+        // qualifying seeds are 738, 1787, 3997, 4135 and 4727. The binding assertion is the empty
+        // known-creature list — it stays RARE with this pool (6 of the first 5000 seeds clear it), while
+        // SEE_NONE and "tight" still hold broadly. The search stays out of the test so it cannot pass
+        // tautologically.
+        const noVision = resolveLeaguePick(591, alternative, opponent, true);
         expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
         expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");

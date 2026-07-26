@@ -232,6 +232,13 @@ describe("public-roster natural guard shard pooler", () => {
         ]);
         expect(first.slices.natural.candidate.games).toBe(16);
         expect(first.slices.natural.control.games).toBe(16);
+        // Re-pinned after Battle Mage (55) grew the Might L2 pool 16 -> 17: the seeded draft on one of the four
+        // boards handed its LOWER seat a "melee-other" cohort, and fixtureRecord only "treats" a seat that
+        // isn't melee-other, which docked one treated game from four of these numbers (8/4/4/4/8 -> 7/3/4/3/7.875).
+        // Re-pinned BACK to 8/4/4/4/8 after Zena (50) moved from Might L2 to Might L3 shrank that pool 17 -> 16:
+        // the same seeded draw no longer lands the melee-other cohort on that seat, so every game is treated
+        // again. The pooling invariants above (contiguous ledger, no omitted boards, 16 natural games) are the
+        // real assertions here and are unchanged — these five are downstream of the draft, not of the pooler.
         expect(first.slices.actionable.candidate.games).toBe(8);
         expect(first.slices.flyerScreen.candidate.games).toBe(4);
         expect(first.slices.cornerShift.candidate.games).toBe(4);

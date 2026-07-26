@@ -119,7 +119,7 @@ const IL_ACTION_FIELDS = Object.freeze({
     range_attack: ["type", "attackerId", "targetId", "aimCell", "aimSide"],
     obstacle_attack: ["type", "attackerId", "targetPosition", "attackFrom", "path", "hasLavaCell", "hasWaterCell"],
     area_throw_attack: ["type", "attackerId", "targetCell"],
-    cast_spell: ["type", "casterId", "spellName", "targetId", "targetCell"],
+    cast_spell: ["type", "casterId", "spellName", "targetId", "targetCell", "targetOrientation"],
 } as const);
 const IL_DECISION_ROW_FIELDS = [
     "t",

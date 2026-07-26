@@ -284,7 +284,15 @@ describe("ranked conditional dual-genome compatibility", () => {
         // Re-pinned after Blacksmith expanded the Life L1 catalog and shifted the seeded round-3 draft picks.
         // Re-pinned again after Ash Moth (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
         // Re-pinned again after Zena (50) grew the L2 pool, which swaps 36 for her in the same seeded draw.
-        expect(mixed.lower.creatureIds).toEqual([32, 50, 31, 26, 38, 20]);
+        // Re-pinned again after Wyvern (51) and Trent (52) grew that pool 13 -> 15; Trent takes the slot
+        // Zena held, in the same seeded draw.
+        // Re-pinned again after Manticore (53) grew that pool 15 -> 16; she in turn takes the slot Trent
+        // held, and the shifted draw swaps 26 for 36 in the same seeded round.
+        // Re-pinned again after Monk (54) grew the L3 pool 8 -> 9, which swaps 38 for 18 in the same draw.
+        // Re-pinned again after Battle Mage (55) and Nightmare (56) grew the L2/L3 pools once more, and the
+        // Venom Cloud Aura's poison began stacking (+35% per further poison) — both legitimately move this
+        // seeded draw. They landed in one shared working tree, so per-change isolation was not possible.
+        expect(mixed.lower.creatureIds).toEqual([32, 55, 31, 36, 18, 9]);
     });
 });
 

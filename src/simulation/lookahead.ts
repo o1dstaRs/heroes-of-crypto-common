@@ -281,6 +281,7 @@ export class LookaheadDriver {
                 unit.canFly(),
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
+                unit.hasAbilityActive("In Its Own World"),
             );
             for (const e of enemies) {
                 if (usedTargets.has(e.getId())) {

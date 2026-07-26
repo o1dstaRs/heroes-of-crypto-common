@@ -93,8 +93,11 @@ const LAVA_GAME_158: RecordedReplay = {
     ],
 };
 
+// Re-recorded after Pegasus dropped from Nature L4 to Nature L3: the red level-four slot became
+// Thunderbird (the other exp-334 L4 flyer) and the seed moved 3167913824 -> 3167914054, the first of
+// several that reproduce the Cowardice fallback here (3167914078, 3167914171, 3167914195 also qualify).
 const NORMAL_GAME_799: RecordedReplay = {
-    seed: 3167913824,
+    seed: 3167914054,
     gridType: PBTypes.GridVals.NORMAL,
     green: [
         ["Nature", "Wolf", 1, 1, 124],
@@ -110,7 +113,7 @@ const NORMAL_GAME_799: RecordedReplay = {
         ["Life", "Healer", 2, 1, 40],
         ["Nature", "Elf", 2, 1, 26],
         ["Life", "Griffin", 3, 1, 9],
-        ["Nature", "Pegasus", 4, 2, 3],
+        ["Might", "Thunderbird", 4, 2, 3],
     ],
 };
 

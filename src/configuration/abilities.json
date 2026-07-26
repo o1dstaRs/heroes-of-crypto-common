@@ -557,13 +557,43 @@
     "Poison Cloud Aura": {
         "name": "Poison Cloud Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells apply {}% of their attack damage to the target as Poison"],
+        "desc": [
+            "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
+            "Poisoning an already poisoned enemy stacks: +35% poison damage per stack"
+        ],
         "power": 15,
         "power_type": "POISON_ON_HIT",
         "skip_reponse": false,
         "stack_powered": false,
         "effect": null,
         "aura_effect": "Poison Cloud",
+        "can_be_cast": false
+    },
+    "Guiding Winds Aura": {
+        "name": "Guiding Winds Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Ranged allies within 2 cells shoot {}% further"],
+        "power": 30,
+        "power_type": "ADDITIONAL_SHOT_DISTANCE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Guiding Winds",
+        "can_be_cast": false
+    },
+    "Venom Cloud Aura": {
+        "name": "Venom Cloud Aura",
+        "type": "BUFF_AURA",
+        "desc": [
+            "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
+            "Poisoning an already poisoned enemy stacks: +35% poison damage per stack"
+        ],
+        "power": 15,
+        "power_type": "POISON_ON_HIT",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Venom Cloud",
         "can_be_cast": false
     },
     "Hamstring": {
@@ -690,6 +720,36 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "In Its Own World": {
+        "name": "In Its Own World",
+        "type": "MOVEMENT",
+        "desc": [
+            "Moves through its own vines at half the usual cost, and crosses them diagonally for the price of a straight step."
+        ],
+        "power": 50,
+        "power_type": "VINE_STRIDE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Basic Tome of Battle Magic": {
+        "name": "Basic Tome of Battle Magic",
+        "type": "INFO",
+        "desc": [
+            "A field primer of offensive magic — the first two pages every war college teaches.",
+            "Grants the caster the following spells:",
+            "Fire Strike and Meteorite"
+        ],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Forest Spellbook": {
         "name": "Forest Spellbook",
         "type": "INFO",
@@ -737,6 +797,50 @@
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
         "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Book of Nightmares": {
+        "name": "Book of Nightmares",
+        "type": "INFO",
+        "desc": ["Allows the caster to access the following spells:", "Fire Wall"],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Tome of Elements": {
+        "name": "Tome of Elements",
+        "type": "INFO",
+        "desc": [
+            "Four pages, one for each element the wyrm was hatched from.",
+            "Grants the caster the following spells:",
+            "Whirlpool, Lightning Strike, Ring of Fire and Meteor Shower"
+        ],
+        "power": 0,
+        "power_type": "SPELLBOOK",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Magic Mirror": {
+        "name": "Magic Mirror",
+        "type": "REFLECT",
+        "desc": [
+            "Rebounds every spell aimed at this creature {}% of the time.",
+            "The spell still lands on the dragon in full — the rebound is on top of it,",
+            "striking the caster with the same damage and the same effects"
+        ],
+        "power": 80,
+        "power_type": "MAGIC_MIRROR_REFLECT",
+        "skip_reponse": false,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
@@ -805,7 +909,7 @@
         "name": "Pegasus Might Aura",
         "type": "BUFF_AURA",
         "desc": ["Allies within range gain +{} base attack and armor"],
-        "power": 3,
+        "power": 2,
         "power_type": "ADDITIONAL_BASE_ATTACK_AND_ARMOR",
         "skip_reponse": false,
         "stack_powered": false,
@@ -1016,6 +1120,22 @@
         "aura_effect": null,
         "can_be_cast": true
     },
+    "Vine Throw": {
+        "name": "Vine Throw",
+        "type": "STATUS",
+        "desc": [
+            "When cast, hurls a vine at an enemy in line of sight, leaving it across every cell on the way.",
+            "A non-flying creature pays 1 extra step to cross a vined cell.",
+            "Any enemy that ends its move standing in the vine loses {} steps, as does the creature struck"
+        ],
+        "power": 1.5,
+        "power_type": "VINE_THROW",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": true
+    },
     "Battle Roar": {
         "name": "Battle Roar",
         "type": "MASS_BUFF",
@@ -1212,6 +1332,77 @@
         ],
         "power": 25,
         "power_type": "STEAL_ABILITY",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Warding Mane Aura": {
+        "name": "Warding Mane Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within 2 cells gain {}% resistance to all magical attacks and debuffs"],
+        "power": 20,
+        "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": "Warding Mane",
+        "can_be_cast": false
+    },
+    "Terrifying Gaze": {
+        "name": "Terrifying Gaze",
+        "type": "MIND",
+        "desc": [
+            "On attack, a {}% chance to frighten the target. A frightened enemy",
+            "can neither attack nor retaliate against the gazer for 1 turn,",
+            "but is free to strike anyone else"
+        ],
+        "power": 60,
+        "power_type": "APPLY_EFFECT",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Terrifying Gaze",
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Serene Mind": {
+        "name": "Serene Mind",
+        "type": "DEFENCE",
+        "desc": ["Provides {}% resistance to all magical attacks and debuffs"],
+        "power": 50,
+        "power_type": "MAGIC_RESIST_50",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Borrowed Grace": {
+        "name": "Borrowed Grace",
+        "type": "ATTACK",
+        "desc": [
+            "Each landed shot has a {}% chance to take one random active buff off the target",
+            "and wear it for the rest of its duration. Auras and equipment cannot be taken"
+        ],
+        "power": 70,
+        "power_type": "STEAL_BUFF",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Absolving Arrow": {
+        "name": "Absolving Arrow",
+        "type": "HEAL",
+        "desc": [
+            "Allies the arrow passes through are absolved of one negative effect with a {}% chance",
+            "(25% at one stack, up to 100% at five); each further effect on the same ally is half",
+            "as likely to be lifted as the one before"
+        ],
+        "power": 100,
+        "power_type": "DISPEL_ON_TRAJECTORY",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,

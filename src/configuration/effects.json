@@ -65,5 +65,11 @@
         "laps": 2,
         "power": 0,
         "desc": "Disables all the unit's abilities for two laps."
+    },
+    "Terrifying Gaze": {
+        "name": "Terrifying Gaze",
+        "laps": 1,
+        "power": 0,
+        "desc": "Too frightened to face the beast that gazed at it. Can neither attack nor retaliate against that enemy, but may still strike anyone else."
     }
 }

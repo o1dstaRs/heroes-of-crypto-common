@@ -534,6 +534,8 @@ export class StrategyV0_2 extends StrategyV0_1 {
                     e.getId() !== current.getId() &&
                     !e.isDead() &&
                     !e.hasBuffActive("Hidden") &&
+                    // Never swap onto the one enemy Terrifying Gaze has put off limits this turn.
+                    !unit.cannotAttackUnitId(e.getId()) &&
                     // A meaningful stack (not a trivial one we'd waste the hit on) that still won't
                     // counter — i.e. it already responded or can't respond.
                     e.getStackPower() > NEGLIGIBLE_COUNTER_STACK_POWER &&
@@ -616,6 +618,9 @@ export class StrategyV0_2 extends StrategyV0_1 {
             forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
         }
         for (const enemy of enemies) {
+            if (unit.cannotAttackUnitId(enemy.getId())) {
+                continue; // frightened by Terrifying Gaze: the gazer is not a legal shot this turn
+            }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
                     if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) {

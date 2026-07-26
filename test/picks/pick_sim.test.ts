@@ -74,10 +74,10 @@ describe("pick_sim", () => {
             15,
             14,
             13, // four globally distinct L1 offers (16-creature pool: Mermaid, Dryad, Blacksmith, Ash Moth)
-            13,
-            12,
-            11,
-            10, // four globally distinct L2 offers (13-creature pool after enabling Zena)
+            16,
+            15,
+            14,
+            13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
             12,
             12,
             12,
@@ -93,19 +93,19 @@ describe("pick_sim", () => {
             10,
             9,
             8, // L1 bans after excluding all four offers (16-creature pool)
-            9,
-            8,
-            7,
-            6,
-            5, // L2 bans after excluding all four offers (13-creature pool after enabling Zena)
-            8,
-            7,
-            6, // L3 bans
             12,
             11,
             10,
             9,
-            8, // L4 bans (12-creature pool after enabling Arachna Queen)
+            8, // L2 bans after excluding all four offers (16-creature pool: Battle Mage in, Zena out to L3)
+            12,
+            11,
+            10, // L3 bans (12-creature pool: the Life Monk, the Chaos Nightmare, Zena up from L2, Pegasus down from L4)
+            12,
+            11,
+            10,
+            9,
+            8, // L4 bans (12-creature pool: Arachna Queen and Magic Dragon in, Pegasus out to L3)
         ]);
 
         const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
@@ -193,13 +193,14 @@ describe("pick_sim", () => {
         state = accept(state, { type: "select_tier2", team: LOWER, artifactId: 1 });
         expect(state.phaseSequence).toBe(9);
 
-        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 30 });
+        // Angel (40) rather than Pegasus (30) for the last L4 slot — Pegasus dropped to L3.
+        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 40 });
         state = accept(state, { type: "pick_creature", team: LOWER, creatureId: 39 });
 
         expect(isPickSimComplete(state)).toBe(true);
         expect(state.phaseSequence).toBe(11);
         expect(state.lower.creatures).toEqual([1, 4, 2, 14, 18, 39]);
-        expect(state.upper.creatures).toEqual([3, 6, 11, 5, 27, 30]);
+        expect(state.upper.creatures).toEqual([3, 6, 11, 5, 27, 40]);
         expect(state.lower.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.upper.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.transcript.map((event) => event.type)).toEqual([
