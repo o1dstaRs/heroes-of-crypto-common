@@ -522,14 +522,38 @@ export class StrategyV0_1 implements IAIStrategy {
         });
     }
     /**
+     * A mindless stack can be temporarily boxed in by its own army even though it is healthy and mobile.
+     * Preserve its chance to charge later in the lap: hourglass once while a teammate can still clear a
+     * lane, then defend when waiting is unavailable. A raw end_turn is both a morale-penalized skip and a
+     * false "stuck" signal in the v0.8 coverage gates.
+     *
+     * Keep ordinary v0.1 callers unchanged. The non-mindless baseline (and strategies inheriting this
+     * fallback) historically ends an idle turn; this special case belongs only to "AI Driven" creatures.
+     */
+    protected idleTurn(unit: Unit, context: IDecisionContext): GameAction[] {
+        if (!isMindlessAiUnit(unit)) {
+            return [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
+        }
+        const fightProperties = context.fightProperties;
+        const canHourglass =
+            !!fightProperties &&
+            fightProperties.hasUnactedTeammate(unit.getTeam(), unit.getId(), context.unitsHolder.getAllUnits()) &&
+            !unit.isOnHourglass() &&
+            !fightProperties.hourglassIncludes(unit.getId()) &&
+            !fightProperties.hasAlreadyHourglass(unit.getId()) &&
+            !fightProperties.hasAlreadyMadeTurn(unit.getId());
+        return canHourglass
+            ? [{ type: "wait_turn", unitId: unit.getId() }]
+            : [{ type: "defend_turn", unitId: unit.getId() }];
+    }
+    /**
      * No reachable enemy/target: advance toward the nearest enemy along the best known route, mirroring
-     * the live server's fallback. If the unit can't move, pass the turn.
+     * the live server's fallback. If the unit can't move, use its appropriate idle action.
      */
     protected fallbackTurn(unit: Unit, context: IDecisionContext): GameAction[] {
         const { grid, matrix, unitsHolder } = context;
-        const endTurn: GameAction = { type: "end_turn", unitId: unit.getId(), reason: "manual" };
         if (!unit.canMove()) {
-            return [endTurn];
+            return this.idleTurn(unit, context);
         }
         const enemyTeam = otherTeam(unit.getTeam());
         const movePath = decisionPathSource(context).getMovePath(
@@ -543,7 +567,7 @@ export class StrategyV0_1 implements IAIStrategy {
         );
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
         if (!enemies.length || !movePath.knownPaths.size) {
-            return [endTurn];
+            return this.idleTurn(unit, context);
         }
 
         const base = unit.getBaseCell();
@@ -576,7 +600,7 @@ export class StrategyV0_1 implements IAIStrategy {
             }
         }
         if (!bestRoute?.route.length) {
-            return [endTurn];
+            return this.idleTurn(unit, context);
         }
         return [
             {

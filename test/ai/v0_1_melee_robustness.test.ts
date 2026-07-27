@@ -17,10 +17,12 @@ import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
+import type { XY } from "../../src/utils/math";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -56,7 +58,126 @@ function applyCowardice(unit: Unit): void {
     unit.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
 }
 
+function setTeamCensus(combat: CombatTestContext): void {
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
+    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+}
+
+function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
+    const cells = [
+        { x: base.x, y: base.y },
+        { x: base.x - 1, y: base.y },
+        { x: base.x, y: base.y - 1 },
+        { x: base.x - 1, y: base.y - 1 },
+    ];
+    const position = getPositionForCells(testGridSettings, cells);
+    if (!position) {
+        throw new Error("invalid large-unit test placement");
+    }
+    unit.setPosition(position.x, position.y);
+    expect(
+        combat.grid.occupyCells(
+            cells,
+            unit.getId(),
+            unit.getTeam(),
+            unit.getAttackRange(),
+            unit.hasAbilityActive("Made of Fire"),
+            unit.hasAbilityActive("Made of Water"),
+        ),
+    ).toBe(true);
+    combat.unitsHolder.addUnit(unit);
+}
+
+function boxedMindlessBerserker(): { combat: CombatTestContext; attacker: Unit; context: IDecisionContext } {
+    const combat = createCombatTestContext();
+    const attacker = createTestUnit({
+        name: "Berserker",
+        team: LOWER,
+        attackType: MELEE,
+        abilities: ["AI Driven"],
+    });
+    placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
+    for (const [index, cell] of [
+        { x: 4, y: 4 },
+        { x: 5, y: 4 },
+        { x: 6, y: 4 },
+        { x: 4, y: 5 },
+        { x: 6, y: 5 },
+        { x: 4, y: 6 },
+        { x: 5, y: 6 },
+        { x: 6, y: 6 },
+    ].entries()) {
+        const ally = createTestUnit({ name: `Ally ${index}`, team: LOWER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, ally, cell);
+    }
+    const enemy = createTestUnit({ name: "Distant Enemy", team: UPPER, attackType: MELEE });
+    placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 12 });
+    setTeamCensus(combat);
+    return { combat, attacker, context: contextFor(combat) };
+}
+
 describe("v0.1 melee robustness", () => {
+    it("hourglasses an ally-boxed AI-Driven Berserker instead of skipping", () => {
+        const { attacker, context } = boxedMindlessBerserker();
+
+        const actions = getAIStrategy("v0.1").decideTurn(attacker, context);
+        expect(actions).toEqual([{ type: "wait_turn", unitId: attacker.getId() }]);
+        expect(actions.some((action) => action.type === "end_turn")).toBe(false);
+    });
+
+    it("hourglasses a large ally-boxed Frenzied Boar instead of skipping", () => {
+        const combat = createCombatTestContext();
+        const boar = createTestUnit({
+            name: "Frenzied Boar",
+            team: LOWER,
+            attackType: MELEE,
+            size: PBTypes.UnitSizeVals.LARGE,
+            speed: 7,
+            abilities: ["AI Driven"],
+        });
+        placeLarge(combat, boar, { x: 7, y: 13 });
+        for (const [index, cell] of [
+            { x: 8, y: 12 },
+            { x: 5, y: 12 },
+            { x: 7, y: 14 },
+            { x: 6, y: 11 },
+        ].entries()) {
+            const ally = createTestUnit({ name: `Blocker ${index}`, team: LOWER, attackType: MELEE });
+            placeUnit(combat.grid, combat.unitsHolder, ally, cell);
+        }
+        const enemy = createTestUnit({
+            name: "Distant Large Enemy",
+            team: UPPER,
+            attackType: MELEE,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
+        placeLarge(combat, enemy, { x: 7, y: 10 });
+        setTeamCensus(combat);
+
+        const actions = getAIStrategy("v0.1").decideTurn(boar, contextFor(combat));
+        expect(actions).toEqual([{ type: "wait_turn", unitId: boar.getId() }]);
+        expect(actions.some((action) => action.type === "end_turn")).toBe(false);
+    });
+
+    it("defends an AI-Driven stack after its hourglass is spent instead of skipping", () => {
+        const { attacker, context } = boxedMindlessBerserker();
+        context.fightProperties!.restoreAlreadyHourglass([attacker.getId()]);
+
+        const actions = getAIStrategy("v0.1").decideTurn(attacker, context);
+        expect(actions).toEqual([{ type: "defend_turn", unitId: attacker.getId() }]);
+        expect(actions.some((action) => action.type === "end_turn")).toBe(false);
+    });
+
+    it("preserves the non-mindless v0.1 idle fallback", () => {
+        const { attacker, context } = boxedMindlessBerserker();
+        attacker.deleteAbility("AI Driven");
+
+        expect(getAIStrategy("v0.1").decideTurn(attacker, context)).toEqual([
+            { type: "end_turn", unitId: attacker.getId(), reason: "manual" },
+        ]);
+    });
+
     it("always prioritizes a live adjacent Aggr target over sticky target memory", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
