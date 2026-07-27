@@ -805,3 +805,26 @@ function positionForCell(cell: { x: number; y: number }): { x: number; y: number
         testGridSettings.getHalfStep(),
     );
 }
+
+describe("Blind Fury description", () => {
+    // Regression: this refresh used to live only in the client's RenderableUnit override, so a ranked
+    // player -- who reads the description the SERVER wrote into the snapshot -- saw the seeded "0%" for
+    // the whole fight while the sandbox showed the real number. It has to work with no client in sight.
+    const troglodyte = (alive: number, died: number) => {
+        const unit = createTestUnit({ name: "Troglodyte", abilities: ["Blind Fury"], amountAlive: alive });
+        unit.getUnitProperties().amount_died = died;
+        unit.adjustBaseStats(false, 0, 0, 0, 0, 0, 0);
+        const index = unit.getUnitProperties().abilities.indexOf("Blind Fury");
+        return unit.getUnitProperties().abilities_descriptions[index] ?? "";
+    };
+
+    it("shows the live bonus, which is the share of the stack already lost", () => {
+        expect(troglodyte(10, 0)).toContain("Current power: 0.0%");
+        expect(troglodyte(6, 4)).toContain("Current power: 40.0%");
+        expect(troglodyte(1, 9)).toContain("Current power: 90.0%");
+    });
+
+    it("never leaves the raw placeholder in the card", () => {
+        expect(troglodyte(6, 4)).not.toContain("{}");
+    });
+});

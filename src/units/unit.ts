@@ -11,6 +11,7 @@
 
 import Denque from "denque";
 import { Ability } from "../abilities/ability";
+import { BLIND_FURY_ABILITY_NAME, blindFuryDescription } from "../abilities/blind_fury_ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
@@ -580,12 +581,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // the server ships in a ranked snapshot, and without it the card kept the raw "{}" placeholder for
         // every player except the one running the sandbox. Same expression adjustBaseStats applies to
         // attack_mod, so the number on the card is the bonus actually being dealt.
-        if (ability.getName() === "Blind Fury") {
-            const alive = this.unitProperties.amount_alive;
-            const died = this.unitProperties.amount_died;
-            const total = alive + died;
-            const lostShare = total > 0 ? (1 - alive / total) * 100 : 0;
-            return ability.getDesc().join("\n").replace(/\{\}/g, lostShare.toFixed(1));
+        if (ability.getName() === BLIND_FURY_ABILITY_NAME) {
+            return blindFuryDescription(
+                ability.getDesc().join("\n"),
+                this.unitProperties.amount_alive,
+                this.unitProperties.amount_died,
+            );
         }
 
         if (ability.getName() === "Chain Lightning") {
@@ -630,6 +631,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (ability.getName() === "Magic Reflection") {
+            // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
+            // figure getMagicMirrorAbilityChance rolls, so the card matches the rebound the engine performs.
+            const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
+            const chance = Math.max(
+                0,
+                Math.min(100, Math.floor((ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck())),
+            );
+            return ability.getDesc().join("\n").replace(/\{\}/g, chance.toString());
         }
         // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to
         // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain
@@ -3627,7 +3638,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * attack.
      */
     private refreshBlindFuryDescription(): void {
-        const abilityName = "Blind Fury";
+        const abilityName = BLIND_FURY_ABILITY_NAME;
         const index = this.unitProperties.abilities.indexOf(abilityName);
         if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
             return;
@@ -3636,13 +3647,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (!ability) {
             return;
         }
-        const alive = this.unitProperties.amount_alive;
-        const total = alive + this.unitProperties.amount_died;
-        const lostShare = total > 0 ? (1 - alive / total) * 100 : 0;
-        this.unitProperties.abilities_descriptions[index] = ability
-            .getDesc()
-            .join("\n")
-            .replace(/\{\}/g, lostShare.toFixed(1));
+        this.unitProperties.abilities_descriptions[index] = blindFuryDescription(
+            ability.getDesc().join("\n"),
+            this.unitProperties.amount_alive,
+            this.unitProperties.amount_died,
+        );
     }
     protected parseSpellData(spellData: string[]): Map<string, number> {
         const spells: Map<string, number> = new Map();
