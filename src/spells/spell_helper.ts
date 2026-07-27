@@ -510,17 +510,21 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
  * The Magic Dragon's passive "Magic Mirror" ability, as a CHANCE in 0..100 (0 when the unit has no such
  * ability, or while it is Broken).
  *
+ * The ability's base power plus the holder's own LUCK, the same way the poison auras combine theirs — a
+ * lucky dragon rebounds more often, an unlucky one less. Clamped to 0..100 at the end, so the sum can never
+ * push the chance past certain or below impossible.
+ *
  * Deliberately separate from getMagicMirrorPower: the BUFF's power is a share of the damage (30% back) that
  * is also re-used as the debuff-reflection probability, whereas the ability's power is only ever a
- * probability — what it rebounds is the whole spell. Folding them into one number would make an 80% ability
- * silently reflect 80% of the damage as well.
+ * probability — what it rebounds is the whole spell. Folding them into one number would make a 75% ability
+ * silently reflect 75% of the damage as well.
  */
 export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
     if (!targetUnit.hasAbilityActive("Magic Mirror")) {
         return 0;
     }
 
-    return Math.max(0, Math.min(100, Math.floor(targetUnit.getAbilityPower("Magic Mirror"))));
+    return Math.max(0, Math.min(100, Math.floor(targetUnit.getAbilityPower("Magic Mirror") + targetUnit.getLuck())));
 };
 
 /**

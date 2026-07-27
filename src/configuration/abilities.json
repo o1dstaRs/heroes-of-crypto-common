@@ -837,7 +837,7 @@
             "The spell still lands on the dragon in full — the rebound is on top of it,",
             "striking the caster with the same damage and the same effects"
         ],
-        "power": 80,
+        "power": 75,
         "power_type": "MAGIC_MIRROR_REFLECT",
         "skip_reponse": false,
         "stack_powered": false,

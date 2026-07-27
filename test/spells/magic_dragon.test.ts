@@ -223,21 +223,32 @@ describe("Tome of Elements spell configuration", () => {
 
         expect(getSpellConfig("Nature", "Whirlpool").minimal_caster_stack_power).toBe(3);
         expect(getSpellConfig("Nature", "Lightning Strike").minimal_caster_stack_power).toBe(1);
-        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(4);
+        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(3);
         expect(getSpellConfig("Nature", "Meteor Shower").minimal_caster_stack_power).toBe(5);
     });
 
-    it("prices Lightning Strike at 225 damage per living dragon at full stack power", () => {
-        const power = natureSpells["Lightning Strike"].power;
-        expect(calculateStackPoweredSpellDamage(power, 1, MAX_UNIT_STACK_POWER)).toBe(225);
-        expect(calculateStackPoweredSpellDamage(power, 2, MAX_UNIT_STACK_POWER)).toBe(450);
+    // The three damage spells are priced as explicit PER-DRAGON targets rather than as a chained ladder
+    // (they used to be "Ring of Fire = bolt less 20%, Meteor Shower = ring less 10%", which these numbers
+    // deliberately break). A full stack is 2 dragons — exp 500 against the 1000-point stack budget — so
+    // these are the numbers the spellbook actually reads on the board.
+    it("prices each spell at its per-dragon damage target at full stack power", () => {
+        const damage = (name: string, alive: number): number =>
+            calculateStackPoweredSpellDamage(natureSpells[name].power, alive, MAX_UNIT_STACK_POWER);
+
+        expect(damage("Lightning Strike", 1)).toBe(150);
+        expect(damage("Ring of Fire", 1)).toBe(125);
+        expect(damage("Meteor Shower", 1)).toBe(100);
+
+        expect(damage("Lightning Strike", 2)).toBe(300);
+        expect(damage("Ring of Fire", 2)).toBe(250);
+        expect(damage("Meteor Shower", 2)).toBe(200);
     });
 
-    // The three damage spells are a priced set, not three independent numbers. Pin the relationships in the
-    // CONFIG so a later tweak to one power cannot silently break the ladder.
-    it("prices Ring of Fire 20% under Lightning Strike and Meteor Shower 10% under Ring of Fire", () => {
-        expect(natureSpells["Ring of Fire"].power).toBeCloseTo(natureSpells["Lightning Strike"].power * 0.8, 10);
-        expect(natureSpells["Meteor Shower"].power).toBeCloseTo(natureSpells["Ring of Fire"].power * 0.9, 10);
+    // The exact ladder percentages are gone, but the ORDER is still design intent: the single-target bolt
+    // out-damages the ring it splashes, which out-damages the 3x3 shower that hits the most units at once.
+    it("keeps the damage ordering bolt > ring > shower", () => {
+        expect(natureSpells["Lightning Strike"].power).toBeGreaterThan(natureSpells["Ring of Fire"].power);
+        expect(natureSpells["Ring of Fire"].power).toBeGreaterThan(natureSpells["Meteor Shower"].power);
     });
 
     it("aims each spell the way its own handler reads it", () => {
@@ -287,7 +298,7 @@ describe("action engine — Lightning Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(225); // 1 alive x stack power 5 x 45
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(150); // 1 alive x stack power 5 x 30
         expect(
             setup.caster
                 .getSpells()
@@ -315,7 +326,7 @@ describe("action engine — Lightning Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(450);
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(300);
     });
 
     it("is magical: magic resistance cuts it down", () => {
@@ -333,7 +344,7 @@ describe("action engine — Lightning Strike", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(168); // floor(225 * 0.75)
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(112); // floor(150 * 0.75)
     });
 });
 
@@ -356,10 +367,10 @@ describe("action engine — Ring of Fire", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(180); // the aimed target: 1 x 5 x 36
-        expect(before[1] - setup.enemies[1].getHp()).toBe(180); // (7,3) touches (6,3)
+        expect(before[0] - setup.enemies[0].getHp()).toBe(125); // the aimed target: 1 x 5 x 25
+        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // (7,3) touches (6,3)
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // (9,3) is two cells away
-        expect(before[3] - setup.allies[0].getHp()).toBe(180); // an ally next to the target burns too
+        expect(before[3] - setup.allies[0].getHp()).toBe(125); // an ally next to the target burns too
         expect(setup.caster.getHp()).toBe(casterHpBefore);
     });
 
@@ -410,8 +421,8 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(162); // 1 x 5 x 32.4, floored
-        expect(before[1] - setup.enemies[1].getHp()).toBe(162);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(100); // 1 x 5 x 20
+        expect(before[1] - setup.enemies[1].getHp()).toBe(100);
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // outside the block
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
     });
@@ -469,12 +480,27 @@ describe("action engine — Whirlpool", () => {
 });
 
 describe("Magic Mirror (passive)", () => {
-    it("reads its 80% chance off the ability, and nothing off a unit without it", () => {
+    it("is the ability's 75% base plus the holder's own luck, and nothing on a unit without it", () => {
         const mirrored = createTestUnit({ name: "Mirrored", abilities: ["Magic Mirror"] });
+        const lucky = createTestUnit({ name: "Lucky", abilities: ["Magic Mirror"], luck: 10 });
+        const unlucky = createTestUnit({ name: "Unlucky", abilities: ["Magic Mirror"], luck: -10 });
         const plain = createTestUnit({ name: "Plain" });
 
-        expect(getMagicMirrorAbilityChance(mirrored)).toBe(80);
+        expect(getMagicMirrorAbilityChance(mirrored)).toBe(75);
+        expect(getMagicMirrorAbilityChance(lucky)).toBe(85);
+        expect(getMagicMirrorAbilityChance(unlucky)).toBe(65);
         expect(getMagicMirrorAbilityChance(plain)).toBe(0);
+    });
+
+    // Luck itself is capped at +/-10 by the unit, so the reachable band is 65..85 and the 0..100 clamp in
+    // getMagicMirrorAbilityChance is belt-and-braces rather than something luck can ever drive it to. Pinned
+    // so raising the base past 90 is caught here rather than silently producing a chance above certain.
+    it("stays inside 65..85 however extreme the requested luck", () => {
+        const blessed = createTestUnit({ name: "Blessed", abilities: ["Magic Mirror"], luck: 100 });
+        const doomed = createTestUnit({ name: "Doomed", abilities: ["Magic Mirror"], luck: -100 });
+
+        expect(getMagicMirrorAbilityChance(blessed)).toBe(85);
+        expect(getMagicMirrorAbilityChance(doomed)).toBe(65);
     });
 
     // The mirror does NOT shield its holder. The spell resolves on it exactly as it would without the
@@ -497,8 +523,36 @@ describe("Magic Mirror (passive)", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(225); // the spell landed as normal
-        expect(casterHpBefore - setup.caster.getHp()).toBe(225); // and came back on top
+        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150); // the spell landed as normal
+        expect(casterHpBefore - setup.caster.getHp()).toBe(150); // and came back on top
+    });
+
+    it("reports the rebound's damage rather than leaving the caster hit unexplained", () => {
+        alwaysRoll(0); // 0 < 80 -> the rebound lands
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+        });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Lightning Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+        expect(result.completed).toBe(true);
+
+        // The caster's own entry is flagged, so ranked (which rebuilds its log from events, never from the
+        // engine's text) can name the rebound instead of showing a bare hit on the caster.
+        const spellCast = result.events.find((event) => event.type === "spell_cast");
+        const damaged = spellCast?.type === "spell_cast" ? (spellCast.damaged ?? []) : [];
+        const reboundEntry = damaged.find((entry) => entry.rebounded);
+        expect(reboundEntry).toBeDefined();
+        expect(reboundEntry!.unitId).toBe(setup.caster.getId());
+        expect(reboundEntry!.amount).toBe(150);
+        // The holder's own hit is NOT a rebound.
+        expect(damaged.filter((entry) => entry.rebounded)).toHaveLength(1);
     });
 
     it("rebounds once per mirror caught in a splash", () => {
@@ -522,9 +576,9 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(before[0] - setup.enemies[0].getHp()).toBe(180);
-        expect(before[1] - setup.enemies[1].getHp()).toBe(180);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(360); // 180 back off each mirror
+        expect(before[0] - setup.enemies[0].getHp()).toBe(125);
+        expect(before[1] - setup.enemies[1].getHp()).toBe(125);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(250); // 125 back off each mirror
     });
 
     it("costs the caster nothing when the roll misses, while the spell lands the same", () => {
@@ -544,7 +598,7 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(225);
+        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150);
         expect(setup.caster.getHp()).toBe(casterHpBefore);
     });
 
@@ -588,6 +642,6 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(casterHpBefore - setup.caster.getHp()).toBe(112); // floor(225 * 0.5)
+        expect(casterHpBefore - setup.caster.getHp()).toBe(75); // floor(150 * 0.5)
     });
 });
