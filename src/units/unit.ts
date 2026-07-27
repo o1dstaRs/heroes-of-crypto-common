@@ -2049,6 +2049,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
+        // The arcane rings (Tier-1 Mage's Ring, Tier-2 Archmage's Ring). A team may hold one of each, and
+        // they add up like every other source here, so both rings together read as a plain "+30%".
+        for (const ringBuffName of ["Mages Ring", "Archmages Ring"]) {
+            const ring = this.getBuff(ringBuffName);
+            if (ring) {
+                const power = ring.getPower();
+                if (Number.isFinite(power) && power > 0) {
+                    total += power;
+                }
+            }
+        }
+
         return total;
     }
     /**

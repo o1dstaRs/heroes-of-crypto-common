@@ -98,7 +98,13 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after v0.1 primary move-and-strike began executing an explicit move before its stationary melee.
 // This resolves Fire Wall, Vine, smoke, moved-state and movement events instead of bypassing that lifecycle;
 // two isolated full-trace evaluations reproduced the hash below.
-const EXPECTED_REPLAY_SHA256 = "39e27e2420033d4ccbc02edf7eb18de12a9fe6841004ec618b255317156e109a";
+// Re-pinned after the arcane rings joined the draft pool: each Tier-1 artifact is now drawn from 13
+// instead of 12 and each Tier-2 offer from a 13-artifact bag, so every seeded draft consumes the shared
+// RNG differently. Note this digest matches NEITHER the value main carried nor the one this branch was
+// pinned to in isolation -- the ring count and the distinct-Tier-1-pair fix each move the draft on their
+// own, so only the combination produces the trace below. Two isolated runs produced this byte-identical
+// digest.
+const EXPECTED_REPLAY_SHA256 = "b50daf9f695d451efdef2c251b4cdaae7f5d9bddd49730b0171c29b7da27a61b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
