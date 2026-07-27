@@ -341,7 +341,7 @@
         "Winged Boots": {
             "name": "Winged Boots",
             "level": 0,
-            "desc": ["Artifact. Grants flying units +{} movement.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Grants flying units +{} movement and +[] armor.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",

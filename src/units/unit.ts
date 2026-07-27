@@ -2868,6 +2868,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (ironPlateBuff) {
             this.unitProperties.base_armor += ironPlateBuff.getPower();
         }
+        // ARTIFACT Winged Boots: flat armour for flyers, alongside the movement it grants below. Only
+        // flying units ever carry the buff (applyArtifacts gates it), so its presence is sufficient here.
+        // The armour is the SECOND stored value — the power is the steps, which the movement hook reads.
+        const wingedBootsArmorBuff = this.getBuff("Winged Boots");
+        if (wingedBootsArmorBuff) {
+            this.unitProperties.base_armor += parseInt(this.getBuffProperties("Winged Boots")[1] || "0", 10);
+        }
         const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondArmorBuff) {
             this.unitProperties.base_armor = Math.max(

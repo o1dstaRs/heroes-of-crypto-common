@@ -495,7 +495,9 @@ export class UnitsHolder {
                     break;
                 case Tier1Artifact.WINGED_BOOTS:
                     if (isFlyer) {
-                        applyArtifactBuff("Winged Boots", AP.WINGED_BOOTS_STEPS);
+                        // Two values: the steps ({}) and the armour ([]). applyBuff stores both, so the
+                        // stat hooks read the armour off getBuffProperties rather than the buff's power.
+                        applyArtifactBuff("Winged Boots", AP.WINGED_BOOTS_STEPS, AP.WINGED_BOOTS_ARMOR);
                     }
                     break;
                 case Tier1Artifact.CURSED_WARD:

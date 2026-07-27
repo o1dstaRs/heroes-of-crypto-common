@@ -33,7 +33,7 @@ export enum Tier1Artifact {
     KEEN_BLADE = 3, // +1 attack (flat)
     IRON_PLATE = 4, // +1 defense (flat)
     SWIFT_BOOTS = 5, // +1 movement to melee units
-    WINGED_BOOTS = 6, // +1 movement to flying units
+    WINGED_BOOTS = 6, // +1 movement and +1 armor to flying units
     DUAL_STRIKE_CHARM = 7, // +50% damage on a unit's second attack
     WOUNDING_CHARM = 8, // grants the Deep Wounds Level 1 card to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
@@ -115,6 +115,7 @@ export const ARTIFACT_POWER = {
     // Swift Boots is now a PERCENT of base steps (not a flat +1), applied to melee units.
     SWIFT_BOOTS_STEPS: 25,
     WINGED_BOOTS_STEPS: 1,
+    WINGED_BOOTS_ARMOR: 1,
     // Per-archer scaling: each ranged unit in the army grants every ranged unit this much bonus attack and
     // defense penalty. N archers => +N attack and -7.5N% defense on each ranged unit.
     LONGBOW_ATTACK_FLAT_PER_ARCHER: 1,
@@ -224,7 +225,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "winged_boots",
         "Winged Boots",
         "Winged Boots",
-        "Grants +{} base movement distance to all flying units.",
+        "Grants +{} base movement distance and +[] armor to all flying units.",
     ),
     [Tier1Artifact.DUAL_STRIKE_CHARM]: t1(
         Tier1Artifact.DUAL_STRIKE_CHARM,
@@ -371,7 +372,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     keen_blade: [AP.KEEN_BLADE_FLAT],
     iron_plate: [AP.IRON_PLATE_FLAT],
     swift_boots: [AP.SWIFT_BOOTS_STEPS],
-    winged_boots: [AP.WINGED_BOOTS_STEPS],
+    winged_boots: [AP.WINGED_BOOTS_STEPS, AP.WINGED_BOOTS_ARMOR],
     dual_strike_charm: [AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT],
     wounding_charm: [AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT],
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
