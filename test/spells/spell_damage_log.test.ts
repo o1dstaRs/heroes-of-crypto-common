@@ -63,6 +63,19 @@ const setup = (magicResist: number) => {
     });
     placeUnit(context.grid, context.unitsHolder, victim, { x: 6, y: 3 });
 
+    // Ring of Fire spares the creature it is aimed at and burns the ring around it, so the cast needs a
+    // second body to catch — and that body, not the aimed one, is what the log has to match. Same magic
+    // resistance, so the number the log prints is still the resisted one this test is about.
+    const ringMate = createTestUnit({
+        name: "Ring mate",
+        team: PBTypes.TeamVals.UPPER,
+        maxHp: 100_000,
+        magicResist,
+        speed: 3,
+        morale: 4,
+    });
+    placeUnit(context.grid, context.unitsHolder, ringMate, { x: 6, y: 4 });
+
     fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
     fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
     fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
@@ -77,13 +90,13 @@ const setup = (magicResist: number) => {
         attackHandler: context.attackHandler,
     });
 
-    return { ...context, engine, caster, victim, sceneLog };
+    return { ...context, engine, caster, victim, ringMate, sceneLog };
 };
 
 /** Cast at the victim and return both the hp it lost and the number the log printed. */
 const castAndRead = (magicResist: number, spellName: string) => {
     const fight = setup(magicResist);
-    const hpBefore = fight.victim.getHp();
+    const hpBefore = spellName === "Ring of Fire" ? fight.ringMate.getHp() : fight.victim.getHp();
     const result = fight.engine.apply({
         type: "cast_spell",
         casterId: fight.caster.getId(),
@@ -94,7 +107,9 @@ const castAndRead = (magicResist: number, spellName: string) => {
 
     const line = fight.sceneLog.lines.find((entry) => entry.includes(fight.caster.getName()))!;
     const logged = Number(line.match(/\((\d+)\)/)?.[1]);
-    return { took: hpBefore - fight.victim.getHp(), logged };
+    // Ring of Fire's damage lands on the ring, not on the creature it was aimed at.
+    const burned = spellName === "Ring of Fire" ? fight.ringMate : fight.victim;
+    return { took: hpBefore - burned.getHp(), logged };
 };
 
 describe("offensive spell scene log", () => {

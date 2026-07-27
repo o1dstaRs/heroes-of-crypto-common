@@ -1641,10 +1641,21 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 10,
             maxHp: 1_000,
         });
+        // Ring of Fire spares the creature it is aimed at, so a cast at a lone target now legitimately
+        // catches nobody and the engine refuses it. Park a second body beside the clear target — it burns
+        // friend or foe — so the ring has something to hit and this still tests LINE OF SIGHT.
+        const ringMate = createTestUnit({
+            team: UPPER,
+            name: "Ring mate",
+            attackType: MELEE,
+            amountAlive: 10,
+            maxHp: 1_000,
+        });
         placeLarge(c, dragon, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, blocker, { x: 6, y: 3 });
         placeUnit(c.grid, c.unitsHolder, blocked, { x: 10, y: 3 });
         placeUnit(c.grid, c.unitsHolder, clear, { x: 3, y: 10 });
+        placeUnit(c.grid, c.unitsHolder, ringMate, { x: 4, y: 10 });
         const context = ctxFor(c, true);
 
         const rings = ofKind(enumerateCandidates(dragon, context, endTurn(dragon)).candidates, "spell").filter(
@@ -1654,10 +1665,11 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const clearRing = rings.find((candidate) => candidate.targetId === clear.getId());
         expect(clearRing).toBeDefined();
 
-        const hpBefore = clear.getCumulativeHp();
+        const hpBefore = ringMate.getCumulativeHp();
         const result = startActionEngine(c, dragon, context).apply(clearRing!.actions[0]);
         expect(result.completed).toBe(true);
-        expect(clear.getCumulativeHp()).toBeLessThan(hpBefore);
+        // The ring burns around the aimed creature, so its neighbour is what takes the damage.
+        expect(ringMate.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("Magic Dragon: called-down Lightning and Whirlpool remain legal through an occupied LOS", () => {
