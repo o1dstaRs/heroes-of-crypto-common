@@ -70,6 +70,43 @@ export function getCellsAroundCell(gridSettings: GridSettings, cell: XY): XY[] {
     return cells;
 }
 
+/**
+ * Every cell touching a unit's whole FOOTPRINT, with the footprint itself removed.
+ *
+ * getCellsAroundCell rings ONE cell, which is right for a 1x1 creature and wrong for a 2x2 one: ringing only
+ * its base cell both misses half the block's real neighbours and returns three cells the creature itself
+ * stands on. Unioning the per-cell rings and then subtracting the footprint gives the shape that actually
+ * hugs the creature — the 8 cells around a small unit, the 12 around a large one.
+ */
+export function getCellsAroundFootprint(gridSettings: GridSettings, footprint: readonly XY[]): XY[] {
+    // Same packed key the ring helper above uses.
+    const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+    const occupied = new Set<number>();
+    for (const cell of footprint) {
+        if (cell) {
+            occupied.add(cellKey(cell));
+        }
+    }
+
+    const ring: XY[] = [];
+    const seen = new Set<number>();
+    for (const cell of footprint) {
+        if (!cell) {
+            continue;
+        }
+        for (const around of getCellsAroundCell(gridSettings, cell)) {
+            const key = cellKey(around);
+            if (occupied.has(key) || seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            ring.push(around);
+        }
+    }
+
+    return ring;
+}
+
 export function projectLineToFieldEdge(gridSettings: GridSettings, x0: number, y0: number, x1: number, y1: number): XY {
     // Calculate direction vector
     const dx = x1 - x0;

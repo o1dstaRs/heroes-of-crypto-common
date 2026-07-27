@@ -18,6 +18,7 @@ import {
     arePointsConnected,
     getCellForPosition,
     getCellsAroundCell,
+    getCellsAroundFootprint,
     getCellsAroundPosition,
     getClosestCrossingPoint,
     getClosestSideCenter,
@@ -671,3 +672,52 @@ function withCryptoWords(words: number[], fn: () => void): void {
         }
     }
 }
+
+describe("getCellsAroundFootprint", () => {
+    const key = (cell: { x: number; y: number }): string => `${cell.x},${cell.y}`;
+
+    // Ring of Fire hugs its target's whole footprint, so the shape has to follow the creature's SIZE:
+    // ringing only a 2x2's base cell would both miss half its neighbours and return cells it stands on.
+    it("matches the single-cell ring for a 1x1 creature", () => {
+        const small = getCellsAroundFootprint(testGridSettings, [{ x: 5, y: 5 }]);
+        expect(small).toHaveLength(8);
+        expect(new Set(small.map(key))).toEqual(new Set(getCellsAroundCell(testGridSettings, { x: 5, y: 5 }).map(key)));
+    });
+
+    it("rings a 2x2 block with 12 distinct cells and none the block occupies", () => {
+        const block = [
+            { x: 5, y: 5 },
+            { x: 6, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 6 },
+        ];
+        const large = getCellsAroundFootprint(testGridSettings, block);
+
+        expect(large).toHaveLength(12);
+        for (const occupied of block) {
+            expect(large.map(key)).not.toContain(key(occupied));
+        }
+        // The per-cell rings overlap heavily, so they must be unioned rather than concatenated.
+        expect(new Set(large.map(key)).size).toBe(large.length);
+    });
+
+    it("reaches cells a base-cell-only ring would miss", () => {
+        const block = [
+            { x: 5, y: 5 },
+            { x: 6, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 6 },
+        ];
+        // (7,6) hugs the block's far side but lies outside the base cell's own ring — the cell that
+        // distinguishes the two shapes, and the reason the engine cannot read the base cell alone.
+        expect(getCellsAroundFootprint(testGridSettings, block).map(key)).toContain("7,6");
+        expect(getCellsAroundCell(testGridSettings, { x: 5, y: 5 }).map(key)).not.toContain("7,6");
+    });
+
+    it("returns nothing for an empty or malformed footprint", () => {
+        expect(getCellsAroundFootprint(testGridSettings, [])).toEqual([]);
+        expect(getCellsAroundFootprint(testGridSettings, [undefined as unknown as { x: number; y: number }])).toEqual(
+            [],
+        );
+    });
+});

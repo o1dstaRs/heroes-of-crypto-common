@@ -1063,7 +1063,9 @@
             "level": 2,
             "desc": [
                 "Bursts into flame around an enemy in line of sight, dealing {} damage.",
-                "Every unit on a cell touching the target — friend or foe — burns for the same amount.",
+                "Every unit on a cell touching it — friend or foe — burns for the same amount.",
+                "The aimed enemy itself is not burned — the ring hugs it without touching it.",
+                "The ring follows the target's size: 8 cells around a small creature, 12 around a large one.",
                 "Damage = creatures alive x stack power x 25."
             ],
             "target": "ANY_ENEMY",

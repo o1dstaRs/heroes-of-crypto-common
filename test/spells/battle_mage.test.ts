@@ -213,10 +213,12 @@ describe("Battle Mage spell configuration", () => {
 
     // The live server sizes a stack as ceil(1000 / exp), and livetwin.test.ts asserts every level 2 creature
     // lands in 22..40. Pin it here too so a balance nudge to `exp` fails in the creature's own test first.
-    it("keeps exp inside the level 2 stack-amount band", () => {
-        const amount = amountForCreatureExperienceBudget("Battle Mage", STACK_EXPERIENCE_BUDGET, 30);
-        expect(amount).toBeGreaterThanOrEqual(22);
-        expect(amount).toBeLessThanOrEqual(40);
+    // Deliberately ABOVE the level 2 band of 22-40: the Battle Mage's damage comes out of a spellbook that
+    // scales with how many of them are standing, so it is priced to field a big cheap stack. Pinned exactly
+    // rather than as a range, because the whole point is the round 50 — see the matching exception in
+    // livetwin.test.ts, which keeps the band honest for every other level 2.
+    it("is priced to field exactly 50 bodies, above the level 2 band", () => {
+        expect(amountForCreatureExperienceBudget("Battle Mage", STACK_EXPERIENCE_BUDGET, 30)).toBe(50);
     });
 
     // "A bit weaker than the weakest level 2s" — the Healer and the Satyr are that floor, and the Battle Mage

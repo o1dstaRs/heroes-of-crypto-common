@@ -64,13 +64,23 @@ describe("exp-budget stack amounts (live server rule, ceil(1000/exp))", () => {
 
     it("lands in the live per-level ranges for EVERY enabled creature (L1 ~73-200 ... L4 1-3)", () => {
         const ranges: Record<number, [number, number]> = { 1: [73, 200], 2: [22, 40], 3: [8, 12], 4: [1, 3] };
+        // Deliberate outliers, named one by one rather than by widening a band — a wider band would quietly
+        // license every other creature of that level to drift too. The Battle Mage is priced to field a
+        // 50-strong stack (exp 20), above the level 2 ceiling of 40, because its damage comes out of a
+        // spellbook that scales with head-count rather than off its own weak attack.
+        const bandExceptions: Record<string, number> = { "Battle Mage": 50 };
         for (const [level, [lo, hi]] of Object.entries(ranges)) {
             const pool = creaturesByLevel(Number(level));
             expect(pool.length).toBeGreaterThan(0);
             for (const c of pool) {
                 const amount = amountForCreatureExperienceBudget(c.creatureName, STACK_EXPERIENCE_BUDGET, -1);
-                expect(amount).toBeGreaterThanOrEqual(lo);
-                expect(amount).toBeLessThanOrEqual(hi);
+                const exception = bandExceptions[c.creatureName];
+                if (exception !== undefined) {
+                    expect(amount).toBe(exception);
+                } else {
+                    expect(amount).toBeGreaterThanOrEqual(lo);
+                    expect(amount).toBeLessThanOrEqual(hi);
+                }
                 // Exact per-creature rule, not a level table.
                 const exp = getCreatureExperience(c.creatureName);
                 expect(exp).toBeDefined();

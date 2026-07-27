@@ -77,7 +77,13 @@ const setupDragonFight = (opts: {
     casterAmountAlive: number;
     casterStackPower: number;
     casterMagicResist?: number;
-    enemies?: { cell: { x: number; y: number }; maxHp?: number; magicResist?: number; abilities?: string[] }[];
+    enemies?: {
+        cell: { x: number; y: number };
+        maxHp?: number;
+        magicResist?: number;
+        abilities?: string[];
+        large?: boolean;
+    }[];
     allies?: { cell: { x: number; y: number } }[];
     blockerCell?: { x: number; y: number };
 }) => {
@@ -110,6 +116,7 @@ const setupDragonFight = (opts: {
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             abilities: spec.abilities ?? [],
+            size: spec.large ? PBTypes.UnitSizeVals.LARGE : PBTypes.UnitSizeVals.SMALL,
             speed: 3,
             morale: 4,
         });
@@ -349,7 +356,9 @@ describe("action engine — Lightning Strike", () => {
 });
 
 describe("action engine — Ring of Fire", () => {
-    it("burns the target and every unit touching it, friend or foe, but never the dragon", () => {
+    // The defining rule: the ring burns AROUND its target, never the target. The aimed creature is the one
+    // thing standing in the fire that does not take a point of it.
+    it("spares the aimed target and burns every unit touching it, friend or foe, but never the dragon", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -367,11 +376,56 @@ describe("action engine — Ring of Fire", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(125); // the aimed target: 1 x 5 x 25
-        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // (7,3) touches (6,3)
+        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // the aimed target is inside the ring, untouched
+        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // (7,3) touches (6,3): 1 x 5 x 25
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // (9,3) is two cells away
         expect(before[3] - setup.allies[0].getHp()).toBe(125); // an ally next to the target burns too
         expect(setup.caster.getHp()).toBe(casterHpBefore);
+    });
+
+    // Size-scaling: a 2x2 target is ringed by the 12 cells around its whole block, not the 8 around its base
+    // cell. (7,4) touches the block's top-right corner and would fall OUTSIDE a base-cell-only ring, so it is
+    // the cell that actually distinguishes the two shapes.
+    it("rings a large target's whole 2x2 block rather than just its base cell", () => {
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 6, y: 3 }, large: true }, { cell: { x: 8, y: 4 } }, { cell: { x: 9, y: 9 } }],
+        });
+        const before = setup.enemies.map((unit) => unit.getHp());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // the large target is spared like any other
+        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // hugs the block, outside a base-cell-only ring
+        expect(before[2] - setup.enemies[2].getHp()).toBe(0); // far away, clear of even the wider ring
+    });
+
+    // Nothing to burn is a REJECTED cast, not a wasted scroll — the ring only exists around other creatures,
+    // so an isolated target would otherwise consume a charge for zero effect.
+    it("refuses the cast when the target has nobody standing around it", () => {
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 9, y: 9 } }],
+        });
+        const hpBefore = setup.enemies[0].getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(setup.enemies[0].getHp()).toBe(hpBefore);
     });
 
     it("is thrown, so a body squarely on the line refuses the cast and keeps the scroll", () => {
@@ -560,10 +614,14 @@ describe("Magic Mirror (passive)", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            // Both stand inside the ring around (6,3), and both carry a mirror.
+            // The ring spares whatever it is aimed at, so the mirrors have to be the NEIGHBOURS: the target
+            // at (6,3) carries none and burns for nothing, while (7,3) and (6,4) both hug it and both reflect.
+            // Neither sits on the caster's line to the target — the dragon throws this one, so a body at
+            // (5,3) would block the cast outright rather than joining the ring.
             enemies: [
-                { cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 6, y: 3 } },
                 { cell: { x: 7, y: 3 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 6, y: 4 }, abilities: ["Magic Mirror"] },
             ],
         });
         const casterHpBefore = setup.caster.getHp();
@@ -576,9 +634,10 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(before[0] - setup.enemies[0].getHp()).toBe(125);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // aimed at, so spared
         expect(before[1] - setup.enemies[1].getHp()).toBe(125);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(250); // 125 back off each mirror
+        expect(before[2] - setup.enemies[2].getHp()).toBe(125);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(250); // 125 back off each of the two mirrors
     });
 
     it("costs the caster nothing when the roll misses, while the spell lands the same", () => {

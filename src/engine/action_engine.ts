@@ -23,6 +23,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
 import {
     getCellsAroundCell,
+    getCellsAroundFootprint,
     getPositionForCell,
     getPositionForCells,
     getRangeAttackSideCenter,
@@ -1617,9 +1618,15 @@ export class GameActionEngine {
     /**
      * Ring of Fire (Magic Dragon / Tome of Elements): flame bursts around one enemy in line of sight.
      *
-     * The footprint is the Cyclops' Large Caliber footprint — the aimed enemy's cell plus every cell touching
-     * it — and, like that splash, it does not care whose side anyone is on: an ally standing next to the
-     * target burns for exactly the same amount. Only the dragon itself is never caught in its own ring.
+     * The ring is every cell TOUCHING the aimed enemy, and the aimed enemy itself is deliberately NOT in it:
+     * the spell bursts AROUND a creature, so the one it is pointed at takes nothing while everything hugging
+     * it burns. Like the Cyclops' Large Caliber splash it does not care whose side anyone is on — an ally
+     * standing next to the target burns for exactly the same amount. Only the dragon is never caught in its
+     * own ring.
+     *
+     * The ring scales to the target's SIZE: a 1x1 enemy is ringed by the 8 cells around it, a 2x2 enemy by
+     * the 12 cells around its whole block. Ringing only the base cell would both miss half a large target's
+     * neighbours and aim the burst at cells the target itself occupies.
      *
      * Reach is LINE OF SIGHT, the gate Fire Strike uses, because unlike Lightning Strike this one is thrown
      * rather than called down. Per target it is the Lightning Strike number less 20%, the price of covering a
@@ -1652,11 +1659,15 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const cells = [...getCellsAroundCell(this.context.grid.getSettings(), to), to];
+        const cells = getCellsAroundFootprint(
+            this.context.grid.getSettings(),
+            target.isSmallSize() ? [to] : target.getCells(),
+        );
         // evaluateAffectedUnits dedupes by unit, so a large creature straddling two of the ring's cells burns
-        // once. The aimed target stands on one of these cells and so is already in the list.
+        // once. The aimed target owns none of these cells, so it is already absent; it is filtered by id too
+        // so the "spares its target" rule survives any future change to how occupancy is reported.
         const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== caster.getId(),
+            (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId(),
         );
         if (!caught.length) {
             return this.reject("spell_not_available");
