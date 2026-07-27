@@ -551,7 +551,12 @@ export class StrategyV0_4 extends StrategyV0_3 {
         }
         return !(
             context.grid.areAllCellsEmpty(fp, unit.getId()) ||
-            context.grid.canOccupyCells(fp, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
+            context.grid.canOccupyCells(
+                fp,
+                unit.canTraverseLava(),
+                unit.hasAbilityActive("Made of Water"),
+                unit.getId(),
+            )
         );
     }
     private chainLightningTarget(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {

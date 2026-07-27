@@ -44,6 +44,7 @@ const setupActionFight = (
         lowerMovementType?: MovementType;
         supportMovementType?: MovementType;
         upperMovementType?: MovementType;
+        lowerCell?: { x: number; y: number };
         supportCell?: { x: number; y: number };
         upperCell?: { x: number; y: number };
         upperAbilities?: string[];
@@ -99,7 +100,7 @@ const setupActionFight = (
         movementType: opts.supportMovementType,
     });
 
-    placeUnit(context.grid, context.unitsHolder, lower, { x: 3, y: 3 });
+    placeUnit(context.grid, context.unitsHolder, lower, opts.lowerCell ?? { x: 3, y: 3 });
     placeUnit(context.grid, context.unitsHolder, upper, opts.upperCell ?? { x: 9, y: 9 });
     placeUnit(context.grid, context.unitsHolder, lowerSupport, opts.supportCell ?? { x: 4, y: 3 });
     fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, opts.lowerUnitsAlive ?? 2);
@@ -575,6 +576,45 @@ describe("GameActionEngine", () => {
             unitId: setup.lower.getId(),
             path: footprint,
             targetCells: footprint,
+        });
+    });
+
+    it("moves a large lava walker across its own footprint onto lava", () => {
+        const currentCell = { x: 5, y: 7 };
+        const targetCell = { x: 6, y: 7 };
+        const targetCells = [
+            { x: 6, y: 7 },
+            { x: 5, y: 7 },
+            { x: 6, y: 6 },
+            { x: 5, y: 6 },
+        ];
+        const path = [currentCell, targetCell];
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.LAVA_CENTER,
+            lowerAbilities: ["Made of Fire"],
+            lowerSize: PBTypes.UnitSizeVals.LARGE,
+            lowerCell: currentCell,
+            supportCell: { x: 2, y: 2 },
+            upperCell: { x: 12, y: 12 },
+            currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
+        });
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path,
+            targetCells,
+            hasLavaCell: true,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.rejectionReason).toBeUndefined();
+        expect(setup.lower.getBaseCell()).toEqual(targetCell);
+        expect(setup.lower.getCells()).toEqual(expect.arrayContaining(targetCells));
+        expect(result.events[0]).toMatchObject({
+            type: "unit_moved",
+            path,
+            targetCells,
         });
     });
 

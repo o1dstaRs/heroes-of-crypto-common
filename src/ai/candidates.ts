@@ -581,6 +581,7 @@ class CandidateGenerator {
                     f,
                     this.unit.canTraverseLava(),
                     this.unit.hasAbilityActive("Made of Water"),
+                    this.unit.getId(),
                 ))
         );
     }

@@ -309,15 +309,24 @@ export class Grid {
     public getSettings(): GridSettings {
         return this.gridSettings;
     }
-    public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean): boolean {
+    /**
+     * Whether one complete footprint may occupy ordinary cells plus traversable terrain. Existing large units
+     * may overlap part of their current 2x2 footprint while sliding one cell; `ownUnitId` permits only that
+     * overlap. Callers placing a new unit omit it, so another stack's cells remain blocked.
+     */
+    public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean, ownUnitId?: string): boolean {
         if (cells.length !== 1 && cells.length !== 4) {
             return false;
         }
 
         for (const c of cells) {
+            if (!isCellWithinGrid(this.gridSettings, c)) {
+                return false;
+            }
             const occupantUnitId = this.getOccupantUnitId(c);
             if (
                 occupantUnitId &&
+                occupantUnitId !== ownUnitId &&
                 (occupantUnitId !== "L" || !canOccupyLava) &&
                 (occupantUnitId !== "W" || !canOccupyWater)
             ) {

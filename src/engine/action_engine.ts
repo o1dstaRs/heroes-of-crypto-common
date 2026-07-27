@@ -365,6 +365,7 @@ export class GameActionEngine {
                 targetCells,
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("Made of Water"),
+                unit.getId(),
             )
         )) {
             return this.reject("move_blocked");

@@ -224,6 +224,36 @@ describe("battle engine turn execution observer", () => {
         expect(recovered!.events.map((event) => event.type)).toEqual(["unit_defended", "turn_completed"]);
     });
 
+    test("records an advance recovery's origin before applying the move", () => {
+        let injectedUnitId: string | undefined;
+        const { result, turns } = runObservedMatchWithV01Transform(35, 1, (unit, _context, incumbent) => {
+            if (injectedUnitId || !unit.canMove()) {
+                return incumbent;
+            }
+            injectedUnitId = unit.getId();
+            return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];
+        });
+
+        expect(injectedUnitId).toBeDefined();
+        const recovered = turns.find((turn) => turn.unitId === injectedUnitId);
+        expect(recovered?.recovery).toMatchObject({
+            source: "advance",
+            completed: true,
+            action: { type: "move_unit", unitId: injectedUnitId },
+        });
+        const recoveryAction = recovered?.recovery.action;
+        if (!recoveryAction || recoveryAction.type !== "move_unit") {
+            throw new Error("expected an advance recovery");
+        }
+        const recordedMove = result.actions.find(
+            (action) => action.unitId === injectedUnitId && action.actionType === "move_unit",
+        );
+        expect(recordedMove).toBeDefined();
+        expect(recordedMove?.fromCell).toEqual(recoveryAction.path[0]);
+        expect(recordedMove?.toCell).toEqual(recoveryAction.path.at(-1));
+        expect(recordedMove?.fromCell).not.toEqual(recordedMove?.toCell);
+    });
+
     test("attributes a rejected ranged shot to Cowardice against its stronger resolved primary", () => {
         let injectedUnitId: string | undefined;
         let resolvedPrimaryId: string | undefined;

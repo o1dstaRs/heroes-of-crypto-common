@@ -1126,7 +1126,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     } else if (
                         !stationary &&
                         !grid.areAllCellsEmpty(afCells, unit.getId()) &&
-                        !grid.canOccupyCells(afCells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
+                        !grid.canOccupyCells(
+                            afCells,
+                            unit.canTraverseLava(),
+                            unit.hasAbilityActive("Made of Water"),
+                            unit.getId(),
+                        )
                     ) {
                         cause = "cell_occupied";
                     } else {
@@ -1198,6 +1203,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 if (finished || currentActiveUnitId !== actingUnitId) {
                     return false;
                 }
+                const fromCell = { ...unit.getBaseCell() };
                 const r = engine.apply(action);
                 if (turnExecutionObserver) {
                     const observedEvents = structuredClone(r.events);
@@ -1212,15 +1218,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     recoveryForObservation = recoveryAttempt;
                     turnEventsForObservation!.push(...observedEvents);
                 }
-                recordAction(
-                    actions,
-                    action,
-                    unit,
-                    { ...unit.getBaseCell() },
-                    r,
-                    unitsHolder,
-                    fightProperties.getCurrentLap(),
-                );
+                recordAction(actions, action, unit, fromCell, r, unitsHolder, fightProperties.getCurrentLap());
                 applyEvents(r.events);
                 return r.completed;
             };

@@ -83,7 +83,12 @@ export class MoveHandler {
 
             if (
                 this.grid.areAllCellsEmpty(targetCells, unitId) ||
-                this.grid.canOccupyCells(targetCells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"))
+                this.grid.canOccupyCells(
+                    targetCells,
+                    unit.canTraverseLava(),
+                    unit.hasAbilityActive("Made of Water"),
+                    unitId,
+                )
             ) {
                 const systemMoveResult = this.finishDirectedUnitMove(unit, targetCells, undefined, updatePositionMask);
                 if (systemMoveResult.log) {
@@ -125,6 +130,7 @@ export class MoveHandler {
                                     shiftedCells,
                                     unit.canTraverseLava(),
                                     unit.hasAbilityActive("Made of Water"),
+                                    unitId,
                                 )
                             ) {
                                 const position = getPositionForCells(this.gridSettings, shiftedCells);
@@ -169,6 +175,7 @@ export class MoveHandler {
                                     shiftedCells,
                                     unit.canTraverseLava(),
                                     unit.hasAbilityActive("Made of Water"),
+                                    unitId,
                                 )
                             ) {
                                 const position = getPositionForCells(this.gridSettings, shiftedCells);

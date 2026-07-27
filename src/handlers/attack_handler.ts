@@ -1525,6 +1525,7 @@ export class AttackHandler {
                         attackFromCells,
                         attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
+                        attackerUnit.getId(),
                     )) &&
                 (stationaryAttack || currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)
             ) {
@@ -1587,6 +1588,7 @@ export class AttackHandler {
                         attackFromCells,
                         attackerUnit.canTraverseLava(),
                         attackerUnit.hasAbilityActive("Made of Water"),
+                        attackerUnit.getId(),
                     )) &&
                 (stationaryAttack || currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)
             ) {
@@ -2511,6 +2513,7 @@ export class AttackHandler {
                             attackFromCells,
                             attackerUnit.canTraverseLava(),
                             attackerUnit.hasAbilityActive("Made of Water"),
+                            attackerUnit.getId(),
                         )) &&
                     (stationaryAttack ||
                         currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)
@@ -2584,6 +2587,7 @@ export class AttackHandler {
                             cells,
                             attackerUnit.canTraverseLava(),
                             attackerUnit.hasAbilityActive("Made of Water"),
+                            attackerUnit.getId(),
                         )) &&
                     (stationaryAttack ||
                         currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.length)

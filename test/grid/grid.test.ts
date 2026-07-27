@@ -83,6 +83,30 @@ describe("Grid Aggregation Matrix Tests", () => {
         expect(aggrMatrix[1][2]).toBe(2);
     });
 
+    test("allows only the moving unit's own cells in a mixed own-footprint and lava landing", () => {
+        const unitId = "largeUnit";
+        const currentFootprint = [
+            { x: 5, y: 7 },
+            { x: 4, y: 7 },
+            { x: 5, y: 6 },
+            { x: 4, y: 6 },
+        ];
+        const shiftedOntoLava = [
+            { x: 6, y: 7 },
+            { x: 5, y: 7 },
+            { x: 6, y: 6 },
+            { x: 5, y: 6 },
+        ];
+        expect(grid.occupyCells(currentFootprint, unitId, PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
+
+        expect(grid.canOccupyCells(shiftedOntoLava, true, false)).toBe(false);
+        expect(grid.canOccupyCells(shiftedOntoLava, true, false, unitId)).toBe(true);
+
+        expect(grid.occupyCell({ x: 6, y: 7 }, "otherUnit", PBTypes.TeamVals.UPPER, 1, true, false)).toBe(true);
+        expect(grid.canOccupyCells(shiftedOntoLava, true, false, unitId)).toBe(false);
+        expect(grid.canOccupyCells([{ x: -1, y: 7 }], true, true, unitId)).toBe(false);
+    });
+
     test("should clean and refresh center obstacles for every center grid type", () => {
         const blockGrid = new Grid(gridSettings, PBTypes.GridVals.BLOCK_CENTER);
         const waterGrid = new Grid(gridSettings, PBTypes.GridVals.WATER_CENTER);
