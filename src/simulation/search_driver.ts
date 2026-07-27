@@ -1864,6 +1864,7 @@ export class SearchDriver {
                           prioritizeDominantFinish,
                           prioritizeV08STargetPressure,
                           prioritizeV08SUrgency,
+                          prioritizeProductiveActions,
                       )
                     : undefined;
             if (this.circuitOpen) {
@@ -2284,7 +2285,9 @@ export class SearchDriver {
                     : prioritizeV08SUrgency
                       ? legalAdvanceIndices.length
                           ? legalAdvanceIndices
-                          : [0]
+                          : prioritizeProductiveActions && legalProductiveIndices.length
+                            ? legalProductiveIndices
+                            : [0]
                       : prioritizeDominantFinish && dominantFinishIndices.length
                         ? dominantFinishIndices
                         : prioritizeProductiveActions && legalProductiveIndices.length
@@ -2503,6 +2506,7 @@ export class SearchDriver {
         prioritizeDominantFinish = false,
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
+        prioritizeProductiveActions = false,
     ): IEnumeratedCandidate | undefined {
         const productiveCandidates = candidates.filter(isProductiveCandidate);
         const directCombatCandidates = productiveCandidates.filter(isDirectCombatCandidate);
@@ -2533,6 +2537,11 @@ export class SearchDriver {
                       ...productiveCandidates.filter(
                           (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
                       ),
+                      ...(prioritizeProductiveActions
+                          ? productiveCandidates.filter(
+                                (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
+                            )
+                          : []),
                   ]
                 : orderedV08SDirectCombat
             : prioritizeDominantFinish

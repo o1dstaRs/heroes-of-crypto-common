@@ -1105,6 +1105,85 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(probed).toEqual(["move"]);
     });
 
+    it("repairs an urgent hard passive with a legal spell when no attack or advance exists", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s", SEARCH_GATE: "1" });
+        const harness = buildBattle(952, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const defend: GameAction[] = [{ type: "defend_turn", unitId: id }];
+        const spell: GameAction[] = [{ type: "cast_spell", casterId: id, spellName: "support" }];
+        const candidates = [
+            { kind: "incumbent", actions: defend },
+            { kind: "spell", actions: spell },
+        ] as unknown as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ) => number[];
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+                aggressiveWaitComparison?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ) => GameAction[];
+            firstEngineValidProductiveCandidate: (
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                prioritizeDominantFinish?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+                prioritizeProductiveActions?: boolean,
+            ) => IEnumeratedCandidate | undefined;
+        };
+        driver.scoreCandidates = (_unit, scored) =>
+            scored.map(({ kind }) => (kind === "incumbent" ? 0.9 : 0.1));
+
+        expect(
+            driver.search(
+                unit,
+                candidates,
+                defend,
+                123,
+                performance.now(),
+                true,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(spell);
+        expect(
+            driver.search(
+                unit,
+                candidates,
+                defend,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(defend);
+        expect(
+            driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true, true),
+        ).toBe(candidates[1]);
+    });
+
     it("keeps v0.7 scoring unchanged and lets v0.8 use nonproductive actions only without a productive option", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6,v0.8s", SEARCH_GATE: "0" });
         const harness = buildBattle(92, "v0.8s");
