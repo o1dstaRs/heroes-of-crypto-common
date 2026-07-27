@@ -264,12 +264,38 @@ describe("v0.9 training protocol", () => {
         expect(seeds.some((seed) => seed <= 3)).toBe(false);
 
         const manifest = buildV09CampaignManifest(identity, directory, ledger);
-        expect(buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")]).environment).toEqual({
+        const learnerLaunch = buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")]);
+        expect(learnerLaunch.environment).toEqual({
             CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID,
             PYTHONDONTWRITEBYTECODE: "1",
             PYTHONUNBUFFERED: "1",
             V09_RUN_FINGERPRINT: manifest.runFingerprint,
         });
+        const fixedGateIndex = learnerLaunch.argv.indexOf("--minimum-fixed-agreement");
+        expect(learnerLaunch.argv.slice(fixedGateIndex, fixedGateIndex + 4)).toEqual([
+            "--minimum-fixed-agreement",
+            "0.99",
+            "--maximum-fixed-accuracy-drop",
+            "0.01",
+        ]);
+        const smokeLaunch = buildV09LearnerLaunch(manifest, directory, [join(directory, "il-smoke/*.jsonl")], {
+            allowPartialCorpus: true,
+            minimumFixedAgreement: 0,
+            maximumFixedAccuracyDrop: 1,
+        });
+        const smokeFixedGateIndex = smokeLaunch.argv.indexOf("--minimum-fixed-agreement");
+        expect(smokeLaunch.argv.slice(smokeFixedGateIndex, smokeFixedGateIndex + 4)).toEqual([
+            "--minimum-fixed-agreement",
+            "0",
+            "--maximum-fixed-accuracy-drop",
+            "1",
+        ]);
+        expect(smokeLaunch.argv).toContain("--allow-partial-corpus");
+        expect(() =>
+            buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")], {
+                minimumFixedAgreement: Number.NaN,
+            }),
+        ).toThrow("finite ratios");
         initializeV09Campaign(directory, manifest, ledger);
         initializeV09Campaign(directory, manifest, ledger);
         expect(

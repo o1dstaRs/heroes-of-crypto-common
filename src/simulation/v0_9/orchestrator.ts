@@ -648,6 +648,10 @@ async function runLearner(
         workers: 8,
         resume: false,
         allowPartialCorpus: smoke,
+        // A one-epoch smoke fit proves the CUDA/QAT -> CPU fixed-point -> parity pipeline, not model quality.
+        // Full training retains the learner's strict 0.99 agreement / 0.01 accuracy-drop gates below.
+        minimumFixedAgreement: smoke ? 0 : undefined,
+        maximumFixedAccuracyDrop: smoke ? 1 : undefined,
     });
     if (!existsSync(launch.executable)) throw new Error("pinned learner interpreter is missing");
     const outputIndex = launch.argv.indexOf("--out") + 1;

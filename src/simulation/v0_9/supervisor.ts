@@ -338,6 +338,8 @@ export function buildV09LearnerLaunch(
         resume?: boolean;
         modelTag?: string;
         allowPartialCorpus?: boolean;
+        minimumFixedAgreement?: number;
+        maximumFixedAccuracyDrop?: number;
     } = {},
 ): IV09LearnerLaunch {
     if (!dataGlobs.length) throw new Error("v0.9 learner requires at least one IL-v4 data glob");
@@ -348,6 +350,18 @@ export function buildV09LearnerLaunch(
     const architectureId = hidden.join("x");
     const modelTag = options.modelTag ?? "initial";
     if (!/^[a-z0-9][a-z0-9._-]*$/.test(modelTag)) throw new Error("v0.9 learner modelTag is invalid");
+    const minimumFixedAgreement = options.minimumFixedAgreement ?? 0.99;
+    const maximumFixedAccuracyDrop = options.maximumFixedAccuracyDrop ?? 0.01;
+    if (
+        !Number.isFinite(minimumFixedAgreement) ||
+        minimumFixedAgreement < 0 ||
+        minimumFixedAgreement > 1 ||
+        !Number.isFinite(maximumFixedAccuracyDrop) ||
+        maximumFixedAccuracyDrop < 0 ||
+        maximumFixedAccuracyDrop > 1
+    ) {
+        throw new Error("v0.9 learner fixed-point gates must be finite ratios in [0, 1]");
+    }
     const output = manifest.outputDirectory;
     const script = resolve(repositoryRoot, "src/simulation/v0_9/python/learner.py");
     const argv = [
@@ -371,6 +385,10 @@ export function buildV09LearnerLaunch(
         String(options.workers ?? 8),
         "--hidden",
         hidden.join(","),
+        "--minimum-fixed-agreement",
+        String(minimumFixedAgreement),
+        "--maximum-fixed-accuracy-drop",
+        String(maximumFixedAccuracyDrop),
     ];
     if (options.resume) argv.push("--resume");
     if (options.allowPartialCorpus) argv.push("--allow-partial-corpus");
