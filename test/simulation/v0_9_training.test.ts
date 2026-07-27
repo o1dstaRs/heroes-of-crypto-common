@@ -61,8 +61,10 @@ import { sealV09ResearchArtifact } from "../../src/simulation/v0_9/seal_artifact
 import {
     assessV09LearnerHardwareEvidence,
     assertV09OutputIsolation,
+    buildV09LearnerLaunch,
     verifyV09V08ProtectionReceipt,
     v09QualificationFailures,
+    V09_PYTHON_ENVIRONMENT,
     writeV09V08ProtectionReceipt,
 } from "../../src/simulation/v0_9/supervisor";
 import { IL_ACTION_FEATURE_NAMES } from "../../src/simulation/il_action_features";
@@ -161,9 +163,13 @@ describe("v0.9 training protocol", () => {
                 ].join("; "),
             ],
             cwd: join(import.meta.dir, "../../src/simulation/v0_9/python"),
+            env: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
         });
         expect(python.exitCode).toBe(0);
         expect(python.stdout.toString().trim()).toBe("ok");
+        expect(readFileSync(join(import.meta.dir, "../../src/simulation/v0_9/python/learner.py"), "utf8")).toMatch(
+            /\nimport random\n/,
+        );
     });
 
     it("pins the exact runtime feature basis without changing IL-v3", () => {
@@ -255,6 +261,12 @@ describe("v0.9 training protocol", () => {
         expect(seeds.some((seed) => seed <= 3)).toBe(false);
 
         const manifest = buildV09CampaignManifest(identity, directory, ledger);
+        expect(buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")]).environment).toEqual({
+            CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID,
+            PYTHONDONTWRITEBYTECODE: "1",
+            PYTHONUNBUFFERED: "1",
+            V09_RUN_FINGERPRINT: manifest.runFingerprint,
+        });
         initializeV09Campaign(directory, manifest, ledger);
         initializeV09Campaign(directory, manifest, ledger);
         expect(
@@ -350,6 +362,7 @@ describe("v0.9 training protocol", () => {
                     "--data",
                     join(directory, "il/**/*.jsonl"),
                 ],
+                env: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
             });
         const valid = validate();
         expect(`${valid.exitCode}:${valid.stderr.toString()}`).toBe("0:");
@@ -530,6 +543,7 @@ describe("v0.9 training protocol", () => {
                 "--vectors",
                 vectorsPath,
             ],
+            env: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
         });
         expect(python.exitCode).toBe(0);
         expect(python.stdout.toString().trim()).toBe('{"id":"half-away","score":1}');
@@ -579,6 +593,7 @@ describe("v0.9 training protocol", () => {
                     "--vectors",
                     vectorsPath,
                 ],
+                env: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
             });
             expect(python.exitCode).toBe(0);
             expect(

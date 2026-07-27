@@ -62,6 +62,7 @@ import {
     verifyV09V08ProtectionReceipt,
     V09_ARCHITECTURE_CANDIDATES,
     V09_GPU_EVIDENCE_POLICY,
+    V09_PYTHON_ENVIRONMENT,
 } from "./supervisor";
 import { V09_TEACHER_COHORTS, V09_TEACHER_MAPS } from "./teacher_actor";
 
@@ -390,7 +391,7 @@ function physicalCpuIds(): number[] {
 async function bootstrapVenv(context: IOrchestratorContext): Promise<void> {
     const python = resolve(context.campaignDirectory, "venv/bin/python");
     const results: ICommandResult[] = [];
-    const environment = { ...process.env, PIP_NO_CACHE_DIR: "1" };
+    const environment = { ...process.env, ...V09_PYTHON_ENVIRONMENT, PIP_NO_CACHE_DIR: "1" };
     if (!existsSync(python)) {
         results.push(
             await runCommand("python3.12", ["-m", "venv", resolve(context.campaignDirectory, "venv")], {
@@ -448,7 +449,11 @@ async function preflight(context: IOrchestratorContext): Promise<void> {
         ],
         {
             cwd: context.repositoryRoot,
-            environment: { ...process.env, CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID },
+            environment: {
+                ...process.env,
+                ...V09_PYTHON_ENVIRONMENT,
+                CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID,
+            },
             monitorGpuUuid: V09_RTX5090_GPU_UUID,
         },
     );
@@ -835,7 +840,10 @@ async function runParity(context: IOrchestratorContext, artifactPath: string, id
             "--vectors",
             path,
         ],
-        { cwd: context.repositoryRoot },
+        {
+            cwd: context.repositoryRoot,
+            environment: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
+        },
     );
     if (result.stdout.trim().split(/\r?\n/).filter(Boolean).length !== vectors.length) {
         throw new Error("Python/TypeScript parity output count mismatch");

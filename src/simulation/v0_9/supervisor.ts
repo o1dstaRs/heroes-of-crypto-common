@@ -99,10 +99,16 @@ export interface IV09LearnerLaunch {
     argv: string[];
     environment: {
         CUDA_VISIBLE_DEVICES: string;
+        PYTHONDONTWRITEBYTECODE: "1";
         PYTHONUNBUFFERED: "1";
         V09_RUN_FINGERPRINT: string;
     };
 }
+
+export const V09_PYTHON_ENVIRONMENT = Object.freeze({
+    PYTHONDONTWRITEBYTECODE: "1",
+    PYTHONUNBUFFERED: "1",
+} as const);
 
 const stageExpectedUnits = (stage: V09CampaignStage): number => {
     switch (stage) {
@@ -373,7 +379,7 @@ export function buildV09LearnerLaunch(
         argv,
         environment: {
             CUDA_VISIBLE_DEVICES: manifest.identity.gpuUuid,
-            PYTHONUNBUFFERED: "1",
+            ...V09_PYTHON_ENVIRONMENT,
             V09_RUN_FINGERPRINT: manifest.runFingerprint,
         },
     };
