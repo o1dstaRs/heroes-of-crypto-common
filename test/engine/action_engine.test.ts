@@ -2314,11 +2314,16 @@ describe("action engine — custom targeted spell legality", () => {
         spells?: string[];
         abilities?: string[];
         stackPower: number;
+        supportCell?: { x: number; y: number };
     }[] = [
         { spellName: "Vine Throw", abilities: ["Vine Throw"], stackPower: 3 },
         { spellName: "Fire Strike", spells: ["Life:Fire Strike"], stackPower: 1 },
         { spellName: "Lightning Strike", spells: ["Nature:Lightning Strike"], stackPower: 1 },
-        { spellName: "Ring of Fire", spells: ["Nature:Ring of Fire"], stackPower: 4 },
+        // Ring of Fire needs a body in the ring: the redesign spares the aimed enemy itself, so a cast at a
+        // lone target now legitimately catches nobody and the engine refuses it. Parking the ally beside the
+        // target (it burns friend or foe) gives the ring something to hit, while (6,4) stays off the
+        // caster's line to (6,3) so this still tests LINE OF SIGHT rather than accidentally blocking it.
+        { spellName: "Ring of Fire", spells: ["Nature:Ring of Fire"], stackPower: 4, supportCell: { x: 6, y: 4 } },
     ];
 
     for (const spellCase of enemySpells) {
@@ -2329,7 +2334,7 @@ describe("action engine — custom targeted spell legality", () => {
                 lowerStackPower: spellCase.stackPower,
                 upperCell: { x: 6, y: 3 },
                 upperMaxHp: 10_000,
-                supportCell: { x: 3, y: 6 },
+                supportCell: spellCase.supportCell ?? { x: 3, y: 6 },
             });
             setup.upper.applyBuff(
                 new Spell({
@@ -2398,7 +2403,7 @@ describe("action engine — custom targeted spell legality", () => {
                 lowerStackPower: spellCase.stackPower,
                 upperCell: { x: 6, y: 3 },
                 upperMaxHp: 10_000,
-                supportCell: { x: 3, y: 6 },
+                supportCell: spellCase.supportCell ?? { x: 3, y: 6 },
             });
 
             const result = setup.engine.apply({
