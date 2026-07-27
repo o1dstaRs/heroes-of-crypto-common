@@ -96,9 +96,11 @@ describe("public-roster placement measurement", () => {
             expect(context.addedPublicCreatureIds).toEqual([C.BLACK_DRAGON, C.NOMAD]);
         }
 
+        // Scavenger, not Squire: Squire gained Arcane Ward Aura and so no longer reads as exact melee-other,
+        // which is the whole condition this case exercises.
         const meleeOther = publicRosterPlacementContext(
             "cohort-safe",
-            [C.SQUIRE],
+            [C.SCAVENGER],
             [C.GRIFFIN, C.BLACK_DRAGON, C.NOMAD],
             [C.GRIFFIN],
         );
@@ -137,7 +139,7 @@ describe("public-roster placement measurement", () => {
             "melee-magic",
             "aura-heavy",
         ]);
-        expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "melee-other"]);
+        expect(publicRosterPlacementRosterTargets([C.SCAVENGER])).toEqual(["natural", "melee-other"]);
     });
 
     test("matched-control delta compares the same selected game slice", () => {

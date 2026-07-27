@@ -307,6 +307,9 @@ describe("Wyvern", () => {
         expect(between(wyvern.speed, valkyrie.speed, harpy.speed)).toBe(true);
         expect(between(wyvern.base_armor, valkyrie.base_armor, harpy.base_armor)).toBe(true);
         expect(between(wyvern.base_attack, valkyrie.base_attack, harpy.base_attack)).toBe(true);
-        expect(between(wyvern.exp, valkyrie.exp, harpy.exp)).toBe(true);
+        // Exp is the deliberate exception: the rebalance took it to 33, UNDER both flyers, so a Wyvern stack
+        // is cheaper than either despite fighting between them. Asserted as strictly-cheaper rather than
+        // dropped, so a future change that quietly prices it back above them is still caught.
+        expect(wyvern.exp).toBeLessThan(Math.min(valkyrie.exp, harpy.exp));
     });
 });
