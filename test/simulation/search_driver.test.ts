@@ -3338,6 +3338,141 @@ describe("search driver — gating, hygiene, determinism", () => {
         expectEngineAcceptsProductiveDecision(h, chosen);
     });
 
+    it("casts instead of shielding or forcing a harmful shot after the deadline and circuit open", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_HORIZON: "6",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const h = buildBattle(13_314, "v0.8s", undefined, [
+            { faction: "Might", creatureName: "Cyclops", level: 3, size: 1, amount: 1 },
+            { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 50 },
+        ]);
+        const named = (team: TeamType, name: string): Unit =>
+            [...h.unitsHolder.getAllUnits().values()].find(
+                (candidate) => candidate.getTeam() === team && candidate.getName() === name,
+            )!;
+        const actor = named(GREEN_TEAM, "Cyclops");
+        const ally = named(GREEN_TEAM, "Squire");
+        const target = named(RED_TEAM, "Squire");
+        const distantEnemy = named(RED_TEAM, "Cyclops");
+        const placements: Array<readonly [Unit, XY]> = [
+            [actor, { x: 2, y: 7 }],
+            [ally, { x: 9, y: 8 }],
+            [target, { x: 9, y: 7 }],
+            [distantEnemy, { x: 13, y: 13 }],
+        ];
+        for (const [unit] of placements) {
+            h.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+        }
+        for (const [unit, cell] of placements) {
+            const position = getPositionForCell(
+                cell,
+                h.grid.getSettings().getMinX(),
+                h.grid.getSettings().getStep(),
+                h.grid.getSettings().getHalfStep(),
+            );
+            unit.setPosition(position.x, position.y);
+            h.grid.occupyCell(
+                cell,
+                unit.getId(),
+                unit.getTeam(),
+                unit.getAttackRange(),
+                unit.hasAbilityActive("Made of Fire"),
+                unit.hasAbilityActive("Made of Water"),
+            );
+        }
+        target.applyDamage(target.getCumulativeHp() - 1, 0, new SceneLogMock(), false);
+        actor.setTarget(target.getId());
+        actor.grantStolenAbility("Forest Spellbook", ["Life:Courage"]);
+        h.setActiveUnitId(actor.getId());
+
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: actor.getId() }];
+        const catalogDriver = h.makeDriver();
+        const catalogCalls = captureCandidates(catalogDriver);
+        expect(catalogDriver.chooseDecision(actor, "v0.8s", incumbent)).toBe(incumbent);
+        expect(catalogCalls).toHaveLength(1);
+        const candidates = catalogCalls[0];
+        const harmfulShot = candidates.find(
+            (candidate) =>
+                candidate.kind === "shot" &&
+                candidate.actions.some(
+                    (action) => action.type === "range_attack" && action.targetId === target.getId(),
+                ) &&
+                candidate.features.expectedDamage < 0 &&
+                candidate.features.expectedKill === 1 &&
+                (candidate.shotFeatures?.primaryTargetDamage ?? 0) > 0,
+        );
+        const courage = candidates.find(
+            (candidate) =>
+                candidate.kind === "spell" &&
+                candidate.actions.some((action) => action.type === "cast_spell" && action.spellName === "Courage"),
+        );
+        const positiveDirectCombat = candidates.filter(
+            (candidate) =>
+                candidate.features.expectedDamage > 0 &&
+                candidate.actions.some(
+                    (action) =>
+                        action.type === "melee_attack" ||
+                        action.type === "range_attack" ||
+                        action.type === "area_throw_attack",
+                ),
+        );
+        expect(harmfulShot).toBeDefined();
+        expect(courage).toBeDefined();
+        expect(positiveDirectCombat).toEqual([]);
+
+        const before = stableSnapshot(h);
+        const deadlineDriver = h.makeDriver() as unknown as {
+            decisionDeadlineMs: number | null;
+            counters: { deadlineFallbacks: number; scoredCandidatesTotal: number };
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        // Zero is injected after construction so the real chooseDecision path deterministically reaches its
+        // deadline fallback without relying on a sub-microsecond wall-clock race.
+        deadlineDriver.decisionDeadlineMs = 0;
+        setDeterministicRandomSource(makeRng(0xd1ead));
+        const deadlineExpectedRandom = getRandomInt(0, 1_000_000);
+        setDeterministicRandomSource(makeRng(0xd1ead));
+
+        const deadlineChosen = deadlineDriver.chooseDecision(actor, "v0.8s", incumbent);
+
+        expect(deadlineChosen).toEqual(courage!.actions);
+        expect(deadlineChosen.some((action) => action.type === "range_attack")).toBe(false);
+        expect(deadlineChosen.some((action) => action.type === "defend_turn")).toBe(false);
+        expect(stableSnapshot(h)).toEqual(before);
+        expect(getRandomInt(0, 1_000_000)).toBe(deadlineExpectedRandom);
+        expect(deadlineDriver.counters).toMatchObject({ deadlineFallbacks: 1, scoredCandidatesTotal: 0 });
+
+        const circuitDriver = h.makeDriver() as unknown as {
+            circuitOpen: boolean;
+            counters: { decisions: number; circuitSkipped: number };
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        circuitDriver.circuitOpen = true;
+        setDeterministicRandomSource(makeRng(0xc1c017));
+        const circuitExpectedRandom = getRandomInt(0, 1_000_000);
+        setDeterministicRandomSource(makeRng(0xc1c017));
+
+        const circuitChosen = circuitDriver.chooseDecision(actor, "v0.8s", incumbent);
+
+        expect(circuitChosen).toEqual(courage!.actions);
+        expect(circuitChosen.some((action) => action.type === "range_attack")).toBe(false);
+        expect(circuitChosen.some((action) => action.type === "defend_turn")).toBe(false);
+        expect(stableSnapshot(h)).toEqual(before);
+        expect(getRandomInt(0, 1_000_000)).toBe(circuitExpectedRandom);
+        expect(circuitDriver.counters).toMatchObject({ decisions: 0, circuitSkipped: 1 });
+
+        // The rejected choice was genuinely engine-legal: it is excluded only because its net AOE damage is
+        // harmful, not because the fallback probe happened to reject it.
+        for (const action of harmfulShot!.actions) {
+            expect(h.engine.apply(action).completed).toBe(true);
+        }
+    });
+
     it("keeps v0.8 observe-only deadline and circuit fallbacks on the exact incumbent", () => {
         setEnv({
             V07_SEARCH: "1",
