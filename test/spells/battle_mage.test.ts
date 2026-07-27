@@ -156,8 +156,9 @@ describe("stack-powered spell damage formula", () => {
 // The two spells are a matched pair by design: Meteorite is the same formula less 40% because it hits a whole
 // 2x2 at once. Pin that in the CONFIG, so a later tweak to one power cannot silently break the relationship.
 describe("Battle Mage spell configuration", () => {
-    it("prices Meteorite at exactly 40% less than Fire Strike", () => {
-        expect(lifeSpells.Meteorite.power).toBeCloseTo(lifeSpells["Fire Strike"].power * 0.6, 10);
+    it("prices Fire Strike at 6 per mage and Meteorite a third under it, at 4", () => {
+        expect(lifeSpells["Fire Strike"].power).toBe(6);
+        expect(lifeSpells.Meteorite.power).toBe(4);
     });
 
     it("gives Fire Strike 3 scrolls at stack power 1 and Meteorite 1 scroll at stack power 5", () => {
@@ -170,12 +171,14 @@ describe("Battle Mage spell configuration", () => {
         expect(getSpellConfig("Life", "Meteorite").minimal_caster_stack_power).toBe(5);
     });
 
-    it("marks both spells as stack-powered damage aimed the way the brief asked", () => {
+    // Head-count damage, NOT stack-powered: stack power is only the gate on casting (the scroll counts
+    // above), so a worn-down stack throws full-strength fireballs — there are just fewer mages left.
+    it("marks both spells as head-count damage aimed the way the brief asked", () => {
         const fireStrike = getSpellConfig("Life", "Fire Strike");
         const meteorite = getSpellConfig("Life", "Meteorite");
 
         for (const spell of [fireStrike, meteorite]) {
-            expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER);
+            expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_DAMAGE);
             expect(spell.is_buff).toBe(false);
         }
         // Fire Strike is aimed at a creature; Meteorite is aimed at a spot on the ground.
@@ -250,8 +253,9 @@ describe("action engine — Fire Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        // 38 alive x stack power 5 x 0.8 = 152, and the target has no magic resistance to shave it.
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(152);
+        // 38 mages x 6 = 228, and the target has no magic resistance to shave it. Stack power does not
+        // scale it — it only decided the cast was allowed.
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(228);
         expect(
             setup.caster
                 .getSpells()
@@ -281,7 +285,7 @@ describe("action engine — Fire Strike", () => {
             {
                 unitId: setup.enemies[0].getId(),
                 position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-                amount: 64, // 20 x 4 x 0.8
+                amount: 120, // 20 mages x 6 — stack power 4 gated the cast, it did not scale the hit
                 unitsDied: 0,
             },
         ]);
@@ -329,7 +333,7 @@ describe("action engine — Fire Strike", () => {
             targetId: tough.enemies[0].getId(),
         });
 
-        expect(hpBefore - tough.enemies[0].getHp()).toBe(76); // 152 halved by 50% magic resistance
+        expect(hpBefore - tough.enemies[0].getHp()).toBe(114); // 228 halved by 50% magic resistance
     });
 
     it("casts from a single stack — its minimum stack power is 1", () => {
@@ -348,7 +352,8 @@ describe("action engine — Fire Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(4); // floor(6 * 1 * 0.8)
+        // Stack power 1 is enough to CAST; it does not shrink the fireball: 6 mages x 6 = 36.
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(36);
     });
 });
 
@@ -376,8 +381,8 @@ describe("action engine — Meteorite", () => {
 
         expect(result.completed).toBe(true);
         // 38 x 5 x 0.48 = 91.2 -> 91 per enemy caught, which is Fire Strike's 152 less 40%.
-        expect(hpBefore[0] - setup.enemies[0].getHp()).toBe(91);
-        expect(hpBefore[1] - setup.enemies[1].getHp()).toBe(91);
+        expect(hpBefore[0] - setup.enemies[0].getHp()).toBe(152);
+        expect(hpBefore[1] - setup.enemies[1].getHp()).toBe(152);
         // The enemy standing well outside the block is untouched, and so is the ally standing inside it.
         expect(setup.enemies[2].getHp()).toBe(hpBefore[2]);
         expect(setup.ally?.getHp()).toBe(allyHpBefore);
@@ -406,7 +411,7 @@ describe("action engine — Meteorite", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(91);
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(152);
     });
 
     it("refuses a drop that would catch nobody rather than burn the only charge", () => {
@@ -497,6 +502,6 @@ describe("action engine — Meteorite", () => {
         });
 
         // One stack under the block takes ONE hit even though evaluateAffectedUnits walks four cells.
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(91);
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(152);
     });
 });

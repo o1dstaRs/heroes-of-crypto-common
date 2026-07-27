@@ -528,9 +528,22 @@ export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
 };
 
 /**
- * Whether an incoming spell rebounds off `targetUnit` WHOLE — damage and effects both, landing on the caster
- * IN ADDITION to landing on the holder, which is hit in full either way. Only the passive ability rebounds
- * the whole spell; the Magic Mirror buff keeps its own partial behaviour.
+ * The SHARE of a rebounded spell's damage the passive ability sends back, as a percentage.
+ *
+ * A mirror returns what it reflects, not more: the caster takes this share of the damage the spell actually
+ * landed, never the whole hit. It is the same figure the ability card advertises (base power moved by the
+ * holder's luck), so the number the player reads is the number that comes back — a mirror that says 75 and
+ * returns 100 is the kind of surprise that makes a stat sheet worthless.
+ *
+ * Effects are a separate question and stay all-or-nothing (see isMirrored): half a Stun is not a thing.
+ */
+export const getMagicMirrorAbilityShare = (targetUnit: Unit): number => getMagicMirrorAbilityChance(targetUnit);
+
+/**
+ * Whether an incoming spell rebounds off `targetUnit` — its effects whole, its damage cut to the mirror's own
+ * share (getMagicMirrorAbilityShare) — landing on the caster IN ADDITION to landing on the holder, which is
+ * hit in full either way. Only the passive ability rebounds a spell; the Magic Mirror buff keeps its own
+ * partial behaviour.
  */
 export const reboundsSpell = (targetUnit: Unit): boolean => {
     const chance = getMagicMirrorAbilityChance(targetUnit);

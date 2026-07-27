@@ -41,11 +41,7 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import {
-    applyMagicResistToSpellDamage,
-    calculateStackPoweredSpellDamage,
-    getEmpowerPercentage,
-} from "../spells/spell_damage";
+import { applyMagicResistToSpellDamage, calculateSpellDamage, getEmpowerPercentage } from "../spells/spell_damage";
 import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
@@ -1270,19 +1266,33 @@ export class GameActionEngine {
      */
     private applySpellDamageToUnits(
         caster: Unit,
-        victims: Array<{ unit: Unit; damage: number; rebounded?: boolean }>,
+        victims: Array<{ unit: Unit; damage: number; rebounded?: boolean; reboundedFromUnitId?: string }>,
     ): {
-        damaged: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[];
+        damaged: {
+            unitId: string;
+            position: XY;
+            amount: number;
+            unitsDied: number;
+            rebounded?: boolean;
+            reboundedFromUnitId?: string;
+        }[];
         unitIdsDied: string[];
         killed: Array<{ victim: Unit; killer: Unit }>;
     } {
-        const damaged: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[] = [];
+        const damaged: {
+            unitId: string;
+            position: XY;
+            amount: number;
+            unitsDied: number;
+            rebounded?: boolean;
+            reboundedFromUnitId?: string;
+        }[] = [];
         const unitIdsDied: string[] = [];
         const killed: Array<{ victim: Unit; killer: Unit }> = [];
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let casterPlusMorale = 0;
 
-        for (const { unit, damage, rebounded } of victims) {
+        for (const { unit, damage, rebounded, reboundedFromUnitId } of victims) {
             // ABILITY Flesh Shield Aura (Abomination): a protected ally hands part of the hit to the
             // Abomination standing beside it. Cast spell damage went straight to applyDamage and skipped
             // this entirely, so the aura absorbed Fire Breath and Chain Lightning (whose ability modules
@@ -1336,6 +1346,7 @@ export class GameActionEngine {
                 amount: damageDealt,
                 unitsDied,
                 ...(rebounded ? { rebounded: true } : {}),
+                ...(reboundedFromUnitId ? { reboundedFromUnitId } : {}),
             });
             this.context.attackHandler?.getDamageStatisticHolder().add({
                 unitName: caster.getName(),
@@ -1411,7 +1422,8 @@ export class GameActionEngine {
         }
 
         const damage = applyMagicResistToSpellDamage(
-            calculateStackPoweredSpellDamage(
+            calculateSpellDamage(
+                spell.getMultiplierType(),
                 spell.getPower(),
                 caster.getAmountAlive(),
                 caster.getStackPower(),
@@ -1477,7 +1489,8 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateStackPoweredSpellDamage(
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
@@ -1527,21 +1540,38 @@ export class GameActionEngine {
         spell: Spell,
         rawDamage: number,
         targets: Unit[],
-    ): Array<{ unit: Unit; damage: number; rebounded?: boolean }> {
-        const victims: Array<{ unit: Unit; damage: number; rebounded?: boolean }> = [];
+    ): Array<{ unit: Unit; damage: number; rebounded?: boolean; reboundedFromUnitId?: string }> {
+        const victims: Array<{
+            unit: Unit;
+            damage: number;
+            rebounded?: boolean;
+            reboundedFromUnitId?: string;
+        }> = [];
         for (const unit of targets) {
-            victims.push({ unit, damage: applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist()) });
+            const landedDamage = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
+            victims.push({ unit, damage: landedDamage });
             if (unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)) {
+                // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own
+                // share (the percentage its card advertises) of the damage that actually landed on the
+                // holder. Reflecting 100% made a 75% card a lie and turned every dragon into a death trap.
+                const share = SpellHelper.getMagicMirrorAbilityShare(unit);
+                const reflected = Math.floor((landedDamage * share) / 100);
                 // The caster's own magic resistance cuts the rebound down, so this is what it actually takes —
                 // say so. The line used to name the rebound without a number, which left the player guessing
                 // what a Magic Mirror had just cost them.
-                const reboundDamage = applyMagicResistToSpellDamage(rawDamage, caster.getMagicResist());
+                const reboundDamage = applyMagicResistToSpellDamage(reflected, caster.getMagicResist());
                 this.context.sceneLog.updateLog(
-                    `${unit.getName()} rebounded ${spell.getName()} back at ${caster.getName()} (${reboundDamage})`,
+                    `${unit.getName()} rebounded ${share}% of ${spell.getName()} back at ${caster.getName()} (${reboundDamage})`,
                 );
                 // Flagged so ranked can say the same thing: it rebuilds its scene log from events and never
                 // reads the line above, so without this the caster's damage appeared with no explanation.
-                victims.push({ unit: caster, damage: reboundDamage, rebounded: true });
+                // The holder rides along so both scenes can draw the beam back from the mirror that threw it.
+                victims.push({
+                    unit: caster,
+                    damage: reboundDamage,
+                    rebounded: true,
+                    reboundedFromUnitId: unit.getId(),
+                });
             }
         }
 
@@ -1582,7 +1612,8 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateStackPoweredSpellDamage(
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
@@ -1673,7 +1704,8 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateStackPoweredSpellDamage(
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
@@ -1747,7 +1779,8 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateStackPoweredSpellDamage(
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),

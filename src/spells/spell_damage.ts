@@ -11,6 +11,7 @@
 
 import { empowerMultiplier } from "../augments/augment_properties";
 import { MAX_UNIT_STACK_POWER } from "../constants";
+import { SpellMultiplierType } from "./spell_properties";
 
 /** The bare minimum of a unit this module needs, so it stays free of a Unit import cycle. */
 interface IEmpowerableCaster {
@@ -114,4 +115,35 @@ export function applyMagicResistToSpellDamage(damage: number, targetMagicResist:
     const resist = Math.max(0, Math.min(100, targetMagicResist));
 
     return Math.max(0, Math.floor(damage * (1 - resist / 100)));
+}
+
+/**
+ * Damage of an offensive spell, dispatched on its multiplier shape so the engine's cast, the client's card
+ * and the AI's estimate all price it identically.
+ *  - UNIT_AMOUNT_DAMAGE: creatures alive x power — the Magic Dragon's spells, where only the head count matters.
+ *  - UNIT_AMOUNT_STACK_POWER: creatures alive x stack power x power — the Battle Mage's.
+ */
+export function calculateSpellDamage(
+    multiplierType: SpellMultiplierType,
+    spellPower: number,
+    casterAmountAlive: number,
+    casterStackPower: number,
+    empowerPercentage = 0,
+): number {
+    if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE) {
+        const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
+        return Math.max(0, Math.floor(amountAlive * spellPower * empowerMultiplier(empowerPercentage)));
+    }
+    if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
+        return calculateStackPoweredSpellDamage(spellPower, casterAmountAlive, casterStackPower, empowerPercentage);
+    }
+    return 0;
+}
+
+/** Whether a spell's multiplier is one of the OFFENSIVE shapes calculateSpellDamage can price. */
+export function isOffensiveSpellMultiplier(multiplierType: SpellMultiplierType): boolean {
+    return (
+        multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER ||
+        multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE
+    );
 }

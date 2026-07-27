@@ -559,7 +559,8 @@ describe("Magic Mirror (passive)", () => {
 
     // The mirror does NOT shield its holder. The spell resolves on it exactly as it would without the
     // ability, and the rebound is a SECOND hit landing on the caster — that is the whole point of it.
-    it("is an extra hit, not a redirection: the holder takes it in full and so does the caster", () => {
+    // What comes back is the mirror's own share (75% at base luck), not the whole spell.
+    it("is an extra hit, not a redirection: the holder takes it in full and the caster takes the share", () => {
         alwaysRoll(0); // 0 < 80 -> the rebound lands
         const setup = setupDragonFight({
             casterAmountAlive: 1,
@@ -578,7 +579,7 @@ describe("Magic Mirror (passive)", () => {
 
         expect(result.completed).toBe(true);
         expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150); // the spell landed as normal
-        expect(casterHpBefore - setup.caster.getHp()).toBe(150); // and came back on top
+        expect(casterHpBefore - setup.caster.getHp()).toBe(112); // 75% of it came back: floor(150 * 0.75)
     });
 
     it("reports the rebound's damage rather than leaving the caster hit unexplained", () => {
@@ -604,7 +605,9 @@ describe("Magic Mirror (passive)", () => {
         const reboundEntry = damaged.find((entry) => entry.rebounded);
         expect(reboundEntry).toBeDefined();
         expect(reboundEntry!.unitId).toBe(setup.caster.getId());
-        expect(reboundEntry!.amount).toBe(150);
+        expect(reboundEntry!.amount).toBe(112); // the mirror's 75% share, not the whole 150
+        // The holder rides along so the scenes can draw the beam back from the mirror that threw it.
+        expect(reboundEntry!.reboundedFromUnitId).toBe(setup.enemies[0].getId());
         // The holder's own hit is NOT a rebound.
         expect(damaged.filter((entry) => entry.rebounded)).toHaveLength(1);
     });
@@ -637,7 +640,7 @@ describe("Magic Mirror (passive)", () => {
         expect(before[0] - setup.enemies[0].getHp()).toBe(0); // aimed at, so spared
         expect(before[1] - setup.enemies[1].getHp()).toBe(125);
         expect(before[2] - setup.enemies[2].getHp()).toBe(125);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(250); // 125 back off each of the two mirrors
+        expect(casterHpBefore - setup.caster.getHp()).toBe(186); // 75% of 125 back off each mirror: 93 + 93
     });
 
     it("costs the caster nothing when the roll misses, while the spell lands the same", () => {
@@ -701,6 +704,7 @@ describe("Magic Mirror (passive)", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(casterHpBefore - setup.caster.getHp()).toBe(75); // floor(150 * 0.5)
+        // 75% share of the 150 that landed, then halved by the CASTER's own 50% magic resistance.
+        expect(casterHpBefore - setup.caster.getHp()).toBe(56); // floor(floor(150 * 0.75) * 0.5)
     });
 });

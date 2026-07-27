@@ -959,13 +959,12 @@
             "level": 1,
             "desc": [
                 "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
-                "Damage = creatures alive x stack power x 0.8.",
                 "Magical: it ignores armor, but magic resistance cuts it down."
             ],
             "target": "ANY_ENEMY",
-            "power": 0.8,
+            "power": 6,
             "power_type": "COMMON",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
@@ -980,13 +979,12 @@
             "level": 2,
             "desc": [
                 "Calls a meteorite down on any 2x2 block of the battlefield.",
-                "Every enemy caught under it takes {} damage.",
-                "Same formula as Fire Strike less 40%, because it strikes them all at once."
+                "Every enemy caught under it takes {} damage."
             ],
             "target": "FREE_CELL",
-            "power": 0.48,
+            "power": 4,
             "power_type": "COMMON",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
@@ -1040,9 +1038,7 @@
             "name": "Lightning Strike",
             "level": 1,
             "desc": [
-                "Calls a bolt down on any enemy on the battlefield, dealing {} damage.",
-                "It falls out of the sky, so no wall, body or mountain can block it.",
-                "Damage = creatures alive x stack power x 30.",
+                "Calls lightning down on an enemy anywhere on the battlefield, dealing {} damage.",
                 "Magical: it ignores armor, but magic resistance cuts it down."
             ],
             "target": "ANY_ENEMY",
@@ -1063,10 +1059,7 @@
             "level": 2,
             "desc": [
                 "Bursts into flame around an enemy in line of sight, dealing {} damage.",
-                "Every unit on a cell touching it — friend or foe — burns for the same amount.",
-                "The aimed enemy itself is not burned — the ring hugs it without touching it.",
-                "The ring follows the target's size: 8 cells around a small creature, 12 around a large one.",
-                "Damage = creatures alive x stack power x 25."
+                "Every unit on a cell touching the target — friend or foe — burns for the same amount."
             ],
             "target": "ANY_ENEMY",
             "power": 25,
@@ -1085,9 +1078,8 @@
             "name": "Meteor Shower",
             "level": 2,
             "desc": [
-                "Rains meteors down on any 3x3 block of the battlefield.",
-                "Every enemy caught under it takes {} damage.",
-                "Damage = creatures alive x stack power x 20, because it strikes them all at once."
+                "Calls a meteor shower down on the battlefield, dealing {} damage.",
+                "Magical: it ignores armor, but magic resistance cuts it down."
             ],
             "target": "FREE_CELL",
             "power": 20,

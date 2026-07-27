@@ -127,7 +127,16 @@ export type GameEvent =
            */
           // `rebounded` marks the CASTER taking its own spell back off a Magic Mirror, so the log can name
           // the rebound instead of showing an unexplained hit on the caster.
-          damaged?: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[];
+          // `reboundedFromUnitId` names WHOSE mirror sent it back, so the client can draw the rebound from
+          // the reflecting unit rather than guessing it was the original target.
+          damaged?: {
+              unitId: string;
+              position: XY;
+              amount: number;
+              unitsDied: number;
+              rebounded?: boolean;
+              reboundedFromUnitId?: string;
+          }[];
           /**
            * What a RESURRECT cast actually brought back, read exactly like `healed` and `damaged` above:
            * ranked rebuilds both its scene log and its VFX from events, never from the engine's own text, so
