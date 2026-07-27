@@ -23,7 +23,7 @@ import {
 import { availableParallelism, hostname } from "node:os";
 import { dirname, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 
 import type { IV09ModelArtifact } from "../../ai/versions/v0_9_model";
 import {
@@ -70,15 +70,65 @@ export const V09_ORCHESTRATOR_RECEIPT_SCHEMA = "hoc.ai.v0_9_orchestrator_receipt
 
 type TrainingPhase = "wide_teacher" | "dagger_1" | "dagger_2";
 
-interface ICommandResult {
+export interface ICommandResult {
     command: string[];
     exitCode: number;
+    signalCode: NodeJS.Signals | null;
     startedAt: string;
     completedAt: string;
     elapsedSeconds: number;
     stdout: string;
     stderr: string;
     gpuSamples: Array<{ at: string; utilization: number; memoryMiB: number; temperatureC: number }>;
+}
+
+export interface IV09ActorCommandLaunch {
+    executable: string;
+    args: readonly string[];
+    cwd: string;
+    environment?: NodeJS.ProcessEnv;
+}
+
+export interface IV09CommandFailureStream {
+    tail: string;
+    totalCharacters: number;
+    omittedCharacters: number;
+}
+
+export interface IV09CommandFailureDiagnostics {
+    stderr: IV09CommandFailureStream | null;
+    stdout: IV09CommandFailureStream | null;
+}
+
+export class V09CommandExecutionError extends Error {
+    public readonly result: ICommandResult;
+    public readonly diagnostics: IV09CommandFailureDiagnostics;
+    public constructor(result: ICommandResult, cause?: unknown) {
+        const diagnostics = commandFailureDiagnostics(result);
+        super(
+            `command failed (${result.exitCode}${result.signalCode ? `/${result.signalCode}` : ""}): ` +
+                `${result.command.join(" ")}${commandFailureDiagnostic(diagnostics)}`,
+            cause === undefined ? undefined : { cause },
+        );
+        this.name = "V09CommandExecutionError";
+        this.result = {
+            ...result,
+            stderr: diagnostics.stderr?.tail ?? "",
+            stdout: diagnostics.stdout?.tail ?? "",
+        };
+        this.diagnostics = diagnostics;
+    }
+}
+
+export class V09ActorCommandsInterruptedError extends Error {
+    public readonly signal: "SIGINT" | "SIGTERM";
+    public readonly exitCode: 130 | 143;
+    public constructor(signal: "SIGINT" | "SIGTERM") {
+        super(`v0.9 actor commands were interrupted by ${signal}; every owned actor process group was terminated`);
+        this.name = "V09ActorCommandsInterruptedError";
+        this.signal = signal;
+        this.exitCode = signal === "SIGINT" ? 130 : 143;
+    }
 }
 
 interface IOrchestratorContext {
@@ -94,6 +144,83 @@ const phasePurposes = (phase: TrainingPhase): [V09SeedPurpose, V09SeedPurpose] =
     `${phase}_train` as V09SeedPurpose,
     `${phase}_validation` as V09SeedPurpose,
 ];
+
+const V09_ACTOR_TERMINATION_GRACE_MS = 5_000;
+const V09_ACTOR_PROCESS_GROUP_POLL_MS = 20;
+const V09_COMMAND_DIAGNOSTIC_STREAM_LIMIT = 16_384;
+
+function boundedDiagnosticStream(value: string): IV09CommandFailureStream | null {
+    if (!value) return null;
+    const omitted = Math.max(0, value.length - V09_COMMAND_DIAGNOSTIC_STREAM_LIMIT);
+    const tail = omitted > 0 ? value.slice(-V09_COMMAND_DIAGNOSTIC_STREAM_LIMIT) : value;
+    return {
+        tail,
+        totalCharacters: value.length,
+        omittedCharacters: omitted,
+    };
+}
+
+function commandFailureDiagnostics(result: ICommandResult): IV09CommandFailureDiagnostics {
+    return {
+        stderr: boundedDiagnosticStream(result.stderr),
+        stdout: boundedDiagnosticStream(result.stdout),
+    };
+}
+
+function commandFailureDiagnostic(diagnostics: IV09CommandFailureDiagnostics): string {
+    const streams = (["stderr", "stdout"] as const).flatMap((label) => {
+        const stream = diagnostics[label];
+        if (!stream) return [];
+        const qualifier =
+            stream.omittedCharacters > 0
+                ? `last ${stream.tail.length} of ${stream.totalCharacters} characters`
+                : `${stream.totalCharacters} characters`;
+        return [`${label} (${qualifier}):\n${stream.tail}`];
+    });
+    return streams.length ? `\n${streams.join("\n")}` : "";
+}
+
+function processGroupExists(processGroupId: number): boolean {
+    try {
+        process.kill(-processGroupId, 0);
+        return true;
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ESRCH") return false;
+        if (code === "EPERM") return true;
+        throw error;
+    }
+}
+
+function signalOwnedProcessTree(child: ChildProcess, processGroupId: number | null, signal: NodeJS.Signals): void {
+    if (processGroupId !== null) {
+        try {
+            process.kill(-processGroupId, signal);
+            return;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+        }
+    }
+    if (child.exitCode === null && child.signalCode === null) child.kill(signal);
+}
+
+function waitMilliseconds(milliseconds: number): Promise<void> {
+    return new Promise((accept) => setTimeout(accept, milliseconds));
+}
+
+async function waitForProcessGroupDisappearance(
+    processGroupId: number,
+    timeoutMilliseconds?: number,
+): Promise<boolean> {
+    const deadline =
+        timeoutMilliseconds === undefined ? Number.POSITIVE_INFINITY : performance.now() + timeoutMilliseconds;
+    while (processGroupExists(processGroupId)) {
+        const remaining = deadline - performance.now();
+        if (remaining <= 0) return false;
+        await waitMilliseconds(Math.min(V09_ACTOR_PROCESS_GROUP_POLL_MS, remaining));
+    }
+    return true;
+}
 
 function atomicJson(path: string, value: unknown): void {
     mkdirSync(dirname(path), { recursive: true });
@@ -256,15 +383,84 @@ async function runCommand(
         environment?: NodeJS.ProcessEnv;
         monitorGpuUuid?: string;
         gpuLogPath?: string;
+        abortSignal?: AbortSignal;
+        terminationGraceMs?: number;
     },
 ): Promise<ICommandResult> {
     const startedAt = new Date().toISOString();
     const started = performance.now();
+    const ownsProcessGroup = process.platform !== "win32" && options.abortSignal !== undefined;
     const child = spawn(executable, [...args], {
         cwd: options.cwd,
         env: options.environment ?? process.env,
         stdio: ["ignore", "pipe", "pipe"],
+        detached: ownsProcessGroup,
     });
+    const processGroupId = ownsProcessGroup && child.pid !== undefined ? child.pid : null;
+    let closed = false;
+    let childError: unknown;
+    let terminationError: unknown;
+    let terminationPromise: Promise<void> | undefined;
+    let signalCode: NodeJS.Signals | null = null;
+    let leaderExitObserved = false;
+    let acceptLeaderExit!: () => void;
+    const leaderExitPromise = new Promise<void>((accept) => {
+        acceptLeaderExit = accept;
+    });
+    const observeLeaderExit = (): void => {
+        if (leaderExitObserved) return;
+        leaderExitObserved = true;
+        acceptLeaderExit();
+    };
+    const closePromise = new Promise<number>((accept) => {
+        child.once("error", (error) => {
+            childError ??= error;
+        });
+        child.once("exit", observeLeaderExit);
+        child.once("close", (code, signal) => {
+            closed = true;
+            signalCode = signal ?? null;
+            observeLeaderExit();
+            accept(code ?? -1);
+        });
+    });
+    const terminate = (): void => {
+        if (terminationPromise || (closed && processGroupId === null)) return;
+        terminationPromise = (async () => {
+            try {
+                signalOwnedProcessTree(child, processGroupId, "SIGTERM");
+            } catch (error) {
+                terminationError ??= error;
+            }
+            const grace = options.terminationGraceMs ?? V09_ACTOR_TERMINATION_GRACE_MS;
+            const terminatedWithinGrace =
+                processGroupId === null
+                    ? await (async (): Promise<boolean> => {
+                          const deadline = performance.now() + grace;
+                          while (!closed && performance.now() < deadline) {
+                              await waitMilliseconds(
+                                  Math.min(V09_ACTOR_PROCESS_GROUP_POLL_MS, deadline - performance.now()),
+                              );
+                          }
+                          return closed;
+                      })()
+                    : await waitForProcessGroupDisappearance(processGroupId, grace);
+            if (terminatedWithinGrace) return;
+            try {
+                signalOwnedProcessTree(child, processGroupId, "SIGKILL");
+            } catch (error) {
+                terminationError ??= error;
+            }
+            if (processGroupId !== null) {
+                // Deliberately unbounded: ownership must not be released while any actor descendant survives.
+                await waitForProcessGroupDisappearance(processGroupId);
+            }
+        })().catch((error: unknown) => {
+            terminationError ??= error;
+        });
+    };
+    if (options.abortSignal?.aborted) terminate();
+    else options.abortSignal?.addEventListener("abort", terminate, { once: true });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8");
@@ -293,16 +489,42 @@ async function runCommand(
     const timer = options.monitorGpuUuid
         ? setInterval(sample, V09_GPU_EVIDENCE_POLICY.sampleIntervalSeconds * 1_000)
         : undefined;
-    const exitCode = await new Promise<number>((accept, reject) => {
-        child.once("error", reject);
-        child.once("close", (code) => accept(code ?? -1));
-    }).finally(() => {
+    let exitCode: number;
+    try {
+        await leaderExitPromise;
+        if (processGroupId !== null && !terminationPromise) {
+            let disappearedNaturally = false;
+            try {
+                disappearedNaturally = await waitForProcessGroupDisappearance(
+                    processGroupId,
+                    V09_ACTOR_PROCESS_GROUP_POLL_MS,
+                );
+            } catch (error) {
+                terminationError ??= error;
+            }
+            if (!disappearedNaturally && !terminationPromise) {
+                terminationError ??= new Error(
+                    `command process group ${processGroupId} survived its leader exit; ` +
+                        "terminating descendants before releasing campaign ownership",
+                );
+                terminate();
+            }
+        }
+        exitCode = await closePromise;
+        if (terminationPromise) await terminationPromise;
+        if (processGroupId !== null) {
+            // A successful group leader must not be allowed to daemonize descendants past the campaign lock.
+            await waitForProcessGroupDisappearance(processGroupId);
+        }
+    } finally {
         if (timer) clearInterval(timer);
-    });
+        options.abortSignal?.removeEventListener("abort", terminate);
+    }
     sample();
     const result: ICommandResult = {
         command: [executable, ...args],
         exitCode,
+        signalCode,
         startedAt,
         completedAt: new Date().toISOString(),
         elapsedSeconds: (performance.now() - started) / 1000,
@@ -310,8 +532,55 @@ async function runCommand(
         stderr,
         gpuSamples,
     };
-    if (exitCode !== 0) throw new Error(`command failed (${exitCode}): ${result.command.join(" ")}`);
+    if (exitCode !== 0 || childError !== undefined || terminationError !== undefined) {
+        throw new V09CommandExecutionError(result, childError ?? terminationError);
+    }
     return result;
+}
+
+export async function runV09ActorCommandsFailFast(
+    launches: readonly IV09ActorCommandLaunch[],
+    terminationGraceMs = V09_ACTOR_TERMINATION_GRACE_MS,
+): Promise<ICommandResult[]> {
+    if (!Number.isFinite(terminationGraceMs) || terminationGraceMs < 0) {
+        throw new Error("v0.9 actor termination grace must be a finite non-negative number");
+    }
+    const controller = new AbortController();
+    let primaryFailure: unknown;
+    let failed = false;
+    const fail = (error: unknown): void => {
+        if (!failed) {
+            failed = true;
+            primaryFailure = error;
+        }
+        if (!controller.signal.aborted) controller.abort(error);
+    };
+    const onSigint = (): void => fail(new V09ActorCommandsInterruptedError("SIGINT"));
+    const onSigterm = (): void => fail(new V09ActorCommandsInterruptedError("SIGTERM"));
+    process.on("SIGINT", onSigint);
+    process.on("SIGTERM", onSigterm);
+    try {
+        const running = launches.map((launch) =>
+            runCommand(launch.executable, launch.args, {
+                cwd: launch.cwd,
+                environment: launch.environment,
+                abortSignal: controller.signal,
+                terminationGraceMs,
+            }).catch((error: unknown) => {
+                fail(error);
+                throw error;
+            }),
+        );
+        const settled = await Promise.allSettled(running);
+        if (failed) throw primaryFailure;
+        return settled.map((result) => {
+            if (result.status === "rejected") throw result.reason;
+            return result.value;
+        });
+    } finally {
+        process.removeListener("SIGINT", onSigint);
+        process.removeListener("SIGTERM", onSigterm);
+    }
 }
 
 function writeReceipt(context: IOrchestratorContext, id: string, payload: unknown): void {
@@ -539,7 +808,7 @@ async function runActorPurpose(
         );
     }
     const script = resolve(context.repositoryRoot, "src/simulation/v0_9/teacher_actor.ts");
-    const launches = Array.from({ length: workers }, (_, workerIndex) => {
+    const launches: IV09ActorCommandLaunch[] = Array.from({ length: workers }, (_, workerIndex) => {
         const actorArgs = [
             script,
             "--campaign",
@@ -566,12 +835,14 @@ async function runActorPurpose(
                       ...actorArgs,
                   ]
                 : actorArgs;
-        return runCommand(executable, args, {
+        return {
+            executable,
+            args,
             cwd: context.repositoryRoot,
             environment: { ...process.env, CUDA_VISIBLE_DEVICES: "" },
-        });
+        };
     });
-    const results = await Promise.all(launches);
+    const results = await runV09ActorCommandsFailFast(launches);
     const binding = studentBinding(studentArtifact);
     const stream = context.ledger.streams.find((candidate) => candidate.purpose === purpose)!;
     validateActorOutput(context, purpose, binding, smoke ? Math.min(workers, stream.count) : stream.count, smoke);
@@ -1452,6 +1723,6 @@ async function main(): Promise<void> {
 if (import.meta.main) {
     main().catch((error) => {
         process.stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
-        process.exitCode = 1;
+        process.exitCode = error instanceof V09ActorCommandsInterruptedError ? error.exitCode : 1;
     });
 }

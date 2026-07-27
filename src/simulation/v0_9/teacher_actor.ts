@@ -22,7 +22,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { DEFAULT_AMOUNT_BY_LEVEL, creaturesByLevel, resolveStackAmount, type IArmyUnitSpec } from "../army";
 import { AI_META_COHORTS, prepareMetaPair, type AiMetaCohort, type IAiMetaArmy } from "../ai_meta_cohorts_core";
-import { runMatch, type IMatchConfig } from "../battle_engine";
+import { runMatch, type IMatchConfig, type IMatchResult } from "../battle_engine";
 import { buildMirrorRoster, type MirrorCohortName } from "../measure_mirror_cohorts";
 import {
     validateV09CampaignManifest,
@@ -77,6 +77,20 @@ export interface IV09TeacherActorArgs {
     studentArtifact: string | null;
     /** Test-only bounded actor pass; production campaign actors leave this false. */
     smoke?: boolean;
+}
+
+export function v09TeacherRejectedActionsMessage(
+    gameId: string,
+    result: Pick<IMatchResult, "rejectedGreen" | "rejectedRed" | "rejectedDetails">,
+): string | null {
+    const rejectedGreen = result.rejectedGreen ?? 0;
+    const rejectedRed = result.rejectedRed ?? 0;
+    if (rejectedGreen === 0 && rejectedRed === 0) return null;
+    return (
+        `teacher game ${gameId} emitted rejected actions: ` +
+        `rejectedGreen=${rejectedGreen}, rejectedRed=${rejectedRed}, ` +
+        `rejectedDetails=${JSON.stringify(result.rejectedDetails ?? [])}`
+    );
 }
 
 function atomicJson(path: string, value: unknown): void {
@@ -488,9 +502,8 @@ export function runV09TeacherActor(args: IV09TeacherActorArgs): {
                         `(evaluations=${studentEvaluations}, activationFailures=${studentActivationFailures})`,
                 );
             }
-            if ((result.rejectedGreen ?? 0) !== 0 || (result.rejectedRed ?? 0) !== 0) {
-                throw new Error(`teacher game ${gameId} emitted rejected actions`);
-            }
+            const rejectedActionsMessage = v09TeacherRejectedActionsMessage(gameId, result);
+            if (rejectedActionsMessage) throw new Error(rejectedActionsMessage);
             const footer = recorder.finalize(shard, { winner: result.winner, endReason: result.endReason });
             completed += 1;
             decisions += footer.decisions;
