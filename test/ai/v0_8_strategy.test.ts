@@ -344,6 +344,7 @@ describe("v0.8 candidate policy", () => {
         expect(selectV08DirectCombatCandidate(candidates)?.actions).toBe(kill);
         expect(selectV08ProductiveCandidate(candidates)?.actions).toBe(kill);
         expect(selectV08ProductiveCandidate(candidates.slice(0, 2))?.actions).toBe(move);
+        expect(selectV08ProductiveCandidate(candidates.slice(1, 2))?.actions).toBe(spell);
     });
 
     it("targets the visible front stack instead of naming an occluded rear stack that it cannot hit", () => {

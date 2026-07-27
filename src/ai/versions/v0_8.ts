@@ -110,11 +110,15 @@ export function ensureExplicitV08Action(unitId: string, decision: GameAction[]):
     return hasMeaningfulAction ? decision : [{ type: "defend_turn", unitId }];
 }
 
-/** Prefer a finishing enemy attack, then the enumerator's nearest-to-enemy legal move. */
+/** Prefer a finishing enemy attack, then the nearest legal move, then a legal spell over a passive turn. */
 export function selectV08ProductiveCandidate(
     candidates: readonly IEnumeratedCandidate[],
 ): IEnumeratedCandidate | undefined {
-    return selectV08DirectCombatCandidate(candidates) ?? candidates.find((candidate) => candidate.kind === "move");
+    return (
+        selectV08DirectCombatCandidate(candidates) ??
+        candidates.find((candidate) => candidate.kind === "move") ??
+        candidates.find((candidate) => candidate.kind === "spell")
+    );
 }
 
 /** Prefer a stack kill first, then maximum immediate damage, then an attack that does not spend movement. */
