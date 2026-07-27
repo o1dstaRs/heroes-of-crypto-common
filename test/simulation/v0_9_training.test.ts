@@ -167,9 +167,12 @@ describe("v0.9 training protocol", () => {
         });
         expect(python.exitCode).toBe(0);
         expect(python.stdout.toString().trim()).toBe("ok");
-        expect(readFileSync(join(import.meta.dir, "../../src/simulation/v0_9/python/learner.py"), "utf8")).toMatch(
-            /\nimport random\n/,
+        const learnerSource = readFileSync(
+            join(import.meta.dir, "../../src/simulation/v0_9/python/learner.py"),
+            "utf8",
         );
+        expect(learnerSource).toMatch(/\nimport random\n/);
+        expect(learnerSource).toContain('fixed_device = torch.device("cpu")');
     });
 
     it("pins the exact runtime feature basis without changing IL-v3", () => {

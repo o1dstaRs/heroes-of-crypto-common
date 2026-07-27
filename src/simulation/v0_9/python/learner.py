@@ -507,7 +507,10 @@ def evaluate_fixed(
     maximum_batches: int,
 ) -> dict[str, float]:
     model.eval()
-    fixed = FixedPointRanker(model, input_scale, device)
+    # The deployable ranker is an integer CPU runtime. CUDA does not implement signed-int64 matrix
+    # multiplication, and evaluating there would not exercise the production execution domain anyway.
+    fixed_device = torch.device("cpu")
+    fixed = FixedPointRanker(model, input_scale, fixed_device)
     decisions = 0
     teacher_correct = 0
     float_fixed_agreement = 0
@@ -515,10 +518,10 @@ def evaluate_fixed(
         for batch_index, batch in enumerate(loader):
             if batch_index >= maximum_batches:
                 break
-            batch = move_batch(batch, device)
-            float_scores = model(batch.features).masked_fill(~batch.mask, -torch.inf)
+            model_batch = move_batch(batch, device)
+            float_scores = model(model_batch.features).masked_fill(~model_batch.mask, -torch.inf)
             fixed_scores = fixed(batch.features).masked_fill(~batch.mask, -(2**63))
-            float_choice = float_scores.argmax(dim=1)
+            float_choice = float_scores.argmax(dim=1).to(fixed_device)
             fixed_choice = fixed_scores.argmax(dim=1)
             decisions += len(fixed_choice)
             teacher_correct += int((fixed_choice == batch.teacher).sum())
