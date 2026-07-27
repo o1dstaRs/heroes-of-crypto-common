@@ -58,11 +58,8 @@ export function fireforgedSwordPower(basePower: number, empowerPercentage: numbe
  *
  *     creatures alive x stack power x the spell's own damage multiplier
  *
- * The Battle Mage's Fire Strike and Meteorite are the first spells to deal damage rather than apply an
- * effect, and both read their number from here. This is deliberately the ONLY place the formula exists: the
- * spellbook prints the finished number on the card (RenderableSpell.getHoverInfo) and the engine deals it
- * (ActionEngine.fireStrikeCast / meteoriteCast), and the two must never be able to disagree — a card that
- * promises 152 and a cast that lands 91 is worse than no preview at all.
+ * The Magic Dragon's Lightning Strike, Ring of Fire and Meteor Shower use this shape. This is deliberately
+ * the ONLY place the formula exists: the spellbook, AI estimate and engine cast must never disagree.
  *
  * Both inputs come off the LIVE caster, so the spell decays with the stack that carries it: a full stack
  * throws a real fireball, a nearly-dead one barely a spark. `stackPower` is clamped to the same 0..5 band
@@ -72,19 +69,22 @@ export function fireforgedSwordPower(basePower: number, empowerPercentage: numbe
  * Returned pre-resistance: this is the number the card shows, before any particular target's magic
  * resistance is known. Per-target reduction is applied by applyMagicResistToSpellDamage.
  *
- * `empowerPercentage` is the caster team's Empower Augment (0 when unbought) — it multiplies the finished
- * figure, so the card and the cast pick it up together from this one place.
+ * `magicDamageBonusPercentage` is the caster's additive total from Empower, its cast buff, and allied auras.
+ * It multiplies the finished figure so the card, AI estimate, aim preview, and cast share one calculation.
  */
 export function calculateStackPoweredSpellDamage(
     spellPower: number,
     casterAmountAlive: number,
     casterStackPower: number,
-    empowerPercentage = 0,
+    magicDamageBonusPercentage = 0,
 ): number {
     const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
     const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, Math.floor(casterStackPower)));
 
-    return Math.max(0, Math.floor(amountAlive * stackPower * spellPower * empowerMultiplier(empowerPercentage)));
+    return Math.max(
+        0,
+        Math.floor(amountAlive * stackPower * spellPower * empowerMultiplier(magicDamageBonusPercentage)),
+    );
 }
 
 /**
@@ -120,22 +120,27 @@ export function applyMagicResistToSpellDamage(damage: number, targetMagicResist:
 /**
  * Damage of an offensive spell, dispatched on its multiplier shape so the engine's cast, the client's card
  * and the AI's estimate all price it identically.
- *  - UNIT_AMOUNT_DAMAGE: creatures alive x power — the Magic Dragon's spells, where only the head count matters.
- *  - UNIT_AMOUNT_STACK_POWER: creatures alive x stack power x power — the Battle Mage's.
+ *  - UNIT_AMOUNT_DAMAGE: creatures alive x power — the Battle Mage's flat-per-caster spells.
+ *  - UNIT_AMOUNT_STACK_POWER: creatures alive x stack power x power — the Magic Dragon's.
  */
 export function calculateSpellDamage(
     multiplierType: SpellMultiplierType,
     spellPower: number,
     casterAmountAlive: number,
     casterStackPower: number,
-    empowerPercentage = 0,
+    magicDamageBonusPercentage = 0,
 ): number {
     if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE) {
         const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
-        return Math.max(0, Math.floor(amountAlive * spellPower * empowerMultiplier(empowerPercentage)));
+        return Math.max(0, Math.floor(amountAlive * spellPower * empowerMultiplier(magicDamageBonusPercentage)));
     }
     if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
-        return calculateStackPoweredSpellDamage(spellPower, casterAmountAlive, casterStackPower, empowerPercentage);
+        return calculateStackPoweredSpellDamage(
+            spellPower,
+            casterAmountAlive,
+            casterStackPower,
+            magicDamageBonusPercentage,
+        );
     }
     return 0;
 }

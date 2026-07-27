@@ -56,12 +56,13 @@ describe("Guiding Winds Aura", () => {
         expect(aura?.is_buff).toBe(true);
         // 5/10/15/20/25 across the stack tiers, plus the owner's luck, held to GUIDING_WINDS_MAX_PERCENT.
         expect(AURA_PERCENT).toBe(25);
+        expect(getAbilityConfig("Guiding Winds Aura").stack_powered).toBe(true);
     });
 
     it("scales with the owner's stack and luck, floored at 0 and capped", () => {
         const projected = (stackPower: number, luck: number) => {
             const owner = createTestUnit({ name: "Dryad", team: PBTypes.TeamVals.LOWER, stackPower, luck });
-            return Math.round(owner.calculateAuraPower(new AuraEffect(getAuraEffectConfig("Guiding Winds")!)));
+            return Math.round(owner.calculateAuraPower(new AuraEffect(getAuraEffectConfig("Guiding Winds")!), 0));
         };
         expect([1, 2, 3, 4, 5].map((stack) => projected(stack, 0))).toEqual([5, 10, 15, 20, 25]);
         // Luck lifts it, and a full stack at maximum luck lands exactly on the cap rather than past it.
@@ -69,6 +70,19 @@ describe("Guiding Winds Aura", () => {
         expect(projected(3, 5)).toBe(20);
         // Never negative, however unlucky the owner.
         expect(projected(1, -10)).toBe(0);
+    });
+
+    it("prints the live stack-and-luck projection on a runtime-granted card", () => {
+        const bearer = createTestUnit({
+            name: "Bearer",
+            team: PBTypes.TeamVals.LOWER,
+            stackPower: 3,
+            luck: 5,
+        });
+        bearer.grantAbility("Guiding Winds Aura");
+
+        const index = bearer.getUnitProperties().abilities.indexOf("Guiding Winds Aura");
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("20%");
     });
 
     it("extends the shot distance of a ranged ally in range, and only that ally", () => {

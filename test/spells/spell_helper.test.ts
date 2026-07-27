@@ -201,6 +201,7 @@ describe("spell_helper", () => {
         expect(canCastSummon(summon, matrix)).toBe(false);
         expect(canCastSummon(spell("Life", "Heal"), matrix, { x: 1, y: 1 })).toBe(false);
         expect(spellToTextureName("Magic Mirror")).toBe("magic_mirror_256");
+        expect(spellToTextureName("Empower")).toBe("empower_256");
     });
 
     it("loads the Chaos:Misfortune luck-floor debuff config", () => {

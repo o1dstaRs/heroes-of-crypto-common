@@ -16,8 +16,11 @@ import { simulationGridSettings } from "../../src/simulation/battle_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
+import { getSpellConfig } from "../../src/configuration/config_provider";
+import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 import {
     FIRE_WALL_CROSS_PENALTY,
@@ -26,6 +29,7 @@ import {
     FireWalls,
     FireWallOrientation,
     fireWallBurnDamage,
+    fireWallBurnPercentage,
     fireWallCells,
     isFireWallableCell,
     nextFireWallOrientation,
@@ -327,6 +331,45 @@ describe("Fire Wall through the action engine", () => {
             expect.objectContaining({ type: "fire_wall_placed", casterId: s.caster.getId(), cells: expected }),
         );
         expect(s.caster.hasSpellRemaining("Fire Wall")).toBe(false);
+    });
+
+    it("bakes the additive augment + Empower spell + Sylvan Focus bonus into every wall cell", () => {
+        const s = setup();
+        const satyr = createTestUnit({
+            name: "Satyr",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Sylvan Focus Aura"],
+            auraEffects: ["Sylvan Focus"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        placeUnit(s.grid, s.unitsHolder, satyr, { x: 2, y: 3 });
+        s.unitsHolder.refreshAuraEffectsForAllUnits();
+
+        const augment = new Spell({
+            spellProperties: getSpellConfig("System", "Empower Augment", NUMBER_OF_LAPS_TOTAL),
+            amount: 1,
+        });
+        augment.setPower(7);
+        s.caster.applyBuff(augment);
+        s.caster.applyBuff(
+            new Spell({
+                spellProperties: getSpellConfig("Chaos", "Empower", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            }),
+        );
+        expect(s.caster.getMagicDamageBonusPercentage()).toBe(47);
+
+        const anchor = { x: 6, y: 6 };
+        const result = s.engine.apply({
+            type: "cast_spell",
+            casterId: s.caster.getId(),
+            spellName: "Fire Wall",
+            targetCell: anchor,
+        });
+        expect(result.completed).toBe(true);
+        expect(s.fightProperties.getFireWalls().burnPercentageAt(anchor)).toBe(fireWallBurnPercentage(47));
+        expect(s.fightProperties.getFireWalls().burnPercentageAt(anchor)).toBe(36.8);
     });
 
     it("falls back to the default horizontal lay when no orientation is sent", () => {

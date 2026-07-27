@@ -13,7 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import creaturesJson from "../../src/configuration/creatures.json";
 import spellsJson from "../../src/configuration/spells.json";
-import { MAX_UNIT_STACK_POWER } from "../../src/constants";
+import { MAX_UNIT_STACK_POWER, NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -23,6 +23,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../../src/spells/spell_damage";
+import { Spell } from "../../src/spells/spell";
 import { SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
@@ -124,9 +125,8 @@ const setupMageFight = (opts: {
     return { ...context, fightProperties, caster, enemies, ally, engine, sceneLog };
 };
 
-// The formula the user specified: creatures alive x stack power x the spell's damage multiplier. It lives in
-// ONE place because the spellbook card prints it and the engine deals it, and a card that promises a number
-// the cast does not deliver is worse than no card at all.
+// The Magic Dragon formula: creatures alive x stack power x the spell's damage multiplier. It lives in one
+// place because the spellbook card, AI estimate and engine cast must agree.
 describe("stack-powered spell damage formula", () => {
     it("multiplies creatures alive by stack power by the spell multiplier", () => {
         expect(calculateStackPoweredSpellDamage(0.8, 38, 5)).toBe(152); // 38 * 5 * 0.8
@@ -153,8 +153,8 @@ describe("stack-powered spell damage formula", () => {
     });
 });
 
-// The two spells are a matched pair by design: Meteorite is the same formula less 40% because it hits a whole
-// 2x2 at once. Pin that in the CONFIG, so a later tweak to one power cannot silently break the relationship.
+// The two spells are a matched flat-per-caster pair: Meteorite is one third below Fire Strike because it hits
+// a whole 2x2 at once. Pin that in the config so a later tweak cannot silently break the relationship.
 describe("Battle Mage spell configuration", () => {
     it("prices Fire Strike at 6 per mage and Meteorite a third under it, at 4", () => {
         expect(lifeSpells["Fire Strike"].power).toBe(6);
@@ -263,6 +263,49 @@ describe("action engine — Fire Strike", () => {
                 ?.getAmount(),
         ).toBe(2);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.caster.getId())).toBe(true);
+    });
+
+    it("deals the additive augment + Empower spell + Sylvan Focus damage the card and AI estimate promise", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+        });
+        const satyr = createTestUnit({
+            name: "Satyr",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Sylvan Focus Aura"],
+            auraEffects: ["Sylvan Focus"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        placeUnit(setup.grid, setup.unitsHolder, satyr, { x: 2, y: 3 });
+        setup.unitsHolder.refreshAuraEffectsForAllUnits();
+
+        const augment = new Spell({
+            spellProperties: getSpellConfig("System", "Empower Augment", NUMBER_OF_LAPS_TOTAL),
+            amount: 1,
+        });
+        augment.setPower(7);
+        setup.caster.applyBuff(augment);
+        setup.caster.applyBuff(
+            new Spell({
+                spellProperties: getSpellConfig("Chaos", "Empower", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            }),
+        );
+        expect(setup.caster.getMagicDamageBonusPercentage()).toBe(47); // 7 augment + 25 spell + 15 aura
+
+        const hpBefore = setup.enemies[0].getHp();
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Fire Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(335); // floor(38 mages x 6 x 1.47)
     });
 
     it("reports the damage on the cast event so ranked can draw the number", () => {
@@ -380,7 +423,7 @@ describe("action engine — Meteorite", () => {
         });
 
         expect(result.completed).toBe(true);
-        // 38 x 5 x 0.48 = 91.2 -> 91 per enemy caught, which is Fire Strike's 152 less 40%.
+        // 38 surviving mages x 4 = 152 per enemy caught.
         expect(hpBefore[0] - setup.enemies[0].getHp()).toBe(152);
         expect(hpBefore[1] - setup.enemies[1].getHp()).toBe(152);
         // The enemy standing well outside the block is untouched, and so is the ally standing inside it.

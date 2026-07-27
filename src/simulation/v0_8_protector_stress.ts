@@ -429,7 +429,8 @@ const attackDamage = (observation: ITurnExecutionObservation): number => {
         } else if (event.type === "area_attacked" && event.attackerId === observation.unitId) {
             total += event.damage.splash?.reduce((sum, hit) => sum + hit.amount, 0) ?? event.damage.amount;
         } else if (event.type === "spell_cast" && event.casterId === observation.unitId) {
-            total += event.damaged?.reduce((sum, hit) => sum + hit.amount, 0) ?? 0;
+            total += event.damaged?.reduce((sum, hit) => sum + (hit.rebounded ? 0 : hit.amount), 0) ?? 0;
+            total += event.secondary?.reduce((sum, hit) => sum + (hit.rebounded ? 0 : hit.amount), 0) ?? 0;
         }
     }
     return total;

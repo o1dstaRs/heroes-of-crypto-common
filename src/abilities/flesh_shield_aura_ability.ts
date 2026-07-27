@@ -48,6 +48,8 @@ export function processFleshShieldAura(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     secondaryDamage?: ISecondaryDamage[],
     damageType: "physical" | "magic" = "physical",
+    recordAttackerDamageStatistic = true,
+    secondaryRebounded = false,
 ): IFleshShieldResult {
     const result: IFleshShieldResult = {
         remainingDamage: damage,
@@ -156,16 +158,21 @@ export function processFleshShieldAura(
         sceneLog,
     );
     result.absorbedDamage = damageDealt;
-    damageStatisticHolder.add({
-        unitName: attackerUnit.getName(),
-        damage: damageDealt,
-        team: attackerUnit.getTeam(),
-        lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
-    });
+    if (recordAttackerDamageStatistic) {
+        damageStatisticHolder.add({
+            unitName: attackerUnit.getName(),
+            damage: damageDealt,
+            team: attackerUnit.getTeam(),
+            lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+        });
+    }
     const unitsDied = Math.max(0, amountAliveBefore - absorberUnit.getAmountAlive());
     if (secondaryDamage) {
         const aggregate = secondaryDamage.find(
-            (entry) => entry.source === "flesh_shield" && entry.unitId === absorberUnit.getId(),
+            (entry) =>
+                entry.source === "flesh_shield" &&
+                entry.unitId === absorberUnit.getId() &&
+                Boolean(entry.rebounded) === secondaryRebounded,
         );
         if (aggregate) {
             aggregate.amount += damageDealt;
@@ -177,6 +184,7 @@ export function processFleshShieldAura(
                 position: positionAtImpact,
                 amount: damageDealt,
                 unitsDied,
+                ...(secondaryRebounded ? { rebounded: true } : {}),
             });
         }
     }

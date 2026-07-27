@@ -76,7 +76,9 @@ afterEach(() => setDeterministicRandomSource(undefined));
 const setupDragonFight = (opts: {
     casterAmountAlive: number;
     casterStackPower: number;
+    casterMaxHp?: number;
     casterMagicResist?: number;
+    casterSpells?: string[];
     enemies?: {
         cell: { x: number; y: number };
         maxHp?: number;
@@ -98,8 +100,8 @@ const setupDragonFight = (opts: {
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         movementType: PBTypes.MovementVals.FLY,
         magicResist: opts.casterMagicResist ?? 0,
-        maxHp: 10_000,
-        spells: dragon.spells,
+        maxHp: opts.casterMaxHp ?? 10_000,
+        spells: opts.casterSpells ?? dragon.spells,
         abilities: ["Tome of Elements"],
         amountAlive: opts.casterAmountAlive,
         stackPower: opts.casterStackPower,
@@ -610,6 +612,59 @@ describe("Magic Mirror (passive)", () => {
         expect(reboundEntry!.reboundedFromUnitId).toBe(setup.enemies[0].getId());
         // The holder's own hit is NOT a rebound.
         expect(damaged.filter((entry) => entry.rebounded)).toHaveLength(1);
+        // The reflected hit is damage the caster suffered, not another 150 of offensive output by it.
+        expect(setup.damageStatisticHolder.get().map(({ damage }) => damage)).toEqual([150]);
+    });
+
+    it("also rebounds Fire Strike, whose dedicated cast path must not bypass Magic Mirror", () => {
+        alwaysRoll(0);
+        const setup = setupDragonFight({
+            casterAmountAlive: 10,
+            casterStackPower: 5,
+            casterSpells: ["Life:Fire Strike"],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+        });
+        const targetHpBefore = setup.enemies[0].getHp();
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Fire Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(targetHpBefore - setup.enemies[0].getHp()).toBe(60); // 10 surviving casters x 6
+        expect(casterHpBefore - setup.caster.getHp()).toBe(45); // the mirror's 75% share
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toHaveLength(1);
+    });
+
+    it("also rebounds Meteorite once per mirror inside its AOE", () => {
+        alwaysRoll(0);
+        const setup = setupDragonFight({
+            casterAmountAlive: 10,
+            casterStackPower: 5,
+            casterSpells: ["Life:Meteorite"],
+            enemies: [
+                { cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 7, y: 4 }, abilities: ["Magic Mirror"] },
+            ],
+        });
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Meteorite",
+            targetCell: { x: 6, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(60); // 75% of (10 casters x 4), twice
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toHaveLength(2);
     });
 
     it("rebounds once per mirror caught in a splash", () => {
@@ -641,6 +696,136 @@ describe("Magic Mirror (passive)", () => {
         expect(before[1] - setup.enemies[1].getHp()).toBe(125);
         expect(before[2] - setup.enemies[2].getHp()).toBe(125);
         expect(casterHpBefore - setup.caster.getHp()).toBe(186); // 75% of 125 back off each mirror: 93 + 93
+    });
+
+    it("does not apply a later rebound to a caster an earlier mirror already killed", () => {
+        alwaysRoll(0);
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            casterMaxHp: 30,
+            enemies: [
+                // Ring of Fire spares its aimed target, so both mirrors must stand on neighbouring ring cells.
+                { cell: { x: 6, y: 3 } },
+                { cell: { x: 7, y: 3 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 6, y: 4 }, abilities: ["Magic Mirror"] },
+            ],
+        });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.caster.isDead()).toBe(true);
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        const rebounds = cast?.type === "spell_cast" ? (cast.damaged ?? []).filter((entry) => entry.rebounded) : [];
+        expect(rebounds).toEqual([
+            expect.objectContaining({
+                unitId: setup.caster.getId(),
+                amount: 30,
+                unitsDied: 1,
+            }),
+        ]);
+    });
+
+    it("keeps direct and rebound Flesh Shield absorption in separate event buckets", () => {
+        alwaysRoll(0);
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            // The aimed target is spared. Its mirror-bearing neighbour burns and rebounds while the friendly
+            // neighbour supplies the direct hit; both lower-team impacts are in Abomination range.
+            // Keep the mirror off the caster-to-target diagonal; Ring of Fire is thrown and checks LOS.
+            enemies: [{ cell: { x: 5, y: 1 } }, { cell: { x: 6, y: 2 }, abilities: ["Magic Mirror"] }],
+            allies: [{ cell: { x: 5, y: 2 } }],
+        });
+        const abomination = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            maxHp: 10_000,
+            luck: 10,
+            stackPower: 5,
+            abilities: ["Flesh Shield Aura"],
+            auraEffects: ["Flesh Shield"],
+            auraRanges: [1],
+            auraIsBuff: [true],
+        });
+        placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
+        setup.unitsHolder.refreshAuraEffectsForAllUnits();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        const absorbed = cast?.type === "spell_cast" ? (cast.secondary ?? []) : [];
+        expect(absorbed).toEqual([
+            expect.objectContaining({
+                source: "flesh_shield",
+                unitId: abomination.getId(),
+                amount: 125,
+            }),
+            expect.objectContaining({
+                source: "flesh_shield",
+                unitId: abomination.getId(),
+                amount: 93,
+                rebounded: true,
+            }),
+        ]);
+        expect(absorbed.filter((entry) => entry.rebounded)).toHaveLength(1);
+    });
+
+    it("does not reward or demoralize its team when friendly Ring absorption kills the owner", () => {
+        alwaysRoll(99); // keep Magic Mirror out of this friendly-fire assertion
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 5, y: 1 } }],
+            allies: [{ cell: { x: 5, y: 2 } }],
+        });
+        const abomination = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            maxHp: 100,
+            luck: 10,
+            stackPower: 5,
+            morale: 4,
+            abilities: ["Flesh Shield Aura"],
+            auraEffects: ["Flesh Shield"],
+            auraRanges: [1],
+            auraIsBuff: [true],
+        });
+        const witness = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            maxHp: 10_000,
+            morale: 4,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
+        placeUnit(setup.grid, setup.unitsHolder, witness, { x: 8, y: 8 });
+        setup.unitsHolder.refreshAuraEffectsForAllUnits();
+        const casterMoraleBefore = setup.caster.getMorale();
+        const witnessMoraleBefore = witness.getMorale();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(abomination.isDead()).toBe(true);
+        expect(setup.caster.getMorale()).toBe(casterMoraleBefore);
+        expect(witness.getMorale()).toBe(witnessMoraleBefore);
     });
 
     it("costs the caster nothing when the roll misses, while the spell lands the same", () => {

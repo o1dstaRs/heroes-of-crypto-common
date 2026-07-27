@@ -131,6 +131,23 @@ describe("Arachna Queen Predatory Assimilation AI routing", () => {
         expect(harness.queen.hasSpellRemaining("Courage")).toBe(false);
     });
 
+    it("chooses and completes the remaining Empower stolen from a Nightmare", () => {
+        const harness = setupQueen();
+        harness.queen.grantStolenAbility("Book of Nightmares", ["Chaos:Empower"]);
+        refreshRuntimeCapabilities(harness);
+
+        const decision = new StrategyV0_7().decideTurn(harness.queen, harness.context);
+        expect(decision).toHaveLength(1);
+        expect(decision[0]).toMatchObject({ type: "cast_spell", spellName: "Empower" });
+        const [execution] = applyDecision(harness.engine, decision);
+
+        expect(execution.result.completed, execution.result.rejectionReason).toBe(true);
+        expect(execution.result.events).toContainEqual(
+            expect.objectContaining({ type: "spell_cast", casterId: harness.queen.getId(), spellName: "Empower" }),
+        );
+        expect(harness.queen.hasSpellRemaining("Empower")).toBe(false);
+    });
+
     it("chooses and completes a legal direct-ability spell cast", () => {
         const harness = setupQueen();
         harness.queen.grantStolenAbility("Battle Roar", [":Battle Roar"]);

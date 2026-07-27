@@ -2405,6 +2405,8 @@ describe("action engine — custom targeted spell legality", () => {
                 upperMaxHp: 10_000,
                 supportCell: spellCase.supportCell ?? { x: 3, y: 6 },
             });
+            const aimedHpBefore = setup.upper.getCumulativeHp();
+            const ringVictimHpBefore = setup.lowerSupport.getCumulativeHp();
 
             const result = setup.engine.apply({
                 type: "cast_spell",
@@ -2415,6 +2417,10 @@ describe("action engine — custom targeted spell legality", () => {
 
             expect(result.completed).toBe(true);
             expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+            if (spellCase.spellName === "Ring of Fire") {
+                expect(setup.upper.getCumulativeHp()).toBe(aimedHpBefore);
+                expect(setup.lowerSupport.getCumulativeHp()).toBeLessThan(ringVictimHpBefore);
+            }
         });
     }
 

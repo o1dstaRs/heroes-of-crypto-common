@@ -79,6 +79,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
     "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword"]),
+    "Book of Nightmares": new Set(["Fire Wall", "Empower"]),
     "Basic Tome of Battle Magic": new Set(["Fire Strike", "Meteorite"]),
     "Tome of Elements": new Set(["Whirlpool", "Lightning Strike", "Ring of Fire", "Meteor Shower"]),
     "Blacksmith Tools": new Set(["Craft"]),
@@ -600,27 +601,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .join("\n")
                 .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
         }
-        if (ability.getName() === "Warding Mane Aura") {
-            // Stack-scaled and luck-moved by calculateAuraPower, so the card must print what this Manticore
-            // actually projects. The aura effect carries the power; without it we fall through to the
-            // raw-power default below and every stack reads the same number.
-            const wardingMane = ability.getAuraEffect();
-            if (wardingMane) {
+        if (
+            ability.getName() === "Warding Mane Aura" ||
+            ability.getName() === "Arcane Ward Aura" ||
+            ability.getName() === "Guiding Winds Aura" ||
+            ability.getName() === "Sylvan Focus Aura"
+        ) {
+            // These aura cards print their owner's live projection. The first three scale with stack and luck;
+            // Sylvan Focus is flat plus the Satyr's luck. Routing runtime-granted cards through the same owner
+            // calculation keeps their text aligned with the value allies actually receive.
+            const projectedAura = ability.getAuraEffect();
+            if (projectedAura) {
                 return ability
                     .getDesc()
                     .join("\n")
-                    .replace(/\{\}/g, Number(this.calculateAuraPower(wardingMane, 0).toFixed(2)).toString());
-            }
-        }
-        if (ability.getName() === "Arcane Ward Aura") {
-            // Squire's Arcane Ward projects the same stack-scaled + luck magic-defence number as Warding Mane,
-            // so the card must print what THIS stack actually grants rather than the flat config power.
-            const arcaneWard = ability.getAuraEffect();
-            if (arcaneWard) {
-                return ability
-                    .getDesc()
-                    .join("\n")
-                    .replace(/\{\}/g, Number(this.calculateAuraPower(arcaneWard, 0).toFixed(2)).toString());
+                    .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
         }
         // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to

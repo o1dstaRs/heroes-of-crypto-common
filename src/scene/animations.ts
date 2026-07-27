@@ -46,6 +46,8 @@ export interface ISecondaryDamage {
     position: XY;
     amount: number;
     unitsDied: number;
+    /** This secondary hit absorbed a Magic Mirror rebound, so it is not offensive output by the caster. */
+    rebounded?: boolean;
 }
 
 export interface IVisibleDamage {

@@ -98,6 +98,19 @@ describe("Sylvan Focus Aura", () => {
         expect(ally.getMagicDamageBonusPercentage()).toBe(AURA_PERCENT + 10);
     });
 
+    it("prints the owner's luck-adjusted value on a runtime-granted card", () => {
+        const bearer = createTestUnit({
+            name: "Bearer",
+            team: PBTypes.TeamVals.LOWER,
+            stackPower: 1,
+            luck: 10,
+        });
+        bearer.grantAbility("Sylvan Focus Aura");
+
+        const index = bearer.getUnitProperties().abilities.indexOf("Sylvan Focus Aura");
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("25%");
+    });
+
     it("does not compound across aura refreshes", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const satyr = makeSatyr();

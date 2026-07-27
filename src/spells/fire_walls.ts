@@ -93,17 +93,17 @@ interface IFireWallCellJSON {
     x: number;
     y: number;
     l: number;
-    // Burn percentage this cell was lit with (Empower-boosted). Optional: a snapshot written before Empower
-    // existed replays at the base percentage.
+    // Burn percentage this cell was lit with (magic-bonus boosted). Optional: an older snapshot replays at
+    // the base percentage.
     p?: number;
 }
 
 // One burning cell with a remaining-laps counter. Mirrors Vine/SmokeCloud/AppliedSpell.minusLap() semantics:
 // decrements per lap, never below 0. When lapsRemaining reaches 0 the FireWalls store deletes the entry.
 //
-// The cell also remembers HOW HOT it was lit: the caster's Empower Augment is baked in at cast time rather
+// The cell also remembers HOW HOT it was lit: the caster's total magic bonus is baked in at cast time rather
 // than looked up when somebody walks through, because by then the wall is just fire on the board — the
-// Nightmare that raised it may be dead, and it burns friend and foe alike.
+// Nightmare that raised it may be dead or out of its aura, and it burns friend and foe alike.
 export class FireWall {
     public constructor(
         public readonly cell: XY,
@@ -250,9 +250,9 @@ export function isFireWallableCell(grid: IFireWallGrid, withinGrid: boolean, cel
 }
 
 /**
- * The share of maximum health a wall lit by this team burns off per crossing: the base 25%, raised by the
- * caster team's Empower Augment. The spellbook card prints this exact figure and fireWallCast stores it on
- * every cell it lights, so what the card promises is what the flames take.
+ * The share of maximum health a wall burns off per crossing: the base 25%, raised by the caster's total
+ * additive magic-damage bonus. The spellbook card prints this exact figure and fireWallCast stores it on every
+ * cell it lights, so what the card promises is what the flames take.
  *
  * Rounded to one decimal because 25 x 1.07 = 26.75 and a card reading "26.8%" is honest where "26.75%" is
  * noise — the engine uses the same rounded number, so the two cannot drift.
@@ -268,7 +268,7 @@ export function fireWallBurnPercentage(empowerPercentage = 0): number {
 
 /**
  * Damage one crossing does to a stack, given its cumulative maximum health and the burn share of the cell it
- * walked into (FIRE_WALL_BURN_PERCENTAGE, raised by the caster team's Empower Augment at cast time).
+ * walked into (FIRE_WALL_BURN_PERCENTAGE, raised by the caster's total magic bonus at cast time).
  */
 export function fireWallBurnDamage(
     cumulativeMaxHp: number,

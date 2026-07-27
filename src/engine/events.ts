@@ -10,7 +10,7 @@
  */
 
 import type { AttackType, GridType, TeamType } from "../generated/protobuf/v1/types_gen";
-import type { IVisibleDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 import type { XY } from "../utils/math";
 
 export interface IGameAnimationEvent {
@@ -137,6 +137,12 @@ export type GameEvent =
               rebounded?: boolean;
               reboundedFromUnitId?: string;
           }[];
+          /**
+           * Damage redirected or triggered while resolving a damaging spell. It uses the same authoritative
+           * secondary payload as attacks so ranked and sandbox can render Flesh Shield absorption instead of
+           * silently removing the redirected part from the visible spell total.
+           */
+          secondary?: ISecondaryDamage[];
           /**
            * What a RESURRECT cast actually brought back, read exactly like `healed` and `damaged` above:
            * ranked rebuilds both its scene log and its VFX from events, never from the engine's own text, so

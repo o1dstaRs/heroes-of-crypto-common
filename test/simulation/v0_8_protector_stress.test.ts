@@ -145,12 +145,9 @@ describe("v0.8 protector stress summary", () => {
 });
 
 describe("v0.8 protector production regressions", () => {
-    // Game indices re-curated after Squire gained Arcane Ward Aura: the aura changes what the search
-    // evaluates, so game 60 moved from the clean set into the forced-gap set (it is now the case the test
-    // below wants) and game 36 left it. Both tests keep their exact meaning — only the seeded games that
-    // currently exhibit each condition changed. The safety metrics (rush violations, guard breaks, exact
-    // range) were 0 throughout and are still asserted here, so this re-points the cases, it does not
-    // loosen them.
+    // Game indices were re-curated after Squire gained Arcane Ward Aura, then again after Abomination's
+    // 500-HP / 44-armor rebalance. The tests keep their exact meaning: only the deterministic cases that
+    // currently exhibit each condition changed, while every safety metric remains asserted.
     test("keeps a live Centaur and Battle Mage from melee-rushing out of Flesh Shield", () => {
         for (const game of [11, 72]) {
             const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, game);
@@ -164,7 +161,9 @@ describe("v0.8 protector production regressions", () => {
     });
 
     test("reports forced narrowing as a blocked gap without mislabeling it as an AI rush", () => {
-        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 60);
+        // The 500-HP / 44-armor Abomination now keeps coverage throughout game 36. Its paired red-seat
+        // scenario still exercises the intended forced narrowing and blocked catch-up telemetry.
+        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 37);
         expect(record.rejectedActions).toBe(0);
         expect(record.metrics.abominationCoverageGapTurns).toBeGreaterThan(0);
         expect(record.metrics.blockedCatchUpTurns).toBeGreaterThan(0);

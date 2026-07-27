@@ -92,10 +92,10 @@ export enum SpellMultiplierType {
     UNIT_AMOUNT_POWER = 3,
     UNIT_CUMULATIVE_MAX_HP = 4,
     // Damage scaled by BOTH the caster's surviving head-count and its stack power (see
-    // calculateStackPoweredSpellDamage). Used by the Battle Mage's offensive spells: a full stack throws a
+    // calculateStackPoweredSpellDamage). Used by the Magic Dragon's offensive spells: a full stack throws a
     // real fireball, a nearly-dead one barely a spark, so the spell decays with the stack that carries it.
     UNIT_AMOUNT_STACK_POWER = 5,
-    /** Flat damage per surviving caster — stack power deliberately not a factor (Magic Dragon). */
+    /** Flat damage per surviving caster — stack power deliberately not a factor (Battle Mage). */
     UNIT_AMOUNT_DAMAGE = 6,
 }
 

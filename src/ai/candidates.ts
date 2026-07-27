@@ -15,6 +15,7 @@ import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
+    getCellsAroundFootprint,
     getCellsAroundPosition,
     getPositionForCell,
     getPositionForCells,
@@ -1956,22 +1957,55 @@ class CandidateGenerator {
         }
     }
     /**
-     * What a stack-powered offensive spell (Fire Strike / Meteorite) would actually land on `target`, from the
-     * very same helper the engine deals and the spellbook card prints. The AI has to value a damage spell at
-     * what it does, or it will keep a fireball in its pocket while it walks into a melee it loses.
+     * What an offensive spell would actually land on `target`, from the same multiplier-aware helper the
+     * engine deals and the spellbook card prints. This covers both flat-per-caster Battle Mage damage and
+     * stack-powered Magic Dragon damage.
      */
-    private stackPoweredSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
+    private offensiveSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
         const value = applyMagicResistToSpellDamage(
             calculateSpellDamage(
                 spell.getMultiplierType(),
                 spell.getPower(),
                 this.unit.getAmountAlive(),
                 this.unit.getStackPower(),
-                this.unit.getEmpowerPercentage(),
+                this.unit.getMagicDamageBonusPercentage(),
             ),
             target.getMagicResist(),
         );
         return { value, kill: value >= target.getCumulativeHp() ? 1 : 0 };
+    }
+    /**
+     * Ring of Fire spares the enemy it is aimed at and burns every other living stack touching that enemy's
+     * full footprint, including allies. Mirror the engine's exact geometry/filtering so an empty ring is never
+     * proposed, then score enemy damage positively and friendly fire negatively.
+     */
+    private ringOfFireDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } | undefined {
+        const cells = getCellsAroundFootprint(
+            this.context.grid.getSettings(),
+            target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
+        );
+        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
+            (unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId(),
+        );
+        if (!caught.length) {
+            return undefined;
+        }
+
+        let value = 0;
+        let kill: 0 | 1 = 0;
+        for (const victim of caught) {
+            const damage = this.offensiveSpellDamage(spell, victim);
+            const effectiveDamage = Math.min(damage.value, victim.getCumulativeHp());
+            if (victim.getTeam() === this.enemyTeam) {
+                value += effectiveDamage;
+                if (damage.kill) {
+                    kill = 1;
+                }
+            } else {
+                value -= effectiveDamage;
+            }
+        }
+        return { value, kill };
     }
     /** A thrown spell needs the clear line the engine's cast re-checks — mirror it, never propose a refusal. */
     private hasSpellLineOfSight(target: Unit): boolean {
@@ -2006,7 +2040,7 @@ class CandidateGenerator {
             spell.getPower(),
             this.unit.getAmountAlive(),
             this.unit.getStackPower(),
-            this.unit.getEmpowerPercentage(),
+            this.unit.getMagicDamageBonusPercentage(),
         );
         if (rawDamage <= 0) {
             return;
@@ -2173,15 +2207,25 @@ class CandidateGenerator {
                         if (spell.getName() === "Vine Throw" && !this.hasSpellLineOfSight(enemy)) {
                             continue;
                         }
-                        // A stack-powered DAMAGE spell must be valued at the damage it lands — a debuff
-                        // candidate carries neither number. The THROWN ones (Fire Strike, Ring of Fire) also
-                        // need the line of sight the engine re-checks; Lightning Strike is called down out of
-                        // the sky and has no line to keep, so gating it would hide a legal cast from the AI.
+                        // An offensive spell must be valued at the damage it lands — a debuff candidate carries
+                        // neither number. The THROWN ones (Fire Strike, Ring of Fire) also need the line of sight
+                        // the engine re-checks; called-down spells have no line to keep.
                         if (isOffensiveSpellMultiplier(spell.getMultiplierType())) {
                             if (isThrownOffensiveSpell(spell.getName()) && !this.hasSpellLineOfSight(enemy)) {
                                 continue;
                             }
-                            const damage = this.stackPoweredSpellDamage(spell, enemy);
+                            if (spell.getName() === "Ring of Fire") {
+                                const damage = this.ringOfFireDamage(spell, enemy);
+                                if (!damage) {
+                                    continue;
+                                }
+                                this.pushSpell(spell, enemy.getId(), undefined, {
+                                    expectedDamage: damage.value,
+                                    expectedKill: damage.kill,
+                                });
+                                continue;
+                            }
+                            const damage = this.offensiveSpellDamage(spell, enemy);
                             this.pushSpell(spell, enemy.getId(), undefined, {
                                 expectedDamage: damage.value,
                                 expectedKill: damage.kill,

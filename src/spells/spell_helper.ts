@@ -514,10 +514,9 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
  * lucky dragon rebounds more often, an unlucky one less. Clamped to 0..100 at the end, so the sum can never
  * push the chance past certain or below impossible.
  *
- * Deliberately separate from getMagicMirrorPower: the BUFF's power is a share of the damage (30% back) that
- * is also re-used as the debuff-reflection probability, whereas the ability's power is only ever a
- * probability — what it rebounds is the whole spell. Folding them into one number would make a 75% ability
- * silently reflect 75% of the damage as well.
+ * Deliberately separate from getMagicMirrorPower: the BUFF and passive ability have independent configured
+ * values. For the passive, this same advertised percentage is both the proc chance and the share of landed
+ * damage returned by getMagicMirrorAbilityShare.
  */
 export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
     if (!targetUnit.hasAbilityActive("Magic Mirror")) {

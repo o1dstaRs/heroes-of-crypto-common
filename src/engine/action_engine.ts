@@ -35,13 +35,13 @@ import {
 import { getDistance } from "../utils/math";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import type { AttackHandler } from "../handlers/attack_handler";
-import type { IAnimationData, IVisibleDamage } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import { applyMagicResistToSpellDamage, calculateSpellDamage, getEmpowerPercentage } from "../spells/spell_damage";
+import { applyMagicResistToSpellDamage, calculateSpellDamage } from "../spells/spell_damage";
 import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
@@ -127,8 +127,8 @@ const spellDamageDealt = (damaged: { unitId: string; amount: number }[], unitId:
     damaged.find((entry) => entry.unitId === unitId)?.amount ?? 0;
 
 /** Damage a splash spell actually dealt across everyone it caught, after each victim's magic resistance. */
-const spellDamageTotal = (damaged: { unitId: string; amount: number }[]): number =>
-    damaged.reduce((sum, entry) => sum + entry.amount, 0);
+const spellDamageTotal = (damaged: { unitId: string; amount: number; rebounded?: boolean }[]): number =>
+    damaged.reduce((sum, entry) => sum + (entry.rebounded ? 0 : entry.amount), 0);
 
 export class GameActionEngine {
     private readonly context: IGameActionEngineContext;
@@ -1152,11 +1152,11 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const laps = spell.getLapsTotal();
-        // The caster team's Empower is baked into the wall now, at cast time: the flames go on burning
-        // whoever crosses them long after the Nightmare that raised them may have died.
+        // The caster's total magic bonus is baked into the wall at cast time: the flames keep that power
+        // after an Empower buff expires, the caster leaves Sylvan Focus, or the source aura dies.
         this.context.fightProperties
             .getFireWalls()
-            .addAll(cells, laps, fireWallBurnPercentage(getEmpowerPercentage(caster)));
+            .addAll(cells, laps, fireWallBurnPercentage(caster.getMagicDamageBonusPercentage()));
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(`${caster.getName()} raised a Fire Wall for ${getLapString(laps)}`);
 
@@ -1276,6 +1276,7 @@ export class GameActionEngine {
             rebounded?: boolean;
             reboundedFromUnitId?: string;
         }[];
+        secondary: ISecondaryDamage[];
         unitIdsDied: string[];
         killed: Array<{ victim: Unit; killer: Unit }>;
     } {
@@ -1287,12 +1288,27 @@ export class GameActionEngine {
             rebounded?: boolean;
             reboundedFromUnitId?: string;
         }[] = [];
+        const secondary: ISecondaryDamage[] = [];
         const unitIdsDied: string[] = [];
         const killed: Array<{ victim: Unit; killer: Unit }> = [];
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let casterPlusMorale = 0;
 
-        for (const { unit, damage, rebounded, reboundedFromUnitId } of victims) {
+        // A spell AOE is one simultaneous impact. Resolve directly-hit Flesh Shield owners before protected
+        // allies so the owner's own hit reserves its HP first; otherwise an allies-first cell order can spend
+        // all owner HP on transfers and make the owner's direct spell hit disappear. A later Magic Mirror
+        // rebound is not part of the original impact and keeps its causal position.
+        const impactOrder = [
+            ...victims.filter(({ unit, rebounded }) => !rebounded && unit.hasAbilityActive("Flesh Shield Aura")),
+            ...victims.filter(({ unit, rebounded }) => rebounded || !unit.hasAbilityActive("Flesh Shield Aura")),
+        ];
+        for (const { unit, damage, rebounded, reboundedFromUnitId } of impactOrder) {
+            // Several Magic Mirrors can enqueue the caster more than once. Once an earlier rebound has killed
+            // it, do not call Unit.applyDamage on the dead stack again: that method deliberately assumes a live
+            // stack and a second call can otherwise mutate a zero-sized stack or report phantom damage.
+            if (unit.isDead()) {
+                continue;
+            }
             // ABILITY Flesh Shield Aura (Abomination): a protected ally hands part of the hit to the
             // Abomination standing beside it. Cast spell damage went straight to applyDamage and skipped
             // this entirely, so the aura absorbed Fire Breath and Chain Lightning (whose ability modules
@@ -1311,21 +1327,37 @@ export class GameActionEngine {
                     this.context.unitsHolder,
                     this.context.sceneLog,
                     statisticHolder,
-                    undefined,
+                    secondary,
                     "magic",
+                    !rebounded,
+                    Boolean(rebounded),
                 );
                 incomingDamage = fleshShieldResult.remainingDamage;
-                casterPlusMorale += fleshShieldResult.increaseMorale;
+                const isHostileImpact = unit.getTeam() !== caster.getTeam();
+                if (!rebounded && isHostileImpact) {
+                    casterPlusMorale += fleshShieldResult.increaseMorale;
+                    for (const [teamKey, moraleDecrease] of Object.entries(
+                        fleshShieldResult.moraleDecreaseForTheUnitTeam,
+                    )) {
+                        moraleDecreaseForTheUnitTeam[teamKey] =
+                            (moraleDecreaseForTheUnitTeam[teamKey] ?? 0) + moraleDecrease;
+                    }
+                }
                 for (const unitId of fleshShieldResult.unitIdsDied) {
                     if (!unitIdsDied.includes(unitId)) {
                         unitIdsDied.push(unitId);
                     }
-                }
-                for (const [teamKey, moraleDecrease] of Object.entries(
-                    fleshShieldResult.moraleDecreaseForTheUnitTeam,
-                )) {
-                    moraleDecreaseForTheUnitTeam[teamKey] =
-                        (moraleDecreaseForTheUnitTeam[teamKey] ?? 0) + moraleDecrease;
+                    // Redirected damage is still an explicit kill by this spell. Preserve that attribution for
+                    // Infest, but never credit friendly Ring-of-Fire absorption or a self-damaging rebound.
+                    const absorbedVictim = this.context.unitsHolder.getAllUnits().get(unitId);
+                    if (
+                        !rebounded &&
+                        absorbedVictim?.isDead() &&
+                        absorbedVictim.getTeam() !== caster.getTeam() &&
+                        !killed.some(({ victim }) => victim.getId() === unitId)
+                    ) {
+                        killed.push({ victim: absorbedVictim, killer: caster });
+                    }
                 }
             }
 
@@ -1348,12 +1380,17 @@ export class GameActionEngine {
                 ...(rebounded ? { rebounded: true } : {}),
                 ...(reboundedFromUnitId ? { reboundedFromUnitId } : {}),
             });
-            this.context.attackHandler?.getDamageStatisticHolder().add({
-                unitName: caster.getName(),
-                damage: damageDealt,
-                team: caster.getTeam(),
-                lap: this.context.fightProperties.getCurrentLap(),
-            });
+            // A Magic Mirror rebound is defensive reflected damage, not offensive output produced by the
+            // caster. Keep it out of damage statistics, consistently with the existing Chain Lightning mirror
+            // path; reboundedFromUnitId is causal/VFX provenance, not a new analytics attribution rule.
+            if (!rebounded) {
+                this.context.attackHandler?.getDamageStatisticHolder().add({
+                    unitName: caster.getName(),
+                    damage: damageDealt,
+                    team: caster.getTeam(),
+                    lap: this.context.fightProperties.getCurrentLap(),
+                });
+            }
 
             if (unit.isDead()) {
                 this.context.sceneLog.updateLog(`${unit.getName()} died`);
@@ -1364,7 +1401,9 @@ export class GameActionEngine {
                 // rebounded by a Magic Mirror can kill the caster itself; neither is a kill to be proud of,
                 // so neither earns the caster morale nor demoralizes the victim's own side.
                 if (unit.getTeam() !== caster.getTeam()) {
-                    killed.push({ victim: unit, killer: caster });
+                    if (!killed.some(({ victim }) => victim.getId() === unit.getId())) {
+                        killed.push({ victim: unit, killer: caster });
+                    }
                     casterPlusMorale += MORALE_CHANGE_FOR_KILL;
                     const teamKey = `${unit.getName()}:${unit.getTeam()}`;
                     moraleDecreaseForTheUnitTeam[teamKey] =
@@ -1383,15 +1422,15 @@ export class GameActionEngine {
             );
         }
 
-        return { damaged, unitIdsDied, killed };
+        return { damaged, secondary, unitIdsDied, killed };
     }
     /**
      * Fire Strike (Battle Mage / Basic Tome of Battle Magic): a small fireball thrown at a single enemy.
      *
      * Reach is LINE OF SIGHT — aimed like an archer's shot, but with no shot range of its own, so whatever the
-     * mage can see it can burn (see hasClearSpellLineOfSight). Damage is the stack-powered formula shared with
-     * the spellbook card, so the number the player read on the page is the number that lands: it is MAGICAL, so
-     * it ignores armor completely and only the target's magic resistance cuts it down. One cast = one charge.
+     * mage can see it can burn (see hasClearSpellLineOfSight). Damage is flat per surviving Battle Mage, shared
+     * with the spellbook card and AI estimate. It is MAGICAL, so it ignores armor and only magic resistance
+     * cuts it down. One cast = one charge.
      */
     private fireStrikeCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
         const from = caster.getBaseCell();
@@ -1421,19 +1460,19 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const damage = applyMagicResistToSpellDamage(
-            calculateSpellDamage(
-                spell.getMultiplierType(),
-                spell.getPower(),
-                caster.getAmountAlive(),
-                caster.getStackPower(),
-                getEmpowerPercentage(caster),
-            ),
-            target.getMagicResist(),
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
+            spell.getPower(),
+            caster.getAmountAlive(),
+            caster.getStackPower(),
+            caster.getMagicDamageBonusPercentage(),
         );
-        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, [{ unit: target, damage }]);
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
+        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(`${caster.getName()} 🔥 ${target.getName()} (${damage})`);
+        this.context.sceneLog.updateLog(
+            `${caster.getName()} 🔥 ${target.getName()} (${spellDamageDealt(damaged, target.getId())})`,
+        );
 
         const events: GameEvent[] = [
             {
@@ -1445,6 +1484,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
+                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -1494,13 +1534,10 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
-            getEmpowerPercentage(caster),
+            caster.getMagicDamageBonusPercentage(),
         );
-        const victims = enemies.map((unit) => ({
-            unit,
-            damage: applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist()),
-        }));
-        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
+        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total across everyone under the 2x2 — see the Lightning Strike log below.
@@ -1516,6 +1553,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
+                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -1587,7 +1625,7 @@ export class GameActionEngine {
      * handleMagicAttack and must not bypass its validation too.
      *
      * Damage is the stack-powered formula shared with the spellbook card, so the number the player read on the
-     * page is the number that lands: 300 per living dragon at full stack power. It is MAGICAL — armor does
+     * page is the number that lands: 150 per living dragon at full stack power. It is MAGICAL — armor does
      * nothing, only the target's magic resistance cuts it down. One cast = one charge.
      */
     private lightningStrikeCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
@@ -1617,10 +1655,10 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
-            getEmpowerPercentage(caster),
+            caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
-        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         // The number the victim ACTUALLY took, not the pre-resistance roll. Logging rawDamage printed the
         // same figure whatever the target's magic resistance was, which read as "mdef does nothing" even
@@ -1640,6 +1678,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
+                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -1660,9 +1699,9 @@ export class GameActionEngine {
      * neighbours and aim the burst at cells the target itself occupies.
      *
      * Reach is LINE OF SIGHT, the gate Fire Strike uses, because unlike Lightning Strike this one is thrown
-     * rather than called down. Per target it is the Lightning Strike number less 20%, the price of covering a
-     * whole neighbourhood at once. A ring that catches nobody is REJECTED rather than silently burning the
-     * charge.
+     * rather than called down. Its explicit 25 multiplier prices the wider footprint below Lightning Strike's
+     * 30 without deriving one spell from the other. A ring that catches nobody is REJECTED rather than silently
+     * burning the charge.
      */
     private ringOfFireCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
         const from = caster.getBaseCell();
@@ -1709,10 +1748,10 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
-            getEmpowerPercentage(caster),
+            caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
-        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total across everyone caught — see the Lightning Strike log above. Each victim
@@ -1730,6 +1769,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
+                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -1745,8 +1785,8 @@ export class GameActionEngine {
      * and Craft, which have no centre cell to anchor on and take a corner instead.
      *
      * Every ENEMY standing under the block takes the damage — allies are not caught (that is Ring of Fire's
-     * job), and a large creature straddling several of the nine cells is hit once. Per target it is the Ring of
-     * Fire number less 10%, the price of covering nine cells at once.
+     * job), and a large creature straddling several of the nine cells is hit once. Its explicit 20 multiplier
+     * prices the nine-cell footprint below Ring of Fire without coupling either spell's future balance.
      *
      * A drop that catches nobody is REJECTED rather than silently burning the only charge — the same courtesy
      * canMassCastSpell extends to a mass spell with no valid recipient.
@@ -1784,10 +1824,10 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
-            getEmpowerPercentage(caster),
+            caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
-        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total, as with Ring of Fire above.
@@ -1803,6 +1843,7 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
+                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));

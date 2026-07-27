@@ -83,7 +83,7 @@ describe("public-roster placement measurement", () => {
     });
 
     test("cohort-safe arm shares the runtime visibility rule and excludes only exact melee-other", () => {
-        const taggedRosters = [[C.ARBALESTER], [C.SATYR], [C.ANGEL], [C.PEASANT]];
+        const taggedRosters = [[C.ARBALESTER], [C.SATYR], [C.ANGEL], [C.PEASANT], [C.SQUIRE]];
         for (const ownRoster of taggedRosters) {
             const context = publicRosterPlacementContext(
                 "cohort-safe",
@@ -139,6 +139,7 @@ describe("public-roster placement measurement", () => {
             "melee-magic",
             "aura-heavy",
         ]);
+        expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "aura-heavy"]);
         expect(publicRosterPlacementRosterTargets([C.SCAVENGER])).toEqual(["natural", "melee-other"]);
     });
 

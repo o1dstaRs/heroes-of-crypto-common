@@ -370,6 +370,25 @@ describe("Predatory Assimilation", () => {
         expect(target.getAllProperties().spells).toEqual(["Life:Heal"]);
     });
 
+    it("steals only the Nightmare spellbook charges that remain after earlier casts", () => {
+        const thief = createTestUnit({ name: "Arachna Queen", abilities: ["Predatory Assimilation"] });
+        const target = createTestUnit({
+            name: "Nightmare after casting Fire Wall",
+            abilities: ["Book of Nightmares"],
+            // Fire Wall is already spent. Empower remains, while Heal belongs to an unrelated source.
+            spells: ["Chaos:Empower", "Life:Heal"],
+        });
+        setDeterministicRandomSource(() => 0);
+
+        expect(processPredatoryAssimilationAbility(thief, target, new SceneLogMock())?.abilityName).toBe(
+            "Book of Nightmares",
+        );
+        expect(target.getAllProperties().spells).toEqual(["Life:Heal"]);
+        expect(thief.getAllProperties().spells).toEqual(["Chaos:Empower"]);
+        expect(thief.hasSpellRemaining("Empower")).toBe(true);
+        expect(thief.hasSpellRemaining("Fire Wall")).toBe(false);
+    });
+
     it("keeps ability-aligned aura slots stable and restores the configured range on an explicit stolen grant", () => {
         const angel = createTestUnit({
             name: "Angel",

@@ -75,11 +75,14 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // instead of being deleted (the raise was floor(died / 2), which is 0 for a single). Any seeded fight where
 // a lone holder falls now continues with it alive, so the traces legitimately move. Two isolated runs
 // produced this byte-identical digest.
-// Re-baselined for the flat per-caster spell damage: Fire Strike and Meteorite (and the Magic Dragon's
-// retune) change what the seeded fights do, so every trace legitimately moves. Two isolated runs produced
-// this byte-identical digest, which is what the guard is actually for — the resolver staying deterministic,
-// not the balance staying frozen.
-const EXPECTED_REPLAY_SHA256 = "dba07b55e683318df94b00d22513cc80951282b6441728d3ec3466eece2f2bc4";
+// Re-pinned after Abomination's rebalance from 550 HP / 45 armor to 500 HP / 44 armor. Only seed
+// 2147640168 fields Abomination and changes; the other three pair records remain byte-identical. Two
+// isolated runs produced this digest.
+// Re-pinned on the combined balance tree after Battle Mage's 50-body pricing, Ash Moth's armor nudge, and
+// Ring of Fire's target-sparing size-aware footprint landed together. The final union preserves main's
+// Mermaid/Wyvern tuning instead of rolling those stats backward. Two shared-tree runs produced this exact
+// byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "2807403485811a8d1279228d16e93fe04b2b34f1e3a657ad1c2abfc7bc6ff751";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
