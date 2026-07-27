@@ -1146,42 +1146,17 @@ describe("search driver — gating, hygiene, determinism", () => {
                 prioritizeProductiveActions?: boolean,
             ) => IEnumeratedCandidate | undefined;
         };
-        driver.scoreCandidates = (_unit, scored) =>
-            scored.map(({ kind }) => (kind === "incumbent" ? 0.9 : 0.1));
+        driver.scoreCandidates = (_unit, scored) => scored.map(({ kind }) => (kind === "incumbent" ? 0.9 : 0.1));
 
         expect(
-            driver.search(
-                unit,
-                candidates,
-                defend,
-                123,
-                performance.now(),
-                true,
-                undefined,
-                false,
-                false,
-                true,
-                true,
-            ),
+            driver.search(unit, candidates, defend, 123, performance.now(), true, undefined, false, false, true, true),
         ).toEqual(spell);
         expect(
-            driver.search(
-                unit,
-                candidates,
-                defend,
-                123,
-                performance.now(),
-                false,
-                undefined,
-                false,
-                false,
-                true,
-                true,
-            ),
+            driver.search(unit, candidates, defend, 123, performance.now(), false, undefined, false, false, true, true),
         ).toEqual(defend);
-        expect(
-            driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true, true),
-        ).toBe(candidates[1]);
+        expect(driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true, true)).toBe(
+            candidates[1],
+        );
     });
 
     it("keeps v0.7 scoring unchanged and lets v0.8 use nonproductive actions only without a productive option", () => {
