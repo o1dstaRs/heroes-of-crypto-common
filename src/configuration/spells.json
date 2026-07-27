@@ -1156,7 +1156,7 @@
                 "Lasts 3 laps."
             ],
             "target": "ANY_ALLY",
-            "power": 75,
+            "power": 30,
             "power_type": "COMMON",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,

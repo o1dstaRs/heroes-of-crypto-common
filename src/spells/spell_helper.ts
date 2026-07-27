@@ -494,7 +494,7 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
     // applied only when a mirror is actually up, so an unbuffed unit still reflects nothing.
     if (mirrorPower > 0) {
         const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, targetUnit.getStackPower()));
-        mirrorPower = (mirrorPower / MAX_UNIT_STACK_POWER) * stackPower + targetUnit.getLuck();
+        mirrorPower = (mirrorPower / MAX_UNIT_STACK_POWER) * stackPower;
     }
     if (mirrorPower > 100) {
         mirrorPower = 100;
