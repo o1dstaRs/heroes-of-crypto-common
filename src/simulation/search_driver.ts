@@ -387,6 +387,16 @@ function isPositiveDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "
     );
 }
 
+/** Productive work that a forced active tier may choose without turning self-damage or a miss into progress. */
+function isForceTierProductiveCandidate(
+    candidate: Pick<IEnumeratedCandidate, "kind" | "actions" | "features">,
+): boolean {
+    return (
+        isProductiveCandidate(candidate) &&
+        (!isDirectCombatCandidate(candidate) || isPositiveDirectCombatCandidate(candidate))
+    );
+}
+
 function isPureMoveCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): boolean {
     return candidate.actions.length > 0 && candidate.actions.every((action) => action.type === "move_unit");
 }
@@ -2249,6 +2259,9 @@ export class SearchDriver {
                 .map((candidate, index) => ({ candidate, index }))
                 .filter(({ candidate, index }) => means[index] !== -Infinity && isProductiveCandidate(candidate))
                 .map(({ index }) => index);
+            const legalForceTierProductiveIndices = legalProductiveIndices.filter((index) =>
+                isForceTierProductiveCandidate(scoredCandidates[index]),
+            );
             const legalDirectCombatIndices = legalProductiveIndices.filter((index) =>
                 isDirectCombatCandidate(scoredCandidates[index]),
             );
@@ -2274,7 +2287,7 @@ export class SearchDriver {
                     ? [preferredFinishingAttackIndex]
                     : legalAdvanceIndices.length
                       ? legalAdvanceIndices
-                      : legalProductiveIndices;
+                      : legalForceTierProductiveIndices;
             const selectionIndices =
                 prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
                     ? prioritizeV08SUrgency
@@ -2285,13 +2298,13 @@ export class SearchDriver {
                     : prioritizeV08SUrgency
                       ? legalAdvanceIndices.length
                           ? legalAdvanceIndices
-                          : prioritizeProductiveActions && legalProductiveIndices.length
-                            ? legalProductiveIndices
+                          : prioritizeProductiveActions && legalForceTierProductiveIndices.length
+                            ? legalForceTierProductiveIndices
                             : [0]
                       : prioritizeDominantFinish && dominantFinishIndices.length
                         ? dominantFinishIndices
-                        : prioritizeProductiveActions && legalProductiveIndices.length
-                          ? legalProductiveIndices
+                        : prioritizeProductiveActions && legalForceTierProductiveIndices.length
+                          ? legalForceTierProductiveIndices
                           : aggressiveWaitComparison
                             ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
                             : scoredCandidates.map((_candidate, index) => index);
@@ -2509,6 +2522,7 @@ export class SearchDriver {
         prioritizeProductiveActions = false,
     ): IEnumeratedCandidate | undefined {
         const productiveCandidates = candidates.filter(isProductiveCandidate);
+        const forceTierProductiveCandidates = productiveCandidates.filter(isForceTierProductiveCandidate);
         const directCombatCandidates = productiveCandidates.filter(isDirectCombatCandidate);
         const forceTierDirectCombatCandidates = directCombatCandidates.filter(isPositiveDirectCombatCandidate);
         const preferredV08STarget = selectV08STargetPressureCandidate(
@@ -2554,7 +2568,9 @@ export class SearchDriver {
                         (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
                     ),
                 ]
-              : productiveCandidates;
+              : prioritizeProductiveActions
+                ? forceTierProductiveCandidates
+                : productiveCandidates;
         for (const candidate of orderedCandidates) {
             const strictCandidate: ISearchCandidate =
                 candidate.kind === "incumbent"
@@ -2643,9 +2659,9 @@ export class SearchDriver {
         const v08sAdvances = prioritizeV08SUrgency
             ? rankedChallengers.filter(({ index }) => isPureMoveCandidate(candidates[index]))
             : [];
-        const productive =
+        const forceTierProductive =
             prioritizeProductiveActions || prioritizeDominantFinish
-                ? rankedChallengers.filter(({ index }) => isProductiveCandidate(candidates[index]))
+                ? rankedChallengers.filter(({ index }) => isForceTierProductiveCandidate(candidates[index]))
                 : [];
         const ordered = v08sDirectCombat.length
             ? [
@@ -2661,10 +2677,12 @@ export class SearchDriver {
                   ]
                 : advances.length
                   ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
-                  : productive.length
+                  : forceTierProductive.length
                     ? [
-                          ...productive,
-                          ...rankedChallengers.filter(({ index }) => !isProductiveCandidate(candidates[index])),
+                          ...forceTierProductive,
+                          ...rankedChallengers.filter(
+                              ({ index }) => !isForceTierProductiveCandidate(candidates[index]),
+                          ),
                       ]
                     : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);

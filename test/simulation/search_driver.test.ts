@@ -1105,15 +1105,22 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(probed).toEqual(["move"]);
     });
 
-    it("repairs an urgent hard passive with a legal spell when no attack or advance exists", () => {
-        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s", SEARCH_GATE: "1" });
+    it("repairs forced passives with a legal spell but never treats harmful combat as progress", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+        });
         const harness = buildBattle(952, "v0.8s");
         const unit = harness.activeUnit()!;
         const id = unit.getId();
         const defend: GameAction[] = [{ type: "defend_turn", unitId: id }];
         const spell: GameAction[] = [{ type: "cast_spell", casterId: id, spellName: "support" }];
+        const harmful: GameAction[] = [{ type: "range_attack", attackerId: id, targetId: "enemy" }];
         const candidates = [
             { kind: "incumbent", actions: defend },
+            { kind: "shot", actions: harmful, features: { expectedDamage: -10, expectedKill: 1 } },
             { kind: "spell", actions: spell },
         ] as unknown as IEnumeratedCandidate[];
         const driver = harness.makeDriver() as unknown as {
@@ -1146,17 +1153,71 @@ describe("search driver — gating, hygiene, determinism", () => {
                 prioritizeProductiveActions?: boolean,
             ) => IEnumeratedCandidate | undefined;
         };
-        driver.scoreCandidates = (_unit, scored) => scored.map(({ kind }) => (kind === "incumbent" ? 0.9 : 0.1));
+        driver.scoreCandidates = (_unit, scored) =>
+            scored.map(({ kind }) => (kind === "shot" ? 1 : kind === "incumbent" ? 0.9 : 0.1));
 
+        // Urgent, ordinary hard-passive, and dominant force tiers all retain the low-scored legal spell in the
+        // shortlist and choose it over both a higher-scored harmful shot and the passive incumbent.
         expect(
             driver.search(unit, candidates, defend, 123, performance.now(), true, undefined, false, false, true, true),
         ).toEqual(spell);
         expect(
+            driver.search(
+                unit,
+                candidates,
+                defend,
+                123,
+                performance.now(),
+                true,
+                undefined,
+                false,
+                false,
+                false,
+                false,
+            ),
+        ).toEqual(spell);
+        expect(
+            driver.search(
+                unit,
+                candidates,
+                defend,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                true,
+                false,
+                false,
+                false,
+            ),
+        ).toEqual(spell);
+
+        // An ordinary urgent incumbent is unchanged, and a hard passive remains preferable to self-harm when
+        // the harmful attack is the only superficially productive challenger.
+        expect(
             driver.search(unit, candidates, defend, 123, performance.now(), false, undefined, false, false, true, true),
         ).toEqual(defend);
+        expect(
+            driver.search(
+                unit,
+                candidates.slice(0, 2),
+                defend,
+                123,
+                performance.now(),
+                true,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(defend);
         expect(driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true, true)).toBe(
-            candidates[1],
+            candidates[2],
         );
+        expect(
+            driver.firstEngineValidProductiveCandidate(unit, candidates.slice(0, 2), 123, false, true, true, true),
+        ).toBeUndefined();
     });
 
     it("keeps v0.7 scoring unchanged and lets v0.8 use nonproductive actions only without a productive option", () => {
