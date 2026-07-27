@@ -22,7 +22,7 @@ import type { V09ArtifactStatus } from "../ai_strategy";
 
 export const V09_MODEL_SCHEMA = "hoc.ai.v0_9_model.v1" as const;
 export const V09_MODEL_HASH_ALGORITHM = "sha256-canonical-inference-json-v1" as const;
-export const V09_QUALIFICATION_RECEIPT_SCHEMA = "hoc.ai.v0_9_qualification_receipt.v1" as const;
+export const V09_QUALIFICATION_RECEIPT_SCHEMA = "hoc.ai.v0_9_qualification_receipt.v2" as const;
 export const V09_EMPTY_FAILURES_SHA256 = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945" as const;
 
 export interface IV09FeatureBlock {
@@ -94,6 +94,10 @@ export interface IV09ModelSource {
  */
 export interface IV09QualificationReceipt {
     readonly schema: typeof V09_QUALIFICATION_RECEIPT_SCHEMA;
+    /** Prevents a pre-v2 summary from being replayed after the reached-Armageddon qualification fix. */
+    readonly qualificationSummarySchema: "hoc.ai.v0_9_qualification.v2";
+    /** v2 gates entering an Armageddon lap, not only battles in which Armageddon damage killed a unit. */
+    readonly armageddonMetric: "reached_armageddon_lap";
     readonly summarySha256: string;
     readonly journalSha256: string;
     readonly manifestSha256: string;
@@ -230,6 +234,8 @@ export function serializeV09ModelHashPayload(artifact: IV09ModelArtifact): strin
 export function serializeV09QualificationReceiptPayload(receipt: IV09QualificationReceipt): string {
     return JSON.stringify({
         schema: receipt.schema,
+        qualificationSummarySchema: receipt.qualificationSummarySchema,
+        armageddonMetric: receipt.armageddonMetric,
         summarySha256: receipt.summarySha256,
         journalSha256: receipt.journalSha256,
         manifestSha256: receipt.manifestSha256,
@@ -293,6 +299,12 @@ export function validateV09ModelArtifact(artifact: IV09ModelArtifact): string[] 
     if (qualification) {
         if (qualification.schema !== V09_QUALIFICATION_RECEIPT_SCHEMA) {
             errors.push(`qualification.schema must be ${V09_QUALIFICATION_RECEIPT_SCHEMA}`);
+        }
+        if (qualification.qualificationSummarySchema !== "hoc.ai.v0_9_qualification.v2") {
+            errors.push("qualification must bind the v2 qualification summary");
+        }
+        if (qualification.armageddonMetric !== "reached_armageddon_lap") {
+            errors.push("qualification must bind reached-Armageddon-lap semantics");
         }
         for (const [name, value] of [
             ["summarySha256", qualification.summarySha256],

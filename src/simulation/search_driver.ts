@@ -299,6 +299,20 @@ class SearchDecisionDeadlineExceeded extends Error {
     }
 }
 
+/**
+ * A rollout mutated the private battle copy and at least one authoritative restore step failed. Callers
+ * must quarantine the live session; returning an incumbent or running another policy is unsafe because
+ * the pre-search state is no longer proven.
+ */
+export class SearchRollbackError extends Error {
+    public readonly cleanupErrors: readonly unknown[];
+    public constructor(cleanupErrors: readonly unknown[]) {
+        super("Search rollout cleanup failed; the battle state is not proven restored");
+        this.name = "SearchRollbackError";
+        this.cleanupErrors = [...cleanupErrors];
+    }
+}
+
 /** Learned leaf weights (fit_value.mjs output) aligned to VALUE_FEATURE_NAMES. */
 interface ILearnedValue {
     b: number;
@@ -749,11 +763,37 @@ export interface ISearchMatchInfo {
     redVersion?: string;
 }
 
+/**
+ * Additive training seam for v0.9 teacher collection. It is inert unless explicitly supplied by an
+ * offline runner; SEARCH_IL_DATASET and its frozen IL-v3 serialization continue through their original path.
+ */
+export interface ISearchScoredDecision {
+    /**
+     * Read-only by contract. The callback runs only after every candidate simulation restored the live snapshot;
+     * mutating the unit or any candidate from an observer is unsupported and invalidates the offline corpus.
+     */
+    unit: Unit;
+    /** Public root-decision context reconstructed after rollback. Treat all referenced engine objects as read-only. */
+    context: Readonly<IDecisionContext>;
+    candidates: readonly IEnumeratedCandidate[];
+    means: readonly number[];
+    valueFeatures: readonly number[];
+    /** Exact rollout count behind each finite mean. No standard error is claimed because samples are not retained. */
+    rolloutsPerCandidate: number;
+    teacherIndex: number;
+    selectedIndex: number;
+    wouldOverride: boolean;
+    seedBase: number;
+}
+
+export type SearchScoredDecisionObserver = (decision: ISearchScoredDecision) => void;
+
 export class SearchDriver {
     public readonly enabled: boolean;
     private readonly mode: SearchMode;
     private readonly deps: ILookaheadDeps;
     private readonly match: ISearchMatchInfo;
+    private readonly scoredDecisionObserver: SearchScoredDecisionObserver | undefined;
     private readonly versions: ReadonlySet<string>;
     private readonly gate: number;
     private readonly horizon: number;
@@ -816,9 +856,14 @@ export class SearchDriver {
     private pureRangedTerminalState: PureRangedTerminalState | null = null;
     private finishedSim = false;
     private circuitOpen = false;
-    public constructor(deps: ILookaheadDeps, match: ISearchMatchInfo = {}) {
+    public constructor(
+        deps: ILookaheadDeps,
+        match: ISearchMatchInfo = {},
+        scoredDecisionObserver?: SearchScoredDecisionObserver,
+    ) {
         this.deps = deps;
         this.match = match;
+        this.scoredDecisionObserver = scoredDecisionObserver;
         this.mode =
             process.env.Q2_WAIT_ABLATION === "1"
                 ? "ablation"
@@ -1417,13 +1462,16 @@ export class SearchDriver {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
-                enrichIncumbentMetadata: isV08Search || this.ilPath !== undefined,
+                enrichIncumbentMetadata:
+                    isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                 preserveMovePostureDiversity:
-                    isV08TargetPressurePolicy &&
-                    v08sHasStrongerRangedOutput &&
-                    !prioritizeDominantFinish &&
-                    !prioritizeV08SUrgency,
-                preserveAttackTargetCoverage: preserveBaselineAttackTargetCoverage,
+                    this.scoredDecisionObserver !== undefined ||
+                    (isV08TargetPressurePolicy &&
+                        v08sHasStrongerRangedOutput &&
+                        !prioritizeDominantFinish &&
+                        !prioritizeV08SUrgency),
+                preserveAttackTargetCoverage:
+                    this.scoredDecisionObserver !== undefined || preserveBaselineAttackTargetCoverage,
             };
             const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
             const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
@@ -1910,10 +1958,20 @@ export class SearchDriver {
             if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
                 this.circuitOpen = true;
             }
-            setDeterministicRandomSource(savedSource);
-            this.deps.setActiveUnitId(savedActive);
+            const cleanupErrors: unknown[] = [];
+            try {
+                setDeterministicRandomSource(savedSource);
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
+            try {
+                this.deps.setActiveUnitId(savedActive);
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
             this.finishedSim = false;
             this.rolloutEnemyTeam = null;
+            if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
         }
     }
     /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the datasets. */
@@ -2228,10 +2286,14 @@ export class SearchDriver {
         // IL dataset state features are extracted on the LIVE pre-rollout state (scoreCandidates
         // snapshot/restores around every rollout, so ordering is belt-and-braces — the same contract as
         // the oracle's Q2 dump).
+        const observedValueFeatures =
+            this.ilPath || this.scoredDecisionObserver
+                ? extractValueFeaturesV2(this.deps.unitsHolder, this.deps.fightProperties, unit.getTeam())
+                : undefined;
         const ilState = this.ilPath
             ? {
                   wf: extractWaitFeatures(unit, this.deps.unitsHolder, this.deps.fightProperties, incumbent),
-                  vf: extractValueFeaturesV2(this.deps.unitsHolder, this.deps.fightProperties, unit.getTeam()),
+                  vf: observedValueFeatures!,
               }
             : undefined;
 
@@ -2426,6 +2488,26 @@ export class SearchDriver {
             validationMeans === null || validationMeans[0] === -Infinity || validationMeans[1] === -Infinity
                 ? null
                 : validationMeans[1] - validationMeans[0];
+        this.scoredDecisionObserver?.({
+            unit,
+            context: {
+                grid: this.deps.grid,
+                matrix: this.deps.grid.getMatrix(),
+                unitsHolder: this.deps.unitsHolder,
+                pathHelper: this.deps.pathHelper,
+                attackHandler: this.deps.attackHandler,
+                fightProperties: this.deps.fightProperties,
+                decisionOrigin: "root",
+            },
+            candidates: scoredCandidates,
+            means,
+            valueFeatures: observedValueFeatures!,
+            rolloutsPerCandidate: this.rollouts,
+            teacherIndex: bestIdx,
+            selectedIndex: overridden ? bestIdx : 0,
+            wouldOverride,
+            seedBase,
+        });
         if (ilState) {
             const chosenIdx = overridden ? bestIdx : 0;
             this.ilRows.push(
@@ -2979,8 +3061,18 @@ export class SearchDriver {
                 try {
                     score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt);
                 } finally {
-                    restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
-                    this.deps.restoreDamageStats(savedStats);
+                    const cleanupErrors: unknown[] = [];
+                    try {
+                        restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
+                    } catch (error) {
+                        cleanupErrors.push(error);
+                    }
+                    try {
+                        this.deps.restoreDamageStats(savedStats);
+                    } catch (error) {
+                        cleanupErrors.push(error);
+                    }
+                    if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
                 }
                 if (score === -Infinity) {
                     illegal = true;

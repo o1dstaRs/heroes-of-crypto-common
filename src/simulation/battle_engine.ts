@@ -9,7 +9,13 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getAIStrategy, getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../ai";
+import {
+    getAIStrategy,
+    getEnemiesCellsWithinMovementRange,
+    type IAIPolicyEvent,
+    type IAIStrategy,
+    type IDecisionContext,
+} from "../ai";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
@@ -47,7 +53,7 @@ import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { getDistance, type XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
-import { setDeterministicRandomSource } from "../utils/lib";
+import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
 import {
     createCombatFactories,
     createUnitFromSpec,
@@ -55,8 +61,10 @@ import {
     makeRng,
     type IArmyUnitSpec,
 } from "./army";
+import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 
+import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import { LookaheadDriver, type ILookaheadDeps } from "./lookahead";
 import {
     canonicalPhaseBSeed,
@@ -64,7 +72,7 @@ import {
     PHASE_B_VALUE_ROW_TYPE,
     requirePhaseBRunFingerprint,
 } from "./phase_b_dataset";
-import { SearchDriver } from "./search_driver";
+import { SearchDriver, type SearchScoredDecisionObserver } from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search } from "./v0_8_a13_search";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
@@ -182,6 +190,21 @@ export interface IDecisionObservation {
     strategyVersion: string;
 }
 
+/**
+ * Exact deployable-path timing for one v0.9 decision. `totalMicros` starts immediately before
+ * `decideTurn` and stops only after the authoritative common-engine dry run has been fully rolled back.
+ */
+export interface IV09ServerPreflightTimingObservation {
+    readonly unitId: string;
+    readonly team: TeamType;
+    readonly lap: number;
+    readonly strategyVersion: "v0.9";
+    readonly decisionMicros: number;
+    readonly preflightMicros: number;
+    readonly totalMicros: number;
+    readonly failure: string | null;
+}
+
 /** Result of applying one action from the strategy's chosen decision. */
 export interface IStrategyActionExecution {
     readonly action: Readonly<GameAction>;
@@ -281,6 +304,27 @@ export interface IMatchConfig {
     policyEventObserver?: (event: IAIPolicyEvent) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
+    /**
+     * Qualification-only production parity seam. Native v0.9 turns are timed through `decideTurn` plus the
+     * same snapshot/apply/rollback transaction the server runs before publishing any live action. Mindless
+     * units and every other strategy version are excluded; ordinary live application still follows.
+     */
+    v09ServerPreflightObserver?: (observation: IV09ServerPreflightTimingObservation) => void;
+    /**
+     * Offline v0.9 teacher seam. When supplied, the match uses an explicitly configured SearchDriver and emits
+     * scored candidates only after rollback; ordinary matches and the production v0.8 a13 factory are unchanged.
+     */
+    searchScoredDecisionObserver?: SearchScoredDecisionObserver;
+    /**
+     * Offline teacher collection invariant. The deep observer search must return the incumbent; listed frozen
+     * anchor teams then run that incumbent through a second, exact production a13 SearchDriver. This keeps
+     * student seats student-driven and anchor seats genuinely v0.8+a13-driven.
+     */
+    searchShadowOnly?: boolean;
+    searchV08A13TrajectoryTeams?: readonly TeamType[];
+    /** Offline-only strategy injection used by v0.9 DAgger actors; ordinary/versioned matches never set these. */
+    greenStrategyOverride?: IAIStrategy;
+    redStrategyOverride?: IAIStrategy;
 }
 
 export interface ISetupAugment {
@@ -607,9 +651,102 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     const engine = new GameActionEngine(engineContext);
     const turnEngine = new TurnEngine(engineContext);
+    const preflightV09Decision = (
+        decided: readonly GameAction[],
+        actingUnitId: string,
+    ): { preflightMicros: number; failure: string | null } => {
+        const startedAt = performance.now();
+        const activeUnitIdSnapshot = currentActiveUnitId;
+        let battleSnapshot: ReturnType<typeof snapshotBattle>;
+        let damageSnapshot: IDamageStatistic[];
+        let summonedUnitSequenceSnapshot: number;
+        let liveRandomSource: ReturnType<typeof getDeterministicRandomSource>;
+        try {
+            battleSnapshot = snapshotBattle(unitsHolder, grid, fightProperties);
+            damageSnapshot = damageStatisticHolder.get().map((statistic) => ({ ...statistic }));
+            summonedUnitSequenceSnapshot = summonedUnitSequence;
+            liveRandomSource = getDeterministicRandomSource();
+        } catch {
+            return {
+                preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
+                failure: "preflight_snapshot_error",
+            };
+        }
 
-    const greenStrategy = getAIStrategy(config.greenVersion);
-    const redStrategy = getAIStrategy(config.redVersion);
+        let failure: string | null = null;
+        let productiveActionApplied = false;
+        const cleanupErrors: unknown[] = [];
+        try {
+            const probeSeed = Number.parseInt(
+                createHash("sha256")
+                    .update(`${config.seed ?? 0}:${actingUnitId}:${JSON.stringify(decided)}`)
+                    .digest("hex")
+                    .slice(0, 8),
+                16,
+            );
+            setDeterministicRandomSource(makeRng(probeSeed));
+            for (const action of decided) {
+                const result = engine.apply(action);
+                if (!result.completed) {
+                    if (action.type === "select_attack_type") {
+                        continue;
+                    }
+                    failure = `proposal_declined:${action.type}:${result.rejectionReason ?? "unknown"}`;
+                    break;
+                }
+                if (action.type !== "select_attack_type") {
+                    productiveActionApplied = true;
+                }
+                if (result.events.some((event) => event.type === "turn_completed" || event.type === "fight_finished")) {
+                    break;
+                }
+            }
+            if (!failure && !productiveActionApplied) {
+                failure = "no_productive_action";
+            }
+            if (!failure && activeUnitIdSnapshot !== actingUnitId) {
+                failure = "active_unit_changed_before_preflight";
+            }
+        } catch {
+            failure = "preflight_runtime_error";
+        } finally {
+            try {
+                setDeterministicRandomSource(liveRandomSource);
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
+            try {
+                restoreBattle(battleSnapshot, unitsHolder, grid, fightProperties);
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
+            try {
+                damageStatisticHolder.clear();
+                for (const statistic of damageSnapshot) {
+                    damageStatisticHolder.add({ ...statistic });
+                }
+                summonedUnitSequence = summonedUnitSequenceSnapshot;
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
+            try {
+                currentActiveUnitId = activeUnitIdSnapshot;
+                FightStateManager.getInstance().setFightProperties(fightProperties);
+            } catch (error) {
+                cleanupErrors.push(error);
+            }
+        }
+        if (cleanupErrors.length) {
+            throw new AggregateError(cleanupErrors, "v0.9 qualification preflight rollback failed");
+        }
+        return {
+            preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
+            failure,
+        };
+    };
+
+    const greenStrategy = config.greenStrategyOverride ?? getAIStrategy(config.greenVersion);
+    const redStrategy = config.redStrategyOverride ?? getAIStrategy(config.redVersion);
 
     // STAGE 2: 2-ply lookahead driver (env-gated V05_LOOKAHEAD, default OFF -> baseline unchanged). When
     // enabled it replaces a v0.5 unit's single decision with the best-by-simulation candidate (see
@@ -647,9 +784,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         greenVersion: config.greenVersion,
         redVersion: config.redVersion,
     };
-    const search = shouldUseDefaultV08A13Search(searchMatch)
-        ? createV08A13SearchDriver(driverDeps, searchMatch)
-        : new SearchDriver(driverDeps, searchMatch);
+    const search = config.searchScoredDecisionObserver
+        ? new SearchDriver(driverDeps, searchMatch, config.searchScoredDecisionObserver)
+        : shouldUseDefaultV08A13Search(searchMatch)
+          ? createV08A13SearchDriver(driverDeps, searchMatch)
+          : new SearchDriver(driverDeps, searchMatch);
+    const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
+    const v08A13TrajectorySearch =
+        config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
+            ? createV08A13SearchDriver(driverDeps, searchMatch)
+            : undefined;
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
     const greenRoster = config.roster;
@@ -883,6 +1027,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const startResult = engine.apply({ type: "start_fight" });
     applyEvents(startResult.events);
     search.onFightReady();
+    v08A13TrajectorySearch?.onFightReady();
 
     const advance = (): void => {
         const maxAttempts = unitsHolder.getAllUnits().size + 2;
@@ -963,9 +1108,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const strategy = isMindlessAiUnit(unit) ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
         const matrix = grid.getMatrix();
         const searchApplies = search.appliesTo(strategy.version);
-        const decisionPathCatalog = searchApplies
-            ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
-            : undefined;
+        const trajectorySearchApplies =
+            v08A13TrajectoryTeams.has(unit.getTeam()) && v08A13TrajectorySearch?.appliesTo(strategy.version) === true;
+        const decisionPathCatalog =
+            searchApplies || trajectorySearchApplies
+                ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
+                : undefined;
         // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
         // search has made its final choice so diagnostics count only policy actions that actually survive a13.
         const incumbentPolicyEvents: IAIPolicyEvent[] | undefined =
@@ -991,8 +1139,32 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         };
         const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
         const targetMemoryBeforeDecision =
-            searchApplies || lookaheadApplies ? captureAITargetMemory(unitsHolder) : undefined;
+            searchApplies || trajectorySearchApplies || lookaheadApplies
+                ? captureAITargetMemory(unitsHolder)
+                : undefined;
+        const v09ServerPreflightStartedAt =
+            config.v09ServerPreflightObserver && strategy.version === "v0.9" ? performance.now() : undefined;
         const decided0 = strategy.decideTurn(unit, decisionContext);
+        let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
+        if (v09ServerPreflightStartedAt !== undefined) {
+            if (searchApplies || trajectorySearchApplies || lookaheadApplies) {
+                throw new Error("v0.9 server preflight timing requires a native policy decision without search");
+            }
+            const decisionCompletedAt = performance.now();
+            const preflight = preflightV09Decision(decided0, actingUnitId);
+            v09ServerPreflightObservation = {
+                unitId: actingUnitId,
+                team: unit.getTeam(),
+                lap: fightProperties.getCurrentLap(),
+                strategyVersion: "v0.9",
+                decisionMicros: Math.max(0, Math.round((decisionCompletedAt - v09ServerPreflightStartedAt) * 1000)),
+                preflightMicros: preflight.preflightMicros,
+                totalMicros: Math.max(0, Math.round((performance.now() - v09ServerPreflightStartedAt) * 1000)),
+                failure: preflight.failure,
+            };
+        }
+        const targetMemoryAfterIncumbent =
+            config.searchShadowOnly && searchApplies ? captureAITargetMemory(unitsHolder) : undefined;
         if (config.decisionObserver) {
             config.decisionObserver({
                 unit,
@@ -1001,22 +1173,34 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 strategyVersion: strategy.version,
             });
         }
+        if (v09ServerPreflightObservation) {
+            config.v09ServerPreflightObserver!(v09ServerPreflightObservation);
+        }
         // Lookahead only re-decides for the v0.5 side, so a v0.5-vs-v0.4 run measures exactly whether
         // adding search to v0.5 beats its own single-decision baseline (the opponent replies with its own
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
-        const decided = searchApplies
+        const shadowDecision = searchApplies
             ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
             : lookaheadApplies
               ? lookahead.chooseDecision(unit, decided0)
               : decided0;
+        if (config.searchShadowOnly && shadowDecision !== decided0) {
+            throw new Error("offline v0.9 teacher SearchDriver escaped SEARCH_OBSERVE_ONLY shadow mode");
+        }
+        if (targetMemoryAfterIncumbent) {
+            restoreAITargetMemory(unitsHolder, targetMemoryAfterIncumbent);
+        }
+        const decided = trajectorySearchApplies
+            ? v08A13TrajectorySearch!.chooseDecision(unit, strategy.version, decided0, decisionContext)
+            : shadowDecision;
         if (decided === decided0 && config.policyEventObserver) {
             for (const event of incumbentPolicyEvents!) {
                 config.policyEventObserver(event);
             }
         }
-        if ((searchApplies || lookaheadApplies) && decided !== decided0) {
+        if ((searchApplies || trajectorySearchApplies || lookaheadApplies) && decided !== decided0) {
             restoreAITargetMemory(unitsHolder, targetMemoryBeforeDecision!);
             const executedAttack = [...decided]
                 .reverse()
@@ -1312,6 +1496,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     }
     // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
     search.onMatchEnd(matchResult.winner, matchResult.endReason);
+    v08A13TrajectorySearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
     return matchResult;
 }
 

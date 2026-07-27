@@ -15,6 +15,7 @@ import {
     V09_QUALIFICATION_RECEIPT_SCHEMA,
     enumerateCandidates,
     scoreV09FixedPoint,
+    serializeV09QualificationReceiptPayload,
     validateV09ModelArtifact,
     v09CandidateFeatureVector,
     v09RangeObservation,
@@ -22,6 +23,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
     type IV09ModelArtifact,
+    type IV09QualificationReceipt,
 } from "../../src/ai";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
@@ -176,6 +178,8 @@ describe("v0.9 fixed-point runtime", () => {
             promoted: true,
             qualification: {
                 schema: V09_QUALIFICATION_RECEIPT_SCHEMA,
+                qualificationSummarySchema: "hoc.ai.v0_9_qualification.v2",
+                armageddonMetric: "reached_armageddon_lap",
                 summarySha256: "d".repeat(64),
                 journalSha256: "e".repeat(64),
                 manifestSha256: "f".repeat(64),
@@ -197,12 +201,44 @@ describe("v0.9 fixed-point runtime", () => {
             },
         };
         expect(validateV09ModelArtifact(promoted)).toEqual([]);
+        expect(JSON.parse(serializeV09QualificationReceiptPayload(promoted.qualification!))).toMatchObject({
+            schema: "hoc.ai.v0_9_qualification_receipt.v2",
+            qualificationSummarySchema: "hoc.ai.v0_9_qualification.v2",
+            armageddonMetric: "reached_armageddon_lap",
+        });
         expect(
             validateV09ModelArtifact({
                 ...promoted,
                 qualification: { ...promoted.qualification!, qualificationGames: 47_999 as 48_000 },
             }),
         ).toContain("qualification must bind the exact 48k+48k promotion sample");
+        expect(
+            validateV09ModelArtifact({
+                ...promoted,
+                qualification: {
+                    ...promoted.qualification!,
+                    schema: "hoc.ai.v0_9_qualification_receipt.v1" as typeof V09_QUALIFICATION_RECEIPT_SCHEMA,
+                },
+            }),
+        ).toContain(`qualification.schema must be ${V09_QUALIFICATION_RECEIPT_SCHEMA}`);
+        expect(
+            validateV09ModelArtifact({
+                ...promoted,
+                qualification: {
+                    ...promoted.qualification!,
+                    qualificationSummarySchema: undefined,
+                } as unknown as IV09QualificationReceipt,
+            }),
+        ).toContain("qualification must bind the v2 qualification summary");
+        expect(
+            validateV09ModelArtifact({
+                ...promoted,
+                qualification: {
+                    ...promoted.qualification!,
+                    armageddonMetric: "decided_by_armageddon_damage",
+                } as unknown as IV09QualificationReceipt,
+            }),
+        ).toContain("qualification must bind reached-Armageddon-lap semantics");
     });
 
     test("keeps candidate zero on ties, sub-margin gains and guarded high scores", () => {

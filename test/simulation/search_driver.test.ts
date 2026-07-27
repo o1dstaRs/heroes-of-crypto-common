@@ -58,12 +58,12 @@ import { ilActionSignature, parseIlGameRow, parseIlRow } from "../../src/simulat
 import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
-import { classifyActions, SearchDriver } from "../../src/simulation/search_driver";
+import { classifyActions, SearchDriver, SearchRollbackError } from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
 import { Unit } from "../../src/units/unit";
 import { UnitsHolder } from "../../src/units/units_holder";
-import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
+import { getDeterministicRandomSource, getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
 import type { XY } from "../../src/utils/math";
 
 const SEARCH_ENV_KEYS = [
@@ -175,6 +175,7 @@ interface Harness {
     makeDriver: () => SearchDriver;
     activeUnit: () => Unit | undefined;
     setActiveUnitId: (id: string) => void;
+    failNextActiveUnitRestore: () => void;
     decideActive: () => GameAction[];
     playTurns: (n: number) => void;
     finished: () => boolean;
@@ -186,6 +187,7 @@ function buildBattle(
     version = "v0.6",
     rolloutStrategy?: IAIStrategy,
     rosterOverride?: readonly IArmyUnitSpec[],
+    failDamageRestore = false,
 ): Harness {
     FightStateManager.getInstance();
     setDeterministicRandomSource(makeRng((seed ^ 0x6d2b79f5) >>> 0));
@@ -210,6 +212,7 @@ function buildBattle(
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
 
     let currentActiveUnitId = "";
+    let failNextActiveUnitRestore = false;
     const engineContext = {
         fightProperties,
         grid,
@@ -239,6 +242,10 @@ function buildBattle(
         strategyForTeam: () => rolloutStrategy ?? strategy,
         getActiveUnitId: () => currentActiveUnitId,
         setActiveUnitId: (id) => {
+            if (failNextActiveUnitRestore) {
+                failNextActiveUnitRestore = false;
+                throw new Error("injected active-unit restore failure");
+            }
             currentActiveUnitId = id;
         },
         damageDealtThisLap: () => damageStat.has(fightProperties.getCurrentLap()),
@@ -247,6 +254,9 @@ function buildBattle(
             damageStat.clear();
             for (const v of saved) {
                 damageStat.add(v);
+            }
+            if (failDamageRestore) {
+                throw new Error("injected damage-stat restore failure");
             }
         },
     };
@@ -403,6 +413,9 @@ function buildBattle(
         setActiveUnitId: (id) => {
             currentActiveUnitId = id;
         },
+        failNextActiveUnitRestore: () => {
+            failNextActiveUnitRestore = true;
+        },
         decideActive,
         finished: () => finished,
         playTurns: (n: number) => {
@@ -468,6 +481,65 @@ describe("search driver — gating, hygiene, determinism", () => {
         };
         return calls;
     };
+
+    it("raises a typed fatal error when rollout cleanup cannot prove the state restored", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+        });
+        const harness = buildBattle(89, "v0.6", undefined, undefined, true);
+        const unit = harness.activeUnit()!;
+        const incumbent = harness.decideActive();
+        const before = stableSnapshot(harness);
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates: (
+                unit: Unit,
+                candidates: readonly Array<{ kind: string; actions: GameAction[] }>,
+                seedBase: number,
+                horizonMode: string,
+                rolloutCount: number,
+            ) => number[];
+        };
+
+        expect(() =>
+            driver.scoreCandidates(unit, [{ kind: "incumbent", actions: incumbent }], 123, "turns", 1),
+        ).toThrow(SearchRollbackError);
+        expect(stableSnapshot(harness)).toEqual(before);
+    });
+
+    it("restores the outer RNG before surfacing an active-unit cleanup failure", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+        });
+        const harness = buildBattle(88, "v0.6");
+        const unit = harness.activeUnit()!;
+        const incumbent = harness.decideActive();
+        const savedSource = (): number => 0.25;
+        setDeterministicRandomSource(savedSource);
+        const driver = harness.makeDriver() as unknown as {
+            search: (
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seedBase: number,
+                t0: number,
+            ) => GameAction[];
+            chooseDecision: (
+                unit: Unit,
+                version: string,
+                incumbent: GameAction[],
+                context?: IDecisionContext,
+            ) => GameAction[];
+        };
+        driver.search = (_unit, _candidates, actions) => actions;
+        harness.failNextActiveUnitRestore();
+
+        expect(() => driver.chooseDecision(unit, "v0.6", incumbent)).toThrow(SearchRollbackError);
+        expect(getDeterministicRandomSource()).toBe(savedSource);
+    });
 
     it("shortlists by an immediate leaf while retaining the incumbent and stable top challengers", () => {
         setEnv({
