@@ -11,6 +11,7 @@
 
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../constants";
 import type { GameAction } from "../../engine/actions";
+import { projectPostMoveActorAvailability } from "../../engine/post_move_actor_availability";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import {
     getPositionForCell,
@@ -37,6 +38,7 @@ import type {
     V08SupportedPrepinEgressFunnelStage,
     V08SupportedRangedEscapeFunnelStage,
 } from "../ai_strategy";
+import { decisionFireWalls } from "../decision_fight_state";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { otherTeam } from "./v0_1";
@@ -249,6 +251,14 @@ function moveAction(unit: Unit, route: IReadonlyWeightedRoute, footprint: XY[]):
         hasLavaCell: route.hasLavaCell,
         hasWaterCell: route.hasWaterCell,
     };
+}
+
+function actorAvailableAfterRoute(unit: Unit, context: IDecisionContext, route: IReadonlyWeightedRoute): boolean {
+    const action = moveAction(unit, route, footprintForAnchor(unit, route.cell));
+    return (
+        action.type !== "move_unit" ||
+        projectPostMoveActorAvailability(unit, decisionFireWalls(context), action).availableAfterMove
+    );
 }
 
 function routeView(
@@ -514,6 +524,7 @@ function supportedPrepinEgress(
     let hasRetainedSignatureRoute = false;
     let hasPostureSafeRoute = false;
     for (const route of routes) {
+        if (!actorAvailableAfterRoute(unit, context, route)) continue;
         const footprint = footprintForAnchor(unit, route.cell);
         const origin = getPositionForCells(settings, footprint);
         if (
@@ -791,6 +802,7 @@ function supportedBandAdvance(
     let bestTargetDistance = currentTargetDistance;
     let bestScreeningGuardId: string | null = null;
     for (const route of routes) {
+        if (!actorAvailableAfterRoute(unit, context, route)) continue;
         const view = routeView(unit, context, route, enemies, guards);
         if (!view || view.protection.reachableThreats !== 0) continue;
         hasZeroExposureRoute = true;
@@ -1027,6 +1039,7 @@ function protectedAdvanceShotCatalog(
     let bestTargetDistance = currentTargetDistance;
     let bestRetainedSignatureAfter = false;
     for (const route of reachableRoutes(unit, context)) {
+        if (!actorAvailableAfterRoute(unit, context, route)) continue;
         const view = routeView(unit, context, route, enemies, frontliners);
         if (!view) {
             continue;

@@ -671,10 +671,7 @@ export class UnitsHolder {
         }
 
         const unitToDelete = this.allUnits.get(unitId);
-        let considerResurrection =
-            checkForResurrection &&
-            unitToDelete?.hasAbilityActive("Resurrection") &&
-            unitToDelete?.hasSpellRemaining("Resurrection");
+        let considerResurrection = checkForResurrection && unitToDelete?.canSelfResurrect();
 
         if (considerResurrection) {
             if (unitToDelete) {
@@ -684,9 +681,7 @@ export class UnitsHolder {
                 // actually died.
                 const died = unitToDelete.getAmountDied() ?? 0;
                 const newAmountAlive = Math.min(died, Math.max(1, Math.floor(died / 2)));
-                if (newAmountAlive > 0) {
-                    unitToDelete.increaseAmountAlive(newAmountAlive);
-                    unitToDelete.decreaseAmountDied(newAmountAlive);
+                if (unitToDelete.reviveAfterDeath(newAmountAlive) > 0) {
                     unitToDelete.handleResurrectionAnimation();
                     unitToDelete.deleteAllEffects();
                     unitToDelete.deleteAllBuffs();

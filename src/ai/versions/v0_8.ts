@@ -12,6 +12,8 @@
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { TeamType } from "../../generated/protobuf/v1/types_gen";
+import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
+import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
 import type { XY } from "../../utils/math";
@@ -144,6 +146,76 @@ export function selectV08DirectCombatCandidate(
         }
     }
     return best;
+}
+
+const immediateDamagePrecedes = (
+    candidate: Readonly<IEnumeratedCandidate>,
+    incumbent: Readonly<IEnumeratedCandidate>,
+): boolean =>
+    candidate.features.expectedKill > incumbent.features.expectedKill ||
+    (candidate.features.expectedKill === incumbent.features.expectedKill &&
+        candidate.features.expectedDamage > incumbent.features.expectedDamage);
+
+/**
+ * Select the strongest engine-legal, immediately damaging spell. A guaranteed stack kill comes first, then
+ * aggregate effective damage (AOE values already cap overkill and subtract Ring of Fire friendly fire).
+ * Stable candidate order resolves exact ties, preserving deterministic target/anchor selection.
+ */
+export function selectV08DamageSpellCandidate(
+    unit: Unit,
+    candidates: readonly IEnumeratedCandidate[],
+): IEnumeratedCandidate | undefined {
+    let best: IEnumeratedCandidate | undefined;
+    for (const candidate of candidates) {
+        const cast = candidate.actions.find((action) => action.type === "cast_spell");
+        if (!cast || !Number.isFinite(candidate.features.expectedDamage) || candidate.features.expectedDamage <= 0) {
+            continue;
+        }
+        const spell = unit.getSpells().find((entry) => entry.getName() === cast.spellName);
+        if (!spell || !isSpellUsableByCaster(unit, spell) || !isOffensiveSpellMultiplier(spell.getMultiplierType())) {
+            continue;
+        }
+        if (!best || immediateDamagePrecedes(candidate, best)) {
+            best = candidate;
+        }
+    }
+    return best;
+}
+
+/**
+ * MELEE_MAGIC spellbooks historically bypass v0.2's pure-MAGIC caster branch, so Battle Mage and Magic Dragon
+ * could walk toward a target while legal long-range damage sat unused. Pick the best legal spell, then compare it
+ * with the physical hit the policy ACTUALLY selected: a strictly better spell replaces that hit, while an equal
+ * or stronger hit conserves the finite charge. A passive/move decision has no damage threshold and cannot hide
+ * behind an unselected attack candidate. Non-damaging spells remain owned by their specialized routers.
+ */
+export function prioritizeV08DamageSpell(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+    if (
+        !unit
+            .getSpells()
+            .some(
+                (spell) => isSpellUsableByCaster(unit, spell) && isOffensiveSpellMultiplier(spell.getMultiplierType()),
+            )
+    ) {
+        return decision;
+    }
+
+    const candidates = enumerateV08BoundaryCandidates(unit, context, decision);
+    const bestSpell = selectV08DamageSpellCandidate(unit, candidates);
+    if (!bestSpell) {
+        return decision;
+    }
+
+    // Candidate zero is the exact supplied decision and enrichIncumbentMetadata prices it when the generator can
+    // reproduce its attack. Comparing against some OTHER unselected direct candidate and then returning a passive
+    // decision would be internally inconsistent: neither of the two damage options would be taken.
+    const incumbent = candidates[0];
+    const incumbentIsPricedDirect =
+        !!incumbent &&
+        isV08DirectCombatDecision(incumbent.actions) &&
+        Number.isFinite(incumbent.features.expectedDamage) &&
+        incumbent.features.expectedDamage > 0;
+    return !incumbentIsPricedDirect || immediateDamagePrecedes(bestSpell, incumbent) ? bestSpell.actions : decision;
 }
 
 function enumerateV08BoundaryCandidates(
@@ -385,10 +457,11 @@ export class StrategyV0_8 extends StrategyV0_7 {
         const finished = prioritizeV08A13FinishDecision(unit, context, active);
         const positioned = prioritizeV08RangedPositioning(unit, context, finished, this.version);
         const legalDecision = repairV08ForbiddenTargetDecision(unit, context, positioned);
+        const spellDecision = prioritizeV08DamageSpell(unit, context, legalDecision);
         const protectedDecision = prioritizeV08BacklineProtector(
             unit,
             context,
-            legalDecision,
+            spellDecision,
             this.canHourglass(unit, context),
         );
         return repairV08BacklineWardDecision(unit, context, protectedDecision);

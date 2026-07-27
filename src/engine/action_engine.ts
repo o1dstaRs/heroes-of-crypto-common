@@ -56,6 +56,13 @@ import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
 import type { GameEvent, IGameAnimationEvent } from "./events";
+import {
+    enteredFireWallCells,
+    isMovePathFootprintOnly,
+    moveCellsMatchAsSet,
+    resolveMoveTargetCells,
+    travelledMovePath,
+} from "./post_move_actor_availability";
 import { TurnEngine, type ITurnEngineContext, type TurnSkipReason } from "./turn_engine";
 
 export type GameActionRejectionReason =
@@ -327,21 +334,18 @@ export class GameActionEngine {
         if (!action.path.length) {
             return this.reject("invalid_move");
         }
-        const targetCells = this.resolveMoveTargetCells(unit, action.path, action.targetCells);
+        const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
         if (!targetCells.length) {
             return this.reject("invalid_move");
         }
-        const pathIsFootprintOnly =
-            !unit.isSmallSize() &&
-            !!action.targetCells?.length &&
-            this.cellsMatchAsSet(action.path, action.targetCells);
+        const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
         const knownMoveRoute = this.resolveKnownMoveRoute(unit, action.path, targetCells, pathIsFootprintOnly);
         if (knownMoveRoute instanceof Error) {
             return this.reject("invalid_move");
         }
         const travelledPath = pathIsFootprintOnly
             ? action.path
-            : this.getTravelledMovePath(unit, knownMoveRoute?.route ?? action.path);
+            : travelledMovePath(unit.getBaseCell(), knownMoveRoute?.route ?? action.path);
         // The cell COUNT is a cheap sanity bound on the walk (real reachability is enforced by knownPaths
         // above). It assumed a cell costs at least one step — no longer true: a vine strider (Trent, "In Its
         // Own World") pays half a step per vined cell, so the same budget legitimately covers twice as many
@@ -469,18 +473,7 @@ export class GameActionEngine {
         }
         // De-duplicate: a large unit reports the same cell once per body part it lands on, and the wall
         // charges per cell entered, not per body part standing in it.
-        const seen = new Set<number>();
-        const burning: XY[] = [];
-        for (const cell of crossedCells) {
-            const key = (cell.x << 8) | (cell.y & 0xff);
-            if (seen.has(key)) {
-                continue;
-            }
-            seen.add(key);
-            if (fireWalls.has(cell)) {
-                burning.push({ x: cell.x, y: cell.y });
-            }
-        }
+        const burning = enteredFireWallCells(fireWalls, crossedCells);
         if (!burning.length) {
             return [];
         }
@@ -2436,15 +2429,6 @@ export class GameActionEngine {
             !this.context.fightProperties.hasAlreadyHourglass(unit.getId())
         );
     }
-    private getTravelledMovePath(unit: Unit, path: XY[]): XY[] {
-        const currentCell = unit.getBaseCell();
-        const firstCell = path[0];
-        if (firstCell && firstCell.x === currentCell.x && firstCell.y === currentCell.y) {
-            return path.slice(1);
-        }
-
-        return path;
-    }
     private resolveKnownMoveRoute(
         unit: Unit,
         path: XY[],
@@ -2507,8 +2491,8 @@ export class GameActionEngine {
         }
 
         return this.cellsMatchInOrder(
-            this.getTravelledMovePath(unit, knownRoute),
-            this.getTravelledMovePath(unit, actionPath),
+            travelledMovePath(unit.getBaseCell(), knownRoute),
+            travelledMovePath(unit.getBaseCell(), actionPath),
         );
     }
     /**
@@ -2563,38 +2547,15 @@ export class GameActionEngine {
             left.every((cell, index) => cell.x === right[index]?.x && cell.y === right[index]?.y)
         );
     }
+    /** Compatibility seam for existing diagnostics; production logic delegates to the shared pure helper. */
     private cellsMatchAsSet(left: XY[], right: XY[]): boolean {
-        if (left.length !== right.length) {
-            return false;
-        }
-
-        const rightCells = new Set(right.map((cell) => this.cellKey(cell)));
-        return left.every((cell) => rightCells.has(this.cellKey(cell)));
+        return moveCellsMatchAsSet(left, right);
     }
     private cellKey(cell: XY): number {
         return (cell.x << 4) | cell.y;
     }
     private sameCell(left: XY, right: XY): boolean {
         return left.x === right.x && left.y === right.y;
-    }
-    private resolveMoveTargetCells(unit: Unit, path: XY[], targetCells?: XY[]): XY[] {
-        if (targetCells?.length) {
-            return structuredClone(targetCells);
-        }
-        const destination = path[path.length - 1];
-        if (!destination) {
-            return [];
-        }
-        if (unit.isSmallSize()) {
-            return [{ ...destination }];
-        }
-
-        return [
-            { x: destination.x, y: destination.y },
-            { x: destination.x + 1, y: destination.y },
-            { x: destination.x, y: destination.y + 1 },
-            { x: destination.x + 1, y: destination.y + 1 },
-        ];
     }
     /**
      * Validate + occupy `cells` for a freshly split stack, or say why it could not be done. Mirrors the

@@ -12,6 +12,7 @@
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import type { GameAction } from "../engine/actions";
+import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
@@ -46,10 +47,12 @@ import {
     isFireWallableCell,
     normalizeFireWallOrientation,
 } from "../spells/fire_walls";
+import { isSmokeableCell } from "../spells/smoke_clouds";
 import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
+import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 
@@ -604,6 +607,14 @@ class CandidateGenerator {
             hasWaterCell: route.hasWaterCell,
         };
     }
+    /** Whether Fire Wall cleanup leaves this mover addressable by a second action in the same decision. */
+    private actorAvailableAfterMove(route: IReadonlyWeightedRoute): boolean {
+        const action = this.moveAction(route);
+        return (
+            action.type !== "move_unit" ||
+            projectPostMoveActorAvailability(this.unit, decisionFireWalls(this.context), action).availableAfterMove
+        );
+    }
     /** Every reachable destination (or nearest-to-enemy top-K when capped). */
     private addMoves(): void {
         const movePath = this.movePath();
@@ -763,7 +774,11 @@ class CandidateGenerator {
         if (movePath) {
             for (const routeList of movePath.knownPaths.values()) {
                 const route = routeList[0];
-                if (!route?.route.length || !this.footprintOk(route.cell)) {
+                if (
+                    !route?.route.length ||
+                    !this.footprintOk(route.cell) ||
+                    ((route.cell.x !== base.x || route.cell.y !== base.y) && !this.actorAvailableAfterMove(route))
+                ) {
                     continue;
                 }
                 const fpCells = this.footprintForCell(route.cell);
@@ -1046,7 +1061,14 @@ class CandidateGenerator {
         let route: IReadonlyWeightedRoute | undefined;
         for (const routeList of movePath.knownPaths.values()) {
             const candidateRoute = routeList[0];
-            if (!candidateRoute?.route.length || candidateRoute.hasLavaCell || candidateRoute.hasWaterCell) continue;
+            if (
+                !candidateRoute?.route.length ||
+                candidateRoute.hasLavaCell ||
+                candidateRoute.hasWaterCell ||
+                !this.actorAvailableAfterMove(candidateRoute)
+            ) {
+                continue;
+            }
             const exactMove = this.moveAction(candidateRoute);
             if (
                 exactMove.type === "move_unit" &&
@@ -1472,7 +1494,8 @@ class CandidateGenerator {
                 (route.cell.x === base.x && route.cell.y === base.y) ||
                 route.hasLavaCell ||
                 route.hasWaterCell ||
-                !this.footprintOk(route.cell)
+                !this.footprintOk(route.cell) ||
+                !this.actorAvailableAfterMove(route)
             ) {
                 continue;
             }
@@ -1783,12 +1806,11 @@ class CandidateGenerator {
     }
     /**
      * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
-     * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. The engine
-     * accepts any free-cell target (no range gate), so we search for the highest-value anchor cell:
+     * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. There is no
+     * cast-range gate, so we search the engine-legal cells for the highest-value anchor:
      *   - Prefer a cell whose 2x2 footprint sits on the segment from each enemy ranger to the centroid of our
      *     own units, weighting by how much enemy ranged firepower would have to shoot through it.
-     *   - Require all 4 footprint cells to be free (the engine skips occupied cells, but a fully-blocked 2x2
-     *     is a wasted charge).
+     *   - Require all 4 footprint cells to pass the engine's exact smoke-placement oracle.
      * Determinism: ties broken by grid order (no RNG), so the lookahead is reproducible.
      */
     private addSmokeCastCandidates(spell: Spell): void {
@@ -1813,7 +1835,6 @@ class CandidateGenerator {
         ax = Math.round(ax / allies.length);
         ay = Math.round(ay / allies.length);
 
-        const gridSize = gs.getGridSize();
         let best: { cell: XY; score: number } | undefined;
         // Sample candidate anchors along each enemy-ranger -> ally-centroid segment (midpoint is the highest-
         // value blocker; we also probe one cell either side for occupancy fit). Bounded by the grid.
@@ -1830,10 +1851,7 @@ class CandidateGenerator {
                     for (const oy of [0, -1]) {
                         const c = { x: anchor.x + ox, y: anchor.y + oy };
                         const cells = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-                        if (cells.some((cc) => !isCellWithinGrid(gs, cc) || cc.x >= gridSize || cc.y >= gridSize)) {
-                            continue;
-                        }
-                        if (!grid.areAllCellsEmpty(cells, this.unit.getId())) {
+                        if (!cells.every((cell) => isSmokeableCell(grid, isCellWithinGrid(gs, cell), cell))) {
                             continue;
                         }
                         const score = firepower / frac; // closer to the ranger = more shots blinded
@@ -1972,7 +1990,7 @@ class CandidateGenerator {
      * stack-powered Magic Dragon damage.
      */
     private offensiveSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
-        const value = applyMagicResistToSpellDamage(
+        const rawDamage = applyMagicResistToSpellDamage(
             calculateSpellDamage(
                 spell.getMultiplierType(),
                 spell.getPower(),
@@ -1982,7 +2000,8 @@ class CandidateGenerator {
             ),
             target.getMagicResist(),
         );
-        return { value, kill: value >= target.getCumulativeHp() ? 1 : 0 };
+        const targetHp = target.getCumulativeHp();
+        return { value: Math.min(rawDamage, targetHp), kill: rawDamage >= targetHp ? 1 : 0 };
     }
     /**
      * Ring of Fire spares the enemy it is aimed at and burns every other living stack touching that enemy's
@@ -2005,14 +2024,13 @@ class CandidateGenerator {
         let kill: 0 | 1 = 0;
         for (const victim of caught) {
             const damage = this.offensiveSpellDamage(spell, victim);
-            const effectiveDamage = Math.min(damage.value, victim.getCumulativeHp());
             if (victim.getTeam() === this.enemyTeam) {
-                value += effectiveDamage;
+                value += damage.value;
                 if (damage.kill) {
                     kill = 1;
                 }
             } else {
-                value -= effectiveDamage;
+                value -= damage.value;
             }
         }
         return { value, kill };

@@ -16,6 +16,7 @@ import {
     type IAIStrategy,
     type IDecisionContext,
 } from "../ai";
+import { creatureIdForName } from "../ai/setup/creature_score";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
@@ -293,9 +294,12 @@ export interface IMatchConfig {
     greenRevealedCreatures?: readonly number[];
     /** Creature ids of GREEN stacks legitimately revealed to RED. Same contract, RED's placement context. */
     redRevealedCreatures?: readonly number[];
-    /** Deduplicated identities from RED's complete roster, public to GREEN during placement. No positions/setup. */
+    /**
+     * Optional override for identities public to GREEN during placement. Undefined derives a deduplicated list
+     * from RED's finalized roster; an explicit empty or partial list is passed through exactly.
+     */
     greenPublicOpponentCreatures?: readonly number[];
-    /** Deduplicated identities from GREEN's complete roster, public to RED during placement. No positions/setup. */
+    /** Same override for identities public to RED, derived from GREEN's finalized roster only when undefined. */
     redPublicOpponentCreatures?: readonly number[];
     /** Explicit per-side placement modes. When present they override the legacy V07_PLACEMENT_REVEAL env gate. */
     greenSetupPlacementPolicy?: PlacementPolicyVariant;
@@ -483,6 +487,15 @@ export function simulationGridSettings(): GridSettings {
 }
 
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+
+const publicCreatureIdsFromRoster = (roster: readonly IArmyUnitSpec[]): number[] => {
+    const ids = new Set<number>();
+    for (const spec of roster) {
+        const id = creatureIdForName(spec.creatureName);
+        if (id !== undefined) ids.add(id);
+    }
+    return [...ids];
+};
 
 const footprintCells = (unit: Unit, base: XY): XY[] =>
     unit.isSmallSize()
@@ -818,6 +831,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---
     const greenRoster = config.roster;
     const redRoster = config.redRoster ?? config.roster;
+    const greenPublicOpponentCreatureIds =
+        config.greenPublicOpponentCreatures === undefined
+            ? publicCreatureIdsFromRoster(redRoster)
+            : config.greenPublicOpponentCreatures;
+    const redPublicOpponentCreatureIds =
+        config.redPublicOpponentCreatures === undefined
+            ? publicCreatureIdsFromRoster(greenRoster)
+            : config.redPublicOpponentCreatures;
     const greenUnits = greenRoster.map((spec, index) =>
         createUnitFromSpec(
             spec,
@@ -873,7 +894,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             config.greenRevealedCreatures,
             config.greenSetupPlacementPolicy,
-            config.greenPublicOpponentCreatures,
+            greenPublicOpponentCreatureIds,
         ),
         red: placeArmy(
             redUnits,
@@ -887,7 +908,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             pathHelper,
             config.redRevealedCreatures,
             config.redSetupPlacementPolicy,
-            config.redPublicOpponentCreatures,
+            redPublicOpponentCreatureIds,
         ),
     };
 

@@ -10,6 +10,7 @@
  */
 
 import { MORALE_CHANGE_FOR_DISTANCE } from "../constants";
+import { travelledMovePath } from "../engine/post_move_actor_availability";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { NO_UPDATE, UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
@@ -306,13 +307,7 @@ export class MoveHandler {
         return "SAME";
     }
     private getTravelledRoute(route: XY[], unit: Unit): XY[] {
-        const currentCell = unit.getBaseCell();
-        const firstCell = route[0];
-        if (firstCell && firstCell.x === currentCell.x && firstCell.y === currentCell.y) {
-            return route.slice(1);
-        }
-
-        return route;
+        return travelledMovePath(unit.getBaseCell(), route);
     }
     public finishDirectedUnitMove(
         unit: Unit,

@@ -11,6 +11,10 @@
 
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import type { GameAction } from "../../engine/actions";
+import {
+    projectPostMoveActorAvailability,
+    repairUnavailableMovePrefixedAttack,
+} from "../../engine/post_move_actor_availability";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import type { Unit } from "../../units/unit";
@@ -31,6 +35,7 @@ import {
     teamRangedFirepower,
 } from "../ai";
 import type { IDecisionContext, IAIStrategy, IPlacementContext } from "../ai_strategy";
+import { decisionFireWalls } from "../decision_fight_state";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam, STRATEGY_V0_1 } from "./v0_1";
 import { StrategyV0_4 } from "./v0_4";
@@ -166,7 +171,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // Free attack-of-opportunity: if a melee unit's move ENDS adjacent to an attackable enemy, strike it
         // instead of just walking up (it's exposed to that enemy next turn regardless — hitting is strictly
         // better). Fixes the common "unit moved next to the enemy but didn't attack".
-        return this.takeAdjacentAttack(unit, context, guarded);
+        const adjacent = this.takeAdjacentAttack(unit, context, guarded);
+        return repairUnavailableMovePrefixedAttack(unit, decisionFireWalls(context), adjacent);
     }
     /**
      * Convert a PURE melee advance that stops next to a live, legally-attackable enemy into a move+strike on
@@ -1231,6 +1237,20 @@ export class StrategyV0_5 extends StrategyV0_4 {
             for (const routes of movePath.knownPaths.values()) {
                 const route = routes[0];
                 if (!route?.route.length || !footprintOk(route.cell)) {
+                    continue;
+                }
+                const move: Extract<GameAction, { type: "move_unit" }> = {
+                    type: "move_unit",
+                    unitId: unit.getId(),
+                    path: route.route.map((cell) => ({ ...cell })),
+                    targetCells: this.footprintForCell(unit, route.cell, context),
+                    hasLavaCell: route.hasLavaCell,
+                    hasWaterCell: route.hasWaterCell,
+                };
+                if (
+                    (route.cell.x !== base.x || route.cell.y !== base.y) &&
+                    !projectPostMoveActorAvailability(unit, decisionFireWalls(context), move).availableAfterMove
+                ) {
                     continue;
                 }
                 for (const e of enemies) {

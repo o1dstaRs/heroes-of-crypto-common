@@ -589,12 +589,13 @@ describe("v0.8 random-roster passive-turn panel", () => {
     });
 
     test("censors a waited unit skipped by a live effect instead of reporting a missed reactivation", () => {
-        // Lava game 2 waits Mermaid once; its scheduled reactivation is consumed by a live effect
-        // before Strategy/SearchDriver is called. The battle-event hook is the only observer of those turns.
+        // Lava game 2 waits Mermaid twice after the damage-spell policy lets Battle Mage preserve the back line:
+        // one wait reactivates normally and the other is consumed by a live effect before Strategy/SearchDriver
+        // is called. The battle-event hook is the only observer of the effect-consumed turn.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
         expect(record.endReason).toBe("elimination");
-        expect(record.byCreature.Mermaid.waitTurns).toBe(1);
-        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(0);
+        expect(record.byCreature.Mermaid.waitTurns).toBe(2);
+        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(1);
         expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(1);
         expect(record.byCreature.Mermaid.missedSameLapWaitReactivations).toBe(0);
         expect(record.metrics.missedSameLapWaitReactivations).toBe(0);
