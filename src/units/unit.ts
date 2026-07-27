@@ -612,6 +612,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .replace(/\{\}/g, Number(this.calculateAuraPower(wardingMane, 0).toFixed(2)).toString());
             }
         }
+        if (ability.getName() === "Arcane Ward Aura") {
+            // Squire's Arcane Ward projects the same stack-scaled + luck magic-defence number as Warding Mane,
+            // so the card must print what THIS stack actually grants rather than the flat config power.
+            const arcaneWard = ability.getAuraEffect();
+            if (arcaneWard) {
+                return ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(/\{\}/g, Number(this.calculateAuraPower(arcaneWard, 0).toFixed(2)).toString());
+            }
+        }
         // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to
         // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain
         // Lightning needs no branch here: its percentages already come from calculateAbilityMultiplier above,
@@ -1953,6 +1964,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
+        // Empower (Nightmare's scroll): a cast buff rather than an augment or an aura, but it feeds the same
+        // total — so the engine's cast, the AI's estimate and the sidebar card all pick it up for free, and
+        // it reads as a plain "+N%" stacked additively with the other sources.
+        const empowerSpell = this.getBuff("Empower");
+        if (empowerSpell) {
+            const power = empowerSpell.getPower();
+            if (Number.isFinite(power) && power > 0) {
+                total += power;
+            }
+        }
+
         // Sylvan Focus (Satyr): allies standing within 2 cells of it deal more magic damage.
         const sylvanFocus = this.getAppliedAuraEffect("Sylvan Focus Aura");
         if (sylvanFocus) {
@@ -2992,6 +3014,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const wardingManeAura = this.getAppliedAuraEffect("Warding Mane Aura");
             if (wardingManeAura) {
                 magicResists.push(Math.max(0, wardingManeAura.getPower()) / 100);
+            }
+
+            // AURA Arcane Ward (Squire): magic defence for every ally within 2 cells, folded in as one more
+            // INDEPENDENT resistance roll exactly like Warding Mane above (already stack-powered as a percentage).
+            const arcaneWardAura = this.getAppliedAuraEffect("Arcane Ward Aura");
+            if (arcaneWardAura) {
+                magicResists.push(Math.max(0, arcaneWardAura.getPower()) / 100);
             }
 
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);

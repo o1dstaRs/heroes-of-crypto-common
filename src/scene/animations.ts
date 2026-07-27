@@ -72,7 +72,10 @@ export interface IVisibleDamage {
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the
     // primary target. Empty/undefined for single-target attacks.
-    splash?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+    // `missed` entries carry no damage — the volley rolled a dodge against that unit. They are still
+    // reported so the renderer can pop MISS over it and ranked can log it (ranked rebuilds its scene log
+    // from events, never from the engine's own text).
+    splash?: { unitId: string; position: XY; amount: number; unitsDied: number; missed?: boolean }[];
     // Secondary damage applied during this exchange (Fire Shield reflect, Chain Lightning bounces,
     // Petrifying Gaze kills, Magic Mirror reflection) — each rendered as its own floating number and
     // scene-log line. Empty/undefined when no such ability triggered.

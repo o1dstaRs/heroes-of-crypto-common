@@ -71,6 +71,12 @@ export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
 
 export interface IPickTeamState {
     perk: Perk;
+    /**
+     * The one creature this team asked to have banned during the PERK phase. Optional — a team may skip it.
+     * Kept per team and NOT exposed through the opponent-facing views (see getVisibleCreatureChoices), so a
+     * proposal cannot leak draft intent before it resolves.
+     */
+    proposedBan?: number;
     bundles: [PickBundle, PickBundle];
     selectedBundleIndex?: 0 | 1;
     tier2Offers: [number, number, number];
@@ -103,11 +109,19 @@ export type PickTranscriptEntry =
           creatureId: number;
           revealedOpponentSlots: number[];
       })
+    | (IPickTranscriptBase & { type: "ban_proposed"; creatureId: number })
     | (IPickTranscriptBase & { type: "tier2_selected"; artifactId: number });
 
 export interface IPickSimState {
     phaseSequence: number;
     creaturesBanned: number[];
+    /**
+     * The creature the players' optional pre-game bans actually removed, decided when the PERK phase closes
+     * (see resolveProposedBans). Undefined when neither team proposed one, or when the roll is still pending.
+     * It is already inside `creaturesBanned`; this field records WHICH ban was the players' so the client can
+     * show the outcome and the server can persist it.
+     */
+    extraBan?: number;
     lower: IPickTeamState;
     upper: IPickTeamState;
     transcript: PickTranscriptEntry[];
@@ -115,6 +129,7 @@ export interface IPickSimState {
 
 export type PickAction =
     | { type: "select_perk"; team: PickTeam; perk: Perk }
+    | { type: "propose_ban"; team: PickTeam; creatureId: number }
     | { type: "select_bundle"; team: PickTeam; bundleIndex: number }
     | { type: "pick_creature"; team: PickTeam; creatureId: number }
     | { type: "select_tier2"; team: PickTeam; artifactId: number };
@@ -125,6 +140,8 @@ export type PickRejectionReason =
     | "not_actor"
     | "invalid_perk"
     | "perk_already_selected"
+    | "ban_already_proposed"
+    | "creature_not_bannable"
     | "invalid_bundle"
     | "bundle_already_selected"
     | "unknown_creature"
@@ -278,8 +295,11 @@ const bundlePhaseComplete = (state: IPickSimState): boolean =>
 const tier2PhaseComplete = (state: IPickSimState): boolean =>
     state.lower.tier2Artifact !== undefined && state.upper.tier2Artifact !== undefined;
 
-const advanceIfReady = (state: IPickSimState): void => {
+const advanceIfReady = (state: IPickSimState, rng: PickRandomInt): void => {
     if (state.phaseSequence === 0 && perkPhaseComplete(state)) {
+        // The optional pre-game bans settle exactly here, as the perk step closes: late enough that both
+        // proposals are in, early enough that the result shapes the whole draft that follows.
+        resolveProposedBans(state, rng);
         state.phaseSequence += 1;
     } else if (state.phaseSequence === 1 && bundlePhaseComplete(state)) {
         state.phaseSequence += 1;
@@ -306,6 +326,98 @@ const rejected = (state: IPickSimState, reason: PickRejectionReason): PickTransi
     state,
     reason,
 });
+
+/**
+ * Creatures a team may propose for the optional pre-game ban: everything in the draft catalog that is not
+ * already auto-banned and not sitting in EITHER team's starting bundle offer.
+ *
+ * Bundle creatures are excluded because those offers are generated before the perk phase and are already on
+ * screen — banning one would either be a wasted ban or force an offer to be re-rolled underneath a player who
+ * has already read it. Same list for both teams, so it gives nothing away.
+ */
+export function getBannableCreatures(state: IPickSimState): number[] {
+    const offered = new Set(
+        [...state.lower.bundles, ...state.upper.bundles].flatMap(([level1Id, level2Id]) => [level1Id, level2Id]),
+    );
+    const banned = new Set(state.creaturesBanned);
+    const bannable: number[] = [];
+    for (let level = 1; level <= 4; level += 1) {
+        for (const creatureId of CreatureLevelList[level]) {
+            if (!offered.has(creatureId) && !banned.has(creatureId)) {
+                bannable.push(creatureId);
+            }
+        }
+    }
+
+    return bannable;
+}
+
+/**
+ * Close out the players' optional bans when the PERK phase ends.
+ *
+ * - nobody proposed one            -> nothing is banned
+ * - both proposed the SAME unit    -> it is banned outright, no roll (they agree)
+ * - two different proposals        -> exactly one of the two, chosen 50/50
+ * - only one team proposed         -> that one is banned (there is no competing ban to roll against)
+ *
+ * The ban REPLACES an auto-ban of the same level rather than adding to the pile, so each level still loses
+ * exactly LIVE_AUTO_BANS_BY_LEVEL[level - 1] creatures — the players only get to steer one of them. If that
+ * level happens to have no auto-ban left to release, the ban still lands and the level is simply one short.
+ */
+const resolveProposedBans = (state: IPickSimState, rng: PickRandomInt): void => {
+    const lowerBan = state.lower.proposedBan;
+    const upperBan = state.upper.proposedBan;
+    let chosen: number | undefined;
+    if (lowerBan !== undefined && upperBan !== undefined) {
+        chosen = lowerBan === upperBan ? lowerBan : [lowerBan, upperBan][draw(rng, 2)];
+    } else {
+        chosen = lowerBan ?? upperBan;
+    }
+    if (chosen === undefined || state.creaturesBanned.includes(chosen)) {
+        return;
+    }
+
+    const level = CreatureLevelMap[chosen];
+    // Release one auto-ban of the same level so the level's total stays put. Released from the END of that
+    // level's block, which is the most recently drawn one — the earlier draws are the ones other state may
+    // already have been derived from.
+    if (level !== undefined) {
+        for (let index = state.creaturesBanned.length - 1; index >= 0; index -= 1) {
+            if (CreatureLevelMap[state.creaturesBanned[index]] === level) {
+                state.creaturesBanned.splice(index, 1);
+                break;
+            }
+        }
+    }
+    state.creaturesBanned.push(chosen);
+    state.extraBan = chosen;
+};
+
+const applyProposedBan = (
+    state: IPickSimState,
+    action: Extract<PickAction, { type: "propose_ban" }>,
+): PickTransition => {
+    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.PERK)) {
+        return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
+    }
+    const own = teamState(state, action.team);
+    if (own.proposedBan !== undefined) {
+        return rejected(state, "ban_already_proposed");
+    }
+    if (!getBannableCreatures(state).includes(action.creatureId)) {
+        return rejected(state, "creature_not_bannable");
+    }
+
+    const next = cloneState(state);
+    teamState(next, action.team).proposedBan = action.creatureId;
+    const event: Extract<PickTranscriptEntry, { type: "ban_proposed" }> = {
+        ...eventBase(next, action.team),
+        type: "ban_proposed",
+        creatureId: action.creatureId,
+    };
+    // Deliberately does NOT advance the phase: the ban is optional, so the perk choice alone gates the step.
+    return accepted(next, event);
+};
 
 const applyPerk = (
     state: IPickSimState,
@@ -345,11 +457,15 @@ const applyPerk = (
         perk: action.perk,
         revealedOpponentSlots: [...nextOwn.revealedOpponentSlots],
     };
-    advanceIfReady(next);
+    advanceIfReady(next, rng);
     return accepted(next, event);
 };
 
-const applyBundle = (state: IPickSimState, action: Extract<PickAction, { type: "select_bundle" }>): PickTransition => {
+const applyBundle = (
+    state: IPickSimState,
+    action: Extract<PickAction, { type: "select_bundle" }>,
+    rng: PickRandomInt,
+): PickTransition => {
     if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.INITIAL_PICK)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
@@ -377,7 +493,7 @@ const applyBundle = (state: IPickSimState, action: Extract<PickAction, { type: "
         creatures: [level1Creature, level2Creature],
         tier1Artifact,
     };
-    advanceIfReady(next);
+    advanceIfReady(next, rng);
     return accepted(next, event);
 };
 
@@ -461,7 +577,11 @@ const applyCreature = (
     return accepted(next, event);
 };
 
-const applyTier2 = (state: IPickSimState, action: Extract<PickAction, { type: "select_tier2" }>): PickTransition => {
+const applyTier2 = (
+    state: IPickSimState,
+    action: Extract<PickAction, { type: "select_tier2" }>,
+    rng: PickRandomInt,
+): PickTransition => {
     if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.ARTIFACT_2)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
@@ -483,7 +603,7 @@ const applyTier2 = (state: IPickSimState, action: Extract<PickAction, { type: "s
         type: "tier2_selected",
         artifactId: action.artifactId,
     };
-    advanceIfReady(next);
+    advanceIfReady(next, rng);
     return accepted(next, event);
 };
 
@@ -495,12 +615,14 @@ export function transitionPickSim(state: IPickSimState, action: PickAction, rng:
     switch (action.type) {
         case "select_perk":
             return applyPerk(state, action, rng);
+        case "propose_ban":
+            return applyProposedBan(state, action);
         case "select_bundle":
-            return applyBundle(state, action);
+            return applyBundle(state, action, rng);
         case "pick_creature":
             return applyCreature(state, action);
         case "select_tier2":
-            return applyTier2(state, action);
+            return applyTier2(state, action, rng);
     }
 }
 

@@ -37,7 +37,11 @@ export interface IAOERangeAttackResult {
     unitIdsDied: string[];
     // Per-affected-unit damage so the client can draw a floating number on every splashed unit at its
     // own position (not just the primary target). Position is captured at impact time.
-    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[];
+    // `missed` marks a unit the volley rolled a MISS against (Dodge / Small Specie / Boar Saliva). It gets
+    // an entry with no damage rather than no entry at all: the engine's own log line about the miss never
+    // reaches ranked, which rebuilds its scene log from events, and the client needs something to pop the
+    // MISS over. Every other entry is a unit that was actually hit.
+    perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number; missed?: boolean }[];
 }
 
 export function processRangeAOEAbility(
@@ -53,7 +57,7 @@ export function processRangeAOEAbility(
     secondaryDamage?: ISecondaryDamage[],
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
-    const perUnitDamage: { unitId: string; position: HoCMath.XY; amount: number; unitsDied: number }[] = [];
+    const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
     // The AOE abilities that route their splash through this tail. Being listed here is what earns an
     // ability the whole AOE package: ARTIFACT Giant's Maul's +% at impact, the victim's status resistance
     // hardening against physical AOE, Flesh Shield owners resolving first, and the per-unit damage
@@ -102,6 +106,15 @@ export function processRangeAOEAbility(
                 sceneLog.updateLog(
                     `${attackerUnit.getName()} misses 🏹 ${isAttack ? "on" : "resp on"} ${unit.getName()}`,
                 );
+                // Report the dodge so it survives to the client: ranked builds its log from events, not from
+                // the line above, and the renderer needs a position to pop MISS over.
+                perUnitDamage.push({
+                    unitId: unit.getId(),
+                    position: { ...unit.getPosition() },
+                    amount: 0,
+                    unitsDied: 0,
+                    missed: true,
+                });
             } else {
                 let abilityMultiplier = attackerUnit.calculateAbilityMultiplier(
                     aoeAbility,

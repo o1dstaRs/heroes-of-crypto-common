@@ -1961,7 +1961,12 @@ class CandidateGenerator {
      */
     private stackPoweredSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
         const value = applyMagicResistToSpellDamage(
-            calculateStackPoweredSpellDamage(spell.getPower(), this.unit.getAmountAlive(), this.unit.getStackPower()),
+            calculateStackPoweredSpellDamage(
+                spell.getPower(),
+                this.unit.getAmountAlive(),
+                this.unit.getStackPower(),
+                this.unit.getEmpowerPercentage(),
+            ),
             target.getMagicResist(),
         );
         return { value, kill: value >= target.getCumulativeHp() ? 1 : 0 };
@@ -1998,6 +2003,7 @@ class CandidateGenerator {
             spell.getPower(),
             this.unit.getAmountAlive(),
             this.unit.getStackPower(),
+            this.unit.getEmpowerPercentage(),
         );
         if (rawDamage <= 0) {
             return;

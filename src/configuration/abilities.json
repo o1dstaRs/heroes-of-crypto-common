@@ -816,7 +816,7 @@
     "Book of Nightmares": {
         "name": "Book of Nightmares",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells:", "Fire Wall"],
+        "desc": ["Allows the caster to access the following spells:", "Fire Wall, Empower"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
@@ -1360,6 +1360,18 @@
         "stack_powered": true,
         "effect": null,
         "aura_effect": "Warding Mane",
+        "can_be_cast": false
+    },
+    "Arcane Ward Aura": {
+        "name": "Arcane Ward Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within 2 cells gain {}% magic defence"],
+        "power": 10,
+        "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": null,
+        "aura_effect": "Arcane Ward",
         "can_be_cast": false
     },
     "Terrifying Gaze": {

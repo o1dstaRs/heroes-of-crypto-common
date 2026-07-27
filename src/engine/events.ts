@@ -125,7 +125,9 @@ export type GameEvent =
            * because a killed stack is removed before the visuals play. Fire Strike has one entry; Meteorite
            * has one per enemy caught under its 2x2 (and none when it lands on empty ground).
            */
-          damaged?: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+          // `rebounded` marks the CASTER taking its own spell back off a Magic Mirror, so the log can name
+          // the rebound instead of showing an unexplained hit on the caster.
+          damaged?: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[];
           /**
            * What a RESURRECT cast actually brought back, read exactly like `healed` and `damaged` above:
            * ranked rebuilds both its scene log and its VFX from events, never from the engine's own text, so

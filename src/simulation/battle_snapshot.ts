@@ -163,6 +163,7 @@ const FIGHT_FIELDS = [
     "augmentPlacementPerTeam",
     "augmentArmorPerTeam",
     "augmentMightPerTeam",
+    "augmentEmpowerPerTeam",
     "augmentSniperPerTeam",
     "augmentMovementPerTeam",
     "artifactTier1PerTeam",

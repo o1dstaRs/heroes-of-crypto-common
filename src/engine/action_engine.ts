@@ -40,10 +40,15 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../spells/spell_damage";
+import {
+    applyMagicResistToSpellDamage,
+    calculateStackPoweredSpellDamage,
+    getEmpowerPercentage,
+} from "../spells/spell_damage";
 import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
+    fireWallBurnPercentage,
     fireWallCells,
     isFireWallableCell,
     normalizeFireWallOrientation,
@@ -487,7 +492,7 @@ export class GameActionEngine {
         const amountAliveBefore = unit.getAmountAlive();
         let total = 0;
         for (let i = 0; i < burning.length; i++) {
-            const damage = fireWallBurnDamage(unit.getCumulativeMaxHp());
+            const damage = fireWallBurnDamage(unit.getCumulativeMaxHp(), fireWalls.burnPercentageAt(burning[i]));
             if (damage <= 0) {
                 break;
             }
@@ -1150,7 +1155,11 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const laps = spell.getLapsTotal();
-        this.context.fightProperties.getFireWalls().addAll(cells, laps);
+        // The caster team's Empower is baked into the wall now, at cast time: the flames go on burning
+        // whoever crosses them long after the Nightmare that raised them may have died.
+        this.context.fightProperties
+            .getFireWalls()
+            .addAll(cells, laps, fireWallBurnPercentage(getEmpowerPercentage(caster)));
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(`${caster.getName()} raised a Fire Wall for ${getLapString(laps)}`);
 
@@ -1260,19 +1269,19 @@ export class GameActionEngine {
      */
     private applySpellDamageToUnits(
         caster: Unit,
-        victims: Array<{ unit: Unit; damage: number }>,
+        victims: Array<{ unit: Unit; damage: number; rebounded?: boolean }>,
     ): {
-        damaged: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+        damaged: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[];
         unitIdsDied: string[];
         killed: Array<{ victim: Unit; killer: Unit }>;
     } {
-        const damaged: { unitId: string; position: XY; amount: number; unitsDied: number }[] = [];
+        const damaged: { unitId: string; position: XY; amount: number; unitsDied: number; rebounded?: boolean }[] = [];
         const unitIdsDied: string[] = [];
         const killed: Array<{ victim: Unit; killer: Unit }> = [];
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let casterPlusMorale = 0;
 
-        for (const { unit, damage } of victims) {
+        for (const { unit, damage, rebounded } of victims) {
             // ABILITY Flesh Shield Aura (Abomination): a protected ally hands part of the hit to the
             // Abomination standing beside it. Cast spell damage went straight to applyDamage and skipped
             // this entirely, so the aura absorbed Fire Breath and Chain Lightning (whose ability modules
@@ -1320,7 +1329,13 @@ export class GameActionEngine {
             );
             const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
 
-            damaged.push({ unitId: unit.getId(), position: positionAtImpact, amount: damageDealt, unitsDied });
+            damaged.push({
+                unitId: unit.getId(),
+                position: positionAtImpact,
+                amount: damageDealt,
+                unitsDied,
+                ...(rebounded ? { rebounded: true } : {}),
+            });
             this.context.attackHandler?.getDamageStatisticHolder().add({
                 unitName: caster.getName(),
                 damage: damageDealt,
@@ -1395,7 +1410,12 @@ export class GameActionEngine {
         }
 
         const damage = applyMagicResistToSpellDamage(
-            calculateStackPoweredSpellDamage(spell.getPower(), caster.getAmountAlive(), caster.getStackPower()),
+            calculateStackPoweredSpellDamage(
+                spell.getPower(),
+                caster.getAmountAlive(),
+                caster.getStackPower(),
+                getEmpowerPercentage(caster),
+            ),
             target.getMagicResist(),
         );
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, [{ unit: target, damage }]);
@@ -1460,6 +1480,7 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
+            getEmpowerPercentage(caster),
         );
         const victims = enemies.map((unit) => ({
             unit,
@@ -1505,18 +1526,21 @@ export class GameActionEngine {
         spell: Spell,
         rawDamage: number,
         targets: Unit[],
-    ): Array<{ unit: Unit; damage: number }> {
-        const victims: Array<{ unit: Unit; damage: number }> = [];
+    ): Array<{ unit: Unit; damage: number; rebounded?: boolean }> {
+        const victims: Array<{ unit: Unit; damage: number; rebounded?: boolean }> = [];
         for (const unit of targets) {
             victims.push({ unit, damage: applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist()) });
             if (unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)) {
+                // The caster's own magic resistance cuts the rebound down, so this is what it actually takes —
+                // say so. The line used to name the rebound without a number, which left the player guessing
+                // what a Magic Mirror had just cost them.
+                const reboundDamage = applyMagicResistToSpellDamage(rawDamage, caster.getMagicResist());
                 this.context.sceneLog.updateLog(
-                    `${unit.getName()} rebounded ${spell.getName()} back at ${caster.getName()}`,
+                    `${unit.getName()} rebounded ${spell.getName()} back at ${caster.getName()} (${reboundDamage})`,
                 );
-                victims.push({
-                    unit: caster,
-                    damage: applyMagicResistToSpellDamage(rawDamage, caster.getMagicResist()),
-                });
+                // Flagged so ranked can say the same thing: it rebuilds its scene log from events and never
+                // reads the line above, so without this the caster's damage appeared with no explanation.
+                victims.push({ unit: caster, damage: reboundDamage, rebounded: true });
             }
         }
 
@@ -1561,6 +1585,7 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
+            getEmpowerPercentage(caster),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
@@ -1641,6 +1666,7 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
+            getEmpowerPercentage(caster),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
@@ -1714,6 +1740,7 @@ export class GameActionEngine {
             spell.getPower(),
             caster.getAmountAlive(),
             caster.getStackPower(),
+            getEmpowerPercentage(caster),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);

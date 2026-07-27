@@ -126,6 +126,61 @@ export const getMightPower = (augment: MightAugment): number => {
     }
 };
 
+/**
+ * Empower is Might's arcane twin: where Might sharpens the sword arm, Empower turns up every source of MAGIC
+ * damage the team can bring — the Battle Mage's and Magic Dragon's offensive spells, the Nightmare's Fire
+ * Wall, a Fireforged Sword's burning edge, and the Chain Lightning / Fire Breath / Fire Shield abilities.
+ *
+ * It deliberately does NOT touch healing, buffs or control spells (Heal, Whirlpool, Magic Mirror): those are
+ * balanced against their own clocks, and a "more damage" upgrade that also doubled as a heal booster would be
+ * the strictly-best pick at every budget.
+ */
+export enum EmpowerAugment {
+    NO_AUGMENT = 0,
+    LEVEL_1 = 1,
+    LEVEL_2 = 2,
+    LEVEL_3 = 3,
+}
+
+export const ToEmpowerAugment: { [empowerAugmentValue: string]: EmpowerAugment } = {
+    "": EmpowerAugment.NO_AUGMENT,
+    "0": EmpowerAugment.NO_AUGMENT,
+    "1": EmpowerAugment.LEVEL_1,
+    "2": EmpowerAugment.LEVEL_2,
+    "3": EmpowerAugment.LEVEL_3,
+};
+
+/** Percentage added to every magic damage number the team deals. Mirrors Might's 8/17/27 shape, a step below. */
+export const getEmpowerPower = (augment: EmpowerAugment): number => {
+    switch (augment) {
+        case EmpowerAugment.NO_AUGMENT:
+            return 0;
+        case EmpowerAugment.LEVEL_1:
+            return 7;
+        case EmpowerAugment.LEVEL_2:
+            return 15;
+        case EmpowerAugment.LEVEL_3:
+            return 24;
+        default:
+            throw new Error("Invalid empower augment");
+    }
+};
+
+/**
+ * The single conversion from an Empower percentage to the factor every magic damage figure is multiplied by.
+ *
+ * Everything that shows or deals Empower-boosted damage goes through here — the engine's spell casts, the
+ * ability multipliers, the AI's damage estimates and the spellbook card — so a card promising 163 can never
+ * be answered by a cast landing 152. A missing/!finite percentage degrades to 1 (no boost) rather than NaN,
+ * because this is called with values read straight off buffs that may not be applied yet.
+ */
+export const empowerMultiplier = (empowerPercentage: number): number => {
+    if (!Number.isFinite(empowerPercentage) || empowerPercentage <= 0) {
+        return 1;
+    }
+    return 1 + empowerPercentage / 100;
+};
+
 export enum SniperAugment {
     NO_AUGMENT = 0,
     LEVEL_1 = 1,
@@ -210,5 +265,6 @@ export type AugmentType =
     | { type: "Placement"; value: PlacementAugment }
     | { type: "Armor"; value: ArmorAugment }
     | { type: "Might"; value: MightAugment }
+    | { type: "Empower"; value: EmpowerAugment }
     | { type: "Sniper"; value: SniperAugment }
     | { type: "Movement"; value: MovementAugment };

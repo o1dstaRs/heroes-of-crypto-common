@@ -93,14 +93,22 @@ interface IFireWallCellJSON {
     x: number;
     y: number;
     l: number;
+    // Burn percentage this cell was lit with (Empower-boosted). Optional: a snapshot written before Empower
+    // existed replays at the base percentage.
+    p?: number;
 }
 
 // One burning cell with a remaining-laps counter. Mirrors Vine/SmokeCloud/AppliedSpell.minusLap() semantics:
 // decrements per lap, never below 0. When lapsRemaining reaches 0 the FireWalls store deletes the entry.
+//
+// The cell also remembers HOW HOT it was lit: the caster's Empower Augment is baked in at cast time rather
+// than looked up when somebody walks through, because by then the wall is just fire on the board — the
+// Nightmare that raised it may be dead, and it burns friend and foe alike.
 export class FireWall {
     public constructor(
         public readonly cell: XY,
         private lapsRemaining: number,
+        public readonly burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
     ) {}
     public getLapsRemaining(): number {
         return this.lapsRemaining;
@@ -136,13 +144,25 @@ export class FireWalls {
     }
     // Light a single cell with the given lap budget. Re-casting over a still-burning cell refreshes its
     // lifetime rather than stacking the burn — two walls on one cell would read as one on screen.
-    public add(cell: XY, laps: number = FIRE_WALL_DEFAULT_LAPS): void {
-        this.walls.set(FireWalls.key(cell), new FireWall({ x: cell.x, y: cell.y }, laps));
+    public add(
+        cell: XY,
+        laps: number = FIRE_WALL_DEFAULT_LAPS,
+        burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
+    ): void {
+        this.walls.set(FireWalls.key(cell), new FireWall({ x: cell.x, y: cell.y }, laps, burnPercentage));
     }
-    public addAll(cells: XY[], laps: number = FIRE_WALL_DEFAULT_LAPS): void {
+    public addAll(
+        cells: XY[],
+        laps: number = FIRE_WALL_DEFAULT_LAPS,
+        burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
+    ): void {
         for (const cell of cells) {
-            this.add(cell, laps);
+            this.add(cell, laps, burnPercentage);
         }
+    }
+    /** Burn share of the wall on this cell, or 0 when the cell is not alight. */
+    public burnPercentageAt(cell: XY): number {
+        return this.walls.get(FireWalls.key(cell))?.burnPercentage ?? 0;
     }
     public remove(cell: XY): boolean {
         return this.walls.delete(FireWalls.key(cell));
@@ -176,7 +196,12 @@ export class FireWalls {
     public toJSON(): IFireWallCellJSON[] {
         const out: IFireWallCellJSON[] = [];
         for (const wall of this.walls.values()) {
-            out.push({ x: wall.cell.x, y: wall.cell.y, l: wall.getLapsRemaining() });
+            out.push({
+                x: wall.cell.x,
+                y: wall.cell.y,
+                l: wall.getLapsRemaining(),
+                p: wall.burnPercentage,
+            });
         }
         return out;
     }
@@ -185,7 +210,11 @@ export class FireWalls {
         if (Array.isArray(data)) {
             for (const c of data) {
                 if (c && typeof c.x === "number" && typeof c.y === "number" && typeof c.l === "number") {
-                    store.add({ x: c.x, y: c.y }, c.l);
+                    store.add(
+                        { x: c.x, y: c.y },
+                        c.l,
+                        typeof c.p === "number" && c.p > 0 ? c.p : FIRE_WALL_BURN_PERCENTAGE,
+                    );
                 }
             }
         }
@@ -220,10 +249,34 @@ export function isFireWallableCell(grid: IFireWallGrid, withinGrid: boolean, cel
     return occupant === "L" || occupant === "W";
 }
 
-/** Damage one crossing does to a stack, given its cumulative maximum health. */
-export function fireWallBurnDamage(cumulativeMaxHp: number): number {
+/**
+ * The share of maximum health a wall lit by this team burns off per crossing: the base 25%, raised by the
+ * caster team's Empower Augment. The spellbook card prints this exact figure and fireWallCast stores it on
+ * every cell it lights, so what the card promises is what the flames take.
+ *
+ * Rounded to one decimal because 25 x 1.07 = 26.75 and a card reading "26.8%" is honest where "26.75%" is
+ * noise — the engine uses the same rounded number, so the two cannot drift.
+ */
+export function fireWallBurnPercentage(empowerPercentage = 0): number {
+    if (!Number.isFinite(empowerPercentage) || empowerPercentage <= 0) {
+        return FIRE_WALL_BURN_PERCENTAGE;
+    }
+    // Scale by (100 + pct)/100 rather than (1 + pct/100): the latter makes 25 x 1.15 come out as
+    // 28.749999999999996, which then rounds DOWN to 28.7 and the card under-promises by a tenth.
+    return Math.round(((FIRE_WALL_BURN_PERCENTAGE * (100 + empowerPercentage)) / 100) * 10) / 10;
+}
+
+/**
+ * Damage one crossing does to a stack, given its cumulative maximum health and the burn share of the cell it
+ * walked into (FIRE_WALL_BURN_PERCENTAGE, raised by the caster team's Empower Augment at cast time).
+ */
+export function fireWallBurnDamage(
+    cumulativeMaxHp: number,
+    burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
+): number {
     if (!Number.isFinite(cumulativeMaxHp) || cumulativeMaxHp <= 0) {
         return 0;
     }
-    return Math.max(1, Math.floor((cumulativeMaxHp * FIRE_WALL_BURN_PERCENTAGE) / 100));
+    const share = Number.isFinite(burnPercentage) && burnPercentage > 0 ? burnPercentage : FIRE_WALL_BURN_PERCENTAGE;
+    return Math.max(1, Math.floor((cumulativeMaxHp * share) / 100));
 }

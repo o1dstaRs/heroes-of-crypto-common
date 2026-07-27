@@ -180,7 +180,10 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned after the L2/L3 catalogs grew (Wyvern..Nightmare) and poison began stacking; both shift the
         // same seeded draw and its combat trace.
         expect(digest("v0.7")).toBe("57e1d04de4e9119764375d2451b1d630220c7461ed71d36d19b5803269b1f9b8");
-        expect(digest("v0.8")).toBe("b6ab3f241ed4bed6b363f67e16016da7653754285721465d836acea1b48d1d33");
+        // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
+        // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
+        // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
+        expect(digest("v0.8")).toBe("7c521763c73b87d8fec908729baa96fcff436aef140416f2ab4f99992323a40f");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

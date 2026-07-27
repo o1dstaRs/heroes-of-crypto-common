@@ -109,6 +109,7 @@ export namespace PBTypes {
             augment_movement?: number;
             synergies?: string[];
             complete?: boolean;
+            augment_empower?: number;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9], this.#one_of_decls);
@@ -142,6 +143,9 @@ export namespace PBTypes {
                 }
                 if ("complete" in data && data.complete != undefined) {
                     this.complete = data.complete;
+                }
+                if ("augment_empower" in data && data.augment_empower != undefined) {
+                    this.augment_empower = data.augment_empower;
                 }
             }
         }
@@ -205,6 +209,12 @@ export namespace PBTypes {
         set complete(value: boolean) {
             pb_1.Message.setField(this, 10, value);
         }
+        get augment_empower() {
+            return pb_1.Message.getFieldWithDefault(this, 11, 0) as number;
+        }
+        set augment_empower(value: number) {
+            pb_1.Message.setField(this, 11, value);
+        }
         static fromObject(data: {
             artifact_tier_1?: number;
             artifact_tier_2?: number;
@@ -216,6 +226,7 @@ export namespace PBTypes {
             augment_movement?: number;
             synergies?: string[];
             complete?: boolean;
+            augment_empower?: number;
         }): PortalMatchSetup {
             const message = new PortalMatchSetup({});
             if (data.artifact_tier_1 != null) {
@@ -248,6 +259,9 @@ export namespace PBTypes {
             if (data.complete != null) {
                 message.complete = data.complete;
             }
+            if (data.augment_empower != null) {
+                message.augment_empower = data.augment_empower;
+            }
             return message;
         }
         toObject() {
@@ -262,6 +276,7 @@ export namespace PBTypes {
                 augment_movement?: number;
                 synergies?: string[];
                 complete?: boolean;
+                augment_empower?: number;
             } = {};
             if (this.artifact_tier_1 != null) {
                 data.artifact_tier_1 = this.artifact_tier_1;
@@ -293,6 +308,9 @@ export namespace PBTypes {
             if (this.complete != null) {
                 data.complete = this.complete;
             }
+            if (this.augment_empower != null) {
+                data.augment_empower = this.augment_empower;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -319,6 +337,8 @@ export namespace PBTypes {
                 writer.writeRepeatedString(9, this.synergies);
             if (this.complete != false)
                 writer.writeBool(10, this.complete);
+            if (this.augment_empower != 0)
+                writer.writeInt32(11, this.augment_empower);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -357,6 +377,9 @@ export namespace PBTypes {
                         break;
                     case 10:
                         message.complete = reader.readBool();
+                        break;
+                    case 11:
+                        message.augment_empower = reader.readInt32();
                         break;
                     default: reader.skipField();
                 }

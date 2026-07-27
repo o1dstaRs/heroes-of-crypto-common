@@ -209,6 +209,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Empower Augment": {
+            "name": "Empower Augment",
+            "level": 0,
+            "desc": [
+                "Level []. Augment increases all magic damage dealt by the entire team by {}%.",
+                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Sniper Augment": {
             "name": "Sniper Augment",
             "level": 0,
@@ -1021,11 +1042,11 @@
             "desc": [
                 "Calls a bolt down on any enemy on the battlefield, dealing {} damage.",
                 "It falls out of the sky, so no wall, body or mountain can block it.",
-                "Damage = creatures alive x stack power x 45.",
+                "Damage = creatures alive x stack power x 30.",
                 "Magical: it ignores armor, but magic resistance cuts it down."
             ],
             "target": "ANY_ENEMY",
-            "power": 45,
+            "power": 30,
             "power_type": "COMMON",
             "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
             "laps": 1,
@@ -1043,17 +1064,17 @@
             "desc": [
                 "Bursts into flame around an enemy in line of sight, dealing {} damage.",
                 "Every unit on a cell touching the target — friend or foe — burns for the same amount.",
-                "Same formula as Lightning Strike less 20%."
+                "Damage = creatures alive x stack power x 25."
             ],
             "target": "ANY_ENEMY",
-            "power": 36,
+            "power": 25,
             "power_type": "COMMON",
             "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
             "self_debuff_applies": false,
-            "minimal_caster_stack_power": 4,
+            "minimal_caster_stack_power": 3,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
@@ -1064,10 +1085,10 @@
             "desc": [
                 "Rains meteors down on any 3x3 block of the battlefield.",
                 "Every enemy caught under it takes {} damage.",
-                "Same formula as Ring of Fire less 10%, because it strikes them all at once."
+                "Damage = creatures alive x stack power x 20, because it strikes them all at once."
             ],
             "target": "FREE_CELL",
-            "power": 32.4,
+            "power": 20,
             "power_type": "COMMON",
             "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
             "laps": 1,
@@ -1095,6 +1116,23 @@
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 1,
             "conflicts_with": ["Mass Riot"],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Empower": {
+            "name": "Empower",
+            "level": 1,
+            "desc": ["Adds {}% to all magic damage the target deals.", "Lasts 3 laps."],
+            "target": "ANY_ALLY",
+            "power": 25,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 3,
+            "is_buff": true,
+            "self_cast_allowed": true,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
         },
@@ -1223,7 +1261,7 @@
                 "Lays a burning wall across 3 cells in a straight line, in any of the four orientations.",
                 "Hold Shift while aiming to rotate it.",
                 "Entering a burning cell costs any creature 1 extra step (double the usual cost)",
-                "and sears it for 25% of its maximum health, friend or foe alike.",
+                "and sears it for {}% of its maximum health, friend or foe alike.",
                 "Lasts 3 laps."
             ],
             "target": "FREE_CELL",

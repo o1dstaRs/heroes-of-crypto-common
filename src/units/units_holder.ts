@@ -10,7 +10,13 @@
  */
 
 import { EffectHelper, type IPlacement, Spell } from "..";
-import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
+import {
+    getArmorPower,
+    getEmpowerPower,
+    getMightPower,
+    getMovementPower,
+    getSniperPower,
+} from "../augments/augment_properties";
 import {
     ARTIFACT_POWER as AP,
     BROKEN_AEGIS_BREAK_CHANCE,
@@ -309,6 +315,30 @@ export class UnitsHolder {
                 augmentMightBuff.setDesc(infoArr);
                 augmentMightBuff.setPower(augmentMightPower);
                 unit.applyBuff(augmentMightBuff);
+            }
+
+            // Empower rides on every unit of the team even though only casters and the fire/lightning
+            // abilities read it: the buff is how the percentage reaches the damage sites (and the sidebar),
+            // and which unit ends up carrying a Fireforged Sword or a stolen ability is not knowable here.
+            const augmentEmpower = fightProperties.getAugmentEmpower(unit.getTeam());
+            const augmentEmpowerPower = getEmpowerPower(augmentEmpower);
+            unit.deleteBuff("Empower Augment");
+            if (augmentEmpower && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
+                const augmentEmpowerBuff = new Spell({
+                    spellProperties: getSpellConfig("System", "Empower Augment", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const infoArr: string[] = [];
+                for (const descStr of augmentEmpowerBuff.getDesc()) {
+                    infoArr.push(
+                        descStr
+                            .replace(/\{\}/g, augmentEmpowerPower.toString())
+                            .replace(/\[\]/g, augmentEmpower.toString()),
+                    );
+                }
+                augmentEmpowerBuff.setDesc(infoArr);
+                augmentEmpowerBuff.setPower(augmentEmpowerPower);
+                unit.applyBuff(augmentEmpowerBuff);
             }
 
             const augmentSniper = fightProperties.getAugmentSniper(unit.getTeam());
@@ -646,7 +676,12 @@ export class UnitsHolder {
 
         if (considerResurrection) {
             if (unitToDelete) {
-                const newAmountAlive = Math.floor((unitToDelete.getAmountDied() ?? 0) / 2);
+                // Half the fallen come back, but a stack that still has its Resurrection charge always brings
+                // back at LEAST one: floor(1 / 2) is 0, so a lone Angel — the common case once you split a
+                // pair — used to fall through to deletion and never raise itself at all. Never more than
+                // actually died.
+                const died = unitToDelete.getAmountDied() ?? 0;
+                const newAmountAlive = Math.min(died, Math.max(1, Math.floor(died / 2)));
                 if (newAmountAlive > 0) {
                     unitToDelete.increaseAmountAlive(newAmountAlive);
                     unitToDelete.decreaseAmountDied(newAmountAlive);

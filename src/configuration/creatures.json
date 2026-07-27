@@ -53,7 +53,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Stun"]
+            "abilities": ["Stun", "Arcane Ward Aura"]
         },
         "Peasant": {
             "name": "Peasant",
@@ -987,7 +987,7 @@
             "exp": 102,
             "size": 1,
             "level": 3,
-            "spells": ["Chaos:Fire Wall"],
+            "spells": ["Chaos:Fire Wall", "Chaos:Empower"],
             "abilities": ["Book of Nightmares"]
         }
     },

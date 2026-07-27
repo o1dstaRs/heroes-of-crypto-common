@@ -48,7 +48,7 @@ export interface IRangeAttackEvaluation {
  * 50% stronger than the Angel stack's own health, so a single Angel is worth casting with. Applied before
  * Holy Cross, which scales the already-boosted budget like it does healing.
  */
-const RESURRECTION_POWER_FACTOR = 1.5;
+export const RESURRECTION_POWER_FACTOR = 1.5;
 
 export interface IAttackResult {
     completed: boolean;

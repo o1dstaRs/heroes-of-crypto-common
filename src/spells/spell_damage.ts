@@ -9,7 +9,48 @@
  * -----------------------------------------------------------------------------
  */
 
+import { empowerMultiplier } from "../augments/augment_properties";
 import { MAX_UNIT_STACK_POWER } from "../constants";
+
+/** The bare minimum of a unit this module needs, so it stays free of a Unit import cycle. */
+interface IEmpowerableCaster {
+    getBuff(name: string): { getPower(): number } | undefined;
+}
+
+/**
+ * The team's Empower Augment percentage, read off the unit that is about to deal the damage.
+ *
+ * UnitsHolder.applyAugments puts an "Empower Augment" buff on every unit of a team that bought the augment,
+ * so the caster itself carries the number — no FightProperties lookup (and therefore no fight-singleton
+ * dependency) is needed at the damage site, which is what lets the client's spellbook and the server's
+ * engine agree while running off completely different fight state.
+ */
+export function getEmpowerPercentage(caster?: IEmpowerableCaster | null): number {
+    if (!caster) {
+        return 0;
+    }
+    const power = caster.getBuff("Empower Augment")?.getPower();
+    return Number.isFinite(power) ? (power as number) : 0;
+}
+
+/**
+ * Fireforged Sword's bonus-damage percentage after the holder team's Empower Augment.
+ *
+ * Both the stat maths (Unit.adjustBaseStats, which turns it into attack_mod) and the spellbook card read
+ * this, so the "+10.7%" the card promises is the "+10.7%" the blade delivers. One decimal for the same
+ * reason fireWallBurnPercentage rounds: 10 x 1.07 = 10.7 is a number, 10.700000000000001 is not.
+ */
+export function fireforgedSwordPower(basePower: number, empowerPercentage: number): number {
+    if (!Number.isFinite(basePower) || basePower <= 0) {
+        return 0;
+    }
+    if (!Number.isFinite(empowerPercentage) || empowerPercentage <= 0) {
+        return basePower;
+    }
+    // (100 + pct)/100 rather than 1 + pct/100 — see fireWallBurnPercentage for why the arithmetic order
+    // matters at the tenth.
+    return Math.round(((basePower * (100 + empowerPercentage)) / 100) * 10) / 10;
+}
 
 /**
  * Damage of a stack-powered offensive spell (SpellMultiplierType.UNIT_AMOUNT_STACK_POWER):
@@ -29,16 +70,20 @@ import { MAX_UNIT_STACK_POWER } from "../constants";
  *
  * Returned pre-resistance: this is the number the card shows, before any particular target's magic
  * resistance is known. Per-target reduction is applied by applyMagicResistToSpellDamage.
+ *
+ * `empowerPercentage` is the caster team's Empower Augment (0 when unbought) — it multiplies the finished
+ * figure, so the card and the cast pick it up together from this one place.
  */
 export function calculateStackPoweredSpellDamage(
     spellPower: number,
     casterAmountAlive: number,
     casterStackPower: number,
+    empowerPercentage = 0,
 ): number {
     const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
     const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, Math.floor(casterStackPower)));
 
-    return Math.max(0, Math.floor(amountAlive * stackPower * spellPower));
+    return Math.max(0, Math.floor(amountAlive * stackPower * spellPower * empowerMultiplier(empowerPercentage)));
 }
 
 /**

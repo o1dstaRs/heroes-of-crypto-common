@@ -14,6 +14,12 @@ export const PENALTY_ON_RANGE_SHOT_THROUGH_TEAMMATES = false;
 export const MIN_UNIT_STACK_POWER = 1;
 export const MAX_UNIT_STACK_POWER = 5;
 
+/**
+ * Ceiling on Guiding Winds' shot-distance bonus. The aura is stack-powered plus the owner's luck, so a full
+ * stack with maximum luck would otherwise reach 35+; this is the hard cap the balance targets.
+ */
+export const GUIDING_WINDS_MAX_PERCENT = 35;
+
 // teams, augments and synergies
 export const MAX_UNITS_PER_TEAM = 8;
 export const MAX_AUGMENT_POINTS = 7;

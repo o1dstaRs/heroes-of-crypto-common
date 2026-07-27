@@ -143,5 +143,13 @@
         "power": 25,
         "is_buff": true,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"
+    },
+    "Arcane Ward": {
+        "name": "Arcane Ward",
+        "range": 2,
+        "desc": "Affected allies gain {}% magic defence.",
+        "power": 10,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"
     }
 }

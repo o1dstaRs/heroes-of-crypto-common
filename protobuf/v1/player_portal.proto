@@ -22,6 +22,8 @@ message PortalMatchSetup {
     repeated string synergies = 9;
     // True only when this setup came from a terminal play snapshot rather than partial pick history.
     bool complete = 10;
+    // Empower (magic damage). Appended at the tail so already-stored PortalMatchSetup rows keep decoding.
+    int32 augment_empower = 11;
 }
 
 // One finished match from the requesting player's perspective.

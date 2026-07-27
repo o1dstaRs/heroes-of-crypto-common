@@ -71,7 +71,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // isolation changed only seed 2147640168's green candidate (one rejected action became zero); the other
 // seven mirrored traces stayed byte-identical before the Armor change above. Two runs on the combined
 // latest-main engine produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "5db6ec536edc87b5c9ecdb42b6b8f4ebfb6ed767cfe81634997ed7c6e32a91e8";
+// Re-pinned after a dying stack of ONE that still holds its Resurrection charge started raising itself
+// instead of being deleted (the raise was floor(died / 2), which is 0 for a single). Any seeded fight where
+// a lone holder falls now continues with it alive, so the traces legitimately move. Two isolated runs
+// produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "913453683cd1f68c2ecf0164682a480d9c6f6179675a6075d08d022aa4d47186";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

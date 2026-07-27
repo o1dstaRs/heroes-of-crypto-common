@@ -1,0 +1,162 @@
+/*
+ * -----------------------------------------------------------------------------
+ * Optional pre-game unit ban.
+ *
+ * During the PERK step either player may additionally nominate ONE creature to be
+ * banned. When the step closes: nobody nominated -> nothing happens; both nominated
+ * the same unit -> it is banned outright; two different -> exactly one of the two,
+ * 50/50. The ban REPLACES an auto-ban of its own level, so each level still loses
+ * LIVE_AUTO_BANS_BY_LEVEL[level - 1] creatures.
+ * -----------------------------------------------------------------------------
+ */
+
+import { describe, expect, it } from "bun:test";
+
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { Perk } from "../../src/perks/perk_properties";
+import {
+    createPickSimState,
+    getBannableCreatures,
+    LIVE_AUTO_BANS_BY_LEVEL,
+    transitionPickSim,
+    type IPickSimState,
+    type PickAction,
+    type PickRandomInt,
+} from "../../src/picks/pick_sim";
+import { CreatureLevelMap } from "../../src/units/unit_properties";
+
+const LOWER = PBTypes.TeamVals.LOWER;
+const UPPER = PBTypes.TeamVals.UPPER;
+const first: PickRandomInt = () => 0;
+
+const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = first): IPickSimState => {
+    const result = transitionPickSim(state, action, rng);
+    expect(result.status).toBe("accepted");
+    if (result.status !== "accepted") {
+        throw new Error(`expected accepted, got ${result.status}`);
+    }
+    return result.state;
+};
+
+/** Close the perk step, which is where the nominations resolve. */
+const finishPerks = (state: IPickSimState, rng: PickRandomInt = first): IPickSimState => {
+    let next = accept(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE }, rng);
+    return accept(next, { type: "select_perk", team: UPPER, perk: Perk.SEE_NONE }, rng);
+};
+
+const bansPerLevel = (state: IPickSimState): number[] => {
+    const counts = [0, 0, 0, 0];
+    for (const creatureId of state.creaturesBanned) {
+        const level = CreatureLevelMap[creatureId];
+        if (level) {
+            counts[level - 1] += 1;
+        }
+    }
+    return counts;
+};
+
+describe("pre-game unit ban", () => {
+    it("offers only creatures that are neither auto-banned nor sitting in a bundle offer", () => {
+        const state = createPickSimState(first);
+        const bannable = getBannableCreatures(state);
+        const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
+
+        expect(bannable.length).toBeGreaterThan(0);
+        for (const creatureId of bannable) {
+            expect(state.creaturesBanned).not.toContain(creatureId);
+            expect(offered).not.toContain(creatureId);
+        }
+    });
+
+    it("bans nothing when neither player nominates one", () => {
+        const before = createPickSimState(first);
+        const after = finishPerks(before);
+
+        expect(after.extraBan).toBeUndefined();
+        expect(after.creaturesBanned).toEqual(before.creaturesBanned);
+    });
+
+    it("bans the agreed unit outright when both players nominate the same one", () => {
+        let state = createPickSimState(first);
+        const target = getBannableCreatures(state)[0];
+        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: target });
+
+        // rng that would pick either side still has to land on the agreed unit — there is nothing to roll.
+        for (const rng of [() => 0, () => 1] as PickRandomInt[]) {
+            const resolved = finishPerks(state, rng);
+            expect(resolved.extraBan).toBe(target);
+            expect(resolved.creaturesBanned).toContain(target);
+        }
+    });
+
+    it("takes one of the two nominations, chosen by the roll", () => {
+        let state = createPickSimState(first);
+        const bannable = getBannableCreatures(state);
+        const lowerPick = bannable[0];
+        const upperPick = bannable.find((id) => id !== lowerPick)!;
+        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: lowerPick });
+        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: upperPick });
+
+        expect(finishPerks(state, () => 0).extraBan).toBe(lowerPick);
+        expect(finishPerks(state, () => 1).extraBan).toBe(upperPick);
+        // Only ONE of them is ever banned.
+        const resolved = finishPerks(state, () => 0);
+        expect(resolved.creaturesBanned).toContain(lowerPick);
+        expect(resolved.creaturesBanned).not.toContain(upperPick);
+    });
+
+    it("bans a lone nomination, with no competing ban to roll against", () => {
+        let state = createPickSimState(first);
+        const target = getBannableCreatures(state)[0];
+        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: target });
+
+        const resolved = finishPerks(state);
+        expect(resolved.extraBan).toBe(target);
+        expect(resolved.creaturesBanned).toContain(target);
+    });
+
+    it("keeps each level's ban count unchanged by releasing an auto-ban of the same level", () => {
+        const baseline = bansPerLevel(finishPerks(createPickSimState(first)));
+        expect(baseline).toEqual([...LIVE_AUTO_BANS_BY_LEVEL]);
+
+        let state = createPickSimState(first);
+        const target = getBannableCreatures(state)[0];
+        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
+        const resolved = finishPerks(state);
+
+        // The player steered one of that level's bans; it did not add a sixth.
+        expect(bansPerLevel(resolved)).toEqual(baseline);
+        expect(resolved.creaturesBanned).toContain(target);
+        expect(resolved.creaturesBanned.length).toBe(baseline.reduce((sum, count) => sum + count, 0));
+    });
+
+    it("refuses a second nomination, an unbannable creature, and anything after the perk step", () => {
+        let state = createPickSimState(first);
+        const bannable = getBannableCreatures(state);
+        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: bannable[0] });
+
+        expect(
+            transitionPickSim(state, { type: "propose_ban", team: LOWER, creatureId: bannable[1] }, first),
+        ).toMatchObject({ status: "rejected", reason: "ban_already_proposed" });
+        expect(
+            transitionPickSim(state, { type: "propose_ban", team: UPPER, creatureId: state.creaturesBanned[0] }, first),
+        ).toMatchObject({ status: "rejected", reason: "creature_not_bannable" });
+
+        const afterPerks = finishPerks(state);
+        expect(
+            transitionPickSim(afterPerks, { type: "propose_ban", team: UPPER, creatureId: bannable[1] }, first),
+        ).toMatchObject({ status: "rejected", reason: "wrong_phase" });
+    });
+
+    it("keeps a nomination out of the opponent's view until it resolves", () => {
+        let state = createPickSimState(first);
+        const target = getBannableCreatures(state)[0];
+        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
+
+        // Nothing the opponent can read has changed: the ban list is untouched until the step closes.
+        expect(state.creaturesBanned).not.toContain(target);
+        expect(state.extraBan).toBeUndefined();
+        expect(state.upper.proposedBan).toBeUndefined();
+    });
+});
