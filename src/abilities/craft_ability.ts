@@ -23,23 +23,11 @@ export interface ICraftResult {
     grantedAbility?: string;
 }
 
-export interface ICraftChances {
-    /** Percent chances (0-100); always sum to 100. */
-    stun: number;
-    nothing: number;
-    double: number;
-    frozen: number;
-}
+import { getCraftChances } from "./craft_chances";
 
-/**
- * The luck-weighted Craft outcome percentages for a caster's luck. Luck shifts probability 1:1 from the bad
- * Stun outcome to the good Frozen outcome (each clamped to 0-20); Nothing and Double stay at 40. Sums to 100.
- * Single source of truth for both the rolls (processCraftAbility) and the ability/spell descriptions.
- */
-export function getCraftChances(luck: number): ICraftChances {
-    const stun = Math.max(0, Math.min(20, 10 - luck));
-    return { stun, nothing: 40, double: 40, frozen: 20 - stun };
-}
+// Re-exported so existing importers keep working; the definitions live in craft_chances.ts, which has no
+// dependencies and so can also be reached from the config layer without closing an import cycle.
+export { getCraftChances, type ICraftChances } from "./craft_chances";
 
 const effectFactory = new EffectFactory();
 

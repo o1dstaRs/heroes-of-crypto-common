@@ -17,6 +17,7 @@ import creaturesJson from "./creatures.json";
 
 import { AuraEffectProperties, EffectProperties } from "../effects/effect_properties";
 import { AbilityProperties, ToAbilityPowerType, ToAbilityType } from "../abilities/ability_properties";
+import { getCraftChances } from "../abilities/craft_chances";
 import {
     SpellMultiplierType,
     SpellPowerType,
@@ -296,6 +297,21 @@ export const getCreatureConfig = (
                 .replace("{}", Number((abilityConfig.power * 2).toFixed()).toString())
                 .replace("{}", Number(abilityConfig.power.toFixed()).toString());
             abilityDescriptions.push(updatedDescription);
+        } else if (abilityConfig.name === "Blacksmith Tools") {
+            // Craft's four outcome odds are computed, not a single power — the config carries power 0, so the
+            // generic branch below printed "0%" for all four and the card claimed the spell does nothing.
+            // Luck is unknown here (this builds the creature TEMPLATE, before any unit exists), so the card
+            // starts at the luck-0 split; Unit.getAbilityDescription re-renders it with the caster's real luck
+            // once the unit is alive.
+            const { stun, nothing, double, frozen } = getCraftChances(0);
+            abilityDescriptions.push(
+                abilityConfig.desc
+                    .join("\n")
+                    .replace("{}", double.toString())
+                    .replace("{}", frozen.toString())
+                    .replace("{}", stun.toString())
+                    .replace("{}", nothing.toString()),
+            );
         } else {
             abilityDescriptions.push(abilityConfig.desc.join("\n").replace(/\{\}/g, abilityConfig.power.toString()));
         }
