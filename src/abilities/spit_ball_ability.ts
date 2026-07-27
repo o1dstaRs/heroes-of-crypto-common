@@ -40,7 +40,7 @@ export function processSpitBallAbility(
     sceneLog: ISceneLog,
 ): void {
     // effect can be absorbed
-    const absorptionTarget = EffectHelper.getAbsorptionTarget(targetUnit, grid, unitsHolder);
+    const absorptionTarget = EffectHelper.getAbsorptionTarget(targetUnit, grid, unitsHolder, sceneLog);
     if (absorptionTarget) {
         targetUnit = absorptionTarget;
     }

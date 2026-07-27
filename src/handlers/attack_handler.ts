@@ -341,7 +341,12 @@ export class AttackHandler {
                 // effect can be absorbed
                 let debuffTarget = targetUnit;
 
-                const absorptionTarget = EffectHelper.getAbsorptionTarget(debuffTarget, this.grid, unitsHolder);
+                const absorptionTarget = EffectHelper.getAbsorptionTarget(
+                    debuffTarget,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                );
                 if (absorptionTarget) {
                     debuffTarget = absorptionTarget;
                 }
@@ -462,7 +467,12 @@ export class AttackHandler {
             if (currentActiveSpell.isSelfDebuffApplicable()) {
                 // effect can be absorbed
                 let debuffTarget = attackerUnit;
-                const absorptionTarget = EffectHelper.getAbsorptionTarget(debuffTarget, this.grid, unitsHolder);
+                const absorptionTarget = EffectHelper.getAbsorptionTarget(
+                    debuffTarget,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                );
                 if (absorptionTarget) {
                     debuffTarget = absorptionTarget;
                 }

@@ -2153,6 +2153,7 @@ export class GameActionEngine {
                 enemy,
                 this.context.grid,
                 this.context.unitsHolder,
+                this.context.sceneLog,
             );
             const debuffTarget = absorptionTarget ?? enemy;
 

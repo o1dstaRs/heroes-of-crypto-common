@@ -61,7 +61,13 @@ describe("effect_helper", () => {
         const rangeOneKeys = getAuraCellKeys(testGridSettings, { x: 5, y: 5 }, 1);
 
         expect(rangeOneCells).toHaveLength(9);
-        expect(rangeOneCells).toEqual(expect.arrayContaining([{ x: 5, y: 5 }, { x: 4, y: 4 }, { x: 6, y: 6 }]));
+        expect(rangeOneCells).toEqual(
+            expect.arrayContaining([
+                { x: 5, y: 5 },
+                { x: 4, y: 4 },
+                { x: 6, y: 6 },
+            ]),
+        );
         expect(rangeOneKeys).toContain((5 << 4) | 5);
         expect(rangeOneKeys).toContain((4 << 4) | 4);
         expect(new Set(rangeOneKeys).size).toBe(rangeOneKeys.length);
@@ -90,5 +96,34 @@ describe("effect_helper", () => {
         source.applyDamage(1000, 0, new SceneLogMock());
 
         expect(getAbsorptionTarget(protectedAlly, grid, unitsHolder)).toBeUndefined();
+    });
+});
+
+// An absorb that says nothing is indistinguishable from the aura not working: the debuff simply lands on a
+// different creature than the one that was hit, with nothing explaining why. Flesh Shield and Water Shield
+// both announce themselves; this one did not, which is what "Absorb Penalties doesn't work" looked like.
+describe("Absorb Penalties announces itself", () => {
+    it("logs which creature took the penalty, and stays silent when nothing is absorbed", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const source = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LOWER });
+        const protectedAlly = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER });
+        placeUnit(grid, unitsHolder, source, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, protectedAlly, { x: 4, y: 3 });
+
+        const lines: string[] = [];
+        const sceneLog = {
+            updateLog: (line?: string) => {
+                if (line) lines.push(line);
+            },
+        };
+
+        // No aura yet: nothing absorbed, nothing said.
+        expect(getAbsorptionTarget(protectedAlly, grid, unitsHolder, sceneLog)).toBeUndefined();
+        expect(lines).toHaveLength(0);
+
+        // Power 100 so the roll always lands and the assertion is not flaky.
+        protectedAlly.applyAuraEffect("Absorb Penalties Aura", "absorb", true, 100, "3;3");
+        expect(getAbsorptionTarget(protectedAlly, grid, unitsHolder, sceneLog)).toBe(source);
+        expect(lines).toEqual(["Peasant absorbs the penalty aimed at Ally"]);
     });
 });

@@ -226,7 +226,21 @@ export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: nu
     return ret;
 }
 
-export const getAbsorptionTarget = (forUnit: Unit, grid: Grid, unitsHolder: UnitsHolder): Unit | undefined => {
+/**
+ * Who actually takes a penalty aimed at `forUnit` — the Absorb Penalties aura's owner when its roll lands,
+ * otherwise nobody (the penalty stays where it was aimed).
+ *
+ * `sceneLog` is optional only so the pure-query callers stay pure; PASS IT wherever a debuff is really being
+ * redirected. A silent absorb is indistinguishable from the aura not working: the debuff simply appears on a
+ * different creature than the one that was hit, with nothing saying why. Flesh Shield and Water Shield both
+ * announce themselves for exactly this reason.
+ */
+export const getAbsorptionTarget = (
+    forUnit: Unit,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+    sceneLog?: { updateLog: (line?: string) => void },
+): Unit | undefined => {
     const absorbPenaltiesAura = forUnit.getBuff("Absorb Penalties Aura");
     if (absorbPenaltiesAura) {
         const x = absorbPenaltiesAura.getFirstSpellProperty();
@@ -237,6 +251,9 @@ export const getAbsorptionTarget = (forUnit: Unit, grid: Grid, unitsHolder: Unit
                 const auraSourceUnit = unitsHolder.getAllUnits().get(auraSourceUnitId);
                 if (auraSourceUnit) {
                     if (getRandomInt(0, 100) < Math.floor(absorbPenaltiesAura.getPower()) && !auraSourceUnit.isDead()) {
+                        sceneLog?.updateLog(
+                            `${auraSourceUnit.getName()} absorbs the penalty aimed at ${forUnit.getName()}`,
+                        );
                         return auraSourceUnit;
                     }
                 }

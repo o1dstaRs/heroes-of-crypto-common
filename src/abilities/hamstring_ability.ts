@@ -39,7 +39,7 @@ export function processHamstringAbility(
         return;
     }
 
-    const absorptionTarget = EffectHelper.getAbsorptionTarget(targetUnit, grid, unitsHolder);
+    const absorptionTarget = EffectHelper.getAbsorptionTarget(targetUnit, grid, unitsHolder, sceneLog);
     if (absorptionTarget) {
         targetUnit = absorptionTarget;
     }
