@@ -473,7 +473,7 @@
                 "Nature:Summon Wolves",
                 "Nature:Summon Wolves"
             ],
-            "abilities": ["Forest Spellbook"]
+            "abilities": ["Forest Spellbook", "Sylvan Focus Aura"]
         },
         "Trent": {
             "name": "Trent",
@@ -1080,7 +1080,7 @@
     "Might": {
         "Mermaid": {
             "name": "Mermaid",
-            "hp": 12,
+            "hp": 11,
             "steps": 4.5,
             "speed": 5,
             "armor": 9,
@@ -1240,7 +1240,7 @@
             "shot_distance": 0,
             "magic_resist": 5,
             "movement_type": "FLY",
-            "exp": 36.3,
+            "exp": 33,
             "size": 1,
             "level": 2,
             "spells": [],

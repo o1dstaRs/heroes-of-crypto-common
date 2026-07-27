@@ -16,6 +16,7 @@ import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
+import { empowerMultiplier } from "../augments/augment_properties";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
     LUCK_CHANGE_FOR_SHIELD,
@@ -27,6 +28,7 @@ import {
     NUMBER_OF_ARMAGEDDON_WAVES,
     NUMBER_OF_LAPS_TOTAL,
     MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
+    GUIDING_WINDS_MAX_PERCENT,
 } from "../constants";
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
@@ -44,6 +46,7 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
+import { fireforgedSwordPower } from "../spells/spell_damage";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -60,6 +63,13 @@ const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 // Assimilation): the quiver's native owner's (Medusa's) shot_distance from creatures.json. Applied in
 // adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
 const STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE = 6.5;
+
+// The abilities whose damage is MAGIC and therefore scales with the team's Empower Augment. Everything else
+// that goes through calculateAbilityMultiplier (Double Punch, Lightning Spin, Through Shot, Boost Health,
+// Magic Shield, …) is physical output or a defensive figure and is deliberately left alone — Empower buys
+// magic damage, not a blanket ability buff. Fire Shield is included even though it triggers on being hit:
+// the flames it throws back are the holder's own magic damage.
+const EMPOWERED_MAGIC_ABILITIES: ReadonlySet<string> = new Set(["Chain Lightning", "Fire Breath", "Fire Shield"]);
 
 // SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
 // unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
@@ -601,6 +611,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(wardingMane, 0).toFixed(2)).toString());
             }
+        }
+        // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to
+        // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain
+        // Lightning needs no branch here: its percentages already come from calculateAbilityMultiplier above,
+        // which applies Empower itself.
+        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName()) && ability.getName() !== "Chain Lightning") {
+            const empowered = ability.getPower() * empowerMultiplier(this.getEmpowerPercentage());
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, Number(empowered.toFixed(1)).toString());
         }
         if (ability.getName() === "Blacksmith Tools") {
             // Craft's per-ally outcome chances shift with the caster's luck (see getCraftChances).
@@ -1770,11 +1791,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
-        // Guiding Winds (Dryad) is a flat percentage of the affected archer's BASE shot distance, not
-        // stack-powered — the same treatment as Rallying Volley above, so the tooltip and the applied
-        // bonus are both the configured number.
+        // Guiding Winds is STACK-POWERED plus the owner's luck: the configured power is what a full stack
+        // projects (5/10/15/20/25 across the tiers at power 25), luck lifts it, and the whole thing is held
+        // to 0..GUIDING_WINDS_MAX_PERCENT so a lucky full stack cannot push archers absurdly far. Computed
+        // here, on the aura's OWNER, so the single stored power carries stack and luck to every ally that
+        // receives it AND to both descriptions that read it back — exactly like Sylvan Focus below.
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE) {
-            return auraEffect.getPower();
+            const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
+            const scaled = (auraEffect.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck();
+            return Math.max(0, Math.min(GUIDING_WINDS_MAX_PERCENT, scaled));
+        }
+
+        // Sylvan Focus (Satyr) is the configured percentage plus the SATYR's own luck — not stack-powered,
+        // so its stack size never changes it, but a lucky Satyr focuses harder for everyone standing in the
+        // aura. Computed here, on the aura's owner, so the single stored power carries the luck to every
+        // ally that receives it AND to both descriptions that read it back.
+        if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE) {
+            return Math.max(0, auraEffect.getPower() + this.getLuck());
         }
 
         const madeOfFireBuff = this.getBuff("Made of Fire");
@@ -1896,6 +1929,49 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ).toFixed(1),
         );
     }
+    /**
+     * The team's Empower Augment percentage (0 when unbought), read off the "Empower Augment" buff
+     * UnitsHolder.applyAugments puts on every unit of the team. Damage sites and description builders both
+     * come here rather than reaching for FightProperties, so the client (which has no authoritative fight
+     * state in ranked) and the engine read the same number.
+     */
+    /**
+     * The total percentage added to everything this unit deals as MAGIC damage, from every source there is.
+     *
+     * Assembled in ONE place on purpose: the engine's cast, the AI's damage estimate and the card in the
+     * sidebar all reach the magic-damage bonus through here, so they cannot disagree about it. Sources are
+     * additive rather than multiplicative, so two of them still read as a plain "+N%".
+     */
+    public getMagicDamageBonusPercentage(): number {
+        let total = 0;
+
+        const empowerBuff = this.getBuff("Empower Augment");
+        if (empowerBuff) {
+            const power = empowerBuff.getPower();
+            if (Number.isFinite(power) && power > 0) {
+                total += power;
+            }
+        }
+
+        // Sylvan Focus (Satyr): allies standing within 2 cells of it deal more magic damage.
+        const sylvanFocus = this.getAppliedAuraEffect("Sylvan Focus Aura");
+        if (sylvanFocus) {
+            const power = sylvanFocus.getPower();
+            if (Number.isFinite(power) && power > 0) {
+                total += power;
+            }
+        }
+
+        return total;
+    }
+    /**
+     * The magic-damage bonus, under the name every existing call site knows it by. The augment stopped being
+     * the only source once Sylvan Focus arrived, and all of those sites want the combined number, so this
+     * simply forwards. Prefer getMagicDamageBonusPercentage in new code.
+     */
+    public getEmpowerPercentage(): number {
+        return this.getMagicDamageBonusPercentage();
+    }
     public calculateAbilityMultiplier(ability: Ability, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
         const madeOfFireBuff = this.getBuff("Made of Fire");
@@ -1928,6 +2004,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
                 (this.getLuck() + synergyAbilityPowerIncrease) / 100 +
                 (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
+        }
+
+        // Empower Augment: the three abilities that deal MAGIC damage scale with it, the rest do not. Applied
+        // to the finished coefficient (not folded into combinedPower) so it reads as exactly "+X% damage",
+        // and applied HERE so the engine's cast, the AI's damage estimate and the card in the sidebar all
+        // pick it up from one place — every one of them calls this method.
+        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName())) {
+            calculatedCoeff *= empowerMultiplier(this.getEmpowerPercentage());
         }
 
         return calculatedCoeff;
@@ -3153,7 +3237,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         if (fireforgedSwordBuff) {
-            this.unitProperties.attack_mod += (this.unitProperties.base_attack * fireforgedSwordBuff.getPower()) / 100;
+            // The burning edge is magic damage riding on a physical swing, so the team's Empower Augment
+            // raises the bonus (and only the bonus — the underlying attack is Might's business).
+            this.unitProperties.attack_mod +=
+                (this.unitProperties.base_attack *
+                    fireforgedSwordPower(fireforgedSwordBuff.getPower(), this.getEmpowerPercentage())) /
+                100;
         }
 
         const weaknessDebuff = this.getDebuff("Weakness");

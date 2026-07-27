@@ -569,11 +569,23 @@
         "aura_effect": "Poison Cloud",
         "can_be_cast": false
     },
+    "Sylvan Focus Aura": {
+        "name": "Sylvan Focus Aura",
+        "type": "BUFF_AURA",
+        "desc": ["Allies within 2 cells deal {}% more magic damage"],
+        "power": 15,
+        "power_type": "ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": "Sylvan Focus",
+        "can_be_cast": false
+    },
     "Guiding Winds Aura": {
         "name": "Guiding Winds Aura",
         "type": "BUFF_AURA",
         "desc": ["Ranged allies within 2 cells shoot {}% further"],
-        "power": 30,
+        "power": 25,
         "power_type": "ADDITIONAL_SHOT_DISTANCE_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": false,

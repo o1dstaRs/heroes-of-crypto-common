@@ -44,6 +44,10 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR ||
         auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS ||
+        // Sylvan Focus (Satyr): deliberately NOT gated on attack type, unlike the ranged auras below. Magic
+        // damage comes out of spells and out of abilities like Fire Breath just as much as out of a MAGIC
+        // attack, so gating on the attack type would deny the bonus to a melee dragon breathing fire.
+        auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE ||
         (auraEffectProperties.power_type === AbilityPowerType.ADDITIONAL_STEPS_WALK && !unit.canFly())
     ) {
         return true;

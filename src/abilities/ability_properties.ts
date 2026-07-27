@@ -92,6 +92,10 @@ export enum AbilityPowerType {
     // (action_engine.vineThrowCast) rather than in a stat hook, but the type still has to be declared:
     // every ability config is asserted to carry a non-zero power type.
     VINE_THROW = 66,
+    // A flat percentage added to everything the holder deals as MAGIC damage — its spells and the magic
+    // abilities, the same surface the Empower augment amplifies. Not stack-powered: the configured number is
+    // what the ally gets, so the aura reads identically whatever the caster's stack size.
+    ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE = 67,
 }
 
 export const AllAbilityPowerTypes = [
@@ -162,6 +166,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.MAGIC_MIRROR_REFLECT,
     AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
     AbilityPowerType.VINE_THROW,
+    AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -235,6 +240,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     MAGIC_MIRROR_REFLECT: AbilityPowerType.MAGIC_MIRROR_REFLECT,
     ADDITIONAL_SHOT_DISTANCE_PERCENTAGE: AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
     VINE_THROW: AbilityPowerType.VINE_THROW,
+    ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE: AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
 };
 
 export enum AbilityType {

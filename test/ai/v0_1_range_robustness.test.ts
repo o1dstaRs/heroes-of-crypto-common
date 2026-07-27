@@ -51,8 +51,12 @@ interface ObservedTurn {
 const toRoster = (rows: readonly StackSpec[]): IArmyUnitSpec[] =>
     rows.map(([faction, creatureName, level, size, amount]) => ({ faction, creatureName, level, size, amount }));
 
+// Re-seeded when Satyr gained Sylvan Focus: BOTH armies below field a Satyr, so the aura changed what the
+// search evaluates and the old seed (1323129968) stopped producing any edge-aimed shot at all — not a
+// different aim cell, none. This seed reproduces the same behaviour the test was written to guard: red's
+// Arbalester picking the alternate DOWN edge rather than the natural one.
 const BLOCK_GAME_62: RecordedReplay = {
-    seed: 1323129968,
+    seed: 1323620946,
     gridType: PBTypes.GridVals.BLOCK_CENTER,
     green: [
         ["Nature", "Wolf", 1, 1, 124],
@@ -269,7 +273,7 @@ describe("v0.1 ranged-fire robustness", () => {
                 action?.attackerId === redArbalester!.unitId &&
                 action.targetId === greenArbalester!.unitId &&
                 action.aimCell?.x === 5 &&
-                action.aimCell.y === 6 &&
+                action.aimCell.y === 5 &&
                 action.aimSide === RangeAttackCellSide.DOWN
             );
         });
@@ -279,7 +283,7 @@ describe("v0.1 ranged-fire robustness", () => {
                 type: "range_attack",
                 attackerId: redArbalester!.unitId,
                 targetId: greenArbalester!.unitId,
-                aimCell: { x: 5, y: 6 },
+                aimCell: { x: 5, y: 5 },
                 aimSide: RangeAttackCellSide.DOWN,
             },
         ]);

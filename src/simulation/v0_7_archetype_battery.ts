@@ -101,8 +101,28 @@ function rawCreatureConfigs(): Map<string, IRawCreatureConfig> {
  * v0.7 preregistration freeze: the archetype battery was preregistered when ANGEL=40 was the last
  * catalog id. Creatures enabled later (Abomination onward) are excluded so the taxonomy — and every
  * historical manifest that pins its sha256 (composed-ladder taxonomySha256) — stays stable.
+ *
+ * The id cap alone does NOT freeze the taxonomy: it stops NEW creatures entering, but an existing creature
+ * gaining a new ability still moves between trait sets. Satyr (well below ANGEL) gaining Sylvan Focus would
+ * have put it in the `aura` set and changed the hash. Re-pinning the manifest is not an option — its raw
+ * bytes are attested by the committed-manifest census, so editing it fails six further production checks —
+ * so abilities added after the freeze are excluded from the classification instead. See
+ * POST_V07_FREEZE_ABILITIES.
  */
 const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
+
+/**
+ * Abilities granted to already-frozen creatures AFTER the v0.7 preregistration.
+ *
+ * They are invisible to the trait classification so the preregistered taxonomy — and the manifest sha256
+ * attested over it — cannot drift when a creature is rebalanced. This changes nothing about how the ability
+ * behaves in a real fight; it only keeps a historical experiment describing the roster it actually ran.
+ *
+ * Add to this set whenever a creature at or below V07_CATALOG_MAX_CREATURE_ID gains an ability that would
+ * move it between trait sets (auras are the usual case, since `aura` is the one set derived from abilities
+ * rather than from attack type).
+ */
+const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura"]);
 
 const creatureEnumId = (creatureName: string): number =>
     (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;
@@ -123,9 +143,12 @@ export function classifyEnabledV07ArchetypeCreatures(): IV07ArchetypeTaxonomy {
         mage: names((entry) => entry.attackType === "MAGIC"),
         meleeMage: names((entry) => entry.attackType === "MELEE_MAGIC"),
         aura: names((entry) =>
-            (configs.get(entry.creatureName)?.abilities ?? []).some(
-                (ability) => abilities[ability]?.aura_effect !== null && abilities[ability]?.aura_effect !== undefined,
-            ),
+            (configs.get(entry.creatureName)?.abilities ?? [])
+                .filter((ability) => !POST_V07_FREEZE_ABILITIES.has(ability))
+                .some(
+                    (ability) =>
+                        abilities[ability]?.aura_effect !== null && abilities[ability]?.aura_effect !== undefined,
+                ),
         ),
         ranged: names((entry) => entry.attackType === "RANGE"),
     };

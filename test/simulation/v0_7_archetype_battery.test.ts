@@ -175,6 +175,9 @@ describe("v0.7 fixed archetype definitions", () => {
                 "Leprechaun",
                 "Peasant",
                 "Pegasus",
+                // Satyr is deliberately ABSENT despite now carrying Sylvan Focus: the aura postdates the
+                // v0.7 preregistration, so POST_V07_FREEZE_ABILITIES hides it from this classification and
+                // keeps the attested taxonomy hash stable.
                 "Valkyrie",
                 "White Tiger",
                 "Wolf Rider",

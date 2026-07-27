@@ -112,11 +112,19 @@
         "is_buff": true,
         "power_type": "ADDITIONAL_RANGE_SHOTS"
     },
+    "Sylvan Focus": {
+        "name": "Sylvan Focus",
+        "range": 2,
+        "desc": "Allies within range deal +{}% magic damage.",
+        "power": 15,
+        "is_buff": true,
+        "power_type": "ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE"
+    },
     "Guiding Winds": {
         "name": "Guiding Winds",
         "range": 2,
         "desc": "Ranged allies within range gain +{}% shot distance.",
-        "power": 30,
+        "power": 25,
         "is_buff": true,
         "power_type": "ADDITIONAL_SHOT_DISTANCE_PERCENTAGE"
     },
