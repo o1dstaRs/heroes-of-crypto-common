@@ -14,6 +14,11 @@ import { describe, expect, it } from "bun:test";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getAbilityConfig } from "../../src/configuration/config_provider";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
+import { AbilityFactory } from "../../src/abilities/ability_factory";
+import { EffectFactory } from "../../src/effects/effect_factory";
+import { getCreatureConfig } from "../../src/configuration/config_provider";
+import { MAX_UNIT_STACK_POWER } from "../../src/constants";
+import { Unit } from "../../src/units/unit";
 
 const AURA_SHOTS = getAbilityConfig("Rallying Volley Aura").power;
 
@@ -105,5 +110,51 @@ describe("Rallying Volley Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
         expect(archer.getRangeShots()).toBe(5);
+    });
+});
+
+// A Limited Supply archer only carries a stack-power fraction of its own quiver, and that ceiling is derived
+// from maxRangeShots — the archer's OWN arrows. The rally's arrows are not the archer's, so they belong on
+// top of the cap. Before this, the aura handed an Arbalester two arrows and the cap clamped them straight
+// back off, while rallying_volley_granted still recorded the grant as spent — and because the top-up is
+// once-only, it could never be handed over again. That is what "Rallying Volley does nothing" looked like.
+//
+// Built from the real creature configs rather than the synthetic helper: only a real Ability carries the
+// Limited Supply power type the clamp keys off, so the synthetic path cannot reproduce this at all.
+describe("Rallying Volley Aura vs Limited Supply", () => {
+    it("adds its shots on top of Arbalester's supply cap instead of being clamped away", () => {
+        const ctx = createCombatTestContext();
+        const effectFactory = new EffectFactory();
+        const abilityFactory = new AbilityFactory(effectFactory);
+        const build = (faction: string, name: string, texture: string, amount: number) =>
+            Unit.createUnit(
+                getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, texture, amount, 0),
+                ctx.grid.getSettings(),
+                PBTypes.TeamVals.LOWER,
+                PBTypes.UnitVals.CREATURE,
+                abilityFactory,
+                effectFactory,
+                false,
+            );
+
+        const zena = build("Might", "Zena", "zena_512", 15);
+        const arbalester = build("Life", "Arbalester", "arbalester_512", 50);
+        ctx.unitsHolder.addUnit(zena);
+        ctx.unitsHolder.addUnit(arbalester);
+        placeUnit(ctx.grid, ctx.unitsHolder, zena, { x: 3, y: 3 });
+        placeUnit(ctx.grid, ctx.unitsHolder, arbalester, { x: 4, y: 3 });
+
+        const ownQuiver = arbalester.getRangeShots();
+        expect(arbalester.hasAbilityActive("Limited Supply")).toBe(true);
+
+        ctx.unitsHolder.refreshAuraEffectsForAllUnits();
+        ctx.unitsHolder.refreshStackPowerForAllUnits();
+
+        const granted = getAbilityConfig("Rallying Volley Aura").power;
+        const cap = Math.floor((ownQuiver * arbalester.getStackPower()) / MAX_UNIT_STACK_POWER);
+        // The archer keeps its capped share of its OWN arrows and the rally's on top — never fewer than the
+        // cap alone, which is what the clamp used to leave it with.
+        expect(arbalester.getRangeShots()).toBe(cap + granted);
+        expect(arbalester.getRangeShots()).toBeGreaterThan(cap);
     });
 });

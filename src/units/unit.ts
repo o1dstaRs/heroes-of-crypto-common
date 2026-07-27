@@ -575,6 +575,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
     private getAbilityDescription(ability: Ability): string {
+        // Blind Fury's power is the share of the stack already lost, so it changes with every casualty.
+        // Computed HERE, in common, rather than only in the client's refresh pass: this is the description
+        // the server ships in a ranked snapshot, and without it the card kept the raw "{}" placeholder for
+        // every player except the one running the sandbox. Same expression adjustBaseStats applies to
+        // attack_mod, so the number on the card is the bonus actually being dealt.
+        if (ability.getName() === "Blind Fury") {
+            const alive = this.unitProperties.amount_alive;
+            const died = this.unitProperties.amount_died;
+            const total = alive + died;
+            const lostShare = total > 0 ? (1 - alive / total) * 100 : 0;
+            return ability.getDesc().join("\n").replace(/\{\}/g, lostShare.toFixed(1));
+        }
+
         if (ability.getName() === "Chain Lightning") {
             const percentage = Number((this.calculateAbilityMultiplier(ability, 0) * 100).toFixed(2));
             const description = ability.getDesc().join("\n");
@@ -3035,9 +3048,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // SHOTS
         if (this.hasAbilityActive("Limited Supply")) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
+            // Rallying Volley's arrows sit ON TOP of the supply cap rather than inside it. The ceiling is
+            // derived from maxRangeShots — the unit's OWN quiver — so without this the aura handed an
+            // Arbalester two arrows and this line immediately clamped them away again, while
+            // rallying_volley_granted still recorded the grant as spent: the top-up is once-only, so the
+            // bonus could never be handed over again. A Limited Supply archer standing in the aura simply
+            // never got it, which is exactly what "Rallying Volley does nothing" looked like.
             this.unitProperties.range_shots = Math.min(
                 this.unitProperties.range_shots,
-                Math.floor(this.maxRangeShots * actualStackPowerCoeff),
+                Math.floor(this.maxRangeShots * actualStackPowerCoeff) + this.unitProperties.rallying_volley_granted,
             );
         }
 
@@ -3590,7 +3609,41 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return spellAdded;
     }
-    protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {}
+    protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {
+        // Blind Fury's card has to be refreshed HERE, in common, and not only in the client's override:
+        // its power is the share of the stack already lost, so it changes with every casualty, and in a
+        // ranked fight the card text a player reads is the one the SERVER put in the snapshot
+        // (RankedPlayScene reads abilities_descriptions straight off the base properties). With the refresh
+        // living only in RenderableUnit, the sandbox showed the live number while every ranked player kept
+        // reading the seeded "0%" for the whole fight.
+        this.refreshBlindFuryDescription();
+    }
+    /**
+     * Rewrite Blind Fury's description with the bonus it is CURRENTLY granting.
+     *
+     * Same expression adjustBaseStats applies to attack_mod a few lines up — deliberately duplicated rather
+     * than shared through a helper only so the two can never drift apart unnoticed: if the maths above
+     * changes, this line sits close enough to change with it. The number on the card is the number in the
+     * attack.
+     */
+    private refreshBlindFuryDescription(): void {
+        const abilityName = "Blind Fury";
+        const index = this.unitProperties.abilities.indexOf(abilityName);
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((a) => a.getName() === abilityName);
+        if (!ability) {
+            return;
+        }
+        const alive = this.unitProperties.amount_alive;
+        const total = alive + this.unitProperties.amount_died;
+        const lostShare = total > 0 ? (1 - alive / total) * 100 : 0;
+        this.unitProperties.abilities_descriptions[index] = ability
+            .getDesc()
+            .join("\n")
+            .replace(/\{\}/g, lostShare.toFixed(1));
+    }
     protected parseSpellData(spellData: string[]): Map<string, number> {
         const spells: Map<string, number> = new Map();
 
