@@ -35,7 +35,8 @@ import {
 import type { Spell } from "../spells/spell";
 import {
     applyMagicResistToSpellDamage,
-    calculateStackPoweredSpellDamage,
+    calculateSpellDamage,
+    isOffensiveSpellMultiplier,
     isThrownOffensiveSpell,
 } from "../spells/spell_damage";
 import {
@@ -44,7 +45,7 @@ import {
     isFireWallableCell,
     normalizeFireWallOrientation,
 } from "../spells/fire_walls";
-import { SpellMultiplierType, SpellTargetType } from "../spells/spell_properties";
+import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -1961,7 +1962,8 @@ class CandidateGenerator {
      */
     private stackPoweredSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
         const value = applyMagicResistToSpellDamage(
-            calculateStackPoweredSpellDamage(
+            calculateSpellDamage(
+                spell.getMultiplierType(),
                 spell.getPower(),
                 this.unit.getAmountAlive(),
                 this.unit.getStackPower(),
@@ -1999,7 +2001,8 @@ class CandidateGenerator {
     private addMeteoriteCastCandidates(spell: Spell): void {
         const { grid, unitsHolder } = this.context;
         const gs = grid.getSettings();
-        const rawDamage = calculateStackPoweredSpellDamage(
+        const rawDamage = calculateSpellDamage(
+            spell.getMultiplierType(),
             spell.getPower(),
             this.unit.getAmountAlive(),
             this.unit.getStackPower(),
@@ -2174,7 +2177,7 @@ class CandidateGenerator {
                         // candidate carries neither number. The THROWN ones (Fire Strike, Ring of Fire) also
                         // need the line of sight the engine re-checks; Lightning Strike is called down out of
                         // the sky and has no line to keep, so gating it would hide a legal cast from the AI.
-                        if (spell.getMultiplierType() === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
+                        if (isOffensiveSpellMultiplier(spell.getMultiplierType())) {
                             if (isThrownOffensiveSpell(spell.getName()) && !this.hasSpellLineOfSight(enemy)) {
                                 continue;
                             }

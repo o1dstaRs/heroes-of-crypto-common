@@ -75,7 +75,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // instead of being deleted (the raise was floor(died / 2), which is 0 for a single). Any seeded fight where
 // a lone holder falls now continues with it alive, so the traces legitimately move. Two isolated runs
 // produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "913453683cd1f68c2ecf0164682a480d9c6f6179675a6075d08d022aa4d47186";
+// Re-baselined for the flat per-caster spell damage: Fire Strike and Meteorite (and the Magic Dragon's
+// retune) change what the seeded fights do, so every trace legitimately moves. Two isolated runs produced
+// this byte-identical digest, which is what the guard is actually for — the resolver staying deterministic,
+// not the balance staying frozen.
+const EXPECTED_REPLAY_SHA256 = "dba07b55e683318df94b00d22513cc80951282b6441728d3ec3466eece2f2bc4";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
