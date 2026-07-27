@@ -1214,16 +1214,28 @@ export class GameActionEngine {
 
         const laps = spell.getLapsTotal();
         this.context.fightProperties.getVines().addAll(pathCells, laps, caster.getTeam());
-        target.applyDebuff(
-            new Spell({
-                spellProperties: getSpellConfig("System", "Vine Throw", laps),
-                amount: 1,
-            }),
-        );
+        // The snare is a DEBUFF, so magic armor gets its usual save against it — the same roll every other
+        // cast debuff takes (see the magic-attack path). Note what the save does NOT cover: the vines are
+        // already on the ground by this point and stay there. The throw physically happened and painted the
+        // cells it crossed; resisting means this creature shrugs off the grip, not that the terrain vanishes.
+        const snareResisted = getRandomInt(0, 100) < Math.floor(target.getMagicResist());
+        if (snareResisted) {
+            this.context.sceneLog.updateLog(`${target.getName()} resisted from Vine Throw snare`);
+        } else {
+            target.applyDebuff(
+                new Spell({
+                    spellProperties: getSpellConfig("System", "Vine Throw", laps),
+                    amount: 1,
+                }),
+            );
+        }
+        // Spent either way: the charge buys the throw, and the throw landed its terrain.
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(
-            `${caster.getName()} snared ${target.getName()} with Vine Throw for ${getLapString(laps)}`,
-        );
+        if (!snareResisted) {
+            this.context.sceneLog.updateLog(
+                `${caster.getName()} snared ${target.getName()} with Vine Throw for ${getLapString(laps)}`,
+            );
+        }
 
         const events: GameEvent[] = [
             {
@@ -1241,6 +1253,9 @@ export class GameActionEngine {
                 targetId: target.getId(),
                 cells: pathCells,
                 lapsRemaining: laps,
+                // Ranked rebuilds its log from events, never from the text above, so the save has to ride
+                // along or a resisted snare reads there as a snare that landed.
+                snareResisted,
             },
         ];
         events.push(...this.turnEngine.completeTurn(caster));

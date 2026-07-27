@@ -164,7 +164,16 @@ export type GameEvent =
     | { type: "smoke_expired"; cells: XY[] }
     // Vine Throw: the vine laid from the caster to the target. `cells` is in throw order (nearest the caster
     // first) so the client can animate the vine growing along the path; `targetId` is the snared creature.
-    | { type: "vine_placed"; casterId: string; targetId: string; cells: XY[]; lapsRemaining: number }
+    // `snareResisted` means the target's magic armor shrugged the movement debuff off — the vine still went
+    // down (the throw physically happened), so only the log differs, not the terrain.
+    | {
+          type: "vine_placed";
+          casterId: string;
+          targetId: string;
+          cells: XY[];
+          lapsRemaining: number;
+          snareResisted?: boolean;
+      }
     // Vines that withered on lap transition — the client drops their visuals.
     | { type: "vine_expired"; cells: XY[] }
     // Fire Wall: the three cells set alight by one cast, in wall order (so the client can light them up in

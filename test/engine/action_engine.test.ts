@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 
 import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
@@ -25,6 +25,7 @@ import { getPositionForCell, getPositionForCells, RangeAttackCellSide } from "..
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
 import { Spell } from "../../src/spells/spell";
 import { SpellProperties, SpellTargetType } from "../../src/spells/spell_properties";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
@@ -50,6 +51,7 @@ const setupActionFight = (
         upperAbilities?: string[];
         upperAmountAlive?: number;
         upperArmor?: number;
+        upperMagicResist?: number;
         upperMaxHp?: number;
         upperSpells?: string[];
         lowerUnitsAlive?: number;
@@ -89,6 +91,7 @@ const setupActionFight = (
         abilities: opts.upperAbilities,
         amountAlive: opts.upperAmountAlive,
         armor: opts.upperArmor,
+        magicResist: opts.upperMagicResist,
         maxHp: opts.upperMaxHp,
         spells: opts.upperSpells,
         movementType: opts.upperMovementType,
@@ -2505,12 +2508,90 @@ describe("action engine — Vine Throw", () => {
                 type: "vine_placed",
                 casterId: setup.lower.getId(),
                 targetId: setup.upper.getId(),
+                // The harness default is 0 magic resist, so the snare cannot be saved against here.
+                snareResisted: false,
             }),
         );
         expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(true);
         expect(setup.upper.getSteps()).toBeLessThan(stepsBefore);
         expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(false);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    // The snare is a debuff, so magic armor takes its usual save against it. What the save does NOT undo is
+    // the terrain: the vine is laid by the throw itself, which physically happened, and the charge is spent
+    // buying that throw. Resisting means this creature shrugs off the grip, not that the vine never existed.
+    // The roll is driven from a seeded source rather than a 100-resist target, because 100 is full magic
+    // immunity and the cast is refused outright before it ever reaches the save.
+    describe("magic armor save", () => {
+        afterEach(() => setDeterministicRandomSource(undefined));
+
+        const WARDED_RESIST = 50;
+        // Constant sources, so it does not matter how many draws the cast takes on the way to the save —
+        // every one of them yields the same number. What that number IS falls out of the seeded source's
+        // bit mixing rather than the float itself, so the first test below pins both against the resist;
+        // without it these two could quietly drift onto the same side and stop testing anything.
+        const SOURCE_UNDER_RESIST = 0;
+        const SOURCE_OVER_RESIST = 0.25;
+
+        const throwAtWardedTarget = (source: number) => {
+            setDeterministicRandomSource(() => source);
+            const setup = setupActionFight({
+                lowerAbilities: ["Vine Throw"],
+                lowerStackPower: 3,
+                upperCell: { x: 6, y: 3 },
+                supportCell: { x: 3, y: 6 },
+                upperMagicResist: WARDED_RESIST,
+            });
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.lower.getId(),
+                spellName: "Vine Throw",
+                targetId: setup.upper.getId(),
+            });
+            return { setup, result };
+        };
+
+        const VINED_CELLS = [
+            { x: 4, y: 3 },
+            { x: 5, y: 3 },
+            { x: 6, y: 3 },
+        ];
+
+        it("draws the two seeded rolls on either side of the target's magic resist", () => {
+            setDeterministicRandomSource(() => SOURCE_UNDER_RESIST);
+            expect(getRandomInt(0, 100)).toBeLessThan(WARDED_RESIST);
+            setDeterministicRandomSource(() => SOURCE_OVER_RESIST);
+            expect(getRandomInt(0, 100)).toBeGreaterThanOrEqual(WARDED_RESIST);
+        });
+
+        it("shrugs the snare off on a winning roll, and still leaves the vine on the ground", () => {
+            const { setup, result } = throwAtWardedTarget(SOURCE_UNDER_RESIST);
+
+            expect(result.completed).toBe(true);
+            expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(false);
+            // The throw landed its terrain regardless, and paid for it.
+            for (const cell of VINED_CELLS) {
+                expect(setup.fightProperties.getVines().has(cell)).toBe(true);
+            }
+            expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(false);
+            // Ranked rebuilds its scene log from events and never reads the engine's text, so the save has
+            // to ride on the event or a resisted snare reads there exactly like one that landed.
+            expect(result.events).toContainEqual(expect.objectContaining({ type: "vine_placed", snareResisted: true }));
+        });
+
+        it("snares the same warded target when the roll goes the other way", () => {
+            const { setup, result } = throwAtWardedTarget(SOURCE_OVER_RESIST);
+
+            expect(result.completed).toBe(true);
+            expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(true);
+            for (const cell of VINED_CELLS) {
+                expect(setup.fightProperties.getVines().has(cell)).toBe(true);
+            }
+            expect(result.events).toContainEqual(
+                expect.objectContaining({ type: "vine_placed", snareResisted: false }),
+            );
+        });
     });
 
     it("refuses the throw when a body blocks the line and leaves no vine behind", () => {
