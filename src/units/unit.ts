@@ -51,8 +51,6 @@ import { fireforgedSwordPower } from "../spells/spell_damage";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
-import { madeOfFireBoostedMaxHp } from "./movement_stat_modifiers";
-import { projectStackDamage } from "./stack_damage";
 import { roundUnitStat } from "./stat_rounding";
 import { UnitProperties } from "./unit_properties";
 import type { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
@@ -1390,27 +1388,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public isSummoned(): boolean {
         return this.summoned;
     }
-    /** Whether death cleanup may spend this stack's native or stolen Resurrection charge. */
-    public canSelfResurrect(): boolean {
-        return this.hasAbilityActive("Resurrection") && this.hasSpellRemaining("Resurrection");
-    }
-    /**
-     * Raise members after the stack has died. This is intentionally distinct from increaseAmountAlive:
-     * that legacy helper merges additional living summons, whereas a summoned Arachna Queen may now own
-     * a real stolen Resurrection charge and must receive its mechanics as-is.
-     */
-    public reviveAfterDeath(amount: number): number {
-        if (!this.isDead() || !Number.isFinite(amount) || amount <= 0) {
-            return 0;
-        }
-        const revived = Math.min(this.unitProperties.amount_died, Math.floor(amount));
-        if (revived <= 0) {
-            return 0;
-        }
-        this.unitProperties.amount_alive += revived;
-        this.unitProperties.amount_died -= revived;
-        return revived;
-    }
     public getLevel(): number {
         return this.unitProperties.level;
     }
@@ -1562,30 +1539,43 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        const damage = projectStackDamage(
-            {
-                hp: this.unitProperties.hp,
-                maxHp: this.unitProperties.max_hp,
-                amountAlive: this.unitProperties.amount_alive,
-                amountDied: this.unitProperties.amount_died,
-            },
-            minusHp,
-        );
-        this.unitProperties.hp = damage.state.hp;
-        this.unitProperties.max_hp = damage.state.maxHp;
-        this.unitProperties.amount_alive = damage.state.amountAlive;
-        this.unitProperties.amount_died = damage.state.amountDied;
-        this.handleDamageAnimation(damage.animationDeaths);
+        if (minusHp < this.unitProperties.hp) {
+            this.unitProperties.hp -= minusHp;
+            this.handleDamageAnimation(0); // Trigger animation hook with no deaths
+            return minusHp;
+        }
+
+        this.unitProperties.amount_died += 1;
+        this.unitProperties.amount_alive -= 1;
+        minusHp -= this.unitProperties.hp;
+        let substracted = this.unitProperties.hp;
+        this.unitProperties.hp = this.unitProperties.max_hp;
+
+        const amountDied = Math.floor(minusHp / this.unitProperties.max_hp);
+        // dead
+        if (amountDied >= this.unitProperties.amount_alive) {
+            this.unitProperties.amount_died += this.unitProperties.amount_alive;
+            const wereAlive = this.unitProperties.amount_alive;
+            this.unitProperties.amount_alive = 0;
+            this.handleDamageAnimation(wereAlive); // Trigger animation hook with all deaths
+            return Math.floor(wereAlive * this.unitProperties.max_hp) + substracted;
+        }
+
+        this.unitProperties.amount_died += amountDied;
+        this.unitProperties.amount_alive -= amountDied;
+        this.unitProperties.hp -= minusHp % this.unitProperties.max_hp;
+
+        this.handleDamageAnimation(amountDied + 1); // Trigger animation hook with the number of deaths
 
         // Apply "Bitter Experience" if available
-        if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
+        if (this.hasAbilityActive("Bitter Experience")) {
             this.unitProperties.base_armor += 1;
             this.initialUnitProperties.base_armor += 1;
             this.unitProperties.steps += 1;
             this.initialUnitProperties.steps += 1;
         }
 
-        return damage.appliedDamage;
+        return minusHp + substracted;
     }
     public isDead(): boolean {
         return this.unitProperties.amount_alive <= 0;
@@ -1703,7 +1693,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 true,
             );
 
-            this.unitProperties.max_hp = madeOfFireBoostedMaxHp(this.unitProperties.max_hp, spellProperties.power);
+            this.unitProperties.max_hp = Math.max(
+                Math.ceil(this.unitProperties.max_hp + this.unitProperties.max_hp / spellProperties.power),
+                this.unitProperties.max_hp,
+            );
             this.unitProperties.base_attack = Math.max(
                 Number(
                     (this.unitProperties.base_attack + this.unitProperties.base_attack / spellProperties.power).toFixed(
@@ -3022,6 +3015,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (armorAugmentMagicBuff) {
             this.unitProperties.magic_resist += roundUnitStat(
                 (this.unitProperties.magic_resist / 100) * armorAugmentMagicBuff.getPower(),
+                2,
+            );
+        }
+        // The Magic Defense augment is the dedicated magic half: same shape as the Armor augment's magic
+        // bonus, applied off the same base so the two stack additively rather than compounding.
+        const magicDefenseAugmentBuff = this.getBuff("Magic Defense Augment");
+        if (magicDefenseAugmentBuff) {
+            this.unitProperties.magic_resist += roundUnitStat(
+                (this.initialUnitProperties.magic_resist / 100) * magicDefenseAugmentBuff.getPower(),
                 2,
             );
         }
