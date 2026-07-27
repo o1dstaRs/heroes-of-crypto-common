@@ -11,3 +11,7 @@ tsconfig.build.tsbuildinfo
 # AI battle-engine tournament outputs
 sim-out/
 sim-out-*/
+
+# Python bytecode from the v0.9 simulation scripts — build output, never source.
+__pycache__/
+*.pyc

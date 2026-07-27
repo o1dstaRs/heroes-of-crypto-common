@@ -12,6 +12,7 @@ import { MAX_UNIT_STACK_POWER } from "../constants";
 
 import { isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
+import { MAGIC_REFLECTION_ABILITY_NAME, magicReflectionPercent } from "../abilities/magic_reflection_ability";
 import { Unit } from "../units/unit";
 import type { IModifyableUnitProperties } from "../units/unit_properties";
 import { getRandomInt } from "../utils/lib";
@@ -519,11 +520,18 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
  * damage returned by getMagicMirrorAbilityShare.
  */
 export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
-    if (!targetUnit.hasAbilityActive("Magic Mirror")) {
+    if (!targetUnit.hasAbilityActive("Magic Reflection")) {
         return 0;
     }
 
-    return Math.max(0, Math.min(100, Math.floor(targetUnit.getAbilityPower("Magic Mirror") + targetUnit.getLuck())));
+    // Stack-powered like the Magic Mirror spell: 15/30/45/60/75 across the stack at power 75, then shifted
+    // by the holder's luck. Shared with the client's cards through magicReflectionPercent so the advertised
+    // chance and the rolled chance are the same number.
+    return magicReflectionPercent(
+        targetUnit.getAbilityPower(MAGIC_REFLECTION_ABILITY_NAME),
+        targetUnit.getStackPower(),
+        targetUnit.getLuck(),
+    );
 };
 
 /**

@@ -841,8 +841,8 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Magic Mirror": {
-        "name": "Magic Mirror",
+    "Magic Reflection": {
+        "name": "Magic Reflection",
         "type": "REFLECT",
         "desc": [
             "Rebounds every spell aimed at this creature {}% of the time.",
@@ -852,7 +852,7 @@
         "power": 75,
         "power_type": "MAGIC_MIRROR_REFLECT",
         "skip_reponse": false,
-        "stack_powered": false,
+        "stack_powered": true,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false

@@ -82,7 +82,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Ring of Fire's target-sparing size-aware footprint landed together. The final union preserves main's
 // Mermaid/Wyvern tuning instead of rolling those stats backward. Two shared-tree runs produced this exact
 // byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "2807403485811a8d1279228d16e93fe04b2b34f1e3a657ad1c2abfc7bc6ff751";
+// Re-pinned after Winged Boots started granting flyers +1 armour alongside their +1 movement: every seeded
+// fight with a flyer under the boots takes damage differently, so the traces legitimately move. Two isolated
+// runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "8559cd84d843b3ccb71a439a43af38dfccb15839b626e91d6c9d111416abab97";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

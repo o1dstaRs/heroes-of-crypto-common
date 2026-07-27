@@ -85,6 +85,7 @@ const setupDragonFight = (opts: {
         magicResist?: number;
         abilities?: string[];
         large?: boolean;
+        stackPower?: number;
     }[];
     allies?: { cell: { x: number; y: number } }[];
     blockerCell?: { x: number; y: number };
@@ -118,6 +119,11 @@ const setupDragonFight = (opts: {
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             abilities: spec.abilities ?? [],
+            // Magic Reflection is stack-scaled, so a mirror's rebound share depends on how full its stack
+            // is. These tests are about rebound MECHANICS -- the extra hit, resistances, event buckets --
+            // so they pin a full stack and read the familiar 75% share; the scaling itself is asserted by
+            // the two formula tests at the top of the Magic Reflection describe.
+            stackPower: spec.stackPower ?? 1,
             size: spec.large ? PBTypes.UnitSizeVals.LARGE : PBTypes.UnitSizeVals.SMALL,
             speed: 3,
             morale: 4,
@@ -171,7 +177,7 @@ describe("Magic Dragon creature configuration", () => {
         expect(dragon.movement_type).toBe("FLY");
         expect(dragon.attack_type).toBe("MELEE_MAGIC");
         expect(dragon.magic_resist).toBe(15); // every level 4 creature carries 15
-        expect(dragon.abilities).toEqual(["Tome of Elements", "Magic Mirror"]);
+        expect(dragon.abilities).toEqual(["Tome of Elements", "Magic Reflection"]);
     });
 
     // The brief: the Tsar Cannon and the Gargantuan, roughly 10-15% weaker across the board, with an attack
@@ -535,28 +541,41 @@ describe("action engine — Whirlpool", () => {
     });
 });
 
-describe("Magic Mirror (passive)", () => {
-    it("is the ability's 75% base plus the holder's own luck, and nothing on a unit without it", () => {
-        const mirrored = createTestUnit({ name: "Mirrored", abilities: ["Magic Mirror"] });
-        const lucky = createTestUnit({ name: "Lucky", abilities: ["Magic Mirror"], luck: 10 });
-        const unlucky = createTestUnit({ name: "Unlucky", abilities: ["Magic Mirror"], luck: -10 });
-        const plain = createTestUnit({ name: "Plain" });
+describe("Magic Reflection (passive)", () => {
+    // STACK-SCALED, like the game's other percentages: the configured 75 is what a FULL stack rebounds, and
+    // a depleted one rebounds proportionally less -- 15/30/45/60/75 across the five tiers -- before luck
+    // shifts it. A dragon down to its last pip is a much poorer mirror than a fresh one.
+    it("scales the ability's 75% base across the stack, then shifts it by the holder's own luck", () => {
+        const atStack = (stackPower: number, luck = 0) =>
+            getMagicMirrorAbilityChance(
+                createTestUnit({
+                    name: `Mirror ${stackPower}/${luck}`,
+                    abilities: ["Magic Reflection"],
+                    stackPower,
+                    luck,
+                }),
+            );
 
-        expect(getMagicMirrorAbilityChance(mirrored)).toBe(75);
-        expect(getMagicMirrorAbilityChance(lucky)).toBe(85);
-        expect(getMagicMirrorAbilityChance(unlucky)).toBe(65);
-        expect(getMagicMirrorAbilityChance(plain)).toBe(0);
+        expect([1, 2, 3, 4, 5].map((stackPower) => atStack(stackPower))).toEqual([15, 30, 45, 60, 75]);
+        expect(atStack(5, 10)).toBe(85);
+        expect(atStack(5, -10)).toBe(65);
+        expect(atStack(1, 10)).toBe(25);
+        expect(atStack(1, -10)).toBe(5);
+        expect(getMagicMirrorAbilityChance(createTestUnit({ name: "Plain" }))).toBe(0);
     });
 
-    // Luck itself is capped at +/-10 by the unit, so the reachable band is 65..85 and the 0..100 clamp in
-    // getMagicMirrorAbilityChance is belt-and-braces rather than something luck can ever drive it to. Pinned
-    // so raising the base past 90 is caught here rather than silently producing a chance above certain.
-    it("stays inside 65..85 however extreme the requested luck", () => {
-        const blessed = createTestUnit({ name: "Blessed", abilities: ["Magic Mirror"], luck: 100 });
-        const doomed = createTestUnit({ name: "Doomed", abilities: ["Magic Mirror"], luck: -100 });
+    // Luck itself is capped at +/-10 by the unit, so a full stack reaches 65..85 and the 0..100 clamp in
+    // magicReflectionPercent is belt-and-braces rather than something luck can ever drive it to. The floor
+    // matters more now that the base scales down: an unlucky single pip must never go negative.
+    it("stays inside 0..100 however extreme the requested luck", () => {
+        const atLuck = (luck: number, stackPower = 5) =>
+            getMagicMirrorAbilityChance(
+                createTestUnit({ name: `Mirror ${luck}`, abilities: ["Magic Reflection"], stackPower, luck }),
+            );
 
-        expect(getMagicMirrorAbilityChance(blessed)).toBe(85);
-        expect(getMagicMirrorAbilityChance(doomed)).toBe(65);
+        expect(atLuck(100)).toBe(85);
+        expect(atLuck(-100)).toBe(65);
+        expect(atLuck(-100, 1)).toBe(5);
     });
 
     // The mirror does NOT shield its holder. The spell resolves on it exactly as it would without the
@@ -567,7 +586,7 @@ describe("Magic Mirror (passive)", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
         const targetHpBefore = setup.enemies[0].getHp();
         const casterHpBefore = setup.caster.getHp();
@@ -589,7 +608,7 @@ describe("Magic Mirror (passive)", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
 
         const result = setup.engine.apply({
@@ -616,13 +635,13 @@ describe("Magic Mirror (passive)", () => {
         expect(setup.damageStatisticHolder.get().map(({ damage }) => damage)).toEqual([150]);
     });
 
-    it("also rebounds Fire Strike, whose dedicated cast path must not bypass Magic Mirror", () => {
+    it("also rebounds Fire Strike, whose dedicated cast path must not bypass Magic Reflection", () => {
         alwaysRoll(0);
         const setup = setupDragonFight({
             casterAmountAlive: 10,
             casterStackPower: 5,
             casterSpells: ["Life:Fire Strike"],
-            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
         const targetHpBefore = setup.enemies[0].getHp();
         const casterHpBefore = setup.caster.getHp();
@@ -648,8 +667,8 @@ describe("Magic Mirror (passive)", () => {
             casterStackPower: 5,
             casterSpells: ["Life:Meteorite"],
             enemies: [
-                { cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] },
-                { cell: { x: 7, y: 4 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 },
+                { cell: { x: 7, y: 4 }, abilities: ["Magic Reflection"], stackPower: 5 },
             ],
         });
         const casterHpBefore = setup.caster.getHp();
@@ -678,8 +697,8 @@ describe("Magic Mirror (passive)", () => {
             // (5,3) would block the cast outright rather than joining the ring.
             enemies: [
                 { cell: { x: 6, y: 3 } },
-                { cell: { x: 7, y: 3 }, abilities: ["Magic Mirror"] },
-                { cell: { x: 6, y: 4 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 7, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 },
+                { cell: { x: 6, y: 4 }, abilities: ["Magic Reflection"], stackPower: 5 },
             ],
         });
         const casterHpBefore = setup.caster.getHp();
@@ -707,8 +726,8 @@ describe("Magic Mirror (passive)", () => {
             enemies: [
                 // Ring of Fire spares its aimed target, so both mirrors must stand on neighbouring ring cells.
                 { cell: { x: 6, y: 3 } },
-                { cell: { x: 7, y: 3 }, abilities: ["Magic Mirror"] },
-                { cell: { x: 6, y: 4 }, abilities: ["Magic Mirror"] },
+                { cell: { x: 7, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 },
+                { cell: { x: 6, y: 4 }, abilities: ["Magic Reflection"], stackPower: 5 },
             ],
         });
 
@@ -740,7 +759,10 @@ describe("Magic Mirror (passive)", () => {
             // The aimed target is spared. Its mirror-bearing neighbour burns and rebounds while the friendly
             // neighbour supplies the direct hit; both lower-team impacts are in Abomination range.
             // Keep the mirror off the caster-to-target diagonal; Ring of Fire is thrown and checks LOS.
-            enemies: [{ cell: { x: 5, y: 1 } }, { cell: { x: 6, y: 2 }, abilities: ["Magic Mirror"] }],
+            enemies: [
+                { cell: { x: 5, y: 1 } },
+                { cell: { x: 6, y: 2 }, abilities: ["Magic Reflection"], stackPower: 5 },
+            ],
             allies: [{ cell: { x: 5, y: 2 } }],
         });
         const abomination = createTestUnit({
@@ -784,7 +806,7 @@ describe("Magic Mirror (passive)", () => {
     });
 
     it("does not reward or demoralize its team when friendly Ring absorption kills the owner", () => {
-        alwaysRoll(99); // keep Magic Mirror out of this friendly-fire assertion
+        alwaysRoll(99); // keep Magic Reflection out of this friendly-fire assertion
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -833,7 +855,7 @@ describe("Magic Mirror (passive)", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
         const targetHpBefore = setup.enemies[0].getHp();
         const casterHpBefore = setup.caster.getHp();
@@ -857,7 +879,7 @@ describe("Magic Mirror (passive)", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
 
         setup.engine.apply({
@@ -878,7 +900,7 @@ describe("Magic Mirror (passive)", () => {
             casterAmountAlive: 1,
             casterStackPower: 5,
             casterMagicResist: 50,
-            enemies: [{ cell: { x: 6, y: 3 }, magicResist: 0, abilities: ["Magic Mirror"] }],
+            enemies: [{ cell: { x: 6, y: 3 }, magicResist: 0, abilities: ["Magic Reflection"], stackPower: 5 }],
         });
         const casterHpBefore = setup.caster.getHp();
 

@@ -22,6 +22,7 @@ export * from "./abilities/ability_factory";
 export * from "./abilities/ability_properties";
 export * from "./abilities/ability_helper";
 export * from "./abilities/blind_fury_ability";
+export * from "./abilities/magic_reflection_ability";
 export * as AllAbilities from "./abilities";
 export * as HoCConfig from "./configuration/config_provider";
 export * from "./effects/aura_effect";
