@@ -17,6 +17,8 @@ import {
     buildV08BacklineWardIntent,
     isV08BacklineProtectionBeneficiary,
     isV08BacklineProtectorDecisionAllowed,
+    isV08BacklineProtectorPureMoveMeaningful,
+    isV08BacklineWardPureMoveMeaningful,
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
     prioritizeV08BacklineProtector,
@@ -154,6 +156,71 @@ describe("v0.8 back-line protector intent", () => {
         ).toBe(false);
     });
 
+    it("preserves every currently covered ward and rejects lateral pure-move jitter", () => {
+        const { protector, ward, context } = protectorBoard("Abomination");
+        const secondary = createTestUnit({
+            team: LOWER,
+            name: "Secondary Mage",
+            attackType: MELEE_MAGIC,
+            spells: ["Life:Fire Strike"],
+            damageMax: 5,
+        });
+        placeUnit(context.grid, context.unitsHolder, secondary, { x: 6, y: 5 });
+        const intent = buildV08BacklineProtectorIntent(protector, context)!;
+        expect(intent.ward).toBe(ward);
+        expect(intent.wards).toContain(secondary);
+
+        const losesSecondary: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: protector.getId(),
+                path: [{ x: 4, y: 4 }],
+                targetCells: [{ x: 4, y: 4 }],
+            },
+        ];
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, losesSecondary)).toBe(false);
+        expect(isV08BacklineProtectorPureMoveMeaningful(intent, protector, context, losesSecondary)).toBe(false);
+
+        const lateralHold: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: protector.getId(),
+                path: [{ x: 6, y: 4 }],
+                targetCells: [{ x: 6, y: 4 }],
+            },
+        ];
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, lateralHold)).toBe(true);
+        expect(isV08BacklineProtectorPureMoveMeaningful(intent, protector, context, lateralHold)).toBe(false);
+        expect(prioritizeV08BacklineProtector(protector, context, lateralHold, true)).toEqual([
+            { type: "wait_turn", unitId: protector.getId() },
+        ]);
+        expect(prioritizeV08BacklineProtector(protector, context, lateralHold, false)).toEqual([
+            { type: "defend_turn", unitId: protector.getId() },
+        ]);
+
+        const relocatingAttack: GameAction[] = [
+            {
+                type: "melee_attack",
+                attackerId: protector.getId(),
+                targetId: context.unitsHolder.getAllEnemyUnits(LOWER)[0].getId(),
+                attackFrom: { x: 4, y: 4 },
+            },
+        ];
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, relocatingAttack)).toBe(false);
+
+        const uncoveredWard = createTestUnit({
+            team: LOWER,
+            name: "Third Archer",
+            attackType: RANGE,
+            rangeShots: 1,
+            damageMax: 1,
+        });
+        placeUnit(context.grid, context.unitsHolder, uncoveredWard, { x: 7, y: 5 });
+        const expandedIntent = buildV08BacklineProtectorIntent(protector, context)!;
+        expect(preservesV08BacklineProtectorIntent(expandedIntent, protector, context, lateralHold)).toBe(true);
+        expect(isV08BacklineProtectorPureMoveMeaningful(expandedIntent, protector, context, lateralHold)).toBe(true);
+    });
+
     it("follows a displaced ward instead of passively waiting forever", () => {
         const { protector, ward, context } = protectorBoard("Abomination", {
             protectorCell: { x: 1, y: 1 },
@@ -165,10 +232,104 @@ describe("v0.8 back-line protector intent", () => {
         expect(preservesV08BacklineProtectorIntent(intent!, protector, context, passive)).toBe(false);
         const follow = prioritizeV08BacklineProtector(protector, context, passive, true);
         expect(follow[0]?.type).toBe("move_unit");
+        expect(isV08BacklineProtectorPureMoveMeaningful(intent!, protector, context, follow)).toBe(true);
         const destination = follow[0]?.type === "move_unit" ? follow[0].path.at(-1)! : protector.getBaseCell();
         expect(
             Math.max(Math.abs(destination.x - ward.getBaseCell().x), Math.abs(destination.y - ward.getBaseCell().y)),
         ).toBeLessThan(4);
+    });
+
+    it("keeps secondary coverage during partial catch-up and permits only a higher-value atomic primary swap", () => {
+        const { protector, ward, context } = protectorBoard("Abomination", {
+            protectorCell: { x: 1, y: 1 },
+        });
+        const secondaryA = createTestUnit({
+            team: LOWER,
+            name: "Secondary Archer A",
+            attackType: RANGE,
+            rangeShots: 10,
+            damageMax: 50,
+            amountAlive: 1,
+        });
+        const secondaryB = createTestUnit({
+            team: LOWER,
+            name: "Secondary Archer B",
+            attackType: RANGE,
+            rangeShots: 10,
+            damageMax: 50,
+            amountAlive: 1,
+        });
+        placeUnit(context.grid, context.unitsHolder, secondaryA, { x: 1, y: 2 });
+        placeUnit(context.grid, context.unitsHolder, secondaryB, { x: 2, y: 1 });
+        const intent = buildV08BacklineProtectorIntent(protector, context)!;
+        expect(intent.ward).toBe(ward);
+
+        const dropsSecondariesPartway: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: protector.getId(),
+                path: [{ x: 3, y: 3 }],
+                targetCells: [{ x: 3, y: 3 }],
+            },
+        ];
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, dropsSecondariesPartway)).toBe(false);
+
+        const lowerValueSwap: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: protector.getId(),
+                path: [{ x: 4, y: 4 }],
+                targetCells: [{ x: 4, y: 4 }],
+            },
+        ];
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, lowerValueSwap)).toBe(false);
+
+        const follow = prioritizeV08BacklineProtector(protector, context, dropsSecondariesPartway, false);
+        expect(follow[0]?.type).toBe("move_unit");
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, follow)).toBe(true);
+        const followDestination = follow[0]?.type === "move_unit" ? follow[0].targetCells : [];
+        expect(followDestination).toEqual(expect.arrayContaining([{ x: 2, y: 2 }]));
+
+        // With only one 500-value secondary, the 800-value primary is an actual value upgrade; the same
+        // immediate swap is allowed, while a partial dropping move remains forbidden.
+        const valueBoard = protectorBoard("Abomination", { protectorCell: { x: 1, y: 1 } });
+        const loneSecondary = createTestUnit({
+            team: LOWER,
+            name: "Lone Secondary",
+            attackType: RANGE,
+            rangeShots: 10,
+            damageMax: 50,
+            amountAlive: 1,
+        });
+        placeUnit(valueBoard.context.grid, valueBoard.context.unitsHolder, loneSecondary, { x: 1, y: 2 });
+        const valueSwapIntent = buildV08BacklineProtectorIntent(valueBoard.protector, valueBoard.context)!;
+        const valueSwap: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: valueBoard.protector.getId(),
+                path: [{ x: 4, y: 4 }],
+                targetCells: [{ x: 4, y: 4 }],
+            },
+        ];
+        const valuePartial: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: valueBoard.protector.getId(),
+                path: [{ x: 3, y: 3 }],
+                targetCells: [{ x: 3, y: 3 }],
+            },
+        ];
+        expect(
+            preservesV08BacklineProtectorIntent(valueSwapIntent, valueBoard.protector, valueBoard.context, valueSwap),
+        ).toBe(true);
+        expect(
+            preservesV08BacklineProtectorIntent(
+                valueSwapIntent,
+                valueBoard.protector,
+                valueBoard.context,
+                valuePartial,
+            ),
+        ).toBe(false);
     });
 
     it("keeps a useful in-place action when forced displacement has no legal catch-up route", () => {
@@ -206,6 +367,23 @@ describe("v0.8 back-line protector intent", () => {
         const repaired = repairV08BacklineWardDecision(ward, context, meleeRush);
         expect(preservesV08BacklineWardIntent(intent!, ward, context, repaired)).toBe(true);
         expect(repaired.some((action) => action.type === "melee_attack" && action.attackFrom.x === 8)).toBe(false);
+    });
+
+    it("does not treat a ward's lateral movement inside the protector screen as work", () => {
+        const { protector, ward, context } = protectorBoard("Abomination");
+        const lateral: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: ward.getId(),
+                path: [{ x: 6, y: 5 }],
+                targetCells: [{ x: 6, y: 5 }],
+            },
+        ];
+        const intent = buildV08BacklineWardIntent(ward, context);
+
+        expect(intent?.protector).toBe(protector);
+        expect(preservesV08BacklineWardIntent(intent!, ward, context, lateral)).toBe(true);
+        expect(isV08BacklineWardPureMoveMeaningful(intent!, ward, context, lateral)).toBe(false);
     });
 
     it("keeps a spell-bearing melee ward screened instead of letting it rush", () => {
@@ -266,6 +444,43 @@ describe("v0.8 back-line protector intent", () => {
 
         expect(isV08BacklineProtectorDecisionAllowed(protector, context, withinExtendedAura)).toBe(true);
         expect(isV08BacklineProtectorDecisionAllowed(protector, context, beyondExtendedAura)).toBe(false);
+
+        const tighteningBoard = protectorBoard("Abomination", { protectorCell: { x: 5, y: 1 } });
+        tighteningBoard.context.fightProperties!.setSynergyUnitsPerFactions(LOWER, 0, 0, 6, 0);
+        tighteningBoard.context.fightProperties!.updateSynergyPerTeam(
+            LOWER,
+            PBTypes.FactionVals.MIGHT,
+            MightSynergy.PLUS_AURAS_RANGE,
+            SynergyLevel.LEVEL_3,
+        );
+        const tighteningIntent = buildV08BacklineProtectorIntent(tighteningBoard.protector, tighteningBoard.context)!;
+        const tighten: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: tighteningBoard.protector.getId(),
+                path: [{ x: 5, y: 2 }],
+                targetCells: [{ x: 5, y: 2 }],
+            },
+        ];
+        expect(
+            preservesV08BacklineProtectorIntent(
+                tighteningIntent,
+                tighteningBoard.protector,
+                tighteningBoard.context,
+                tighten,
+            ),
+        ).toBe(true);
+        expect(
+            isV08BacklineProtectorPureMoveMeaningful(
+                tighteningIntent,
+                tighteningBoard.protector,
+                tighteningBoard.context,
+                tighten,
+            ),
+        ).toBe(true);
+        expect(prioritizeV08BacklineProtector(tighteningBoard.protector, tighteningBoard.context, tighten, false)).toBe(
+            tighten,
+        );
     });
 
     it("uses Queen only as a non-summoned anti-fly interceptor and permits local interception", () => {
@@ -293,6 +508,25 @@ describe("v0.8 back-line protector intent", () => {
             true,
         );
         expect(isV08BacklineProtectorDecisionAllowed(flyerBoard.protector, flyerBoard.context, rush)).toBe(false);
+
+        const secondary = createTestUnit({
+            team: LOWER,
+            name: "Secondary Mage",
+            attackType: MELEE_MAGIC,
+            spells: ["Life:Fire Strike"],
+            damageMax: 1,
+        });
+        placeUnit(flyerBoard.context.grid, flyerBoard.context.unitsHolder, secondary, { x: 4, y: 5 });
+        const multiWardIntent = buildV08BacklineProtectorIntent(flyerBoard.protector, flyerBoard.context)!;
+        expect(multiWardIntent.wards).toContain(secondary);
+        expect(
+            preservesV08BacklineProtectorIntent(
+                multiWardIntent,
+                flyerBoard.protector,
+                flyerBoard.context,
+                localIntercept,
+            ),
+        ).toBe(false);
 
         const noFlyer = protectorBoard("Arachna Queen");
         expect(buildV08BacklineProtectorIntent(noFlyer.protector, noFlyer.context)).toBeUndefined();

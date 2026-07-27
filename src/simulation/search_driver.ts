@@ -34,6 +34,8 @@ import {
 import {
     buildV08BacklineProtectorIntent,
     buildV08BacklineWardIntent,
+    isV08BacklineProtectorPureMoveMeaningful,
+    isV08BacklineWardPureMoveMeaningful,
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
@@ -605,6 +607,12 @@ interface ISearchCounters {
     pureRangedJitNoMeleeFocusProposalsByLap: Record<string, number>;
     pureRangedJitNoMeleeFocusOverridesByLap: Record<string, number>;
     rolloutTurnsTotal: number;
+    /** Hard-passive decisions whose bounded, role-filtered catalog required an exact private expansion. */
+    passiveCatalogExpansions: number;
+    /** Exact private expansions that found an engine-valid productive candidate. */
+    passiveCatalogExpansionRecoveries: number;
+    /** Hard-passive decisions resolved immediately because exactly one engine-valid force-tier action existed. */
+    singleForceTierFastPaths: number;
     msTotal: number;
     circuitSkipped: number;
     searchedByIncumbentKind: Record<string, number>;
@@ -732,6 +740,9 @@ const emptyCounters = (): ISearchCounters => ({
     pureRangedJitNoMeleeFocusProposalsByLap: {},
     pureRangedJitNoMeleeFocusOverridesByLap: {},
     rolloutTurnsTotal: 0,
+    passiveCatalogExpansions: 0,
+    passiveCatalogExpansionRecoveries: 0,
+    singleForceTierFastPaths: 0,
     msTotal: 0,
     circuitSkipped: 0,
     searchedByIncumbentKind: {},
@@ -788,12 +799,21 @@ export interface ISearchScoredDecision {
 
 export type SearchScoredDecisionObserver = (decision: ISearchScoredDecision) => void;
 
+/** Exact authoritative result of the production hard-passive probe used by qualification diagnostics. */
+export interface ISearchPassiveProductiveProbe {
+    readonly unitId: string;
+    readonly hasEngineValidProductiveAlternative: boolean;
+}
+
+export type SearchPassiveProductiveProbeObserver = (probe: ISearchPassiveProductiveProbe) => void;
+
 export class SearchDriver {
     public readonly enabled: boolean;
     private readonly mode: SearchMode;
     private readonly deps: ILookaheadDeps;
     private readonly match: ISearchMatchInfo;
     private readonly scoredDecisionObserver: SearchScoredDecisionObserver | undefined;
+    private readonly passiveProductiveProbeObserver: SearchPassiveProductiveProbeObserver | undefined;
     private readonly versions: ReadonlySet<string>;
     private readonly gate: number;
     private readonly horizon: number;
@@ -860,10 +880,12 @@ export class SearchDriver {
         deps: ILookaheadDeps,
         match: ISearchMatchInfo = {},
         scoredDecisionObserver?: SearchScoredDecisionObserver,
+        passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
     ) {
         this.deps = deps;
         this.match = match;
         this.scoredDecisionObserver = scoredDecisionObserver;
+        this.passiveProductiveProbeObserver = passiveProductiveProbeObserver;
         this.mode =
             process.env.Q2_WAIT_ABLATION === "1"
                 ? "ablation"
@@ -1458,12 +1480,40 @@ export class SearchDriver {
                 prioritizeV08SUrgency ||
                 pureRangedParetoNoMeleeFocusCatalogBoard ||
                 pureRangedJitNoMeleeFocusCatalogBoard;
+            const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
+            const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
+            const preservesBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
+                (!backlineProtectorIntent ||
+                    preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)) &&
+                (!backlineWardIntent ||
+                    preservesV08BacklineWardIntent(backlineWardIntent, unit, context, candidate.actions));
+            const keepsBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
+                preservesBacklineIntent(candidate) &&
+                (!isPureMoveCandidate(candidate) ||
+                    ((!backlineProtectorIntent ||
+                        isV08BacklineProtectorPureMoveMeaningful(
+                            backlineProtectorIntent,
+                            unit,
+                            context,
+                            candidate.actions,
+                        )) &&
+                        (!backlineWardIntent ||
+                            isV08BacklineWardPureMoveMeaningful(
+                                backlineWardIntent,
+                                unit,
+                                context,
+                                candidate.actions,
+                            ))));
             const enumerationOptions = {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
                 enrichIncumbentMetadata:
                     isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
+                retainMoveCandidateBeforeCap:
+                    prioritizeProductiveActions && (backlineProtectorIntent || backlineWardIntent)
+                        ? keepsBacklineIntent
+                        : undefined,
                 preserveMovePostureDiversity:
                     this.scoredDecisionObserver !== undefined ||
                     (isV08TargetPressurePolicy &&
@@ -1473,26 +1523,21 @@ export class SearchDriver {
                 preserveAttackTargetCoverage:
                     this.scoredDecisionObserver !== undefined || preserveBaselineAttackTargetCoverage,
             };
-            const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
-            const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 // Abomination/Arachna Queen are drafted and deployed as back-line protectors. Native v0.8
                 // establishes that intent; every a13 challenger must preserve its ward geometry (or answer an
                 // intruder) so rollout search cannot turn the role-aware hold into an unsupported charge.
-                if (
-                    backlineProtectorIntent &&
-                    !preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)
-                ) {
-                    return false;
-                }
+                if (backlineProtectorIntent && !preservesBacklineIntent(candidate)) return false;
                 // The protected ranged/caster stack owns the other half of the same contract: while its output
                 // remains live it may shoot, cast, or reposition within the screen, but search cannot promote a
                 // melee rush that walks out of the aura the protector is deliberately holding.
+                if (backlineWardIntent && !preservesBacklineIntent(candidate)) return false;
                 if (
-                    backlineWardIntent &&
-                    !preservesV08BacklineWardIntent(backlineWardIntent, unit, context, candidate.actions)
+                    prioritizeProductiveActions &&
+                    (backlineProtectorIntent || backlineWardIntent) &&
+                    !keepsBacklineIntent(candidate)
                 ) {
                     return false;
                 }
@@ -1510,9 +1555,63 @@ export class SearchDriver {
                 }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
-            const candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
+            let candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
                 keepCandidate,
             );
+            // Movement applies the role gate before its generic top-K cap, so the normal bounded catalog keeps
+            // the nearest meaningful route instead of capping to screen jitter or a screen-breaking route.
+            // A semantic candidate can still be rejected by the real action engine. Probe the bounded catalog
+            // once before deciding whether it is complete; only when no force-tier action actually executes do
+            // we make one private uncapped pass. The first engine-valid recovery alone enters search, so this
+            // cannot broaden rollouts or affect a hard-passive decision whose bounded catalog was actionable.
+            let boundedProductiveFallback: IEnumeratedCandidate | undefined;
+            let expandedProductiveFallback: IEnumeratedCandidate | undefined;
+            if (prioritizeProductiveActions && !this.observeOnly) {
+                boundedProductiveFallback = this.firstEngineValidProductiveCandidate(
+                    unit,
+                    candidates,
+                    seedBase,
+                    prioritizeDominantFinish,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                    true,
+                );
+                if (!boundedProductiveFallback) {
+                    this.counters.passiveCatalogExpansions += 1;
+                    const expandedCandidates = enumerateCandidates(unit, context, incumbent, {
+                        maxMoveShotComposites: this.moveShotCapForVersion(version),
+                        includeMountainAttacks: isV08Search,
+                        enrichIncumbentMetadata:
+                            isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
+                        preserveMovePostureDiversity:
+                            this.scoredDecisionObserver !== undefined ||
+                            (isV08TargetPressurePolicy &&
+                                v08sHasStrongerRangedOutput &&
+                                !prioritizeDominantFinish &&
+                                !prioritizeV08SUrgency),
+                        preserveAttackTargetCoverage:
+                            this.scoredDecisionObserver !== undefined || preserveBaselineAttackTargetCoverage,
+                    }).candidates.filter(keepCandidate);
+                    expandedProductiveFallback = this.firstEngineValidProductiveCandidate(
+                        unit,
+                        expandedCandidates,
+                        seedBase,
+                        prioritizeDominantFinish,
+                        prioritizeV08STargetPressure,
+                        prioritizeV08SUrgency,
+                        true,
+                    );
+                    if (expandedProductiveFallback) {
+                        this.counters.passiveCatalogExpansionRecoveries += 1;
+                        candidates = [...candidates, expandedProductiveFallback];
+                    }
+                }
+                this.passiveProductiveProbeObserver?.({
+                    unitId: unit.getId(),
+                    hasEngineValidProductiveAlternative:
+                        boundedProductiveFallback !== undefined || expandedProductiveFallback !== undefined,
+                });
+            }
             if (mixedSupportedParetoFunnelProbe?.failedStage === null) {
                 if (pureRangedParetoNoMeleeFocusCatalogBoard) {
                     this.counters.mixedSupportedParetoNoMeleeFocusFunnelCumulative.catalog_expansion += 1;
@@ -1914,17 +2013,19 @@ export class SearchDriver {
             // actually completes rather than merely passing the enumerator's legality mirror. A circuit-open
             // decision also probes here because it intentionally skips the expensive comparison below.
             const productiveFallback =
-                useProductiveFallback && (this.decisionDeadlineMs !== null || this.circuitOpen)
-                    ? this.firstEngineValidProductiveCandidate(
-                          unit,
-                          candidates,
-                          seedBase,
-                          prioritizeDominantFinish,
-                          prioritizeV08STargetPressure,
-                          prioritizeV08SUrgency,
-                          prioritizeProductiveActions,
-                      )
-                    : undefined;
+                prioritizeProductiveActions && !this.observeOnly
+                    ? (expandedProductiveFallback ?? boundedProductiveFallback)
+                    : useProductiveFallback && (this.decisionDeadlineMs !== null || this.circuitOpen)
+                      ? this.firstEngineValidProductiveCandidate(
+                            unit,
+                            candidates,
+                            seedBase,
+                            prioritizeDominantFinish,
+                            prioritizeV08STargetPressure,
+                            prioritizeV08SUrgency,
+                            false,
+                        )
+                      : undefined;
             if (this.circuitOpen) {
                 this.counters.circuitSkipped += 1;
                 this.counters.msTotal += performance.now() - t0;
@@ -1932,6 +2033,25 @@ export class SearchDriver {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
                 return productiveFallback?.actions ?? incumbent;
+            }
+            // A hard passive with exactly one engine-valid force-tier alternative has no search decision left:
+            // the lexicographic gate below must select that action regardless of rollout value. Returning the
+            // already-probed action avoids spending the deadline on an inevitable screen-preserving move and
+            // materially lowers protector decision latency without changing candidate identity or posture.
+            if (
+                prioritizeProductiveActions &&
+                productiveFallback &&
+                candidates.filter(isForceTierProductiveCandidate).length === 1
+            ) {
+                this.counters.decisions += 1;
+                this.counters.singleForceTierFastPaths += 1;
+                this.counters.msTotal += performance.now() - t0;
+                if (productiveFallback.actions !== incumbent) {
+                    this.counters.overrides += 1;
+                    bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                    bump(this.counters.overridesToKind, productiveFallback.kind);
+                }
+                return productiveFallback.actions;
             }
             this.counters.decisions += 1;
             if (this.mode === "ablation") {
@@ -2061,6 +2181,9 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            passiveCatalogExpansions: c.passiveCatalogExpansions,
+            passiveCatalogExpansionRecoveries: c.passiveCatalogExpansionRecoveries,
+            singleForceTierFastPaths: c.singleForceTierFastPaths,
             dominantFinishTurns: c.dominantFinishTurns,
             dominantFinishCombatOverrides: c.dominantFinishCombatOverrides,
             dominantFinishCombatFallbacks: c.dominantFinishCombatFallbacks,

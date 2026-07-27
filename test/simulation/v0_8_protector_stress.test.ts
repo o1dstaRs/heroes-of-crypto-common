@@ -160,13 +160,11 @@ describe("v0.8 protector production regressions", () => {
         }
     });
 
-    test("reports forced narrowing as a blocked gap without mislabeling it as an AI rush", () => {
-        // The 500-HP / 44-armor Abomination now keeps coverage throughout game 36. Its paired red-seat
-        // scenario still exercises the intended forced narrowing and blocked catch-up telemetry.
-        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 37);
+    test("keeps exact Flesh Shield coverage through the former center-map narrowing case", () => {
+        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 36);
         expect(record.rejectedActions).toBe(0);
-        expect(record.metrics.abominationCoverageGapTurns).toBeGreaterThan(0);
-        expect(record.metrics.blockedCatchUpTurns).toBeGreaterThan(0);
+        expect(record.metrics.abominationCoverageGapTurns).toBe(0);
+        expect(record.metrics.blockedCatchUpTurns).toBe(0);
         expect(record.metrics.abominationExactRangeViolations).toBe(0);
         expect(record.metrics.guardBreakingFinalActions).toBe(0);
         expect(record.metrics.rushViolations).toBe(0);

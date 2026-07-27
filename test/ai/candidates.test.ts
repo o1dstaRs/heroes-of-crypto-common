@@ -319,6 +319,31 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(optInUncapped.map(({ targetCell }) => targetCell)).toEqual(full.map(({ targetCell }) => targetCell));
     });
 
+    it("applies a hard move-role gate before selecting the nearest capped destination", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Role holder", attackType: MELEE, speed: 4 });
+        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
+        const distance = (cell: XY): number =>
+            Math.abs(cell.x - enemy.getBaseCell().x) + Math.abs(cell.y - enemy.getBaseCell().y);
+        const fullEligible = ofKind(enumerateCandidates(unit, ctxFor(c), endTurn(unit)).candidates, "move").filter(
+            ({ targetCell }) => targetCell !== undefined && targetCell.y <= unit.getBaseCell().y,
+        );
+        const nearestEligibleDistance = Math.min(...fullEligible.map(({ targetCell }) => distance(targetCell!)));
+
+        const gated = enumerateCandidates(unit, ctxFor(c), endTurn(unit), {
+            maxMoveDestinations: 1,
+            retainMoveCandidateBeforeCap: ({ targetCell }) =>
+                targetCell !== undefined && targetCell.y <= unit.getBaseCell().y,
+        });
+        const gatedMoves = ofKind(gated.candidates, "move");
+        expect(gatedMoves).toHaveLength(1);
+        expect(gatedMoves[0].targetCell!.y).toBeLessThanOrEqual(unit.getBaseCell().y);
+        expect(distance(gatedMoves[0].targetCell!)).toBe(nearestEligibleDistance);
+        expect(gated.truncated).toContain("move");
+    });
+
     it("does not expand an opt-in move cap when every reachable destination is closing", () => {
         const c = createCombatTestContext();
         const unit = createTestUnit({ team: LOWER, name: "Corner runner", attackType: MELEE, speed: 2 });

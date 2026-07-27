@@ -190,6 +190,13 @@ export interface IEnumerateOptions {
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
+     * Optional consumer-specific move gate applied before maxMoveDestinations. This lets a role-aware caller
+     * retain the nearest move satisfying a hard geometry contract instead of capping first and accidentally
+     * erasing the entire legal role-preserving move class. Default undefined keeps every existing consumer's
+     * candidate set and ordering exact.
+     */
+    retainMoveCandidateBeforeCap?: (candidate: Readonly<IEnumeratedCandidate>) => boolean;
+    /**
      * Opt-in capped-move diversity for ranged-posture search. When both classes exist, retain the nearest
      * closing move and the least-retreating non-closing move; a cap of one expands to two so neither posture is
      * erased. Default false so historical capped consumers, including v0.7 search, keep their exact ordering.
@@ -604,7 +611,7 @@ class CandidateGenerator {
             return;
         }
         const base = this.unit.getBaseCell();
-        const routes: IReadonlyWeightedRoute[] = [];
+        let routes: IReadonlyWeightedRoute[] = [];
         for (const routeList of movePath.knownPaths.values()) {
             const route = routeList[0];
             if (!route?.route.length) {
@@ -617,6 +624,15 @@ class CandidateGenerator {
                 continue;
             }
             routes.push(route);
+        }
+        const candidateOf = (route: IReadonlyWeightedRoute): IEnumeratedCandidate => ({
+            kind: "move",
+            actions: [this.moveAction(route)],
+            targetCell: { x: route.cell.x, y: route.cell.y },
+            features: this.features(),
+        });
+        if (this.options.retainMoveCandidateBeforeCap) {
+            routes = routes.filter((route) => this.options.retainMoveCandidateBeforeCap?.(candidateOf(route)));
         }
         const cap = this.options.maxMoveDestinations ?? 0;
         let kept = routes;
@@ -653,12 +669,6 @@ class CandidateGenerator {
             }
             if (kept.length < routes.length) this.truncated.push("move");
         }
-        const candidateOf = (route: IReadonlyWeightedRoute): IEnumeratedCandidate => ({
-            kind: "move",
-            actions: [this.moveAction(route)],
-            targetCell: { x: route.cell.x, y: route.cell.y },
-            features: this.features(),
-        });
         if (this.options.enrichIncumbentMetadata) {
             for (const route of routes) this.enrichIncumbentCandidate(candidateOf(route));
         }

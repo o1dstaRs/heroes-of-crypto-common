@@ -72,7 +72,11 @@ import {
     PHASE_B_VALUE_ROW_TYPE,
     requirePhaseBRunFingerprint,
 } from "./phase_b_dataset";
-import { SearchDriver, type SearchScoredDecisionObserver } from "./search_driver";
+import {
+    SearchDriver,
+    type SearchPassiveProductiveProbeObserver,
+    type SearchScoredDecisionObserver,
+} from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search } from "./v0_8_a13_search";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
@@ -305,6 +309,12 @@ export interface IMatchConfig {
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
     /**
+     * Optional detached turn-activation events emitted before strategy selection. Diagnostics need this narrow
+     * seam to distinguish an hourglass unit legitimately skipped by Stun/Freeze/Blindness from a living waiter
+     * silently lost at the lap boundary without cloning every ordinary combat event batch.
+     */
+    turnActivationObserver?: (events: readonly GameEvent[]) => void;
+    /**
      * Qualification-only production parity seam. Native v0.9 turns are timed through `decideTurn` plus the
      * same snapshot/apply/rollback transaction the server runs before publishing any live action. Mindless
      * units and every other strategy version are excluded; ordinary live application still follows.
@@ -315,6 +325,11 @@ export interface IMatchConfig {
      * scored candidates only after rollback; ordinary matches and the production v0.8 a13 factory are unchanged.
      */
     searchScoredDecisionObserver?: SearchScoredDecisionObserver;
+    /**
+     * Qualification-only result from the exact production hard-passive engine probe. The callback observes
+     * whether at least one role-filtered productive candidate really executes; it never changes selection.
+     */
+    searchPassiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver;
     /**
      * Offline teacher collection invariant. The deep observer search must return the incumbent; listed frozen
      * anchor teams then run that incumbent through a second, exact production a13 SearchDriver. This keeps
@@ -785,10 +800,15 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         redVersion: config.redVersion,
     };
     const search = config.searchScoredDecisionObserver
-        ? new SearchDriver(driverDeps, searchMatch, config.searchScoredDecisionObserver)
+        ? new SearchDriver(
+              driverDeps,
+              searchMatch,
+              config.searchScoredDecisionObserver,
+              config.searchPassiveProductiveProbeObserver,
+          )
         : shouldUseDefaultV08A13Search(searchMatch)
-          ? createV08A13SearchDriver(driverDeps, searchMatch)
-          : new SearchDriver(driverDeps, searchMatch);
+          ? createV08A13SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
+          : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
@@ -1035,6 +1055,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             const result = turnEngine.advanceAfterNoActiveUnit({
                 damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
             });
+            if (config.turnActivationObserver) {
+                const skipped = result.events.filter((event) => event.type === "unit_skipped");
+                if (skipped.length) config.turnActivationObserver(structuredClone(skipped));
+            }
             applyEvents(result.events);
             if (result.fightFinished) {
                 finished = true;
