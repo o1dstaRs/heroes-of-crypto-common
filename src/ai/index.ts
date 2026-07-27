@@ -21,6 +21,7 @@ import { STRATEGY_V0_7 } from "./versions/v0_7";
 import { STRATEGY_V0_7S } from "./versions/v0_7s";
 import { STRATEGY_V0_8 } from "./versions/v0_8";
 import { STRATEGY_V0_8S } from "./versions/v0_8s";
+import { STRATEGY_V0_9 } from "./versions/v0_9";
 
 export type {
     AIPolicyEventKind,
@@ -35,11 +36,14 @@ export type {
     IV08SupportedBandDuelDecisionSummary,
     IV08SupportedBandDuelDetails,
     IV08SupportedPrepinEgressDetails,
+    IV09DecisionTelemetryDetails,
     V08ProtectedAdvanceGuardrailMode,
     V08ProtectedAdvanceGuardrailReason,
     V08SupportedBandDominanceReason,
     V08SupportedBandScreenedCloserReason,
     V08SupportedBandDuelDifference,
+    V09ArtifactStatus,
+    V09DecisionFallbackReason,
 } from "./ai_strategy";
 
 // Browser-safe identity and immutable configuration for the promoted v0.8+a13
@@ -79,6 +83,49 @@ export type {
     IShotCandidateFeatures,
 } from "./candidates";
 
+// Browser-safe v0.9 artifact identity, feature contract and deterministic fixed-point inference. The embedded
+// bootstrap is explicitly anchor-only/unpromoted; server allocation must require V09_MODEL_PROMOTED.
+export {
+    V09_MODEL_ARTIFACT,
+    V09_MODEL_ID,
+    V09_MODEL_PROMOTED,
+    V09_MODEL_SHA256,
+    V09_MODEL_STATUS,
+} from "./versions/v0_9_artifact";
+export {
+    V09_CANDIDATE_FEATURE_NAMES,
+    V09_FEATURE_SCHEMA,
+    V09_FEATURE_SCHEMA_SHA256,
+    V09_INPUT_FEATURE_NAMES,
+    V09_RICH_FEATURE_NAMES,
+    v09CandidateFeatureVector,
+    v09HasResolvedVisibleShot,
+    v09RangeObservation,
+} from "./versions/v0_9_features";
+export {
+    V09_FEATURE_BLOCKS,
+    V09_EMPTY_FAILURES_SHA256,
+    V09_MODEL_HASH_ALGORITHM,
+    V09_MODEL_SCHEMA,
+    V09_QUALIFICATION_RECEIPT_SCHEMA,
+    isV09ModelRunnable,
+    scoreV09FixedPoint,
+    serializeV09ModelHashPayload,
+    serializeV09QualificationReceiptPayload,
+    validateV09ModelArtifact,
+} from "./versions/v0_9_model";
+export type {
+    IV09Architecture,
+    IV09DenseLayer,
+    IV09FeatureBlock,
+    IV09FeatureContract,
+    IV09FixedPointContract,
+    IV09ModelArtifact,
+    IV09ModelSource,
+    IV09Normalization,
+    IV09QualificationReceipt,
+} from "./versions/v0_9_model";
+
 /**
  * Registry of every in-game AI version. Add the next generation here — the battle engine and
  * tournament runner discover versions through this map, so a new version is comparable against the
@@ -102,6 +149,10 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // v0.7 = v0.6 + the distilled wait-scorer baked in (S1 sign-off; see versions/v0_7.ts).
     // It remains registered as the frozen incumbent now that v0.8 is the shipped default below.
     STRATEGY_V0_7,
+    // v0.9 is registered for explicit research/canary seats, but its embedded artifact is an intentionally
+    // untrained, unpromoted candidate-zero anchor. Keep it before the v0.8s/v0.8 pair until a separately reviewed
+    // qualification commit promotes a real model; this preserves LATEST/DEFAULT and alias adjacency invariants.
+    STRATEGY_V0_9,
     // v0.8s is the compatibility alias used to replay the frozen a13 training/validation seat. Its native
     // strategy is now identical to v0.8; the distinct version string remains useful for historical artifacts
     // and seat-scoped research. Keep it before v0.8 so it can never become LATEST/DEFAULT by registration.

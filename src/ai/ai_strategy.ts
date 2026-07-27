@@ -68,7 +68,8 @@ export type AIPolicyEventKind =
     | "v0.8_supported_band_advance_funnel"
     | "v0.8_supported_band_dominance_comparison"
     | "v0.8_supported_band_screened_closer_comparison"
-    | "v0.8_supported_band_duel_difference";
+    | "v0.8_supported_band_duel_difference"
+    | "v0.9_decision";
 
 export const V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES = [
     "melee_incumbent",
@@ -313,6 +314,39 @@ export interface IV08ProtectedAdvanceGuardrailDetails {
     reachableThreatsAfter: number;
 }
 
+export type V09ArtifactStatus = "anchor_only" | "trained";
+
+export type V09DecisionFallbackReason =
+    | "untrained_anchor"
+    | "unpromoted_model"
+    | "invalid_artifact"
+    | "missing_context"
+    | "runtime_error"
+    | "budget_exceeded"
+    | "no_safe_candidate"
+    | "hard_guard"
+    | "below_margin";
+
+/**
+ * One detached v0.9 root-decision record. It is emitted even while the deliberately untrained bootstrap
+ * artifact reproduces v0.8, which lets the server attribute every v0.9 seat without treating an ordinary
+ * confidence fallback as a model/runtime fault.
+ */
+export interface IV09DecisionTelemetryDetails {
+    artifactStatus: V09ArtifactStatus;
+    modelId: string;
+    modelSha256: string | null;
+    selectedCandidateIndex: number;
+    selectedCandidateSignature: string;
+    candidateCount: number;
+    anchorScore: number | null;
+    selectedScore: number | null;
+    margin: number | null;
+    elapsedMicros: number;
+    fallbackReason: V09DecisionFallbackReason | null;
+    circuitBreakerRecommended: boolean;
+}
+
 /** Detached, read-only strategy telemetry used by simulation diagnostics; live callers leave it unset. */
 export type IAIPolicyEvent =
     | (IAIPolicyEventBase & {
@@ -366,6 +400,11 @@ export type IAIPolicyEvent =
           details?: never;
       })
     | (IAIPolicyEventBase & {
+          kind: "v0.9_decision";
+          details: IV09DecisionTelemetryDetails;
+          stage?: never;
+      })
+    | (IAIPolicyEventBase & {
           kind: Exclude<
               AIPolicyEventKind,
               | "v0.8_supported_ranged_escape"
@@ -378,6 +417,7 @@ export type IAIPolicyEvent =
               | "v0.8_protected_advance_guardrail"
               | "v0.8_supported_prepin_egress"
               | "v0.8_supported_prepin_egress_funnel"
+              | "v0.9_decision"
           >;
           stage?: never;
           details?: never;

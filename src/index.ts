@@ -95,8 +95,19 @@ export {
     V08_A13_SOURCE_TREE,
     V08_A13_SOURCE_VERSION,
     V08_A13_VALUE_LEAF,
+    V09_MODEL_ARTIFACT,
+    V09_MODEL_ID,
+    V09_MODEL_PROMOTED,
+    V09_MODEL_SHA256,
+    V09_MODEL_STATUS,
+    V09_EMPTY_FAILURES_SHA256,
+    V09_QUALIFICATION_RECEIPT_SCHEMA,
+    serializeV09ModelHashPayload,
+    serializeV09QualificationReceiptPayload,
+    validateV09ModelArtifact,
 } from "./ai";
 export type {
+    IAIPolicyEvent,
     IAIStrategy,
     IDecisionContext,
     IPlacementContext,
@@ -106,6 +117,9 @@ export type {
     IEnumeratedCandidate,
     IEnumerateOptions,
     IShotCandidateFeatures,
+    IV09DecisionTelemetryDetails,
+    IV09ModelArtifact,
+    IV09QualificationReceipt,
 } from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
